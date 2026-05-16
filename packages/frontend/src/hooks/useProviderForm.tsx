@@ -5,6 +5,7 @@ import type { QuotaCheckerInfo } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../contexts/ToastContext';
+import { t } from '../i18n';
 
 const KNOWN_APIS = [
   'chat',
@@ -281,7 +282,9 @@ export function useProviderForm() {
         setTimeout(poll, 1000);
       } catch (error) {
         if (!cancelled) {
-          setOauthError(error instanceof Error ? error.message : 'Failed to load OAuth session');
+          setOauthError(
+            error instanceof Error ? error.message : t('providers.form.oauthSessionFailed')
+          );
           setOauthBusy(false);
         }
       }
@@ -319,7 +322,7 @@ export function useProviderForm() {
       await loadData();
       setDeleteModalProvider(null);
     } catch (e) {
-      toast.error('Failed to delete provider: ' + e);
+      toast.error(t('providers.form.deleteFailed', { error: String(e) }));
     } finally {
       setDeleteModalLoading(false);
     }
@@ -327,7 +330,7 @@ export function useProviderForm() {
 
   const handleSave = async () => {
     if (!editingProvider.id) {
-      toast.error('Provider ID is required');
+      toast.error(t('providers.form.providerIdRequired'));
       return;
     }
     setIsSaving(true);
@@ -337,7 +340,7 @@ export function useProviderForm() {
         providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0].value };
       }
       if (isOAuthMode && !providerToSave.oauthAccount?.trim()) {
-        toast.error('OAuth account is required');
+        toast.error(t('providers.form.oauthAccountRequired'));
         return;
       }
       if (providerToSave.quotaChecker && !providerToSave.quotaChecker.type?.trim()) {
@@ -348,7 +351,7 @@ export function useProviderForm() {
       setIsModalOpen(false);
     } catch (e) {
       console.error('Save error', e);
-      toast.error('Failed to save provider: ' + e);
+      toast.error(t('providers.form.saveFailed', { error: String(e) }));
     } finally {
       setIsSaving(false);
     }
@@ -360,7 +363,7 @@ export function useProviderForm() {
       await api.saveProvider({ ...provider, enabled: newState }, provider.id);
     } catch (e) {
       console.error('Toggle error', e);
-      toast.error('Failed to update provider status: ' + e);
+      toast.error(t('providers.form.toggleFailed', { error: String(e) }));
       loadData();
     }
   };
@@ -379,7 +382,7 @@ export function useProviderForm() {
     else if (modelType === 'speech') testApiTypes = ['speech'];
     try {
       const results = await Promise.all(
-        testApiTypes.map((t) => api.testModel(providerId, modelId, t))
+        testApiTypes.map((apiKind) => api.testModel(providerId, modelId, apiKind))
       );
       const allSuccess = results.every((r) => r.success);
       const firstError = results.find((r) => !r.success);
@@ -392,7 +395,12 @@ export function useProviderForm() {
           result: allSuccess ? 'success' : 'error',
           message: allSuccess
             ? `Success (${avgDuration}ms avg, ${testApiTypes.length} API${testApiTypes.length > 1 ? 's' : ''})`
-            : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
+            : firstError
+              ? t('providers.form.testFailedVia', {
+                  apiType: firstError.apiType ?? 'unknown',
+                  error: firstError.error ?? t('providers.form.testFailed'),
+                })
+              : t('providers.form.testFailed'),
           showResult: true,
           showMessage: true,
         },
@@ -455,7 +463,7 @@ export function useProviderForm() {
     const providerId = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
     const accountId = editingProvider.oauthAccount?.trim();
     if (!accountId) {
-      setOauthError('OAuth account is required before starting login');
+      setOauthError(t('providers.form.oauthAccountBeforeLogin'));
       return;
     }
     setOauthBusy(true);
@@ -469,7 +477,9 @@ export function useProviderForm() {
       if (['awaiting_prompt', 'awaiting_manual_code', 'awaiting_auth'].includes(session.status))
         setOauthBusy(false);
     } catch (error) {
-      setOauthError(error instanceof Error ? error.message : 'Failed to start OAuth');
+      setOauthError(
+        error instanceof Error ? error.message : t('providers.form.oauthStartFailed')
+      );
       setOauthBusy(false);
     }
   };
@@ -483,7 +493,9 @@ export function useProviderForm() {
       setOauthSession(session);
       setOauthPromptValue('');
     } catch (error) {
-      setOauthError(error instanceof Error ? error.message : 'Failed to submit prompt');
+      setOauthError(
+        error instanceof Error ? error.message : t('providers.form.oauthPromptFailed')
+      );
     } finally {
       setOauthBusy(false);
     }
@@ -498,7 +510,7 @@ export function useProviderForm() {
       setOauthSession(session);
       setOauthManualCode('');
     } catch (error) {
-      setOauthError(error instanceof Error ? error.message : 'Failed to submit code');
+      setOauthError(error instanceof Error ? error.message : t('providers.form.oauthCodeFailed'));
     } finally {
       setOauthBusy(false);
     }
@@ -512,7 +524,9 @@ export function useProviderForm() {
       const session = await api.cancelOAuthSession(oauthSessionId);
       setOauthSession(session);
     } catch (error) {
-      setOauthError(error instanceof Error ? error.message : 'Failed to cancel session');
+      setOauthError(
+        error instanceof Error ? error.message : t('providers.form.oauthCancelFailed')
+      );
     } finally {
       setOauthBusy(false);
     }
@@ -691,7 +705,7 @@ export function useProviderForm() {
         const models = await api.getOAuthProviderModels(oauthProvider);
         const sortedModels = [...models].sort((a, b) => a.id.localeCompare(b.id));
         if (sortedModels.length === 0) {
-          setFetchError(`No models found for OAuth provider '${oauthProvider}'.`);
+          setFetchError(t('providers.form.fetchOAuthEmpty', { provider: oauthProvider }));
           setFetchedModels([]);
           setSelectedModelIds(new Set());
           return;
@@ -699,7 +713,7 @@ export function useProviderForm() {
         setFetchedModels(sortedModels);
         setSelectedModelIds(new Set());
       } catch (error) {
-        setFetchError(error instanceof Error ? error.message : 'Failed to fetch models');
+        setFetchError(error instanceof Error ? error.message : t('providers.form.fetchFailed'));
         setFetchedModels([]);
       } finally {
         setIsFetchingModels(false);
@@ -707,20 +721,21 @@ export function useProviderForm() {
       return;
     }
     if (!modelsUrl) {
-      setFetchError('Please enter a URL');
+      setFetchError(t('providers.form.fetchUrlRequired'));
       return;
     }
     setIsFetchingModels(true);
     setFetchError(null);
     try {
       const data = await api.fetchProviderModels(modelsUrl, editingProvider.apiKey);
-      if (!data.data || !Array.isArray(data.data)) throw new Error('Invalid response format');
+      if (!data.data || !Array.isArray(data.data))
+        throw new Error(t('providers.form.fetchInvalidFormat'));
       setFetchedModels(
         [...data.data].sort((a: FetchedModel, b: FetchedModel) => a.id.localeCompare(b.id))
       );
       setSelectedModelIds(new Set());
     } catch (error) {
-      setFetchError(error instanceof Error ? error.message : 'Failed to fetch models');
+      setFetchError(error instanceof Error ? error.message : t('providers.form.fetchFailed'));
       setFetchedModels([]);
     } finally {
       setIsFetchingModels(false);

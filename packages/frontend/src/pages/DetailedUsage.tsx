@@ -63,6 +63,7 @@
  * | `filterStatus`  | status string (e.g., "error")             | (none)      |
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -676,12 +677,14 @@ const aggregateByGroup = (records: UsageRecord[], groupBy: GroupBy): AggregatedP
  * @param data            - Aggregated time-series data points
  * @param chartType       - Which chart visualization to render
  * @param selectedMetrics - Array of metric keys currently toggled on
+ * @param metricLabel     - Resolver from metric key to localized label
  * @returns JSX element containing the Recharts ResponsiveContainer and chart
  */
 const renderTimeSeriesChart = (
   data: AggregatedPoint[],
   chartType: ChartType,
-  selectedMetrics: string[]
+  selectedMetrics: string[],
+  metricLabel: (key: string) => string
 ) => {
   // Select the appropriate Recharts container component based on chart type.
   // ComposedChart is special: it can contain both Bar and Line children.
@@ -732,13 +735,14 @@ const renderTimeSeriesChart = (
           const isBar = isComposed ? barMetrics.includes(metricKey) : chartType === 'bar';
           const yAxisId = metric.yAxisId || 'left';
 
+          const localizedLabel = metricLabel(metric.key);
           if (isComposed && isBar) {
             return (
               <Bar
                 key={metricKey}
                 yAxisId={yAxisId}
                 dataKey={metricKey}
-                name={metric.label}
+                name={localizedLabel}
                 fill={metric.color}
                 radius={[4, 4, 0, 0]}
               />
@@ -751,7 +755,7 @@ const renderTimeSeriesChart = (
                 yAxisId={yAxisId}
                 type="monotone"
                 dataKey={metricKey}
-                name={metric.label}
+                name={localizedLabel}
                 stroke={metric.color}
                 strokeWidth={2}
                 dot={false}
@@ -765,7 +769,7 @@ const renderTimeSeriesChart = (
                 yAxisId={yAxisId}
                 type="monotone"
                 dataKey={metricKey}
-                name={metric.label}
+                name={localizedLabel}
                 stroke={metric.color}
                 fill={metric.color}
                 fillOpacity={0.3}
@@ -779,7 +783,7 @@ const renderTimeSeriesChart = (
                 yAxisId={yAxisId}
                 type="monotone"
                 dataKey={metricKey}
-                name={metric.label}
+                name={localizedLabel}
                 stroke={metric.color}
                 strokeWidth={2}
                 dot={{ r: 4 }}
@@ -791,7 +795,7 @@ const renderTimeSeriesChart = (
               key={metricKey}
               yAxisId={yAxisId}
               dataKey={metricKey}
-              name={metric.label}
+              name={localizedLabel}
               fill={metric.color}
               radius={[4, 4, 0, 0]}
             />
@@ -869,6 +873,8 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   initialQueryString,
   onBack,
 }) => {
+  const { t } = useTranslation();
+  const metricLabel = useCallback((key: string) => t(`detailedUsage.metrics.${key}`), [t]);
   // ---------------------------------------------------------------------------
   // Query string resolution: prefer initialQueryString prop (embedded mode),
   // fall back to window.location.search (standalone mode).
@@ -1075,21 +1081,25 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
     const successRate = total > 0 ? ((total - errors) / total) * 100 : 0;
 
     return [
-      { label: 'Requests', value: formatNumber(total, 0), icon: Activity },
+      { label: t('detailedUsage.stats.requests'), value: formatNumber(total, 0), icon: Activity },
       {
-        label: 'Errors',
+        label: t('detailedUsage.stats.errors'),
         value: formatNumber(errors, 0),
         icon: AlertTriangle,
         color: errors > 0 ? 'text-red-500' : '',
       },
-      { label: 'Tokens', value: formatTokens(tokens), icon: Database },
-      { label: 'Cost', value: formatCost(cost, 4), icon: DollarSign },
-      { label: 'Avg Duration', value: formatMs(avgDuration), icon: Clock },
-      { label: 'Avg TTFT', value: formatMs(avgTtft), icon: Clock },
-      { label: 'Avg TPS', value: formatNumber(avgTps, 1), icon: TrendingUp },
-      { label: 'Success Rate', value: `${successRate.toFixed(1)}%`, icon: TrendingUp },
+      { label: t('detailedUsage.stats.tokens'), value: formatTokens(tokens), icon: Database },
+      { label: t('detailedUsage.stats.cost'), value: formatCost(cost, 4), icon: DollarSign },
+      { label: t('detailedUsage.stats.avgDuration'), value: formatMs(avgDuration), icon: Clock },
+      { label: t('detailedUsage.stats.avgTtft'), value: formatMs(avgTtft), icon: Clock },
+      { label: t('detailedUsage.stats.avgTps'), value: formatNumber(avgTps, 1), icon: TrendingUp },
+      {
+        label: t('detailedUsage.stats.successRate'),
+        value: `${successRate.toFixed(1)}%`,
+        icon: TrendingUp,
+      },
     ];
-  }, [records]);
+  }, [records, t]);
 
   /** Toggle a metric on or off in the chart. Removes it if already selected, adds it otherwise. */
   const toggleMetric = (key: string) =>
@@ -1117,8 +1127,8 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           - "Live Data" badge showing time since last auto-refresh
       ------------------------------------------------------------------- */}
       <PageHeader
-        title="Detailed Usage"
-        subtitle="Advanced analytics with customizable chart types"
+        title={t('detailedUsage.title')}
+        subtitle={t('detailedUsage.subtitle')}
         actions={
           <>
             {(onBack || !embedded) && (
@@ -1128,14 +1138,18 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                 leftIcon={<ArrowLeft size={16} />}
                 onClick={() => (onBack ? onBack() : (window.location.href = '/ui/live-metrics'))}
               >
-                {onBack ? 'Back to Live Card' : 'Return to Live Metrics'}
+                {onBack
+                  ? t('detailedUsage.backToLiveCard')
+                  : t('detailedUsage.returnToLiveMetrics')}
               </Button>
             )}
             <Badge
               status="connected"
-              secondaryText={`Last updated: ${formatTimeAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000))}`}
+              secondaryText={t('detailedUsage.lastUpdated', {
+                time: formatTimeAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 1000)),
+              })}
             >
-              Live Data
+              {t('detailedUsage.liveData')}
             </Badge>
           </>
         }
@@ -1174,11 +1188,13 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           5. Metric toggles: show/hide individual metrics on the chart
              -- Only visible when groupBy='time' (categorical views use pie)
       ------------------------------------------------------------------- */}
-      <Card className="mb-6" title="Chart Configuration">
+      <Card className="mb-6" title={t('detailedUsage.config.title')}>
         <div className="grid grid-cols-1 gap-4 lg:flex lg:flex-wrap">
           {/* --- Time Range Selector --- */}
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-text-muted uppercase">Time Range</span>
+            <span className="text-xs font-semibold text-text-muted uppercase">
+              {t('detailedUsage.config.timeRange')}
+            </span>
             <TimeRangeSelector
               value={timeRange}
               onChange={(range) => {
@@ -1195,21 +1211,18 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
 
           {/* --- Group By Selector --- */}
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-text-muted uppercase">Group By</span>
+            <span className="text-xs font-semibold text-text-muted uppercase">
+              {t('detailedUsage.config.groupBy')}
+            </span>
             <div className="flex flex-wrap gap-2">
-              {[
-                { k: 'time', l: 'Time' },
-                { k: 'provider', l: 'Provider' },
-                { k: 'model', l: 'Model' },
-                { k: 'status', l: 'Status' },
-              ].map((o) => (
+              {(['time', 'provider', 'model', 'status'] as const).map((k) => (
                 <Button
-                  key={o.k}
+                  key={k}
                   size="sm"
-                  variant={groupBy === o.k ? 'primary' : 'secondary'}
-                  onClick={() => setGroupBy(o.k as GroupBy)}
+                  variant={groupBy === k ? 'primary' : 'secondary'}
+                  onClick={() => setGroupBy(k as GroupBy)}
                 >
-                  {o.l}
+                  {t(`detailedUsage.groupBy.${k}`)}
                 </Button>
               ))}
             </div>
@@ -1217,24 +1230,28 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
 
           {/* --- Chart Type Picker --- */}
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-text-muted uppercase">Chart Type</span>
+            <span className="text-xs font-semibold text-text-muted uppercase">
+              {t('detailedUsage.config.chartType')}
+            </span>
             <div className="flex flex-wrap gap-2">
-              {[
-                { k: 'area', i: LineChartIcon, l: 'Area' },
-                { k: 'line', i: LineChartIcon, l: 'Line' },
-                { k: 'bar', i: BarChart3, l: 'Bar' },
-                { k: 'composed', i: BarChart3, l: 'Mixed' },
-                { k: 'pie', i: PieChartIcon, l: 'Pie' },
-              ].map((t) => (
+              {(
+                [
+                  { k: 'area', i: LineChartIcon },
+                  { k: 'line', i: LineChartIcon },
+                  { k: 'bar', i: BarChart3 },
+                  { k: 'composed', i: BarChart3 },
+                  { k: 'pie', i: PieChartIcon },
+                ] as const
+              ).map((opt) => (
                 <Button
-                  key={t.k}
+                  key={opt.k}
                   size="sm"
-                  variant={chartType === t.k ? 'primary' : 'secondary'}
-                  onClick={() => setChartType(t.k as ChartType)}
-                  disabled={groupBy !== 'time' && t.k !== 'pie'}
+                  variant={chartType === opt.k ? 'primary' : 'secondary'}
+                  onClick={() => setChartType(opt.k as ChartType)}
+                  disabled={groupBy !== 'time' && opt.k !== 'pie'}
                 >
-                  <t.i size={14} className="mr-1" />
-                  {t.l}
+                  <opt.i size={14} className="mr-1" />
+                  {t(`detailedUsage.chartTypes.${opt.k}`)}
                 </Button>
               ))}
             </div>
@@ -1242,7 +1259,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
 
           {/* --- View Mode Toggle (Chart vs List) --- */}
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-text-muted uppercase">View</span>
+            <span className="text-xs font-semibold text-text-muted uppercase">
+              {t('detailedUsage.config.view')}
+            </span>
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
@@ -1250,7 +1269,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                 onClick={() => setViewMode('chart')}
               >
                 <LineChartIcon size={14} className="mr-1" />
-                Chart
+                {t('detailedUsage.viewModes.chart')}
               </Button>
               <Button
                 size="sm"
@@ -1258,7 +1277,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                 onClick={() => setViewMode('list')}
               >
                 <List size={14} className="mr-1" />
-                List
+                {t('detailedUsage.viewModes.list')}
               </Button>
             </div>
           </div>
@@ -1268,7 +1287,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
               are rendered as separate series in the chart. */}
           {groupBy === 'time' && (
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold text-text-muted uppercase">Metrics</span>
+              <span className="text-xs font-semibold text-text-muted uppercase">
+                {t('detailedUsage.config.metrics')}
+              </span>
               <div className="flex gap-2 flex-wrap">
                 {METRICS.map((m) => (
                   <button
@@ -1276,7 +1297,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                     onClick={() => toggleMetric(m.key)}
                     className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${selectedMetrics.includes(m.key) ? 'bg-primary text-white' : 'bg-bg-hover text-text-secondary'}`}
                   >
-                    {m.label}
+                    {metricLabel(m.key)}
                   </button>
                 ))}
               </div>
@@ -1295,27 +1316,33 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       ------------------------------------------------------------------- */}
       {viewMode === 'chart' ? (
         <Card
-          title={`Usage by ${groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}`}
+          title={t('detailedUsage.chartCard.titleByGroup', {
+            group: t(`detailedUsage.groupBy.${groupBy}`),
+          })}
           extra={
             <Button size="sm" variant="secondary" onClick={loadData} isLoading={loading}>
-              Refresh
+              {t('detailedUsage.chartCard.refresh')}
             </Button>
           }
         >
           {aggregatedData.length === 0 ? (
             <div className="h-96 flex items-center justify-center text-text-secondary">
-              No data available
+              {t('detailedUsage.chartCard.noData')}
             </div>
           ) : chartType === 'pie' ? (
             renderPieChart(aggregatedData, selectedMetrics[0] || 'requests')
           ) : (
-            renderTimeSeriesChart(aggregatedData, chartType, selectedMetrics)
+            renderTimeSeriesChart(aggregatedData, chartType, selectedMetrics, metricLabel)
           )}
         </Card>
       ) : (
         <Card
-          title="Raw Request Log"
-          extra={<span className="text-xs text-text-secondary">{records.length} requests</span>}
+          title={t('detailedUsage.list.title')}
+          extra={
+            <span className="text-xs text-text-secondary">
+              {t('detailedUsage.list.count', { count: records.length })}
+            </span>
+          }
         >
           <div className="max-h-125 space-y-3 overflow-y-auto md:hidden">
             {records.slice(0, 100).map((r, i) => (
@@ -1391,19 +1418,21 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-card">
                 <tr className="text-left border-b border-border-glass text-text-secondary">
-                  {[
-                    'Time',
-                    'Provider',
-                    'Model',
-                    'Status',
-                    'Tokens',
-                    'Cost',
-                    'Duration',
-                    'TTFT',
-                    'TPS',
-                  ].map((h) => (
+                  {(
+                    [
+                      'time',
+                      'provider',
+                      'model',
+                      'status',
+                      'tokens',
+                      'cost',
+                      'duration',
+                      'ttft',
+                      'tps',
+                    ] as const
+                  ).map((h) => (
                     <th key={h} className="py-2 pr-3">
-                      {h}
+                      {t(`detailedUsage.list.headers.${h}`)}
                     </th>
                   ))}
                 </tr>
@@ -1466,7 +1495,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           for precise numeric comparison across groups.
       ------------------------------------------------------------------- */}
       {groupBy !== 'time' && aggregatedData.length > 0 && (
-        <Card className="mt-6" title="Detailed Breakdown">
+        <Card className="mt-6" title={t('detailedUsage.breakdown.title')}>
           <div className="space-y-3 md:hidden">
             {aggregatedData.map((row, i) => (
               <article key={i} className="rounded-md border border-border-glass bg-bg-subtle p-3">
@@ -1476,24 +1505,26 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                      Requests
+                      {t('detailedUsage.breakdown.labels.requests')}
                     </div>
                     <div className="font-medium text-text">{formatNumber(row.requests, 0)}</div>
                   </div>
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                      Success
+                      {t('detailedUsage.breakdown.labels.success')}
                     </div>
                     <div className="font-medium text-green-500">{row.successRate.toFixed(1)}%</div>
                   </div>
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                      Tokens
+                      {t('detailedUsage.breakdown.labels.tokens')}
                     </div>
                     <div className="font-medium text-text">{formatTokens(row.tokens)}</div>
                   </div>
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                    <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
+                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                      {t('detailedUsage.breakdown.labels.cost')}
+                    </div>
                     <div className="font-medium text-text">{formatCost(row.cost, 6)}</div>
                   </div>
                 </div>
@@ -1505,21 +1536,21 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-border-glass text-text-secondary">
-                  <th className="py-3 pr-4">
-                    {groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
-                  </th>
-                  {[
-                    'Requests',
-                    'Errors',
-                    'Success %',
-                    'Tokens',
-                    'Cost',
-                    'Avg Duration',
-                    'Avg TTFT',
-                    'Avg TPS',
-                  ].map((h) => (
+                  <th className="py-3 pr-4">{t(`detailedUsage.groupBy.${groupBy}`)}</th>
+                  {(
+                    [
+                      'requests',
+                      'errors',
+                      'successPct',
+                      'tokens',
+                      'cost',
+                      'avgDuration',
+                      'avgTtft',
+                      'avgTps',
+                    ] as const
+                  ).map((h) => (
                     <th key={h} className="py-3 pr-4">
-                      {h}
+                      {t(`detailedUsage.breakdown.headers.${h}`)}
                     </th>
                   ))}
                 </tr>

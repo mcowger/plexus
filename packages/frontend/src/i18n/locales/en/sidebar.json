@@ -1,0 +1,46 @@
+{
+  "sections": {
+    "main": "Main",
+    "configuration": "Configuration",
+    "devTools": "Dev Tools"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "logs": "Logs",
+    "errors": "Errors",
+    "myKey": "My Key",
+    "providers": "Providers",
+    "models": "Models",
+    "keys": "Keys",
+    "quotas": "Quotas",
+    "mcp": "MCP",
+    "settings": "Settings",
+    "traces": "Traces",
+    "systemLogs": "System Logs"
+  },
+  "widgets": {
+    "balances": "Balances",
+    "quotas": "Quotas"
+  },
+  "expand": "Expand sidebar",
+  "collapse": "Collapse sidebar",
+  "closeNavigation": "Close navigation",
+  "signOut": "Sign out",
+  "user": {
+    "admin": "Admin",
+    "fullAccess": "full access",
+    "limited": "limited"
+  },
+  "version": {
+    "outdatedAria": "Outdated version. Latest is {{version}}",
+    "updateAvailable": "Update available: {{version}}"
+  },
+  "debug": {
+    "on": "ON",
+    "off": "OFF",
+    "enableTitle": "Enable Debug Mode?",
+    "disableTitle": "Disable Debug Mode?",
+    "enableBody": "Enabling debug mode will capture FULL raw request and response payloads, including personal data if present. This can consume significant storage.",
+    "disableBody": "Disabling debug mode will stop capturing full request/response payloads."
+  }
+}

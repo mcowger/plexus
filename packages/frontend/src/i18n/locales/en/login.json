@@ -1,0 +1,15 @@
+{
+  "title": "Sign in",
+  "description": "Enter your admin key for full access, or an API key secret for a scoped view of your key's activity.",
+  "label": "Admin key or API key secret",
+  "placeholder": "sk-admin-•••• or sk-•••••••••••••",
+  "showKey": "Show key",
+  "hideKey": "Hide key",
+  "submit": "Access Dashboard",
+  "encrypted": "End-to-end encrypted",
+  "footer": "© 2026 Plexus · Unified LLM Gateway",
+  "errors": {
+    "empty": "Please enter a key",
+    "invalid": "Invalid key. Verify the prefix and try again."
+  }
+}

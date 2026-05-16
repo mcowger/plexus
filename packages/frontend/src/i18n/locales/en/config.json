@@ -1,0 +1,162 @@
+{
+  "title": "Configuration",
+  "subtitle": "View current system configuration (read-only). Use the Providers, Models, and Keys pages to make changes.",
+  "editorFailedToLoad": "Editor failed to load",
+  "export": {
+    "cardTitle": "Configuration Export",
+    "refresh": "Refresh",
+    "restart": "Restart",
+    "exportJson": "Export JSON"
+  },
+  "validation": {
+    "required": "Required",
+    "invalidNumber": "Invalid number",
+    "mustBeNumber": "Must be a number",
+    "mustBeInteger": "Must be an integer",
+    "mustBeIntegerSeconds": "Must be an integer (seconds)",
+    "mustBeAtLeast": "Must be at least {{min}}",
+    "mustBeAtMost": "Must be at most {{max}}",
+    "mustBeAtLeastOneSecond": "Must be at least 1 second",
+    "mustBeBetween": "Must be between {{min}} and {{max}}"
+  },
+  "failover": {
+    "title": "Failover Settings",
+    "enable": "Enable Failover",
+    "enableDesc": "When enabled, failed requests are automatically retried on the next available provider.",
+    "toggleAriaLabel": "Toggle failover on/off",
+    "statusCodes": "Retryable Status Codes",
+    "statusCodesDesc": "HTTP status codes that trigger a retry on the next provider. Enter comma-separated values (100–599). Defaults to all non-2xx codes except 413 and 422 when empty.",
+    "statusCodesPlaceholder": "e.g. 429, 500, 502, 503",
+    "errors": "Retryable Network Errors",
+    "errorsDesc": "Network error codes that trigger a retry on the next provider. Enter comma-separated values. Defaults to ECONNREFUSED, ETIMEDOUT, ENOTFOUND when empty.",
+    "errorsPlaceholder": "e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND",
+    "toast": {
+      "loadFailed": "Failed to load failover settings",
+      "saved": "Failover settings saved",
+      "saveFailed": "Failed to save failover settings"
+    }
+  },
+  "cooldown": {
+    "title": "Cooldown Settings",
+    "exponentialBackoff": "Exponential Backoff",
+    "exponentialBackoffDesc": "When a provider fails, it is placed on cooldown using exponential backoff: <1>C(n) = min(C_max, C₀ × 2ⁿ)</1> where n is the consecutive failure count.",
+    "initial": "Initial Cooldown (minutes)",
+    "initialDesc": "C₀ — the cooldown duration after the first failure. Subsequent failures double the duration until the maximum is reached. Fractional values are supported (e.g. 0.1 = 6 seconds).",
+    "max": "Maximum Cooldown (minutes)",
+    "maxDesc": "C_max — the upper limit for any cooldown duration, regardless of how many consecutive failures have occurred. Fractional values are supported (e.g. 0.1 = 6 seconds).",
+    "toast": {
+      "loadFailed": "Failed to load cooldown settings",
+      "saved": "Cooldown settings saved",
+      "saveFailed": "Failed to save cooldown settings"
+    }
+  },
+  "timeout": {
+    "title": "Timeout Settings",
+    "heading": "Upstream Request Timeout",
+    "headingDesc": "The maximum time Plexus waits for an upstream provider to respond before aborting the request. Can be overridden per-provider in the provider's advanced settings.",
+    "default": "Default Timeout (seconds)",
+    "defaultDesc": "The global default for all upstream requests. Must be between 1 and 3600 seconds. When a provider-specific timeout is set, it overrides this value.",
+    "toast": {
+      "loadFailed": "Failed to load timeout settings",
+      "saved": "Timeout settings saved",
+      "saveFailed": "Failed to save timeout settings"
+    }
+  },
+  "stall": {
+    "title": "Stall Detection",
+    "heading": "Stream Stall Detection",
+    "headingDesc": "Detect when an upstream provider is taking too long to start responding (TTFB stall) or is producing data too slowly (throughput stall). When a stall is detected, the request is aborted so the client can retry with a different provider. Leave TTFB seconds and min bytes/sec empty to disable each dimension independently.",
+    "status": "Status: {{state}}",
+    "statusEnabled": "Enabled",
+    "statusDisabled": "Disabled (no thresholds set)",
+    "ttfbSeconds": "TTFB Timeout (seconds)",
+    "ttfbSecondsDesc": "Time allowed for the provider to start producing meaningful output. Leave empty to disable TTFB stall detection. Must be between 5 and 120 seconds.",
+    "disabledPlaceholder": "Disabled",
+    "ttfbBytes": "TTFB Byte Threshold",
+    "ttfbBytesDesc": "Byte threshold that confirms the provider is actually producing content. 100 bytes is roughly half a token. Must be between 50 and 10,000.",
+    "minBps": "Minimum Bytes Per Second",
+    "minBpsDesc": "Throughput floor after the grace period. Sliding window check. Leave empty to disable throughput stall detection. 500 B/s is approximately 2-3 tokens/sec. Must be between 50 and 5,000.",
+    "windowSeconds": "Sliding Window (seconds)",
+    "windowSecondsDesc": "Width of the sliding window for throughput calculation. Longer = more stable, shorter = more responsive. Must be between 3 and 30 seconds.",
+    "graceSeconds": "Grace Period (seconds)",
+    "graceSecondsDesc": "Time after TTFB threshold is met before throughput enforcement begins. Allows for natural thinking/reasoning pauses. Must be between 0 and 120 seconds.",
+    "toast": {
+      "loadFailed": "Failed to load stall detection settings",
+      "saved": "Stall detection settings saved",
+      "saveFailed": "Failed to save stall detection settings"
+    }
+  },
+  "exploration": {
+    "title": "Exploration Settings",
+    "heading": "Provider Exploration",
+    "headingDesc": "Exploration keeps performance, latency, and end-to-end TPS data fresh across targets. By default, inline exploration occasionally diverts a small fraction of live requests to non-optimal providers. Enable background exploration to suppress inline exploration and instead fire representative probe requests in the background — live traffic is never redirected. Both modes apply to the performance, latency, and e2e_performance selectors.",
+    "background": "Background Exploration",
+    "backgroundDesc": "When enabled, inline exploration is suppressed and Plexus fires small representative probe requests in the background. Probes appear in usage records with apiKey=\"probe\" and attribution=\"background\".",
+    "backgroundAriaLabel": "Toggle background exploration on/off",
+    "staleness": "Staleness Threshold (seconds)",
+    "stalenessDesc": "A target is re-probed only after this many seconds have elapsed since its last probe. Default: 600 (10 minutes). Minimum: 1.",
+    "concurrency": "Worker Concurrency",
+    "concurrencyDesc": "Maximum number of background probes Plexus runs in parallel. Per-target probes are deduplicated separately. Default: 2. Range: 1–16.",
+    "performanceRate": "Performance Exploration Rate",
+    "performanceRateDesc": "The probability of exploring a non-optimal provider when using the performance selector. Default: 0.05 (5%).",
+    "latencyRate": "Latency Exploration Rate",
+    "latencyRateDesc": "The probability of exploring a non-optimal provider when using the latency selector. Defaults to the Performance Exploration Rate if not explicitly set.",
+    "e2eRate": "E2E Performance Exploration Rate",
+    "e2eRateDesc": "The probability of exploring any provider when using the e2e_performance selector. Unlike the performance selector, exploration includes all candidates (including the current best) to keep end-to-end metrics fresh. Defaults to the Performance Exploration Rate if not explicitly set.",
+    "toast": {
+      "ratesLoadFailed": "Failed to load exploration rate settings",
+      "backgroundLoadFailed": "Failed to load background exploration settings",
+      "saved": "Exploration settings saved",
+      "saveFailed": "Failed to save exploration settings"
+    }
+  },
+  "backup": {
+    "title": "Backup & Restore",
+    "fullBackup": "Full Backup",
+    "configBackup": "Config Backup",
+    "intro": "Back up your database or restore from a previously exported backup file.",
+    "sensitiveTitle": "Backup files contain sensitive data",
+    "sensitiveBody": "This includes API keys and OAuth tokens in plaintext. Store backup files securely.",
+    "configBackupDesc": "Providers, models, keys, quotas, and settings only. Fast and small.",
+    "fullBackupDesc": "Config plus all usage logs, debug data, and errors. May take a moment for large databases.",
+    "restoreFromFile": "Restore from File…",
+    "restorePrompt": {
+      "title": "Restore Database?",
+      "message": "This will **replace all existing data** with the contents of the backup file. This action cannot be undone. Are you sure?",
+      "confirmLabel": "Restore"
+    },
+    "toast": {
+      "configBackupDownloaded": "Config backup downloaded",
+      "configBackupFailed": "Backup failed",
+      "fullBackupDownloaded": "Full backup downloaded",
+      "fullBackupFailed": "Full backup failed",
+      "restoreComplete": "Restore complete",
+      "restoreFailed": "Restore failed"
+    }
+  },
+  "cardLayout": {
+    "title": "Card Layout",
+    "export": "Export",
+    "import": "Import",
+    "intro": "Import or export your Live Metrics card layout configuration.",
+    "currentOrder": "Current Card Order",
+    "defaultLayout": "Default layout — no customizations saved.",
+    "toast": {
+      "imported": "Card layout imported",
+      "invalidIds": "Invalid card layout: contains unknown card IDs",
+      "invalidFormat": "Invalid card layout format",
+      "invalidJson": "Failed to import: Invalid JSON file"
+    }
+  },
+  "restart": {
+    "title": "Restart Plexus?",
+    "message": "This will briefly interrupt all ongoing requests. Are you sure you want to continue?",
+    "confirmLabel": "Restart",
+    "toast": {
+      "failed": "Restart failed"
+    }
+  },
+  "configToast": {
+    "loadFailed": "Failed to load config"
+  }
+}

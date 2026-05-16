@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 export interface PoeQuotaConfigProps {
   options: Record<string, unknown>;
@@ -7,15 +8,17 @@ export interface PoeQuotaConfigProps {
 }
 
 export const PoeQuotaConfig: React.FC<PoeQuotaConfigProps> = ({ options, onChange }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-label={t('checkerConfigs.poe.formAriaLabel')}>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}

@@ -1,0 +1,46 @@
+{
+  "sections": {
+    "main": "主菜单",
+    "configuration": "配置",
+    "devTools": "开发工具"
+  },
+  "nav": {
+    "dashboard": "仪表盘",
+    "logs": "请求日志",
+    "errors": "错误日志",
+    "myKey": "我的密钥",
+    "providers": "服务商",
+    "models": "模型",
+    "keys": "密钥",
+    "quotas": "配额",
+    "mcp": "MCP",
+    "settings": "系统设置",
+    "traces": "调用追踪",
+    "systemLogs": "系统日志"
+  },
+  "widgets": {
+    "balances": "余额",
+    "quotas": "配额"
+  },
+  "expand": "展开侧边栏",
+  "collapse": "收起侧边栏",
+  "closeNavigation": "关闭导航",
+  "signOut": "退出登录",
+  "user": {
+    "admin": "管理员",
+    "fullAccess": "完全权限",
+    "limited": "受限权限"
+  },
+  "version": {
+    "outdatedAria": "版本已过期，最新版本为 {{version}}",
+    "updateAvailable": "有可用更新：{{version}}"
+  },
+  "debug": {
+    "on": "开",
+    "off": "关",
+    "enableTitle": "启用调试模式？",
+    "disableTitle": "关闭调试模式？",
+    "enableBody": "启用调试模式将捕获完整的原始请求和响应负载，包括其中可能存在的个人数据。这可能占用大量存储空间。",
+    "disableBody": "关闭调试模式将停止捕获完整的请求/响应负载。"
+  }
+}

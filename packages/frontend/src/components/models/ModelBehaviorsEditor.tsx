@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Trans } from 'react-i18next';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
 import type { Alias, AliasBehavior } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface Props {
   editingAlias: Alias;
@@ -11,17 +13,18 @@ interface Props {
 }
 
 export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
+  const { t } = useT('models.behaviorsEditor');
   const [isOpen, setIsOpen] = useState(false);
 
-  const getBehavior = (type: AliasBehavior['type']): boolean => {
-    return (editingAlias.advanced ?? []).some((b) => b.type === type && b.enabled !== false);
+  const getBehavior = (behaviorType: AliasBehavior['type']): boolean => {
+    return (editingAlias.advanced ?? []).some((b) => b.type === behaviorType && b.enabled !== false);
   };
 
-  const setBehavior = (type: AliasBehavior['type'], enabled: boolean) => {
+  const setBehavior = (behaviorType: AliasBehavior['type'], enabled: boolean) => {
     const current = editingAlias.advanced ?? [];
-    const without = current.filter((b) => b.type !== type);
+    const without = current.filter((b) => b.type !== behaviorType);
     const next: AliasBehavior[] = enabled
-      ? [...without, { type, enabled: true } as AliasBehavior]
+      ? [...without, { type: behaviorType, enabled: true } as AliasBehavior]
       : without;
     setEditingAlias({ ...editingAlias, advanced: next });
   };
@@ -45,6 +48,8 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
     setEditingAlias({ ...editingAlias, aliases: newAliases });
   };
 
+  const codeClass = 'text-primary';
+
   return (
     <div className="border border-border-glass rounded-sm overflow-hidden">
       <button
@@ -52,7 +57,7 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
         onClick={() => setIsOpen((o) => !o)}
         className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
       >
-        <span className="font-body text-[13px] font-medium text-text-secondary">Advanced</span>
+        <span className="font-body text-[13px] font-medium text-text-secondary">{t('sectionTitle')}</span>
         {isOpen ? (
           <ChevronDown size={14} className="text-text-muted" />
         ) : (
@@ -71,16 +76,20 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
               className="font-body text-[13px] font-medium text-text-secondary"
               style={{ display: 'block', marginBottom: '6px' }}
             >
-              Behaviors
+              {t('behaviorsLabel')}
             </label>
             <div className="flex items-center justify-between py-1">
               <div>
-                <span className="font-body text-[13px] text-text">Strip Adaptive Thinking</span>
+                <span className="font-body text-[13px] text-text">{t('stripAdaptiveTitle')}</span>
                 <p className="font-body text-[11px] text-text-muted mt-0.5">
-                  On the <code className="text-primary">/v1/messages</code> path, remove{' '}
-                  <code className="text-primary">thinking</code> when set to{' '}
-                  <code className="text-primary">adaptive</code> so the provider uses its default
-                  behaviour.
+                  <Trans
+                    i18nKey="models.behaviorsEditor.stripAdaptiveHelp"
+                    components={{
+                      1: <code className={codeClass} />,
+                      2: <code className={codeClass} />,
+                      3: <code className={codeClass} />,
+                    }}
+                  />
                 </p>
               </div>
               <Switch
@@ -92,10 +101,9 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
             <div className="flex items-center justify-between py-1">
               <div>
-                <span className="font-body text-[13px] text-text">Vision Fallthrough</span>
+                <span className="font-body text-[13px] text-text">{t('visionFallthroughTitle')}</span>
                 <p className="font-body text-[11px] text-text-muted mt-0.5">
-                  If the request contains images and the target model is text-only, use the
-                  descriptor model to convert images to text.
+                  {t('visionFallthroughHelp')}
                 </p>
               </div>
               <Switch
@@ -107,12 +115,9 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
             <div className="flex items-center justify-between py-1">
               <div>
-                <span className="font-body text-[13px] text-text">Enforce Limits</span>
+                <span className="font-body text-[13px] text-text">{t('enforceLimitsTitle')}</span>
                 <p className="font-body text-[11px] text-text-muted mt-0.5">
-                  Reject oversized prompts locally (400 context_length_exceeded) before dispatch.
-                  Uses a fast heuristic estimator with a 10% safety margin, and reserves the smaller
-                  of max_tokens and the model&apos;s max completion for the response. Requires a
-                  known context_length in metadata (override or catalog).
+                  {t('enforceLimitsHelp')}
                 </p>
                 {editingAlias.enforce_limits &&
                   !editingAlias.metadata?.overrides?.context_length &&
@@ -122,8 +127,7 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                       style={{ color: 'var(--color-warning)' }}
                     >
                       <AlertTriangle size={12} />
-                      No context_length found in metadata — this toggle will have no effect until a
-                      metadata source with a known context_length is configured.
+                      {t('enforceLimitsWarning')}
                     </p>
                   )}
               </div>
@@ -136,11 +140,9 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
             <div className="flex items-center justify-between py-1">
               <div>
-                <span className="font-body text-[13px] text-text">Sticky Session</span>
+                <span className="font-body text-[13px] text-text">{t('stickySessionTitle')}</span>
                 <p className="font-body text-[11px] text-text-muted mt-0.5">
-                  For multi-turn conversations, prefer the same provider/model used on the previous
-                  turn (when still healthy) for better prompt-cache hit rates and consistent model
-                  behaviour. Session continuity is tracked in memory only.
+                  {t('stickySessionHelp')}
                 </p>
               </div>
               <Switch
@@ -160,7 +162,7 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                 className="font-body text-[13px] font-medium text-text-secondary"
                 style={{ marginBottom: 0 }}
               >
-                Additional Aliases
+                {t('additionalAliases')}
               </label>
               <Button
                 size="sm"
@@ -168,24 +170,22 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                 onClick={addAlias}
                 leftIcon={<Plus size={14} />}
               >
-                Add Alias
+                {t('addAlias')}
               </Button>
             </div>
 
             {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
-              <div className="text-text-muted italic text-center text-sm py-2">
-                No additional aliases
-              </div>
+              <div className="text-text-muted italic text-center text-sm py-2">{t('noAdditionalAliases')}</div>
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {editingAlias.aliases?.map((alias, idx) => (
+              {editingAlias.aliases?.map((aliasRow, idx) => (
                 <div key={idx} className="flex gap-2">
                   <div className="min-w-0 flex-1">
                     <Input
-                      value={alias}
+                      value={aliasRow}
                       onChange={(e) => updateAlias(idx, e.target.value)}
-                      placeholder="e.g. gpt4"
+                      placeholder={t('aliasPlaceholder')}
                     />
                   </div>
                   <Button

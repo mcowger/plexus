@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Eye, Loader2, Save } from 'lucide-react';
 import { api, Alias } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface Props {
   aliases: Alias[];
 }
 
 export function VisionFallthroughSelector({ aliases }: Props) {
+  const { t } = useT('models.visionSelector');
   const [globalDescriptorModel, setGlobalDescriptorModel] = useState('');
   const [isSavingDescriptor, setIsSavingDescriptor] = useState(false);
 
@@ -42,13 +44,13 @@ export function VisionFallthroughSelector({ aliases }: Props) {
   return (
     <span className="inline-flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-slate-900/60 px-3 py-1.5 sm:w-auto">
       <Eye size={14} className="text-text-secondary" />
-      <span className="text-xs font-medium text-text-secondary">Vision Fall Through:</span>
+      <span className="text-xs font-medium text-text-secondary">{t('label')}</span>
       <select
         className="min-w-0 flex-1 cursor-pointer border-none bg-transparent text-xs text-text outline-none focus:ring-0 sm:max-w-[140px]"
         value={globalDescriptorModel}
         onChange={(e) => setGlobalDescriptorModel(e.target.value)}
       >
-        <option value="">(None)</option>
+        <option value="">{t('noneOption')}</option>
         {sortedAliases.map((a) => (
           <option key={a.id} value={a.id}>
             {a.id}
@@ -59,7 +61,7 @@ export function VisionFallthroughSelector({ aliases }: Props) {
         onClick={handleSaveDescriptor}
         disabled={isSavingDescriptor}
         className="ml-1 text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
-        title="Save descriptor model"
+        title={t('saveTitle')}
         type="button"
       >
         {isSavingDescriptor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

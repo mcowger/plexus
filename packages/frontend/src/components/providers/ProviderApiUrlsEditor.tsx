@@ -3,6 +3,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import type { Provider } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 const KNOWN_APIS = [
   'chat',
@@ -41,11 +42,12 @@ export function ProviderApiUrlsEditor({
   isApiBaseUrlsOpen,
   setIsApiBaseUrlsOpen,
 }: Props) {
+  const { t } = useT('providers.apiUrls');
   return (
     <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
       <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Connection Type
+          {t('connectionType')}
         </label>
         <select
           className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
@@ -72,12 +74,12 @@ export function ProviderApiUrlsEditor({
             }
           }}
         >
-          <option value="url">Custom API URL</option>
-          <option value="oauth">OAuth (pi-ai)</option>
+          <option value="url">{t('customApiUrl')}</option>
+          <option value="oauth">{t('oauthPiAi')}</option>
         </select>
       </div>
       <label className="font-body text-[13px] font-medium text-text-secondary">
-        Supported APIs & Base URLs
+        {t('supportedApis')}
       </label>
       <div
         style={{
@@ -87,15 +89,13 @@ export function ProviderApiUrlsEditor({
           lineHeight: '1.5',
         }}
       >
-        <span style={{ fontStyle: 'italic' }}>API types determine the protocol:</span>
+        <span style={{ fontStyle: 'italic' }}>{t('protocolHint')}</span>
         <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
           <li>
-            <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints, including
-            Ollama&apos;s <code className="text-primary">/v1</code> API
+            <span style={{ fontWeight: 600 }}>chat</span> — {t('chatBullet')}
           </li>
           <li>
-            <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the root URL
-            (e.g. <code className="text-primary">http://localhost:11434</code>)
+            <span style={{ fontWeight: 600 }}>ollama</span> — {t('ollamaBullet')}
           </li>
         </ul>
       </div>
@@ -112,7 +112,7 @@ export function ProviderApiUrlsEditor({
         >
           <div className="flex flex-col gap-1">
             <label className="font-body text-[13px] font-medium text-text-secondary">
-              OAuth Provider
+              {t('oauthProvider')}
             </label>
             <select
               className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
@@ -129,12 +129,12 @@ export function ProviderApiUrlsEditor({
             </select>
           </div>
           <Input
-            label="OAuth Account"
+            label={t('oauthAccount')}
             value={editingProvider.oauthAccount || ''}
             onChange={(e) =>
               setEditingProvider({ ...editingProvider, oauthAccount: e.target.value })
             }
-            placeholder="e.g. work, personal, team-a"
+            placeholder={t('oauthAccountPlaceholder')}
           />
         </div>
       ) : (
@@ -148,7 +148,7 @@ export function ProviderApiUrlsEditor({
               className="font-body text-[13px] font-medium text-text-secondary"
               style={{ marginBottom: 0, flex: 1 }}
             >
-              Base URL Entries
+              {t('baseUrlEntries')}
             </label>
             <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
               {Object.keys(getApiBaseUrlMap()).length}
@@ -178,7 +178,7 @@ export function ProviderApiUrlsEditor({
             >
               {Object.entries(getApiBaseUrlMap()).length === 0 && (
                 <div className="font-body text-[11px] text-text-secondary italic">
-                  No base URLs configured yet.
+                  {t('noBaseUrls')}
                 </div>
               )}
               {Object.entries(getApiBaseUrlMap()).map(([apiType, url]) => {
@@ -209,18 +209,16 @@ export function ProviderApiUrlsEditor({
                           )
                         }
                       >
-                        {KNOWN_APIS.map((t) => (
-                          <option key={t} value={t} className="bg-bg-surface text-text">
-                            {t}
+                        {KNOWN_APIS.map((apiOpt) => (
+                          <option key={apiOpt} value={apiOpt} className="bg-bg-surface text-text">
+                            {apiOpt}
                           </option>
                         ))}
                       </select>
                       <input
                         className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                         placeholder={
-                          apiType === 'ollama'
-                            ? 'http://localhost:11434'
-                            : 'https://api.example.com/v1/...'
+                          apiType === 'ollama' ? t('ollamaPlaceholder') : t('defaultUrlPlaceholder')
                         }
                         value={typeof url === 'string' ? url : ''}
                         onChange={(e) => updateApiBaseUrlEntry(apiType, apiType, e.target.value)}
@@ -228,20 +226,13 @@ export function ProviderApiUrlsEditor({
                       {showOllamaV1Warning && (
                         <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
                           <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
-                          <span className="text-[11px] text-warning">
-                            <span style={{ fontWeight: 600 }}>native ollama</span> type expects root
-                            URL. URLs with <code>/v1</code> are OpenAI-compatible — use{' '}
-                            <span style={{ fontWeight: 600 }}>chat</span> type.
-                          </span>
+                          <span className="text-[11px] text-warning">{t('warnings.ollamaV1Prefix')}</span>
                         </div>
                       )}
                       {showChatOllamaWarning && (
                         <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
                           <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
-                          <span className="text-[11px] text-warning">
-                            This URL contains <code>/api/</code> paths typical of native Ollama. Use{' '}
-                            <span style={{ fontWeight: 600 }}>ollama</span> type if native.
-                          </span>
+                          <span className="text-[11px] text-warning">{t('warnings.chatOllamaPrefix')}</span>
                         </div>
                       )}
                     </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { useT } from '../../i18n';
 
 interface Props {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface Props {
   title: string;
   message: React.ReactNode;
   confirmLabel?: string;
+  variant?: 'single' | 'all';
   onConfirm: () => Promise<void> | void;
   isLoading: boolean;
 }
@@ -18,10 +20,17 @@ export function ConfirmDeleteModal({
   onClose,
   title,
   message,
-  confirmLabel = 'Delete',
+  confirmLabel,
+  variant = 'single',
   onConfirm,
   isLoading,
 }: Props) {
+  const { t: tc } = useT('common');
+  const { t } = useT('models.confirmDelete');
+
+  const confirmActionLabel = confirmLabel ?? tc('delete');
+  const promptText = variant === 'all' ? t('promptAll') : t('promptSingle');
+
   return (
     <Modal
       isOpen={isOpen}
@@ -31,10 +40,10 @@ export function ConfirmDeleteModal({
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <Button variant="ghost" onClick={onClose} disabled={isLoading}>
-            Cancel
+            {tc('cancel')}
           </Button>
           <Button onClick={onConfirm} isLoading={isLoading} variant="danger">
-            {confirmLabel}
+            {confirmActionLabel}
           </Button>
         </div>
       }
@@ -64,9 +73,7 @@ export function ConfirmDeleteModal({
         </div>
         <div>
           <p className="text-text" style={{ marginBottom: '8px', fontWeight: 500 }}>
-            {title === 'Delete Model Alias'
-              ? 'Are you sure you want to delete this alias?'
-              : 'Are you sure you want to delete all configured models?'}
+            {promptText}
           </p>
           <p className="text-text-secondary" style={{ fontSize: '14px' }}>
             {message}

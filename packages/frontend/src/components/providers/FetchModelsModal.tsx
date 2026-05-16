@@ -4,6 +4,7 @@ import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import { Download } from 'lucide-react';
 import type { FetchedModel } from '../../hooks/useProviderForm';
+import { useT } from '../../i18n/useT';
 
 interface Props {
   isOpen: boolean;
@@ -34,19 +35,23 @@ export function FetchModelsModal({
   onToggleSelection,
   onAddSelected,
 }: Props) {
+  const { t } = useT('providers.fetchModels');
+  const { t: tc } = useT('common');
+  const n = selectedModelIds.size;
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Fetch Models from Provider"
+      title={t('title')}
       size="md"
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </Button>
-          <Button onClick={onAddSelected} disabled={selectedModelIds.size === 0}>
-            Add {selectedModelIds.size} Model{selectedModelIds.size !== 1 ? 's' : ''}
+          <Button onClick={onAddSelected} disabled={n === 0}>
+            {t('addModels', { count: n })}
           </Button>
         </div>
       }
@@ -55,14 +60,10 @@ export function FetchModelsModal({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
             <Input
-              label="Models Endpoint URL"
+              label={t('endpointLabel')}
               value={modelsUrl}
               onChange={(e) => setModelsUrl(e.target.value)}
-              placeholder={
-                isOAuthMode
-                  ? 'OAuth providers use built-in model lists'
-                  : 'https://api.example.com/v1/models'
-              }
+              placeholder={isOAuthMode ? t('oauthPlaceholder') : t('urlPlaceholder')}
               disabled={isOAuthMode}
             />
           </div>
@@ -72,7 +73,7 @@ export function FetchModelsModal({
             leftIcon={<Download size={16} />}
             className="w-full sm:w-auto"
           >
-            Fetch
+            {t('fetch')}
           </Button>
         </div>
         {fetchError && (
@@ -93,7 +94,7 @@ export function FetchModelsModal({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label className="font-body text-[13px] font-medium text-text-secondary">
-                Available Models ({fetchedModels.length})
+                {t('availableModels', { count: fetchedModels.length })}
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <Button
@@ -101,14 +102,14 @@ export function FetchModelsModal({
                   variant="ghost"
                   onClick={() => fetchedModels.forEach((m) => onToggleSelection(m.id))}
                 >
-                  Select All
+                  {t('selectAll')}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => selectedModelIds.forEach((id) => onToggleSelection(id))}
                 >
-                  Clear
+                  {t('clear')}
                 </Button>
               </div>
             </div>
@@ -218,9 +219,7 @@ export function FetchModelsModal({
               fontStyle: 'italic',
             }}
           >
-            {isOAuthMode
-              ? 'Click Fetch to load known OAuth models'
-              : 'Enter a URL and click Fetch to load available models'}
+            {isOAuthMode ? t('emptyOAuth') : t('emptyUrl')}
           </div>
         )}
       </div>

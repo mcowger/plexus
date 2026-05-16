@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BarChart3, Gauge, TimerReset, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import { api, type ProviderPerformanceData } from '../../../lib/api';
@@ -29,6 +30,7 @@ const PerformanceBarChart = ({
   metric: ChartMetric;
   reverse?: boolean;
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -36,7 +38,10 @@ const PerformanceBarChart = ({
     ...row,
     label: row.target_model ? `${row.provider}/${row.target_model}` : row.provider,
   }));
-  const metricLabel = metric === 'avg_tokens_per_sec' ? 'Avg throughput' : 'Avg TTFT';
+  const metricLabel =
+    metric === 'avg_tokens_per_sec'
+      ? t('dashboard.performance.avgThroughput')
+      : t('dashboard.performance.avgTtft');
 
   useEffect(() => {
     const el = containerRef.current;
@@ -61,7 +66,7 @@ const PerformanceBarChart = ({
     <div ref={containerRef} className="h-full w-full min-w-0">
       {chartData.length === 0 ? (
         <div className="h-full w-full min-w-0 flex items-center justify-center text-sm text-text-secondary">
-          No performance data for this model yet.
+          {t('dashboard.performance.noPerformanceData')}
         </div>
       ) : size.width > 10 && size.height > 10 ? (
         <BarChart
@@ -100,7 +105,7 @@ const PerformanceBarChart = ({
               const numericValue = Number(value ?? 0);
               return [
                 metric === 'avg_tokens_per_sec'
-                  ? `${formatNumber(numericValue, 1)} tok/s`
+                  ? `${formatNumber(numericValue, 1)} ${t('dashboard.performance.tokPerSec')}`
                   : formatMs(numericValue),
                 metricLabel,
               ];
@@ -125,6 +130,7 @@ const PerformanceBarChart = ({
 };
 
 export const PerformanceTab = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const [rows, setRows] = useState<ProviderPerformanceData[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
@@ -141,9 +147,9 @@ export const PerformanceTab = () => {
   const clearPerformance = async () => {
     if (!selectedModel) return;
     const ok = await toast.confirm({
-      title: 'Clear performance data?',
-      message: `Are you sure you want to clear all performance data for "${selectedModel}"?`,
-      confirmLabel: 'Clear',
+      title: t('dashboard.performance.clearConfirm.title'),
+      message: t('dashboard.performance.clearConfirm.message', { model: selectedModel }),
+      confirmLabel: t('dashboard.performance.clearConfirm.confirmLabel'),
       variant: 'danger',
     });
     if (!ok) return;
@@ -195,13 +201,13 @@ export const PerformanceTab = () => {
   return (
     <div className="p-6 transition-all duration-300">
       <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Performance</h1>
-        <p className="text-[15px] text-text-secondary m-0">
-          Compare provider speed for a given model by throughput and time-to-first-token.
-        </p>
+        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">
+          {t('dashboard.performance.title')}
+        </h1>
+        <p className="text-[15px] text-text-secondary m-0">{t('dashboard.performance.subtitle')}</p>
       </div>
 
-      <Card className="mb-4" title="Filters & Summary">
+      <Card className="mb-4" title={t('dashboard.performance.filtersSummary')}>
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={selectedModel}
@@ -209,7 +215,7 @@ export const PerformanceTab = () => {
             className="bg-bg-glass text-text border border-border-glass rounded-md px-3 py-2 text-sm min-w-60"
           >
             {models.length === 0 ? (
-              <option value="">No models available</option>
+              <option value="">{t('dashboard.performance.noModelsAvailable')}</option>
             ) : (
               models.map((model) => (
                 <option key={model} value={model}>
@@ -220,7 +226,7 @@ export const PerformanceTab = () => {
           </select>
 
           <Button size="sm" variant="secondary" onClick={loadPerformance} isLoading={loading}>
-            Refresh
+            {t('dashboard.performance.refresh')}
           </Button>
 
           <Button
@@ -231,14 +237,16 @@ export const PerformanceTab = () => {
             disabled={!selectedModel || selectedRows.length === 0}
           >
             <Trash2 size={14} className="mr-1" />
-            Clear
+            {t('dashboard.performance.clear')}
           </Button>
 
           <div className="text-sm text-text-secondary">
-            Providers: <span className="text-text font-medium">{selectedRows.length}</span>
+            {t('dashboard.performance.providers')}:{' '}
+            <span className="text-text font-medium">{selectedRows.length}</span>
           </div>
           <div className="text-sm text-text-secondary">
-            Samples: <span className="text-text font-medium">{formatNumber(totalSamples, 0)}</span>
+            {t('dashboard.performance.samples')}:{' '}
+            <span className="text-text font-medium">{formatNumber(totalSamples, 0)}</span>
           </div>
         </div>
       </Card>
@@ -246,7 +254,7 @@ export const PerformanceTab = () => {
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         <Card
           className="min-w-0"
-          title="Fastest Providers (tok/s)"
+          title={t('dashboard.performance.cards.fastestProviders')}
           extra={<Gauge size={16} className="text-primary" />}
         >
           <div style={{ height: 280 }}>
@@ -261,7 +269,7 @@ export const PerformanceTab = () => {
                     {String(index + 1).padStart(2, '0')}. {label}
                   </span>
                   <span className="text-text font-medium">
-                    {formatNumber(row.avg_tokens_per_sec, 1)} tok/s
+                    {formatNumber(row.avg_tokens_per_sec, 1)} {t('dashboard.performance.tokPerSec')}
                   </span>
                 </div>
               );
@@ -271,7 +279,7 @@ export const PerformanceTab = () => {
 
         <Card
           className="min-w-0"
-          title="Fastest First Token (TTFT)"
+          title={t('dashboard.performance.cards.fastestFirstToken')}
           extra={<TimerReset size={16} className="text-primary" />}
         >
           <div style={{ height: 280 }}>
@@ -294,29 +302,31 @@ export const PerformanceTab = () => {
 
         <Card
           className="min-w-0"
-          title="Selected Model"
+          title={t('dashboard.performance.cards.selectedModel')}
           extra={<BarChart3 size={16} className="text-primary" />}
         >
           <div className="space-y-3 text-sm">
-            <div className="text-text-secondary">Model</div>
-            <div className="text-text font-medium break-all">{selectedModel || '—'}</div>
+            <div className="text-text-secondary">{t('dashboard.performance.model')}</div>
+            <div className="text-text font-medium break-all">
+              {selectedModel || t('dashboard.performance.dash')}
+            </div>
 
             <div className="pt-2 border-t border-border-glass text-text-secondary">
-              Top throughput provider
+              {t('dashboard.performance.topThroughputProvider')}
             </div>
             <div className="text-text font-medium">
               {fastestByTokens[0]
-                ? `${fastestByTokens[0].target_model ? `${fastestByTokens[0].provider}/${fastestByTokens[0].target_model}` : fastestByTokens[0].provider} · ${formatNumber(fastestByTokens[0].avg_tokens_per_sec, 1)} tok/s`
-                : '—'}
+                ? `${fastestByTokens[0].target_model ? `${fastestByTokens[0].provider}/${fastestByTokens[0].target_model}` : fastestByTokens[0].provider} · ${formatNumber(fastestByTokens[0].avg_tokens_per_sec, 1)} ${t('dashboard.performance.tokPerSec')}`
+                : t('dashboard.performance.dash')}
             </div>
 
             <div className="pt-2 border-t border-border-glass text-text-secondary">
-              Lowest TTFT provider
+              {t('dashboard.performance.lowestTtftProvider')}
             </div>
             <div className="text-text font-medium">
               {fastestByTtft[0]
                 ? `${fastestByTtft[0].target_model ? `${fastestByTtft[0].provider}/${fastestByTtft[0].target_model}` : fastestByTtft[0].provider} · ${formatMs(fastestByTtft[0].avg_ttft_ms)}`
-                : '—'}
+                : t('dashboard.performance.dash')}
             </div>
           </div>
         </Card>

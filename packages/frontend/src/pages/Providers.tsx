@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -18,16 +19,17 @@ import { DeleteProviderModal } from '../components/providers/DeleteProviderModal
 import { Plus } from 'lucide-react';
 
 export const Providers = () => {
+  const { t } = useTranslation();
   const f = useProviderForm();
 
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Providers"
-        subtitle="Upstream LLM providers routed by the gateway"
+        title={t('providers.title')}
+        subtitle={t('providers.subtitle')}
         actions={
           <Button leftIcon={<Plus size={14} />} onClick={f.handleAddNew} size="sm">
-            Add provider
+            {t('providers.addProvider')}
           </Button>
         }
       />
@@ -47,19 +49,23 @@ export const Providers = () => {
         <Modal
           isOpen={f.isModalOpen}
           onClose={() => f.setIsModalOpen(false)}
-          title={f.originalId ? `Edit Provider: ${f.originalId}` : 'Add Provider'}
+          title={
+            f.originalId
+              ? t('providers.modal.editTitle', { id: f.originalId })
+              : t('providers.modal.addTitle')
+          }
           size="lg"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="ghost" onClick={() => f.setIsModalOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={f.handleSave}
                 isLoading={f.isSaving}
                 disabled={!!f.quotaValidationError}
               >
-                Save Provider
+                {t('providers.modal.save')}
               </Button>
             </div>
           }
@@ -68,33 +74,33 @@ export const Providers = () => {
             {/* Basic fields */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
               <Input
-                label="Unique ID"
+                label={t('providers.modal.fields.uniqueId')}
                 value={f.editingProvider.id}
                 onChange={(e) => f.setEditingProvider({ ...f.editingProvider, id: e.target.value })}
-                placeholder="e.g. openai"
+                placeholder={t('providers.modal.fields.uniqueIdPlaceholder')}
                 disabled={!!f.originalId}
               />
               <Input
-                label="Display Name"
+                label={t('providers.modal.fields.displayName')}
                 value={f.editingProvider.name}
                 onChange={(e) =>
                   f.setEditingProvider({ ...f.editingProvider, name: e.target.value })
                 }
-                placeholder="e.g. OpenAI Production"
+                placeholder={t('providers.modal.fields.displayNamePlaceholder')}
               />
               <Input
-                label="API Key"
+                label={t('providers.modal.fields.apiKey')}
                 type="password"
                 value={f.editingProvider.apiKey}
                 onChange={(e) =>
                   f.setEditingProvider({ ...f.editingProvider, apiKey: e.target.value })
                 }
-                placeholder="sk-..."
+                placeholder={t('providers.modal.fields.apiKeyPlaceholder')}
                 disabled={f.isOAuthMode}
               />
               <div className="flex flex-col gap-2">
                 <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Enabled
+                  {t('providers.modal.fields.enabled')}
                 </label>
                 <div style={{ height: '38px', display: 'flex', alignItems: 'center' }}>
                   <Switch

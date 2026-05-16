@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
 import { Calendar, ChevronDown } from 'lucide-react';
 import {
@@ -20,11 +21,11 @@ interface TimeRangeSelectorProps {
   onCustomRangeChange?: (range: CustomDateRange | null) => void;
 }
 
-const PRESETS: { label: string; value: DateRangePreset }[] = [
-  { label: 'Today', value: 'today' },
-  { label: 'This Week', value: 'this-week' },
-  { label: 'This Month', value: 'this-month' },
-  { label: 'Last Month', value: 'last-month' },
+const PRESETS: { labelKey: string; value: DateRangePreset }[] = [
+  { labelKey: 'today', value: 'today' },
+  { labelKey: 'thisWeek', value: 'this-week' },
+  { labelKey: 'thisMonth', value: 'this-month' },
+  { labelKey: 'lastMonth', value: 'last-month' },
 ];
 
 export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
@@ -34,6 +35,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
   customRange,
   onCustomRangeChange,
 }) => {
+  const { t } = useTranslation();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showPresetDropdown, setShowPresetDropdown] = useState(false);
   const [startDate, setStartDate] = useState<string>('');
@@ -87,7 +89,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
 
     if (newStart && newEnd) {
       if (!isValidDateRange(newStart, newEnd)) {
-        setError('End date must be after start date and not in the future');
+        setError(t('dashboard.cards.timeRangeSelector.rangeError'));
         return;
       }
       setError(null);
@@ -128,14 +130,13 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                 variant={value === range ? 'primary' : 'secondary'}
                 onClick={handleCustomClick}
                 style={{
-                  textTransform: 'capitalize',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                 }}
               >
                 <Calendar size={14} />
-                Custom
+                {t('dashboard.cards.timeRangeSelector.custom')}
                 <ChevronDown
                   size={12}
                   style={{
@@ -179,7 +180,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                           justifyContent: 'space-between',
                         }}
                       >
-                        <span>Quick Select</span>
+                        <span>{t('dashboard.cards.timeRangeSelector.quickSelect')}</span>
                         <ChevronDown
                           size={14}
                           style={{
@@ -221,7 +222,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                               (e.currentTarget.style.backgroundColor = 'transparent')
                             }
                           >
-                            {preset.label}
+                            {t(`dashboard.cards.timeRangeSelector.presets.${preset.labelKey}`)}
                           </button>
                         ))}
                       </div>
@@ -238,7 +239,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                           marginBottom: '4px',
                         }}
                       >
-                        Start Date
+                        {t('dashboard.cards.timeRangeSelector.startDate')}
                       </label>
                       <input
                         type="datetime-local"
@@ -265,7 +266,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                           marginBottom: '4px',
                         }}
                       >
-                        End Date
+                        {t('dashboard.cards.timeRangeSelector.endDate')}
                       </label>
                       <input
                         type="datetime-local"
@@ -326,9 +327,8 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
               setShowCustomPicker(false);
               setShowPresetDropdown(false);
             }}
-            style={{ textTransform: 'capitalize' }}
           >
-            {range}
+            {t(`dashboard.cards.timeRangeSelector.ranges.${range}`)}
           </Button>
         );
       })}

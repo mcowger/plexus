@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 export interface CopilotQuotaConfigProps {
   options: Record<string, unknown>;
@@ -7,15 +8,17 @@ export interface CopilotQuotaConfigProps {
 }
 
 export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options, onChange }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string | number) => {
     onChange({ ...options, [key]: value });
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-label={t('checkerConfigs.copilot.formAriaLabel')}>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
@@ -25,7 +28,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          User-Agent (optional)
+          {t('checkerCommon.userAgentHeaderOptional')}
         </label>
         <Input
           value={(options.userAgent as string) ?? ''}
@@ -35,7 +38,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Editor-Version (optional)
+          {t('checkerCommon.editorVersionOptional')}
         </label>
         <Input
           value={(options.editorVersion as string) ?? ''}
@@ -45,7 +48,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          API Version (optional)
+          {t('checkerCommon.apiVersionOptional')}
         </label>
         <Input
           value={(options.apiVersion as string) ?? ''}
@@ -55,7 +58,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Timeout (ms) (optional)
+          {t('checkerCommon.timeoutMsOptional')}
         </label>
         <Input
           type="number"

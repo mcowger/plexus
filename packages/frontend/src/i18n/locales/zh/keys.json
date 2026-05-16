@@ -1,0 +1,151 @@
+{
+  "title": "访问控制",
+  "subtitle": "签发给下游消费方的 API 密钥",
+  "createKey": "创建密钥",
+  "addQuota": "添加配额",
+  "tabKeys": "API 密钥 ({{count}})",
+  "tabQuotas": "配额 ({{count}})",
+  "searchKeysPlaceholder": "搜索密钥...",
+  "searchQuotasPlaceholder": "搜索配额...",
+  "keysSection": {
+    "title": "活动密钥",
+    "empty": "未找到密钥",
+    "secret": "密钥值",
+    "quota": "配额",
+    "usage": "使用量",
+    "loadingQuotaStatus": "正在加载配额状态...",
+    "noQuotaAssigned": "未分配配额",
+    "loading": "加载中...",
+    "details": "详情",
+    "reset": "重置",
+    "copySecret": "复制密钥值",
+    "copySecretTitle": "复制密钥值",
+    "viewDetails": "查看详情",
+    "resetQuota": "重置配额",
+    "ariaEdit": "编辑 {{name}}",
+    "ariaDelete": "删除 {{name}}",
+    "table": {
+      "keyName": "密钥名称",
+      "secret": "密钥值",
+      "quota": "配额",
+      "status": "状态",
+      "actions": "操作"
+    }
+  },
+  "quotasSection": {
+    "title": "用户配额",
+    "emptyDefined": "尚未定义任何配额",
+    "emptySearch": "未找到配额",
+    "limit": "上限",
+    "keys": "密钥数",
+    "ariaEdit": "编辑 {{name}}",
+    "ariaDelete": "删除 {{name}}",
+    "keysCount_other": "{{count}} 个密钥",
+    "table": {
+      "name": "名称",
+      "type": "类型",
+      "limit": "上限",
+      "keysUsing": "使用密钥数",
+      "actions": "操作"
+    }
+  },
+  "deleteKey": {
+    "title": "删除密钥？",
+    "message": "确定要删除密钥 '{{name}}' 吗？此操作无法撤销。",
+    "confirmLabel": "删除",
+    "saveFailed": "保存密钥失败",
+    "deleteFailed": "删除密钥失败"
+  },
+  "deleteQuota": {
+    "title": "删除配额？",
+    "message": "确定要删除配额 '{{name}}' 吗？此操作无法撤销。",
+    "confirmLabel": "删除",
+    "saveFailed": "保存配额失败",
+    "deleteFailed": "删除配额失败",
+    "rollingNeedsDuration": "滚动窗口配额必须设置时长"
+  },
+  "resetQuotaConfirm": {
+    "title": "重置配额？",
+    "message": "重置密钥 '{{name}}' 的配额使用量？",
+    "confirmLabel": "重置",
+    "failed": "清除配额失败"
+  },
+  "keyModal": {
+    "titleEdit": "编辑密钥",
+    "titleAdd": "添加密钥",
+    "save": "保存密钥",
+    "keyNameLabel": "密钥名称（ID）",
+    "keyNamePlaceholder": "例如：production-app-1",
+    "keyNameHelpLocked": "密钥 ID 创建后不可更改。",
+    "keyNameHelpNew": "此密钥的唯一标识。",
+    "secretLabel": "密钥值（Secret）",
+    "secretPlaceholder": "sk-...",
+    "generateTitle": "生成新密钥值",
+    "secretHelp": "用于身份验证的密钥值。点击刷新可生成一个安全的随机密钥值。",
+    "commentLabel": "备注",
+    "commentPlaceholder": "可选描述...",
+    "excludedModelsLabel": "排除的模型别名",
+    "excludedModelsPlaceholder": "可选：选择要排除的模型别名...",
+    "excludedModelsHelp": "可选黑名单。如果设置，此密钥将无法使用这些模型别名。",
+    "allowedModelsLabel": "允许的模型别名",
+    "allowedModelsPlaceholder": "可选：选择模型别名...",
+    "allowedModelsHelp": "可选白名单。如果设置,此密钥只能使用这些已配置的模型别名。",
+    "excludedProvidersLabel": "排除的服务商",
+    "excludedProvidersPlaceholder": "可选：选择要排除的服务商...",
+    "excludedProvidersHelp": "可选黑名单。如果设置，路由将不会使用这些服务商 ID。",
+    "allowedProvidersLabel": "允许的服务商",
+    "allowedProvidersPlaceholder": "可选：选择服务商...",
+    "allowedProvidersHelp": "可选白名单。如果设置，路由将仅限于这些服务商 ID。",
+    "quotaAssignmentLabel": "分配配额",
+    "quotaNoneOption": "<无>",
+    "quotaAssignmentHelp": "可选：为此密钥分配一个配额。白名单/黑名单检查会在路由前及路由过程中执行。"
+  },
+  "quotaModal": {
+    "titleEdit": "编辑配额",
+    "titleAdd": "添加配额",
+    "save": "保存配额",
+    "nameLabel": "配额名称",
+    "namePlaceholder": "例如：daily-1000",
+    "nameHelpLocked": "配额名称创建后不可更改。",
+    "nameHelpNew": "此配额的唯一标识。请使用小写字母、数字和连字符。",
+    "typeLabel": "配额类型",
+    "typeOptions": {
+      "rolling": "滚动窗口",
+      "daily": "每日（UTC）",
+      "weekly": "每周（UTC）",
+      "monthly": "每月（UTC）"
+    },
+    "typeDescription": {
+      "rolling": "在一个滑动时间窗口内限制使用量",
+      "daily": "每天 UTC 零点重置",
+      "weekly": "每周一 UTC 零点重置",
+      "monthly": "每月 1 号 UTC 零点重置"
+    },
+    "durationLabel": "时长",
+    "durationPlaceholder": "例如：1h、30m、1d",
+    "durationHelp": "滚动窗口的时长（例如：1h、30m、2h30m、1d）",
+    "limitTypeLabel": "限制类型",
+    "limitTypeOptions": {
+      "requests": "请求数",
+      "tokens": "令牌数",
+      "cost": "费用（$）"
+    },
+    "limitLabel": "上限",
+    "limitPlaceholder": "1000",
+    "maxAllowed": "允许的最大{{type}}",
+    "maxAllowedType": {
+      "requests": "请求数",
+      "tokens": "令牌数",
+      "cost": "费用（$）"
+    }
+  },
+  "quotaDetailModal": {
+    "title": "配额状态：{{name}}",
+    "resetUsage": "重置使用量",
+    "active": "配额可用",
+    "exhausted": "配额已用尽",
+    "usage": "使用量",
+    "remaining": "剩余",
+    "resetsAt": "重置时间"
+  }
+}

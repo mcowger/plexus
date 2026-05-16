@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Cpu, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { api, Alias } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface Props {
   editingAlias: Alias;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props) {
+  const { t } = useT('models.architectureEditor');
   const [isOpen, setIsOpen] = useState(false);
   const [hfModelId, setHfModelId] = useState('');
   const [isFetchingHfModel, setIsFetchingHfModel] = useState(false);
@@ -16,7 +18,7 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
 
   const fetchHfModelArchitecture = async () => {
     if (!hfModelId.trim()) {
-      setHfFetchError('Please enter a Hugging Face model ID');
+      setHfFetchError(t('errorMissingHfId'));
       return;
     }
     setIsFetchingHfModel(true);
@@ -39,11 +41,13 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
         },
       });
     } catch (error) {
-      setHfFetchError(error instanceof Error ? error.message : 'Failed to fetch model config');
+      setHfFetchError(error instanceof Error ? error.message : t('errorFetchFailed'));
     } finally {
       setIsFetchingHfModel(false);
     }
   };
+
+  const tp = editingAlias.model_architecture?.total_params;
 
   return (
     <div className="border border-border-glass rounded-sm overflow-hidden">
@@ -55,11 +59,11 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Cpu size={13} className="text-text-muted" />
           <span className="font-body text-[13px] font-medium text-text-secondary">
-            Model Architecture
+            {t('sectionTitle')}
           </span>
-          {editingAlias.model_architecture?.total_params && (
+          {tp && (
             <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
-              {editingAlias.model_architecture.total_params}B params
+              {t('paramsBadge', { value: tp })}
             </span>
           )}
         </div>
@@ -75,29 +79,28 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
           className="px-3 py-3 border-t border-border-glass"
           style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
         >
-          <p className="font-body text-[11px] text-text-muted">
-            Fetch model architecture from Hugging Face or enter manually. These values are used for
-            energy calculation.
-          </p>
+          <p className="font-body text-[11px] text-text-muted">{t('intro')}</p>
 
           {/* Display currently saved architecture values */}
           {editingAlias.model_architecture?.total_params && (
             <div className="px-3 py-2 bg-bg-subtle border border-border-glass rounded-md">
               <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
-                Currently Saved:
+                {t('currentlySaved')}
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text">
                 {editingAlias.model_architecture.total_params && (
-                  <span>{editingAlias.model_architecture.total_params}B params</span>
+                  <span>{t('paramsBadge', { value: editingAlias.model_architecture.total_params })}</span>
                 )}
                 {editingAlias.model_architecture.active_params && (
-                  <span>({editingAlias.model_architecture.active_params}B active)</span>
+                  <span>
+                    {t('summaryActive', { value: editingAlias.model_architecture.active_params })}
+                  </span>
                 )}
-                {editingAlias.model_architecture.layers && (
-                  <span>{editingAlias.model_architecture.layers} layers</span>
+                {editingAlias.model_architecture.layers != null && (
+                  <span>{t('summaryLayers', { count: editingAlias.model_architecture.layers })}</span>
                 )}
-                {editingAlias.model_architecture.heads && (
-                  <span>{editingAlias.model_architecture.heads} heads</span>
+                {editingAlias.model_architecture.heads != null && (
+                  <span>{t('summaryHeads', { count: editingAlias.model_architecture.heads })}</span>
                 )}
                 {editingAlias.model_architecture.dtype && (
                   <span className="text-primary">
@@ -112,13 +115,13 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Hugging Face Model ID
+                {t('hfModelIdLabel')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 value={hfModelId}
                 onChange={(e) => setHfModelId(e.target.value)}
-                placeholder="e.g. meta-llama/Llama-3.1-70B-Instruct"
+                placeholder={t('hfPlaceholder')}
                 onKeyDown={(e) => e.key === 'Enter' && fetchHfModelArchitecture()}
               />
             </div>
@@ -129,7 +132,7 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
               variant="secondary"
               className="w-full sm:w-auto"
             >
-              Fetch from HF
+              {t('fetchFromHf')}
             </Button>
           </div>
 
@@ -142,7 +145,7 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
           <div className="grid grid-cols-1 gap-2 p-3 border border-border-glass rounded-md bg-bg-subtle sm:grid-cols-2">
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Total Params (B)
+                {t('fieldTotalParams')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -159,12 +162,12 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 1.76"
+                placeholder={t('placeholderSmallFloat')}
               />
             </div>
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Active Params (B)
+                {t('fieldActiveParams')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -181,12 +184,12 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 1.76"
+                placeholder={t('placeholderSmallFloat')}
               />
             </div>
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Layers
+                {t('fieldLayers')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -203,11 +206,13 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 120"
+                placeholder={t('placeholderInt120')}
               />
             </div>
             <div>
-              <label className="font-body text-[11px] font-medium text-text-secondary">Heads</label>
+              <label className="font-body text-[11px] font-medium text-text-secondary">
+                {t('fieldHeads')}
+              </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 type="number"
@@ -223,12 +228,12 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 96"
+                placeholder={t('placeholderInt96')}
               />
             </div>
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                KV LoRA Rank
+                {t('fieldKvLoraRank')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -245,12 +250,12 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 128"
+                placeholder={t('placeholderInt128')}
               />
             </div>
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                RoPE Head Dim
+                {t('fieldRopeHeadDim')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -267,12 +272,12 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 96"
+                placeholder={t('placeholderInt96')}
               />
             </div>
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Context Length
+                {t('fieldContextLength')}
               </label>
               <input
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -289,12 +294,12 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                     },
                   })
                 }
-                placeholder="e.g. 128000"
+                placeholder={t('placeholderContextExample')}
               />
             </div>
             <div>
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Data Type
+                {t('fieldDataType')}
               </label>
               <select
                 className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -309,15 +314,15 @@ export function ModelArchitectureEditor({ editingAlias, setEditingAlias }: Props
                   })
                 }
               >
-                <option value="">Default (FP16)</option>
-                <option value="fp16">FP16</option>
-                <option value="bf16">BF16</option>
-                <option value="fp8">FP8</option>
-                <option value="fp8_e4m3">FP8 E4M3</option>
-                <option value="fp8_e5m2">FP8 E5M2</option>
-                <option value="nvfp4">NVFP4</option>
-                <option value="int4">INT4</option>
-                <option value="int8">INT8</option>
+                <option value="">{t('dtypeDefault')}</option>
+                <option value="fp16">{t('dtypeFp16')}</option>
+                <option value="bf16">{t('dtypeBf16')}</option>
+                <option value="fp8">{t('dtypeFp8')}</option>
+                <option value="fp8_e4m3">{t('dtypeFp8E4m3')}</option>
+                <option value="fp8_e5m2">{t('dtypeFp8E5m2')}</option>
+                <option value="nvfp4">{t('dtypeNvfp4')}</option>
+                <option value="int4">{t('dtypeInt4')}</option>
+                <option value="int8">{t('dtypeInt8')}</option>
               </select>
             </div>
           </div>

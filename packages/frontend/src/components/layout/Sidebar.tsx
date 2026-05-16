@@ -18,6 +18,7 @@ import {
   UserCircle2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useTranslation } from 'react-i18next';
 import { api, fetchQuotaCheckers } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
@@ -27,6 +28,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { CompactBalancesCard, CompactQuotasCard } from '../quota';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { PlexusMark } from './PlexusMark';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface SidebarProps {
   mode?: 'desktop' | 'drawer';
@@ -102,6 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
   const { logout, isAdmin, isLimited, principal } = useAuth();
   const { isCollapsed, toggleSidebar, isMobileOpen, closeMobile } = useSidebar();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const collapsed = mode === 'desktop' && isCollapsed;
 
@@ -244,10 +247,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
             <div className="flex items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-text-muted font-mono leading-none">
               <span>{appVersion}</span>
               {isOutdated && (
-                <Tooltip content={`Update available: ${latestVersion}`} position="bottom">
+                <Tooltip
+                  content={t('sidebar.version.updateAvailable', { version: latestVersion })}
+                  position="bottom"
+                >
                   <span
                     className="inline-flex text-primary"
-                    aria-label={`Outdated version. Latest is ${latestVersion}`}
+                    aria-label={t('sidebar.version.outdatedAria', { version: latestVersion })}
                   >
                     <AlertTriangle size={10} />
                   </span>
@@ -260,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           <button
             onClick={toggleSidebar}
             className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0 focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
           >
             {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
           </button>
@@ -269,7 +275,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           <button
             onClick={closeMobile}
             className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0"
-            aria-label="Close navigation"
+            aria-label={t('sidebar.closeNavigation')}
           >
             <PanelLeftClose size={16} />
           </button>
@@ -278,18 +284,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
 
       {/* Main nav */}
       <nav className="flex-1 px-3 pb-2 flex flex-col gap-0.5">
-        <NavSection title="Main" collapsed={collapsed} />
-        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
-        <NavItem to="/logs" icon={ScrollText} label="Logs" collapsed={collapsed} />
-        <NavItem to="/errors" icon={AlertTriangle} label="Errors" collapsed={collapsed} />
-        {isLimited && <NavItem to="/me" icon={UserCircle2} label="My Key" collapsed={collapsed} />}
+        <NavSection title={t('sidebar.sections.main')} collapsed={collapsed} />
+        <NavItem
+          to="/"
+          icon={LayoutDashboard}
+          label={t('sidebar.nav.dashboard')}
+          collapsed={collapsed}
+        />
+        <NavItem to="/logs" icon={ScrollText} label={t('sidebar.nav.logs')} collapsed={collapsed} />
+        <NavItem
+          to="/errors"
+          icon={AlertTriangle}
+          label={t('sidebar.nav.errors')}
+          collapsed={collapsed}
+        />
+        {isLimited && (
+          <NavItem
+            to="/me"
+            icon={UserCircle2}
+            label={t('sidebar.nav.myKey')}
+            collapsed={collapsed}
+          />
+        )}
 
         {/* Balances widget */}
         {isAdmin && balanceQuotas.length > 0 && !collapsed && (
           <div className="mt-3 px-2.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
-                Balances
+                {t('sidebar.widgets.balances')}
               </span>
             </div>
             <CompactBalancesCard balanceQuotas={balanceQuotas} displayNameMap={displayNameMap} />
@@ -301,7 +324,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           <div className="mt-2 px-2.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
-                Quotas
+                {t('sidebar.widgets.quotas')}
               </span>
             </div>
             <CompactQuotasCard allowanceQuotas={allowanceQuotas} displayNameMap={displayNameMap} />
@@ -310,20 +333,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
 
         {isAdmin && (
           <>
-            <NavSection title="Configuration" collapsed={collapsed} />
-            <NavItem to="/providers" icon={Server} label="Providers" collapsed={collapsed} />
-            <NavItem to="/models" icon={Boxes} label="Models" collapsed={collapsed} />
-            <NavItem to="/keys" icon={Key} label="Keys" collapsed={collapsed} />
-            <NavItem to="/quotas" icon={Gauge} label="Quotas" collapsed={collapsed} />
-            <NavItem to="/mcp" icon={PlugZap} label="MCP" collapsed={collapsed} />
-            <NavItem to="/config" icon={Settings} label="Settings" collapsed={collapsed} />
+            <NavSection title={t('sidebar.sections.configuration')} collapsed={collapsed} />
+            <NavItem
+              to="/providers"
+              icon={Server}
+              label={t('sidebar.nav.providers')}
+              collapsed={collapsed}
+            />
+            <NavItem
+              to="/models"
+              icon={Boxes}
+              label={t('sidebar.nav.models')}
+              collapsed={collapsed}
+            />
+            <NavItem to="/keys" icon={Key} label={t('sidebar.nav.keys')} collapsed={collapsed} />
+            <NavItem
+              to="/quotas"
+              icon={Gauge}
+              label={t('sidebar.nav.quotas')}
+              collapsed={collapsed}
+            />
+            <NavItem to="/mcp" icon={PlugZap} label={t('sidebar.nav.mcp')} collapsed={collapsed} />
+            <NavItem
+              to="/config"
+              icon={Settings}
+              label={t('sidebar.nav.settings')}
+              collapsed={collapsed}
+            />
           </>
         )}
 
-        <NavSection title="Dev Tools" collapsed={collapsed} />
+        <NavSection title={t('sidebar.sections.devTools')} collapsed={collapsed} />
         <div className="flex items-center gap-1">
           <div className="flex-1">
-            <NavItem to="/debug" icon={Route} label="Traces" collapsed={collapsed} />
+            <NavItem
+              to="/debug"
+              icon={Route}
+              label={t('sidebar.nav.traces')}
+              collapsed={collapsed}
+            />
           </div>
           {isAdmin && !collapsed && (
             <button
@@ -335,13 +383,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
                   : 'bg-slate-700/40 text-text-muted hover:bg-slate-700/60'
               )}
             >
-              {debugMode ? 'ON' : 'OFF'}
+              {debugMode ? t('sidebar.debug.on') : t('sidebar.debug.off')}
             </button>
           )}
         </div>
         {isAdmin && (
-          <NavItem to="/system-logs" icon={Terminal} label="System Logs" collapsed={collapsed} />
+          <NavItem
+            to="/system-logs"
+            icon={Terminal}
+            label={t('sidebar.nav.systemLogs')}
+            collapsed={collapsed}
+          />
         )}
+
+        {/* Language switcher lives at the bottom of the nav block so it stays
+            visible above the user pill regardless of how many admin items are
+            rendered. */}
+        <div className="mt-2">
+          <LanguageSwitcher collapsed={collapsed} />
+        </div>
       </nav>
 
       {/* User pill + logout */}
@@ -353,17 +413,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-text truncate">
-                {principal.role === 'admin' ? 'Admin' : principal.keyName}
+                {principal.role === 'admin' ? t('sidebar.user.admin') : principal.keyName}
               </div>
               <div className="text-[10px] text-text-muted uppercase tracking-wider font-mono">
-                {principal.role === 'admin' ? 'full access' : 'limited'}
+                {principal.role === 'admin'
+                  ? t('sidebar.user.fullAccess')
+                  : t('sidebar.user.limited')}
               </div>
             </div>
-            <Tooltip content="Sign out" position="top">
+            <Tooltip content={t('sidebar.signOut')} position="top">
               <button
                 onClick={handleLogout}
                 className="p-1 rounded text-text-secondary hover:text-danger hover:bg-red-500/10 transition-colors"
-                aria-label="Sign out"
+                aria-label={t('sidebar.signOut')}
               >
                 <LogOut size={14} />
               </button>
@@ -371,11 +433,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           </div>
         )}
         {collapsed && (
-          <Tooltip content="Sign out" position="right">
+          <Tooltip content={t('sidebar.signOut')} position="right">
             <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center py-2 rounded-md text-danger hover:bg-red-500/10 transition-colors"
-              aria-label="Sign out"
+              aria-label={t('sidebar.signOut')}
             >
               <LogOut size={16} />
             </button>
@@ -386,23 +448,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
       <Modal
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
-        title={debugMode ? 'Disable Debug Mode?' : 'Enable Debug Mode?'}
+        title={debugMode ? t('sidebar.debug.disableTitle') : t('sidebar.debug.enableTitle')}
         size="sm"
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowConfirm(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant={debugMode ? 'primary' : 'danger'} onClick={confirmToggle}>
-              {debugMode ? 'Disable' : 'Enable'}
+              {debugMode ? t('common.disable') : t('common.enable')}
             </Button>
           </>
         }
       >
         <p className="text-sm text-text-secondary">
-          {debugMode
-            ? 'Disabling debug mode will stop capturing full request/response payloads.'
-            : 'Enabling debug mode will capture FULL raw request and response payloads, including personal data if present. This can consume significant storage.'}
+          {debugMode ? t('sidebar.debug.disableBody') : t('sidebar.debug.enableBody')}
         </p>
       </Modal>
     </aside>

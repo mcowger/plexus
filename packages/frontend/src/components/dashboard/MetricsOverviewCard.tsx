@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../ui/Card';
 
 export interface MetricItem {
@@ -14,12 +15,11 @@ interface MetricsOverviewCardProps {
   title?: string;
 }
 
-export const MetricsOverviewCard: React.FC<MetricsOverviewCardProps> = ({
-  metrics,
-  title = 'Key Metrics',
-}) => {
+export const MetricsOverviewCard: React.FC<MetricsOverviewCardProps> = ({ metrics, title }) => {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('dashboard.cards.metricsOverview.defaultTitle');
   return (
-    <Card title={title}>
+    <Card title={resolvedTitle}>
       <div
         style={{
           display: 'grid',
@@ -49,8 +49,10 @@ export const MetricsOverviewCard: React.FC<MetricsOverviewCardProps> = ({
               <div
                 className={`text-sm leading-normal ${metric.trend > 0 ? 'text-success' : 'text-danger'}`}
               >
-                {metric.trend > 0 ? '+' : ''}
-                {metric.trend}% from last week
+                {t('dashboard.cards.metricsOverview.trendFromLastWeek', {
+                  sign: metric.trend > 0 ? '+' : '',
+                  value: metric.trend,
+                })}
               </div>
             )}
           </div>

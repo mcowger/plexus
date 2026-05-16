@@ -1,0 +1,162 @@
+{
+  "title": "系统设置",
+  "subtitle": "查看当前系统配置（只读）。请前往服务商、模型、密钥页面进行修改。",
+  "editorFailedToLoad": "编辑器加载失败",
+  "export": {
+    "cardTitle": "配置导出",
+    "refresh": "刷新",
+    "restart": "重启",
+    "exportJson": "导出 JSON"
+  },
+  "validation": {
+    "required": "必填",
+    "invalidNumber": "无效的数字",
+    "mustBeNumber": "必须是数字",
+    "mustBeInteger": "必须是整数",
+    "mustBeIntegerSeconds": "必须是整数（秒）",
+    "mustBeAtLeast": "不能小于 {{min}}",
+    "mustBeAtMost": "不能大于 {{max}}",
+    "mustBeAtLeastOneSecond": "不能小于 1 秒",
+    "mustBeBetween": "必须在 {{min}} 到 {{max}} 之间"
+  },
+  "failover": {
+    "title": "故障切换设置",
+    "enable": "启用故障切换",
+    "enableDesc": "启用后，失败的请求将自动在下一个可用服务商上重试。",
+    "toggleAriaLabel": "切换故障切换开关",
+    "statusCodes": "可重试的状态码",
+    "statusCodesDesc": "触发在下一个服务商上重试的 HTTP 状态码。请输入逗号分隔的数值（100–599）。留空时默认包含除 413、422 外的所有非 2xx 状态码。",
+    "statusCodesPlaceholder": "例如 429, 500, 502, 503",
+    "errors": "可重试的网络错误",
+    "errorsDesc": "触发在下一个服务商上重试的网络错误码。请输入逗号分隔的数值。留空时默认包含 ECONNREFUSED、ETIMEDOUT、ENOTFOUND。",
+    "errorsPlaceholder": "例如 ECONNREFUSED, ETIMEDOUT, ENOTFOUND",
+    "toast": {
+      "loadFailed": "加载故障切换设置失败",
+      "saved": "故障切换设置已保存",
+      "saveFailed": "保存故障切换设置失败"
+    }
+  },
+  "cooldown": {
+    "title": "冷却设置",
+    "exponentialBackoff": "指数退避",
+    "exponentialBackoffDesc": "当服务商失败时，将通过指数退避方式进入冷却：<1>C(n) = min(C_max, C₀ × 2ⁿ)</1>，其中 n 表示连续失败次数。",
+    "initial": "初始冷却时间（分钟）",
+    "initialDesc": "C₀ —— 首次失败后的冷却时长。后续失败将翻倍直至达到最大值。支持小数（例如 0.1 = 6 秒）。",
+    "max": "最大冷却时间（分钟）",
+    "maxDesc": "C_max —— 任意冷却时长的上限，无论连续失败多少次都不会超过。支持小数（例如 0.1 = 6 秒）。",
+    "toast": {
+      "loadFailed": "加载冷却设置失败",
+      "saved": "冷却设置已保存",
+      "saveFailed": "保存冷却设置失败"
+    }
+  },
+  "timeout": {
+    "title": "超时设置",
+    "heading": "上游请求超时",
+    "headingDesc": "Plexus 等待上游服务商响应的最长时间，超过后将中止请求。可在服务商高级设置中按服务商覆盖。",
+    "default": "默认超时（秒）",
+    "defaultDesc": "所有上游请求的全局默认值，取值范围 1 到 3600 秒。若服务商单独配置了超时，则以服务商设置为准。",
+    "toast": {
+      "loadFailed": "加载超时设置失败",
+      "saved": "超时设置已保存",
+      "saveFailed": "保存超时设置失败"
+    }
+  },
+  "stall": {
+    "title": "卡顿检测",
+    "heading": "流式响应卡顿检测",
+    "headingDesc": "检测上游服务商响应过慢（TTFB 卡顿）或数据产生过慢（吞吐卡顿）的情况。一旦检测到卡顿，将中止请求以便客户端重试其他服务商。可分别将 TTFB 秒数或最小字节/秒留空以关闭对应维度。",
+    "status": "状态：{{state}}",
+    "statusEnabled": "已启用",
+    "statusDisabled": "已禁用（未设置任何阈值）",
+    "ttfbSeconds": "TTFB 超时（秒）",
+    "ttfbSecondsDesc": "允许服务商开始产生有效输出的最长时间。留空可关闭 TTFB 卡顿检测。取值范围 5 到 120 秒。",
+    "disabledPlaceholder": "已禁用",
+    "ttfbBytes": "TTFB 字节阈值",
+    "ttfbBytesDesc": "用于确认服务商确实在产生内容的字节阈值。100 字节大约是半个 token。取值范围 50 到 10,000。",
+    "minBps": "最小字节/秒",
+    "minBpsDesc": "宽限期结束后的吞吐量下限，按滑动窗口检测。留空可关闭吞吐卡顿检测。500 B/s 大约相当于 2-3 token/秒。取值范围 50 到 5,000。",
+    "windowSeconds": "滑动窗口（秒）",
+    "windowSecondsDesc": "用于吞吐量计算的滑动窗口宽度。窗口越长越稳定，越短越灵敏。取值范围 3 到 30 秒。",
+    "graceSeconds": "宽限期（秒）",
+    "graceSecondsDesc": "在达到 TTFB 阈值之后、开始进行吞吐量校验之前的等待时间，用于容许自然的思考/推理停顿。取值范围 0 到 120 秒。",
+    "toast": {
+      "loadFailed": "加载卡顿检测设置失败",
+      "saved": "卡顿检测设置已保存",
+      "saveFailed": "保存卡顿检测设置失败"
+    }
+  },
+  "exploration": {
+    "title": "探索设置",
+    "heading": "服务商探索",
+    "headingDesc": "探索机制用于保持各目标的性能、延迟和端到端 TPS 数据新鲜。默认采用内联探索，会偶尔将一小部分实时请求分流到非最优服务商。启用后台探索后将关闭内联探索，改为在后台发起代表性的探测请求 —— 实时流量永远不会被改向。两种模式均适用于 performance、latency、e2e_performance 选择器。",
+    "background": "后台探索",
+    "backgroundDesc": "启用后，将关闭内联探索，Plexus 会在后台发起轻量的代表性探测请求。这些探测会以 apiKey=\"probe\"、attribution=\"background\" 出现在用量记录中。",
+    "backgroundAriaLabel": "切换后台探索开关",
+    "staleness": "陈旧阈值（秒）",
+    "stalenessDesc": "目标距离上次探测达到该秒数后才会被重新探测。默认 600（10 分钟），最小值为 1。",
+    "concurrency": "工作并发度",
+    "concurrencyDesc": "Plexus 并行运行的后台探测最大数量。每个目标的探测会单独去重。默认 2，取值范围 1–16。",
+    "performanceRate": "性能探索率",
+    "performanceRateDesc": "使用 performance 选择器时探索非最优服务商的概率。默认 0.05 (5%)。",
+    "latencyRate": "延迟探索率",
+    "latencyRateDesc": "使用 latency 选择器时探索非最优服务商的概率。若未显式设置，将沿用性能探索率。",
+    "e2eRate": "端到端性能探索率",
+    "e2eRateDesc": "使用 e2e_performance 选择器时探索任意服务商的概率。与 performance 选择器不同，探索会覆盖所有候选（包括当前最优），以保持端到端指标新鲜。若未显式设置，将沿用性能探索率。",
+    "toast": {
+      "ratesLoadFailed": "加载探索率设置失败",
+      "backgroundLoadFailed": "加载后台探索设置失败",
+      "saved": "探索设置已保存",
+      "saveFailed": "保存探索设置失败"
+    }
+  },
+  "backup": {
+    "title": "备份与恢复",
+    "fullBackup": "完整备份",
+    "configBackup": "配置备份",
+    "intro": "备份数据库，或从之前导出的备份文件中恢复。",
+    "sensitiveTitle": "备份文件包含敏感数据",
+    "sensitiveBody": "其中包括明文形式的 API 密钥和 OAuth 令牌，请妥善保管备份文件。",
+    "configBackupDesc": "仅包含服务商、模型、密钥、配额和设置，速度快、体积小。",
+    "fullBackupDesc": "在配置之外还包含全部用量日志、调试数据和错误日志。对于较大数据库可能耗时较长。",
+    "restoreFromFile": "从文件恢复…",
+    "restorePrompt": {
+      "title": "恢复数据库？",
+      "message": "此操作将**用备份文件内容替换全部现有数据**，且无法撤销。确定要继续吗？",
+      "confirmLabel": "恢复"
+    },
+    "toast": {
+      "configBackupDownloaded": "配置备份已下载",
+      "configBackupFailed": "备份失败",
+      "fullBackupDownloaded": "完整备份已下载",
+      "fullBackupFailed": "完整备份失败",
+      "restoreComplete": "恢复完成",
+      "restoreFailed": "恢复失败"
+    }
+  },
+  "cardLayout": {
+    "title": "卡片布局",
+    "export": "导出",
+    "import": "导入",
+    "intro": "导入或导出您的实时指标卡片布局配置。",
+    "currentOrder": "当前卡片顺序",
+    "defaultLayout": "默认布局 —— 未保存任何自定义。",
+    "toast": {
+      "imported": "卡片布局已导入",
+      "invalidIds": "无效的卡片布局：包含未知的卡片 ID",
+      "invalidFormat": "无效的卡片布局格式",
+      "invalidJson": "导入失败：JSON 文件无效"
+    }
+  },
+  "restart": {
+    "title": "重启 Plexus？",
+    "message": "此操作将短暂中断所有进行中的请求，确定要继续吗？",
+    "confirmLabel": "重启",
+    "toast": {
+      "failed": "重启失败"
+    }
+  },
+  "configToast": {
+    "loadFailed": "加载配置失败"
+  }
+}

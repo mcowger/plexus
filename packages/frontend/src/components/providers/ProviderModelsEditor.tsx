@@ -18,7 +18,8 @@ import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import { OpenRouterSlugInput } from '../ui/OpenRouterSlugInput';
 import type { Provider } from '../../lib/api';
-import { KNOWN_ADAPTERS } from './ProviderAdvancedEditor';
+import { KNOWN_ADAPTER_KEYS } from './ProviderAdvancedEditor';
+import { useT } from '../../i18n/useT';
 
 const KNOWN_APIS = [
   'chat',
@@ -65,6 +66,7 @@ function ModelIdInput({
   modelId: string;
   onCommit: (oldId: string, newId: string) => void;
 }) {
+  const { t } = useT('providers.models');
   const [draftId, setDraftId] = useState(modelId);
   useEffect(() => {
     setDraftId(modelId);
@@ -75,7 +77,7 @@ function ModelIdInput({
   };
   return (
     <Input
-      label="Model ID"
+      label={t('modelId')}
       value={draftId}
       onChange={(e) => setDraftId(e.target.value)}
       onBlur={commit}
@@ -143,6 +145,8 @@ export function ProviderModelsEditor({
   onDismissTestMessage,
   getApiBaseUrlMap,
 }: Props) {
+  const { t } = useT('providers.models');
+  const { t: ta } = useT('providers.advanced');
   return (
     <div className="border border-border-glass rounded-md">
       <div
@@ -150,8 +154,10 @@ export function ProviderModelsEditor({
         onClick={() => setIsModelsOpen(!isModelsOpen)}
       >
         {isModelsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>Provider Models</span>
-        <Badge status="connected">{Object.keys(editingProvider.models || {}).length} Models</Badge>
+        <span style={{ fontWeight: 600, fontSize: '13px', flex: 1 }}>{t('title')}</span>
+        <Badge status="connected">
+          {t('modelsCount', { count: Object.keys(editingProvider.models || {}).length })}
+        </Badge>
         <Button
           size="sm"
           variant="secondary"
@@ -162,7 +168,7 @@ export function ProviderModelsEditor({
           leftIcon={<Download size={14} />}
           style={{ marginLeft: '8px' }}
         >
-          Fetch Models
+          {t('fetchModels')}
         </Button>
       </div>
       {isModelsOpen && (
@@ -205,7 +211,7 @@ export function ProviderModelsEditor({
                         onTestModel(editingProvider.id, mId, mCfg.type);
                       }}
                       className="flex items-center cursor-pointer"
-                      title="Test this model"
+                      title={t('testModel')}
                     >
                       {testState?.loading ? (
                         <Loader2 size={14} className="animate-spin text-text-secondary" />
@@ -242,7 +248,7 @@ export function ProviderModelsEditor({
                           onDismissTestMessage(testKey);
                         }}
                         className="cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
-                        title="Click to dismiss"
+                        title={t('dismissTest')}
                       >
                         <span className="text-[11px] italic text-danger">
                           {testState.message} [×]
@@ -266,7 +272,7 @@ export function ProviderModelsEditor({
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <div className="flex flex-col gap-1">
                           <label className="font-body text-[13px] font-medium text-text-secondary">
-                            Model Type
+                            {t('modelType')}
                           </label>
                           <select
                             className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -301,17 +307,17 @@ export function ProviderModelsEditor({
                               else updateModelConfig(mId, { type: newType });
                             }}
                           >
-                            <option value="chat">Chat</option>
-                            <option value="embeddings">Embeddings</option>
-                            <option value="transcriptions">Transcriptions</option>
-                            <option value="speech">Speech</option>
-                            <option value="image">Image</option>
-                            <option value="responses">Responses</option>
+                            <option value="chat">{t('types.chat')}</option>
+                            <option value="embeddings">{t('types.embeddings')}</option>
+                            <option value="transcriptions">{t('types.transcriptions')}</option>
+                            <option value="speech">{t('types.speech')}</option>
+                            <option value="image">{t('types.image')}</option>
+                            <option value="responses">{t('types.responses')}</option>
                           </select>
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="font-body text-[13px] font-medium text-text-secondary">
-                            Pricing Source
+                            {t('pricingSource')}
                           </label>
                           <select
                             className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -348,10 +354,10 @@ export function ProviderModelsEditor({
                               updateModelConfig(mId, { pricing: newPricing });
                             }}
                           >
-                            <option value="simple">Simple</option>
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="defined">Ranges (Complex)</option>
-                            <option value="per_request">Per Request (Flat Fee)</option>
+                            <option value="simple">{t('pricingSources.simple')}</option>
+                            <option value="openrouter">{t('pricingSources.openrouter')}</option>
+                            <option value="defined">{t('pricingSources.defined')}</option>
+                            <option value="per_request">{t('pricingSources.per_request')}</option>
                           </select>
                         </div>
                         {mCfg.type !== 'embeddings' &&
@@ -361,7 +367,7 @@ export function ProviderModelsEditor({
                           mCfg.type !== 'responses' && (
                             <div className="flex flex-col gap-1">
                               <label className="font-body text-[13px] font-medium text-text-secondary">
-                                Access Via (APIs)
+                                {t('accessVia')}
                               </label>
                               <div
                                 style={{
@@ -371,7 +377,7 @@ export function ProviderModelsEditor({
                                   lineHeight: '1.4',
                                 }}
                               >
-                                Choose which API protocols this model should use.
+                                {t('accessViaHint')}
                               </div>
                               <div
                                 style={{
@@ -453,8 +459,7 @@ export function ProviderModelsEditor({
                                     fontStyle: 'italic',
                                   }}
                                 >
-                                  Empty selection — Plexus will use any API type configured for this
-                                  provider.
+                                  {t('accessViaEmpty')}
                                 </div>
                               )}
                               {(() => {
@@ -476,10 +481,7 @@ export function ProviderModelsEditor({
                                     <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
                                       <Info size={14} className="text-info shrink-0 mt-0.5" />
                                       <span className="text-[11px] text-info">
-                                        Provider has a native Ollama URL. If you want this model to
-                                        use native Ollama, select{' '}
-                                        <span style={{ fontWeight: 600 }}>ollama</span> in Access
-                                        Via above.
+                                        {t('nativeOllamaAccessHint')}
                                       </span>
                                     </div>
                                   );
@@ -501,7 +503,7 @@ export function ProviderModelsEditor({
                           }}
                         >
                           <Input
-                            label="Input $/M"
+                            label={t('inputPerM')}
                             type="number"
                             step="0.000001"
                             value={mCfg.pricing.input || 0}
@@ -512,7 +514,7 @@ export function ProviderModelsEditor({
                             }
                           />
                           <Input
-                            label="Output $/M"
+                            label={t('outputPerM')}
                             type="number"
                             step="0.000001"
                             value={mCfg.pricing.output || 0}
@@ -523,7 +525,7 @@ export function ProviderModelsEditor({
                             }
                           />
                           <Input
-                            label="Cached $/M"
+                            label={t('cachedPerM')}
                             type="number"
                             step="0.000001"
                             value={mCfg.pricing.cached || 0}
@@ -534,7 +536,7 @@ export function ProviderModelsEditor({
                             }
                           />
                           <Input
-                            label="Cache Write $/M"
+                            label={t('cacheWritePerM')}
                             type="number"
                             step="0.000001"
                             value={mCfg.pricing.cache_write || 0}
@@ -558,10 +560,11 @@ export function ProviderModelsEditor({
                             borderRadius: 'var(--radius-sm)',
                           }}
                         >
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 flex flex-col gap-1">
+                            <p className="text-[11px] text-text-secondary leading-snug">{t('openrouterInfo')}</p>
                             <OpenRouterSlugInput
-                              label="OpenRouter Model Slug"
-                              placeholder="e.g. anthropic/claude-3.5-sonnet"
+                              label={t('openrouterSlug')}
+                              placeholder={t('openrouterSlugPlaceholder')}
                               value={mCfg.pricing.slug || ''}
                               onChange={(value) =>
                                 updateModelConfig(mId, {
@@ -572,7 +575,7 @@ export function ProviderModelsEditor({
                           </div>
                           <div className="w-full sm:w-24">
                             <Input
-                              label="Discount (0-1)"
+                              label={t('discount')}
                               type="number"
                               step="0.01"
                               min="0"
@@ -589,7 +592,7 @@ export function ProviderModelsEditor({
                                   });
                               }}
                             />
-                            <span className="text-[10px] text-text-muted">0.1 = 10% off</span>
+                            <span className="text-[10px] text-text-muted">{t('discountHint')}</span>
                           </div>
                         </div>
                       )}
@@ -615,7 +618,7 @@ export function ProviderModelsEditor({
                               className="font-body text-[13px] font-medium text-text-secondary"
                               style={{ marginBottom: 0 }}
                             >
-                              Pricing Ranges
+                              {t('pricingRanges')}
                             </label>
                             <Button
                               size="sm"
@@ -640,7 +643,7 @@ export function ProviderModelsEditor({
                               }}
                               leftIcon={<Plus size={14} />}
                             >
-                              Add Range
+                              {t('addRange')}
                             </Button>
                           </div>
                           {(mCfg.pricing.range || []).map((range: any, idx: number) => (
@@ -678,7 +681,7 @@ export function ProviderModelsEditor({
                                 style={{ marginBottom: '8px' }}
                               >
                                 <Input
-                                  label="Lower Bound"
+                                  label={t('lowerBound')}
                                   type="number"
                                   value={range.lower_bound}
                                   onChange={(e) => {
@@ -690,7 +693,7 @@ export function ProviderModelsEditor({
                                   }}
                                 />
                                 <Input
-                                  label="Upper Bound (0 = Infinite)"
+                                  label={t('upperBound')}
                                   type="number"
                                   value={range.upper_bound === Infinity ? 0 : range.upper_bound}
                                   onChange={(e) => {
@@ -705,7 +708,7 @@ export function ProviderModelsEditor({
                               </div>
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                 <Input
-                                  label="Input $/M"
+                                  label={t('inputPerM')}
                                   type="number"
                                   step="0.000001"
                                   value={range.input_per_m}
@@ -718,7 +721,7 @@ export function ProviderModelsEditor({
                                   }}
                                 />
                                 <Input
-                                  label="Output $/M"
+                                  label={t('outputPerM')}
                                   type="number"
                                   step="0.000001"
                                   value={range.output_per_m}
@@ -731,7 +734,7 @@ export function ProviderModelsEditor({
                                   }}
                                 />
                                 <Input
-                                  label="Cached $/M"
+                                  label={t('cachedPerM')}
                                   type="number"
                                   step="0.000001"
                                   value={range.cached_per_m || 0}
@@ -744,7 +747,7 @@ export function ProviderModelsEditor({
                                   }}
                                 />
                                 <Input
-                                  label="Cache Write $/M"
+                                  label={t('cacheWritePerM')}
                                   type="number"
                                   step="0.000001"
                                   value={range.cache_write_per_m || 0}
@@ -765,7 +768,7 @@ export function ProviderModelsEditor({
                           ))}
                           {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
                             <div className="text-text-muted italic text-center text-sm p-4">
-                              No ranges defined. Pricing will likely default to 0.
+                              {t('noRanges')}
                             </div>
                           )}
                         </div>
@@ -780,7 +783,7 @@ export function ProviderModelsEditor({
                           }}
                         >
                           <Input
-                            label="Cost Per Request ($)"
+                            label={t('costPerRequest')}
                             type="number"
                             step="0.000001"
                             min="0"
@@ -798,7 +801,7 @@ export function ProviderModelsEditor({
                             className="font-body text-[11px] text-text-secondary"
                             style={{ fontStyle: 'italic' }}
                           >
-                            A flat fee charged per API call, regardless of token count.
+                            {t('flatFeeHint')}
                           </div>
                         </div>
                       )}
@@ -809,25 +812,25 @@ export function ProviderModelsEditor({
                         style={{ marginTop: '12px' }}
                       >
                         <label className="font-body text-[13px] font-medium text-text-secondary block mb-1">
-                          Model Adapters
+                          {t('modelAdapters')}
                         </label>
                         <div
                           className="font-body text-[11px] text-text-secondary mb-2"
                           style={{ lineHeight: 1.4 }}
                         >
-                          Override or extend provider-level adapters for this specific model.
+                          {t('modelAdaptersHint')}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {KNOWN_ADAPTERS.map((a) => {
+                          {KNOWN_ADAPTER_KEYS.map((adapterKey) => {
                             const modelAdapters: string[] = mCfg.adapter
                               ? Array.isArray(mCfg.adapter)
                                 ? mCfg.adapter
                                 : [mCfg.adapter]
                               : [];
-                            const active = modelAdapters.includes(a.value);
+                            const active = modelAdapters.includes(adapterKey);
                             return (
                               <label
-                                key={a.value}
+                                key={adapterKey}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'flex-start',
@@ -847,8 +850,8 @@ export function ProviderModelsEditor({
                                   style={{ marginTop: '2px', flexShrink: 0 }}
                                   onChange={() => {
                                     const next = active
-                                      ? modelAdapters.filter((v) => v !== a.value)
-                                      : [...modelAdapters, a.value];
+                                      ? modelAdapters.filter((v) => v !== adapterKey)
+                                      : [...modelAdapters, adapterKey];
                                     updateModelConfig(mId, {
                                       adapter: next.length > 0 ? next : undefined,
                                     });
@@ -856,13 +859,13 @@ export function ProviderModelsEditor({
                                 />
                                 <div>
                                   <div className="font-body text-[12px] font-medium text-text">
-                                    {a.label}
+                                    {ta(`adapters.${adapterKey}.label`)}
                                   </div>
                                   <div
                                     className="font-body text-[11px] text-text-secondary"
                                     style={{ lineHeight: 1.35 }}
                                   >
-                                    {a.description}
+                                    {ta(`adapters.${adapterKey}.description`)}
                                   </div>
                                 </div>
                               </label>
@@ -895,7 +898,7 @@ export function ProviderModelsEditor({
                             className="font-body text-[13px] font-medium text-text-secondary"
                             style={{ marginBottom: 0, flex: 1, cursor: 'pointer' }}
                           >
-                            Extra Body Fields
+                            {t('modelExtraBody')}
                           </label>
                           <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
                             {Object.keys(mCfg.extraBody || {}).length}
@@ -925,20 +928,20 @@ export function ProviderModelsEditor({
                           >
                             {Object.entries(mCfg.extraBody || {}).length === 0 && (
                               <div className="font-body text-[11px] text-text-secondary italic">
-                                No extra body fields configured.
+                                {t('noModelExtraBody')}
                               </div>
                             )}
                             {Object.entries(mCfg.extraBody || {}).map(
                               ([key, val]: [string, any], idx: number) => (
                                 <div key={idx} style={{ display: 'flex', gap: '6px' }}>
                                   <Input
-                                    placeholder="Field Name"
+                                    placeholder={ta('fieldName')}
                                     value={key}
                                     onChange={(e) => updateModelKV(mId, key, e.target.value, val)}
                                     style={{ flex: 1 }}
                                   />
                                   <Input
-                                    placeholder="Value"
+                                    placeholder={ta('value')}
                                     value={
                                       typeof val === 'object' ? JSON.stringify(val) : String(val)
                                     }
@@ -972,7 +975,7 @@ export function ProviderModelsEditor({
               );
             })}
             <Button variant="secondary" size="sm" leftIcon={<Plus size={14} />} onClick={addModel}>
-              Add Model Mapping
+              {t('addMapping')}
             </Button>
           </div>
         </div>

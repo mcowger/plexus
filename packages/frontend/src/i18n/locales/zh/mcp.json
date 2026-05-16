@@ -1,0 +1,91 @@
+{
+  "title": "MCP 服务器",
+  "subtitle": "Model Context Protocol 连接 — 向客户端暴露工具与资源",
+  "addServer": "添加服务器",
+  "addServerLong": "添加 MCP 服务器",
+  "serversCardTitle": "MCP 服务器",
+  "noServers": "尚未配置 MCP 服务器。点击 \"添加 MCP 服务器\" 创建一个。",
+  "loading": "加载中...",
+  "headersLabel": "请求头：",
+  "deleteAria": "删除 {{name}}",
+  "table": {
+    "name": "名称",
+    "upstreamUrl": "上游 URL",
+    "status": "状态",
+    "headers": "请求头",
+    "actions": "操作",
+    "headersConfigured": "已配置 {{count}} 个",
+    "headersCount": "{{count}} 个请求头",
+    "dash": "-"
+  },
+  "logs": {
+    "cardTitle": "MCP 使用日志",
+    "filterByServer": "按服务器筛选...",
+    "filterByKey": "按密钥筛选...",
+    "search": "搜索",
+    "deleteAll": "全部删除",
+    "loading": "加载中...",
+    "empty": "未找到 MCP 日志",
+    "deleteAria": "删除 MCP 日志",
+    "deleteTitle": "删除日志",
+    "labels": {
+      "server": "服务器",
+      "method": "方法",
+      "rpc": "RPC",
+      "duration": "耗时",
+      "date": "日期",
+      "key": "密钥",
+      "rpcMethod": "RPC 方法",
+      "status": "状态"
+    },
+    "streamed": "流式",
+    "buffered": "缓冲",
+    "statusLabel": "状态 {{status}}",
+    "page": "第 {{current}} 页，共 {{total}} 页"
+  },
+  "modal": {
+    "editTitle": "编辑 {{name}}",
+    "addTitle": "添加 MCP 服务器",
+    "saving": "保存中...",
+    "fields": {
+      "serverName": "服务器名称",
+      "serverNamePlaceholder": "my-mcp-server",
+      "upstreamUrl": "上游 URL",
+      "upstreamUrlPlaceholder": "https://mcp.example.com/mcp",
+      "headerKey": "请求头名称",
+      "headerKeyPlaceholder": "Authorization",
+      "headerValue": "请求头值",
+      "headerValuePlaceholder": "Bearer token...",
+      "configuredHeaders": "已配置的请求头"
+    }
+  },
+  "deleteLogsModal": {
+    "title": "确认删除",
+    "intro": "请选择要删除的 MCP 日志：",
+    "deleteOlder": "删除超过",
+    "days": "天的日志",
+    "deleteAll": "删除全部日志（无法撤销）",
+    "deleting": "删除中...",
+    "deleteLogs": "删除日志"
+  },
+  "singleDeleteModal": {
+    "title": "确认删除",
+    "message": "确定要删除这条 MCP 日志吗？",
+    "deleting": "删除中...",
+    "deleteLog": "删除日志"
+  },
+  "confirm": {
+    "deleteTitle": "删除 MCP 服务器？",
+    "deleteMessage": "确定要删除 MCP 服务器 \"{{name}}\" 吗？",
+    "deleteLabel": "删除"
+  },
+  "toast": {
+    "serverNameRequired": "请输入服务器名称",
+    "invalidServerName": "服务器名称无效。请使用小写字母、数字、连字符与下划线（2-63 个字符，必须以字母或数字开头）",
+    "upstreamUrlRequired": "请输入上游 URL",
+    "saveFailed": "保存 MCP 服务器失败：{{error}}",
+    "deleteFailed": "删除 MCP 服务器失败：{{error}}",
+    "updateFailed": "更新 MCP 服务器失败：{{error}}",
+    "deleted": "已删除 {{name}}"
+  }
+}

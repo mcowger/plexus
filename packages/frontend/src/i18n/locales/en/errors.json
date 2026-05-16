@@ -1,0 +1,53 @@
+{
+  "title": "Errors",
+  "subtitle": {
+    "scoped": "Errors for key \"{{keyName}}\" only",
+    "default": "Grouped by signature · last 24h"
+  },
+  "actions": {
+    "deleteAll": "Delete All",
+    "refresh": "Refresh"
+  },
+  "list": {
+    "header": "Recent Errors",
+    "empty": "No errors found.",
+    "deleteTooltip": "Delete error log"
+  },
+  "details": {
+    "title": "Error Details",
+    "requestId": "Request ID:",
+    "time": "Time:",
+    "selectPlaceholder": "Select an error to inspect details",
+    "routing": {
+      "title": "Routing Information",
+      "provider": "Provider:",
+      "targetModel": "Target Model:",
+      "targetApi": "Target API:",
+      "statusCode": "Status Code:",
+      "url": "Request URL:"
+    },
+    "panels": {
+      "message": "Message",
+      "stackTrace": "Stack Trace",
+      "noStack": "(No stack trace available)",
+      "providerResponse": "Provider Response",
+      "headers": "Request Headers",
+      "additional": "Additional Details",
+      "copyTooltip": "Copy to clipboard"
+    }
+  },
+  "deleteAllModal": {
+    "title": "Confirm Deletion",
+    "cancelButton": "Cancel",
+    "deleteButton": "Delete All Errors",
+    "deleting": "Deleting...",
+    "body": "Are you sure you want to delete ALL error logs? This action cannot be undone."
+  },
+  "singleDeleteModal": {
+    "title": "Confirm Deletion",
+    "cancelButton": "Cancel",
+    "deleteButton": "Delete Error Log",
+    "deleting": "Deleting...",
+    "body": "Are you sure you want to delete this error log? This action cannot be undone."
+  }
+}

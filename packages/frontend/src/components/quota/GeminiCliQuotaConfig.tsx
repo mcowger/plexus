@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 interface GeminiCliQuotaConfigProps {
   options: Record<string, unknown>;
@@ -10,15 +11,17 @@ export const GeminiCliQuotaConfig: React.FC<GeminiCliQuotaConfigProps> = ({
   options,
   onChange,
 }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-label={t('checkerConfigs.gemini-cli.formAriaLabel')}>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
@@ -29,7 +32,7 @@ export const GeminiCliQuotaConfig: React.FC<GeminiCliQuotaConfigProps> = ({
 
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          User Agent (optional)
+          {t('checkerCommon.userAgentOptional')}
         </label>
         <Input
           value={(options.userAgent as string) ?? ''}
@@ -40,7 +43,7 @@ export const GeminiCliQuotaConfig: React.FC<GeminiCliQuotaConfigProps> = ({
 
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Goog API Client (optional)
+          {t('checkerCommon.googApiClientOptional')}
         </label>
         <Input
           value={(options.googApiClient as string) ?? ''}
@@ -51,7 +54,7 @@ export const GeminiCliQuotaConfig: React.FC<GeminiCliQuotaConfigProps> = ({
 
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Client Metadata (optional)
+          {t('checkerCommon.clientMetadataOptional')}
         </label>
         <Input
           value={(options.clientMetadata as string) ?? ''}

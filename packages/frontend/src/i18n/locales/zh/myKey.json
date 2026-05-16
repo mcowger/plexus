@@ -1,0 +1,42 @@
+{
+  "title": "我的密钥",
+  "loadingSubtitle": "正在加载密钥详情...",
+  "subtitle": "密钥 <name>{{name}}</name> 的详情。本次会话中的所有日志、追踪和仪表板数据均仅限于该密钥。",
+  "loadError": "无法加载密钥信息。",
+  "anyUnrestricted": "任意（不限）",
+  "identity": {
+    "title": "身份信息",
+    "keyName": "密钥名称",
+    "quota": "配额",
+    "allowedProviders": "允许的服务商",
+    "allowedModels": "允许的模型"
+  },
+  "comment": {
+    "title": "备注",
+    "placeholder": "关于此密钥的自由备注（可选）",
+    "saved": "备注已保存",
+    "saveFailed": "保存备注失败"
+  },
+  "trace": {
+    "title": "追踪捕获",
+    "description": "仅针对此密钥捕获完整的请求/响应内容。",
+    "globalOn": "全局追踪已开启（管理员）—— 无论此开关如何，所有请求都会被捕获。",
+    "on": "正在为此密钥捕获追踪。",
+    "off": "此密钥的追踪已关闭。",
+    "ariaToggle": "切换追踪捕获",
+    "toggleFailed": "切换追踪失败"
+  },
+  "rotate": {
+    "title": "轮换密钥值",
+    "description": "为此密钥生成新的密钥值。旧的密钥值将立即失效。历史日志、追踪和错误记录会被保留（它们按密钥名称索引，而非密钥值）。",
+    "button": "轮换密钥值",
+    "confirmTitle": "确认轮换密钥值？",
+    "confirmBody": "旧的密钥值将立即停止工作。所有使用旧值的客户端将收到 401 错误，直到更新为新密钥值。",
+    "confirmAction": "立即轮换",
+    "successTitle": "已生成新的密钥值",
+    "successBody": "请立即复制此密钥值 —— 之后将不再显示。",
+    "sessionRefreshFailed": "密钥值已轮换，但会话刷新失败。请使用新密钥值重新登录。",
+    "failed": "轮换失败"
+  },
+  "loadFailed": "加载失败"
+}

@@ -20,6 +20,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Key, Layers, Boxes, Gauge, Activity, AlertTriangle } from 'lucide-react';
 import { api, type PieChartDataPoint } from '../../../lib/api';
 import { formatNumber, formatTokens, formatCost } from '../../../lib/format';
@@ -64,19 +66,20 @@ interface QuotaInfo {
  * Format an ISO resets-at timestamp as a short relative string, e.g.
  * "in 3h 20m". Falls back to an absolute date for far-future resets.
  */
-function formatResetsIn(iso: string | null): string {
-  if (!iso) return '—';
+function formatResetsIn(iso: string | null, t: TFunction): string {
+  if (!iso) return t('dashboard.overall.dash');
   const resetsAt = new Date(iso).getTime();
   const diffMs = resetsAt - Date.now();
-  if (diffMs <= 0) return 'resetting now';
+  if (diffMs <= 0) return t('dashboard.overall.quota.resetting');
   const diffSeconds = Math.floor(diffMs / 1000);
   const days = Math.floor(diffSeconds / 86400);
   const hours = Math.floor((diffSeconds % 86400) / 3600);
   const minutes = Math.floor((diffSeconds % 3600) / 60);
-  if (days > 7) return `on ${new Date(iso).toLocaleDateString()}`;
-  if (days > 0) return `in ${days}d ${hours}h`;
-  if (hours > 0) return `in ${hours}h ${minutes}m`;
-  return `in ${minutes}m`;
+  if (days > 7)
+    return t('dashboard.overall.quota.resetOnDate', { date: new Date(iso).toLocaleDateString() });
+  if (days > 0) return t('dashboard.overall.quota.resetInDaysHours', { days, hours });
+  if (hours > 0) return t('dashboard.overall.quota.resetInHoursMinutes', { hours, minutes });
+  return t('dashboard.overall.quota.resetInMinutes', { minutes });
 }
 
 /**
@@ -160,6 +163,7 @@ const BreakdownList: React.FC<{
 };
 
 export const OverallTab: React.FC = () => {
+  const { t } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('day');
   const [info, setInfo] = useState<SelfInfo | null>(null);
   const [summary, setSummary] = useState<SummaryStats | null>(null);
@@ -265,14 +269,16 @@ export const OverallTab: React.FC = () => {
   const allowedProviders = info?.allowedProviders ?? [];
   const allowedModels = info?.allowedModels ?? [];
 
+  const rangeLabel = t(`dashboard.overall.range.${timeRange}`);
+
   return (
     <div className="p-6 transition-all duration-300 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Overall</h1>
-          <p className="text-[15px] text-text-secondary m-0">
-            Access, usage, and quota summary for your API key.
-          </p>
+          <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">
+            {t('dashboard.overall.title')}
+          </h1>
+          <p className="text-[15px] text-text-secondary m-0">{t('dashboard.overall.subtitle')}</p>
         </div>
         <TimeRangeSelector
           value={timeRange}
@@ -288,19 +294,27 @@ export const OverallTab: React.FC = () => {
         className="grid gap-4"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
       >
-        <Card title="Key" extra={<Key size={16} className="text-text-muted" />} className="min-w-0">
+        <Card
+          title={t('dashboard.overall.cards.key')}
+          extra={<Key size={16} className="text-text-muted" />}
+          className="min-w-0"
+        >
           <dl className="grid grid-cols-1 gap-3 text-sm">
             <div className="flex">
-              <dt className="w-32 text-text-muted">Name</dt>
-              <dd className="font-mono text-text break-all">{info?.keyName || '—'}</dd>
+              <dt className="w-32 text-text-muted">{t('dashboard.overall.fields.name')}</dt>
+              <dd className="font-mono text-text break-all">
+                {info?.keyName || t('dashboard.overall.dash')}
+              </dd>
             </div>
             <div className="flex">
-              <dt className="w-32 text-text-muted">Quota</dt>
-              <dd className="text-text">{info?.quotaName || 'None assigned'}</dd>
+              <dt className="w-32 text-text-muted">{t('dashboard.overall.fields.quota')}</dt>
+              <dd className="text-text">
+                {info?.quotaName || t('dashboard.overall.fields.noneAssigned')}
+              </dd>
             </div>
             {info?.comment && (
               <div className="flex">
-                <dt className="w-32 text-text-muted">Comment</dt>
+                <dt className="w-32 text-text-muted">{t('dashboard.overall.fields.comment')}</dt>
                 <dd className="text-text">{info.comment}</dd>
               </div>
             )}
@@ -308,37 +322,34 @@ export const OverallTab: React.FC = () => {
         </Card>
 
         <Card
-          title="Quota"
+          title={t('dashboard.overall.cards.quota')}
           extra={<Gauge size={16} className="text-text-muted" />}
           className="min-w-0"
         >
           {loading && !quota && !quotaError ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.loading')}</p>
           ) : quotaError ? (
             <div className="flex items-start gap-2 text-sm text-warning">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-              <span>
-                Could not load quota status. If this key has a quota assigned, its current usage is
-                not shown here — try refreshing.
-              </span>
+              <span>{t('dashboard.overall.quota.loadError')}</span>
             </div>
           ) : !quota || !quota.quotaName ? (
-            <p className="text-sm text-text-muted">
-              No quota is assigned to this key — requests are unrestricted by quota policy.
-            </p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.quota.noneAssigned')}</p>
           ) : quota.limit == null ? (
             <div className="space-y-2">
               <p className="text-sm text-text">
-                Assigned: <span className="font-medium">{quota.quotaName}</span>
+                {t('dashboard.overall.quota.assignedLabel')}{' '}
+                <span className="font-medium">{quota.quotaName}</span>
               </p>
-              <p className="text-xs text-text-muted">
-                Quota definition not resolved yet; current status is unavailable.
-              </p>
+              <p className="text-xs text-text-muted">{t('dashboard.overall.quota.notResolved')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               <QuotaProgressBar
-                label={`${quota.quotaName} (${quota.limitType ?? 'usage'})`}
+                label={t('dashboard.overall.quota.labelTemplate', {
+                  name: quota.quotaName,
+                  type: quota.limitType ?? t('dashboard.overall.quota.usageLabel'),
+                })}
                 value={quota.currentUsage}
                 max={quota.limit}
                 displayValue={`${formatQuotaValue(quota.currentUsage, quota.limitType)} / ${formatQuotaValue(
@@ -350,19 +361,23 @@ export const OverallTab: React.FC = () => {
               />
               <div className="flex items-center justify-between text-xs text-text-muted">
                 <span>
-                  Remaining:{' '}
+                  {t('dashboard.overall.quota.remaining')}{' '}
                   <span className="text-text font-medium">
                     {quota.remaining != null
                       ? formatQuotaValue(quota.remaining, quota.limitType)
-                      : '—'}
+                      : t('dashboard.overall.dash')}
                   </span>
                 </span>
-                <span>Resets {formatResetsIn(quota.resetsAt)}</span>
+                <span>
+                  {t('dashboard.overall.quota.resets', {
+                    value: formatResetsIn(quota.resetsAt, t),
+                  })}
+                </span>
               </div>
               {!quota.allowed && (
                 <div className="flex items-center gap-2 text-xs text-danger">
                   <AlertTriangle size={14} />
-                  <span>Quota exhausted — new requests will be rejected until it resets.</span>
+                  <span>{t('dashboard.overall.quota.exhausted')}</span>
                 </div>
               )}
             </div>
@@ -376,14 +391,12 @@ export const OverallTab: React.FC = () => {
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
       >
         <Card
-          title="Allowed providers"
+          title={t('dashboard.overall.cards.allowedProviders')}
           extra={<Layers size={16} className="text-text-muted" />}
           className="min-w-0"
         >
           {allowedProviders.length === 0 ? (
-            <p className="text-sm text-text-muted">
-              Any provider (unrestricted) — this key can route to every provider the gateway knows.
-            </p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.access.anyProvider')}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {allowedProviders.map((p) => (
@@ -399,15 +412,12 @@ export const OverallTab: React.FC = () => {
         </Card>
 
         <Card
-          title="Allowed models"
+          title={t('dashboard.overall.cards.allowedModels')}
           extra={<Boxes size={16} className="text-text-muted" />}
           className="min-w-0"
         >
           {allowedModels.length === 0 ? (
-            <p className="text-sm text-text-muted">
-              Any model (unrestricted) — this key can request every model alias configured on the
-              gateway.
-            </p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.access.anyModel')}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {allowedModels.map((m) => (
@@ -425,36 +435,48 @@ export const OverallTab: React.FC = () => {
 
       {/* -------- Row 3: Token + request totals for selected range ------ */}
       <Card
-        title={`Totals (${timeRange})`}
+        title={t('dashboard.overall.cards.totals', { range: rangeLabel })}
         extra={<Activity size={16} className="text-text-muted" />}
       >
         {loading && !summary ? (
-          <p className="text-sm text-text-muted">Loading…</p>
+          <p className="text-sm text-text-muted">{t('dashboard.overall.loading')}</p>
         ) : !summary ? (
-          <p className="text-sm text-text-muted">No usage recorded in this range.</p>
+          <p className="text-sm text-text-muted">{t('dashboard.overall.totals.noUsage')}</p>
         ) : (
           <div
             className="grid gap-6"
             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))' }}
           >
-            <Metric label="Requests" value={formatNumber(summary.totalRequests, 0)} />
-            <Metric label="Total tokens" value={formatTokens(summary.totalTokens)} />
-            <Metric label="Input" value={formatTokens(summary.inputTokens)} />
-            <Metric label="Output" value={formatTokens(summary.outputTokens)} />
             <Metric
-              label="Cached"
+              label={t('dashboard.overall.totals.requests')}
+              value={formatNumber(summary.totalRequests, 0)}
+            />
+            <Metric
+              label={t('dashboard.overall.totals.totalTokens')}
+              value={formatTokens(summary.totalTokens)}
+            />
+            <Metric
+              label={t('dashboard.overall.totals.input')}
+              value={formatTokens(summary.inputTokens)}
+            />
+            <Metric
+              label={t('dashboard.overall.totals.output')}
+              value={formatTokens(summary.outputTokens)}
+            />
+            <Metric
+              label={t('dashboard.overall.totals.cached')}
               value={formatTokens(summary.cachedTokens)}
-              sub="reads from cache"
+              sub={t('dashboard.overall.totals.cachedSub')}
             />
             <Metric
-              label="Cache write"
+              label={t('dashboard.overall.totals.cacheWrite')}
               value={formatTokens(summary.cacheWriteTokens)}
-              sub="new cache entries"
+              sub={t('dashboard.overall.totals.cacheWriteSub')}
             />
             <Metric
-              label="Cost (today)"
+              label={t('dashboard.overall.totals.costToday')}
               value={formatCost(summary.todayCost)}
-              sub="attributed to this key"
+              sub={t('dashboard.overall.totals.costTodaySub')}
             />
           </div>
         )}
@@ -465,49 +487,49 @@ export const OverallTab: React.FC = () => {
         className="grid gap-4"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
       >
-        <Card title="Requests by provider" className="min-w-0">
+        <Card title={t('dashboard.overall.cards.requestsByProvider')} className="min-w-0">
           {loading && !providerData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.loading')}</p>
           ) : (
             <BreakdownList
               data={providerData}
-              emptyLabel="No requests recorded for any provider in this range."
+              emptyLabel={t('dashboard.overall.breakdown.noProviderRequests')}
               metric="requests"
             />
           )}
         </Card>
 
-        <Card title="Tokens by provider" className="min-w-0">
+        <Card title={t('dashboard.overall.cards.tokensByProvider')} className="min-w-0">
           {loading && !providerData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.loading')}</p>
           ) : (
             <BreakdownList
               data={providerData}
-              emptyLabel="No tokens recorded for any provider in this range."
+              emptyLabel={t('dashboard.overall.breakdown.noProviderTokens')}
               metric="tokens"
             />
           )}
         </Card>
 
-        <Card title="Requests by model alias" className="min-w-0">
+        <Card title={t('dashboard.overall.cards.requestsByModelAlias')} className="min-w-0">
           {loading && !modelData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.loading')}</p>
           ) : (
             <BreakdownList
               data={modelData}
-              emptyLabel="No requests recorded for any model alias in this range."
+              emptyLabel={t('dashboard.overall.breakdown.noModelRequests')}
               metric="requests"
             />
           )}
         </Card>
 
-        <Card title="Tokens by model alias" className="min-w-0">
+        <Card title={t('dashboard.overall.cards.tokensByModelAlias')} className="min-w-0">
           {loading && !modelData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-sm text-text-muted">{t('dashboard.overall.loading')}</p>
           ) : (
             <BreakdownList
               data={modelData}
-              emptyLabel="No tokens recorded for any model alias in this range."
+              emptyLabel={t('dashboard.overall.breakdown.noModelTokens')}
               metric="tokens"
             />
           )}

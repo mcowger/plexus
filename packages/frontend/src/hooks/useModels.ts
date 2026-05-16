@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, Alias, Provider, Model, Cooldown } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
+import { t } from '../i18n';
 
 export interface OrphanGroup {
   modelId: string;
@@ -97,7 +98,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to save alias', e);
-      toast.error('Failed to save alias');
+      toast.error(t('models.toast.saveFailed'));
       return false;
     } finally {
       setIsSaving(false);
@@ -111,7 +112,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to delete alias', e);
-      toast.error('Failed to delete alias');
+      toast.error(t('models.toast.deleteFailed'));
       return false;
     }
   };
@@ -123,7 +124,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to delete all aliases', e);
-      toast.error('Failed to delete all aliases');
+      toast.error(t('models.toast.deleteAllFailed'));
       return false;
     }
   };
@@ -145,7 +146,7 @@ export const useModels = () => {
       await api.saveAlias(updatedAlias, alias.id);
     } catch (e) {
       console.error('Toggle error', e);
-      toast.error('Failed to update target status: ' + e);
+      toast.error(t('models.toast.toggleTargetFailed', { error: String(e) }));
       loadData();
     }
   };
@@ -368,14 +369,14 @@ export const useModels = () => {
       }
 
       await loadData();
-      toast.success('Imports saved successfully');
+      toast.success(t('models.toast.importsSaved'));
       setIsImportModalOpen(false);
       setSelectedImports(new Map());
       setOrphanGroups([]);
       return true;
     } catch (e) {
       console.error('Failed to save imports', e);
-      toast.error('Failed to save imports');
+      toast.error(t('models.toast.importsFailed'));
       return false;
     } finally {
       setIsImporting(false);

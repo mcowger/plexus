@@ -1,0 +1,27 @@
+{
+  "title": "System Logs",
+  "subtitle": "Live tail · stderr+stdout",
+  "liveOutput": "Live Output",
+  "apply": "Apply",
+  "reset": "Reset",
+  "resume": "Resume",
+  "pause": "Pause",
+  "clear": "Clear",
+  "info": {
+    "currentLevel": "Current level:",
+    "startupDefault": "Startup default:",
+    "runtimeNote": "Runtime changes reset on restart."
+  },
+  "modules": {
+    "all": "All modules",
+    "addPlaceholder": "Add module...",
+    "clear": "Clear"
+  },
+  "waitingForLogs": "Waiting for logs...",
+  "toast": {
+    "levelSet": "Logging level set to {{level}}",
+    "levelSetFailed": "Failed to update logging level",
+    "levelReset": "Logging level reset to {{level}}",
+    "levelResetFailed": "Failed to reset logging level"
+  }
+}

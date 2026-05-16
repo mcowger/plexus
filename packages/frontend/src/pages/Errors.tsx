@@ -17,9 +17,11 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Errors: React.FC = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const { isAdmin, principal } = useAuth();
   const [errors, setErrors] = useState<InferenceError[]>([]);
@@ -146,13 +148,13 @@ export const Errors: React.FC = () => {
           title={
             <span className="inline-flex items-center gap-2">
               <AlertTriangle size={20} className="text-rose-400" />
-              Errors
+              {t('errors.title')}
             </span>
           }
           subtitle={
             principal?.role === 'limited' && principal.keyName
-              ? `Errors for key "${principal.keyName}" only`
-              : 'Grouped by signature · last 24h'
+              ? t('errors.subtitle.scoped', { keyName: principal.keyName })
+              : t('errors.subtitle.default')
           }
           actions={
             <>
@@ -164,7 +166,7 @@ export const Errors: React.FC = () => {
                   leftIcon={<Trash2 size={16} />}
                   disabled={errors.length === 0}
                 >
-                  Delete All
+                  {t('errors.actions.deleteAll')}
                 </Button>
               )}
               <Button
@@ -173,7 +175,7 @@ export const Errors: React.FC = () => {
                 size="sm"
                 leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}
               >
-                Refresh
+                {t('errors.actions.refresh')}
               </Button>
             </>
           }
@@ -185,7 +187,7 @@ export const Errors: React.FC = () => {
         <div className="flex max-h-[34vh] w-full shrink-0 flex-col border-b border-border-glass bg-bg-surface md:max-h-none md:w-[320px] md:border-b-0 md:border-r">
           <div className="border-b border-border-glass p-3 sm:p-4">
             <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
-              Recent Errors
+              {t('errors.list.header')}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
@@ -209,7 +211,7 @@ export const Errors: React.FC = () => {
                     <button
                       onClick={(e) => handleDelete(e, err.requestId)}
                       className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                      title="Delete error log"
+                      title={t('errors.list.deleteTooltip')}
                     >
                       <Trash2 size={12} />
                     </button>
@@ -225,7 +227,7 @@ export const Errors: React.FC = () => {
             ))}
             {errors.length === 0 && (
               <div className="text-center p-8 text-[var(--color-text-muted)] italic text-sm">
-                No errors found.
+                {t('errors.list.empty')}
               </div>
             )}
           </div>
@@ -237,15 +239,19 @@ export const Errors: React.FC = () => {
             <div className="flex flex-col">
               <div className="mb-3 border-b border-[var(--color-border)] p-3 sm:mb-4 sm:p-4">
                 <h3 className="mb-2 text-base font-semibold text-red-500 sm:text-lg">
-                  Error Details
+                  {t('errors.details.title')}
                 </h3>
                 <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 sm:gap-4 sm:text-sm">
                   <div className="min-w-0">
-                    <span className="text-[var(--color-text-muted)]">Request ID:</span>
+                    <span className="text-[var(--color-text-muted)]">
+                      {t('errors.details.requestId')}
+                    </span>
                     <span className="ml-2 break-all font-mono">{selectedError.requestId}</span>
                   </div>
                   <div className="min-w-0">
-                    <span className="text-[var(--color-text-muted)]">Time:</span>
+                    <span className="text-[var(--color-text-muted)]">
+                      {t('errors.details.time')}
+                    </span>
                     <span className="ml-2">{new Date(selectedError.date).toLocaleString()}</span>
                   </div>
                 </div>
@@ -255,12 +261,14 @@ export const Errors: React.FC = () => {
                     return (
                       <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
                         <h4 className="text-sm font-semibold text-yellow-500 mb-2">
-                          Routing Information
+                          {t('errors.details.routing.title')}
                         </h4>
                         <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 sm:gap-4 sm:text-sm">
                           {details.provider && (
                             <div className="min-w-0">
-                              <span className="text-[var(--color-text-muted)]">Provider:</span>
+                              <span className="text-[var(--color-text-muted)]">
+                                {t('errors.details.routing.provider')}
+                              </span>
                               <span className="ml-2 break-all font-mono text-blue-400">
                                 {details.provider}
                               </span>
@@ -268,7 +276,9 @@ export const Errors: React.FC = () => {
                           )}
                           {details.targetModel && (
                             <div className="min-w-0">
-                              <span className="text-[var(--color-text-muted)]">Target Model:</span>
+                              <span className="text-[var(--color-text-muted)]">
+                                {t('errors.details.routing.targetModel')}
+                              </span>
                               <span className="ml-2 break-all font-mono text-blue-400">
                                 {details.targetModel}
                               </span>
@@ -276,7 +286,9 @@ export const Errors: React.FC = () => {
                           )}
                           {details.targetApiType && (
                             <div className="min-w-0">
-                              <span className="text-[var(--color-text-muted)]">Target API:</span>
+                              <span className="text-[var(--color-text-muted)]">
+                                {t('errors.details.routing.targetApi')}
+                              </span>
                               <span className="ml-2 break-all font-mono text-blue-400">
                                 {details.targetApiType}
                               </span>
@@ -284,7 +296,9 @@ export const Errors: React.FC = () => {
                           )}
                           {details.statusCode && (
                             <div className="min-w-0">
-                              <span className="text-[var(--color-text-muted)]">Status Code:</span>
+                              <span className="text-[var(--color-text-muted)]">
+                                {t('errors.details.routing.statusCode')}
+                              </span>
                               <span className="ml-2 font-mono text-red-400">
                                 {details.statusCode}
                               </span>
@@ -292,7 +306,9 @@ export const Errors: React.FC = () => {
                           )}
                           {details.url && (
                             <div className="sm:col-span-2">
-                              <span className="text-[var(--color-text-muted)]">Request URL:</span>
+                              <span className="text-[var(--color-text-muted)]">
+                                {t('errors.details.routing.url')}
+                              </span>
                               <div className="ml-2 font-mono text-xs text-blue-400 break-all mt-1">
                                 {details.url}
                               </div>
@@ -307,15 +323,15 @@ export const Errors: React.FC = () => {
               </div>
 
               <AccordionPanel
-                title="Message"
+                title={t('errors.details.panels.message')}
                 content={selectedError.errorMessage}
                 color="text-red-400"
                 defaultOpen={true}
                 language="plaintext"
               />
               <AccordionPanel
-                title="Stack Trace"
-                content={selectedError.errorStack || '(No stack trace available)'}
+                title={t('errors.details.panels.stackTrace')}
+                content={selectedError.errorStack || t('errors.details.panels.noStack')}
                 color="text-orange-400"
                 defaultOpen={true}
                 language="plaintext"
@@ -325,7 +341,7 @@ export const Errors: React.FC = () => {
                 if (details?.providerResponse) {
                   return (
                     <AccordionPanel
-                      title="Provider Response"
+                      title={t('errors.details.panels.providerResponse')}
                       content={details.providerResponse}
                       color="text-purple-400"
                       defaultOpen={false}
@@ -340,7 +356,7 @@ export const Errors: React.FC = () => {
                 if (details?.headers) {
                   return (
                     <AccordionPanel
-                      title="Request Headers"
+                      title={t('errors.details.panels.headers')}
                       content={formatContent(details.headers)}
                       color="text-cyan-400"
                       defaultOpen={false}
@@ -368,7 +384,7 @@ export const Errors: React.FC = () => {
                   if (hasOtherFields) {
                     return (
                       <AccordionPanel
-                        title="Additional Details"
+                        title={t('errors.details.panels.additional')}
                         content={formatContent(details)}
                         color="text-blue-400"
                         defaultOpen={false}
@@ -381,7 +397,7 @@ export const Errors: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">
               <AlertTriangle size={48} opacity={0.2} />
-              <p>Select an error to inspect details</p>
+              <p>{t('errors.details.selectPlaceholder')}</p>
             </div>
           )}
         </div>
@@ -390,37 +406,41 @@ export const Errors: React.FC = () => {
       <Modal
         isOpen={isDeleteAllModalOpen}
         onClose={() => setIsDeleteAllModalOpen(false)}
-        title="Confirm Deletion"
+        title={t('errors.deleteAllModal.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsDeleteAllModalOpen(false)}>
-              Cancel
+              {t('errors.deleteAllModal.cancelButton')}
             </Button>
             <Button variant="danger" onClick={confirmDeleteAll} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete All Errors'}
+              {isDeleting
+                ? t('errors.deleteAllModal.deleting')
+                : t('errors.deleteAllModal.deleteButton')}
             </Button>
           </>
         }
       >
-        <p>Are you sure you want to delete ALL error logs? This action cannot be undone.</p>
+        <p>{t('errors.deleteAllModal.body')}</p>
       </Modal>
 
       <Modal
         isOpen={isSingleDeleteModalOpen}
         onClose={() => setIsSingleDeleteModalOpen(false)}
-        title="Confirm Deletion"
+        title={t('errors.singleDeleteModal.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
-              Cancel
+              {t('errors.singleDeleteModal.cancelButton')}
             </Button>
             <Button variant="danger" onClick={confirmDeleteSingle} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete Error Log'}
+              {isDeleting
+                ? t('errors.singleDeleteModal.deleting')
+                : t('errors.singleDeleteModal.deleteButton')}
             </Button>
           </>
         }
       >
-        <p>Are you sure you want to delete this error log? This action cannot be undone.</p>
+        <p>{t('errors.singleDeleteModal.body')}</p>
       </Modal>
     </div>
   );
@@ -433,6 +453,7 @@ const AccordionPanel: React.FC<{
   defaultOpen?: boolean;
   language?: string;
 }> = ({ title, content, color, defaultOpen = false, language = 'json' }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
 
@@ -461,7 +482,7 @@ const AccordionPanel: React.FC<{
         <button
           className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
           onClick={handleCopy}
-          title="Copy to clipboard"
+          title={t('errors.details.panels.copyTooltip')}
         >
           {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
         </button>

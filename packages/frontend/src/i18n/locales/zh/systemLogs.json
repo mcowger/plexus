@@ -1,0 +1,27 @@
+{
+  "title": "系统日志",
+  "subtitle": "实时跟随 · stderr+stdout",
+  "liveOutput": "实时输出",
+  "apply": "应用",
+  "reset": "重置",
+  "resume": "继续",
+  "pause": "暂停",
+  "clear": "清空",
+  "info": {
+    "currentLevel": "当前级别：",
+    "startupDefault": "启动默认：",
+    "runtimeNote": "运行时修改在重启后会被重置。"
+  },
+  "modules": {
+    "all": "全部模块",
+    "addPlaceholder": "添加模块...",
+    "clear": "清除"
+  },
+  "waitingForLogs": "等待日志...",
+  "toast": {
+    "levelSet": "日志级别已设为 {{level}}",
+    "levelSetFailed": "更新日志级别失败",
+    "levelReset": "日志级别已重置为 {{level}}",
+    "levelResetFailed": "重置日志级别失败"
+  }
+}

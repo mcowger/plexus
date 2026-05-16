@@ -1,6 +1,7 @@
 import React from 'react';
 import { Input } from '../ui/Input';
 import { ExternalLink } from 'lucide-react';
+import { useT } from '../../i18n';
 
 export interface ZenmuxQuotaConfigProps {
   options: Record<string, unknown>;
@@ -8,6 +9,8 @@ export interface ZenmuxQuotaConfigProps {
 }
 
 export const ZenmuxQuotaConfig: React.FC<ZenmuxQuotaConfigProps> = ({ options, onChange }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };
@@ -19,25 +22,26 @@ export const ZenmuxQuotaConfig: React.FC<ZenmuxQuotaConfigProps> = ({ options, o
           htmlFor="zenmux-management-api-key"
           className="font-body text-[13px] font-medium text-text-secondary"
         >
-          Management API Key <span className="text-danger">*</span>
+          {t('checkerCommon.managementApiKey')} <span className="text-danger">*</span>
         </label>
         <Input
           id="zenmux-management-api-key"
           type="password"
           value={(options.managementApiKey as string) ?? ''}
           onChange={(e) => handleChange('managementApiKey', e.target.value)}
-          placeholder="Enter your Zenmux management API key"
+          placeholder={t('checkerConfigs.zenmux.managementKeyPlaceholder')}
         />
         <span className="text-[10px] text-text-muted">
-          Required. Use a management API key from{' '}
+          {t('checkerConfigs.zenmux.managementKeyHintBefore')}{' '}
           <a
             href="https://zenmux.ai/dashboard"
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary hover:underline inline-flex items-center gap-1"
           >
-            Zenmux Dashboard <ExternalLink size={10} />
+            {t('checkerConfigs.zenmux.managementKeyLink')} <ExternalLink size={10} />
           </a>
+          {t('checkerConfigs.zenmux.managementKeyHintAfter')}
         </span>
       </div>
 
@@ -46,7 +50,7 @@ export const ZenmuxQuotaConfig: React.FC<ZenmuxQuotaConfigProps> = ({ options, o
           htmlFor="zenmux-endpoint"
           className="font-body text-[13px] font-medium text-text-secondary"
         >
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           id="zenmux-endpoint"
@@ -54,9 +58,7 @@ export const ZenmuxQuotaConfig: React.FC<ZenmuxQuotaConfigProps> = ({ options, o
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://zenmux.ai/api/v1/management/subscription/detail"
         />
-        <span className="text-[10px] text-text-muted">
-          Custom endpoint URL. Defaults to Zenmux's API.
-        </span>
+        <span className="text-[10px] text-text-muted">{t('checkerConfigs.zenmux.endpointHint')}</span>
       </div>
     </div>
   );

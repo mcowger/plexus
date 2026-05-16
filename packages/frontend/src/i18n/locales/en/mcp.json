@@ -1,0 +1,91 @@
+{
+  "title": "MCP servers",
+  "subtitle": "Model Context Protocol connections — exposes tools and resources to clients",
+  "addServer": "Add server",
+  "addServerLong": "Add MCP Server",
+  "serversCardTitle": "MCP Servers",
+  "noServers": "No MCP servers configured. Click \"Add MCP Server\" to create one.",
+  "loading": "Loading...",
+  "headersLabel": "Headers: ",
+  "deleteAria": "Delete {{name}}",
+  "table": {
+    "name": "Name",
+    "upstreamUrl": "Upstream URL",
+    "status": "Status",
+    "headers": "Headers",
+    "actions": "Actions",
+    "headersConfigured": "{{count}} configured",
+    "headersCount": "{{count}} header(s)",
+    "dash": "-"
+  },
+  "logs": {
+    "cardTitle": "MCP Usage Logs",
+    "filterByServer": "Filter by Server...",
+    "filterByKey": "Filter by Key...",
+    "search": "Search",
+    "deleteAll": "Delete All",
+    "loading": "Loading...",
+    "empty": "No MCP logs found",
+    "deleteAria": "Delete MCP log",
+    "deleteTitle": "Delete log",
+    "labels": {
+      "server": "Server",
+      "method": "Method",
+      "rpc": "RPC",
+      "duration": "Duration",
+      "date": "Date",
+      "key": "Key",
+      "rpcMethod": "RPC Method",
+      "status": "Status"
+    },
+    "streamed": "streamed",
+    "buffered": "buffered",
+    "statusLabel": "Status {{status}}",
+    "page": "Page {{current}} of {{total}}"
+  },
+  "modal": {
+    "editTitle": "Edit {{name}}",
+    "addTitle": "Add MCP Server",
+    "saving": "Saving...",
+    "fields": {
+      "serverName": "Server Name",
+      "serverNamePlaceholder": "my-mcp-server",
+      "upstreamUrl": "Upstream URL",
+      "upstreamUrlPlaceholder": "https://mcp.example.com/mcp",
+      "headerKey": "Header Key",
+      "headerKeyPlaceholder": "Authorization",
+      "headerValue": "Header Value",
+      "headerValuePlaceholder": "Bearer token...",
+      "configuredHeaders": "Configured Headers"
+    }
+  },
+  "deleteLogsModal": {
+    "title": "Confirm Deletion",
+    "intro": "Select which MCP logs you would like to delete:",
+    "deleteOlder": "Delete logs older than",
+    "days": "days",
+    "deleteAll": "Delete ALL logs (Cannot be undone)",
+    "deleting": "Deleting...",
+    "deleteLogs": "Delete Logs"
+  },
+  "singleDeleteModal": {
+    "title": "Confirm Deletion",
+    "message": "Are you sure you want to delete this MCP log entry?",
+    "deleting": "Deleting...",
+    "deleteLog": "Delete Log"
+  },
+  "confirm": {
+    "deleteTitle": "Delete MCP server?",
+    "deleteMessage": "Are you sure you want to delete the MCP server \"{{name}}\"?",
+    "deleteLabel": "Delete"
+  },
+  "toast": {
+    "serverNameRequired": "Server Name is required",
+    "invalidServerName": "Invalid server name. Use lowercase letters, numbers, hyphens, and underscores (2-63 characters, must start with letter or number)",
+    "upstreamUrlRequired": "Upstream URL is required",
+    "saveFailed": "Failed to save MCP server: {{error}}",
+    "deleteFailed": "Failed to delete MCP server: {{error}}",
+    "updateFailed": "Failed to update MCP server: {{error}}",
+    "deleted": "Deleted {{name}}"
+  }
+}

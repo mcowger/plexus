@@ -5,6 +5,7 @@ import { Switch } from '../ui/Switch';
 import { Alias, Provider, Cooldown } from '../../lib/api';
 import { ModelTypeBadge } from './ModelTypeBadge';
 import { formatMsToMinSec } from '@plexus/shared';
+import { useT } from '../../i18n';
 
 interface AliasTableRowProps {
   alias: Alias;
@@ -40,6 +41,8 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
   onTestTarget,
   onDismissTestMessage,
 }) => {
+  const { t } = useT('models.aliasRow');
+
   return (
     <tr className="hover:bg-bg-hover">
       <td
@@ -59,7 +62,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             <button
               onClick={() => onDelete(alias)}
               className="bg-none border-none cursor-pointer p-1 rounded color-danger opacity-60 transition-opacity hover:opacity-100"
-              title="Delete alias"
+              title={t('deleteAliasTitle')}
             >
               <Trash2 size={14} />
             </button>
@@ -92,7 +95,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             <div
               key={group.name}
               className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium border border-border-glass text-text-secondary capitalize"
-              title={`Group: ${group.name}`}
+              title={t('groupTitle', { name: group.name })}
             >
               {group.name}: {group.selector}
             </div>
@@ -131,16 +134,16 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                 />
               </div>
               <div className="flex flex-col gap-1">
-                {group.targets.map((t, targetIdx) => {
-                  const provider = providers.find((p) => p.id === t.provider);
+                {group.targets.map((t_row, targetIdx) => {
+                  const provider = providers.find((p) => p.id === t_row.provider);
                   const isProviderDisabled = provider?.enabled === false;
-                  const isTargetDisabled = t.enabled === false;
+                  const isTargetDisabled = t_row.enabled === false;
                   const isDisabled = isProviderDisabled || isTargetDisabled;
                   const testKey = `${alias.id}-${groupIdx}-${targetIdx}`;
                   const testState = testStates[testKey];
 
                   const cooldown = cooldowns.find(
-                    (c) => c.provider === t.provider && c.model === t.model && !c.accountId
+                    (c) => c.provider === t_row.provider && c.model === t_row.model && !c.accountId
                   );
                   const isCoolingDown = !!cooldown;
                   const cooldownDisplay = cooldown
@@ -148,7 +151,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                     : '';
 
                   return (
-                    <React.Fragment key={`${t.provider}-${t.model}-${targetIdx}`}>
+                    <React.Fragment key={`${t_row.provider}-${t_row.model}-${targetIdx}`}>
                       <div
                         className={`flex items-center gap-2 text-xs transition-opacity ${
                           isDisabled ? 'opacity-70 line-through text-danger' : 'text-text-secondary'
@@ -157,7 +160,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                         {isCoolingDown && (
                           <div
                             className="flex items-center gap-1 text-warning font-medium text-[11px]"
-                            title={`On cooldown for ${cooldownDisplay}`}
+                            title={t('cooldownTitle', { duration: cooldownDisplay })}
                           >
                             <Clock size={12} />
                             <span>{cooldownDisplay}</span>
@@ -172,7 +175,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                               else if (alias.type === 'image') testApiTypes = ['images'];
                               else if (alias.type === 'responses') testApiTypes = ['responses'];
 
-                              onTestTarget(alias.id, testKey, t.provider, t.model, testApiTypes);
+                              onTestTarget(alias.id, testKey, t_row.provider, t_row.model, testApiTypes);
                             }
                           }}
                           className={`flex items-center cursor-pointer transition-opacity ${
@@ -193,13 +196,13 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                           )}
                         </div>
                         <Switch
-                          checked={t.enabled !== false}
+                          checked={t_row.enabled !== false}
                           onChange={(val) => onToggleTarget(alias, groupIdx, targetIdx, val)}
                           size="sm"
                           disabled={isProviderDisabled}
                         />
                         <div className="flex-1 truncate">
-                          {t.provider} &rarr; {t.model}
+                          {t_row.provider} &rarr; {t_row.model}
                         </div>
                       </div>
                       {testState?.showMessage &&
@@ -212,7 +215,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                                 onDismissTestMessage(testKey);
                               }}
                               className="cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
-                              title="Click to dismiss"
+                              title={t('dismissErrorTitle')}
                             >
                               <span className="text-[11px] italic text-danger">
                                 {testState.message} [×]

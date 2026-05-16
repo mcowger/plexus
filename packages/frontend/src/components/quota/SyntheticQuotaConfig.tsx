@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 export interface SyntheticQuotaConfigProps {
   options: Record<string, unknown>;
@@ -10,6 +11,8 @@ export const SyntheticQuotaConfig: React.FC<SyntheticQuotaConfigProps> = ({
   options,
   onChange,
 }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string | number | undefined) => {
     if (value !== undefined) {
       onChange({ ...options, [key]: value });
@@ -23,20 +26,18 @@ export const SyntheticQuotaConfig: React.FC<SyntheticQuotaConfigProps> = ({
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://api.synthetic.new/v2/quotas"
         />
-        <span className="text-[10px] text-text-muted">
-          Custom endpoint URL. Defaults to Synthetic's API.
-        </span>
+        <span className="text-[10px] text-text-muted">{t('checkerConfigs.synthetic.endpointHint')}</span>
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Max Utilization Percent (optional)
+          {t('checkerCommon.maxUtilizationPercentOptional')}
         </label>
         <Input
           type="number"
@@ -49,10 +50,7 @@ export const SyntheticQuotaConfig: React.FC<SyntheticQuotaConfigProps> = ({
           }}
           placeholder="99"
         />
-        <span className="text-[10px] text-text-muted">
-          Threshold (1–100) to trigger cooldown. Default: 99. Set lower to reserve quota — e.g. 30 =
-          provider cooled down at 30% usage, preserving 70%.
-        </span>
+        <span className="text-[10px] text-text-muted">{t('checkerConfigs.synthetic.maxUtilizationHint')}</span>
       </div>
     </div>
   );

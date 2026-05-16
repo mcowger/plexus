@@ -1,0 +1,106 @@
+{
+  "title": "请求日志",
+  "subtitle": {
+    "scoped": "仅限于密钥 \"{{keyName}}\"",
+    "default": "所有通过网关路由的 API 请求"
+  },
+  "actions": {
+    "deleteAll": "全部删除",
+    "search": "搜索"
+  },
+  "filters": {
+    "byKey": "按密钥过滤…",
+    "byModel": "按模型过滤…",
+    "byProvider": "按服务商过滤…",
+    "startDate": "起始时间",
+    "endDate": "结束时间",
+    "clearDates": "清除时间过滤",
+    "sortBy": "按 {{label}} 排序"
+  },
+  "states": {
+    "loading": "加载中...",
+    "noLogs": "未找到日志"
+  },
+  "columns": {
+    "date": "时间",
+    "key": "密钥",
+    "api": "API",
+    "model": "模型",
+    "tokens": "Tokens",
+    "cost": "费用",
+    "perf": "性能",
+    "meta": "元数据",
+    "status": "状态",
+    "latency": "延迟"
+  },
+  "card": {
+    "metaSummary": "{{messages}} 条消息 / {{tools}} 个工具"
+  },
+  "errorButton": "错误",
+  "debugButton": "调试",
+  "tooltips": {
+    "viewError": "查看错误详情",
+    "viewDebug": "查看调试追踪",
+    "deleteLog": "删除日志",
+    "copyIncomingModel": "复制请求模型别名",
+    "copySelectedModel": "复制已选模型名称",
+    "copyFallthroughModel": "复制回退模型名称",
+    "copyRequiresHttps": "复制功能需要 HTTPS",
+    "viewRetryHistory": "查看重试历史",
+    "visionFallthrough": "视觉回退{{via}}（图片已转换为文本）",
+    "visionVia": "（经由 {{model}}）",
+    "descriptorRequest": "描述请求（已生成图片描述）",
+    "visionFallthroughDescriptor": "视觉回退描述模型",
+    "apiInfo": "请求：{{incoming}} → 响应：{{outgoing}} • {{streamMode}} • {{passthroughMode}}",
+    "streamed": "流式",
+    "nonStreamed": "非流式",
+    "passthrough": "直通",
+    "translated": "已转换",
+    "energy": "能耗:{{energy}} ≈ {{slices}} 片烤面包",
+    "ipAddress": "IP:{{ip}}",
+    "tokensTooltip": "输入:{{input}} • 输出:{{output}} • 推理:{{reasoning}} • 缓存:{{cached}} • 缓存写入:{{cacheWrite}}",
+    "estimatedSuffix": " • * = 估算值"
+  },
+  "perf": {
+    "duration": "时长:{{value}}",
+    "ttft": "TTFT:{{value}}",
+    "tps": "TPS:{{value}}"
+  },
+  "pagination": {
+    "summary": "第 {{current}} / {{total}} 页"
+  },
+  "dateFormat": {
+    "invalid": "无效",
+    "errorWord": "错误",
+    "dateWord": "日期"
+  },
+  "retryModal": {
+    "title": "重试历史",
+    "closeButton": "关闭",
+    "request": "请求:",
+    "attempts": "尝试次数:",
+    "empty": "此请求没有可用的重试历史。",
+    "attemptHeader": "第 {{index}} 次尝试:{{provider}}/{{model}}",
+    "api": "API:{{value}}",
+    "statusCode": "状态码:{{code}}",
+    "retryable": "是否可重试:{{value}}",
+    "yes": "是",
+    "no": "否"
+  },
+  "deleteModal": {
+    "title": "确认删除",
+    "cancelButton": "取消",
+    "deleteButton": "删除日志",
+    "deleting": "删除中...",
+    "intro": "请选择要删除的日志:",
+    "olderLabel": "删除早于",
+    "daysSuffix": "天的日志",
+    "allLabel": "删除所有日志（无法撤销）"
+  },
+  "singleDelete": {
+    "deleteButton": "删除日志",
+    "deleting": "删除中...",
+    "confirmPrefix": "确定要删除日志 ",
+    "confirmSuffix": " 吗？此操作无法撤销。"
+  }
+}

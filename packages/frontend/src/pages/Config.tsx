@@ -1,5 +1,6 @@
 import { Component, useEffect, useRef, useState, useCallback } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import Editor from '@monaco-editor/react';
 import {
   RotateCcw,
@@ -16,6 +17,7 @@ import {
   Radar,
   Activity,
 } from 'lucide-react';
+import i18n from '../i18n';
 import { api } from '../lib/api';
 import { formatMinutesToMinSec } from '@plexus/shared';
 import { useToast } from '../contexts/ToastContext';
@@ -45,7 +47,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
         <div className="h-[400px] sm:h-[500px] flex items-center justify-center bg-bg-glass/30 text-text-secondary rounded-md">
           <div className="text-center p-6">
             <AlertTriangle className="mx-auto mb-3 text-warning" size={32} />
-            <p className="text-sm font-semibold mb-1">Editor failed to load</p>
+            <p className="text-sm font-semibold mb-1">{i18n.t('config.editorFailedToLoad')}</p>
             <p className="text-xs text-text-muted">{this.state.error.message}</p>
           </div>
         </div>
@@ -126,6 +128,7 @@ const DEFAULT_COOLDOWN_POLICY: CooldownPolicy = {
 };
 
 export const Config = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const [config, setConfig] = useState('');
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
@@ -155,14 +158,14 @@ export const Config = () => {
     raw: string
   ): { valid: boolean; value?: number; error?: string } => {
     if (raw === '') {
-      return { valid: false, error: 'Required' };
+      return { valid: false, error: t('config.validation.required') };
     }
     const num = Number(raw);
     if (isNaN(num) || !isFinite(num)) {
-      return { valid: false, error: 'Invalid number' };
+      return { valid: false, error: t('config.validation.invalidNumber') };
     }
     if (num < 0.1) {
-      return { valid: false, error: 'Must be at least 0.1' };
+      return { valid: false, error: t('config.validation.mustBeAtLeast', { min: 0.1 }) };
     }
     return { valid: true, value: num };
   };
@@ -188,17 +191,17 @@ export const Config = () => {
     raw: string
   ): { valid: boolean; value?: number; error?: string } => {
     if (raw === '') {
-      return { valid: false, error: 'Required' };
+      return { valid: false, error: t('config.validation.required') };
     }
     const num = Number(raw);
     if (isNaN(num) || !isFinite(num) || !Number.isInteger(num)) {
-      return { valid: false, error: 'Must be an integer' };
+      return { valid: false, error: t('config.validation.mustBeInteger') };
     }
     if (num < 1) {
-      return { valid: false, error: 'Must be at least 1' };
+      return { valid: false, error: t('config.validation.mustBeAtLeast', { min: 1 }) };
     }
     if (num > 3600) {
-      return { valid: false, error: 'Must be at most 3600' };
+      return { valid: false, error: t('config.validation.mustBeAtMost', { max: 3600 }) };
     }
     return { valid: true, value: num };
   };
@@ -218,10 +221,11 @@ export const Config = () => {
       return { valid: true }; // Empty for non-nullable fields means "use default" / unchanged
     }
     const num = Number(raw);
-    if (!Number.isFinite(num)) return { valid: false, error: 'Must be a number' };
-    if (!Number.isInteger(num)) return { valid: false, error: 'Must be an integer' };
-    if (num < min) return { valid: false, error: `Must be at least ${min}` };
-    if (num > max) return { valid: false, error: `Must be at most ${max}` };
+    if (!Number.isFinite(num)) return { valid: false, error: t('config.validation.mustBeNumber') };
+    if (!Number.isInteger(num))
+      return { valid: false, error: t('config.validation.mustBeInteger') };
+    if (num < min) return { valid: false, error: t('config.validation.mustBeAtLeast', { min }) };
+    if (num > max) return { valid: false, error: t('config.validation.mustBeAtMost', { max }) };
     return { valid: true, value: num };
   };
 
@@ -256,14 +260,14 @@ export const Config = () => {
     raw: string
   ): { valid: boolean; value?: number; error?: string } => {
     if (raw === '') {
-      return { valid: false, error: 'Required' };
+      return { valid: false, error: t('config.validation.required') };
     }
     const num = Number(raw);
     if (isNaN(num) || !isFinite(num)) {
-      return { valid: false, error: 'Invalid number' };
+      return { valid: false, error: t('config.validation.invalidNumber') };
     }
     if (num < 0 || num > 1) {
-      return { valid: false, error: 'Must be between 0 and 1' };
+      return { valid: false, error: t('config.validation.mustBeBetween', { min: 0, max: 1 }) };
     }
     return { valid: true, value: num };
   };
@@ -286,24 +290,25 @@ export const Config = () => {
   const validateStalenessInput = (
     raw: string
   ): { valid: boolean; value?: number; error?: string } => {
-    if (raw === '') return { valid: false, error: 'Required' };
+    if (raw === '') return { valid: false, error: t('config.validation.required') };
     const num = Number(raw);
     if (!Number.isFinite(num) || !Number.isInteger(num)) {
-      return { valid: false, error: 'Must be an integer (seconds)' };
+      return { valid: false, error: t('config.validation.mustBeIntegerSeconds') };
     }
-    if (num < 1) return { valid: false, error: 'Must be at least 1 second' };
+    if (num < 1) return { valid: false, error: t('config.validation.mustBeAtLeastOneSecond') };
     return { valid: true, value: num };
   };
 
   const validateConcurrencyInput = (
     raw: string
   ): { valid: boolean; value?: number; error?: string } => {
-    if (raw === '') return { valid: false, error: 'Required' };
+    if (raw === '') return { valid: false, error: t('config.validation.required') };
     const num = Number(raw);
     if (!Number.isFinite(num) || !Number.isInteger(num)) {
-      return { valid: false, error: 'Must be an integer' };
+      return { valid: false, error: t('config.validation.mustBeInteger') };
     }
-    if (num < 1 || num > 16) return { valid: false, error: 'Must be between 1 and 16' };
+    if (num < 1 || num > 16)
+      return { valid: false, error: t('config.validation.mustBeBetween', { min: 1, max: 16 }) };
     return { valid: true, value: num };
   };
 
@@ -328,9 +333,9 @@ export const Config = () => {
       setFailoverLoaded(true);
     } catch (e) {
       console.error('Failed to load failover policy:', e);
-      toast.error('Failed to load failover settings');
+      toast.error(t('config.failover.toast.loadFailed'));
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const loadCooldownPolicy = useCallback(async () => {
     try {
@@ -341,9 +346,9 @@ export const Config = () => {
       setCooldownLoaded(true);
     } catch (e) {
       console.error('Failed to load cooldown policy:', e);
-      toast.error('Failed to load cooldown settings');
+      toast.error(t('config.cooldown.toast.loadFailed'));
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const loadExplorationRates = useCallback(async () => {
     try {
@@ -355,9 +360,9 @@ export const Config = () => {
       setExplorationLoaded(true);
     } catch (e) {
       console.error('Failed to load exploration rates:', e);
-      toast.error('Failed to load exploration rate settings');
+      toast.error(t('config.exploration.toast.ratesLoadFailed'));
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const loadBackgroundExploration = useCallback(async () => {
     try {
@@ -368,9 +373,9 @@ export const Config = () => {
       setBgExplorationLoaded(true);
     } catch (e) {
       console.error('Failed to load background exploration settings:', e);
-      toast.error('Failed to load background exploration settings');
+      toast.error(t('config.exploration.toast.backgroundLoadFailed'));
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const loadTimeoutConfig = useCallback(async () => {
     try {
@@ -380,9 +385,9 @@ export const Config = () => {
       setTimeoutLoaded(true);
     } catch (e) {
       console.error('Failed to load timeout config:', e);
-      toast.error('Failed to load timeout settings');
+      toast.error(t('config.timeout.toast.loadFailed'));
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const handleSaveFailover = async () => {
     setFailoverSaving(true);
@@ -410,9 +415,9 @@ export const Config = () => {
       setFailoverPolicy(updated);
       setStatusCodesText(updated.retryableStatusCodes.join(', '));
       setErrorsText(updated.retryableErrors.join(', '));
-      toast.success('Failover settings saved');
+      toast.success(t('config.failover.toast.saved'));
     } catch (e) {
-      toast.error((e as Error).message, 'Failed to save failover settings');
+      toast.error((e as Error).message, t('config.failover.toast.saveFailed'));
     } finally {
       setFailoverSaving(false);
     }
@@ -430,9 +435,9 @@ export const Config = () => {
       setCooldownPolicy(updated);
       setCooldownInitialInput(String(updated.initialMinutes));
       setCooldownMaxInput(String(updated.maxMinutes));
-      toast.success('Cooldown settings saved');
+      toast.success(t('config.cooldown.toast.saved'));
     } catch (e) {
-      toast.error((e as Error).message, 'Failed to save cooldown settings');
+      toast.error((e as Error).message, t('config.cooldown.toast.saveFailed'));
     } finally {
       setCooldownSaving(false);
     }
@@ -450,9 +455,9 @@ export const Config = () => {
       setStallLoaded(true);
     } catch (e) {
       console.error('Failed to load stall config:', e);
-      toast.error('Failed to load stall detection settings');
+      toast.error(t('config.stall.toast.loadFailed'));
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const handleSaveTimeout = async () => {
     if (!timeoutDefaultValidation.valid) return;
@@ -464,9 +469,9 @@ export const Config = () => {
 
       setTimeoutConfig(updated);
       setTimeoutDefaultInput(String(updated.defaultSeconds));
-      toast.success('Timeout settings saved');
+      toast.success(t('config.timeout.toast.saved'));
     } catch (e) {
-      toast.error((e as Error).message, 'Failed to save timeout settings');
+      toast.error((e as Error).message, t('config.timeout.toast.saveFailed'));
     } finally {
       setTimeoutSaving(false);
     }
@@ -517,9 +522,9 @@ export const Config = () => {
       );
       setStallWindowInput(String(updated.windowSeconds));
       setStallGraceInput(String(updated.gracePeriodSeconds));
-      toast.success('Stall detection settings saved');
+      toast.success(t('config.stall.toast.saved'));
     } catch (e) {
-      toast.error((e as Error).message, 'Failed to save stall detection settings');
+      toast.error((e as Error).message, t('config.stall.toast.saveFailed'));
     } finally {
       setStallSaving(false);
     }
@@ -574,9 +579,9 @@ export const Config = () => {
         setExplorationE2EInput(String(updatedRates.e2ePerformanceExplorationRate));
       }
 
-      toast.success('Exploration settings saved');
+      toast.success(t('config.exploration.toast.saved'));
     } catch (e) {
-      toast.error((e as Error).message, 'Failed to save exploration settings');
+      toast.error((e as Error).message, t('config.exploration.toast.saveFailed'));
     } finally {
       setExplorationSaving(false);
       setBgExplorationSaving(false);
@@ -591,7 +596,7 @@ export const Config = () => {
     } catch (e) {
       console.error('Failed to load config:', e);
       setIsConfigLoaded(false);
-      toast.error('Failed to load config');
+      toast.error(t('config.configToast.loadFailed'));
     }
   };
 
@@ -662,18 +667,18 @@ export const Config = () => {
           const validIds = new Set<string>(DEFAULT_CARD_ORDER);
           const allIdsValid = parsed.every((item: { id: string }) => validIds.has(item.id));
           if (!allIdsValid) {
-            toast.error('Invalid card layout: contains unknown card IDs');
+            toast.error(t('config.cardLayout.toast.invalidIds'));
             return;
           }
 
           localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(parsed));
           setCardLayout(parsed);
-          toast.success('Card layout imported');
+          toast.success(t('config.cardLayout.toast.imported'));
         } else {
-          toast.error('Invalid card layout format');
+          toast.error(t('config.cardLayout.toast.invalidFormat'));
         }
       } catch {
-        toast.error('Failed to import: Invalid JSON file');
+        toast.error(t('config.cardLayout.toast.invalidJson'));
       }
     };
     reader.readAsText(file);
@@ -698,9 +703,9 @@ export const Config = () => {
       const blob = await api.createBackup();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       triggerBlobDownload(blob, `plexus-backup-${timestamp}.json`);
-      toast.success('Config backup downloaded');
+      toast.success(t('config.backup.toast.configBackupDownloaded'));
     } catch (e) {
-      toast.error((e as Error).message, 'Backup failed');
+      toast.error((e as Error).message, t('config.backup.toast.configBackupFailed'));
     } finally {
       setIsBackupLoading(false);
     }
@@ -712,9 +717,9 @@ export const Config = () => {
       const blob = await api.createFullBackup();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       triggerBlobDownload(blob, `plexus-backup-${timestamp}.tar.gz`);
-      toast.success('Full backup downloaded');
+      toast.success(t('config.backup.toast.fullBackupDownloaded'));
     } catch (e) {
-      toast.error((e as Error).message, 'Full backup failed');
+      toast.error((e as Error).message, t('config.backup.toast.fullBackupFailed'));
     } finally {
       setIsFullBackupLoading(false);
     }
@@ -734,10 +739,9 @@ export const Config = () => {
       file.type === 'application/x-gzip';
 
     const ok = await toast.confirm({
-      title: 'Restore Database?',
-      message:
-        'This will **replace all existing data** with the contents of the backup file. This action cannot be undone. Are you sure?',
-      confirmLabel: 'Restore',
+      title: t('config.backup.restorePrompt.title'),
+      message: t('config.backup.restorePrompt.message'),
+      confirmLabel: t('config.backup.restorePrompt.confirmLabel'),
       variant: 'danger',
     });
     if (!ok) return;
@@ -752,11 +756,11 @@ export const Config = () => {
         const data = JSON.parse(text);
         result = await api.restoreBackup(data);
       }
-      toast.success(result.message, 'Restore complete');
+      toast.success(result.message, t('config.backup.toast.restoreComplete'));
       // Reload config after restore
       await loadConfig();
     } catch (e) {
-      toast.error((e as Error).message, 'Restore failed');
+      toast.error((e as Error).message, t('config.backup.toast.restoreFailed'));
     } finally {
       setIsRestoreLoading(false);
     }
@@ -764,10 +768,9 @@ export const Config = () => {
 
   const handleRestart = async () => {
     const ok = await toast.confirm({
-      title: 'Restart Plexus?',
-      message:
-        'This will briefly interrupt all ongoing requests. Are you sure you want to continue?',
-      confirmLabel: 'Restart',
+      title: t('config.restart.title'),
+      message: t('config.restart.message'),
+      confirmLabel: t('config.restart.confirmLabel'),
       variant: 'danger',
     });
     if (!ok) return;
@@ -776,21 +779,18 @@ export const Config = () => {
     try {
       await api.restart();
     } catch (e) {
-      toast.error((e as Error).message, 'Restart failed');
+      toast.error((e as Error).message, t('config.restart.toast.failed'));
       setIsRestarting(false);
     }
   };
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Configuration"
-        subtitle="View current system configuration (read-only). Use the Providers, Models, and Keys pages to make changes."
-      />
+      <PageHeader title={t('config.title')} subtitle={t('config.subtitle')} />
 
       <div className="flex flex-col gap-6">
         <Card
-          title="Configuration Export"
+          title={t('config.export.cardTitle')}
           flush
           extra={
             <div className="flex flex-wrap items-center gap-2">
@@ -800,7 +800,7 @@ export const Config = () => {
                 onClick={loadConfig}
                 leftIcon={<RotateCcw size={14} />}
               >
-                Refresh
+                {t('config.export.refresh')}
               </Button>
               <Button
                 variant="secondary"
@@ -809,7 +809,7 @@ export const Config = () => {
                 isLoading={isRestarting}
                 leftIcon={<RefreshCw size={14} />}
               >
-                Restart
+                {t('config.export.restart')}
               </Button>
               <Button
                 variant="primary"
@@ -818,7 +818,7 @@ export const Config = () => {
                 disabled={!isConfigLoaded}
                 leftIcon={<Download size={14} />}
               >
-                Export JSON
+                {t('config.export.exportJson')}
               </Button>
             </div>
           }
@@ -844,7 +844,7 @@ export const Config = () => {
 
         {/* ─── Failover Settings ──────────────────────────────────── */}
         <Disclosure
-          title="Failover Settings"
+          title={t('config.failover.title')}
           defaultOpen={false}
           extra={
             <Button
@@ -855,7 +855,7 @@ export const Config = () => {
               disabled={!failoverLoaded}
               leftIcon={<Save size={14} />}
             >
-              Save
+              {t('common.save')}
             </Button>
           }
         >
@@ -865,17 +865,14 @@ export const Config = () => {
               <div className="flex items-center gap-2">
                 <Shield size={16} className="text-primary" />
                 <div>
-                  <p className="text-sm font-medium text-text">Enable Failover</p>
-                  <p className="text-xs text-text-muted">
-                    When enabled, failed requests are automatically retried on the next available
-                    provider.
-                  </p>
+                  <p className="text-sm font-medium text-text">{t('config.failover.enable')}</p>
+                  <p className="text-xs text-text-muted">{t('config.failover.enableDesc')}</p>
                 </div>
               </div>
               <Switch
                 checked={failoverPolicy.enabled}
                 onChange={(checked) => setFailoverPolicy((prev) => ({ ...prev, enabled: checked }))}
-                aria-label="Toggle failover on/off"
+                aria-label={t('config.failover.toggleAriaLabel')}
               />
             </div>
 
@@ -885,17 +882,14 @@ export const Config = () => {
                 htmlFor="retryableStatusCodes"
                 className="block text-sm font-medium text-text mb-1"
               >
-                Retryable Status Codes
+                {t('config.failover.statusCodes')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                HTTP status codes that trigger a retry on the next provider. Enter comma-separated
-                values (100–599). Defaults to all non-2xx codes except 413 and 422 when empty.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.failover.statusCodesDesc')}</p>
               <textarea
                 id="retryableStatusCodes"
                 value={statusCodesText}
                 onChange={(e) => setStatusCodesText(e.target.value)}
-                placeholder="e.g. 429, 500, 502, 503"
+                placeholder={t('config.failover.statusCodesPlaceholder')}
                 rows={3}
                 className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
               />
@@ -904,17 +898,14 @@ export const Config = () => {
             {/* Retryable Errors */}
             <div>
               <label htmlFor="retryableErrors" className="block text-sm font-medium text-text mb-1">
-                Retryable Network Errors
+                {t('config.failover.errors')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                Network error codes that trigger a retry on the next provider. Enter comma-separated
-                values. Defaults to ECONNREFUSED, ETIMEDOUT, ENOTFOUND when empty.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.failover.errorsDesc')}</p>
               <textarea
                 id="retryableErrors"
                 value={errorsText}
                 onChange={(e) => setErrorsText(e.target.value)}
-                placeholder="e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND"
+                placeholder={t('config.failover.errorsPlaceholder')}
                 rows={2}
                 className="w-full rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
               />
@@ -924,7 +915,7 @@ export const Config = () => {
 
         {/* ─── Cooldown Settings ──────────────────────────────────── */}
         <Disclosure
-          title="Cooldown Settings"
+          title={t('config.cooldown.title')}
           defaultOpen={false}
           extra={
             <Button
@@ -935,7 +926,7 @@ export const Config = () => {
               disabled={!isCooldownValid}
               leftIcon={<Save size={14} />}
             >
-              Save
+              {t('common.save')}
             </Button>
           }
         >
@@ -944,11 +935,14 @@ export const Config = () => {
             <div className="flex items-center gap-2">
               <Timer size={16} className="text-primary" />
               <div>
-                <p className="text-sm font-medium text-text">Exponential Backoff</p>
+                <p className="text-sm font-medium text-text">
+                  {t('config.cooldown.exponentialBackoff')}
+                </p>
                 <p className="text-xs text-text-muted">
-                  When a provider fails, it is placed on cooldown using exponential backoff:{' '}
-                  <code className="text-text-secondary">C(n) = min(C_max, C₀ × 2ⁿ)</code> where n is
-                  the consecutive failure count.
+                  <Trans
+                    i18nKey="config.cooldown.exponentialBackoffDesc"
+                    components={{ 1: <code className="text-text-secondary" /> }}
+                  />
                 </p>
               </div>
             </div>
@@ -959,13 +953,9 @@ export const Config = () => {
                 htmlFor="cooldownInitialMinutes"
                 className="block text-sm font-medium text-text mb-1"
               >
-                Initial Cooldown (minutes)
+                {t('config.cooldown.initial')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                C₀ — the cooldown duration after the first failure. Subsequent failures double the
-                duration until the maximum is reached. Fractional values are supported (e.g. 0.1 = 6
-                seconds).
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.cooldown.initialDesc')}</p>
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
                   <input
@@ -1181,12 +1171,9 @@ export const Config = () => {
             {/* TTFB Bytes */}
             <div>
               <label htmlFor="stallTtfbBytes" className="block text-sm font-medium text-text mb-1">
-                TTFB Byte Threshold
+                {t('config.stall.ttfbBytes')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                Byte threshold that confirms the provider is actually producing content. 100 bytes
-                is roughly half a token. Must be between 50 and 10,000.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.stall.ttfbBytesDesc')}</p>
               <div className="flex flex-col gap-1">
                 <input
                   id="stallTtfbBytes"
@@ -1207,13 +1194,9 @@ export const Config = () => {
             {/* Min Bytes Per Second */}
             <div>
               <label htmlFor="stallMinBps" className="block text-sm font-medium text-text mb-1">
-                Minimum Bytes Per Second
+                {t('config.stall.minBps')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                Throughput floor after the grace period. Sliding window check. Leave empty to
-                disable throughput stall detection. 500 B/s is approximately 2-3 tokens/sec. Must be
-                between 50 and 5,000.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.stall.minBpsDesc')}</p>
               <div className="flex flex-col gap-1">
                 <input
                   id="stallMinBps"
@@ -1221,7 +1204,7 @@ export const Config = () => {
                   min={50}
                   max={5000}
                   step={1}
-                  placeholder="Disabled"
+                  placeholder={t('config.stall.disabledPlaceholder')}
                   value={stallMinBpsInput}
                   onChange={(e) => setStallMinBpsInput(e.target.value)}
                   className="w-full max-w-[200px] rounded-md border border-border bg-bg-glass px-3 py-2 text-sm text-text font-mono placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
@@ -1238,12 +1221,9 @@ export const Config = () => {
                 htmlFor="stallWindowSeconds"
                 className="block text-sm font-medium text-text mb-1"
               >
-                Sliding Window (seconds)
+                {t('config.stall.windowSeconds')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                Width of the sliding window for throughput calculation. Longer = more stable,
-                shorter = more responsive. Must be between 3 and 30 seconds.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.stall.windowSecondsDesc')}</p>
               <div className="flex flex-col gap-1">
                 <input
                   id="stallWindowSeconds"
@@ -1267,12 +1247,9 @@ export const Config = () => {
                 htmlFor="stallGraceSeconds"
                 className="block text-sm font-medium text-text mb-1"
               >
-                Grace Period (seconds)
+                {t('config.stall.graceSeconds')}
               </label>
-              <p className="text-xs text-text-muted mb-2">
-                Time after TTFB threshold is met before throughput enforcement begins. Allows for
-                natural thinking/reasoning pauses. Must be between 0 and 120 seconds.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.stall.graceSecondsDesc')}</p>
               <div className="flex flex-col gap-1">
                 <input
                   id="stallGraceSeconds"
@@ -1294,7 +1271,7 @@ export const Config = () => {
 
         {/* ─── Exploration Settings (inline rates + background mode) ───── */}
         <Disclosure
-          title="Exploration Settings"
+          title={t('config.exploration.title')}
           defaultOpen={false}
           extra={
             <Button
@@ -1305,7 +1282,7 @@ export const Config = () => {
               disabled={!isExplorationValid}
               leftIcon={<Save size={14} />}
             >
-              Save
+              {t('common.save')}
             </Button>
           }
         >
@@ -1314,15 +1291,8 @@ export const Config = () => {
             <div className="flex items-start gap-2">
               <Compass size={16} className="text-primary mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-text">Provider Exploration</p>
-                <p className="text-xs text-text-muted">
-                  Exploration keeps performance, latency, and end-to-end TPS data fresh across
-                  targets. By default, inline exploration occasionally diverts a small fraction of
-                  live requests to non-optimal providers. Enable background exploration to suppress
-                  inline exploration and instead fire representative probe requests in the
-                  background — live traffic is never redirected. Both modes apply to the
-                  performance, latency, and e2e_performance selectors.
-                </p>
+                <p className="text-sm font-medium text-text">{t('config.exploration.heading')}</p>
+                <p className="text-xs text-text-muted">{t('config.exploration.headingDesc')}</p>
               </div>
             </div>
 
@@ -1331,18 +1301,18 @@ export const Config = () => {
               <div className="flex items-start gap-2">
                 <Radar size={16} className="text-primary mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-text">Background Exploration</p>
+                  <p className="text-sm font-medium text-text">
+                    {t('config.exploration.background')}
+                  </p>
                   <p className="text-xs text-text-muted">
-                    When enabled, inline exploration is suppressed and Plexus fires small
-                    representative probe requests in the background. Probes appear in usage records
-                    with apiKey="probe" and attribution="background".
+                    {t('config.exploration.backgroundDesc')}
                   </p>
                 </div>
               </div>
               <Switch
                 checked={bgExploration.enabled}
                 onChange={(checked) => setBgExploration((prev) => ({ ...prev, enabled: checked }))}
-                aria-label="Toggle background exploration on/off"
+                aria-label={t('config.exploration.backgroundAriaLabel')}
               />
             </div>
 
@@ -1354,11 +1324,10 @@ export const Config = () => {
                     htmlFor="bgExplorationStaleness"
                     className="block text-sm font-medium text-text mb-1"
                   >
-                    Staleness Threshold (seconds)
+                    {t('config.exploration.staleness')}
                   </label>
                   <p className="text-xs text-text-muted mb-2">
-                    A target is re-probed only after this many seconds have elapsed since its last
-                    probe. Default: 600 (10 minutes). Minimum: 1.
+                    {t('config.exploration.stalenessDesc')}
                   </p>
                   <div className="flex flex-col gap-1">
                     <input
@@ -1381,11 +1350,10 @@ export const Config = () => {
                     htmlFor="bgExplorationConcurrency"
                     className="block text-sm font-medium text-text mb-1"
                   >
-                    Worker Concurrency
+                    {t('config.exploration.concurrency')}
                   </label>
                   <p className="text-xs text-text-muted mb-2">
-                    Maximum number of background probes Plexus runs in parallel. Per-target probes
-                    are deduplicated separately. Default: 2. Range: 1–16.
+                    {t('config.exploration.concurrencyDesc')}
                   </p>
                   <div className="flex flex-col gap-1">
                     <input
@@ -1414,11 +1382,10 @@ export const Config = () => {
                     htmlFor="performanceExplorationRate"
                     className="block text-sm font-medium text-text mb-1"
                   >
-                    Performance Exploration Rate
+                    {t('config.exploration.performanceRate')}
                   </label>
                   <p className="text-xs text-text-muted mb-2">
-                    The probability of exploring a non-optimal provider when using the performance
-                    selector. Default: 0.05 (5%).
+                    {t('config.exploration.performanceRateDesc')}
                   </p>
                   <div className="flex flex-col gap-1">
                     <input
@@ -1442,11 +1409,10 @@ export const Config = () => {
                     htmlFor="latencyExplorationRate"
                     className="block text-sm font-medium text-text mb-1"
                   >
-                    Latency Exploration Rate
+                    {t('config.exploration.latencyRate')}
                   </label>
                   <p className="text-xs text-text-muted mb-2">
-                    The probability of exploring a non-optimal provider when using the latency
-                    selector. Defaults to the Performance Exploration Rate if not explicitly set.
+                    {t('config.exploration.latencyRateDesc')}
                   </p>
                   <div className="flex flex-col gap-1">
                     <input
@@ -1470,13 +1436,10 @@ export const Config = () => {
                     htmlFor="e2ePerformanceExplorationRate"
                     className="block text-sm font-medium text-text mb-1"
                   >
-                    E2E Performance Exploration Rate
+                    {t('config.exploration.e2eRate')}
                   </label>
                   <p className="text-xs text-text-muted mb-2">
-                    The probability of exploring any provider when using the e2e_performance
-                    selector. Unlike the performance selector, exploration includes all candidates
-                    (including the current best) to keep end-to-end metrics fresh. Defaults to the
-                    Performance Exploration Rate if not explicitly set.
+                    {t('config.exploration.e2eRateDesc')}
                   </p>
                   <div className="flex flex-col gap-1">
                     <input
@@ -1500,7 +1463,7 @@ export const Config = () => {
         </Disclosure>
 
         <Card
-          title="Backup & Restore"
+          title={t('config.backup.title')}
           extra={
             <div className="flex items-center gap-2">
               <Button
@@ -1510,7 +1473,7 @@ export const Config = () => {
                 isLoading={isFullBackupLoading}
                 leftIcon={<Archive size={14} />}
               >
-                Full Backup
+                {t('config.backup.fullBackup')}
               </Button>
               <Button
                 variant="primary"
@@ -1519,23 +1482,19 @@ export const Config = () => {
                 isLoading={isBackupLoading}
                 leftIcon={<HardDrive size={14} />}
               >
-                Config Backup
+                {t('config.backup.configBackup')}
               </Button>
             </div>
           }
         >
-          <p className="text-sm text-text-secondary mb-3">
-            Back up your database or restore from a previously exported backup file.
-          </p>
+          <p className="text-sm text-text-secondary mb-3">{t('config.backup.intro')}</p>
 
           <div className="p-3 bg-warning/10 border border-warning/30 rounded-md mb-4">
             <div className="flex items-start gap-2">
               <AlertTriangle size={16} className="text-warning mt-0.5 shrink-0" />
               <div className="text-sm text-text-secondary">
-                <p className="font-medium text-text">Backup files contain sensitive data</p>
-                <p className="mt-0.5 text-xs text-text-muted">
-                  This includes API keys and OAuth tokens in plaintext. Store backup files securely.
-                </p>
+                <p className="font-medium text-text">{t('config.backup.sensitiveTitle')}</p>
+                <p className="mt-0.5 text-xs text-text-muted">{t('config.backup.sensitiveBody')}</p>
               </div>
             </div>
           </div>
@@ -1543,20 +1502,15 @@ export const Config = () => {
           <div className="flex flex-col sm:flex-row gap-3 mb-3">
             <div className="flex-1">
               <h4 className="font-heading text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-                Config Backup
+                {t('config.backup.configBackup')}
               </h4>
-              <p className="text-xs text-text-muted mb-2">
-                Providers, models, keys, quotas, and settings only. Fast and small.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.backup.configBackupDesc')}</p>
             </div>
             <div className="flex-1">
               <h4 className="font-heading text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
-                Full Backup
+                {t('config.backup.fullBackup')}
               </h4>
-              <p className="text-xs text-text-muted mb-2">
-                Config plus all usage logs, debug data, and errors. May take a moment for large
-                databases.
-              </p>
+              <p className="text-xs text-text-muted mb-2">{t('config.backup.fullBackupDesc')}</p>
             </div>
           </div>
 
@@ -1568,7 +1522,7 @@ export const Config = () => {
               isLoading={isRestoreLoading}
               leftIcon={<Upload size={14} />}
             >
-              Restore from File…
+              {t('config.backup.restoreFromFile')}
             </Button>
           </div>
 
@@ -1582,7 +1536,7 @@ export const Config = () => {
         </Card>
 
         <Card
-          title="Card Layout"
+          title={t('config.cardLayout.title')}
           extra={
             <div className="flex items-center gap-2">
               <Button
@@ -1591,7 +1545,7 @@ export const Config = () => {
                 onClick={handleExportLayout}
                 leftIcon={<Download size={14} />}
               >
-                Export
+                {t('config.cardLayout.export')}
               </Button>
               <Button
                 variant="primary"
@@ -1599,14 +1553,12 @@ export const Config = () => {
                 onClick={handleImportLayout}
                 leftIcon={<Upload size={14} />}
               >
-                Import
+                {t('config.cardLayout.import')}
               </Button>
             </div>
           }
         >
-          <p className="text-sm text-text-secondary mb-4">
-            Import or export your Live Metrics card layout configuration.
-          </p>
+          <p className="text-sm text-text-secondary mb-4">{t('config.cardLayout.intro')}</p>
 
           <input
             ref={fileInputRef}
@@ -1618,12 +1570,12 @@ export const Config = () => {
 
           <div>
             <h4 className="font-heading text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
-              Current Card Order
+              {t('config.cardLayout.currentOrder')}
             </h4>
             <div className="flex flex-wrap gap-2">
               {cardLayout.length === 0 && (
                 <p className="text-xs text-text-muted italic">
-                  Default layout — no customizations saved.
+                  {t('config.cardLayout.defaultLayout')}
                 </p>
               )}
               {cardLayout.map((card, index) => (

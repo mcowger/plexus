@@ -1,0 +1,92 @@
+{
+  "title": "详细用量",
+  "subtitle": "可自定义图表类型的高级分析",
+  "backToLiveCard": "返回实时卡片",
+  "returnToLiveMetrics": "返回实时指标",
+  "liveData": "实时数据",
+  "lastUpdated": "最近更新：{{time}}",
+  "stats": {
+    "requests": "请求数",
+    "errors": "错误数",
+    "tokens": "Token",
+    "cost": "费用",
+    "avgDuration": "平均耗时",
+    "avgTtft": "平均 TTFT",
+    "avgTps": "平均 TPS",
+    "successRate": "成功率"
+  },
+  "config": {
+    "title": "图表配置",
+    "timeRange": "时间范围",
+    "groupBy": "分组方式",
+    "chartType": "图表类型",
+    "view": "视图",
+    "metrics": "指标"
+  },
+  "groupBy": {
+    "time": "时间",
+    "provider": "服务商",
+    "model": "模型",
+    "apiKey": "API 密钥",
+    "status": "状态"
+  },
+  "chartTypes": {
+    "area": "面积图",
+    "line": "折线图",
+    "bar": "柱状图",
+    "composed": "混合图",
+    "pie": "饼图"
+  },
+  "viewModes": {
+    "chart": "图表",
+    "list": "列表"
+  },
+  "metrics": {
+    "requests": "请求数",
+    "tokens": "Token",
+    "cost": "费用",
+    "duration": "耗时",
+    "ttft": "TTFT",
+    "tps": "TPS",
+    "errors": "错误数"
+  },
+  "chartCard": {
+    "titleByGroup": "按{{group}}查看用量",
+    "refresh": "刷新",
+    "noData": "暂无数据"
+  },
+  "list": {
+    "title": "原始请求日志",
+    "count": "{{count}} 条请求",
+    "headers": {
+      "time": "时间",
+      "provider": "服务商",
+      "model": "模型",
+      "status": "状态",
+      "tokens": "Token",
+      "cost": "费用",
+      "duration": "耗时",
+      "ttft": "TTFT",
+      "tps": "TPS"
+    }
+  },
+  "breakdown": {
+    "title": "详细分类",
+    "labels": {
+      "requests": "请求数",
+      "success": "成功率",
+      "tokens": "Token",
+      "cost": "费用"
+    },
+    "headers": {
+      "requests": "请求数",
+      "errors": "错误数",
+      "successPct": "成功率 %",
+      "tokens": "Token",
+      "cost": "费用",
+      "avgDuration": "平均耗时",
+      "avgTtft": "平均 TTFT",
+      "avgTps": "平均 TPS"
+    }
+  }
+}

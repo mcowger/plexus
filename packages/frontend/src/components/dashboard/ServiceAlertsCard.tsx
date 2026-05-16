@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../ui/Card';
 import { AlertTriangle } from 'lucide-react';
 import type { Cooldown } from '../../lib/api';
@@ -10,6 +11,7 @@ interface ServiceAlertsCardProps {
 }
 
 export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns, onClearAll }) => {
+  const { t } = useTranslation();
   if (cooldowns.length === 0) {
     return null;
   }
@@ -29,7 +31,7 @@ export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns,
 
   return (
     <Card
-      title="Service Alerts"
+      title={t('dashboard.cards.serviceAlerts.title')}
       className="alert-card"
       style={{ borderColor: 'var(--color-warning)' }}
       extra={
@@ -38,7 +40,7 @@ export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns,
           onClick={onClearAll}
           style={{ color: 'var(--color-warning)' }}
         >
-          Clear All
+          {t('dashboard.cards.serviceAlerts.clearAll')}
         </button>
       }
     >
@@ -50,14 +52,24 @@ export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns,
           const timeDisplay = formatMsToMinSec(maxTime);
 
           let statusText: string;
-          const modelDisplay = model || 'all models';
+          const modelDisplay = model || t('dashboard.cards.serviceAlerts.allModels');
 
           if (hasAccountId && modelCooldowns.length > 1) {
-            statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown for up to ${timeDisplay}`;
+            statusText = t('dashboard.cards.serviceAlerts.statusMultipleAccounts', {
+              model: modelDisplay,
+              count: modelCooldowns.length,
+              time: timeDisplay,
+            });
           } else if (hasAccountId && modelCooldowns.length === 1) {
-            statusText = `${modelDisplay} has 1 account on cooldown for ${timeDisplay}`;
+            statusText = t('dashboard.cards.serviceAlerts.statusSingleAccount', {
+              model: modelDisplay,
+              time: timeDisplay,
+            });
           } else {
-            statusText = `${modelDisplay} is on cooldown for ${timeDisplay}`;
+            statusText = t('dashboard.cards.serviceAlerts.statusModelCooldown', {
+              model: modelDisplay,
+              time: timeDisplay,
+            });
           }
 
           return (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 export interface MoonshotQuotaConfigProps {
   options: Record<string, unknown>;
@@ -7,6 +8,8 @@ export interface MoonshotQuotaConfigProps {
 }
 
 export const MoonshotQuotaConfig: React.FC<MoonshotQuotaConfigProps> = ({ options, onChange }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };
@@ -15,16 +18,14 @@ export const MoonshotQuotaConfig: React.FC<MoonshotQuotaConfigProps> = ({ option
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://api.moonshot.ai/v1/users/me/balance"
         />
-        <span className="text-[10px] text-text-muted">
-          Custom endpoint URL. Defaults to Moonshot API.
-        </span>
+        <span className="text-[10px] text-text-muted">{t('checkerConfigs.moonshot.endpointHint')}</span>
       </div>
     </div>
   );

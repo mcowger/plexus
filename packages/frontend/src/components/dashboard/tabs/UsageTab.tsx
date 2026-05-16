@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 /**
  * `ConcurrencyData` is imported as a **type-only** import from the API layer.
  * Its shape is:
@@ -97,6 +98,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   customDateRange,
   onCustomDateRangeChange: _onCustomDateRangeChange,
 }) => {
+  const { t } = useTranslation();
   // ---------------------------------------------------------------------------
   // State -- pre-existing usage data
   // ---------------------------------------------------------------------------
@@ -369,7 +371,10 @@ export const UsageTab: React.FC<UsageTabProps> = ({
               <strong>{label}</strong>
             </p>
             <p style={{ margin: '4px 0 0 0', color: '#ffffff', fontSize: '13px' }}>
-              {dataKey === 'requests' ? 'Requests' : 'Tokens'}: {formattedValue}
+              {dataKey === 'requests'
+                ? t('dashboard.usage.legend.requests')
+                : t('dashboard.usage.legend.tokens')}
+              : {formattedValue}
             </p>
           </div>
         );
@@ -469,10 +474,10 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   return (
     <div className="p-6 transition-all duration-300">
       <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Usage Analytics</h1>
-        <p className="text-[15px] text-text-secondary m-0">
-          Token usage and request statistics over time.
-        </p>
+        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">
+          {t('dashboard.usage.title')}
+        </h1>
+        <p className="text-[15px] text-text-secondary m-0">{t('dashboard.usage.subtitle')}</p>
       </div>
 
       <div className="mb-4">
@@ -482,7 +487,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       {/* All Charts in 4-Column Grid */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {/* Time Series - Requests */}
-        <Card className="min-w-0" title="Requests over Time">
+        <Card className="min-w-0" title={t('dashboard.usage.cards.requestsOverTime')}>
           <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -538,11 +543,11 @@ export const UsageTab: React.FC<UsageTabProps> = ({
          * The x-axis uses the pre-formatted `label` field ("HH:MM") rather
          * than raw timestamps to keep tick labels compact.
          */}
-        <Card className="min-w-0" title="Concurrency by Provider">
+        <Card className="min-w-0" title={t('dashboard.usage.cards.concurrencyByProvider')}>
           <div style={{ height: 300, marginTop: '12px' }}>
             {concurrencyByProviderTimeline.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary text-sm">
-                No concurrency data available
+                {t('dashboard.usage.noConcurrencyData')}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -592,11 +597,11 @@ export const UsageTab: React.FC<UsageTabProps> = ({
          * highest-traffic model at the bottom of the stack (matching the
          * sort order from `modelKeys`).
          */}
-        <Card className="min-w-0" title="Concurrency by Model">
+        <Card className="min-w-0" title={t('dashboard.usage.cards.concurrencyByModel')}>
           <div style={{ height: 300, marginTop: '12px' }}>
             {concurrencyByModelTimeline.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary text-sm">
-                No concurrency data available
+                {t('dashboard.usage.noConcurrencyData')}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -631,7 +636,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         </Card>
 
         {/* Time Series - Tokens */}
-        <Card className="min-w-0" title="Token Usage">
+        <Card className="min-w-0" title={t('dashboard.usage.cards.tokenUsage')}>
           <div style={{ height: 300, marginTop: '12px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
@@ -655,7 +660,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                 <Area
                   type="monotone"
                   dataKey="tokens"
-                  name="Total Tokens"
+                  name={t('dashboard.usage.legend.totalTokens')}
                   stroke="var(--color-primary)"
                   fill="var(--color-glow)"
                   fillOpacity={0.1}
@@ -663,7 +668,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                 <Area
                   type="monotone"
                   dataKey="inputTokens"
-                  name="Input"
+                  name={t('dashboard.usage.legend.input')}
                   stroke="#82ca9d"
                   fill="#82ca9d"
                   fillOpacity={0.3}
@@ -671,7 +676,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                 <Area
                   type="monotone"
                   dataKey="outputTokens"
-                  name="Output"
+                  name={t('dashboard.usage.legend.output')}
                   stroke="#ffc658"
                   fill="#ffc658"
                   fillOpacity={0.3}
@@ -679,7 +684,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                 <Area
                   type="monotone"
                   dataKey="cachedTokens"
-                  name="Cached"
+                  name={t('dashboard.usage.legend.cached')}
                   stroke="#ff7300"
                   fill="#ff7300"
                   fillOpacity={0.3}
@@ -687,7 +692,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                 <Area
                   type="monotone"
                   dataKey="cacheWriteTokens"
-                  name="Cache Write"
+                  name={t('dashboard.usage.legend.cacheWrite')}
                   stroke="#a855f7"
                   fill="#a855f7"
                   fillOpacity={0.3}
@@ -698,21 +703,37 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         </Card>
 
         <ChartToggleCard
-          title="Usage by Model Alias (Requests)"
+          title={t('dashboard.usage.cards.usageByModelRequests')}
           dataKey="requests"
           data={modelData}
         />
-        <ChartToggleCard title="Usage by Model Alias (Tokens)" dataKey="tokens" data={modelData} />
         <ChartToggleCard
-          title="Usage by Provider (Requests)"
+          title={t('dashboard.usage.cards.usageByModelTokens')}
+          dataKey="tokens"
+          data={modelData}
+        />
+        <ChartToggleCard
+          title={t('dashboard.usage.cards.usageByProviderRequests')}
           dataKey="requests"
           data={providerData}
         />
-        <ChartToggleCard title="Usage by Provider (Tokens)" dataKey="tokens" data={providerData} />
-        <ChartToggleCard title="Usage by API Key (Requests)" dataKey="requests" data={keyData} />
-        <ChartToggleCard title="Usage by API Key (Tokens)" dataKey="tokens" data={keyData} />
+        <ChartToggleCard
+          title={t('dashboard.usage.cards.usageByProviderTokens')}
+          dataKey="tokens"
+          data={providerData}
+        />
+        <ChartToggleCard
+          title={t('dashboard.usage.cards.usageByKeyRequests')}
+          dataKey="requests"
+          data={keyData}
+        />
+        <ChartToggleCard
+          title={t('dashboard.usage.cards.usageByKeyTokens')}
+          dataKey="tokens"
+          data={keyData}
+        />
 
-        <Card className="min-w-0" title="Energy Comparisons">
+        <Card className="min-w-0" title={t('dashboard.usage.cards.energyComparisons')}>
           <div style={{ marginTop: '12px', height: 300 }}>
             <TotalEnergyComparison totalKwh={energySummary?.totalKwhUsed} />
           </div>

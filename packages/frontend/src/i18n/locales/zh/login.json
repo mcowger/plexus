@@ -1,0 +1,15 @@
+{
+  "title": "登录",
+  "description": "输入管理员密钥以获得完整权限，或输入 API 密钥以查看该密钥范围内的活动。",
+  "label": "管理员密钥或 API 密钥",
+  "placeholder": "sk-admin-•••• 或 sk-•••••••••••••",
+  "showKey": "显示密钥",
+  "hideKey": "隐藏密钥",
+  "submit": "进入控制台",
+  "encrypted": "端到端加密",
+  "footer": "© 2026 Plexus · 统一 LLM 网关",
+  "errors": {
+    "empty": "请输入密钥",
+    "invalid": "密钥无效，请检查前缀后重试。"
+  }
+}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -18,10 +19,11 @@ interface RecentActivityChartProps {
 }
 
 export const RecentActivityChart: React.FC<RecentActivityChartProps> = ({ data }) => {
+  const { t } = useTranslation();
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-text-muted italic p-8">
-        No activity data available
+        {t('dashboard.cards.recentActivity.noData')}
       </div>
     );
   }
@@ -76,7 +78,7 @@ export const RecentActivityChart: React.FC<RecentActivityChartProps> = ({ data }
             dataKey="requests"
             barSize={20}
             fill="#413ea0"
-            name="Requests"
+            name={t('dashboard.cards.recentActivity.requests')}
             radius={[4, 4, 0, 0]}
           />
           <Line
@@ -84,7 +86,7 @@ export const RecentActivityChart: React.FC<RecentActivityChartProps> = ({ data }
             type="monotone"
             dataKey="tokens"
             stroke="#ff7300"
-            name="Tokens"
+            name={t('dashboard.cards.recentActivity.tokens')}
             dot={{ r: 4 }}
           />
         </ComposedChart>

@@ -1,0 +1,106 @@
+{
+  "title": "Logs",
+  "subtitle": {
+    "scoped": "Scoped to key \"{{keyName}}\"",
+    "default": "All API requests routed through the gateway"
+  },
+  "actions": {
+    "deleteAll": "Delete All",
+    "search": "Search"
+  },
+  "filters": {
+    "byKey": "Filter by key…",
+    "byModel": "Filter by model…",
+    "byProvider": "Filter by provider…",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "clearDates": "Clear date filters",
+    "sortBy": "Sort by {{label}}"
+  },
+  "states": {
+    "loading": "Loading...",
+    "noLogs": "No logs found"
+  },
+  "columns": {
+    "date": "Date",
+    "key": "Key",
+    "api": "API",
+    "model": "Model",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "perf": "Perf",
+    "meta": "Meta",
+    "status": "Status",
+    "latency": "Latency"
+  },
+  "card": {
+    "metaSummary": "{{messages}} msg / {{tools}} tools"
+  },
+  "errorButton": "Error",
+  "debugButton": "Debug",
+  "tooltips": {
+    "viewError": "View Error Details",
+    "viewDebug": "View Debug Trace",
+    "deleteLog": "Delete log",
+    "copyIncomingModel": "Copy incoming model alias",
+    "copySelectedModel": "Copy selected model name",
+    "copyFallthroughModel": "Copy fallthrough model name",
+    "copyRequiresHttps": "Copy requires HTTPS",
+    "viewRetryHistory": "View retry history",
+    "visionFallthrough": "Vision Fallthrough{{via}} (Images converted to text)",
+    "visionVia": " via {{model}}",
+    "descriptorRequest": "Descriptor Request (Generated image description)",
+    "visionFallthroughDescriptor": "Vision fallthrough descriptor model",
+    "apiInfo": "Incoming: {{incoming}} → Outgoing: {{outgoing}} • {{streamMode}} • {{passthroughMode}}",
+    "streamed": "Streamed",
+    "nonStreamed": "Non-streamed",
+    "passthrough": "Direct/Passthrough",
+    "translated": "Translated",
+    "energy": "Energy: {{energy}} ≈ {{slices}} toast slices",
+    "ipAddress": "IP: {{ip}}",
+    "tokensTooltip": "Input: {{input}} • Output: {{output}} • Reasoning: {{reasoning}} • Cached: {{cached}} • Cache Write: {{cacheWrite}}",
+    "estimatedSuffix": " • * = Estimated"
+  },
+  "perf": {
+    "duration": "Duration: {{value}}",
+    "ttft": "TTFT: {{value}}",
+    "tps": "TPS: {{value}}"
+  },
+  "pagination": {
+    "summary": "Page {{current}} of {{total}}"
+  },
+  "dateFormat": {
+    "invalid": "Invalid",
+    "errorWord": "Error",
+    "dateWord": "Date"
+  },
+  "retryModal": {
+    "title": "Retry History",
+    "closeButton": "Close",
+    "request": "Request:",
+    "attempts": "Attempts:",
+    "empty": "No retry history is available for this request.",
+    "attemptHeader": "Attempt {{index}}: {{provider}}/{{model}}",
+    "api": "API: {{value}}",
+    "statusCode": "Status Code: {{code}}",
+    "retryable": "Retryable: {{value}}",
+    "yes": "yes",
+    "no": "no"
+  },
+  "deleteModal": {
+    "title": "Confirm Deletion",
+    "cancelButton": "Cancel",
+    "deleteButton": "Delete Logs",
+    "deleting": "Deleting...",
+    "intro": "Select which logs you would like to delete:",
+    "olderLabel": "Delete logs older than",
+    "daysSuffix": "days",
+    "allLabel": "Delete ALL logs (Cannot be undone)"
+  },
+  "singleDelete": {
+    "deleteButton": "Delete Log",
+    "deleting": "Deleting...",
+    "confirmPrefix": "Are you sure you want to delete log ",
+    "confirmSuffix": "? This action cannot be undone."
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "title": "My Key",
+  "loadingSubtitle": "Loading your key details...",
+  "subtitle": "Details for <name>{{name}}</name>. All logs, traces, and dashboard data in this session are scoped to this key.",
+  "loadError": "Unable to load key info.",
+  "anyUnrestricted": "Any (unrestricted)",
+  "identity": {
+    "title": "Identity",
+    "keyName": "Key name",
+    "quota": "Quota",
+    "allowedProviders": "Allowed providers",
+    "allowedModels": "Allowed models"
+  },
+  "comment": {
+    "title": "Comment",
+    "placeholder": "Free-text note about this key (optional)",
+    "saved": "Comment saved",
+    "saveFailed": "Failed to save comment"
+  },
+  "trace": {
+    "title": "Trace capture",
+    "description": "Capture full request/response payloads for this key only.",
+    "globalOn": "Global tracing is ON (admin) — all requests are captured regardless of this toggle.",
+    "on": "Currently capturing traces for this key.",
+    "off": "Tracing is off for this key.",
+    "ariaToggle": "Toggle trace capture",
+    "toggleFailed": "Failed to toggle trace"
+  },
+  "rotate": {
+    "title": "Rotate secret",
+    "description": "Generates a new secret for this key. The old secret stops working immediately. Your historical logs, traces, and errors are preserved (they're indexed by key name, not secret).",
+    "button": "Rotate secret",
+    "confirmTitle": "Rotate secret?",
+    "confirmBody": "The old secret will stop working immediately. Any clients using it will receive 401 errors until they are updated with the new secret.",
+    "confirmAction": "Rotate now",
+    "successTitle": "New secret generated",
+    "successBody": "Copy this secret now — it will not be shown again.",
+    "sessionRefreshFailed": "Secret rotated, but session refresh failed. Re-login with the new secret.",
+    "failed": "Rotation failed"
+  },
+  "loadFailed": "Load failed"
+}

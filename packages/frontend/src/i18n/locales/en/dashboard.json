@@ -1,0 +1,327 @@
+{
+  "title": "Dashboard",
+  "subtitle": "Real-time gateway traffic across all providers",
+  "ariaSections": "Dashboard sections",
+  "tabs": {
+    "overall": "Overall",
+    "live": "Live Metrics",
+    "usage": "Usage Analytics",
+    "performance": "Performance"
+  },
+  "overall": {
+    "title": "Overall",
+    "subtitle": "Access, usage, and quota summary for your API key.",
+    "loading": "Loading…",
+    "dash": "—",
+    "cards": {
+      "key": "Key",
+      "quota": "Quota",
+      "allowedProviders": "Allowed providers",
+      "allowedModels": "Allowed models",
+      "totals": "Totals ({{range}})",
+      "requestsByProvider": "Requests by provider",
+      "tokensByProvider": "Tokens by provider",
+      "requestsByModelAlias": "Requests by model alias",
+      "tokensByModelAlias": "Tokens by model alias"
+    },
+    "fields": {
+      "name": "Name",
+      "quota": "Quota",
+      "comment": "Comment",
+      "noneAssigned": "None assigned"
+    },
+    "quota": {
+      "loadError": "Could not load quota status. If this key has a quota assigned, its current usage is not shown here — try refreshing.",
+      "noneAssigned": "No quota is assigned to this key — requests are unrestricted by quota policy.",
+      "assignedLabel": "Assigned:",
+      "notResolved": "Quota definition not resolved yet; current status is unavailable.",
+      "usageLabel": "usage",
+      "labelTemplate": "{{name}} ({{type}})",
+      "remaining": "Remaining:",
+      "resets": "Resets {{value}}",
+      "exhausted": "Quota exhausted — new requests will be rejected until it resets.",
+      "resetting": "resetting now",
+      "resetOnDate": "on {{date}}",
+      "resetInDaysHours": "in {{days}}d {{hours}}h",
+      "resetInHoursMinutes": "in {{hours}}h {{minutes}}m",
+      "resetInMinutes": "in {{minutes}}m"
+    },
+    "access": {
+      "anyProvider": "Any provider (unrestricted) — this key can route to every provider the gateway knows.",
+      "anyModel": "Any model (unrestricted) — this key can request every model alias configured on the gateway."
+    },
+    "totals": {
+      "noUsage": "No usage recorded in this range.",
+      "requests": "Requests",
+      "totalTokens": "Total tokens",
+      "input": "Input",
+      "output": "Output",
+      "cached": "Cached",
+      "cachedSub": "reads from cache",
+      "cacheWrite": "Cache write",
+      "cacheWriteSub": "new cache entries",
+      "costToday": "Cost (today)",
+      "costTodaySub": "attributed to this key"
+    },
+    "breakdown": {
+      "noProviderRequests": "No requests recorded for any provider in this range.",
+      "noProviderTokens": "No tokens recorded for any provider in this range.",
+      "noModelRequests": "No requests recorded for any model alias in this range.",
+      "noModelTokens": "No tokens recorded for any model alias in this range."
+    },
+    "range": {
+      "hour": "hour",
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    }
+  },
+  "usage": {
+    "title": "Usage Analytics",
+    "subtitle": "Token usage and request statistics over time.",
+    "cards": {
+      "requestsOverTime": "Requests over Time",
+      "concurrencyByProvider": "Concurrency by Provider",
+      "concurrencyByModel": "Concurrency by Model",
+      "tokenUsage": "Token Usage",
+      "usageByModelRequests": "Usage by Model Alias (Requests)",
+      "usageByModelTokens": "Usage by Model Alias (Tokens)",
+      "usageByProviderRequests": "Usage by Provider (Requests)",
+      "usageByProviderTokens": "Usage by Provider (Tokens)",
+      "usageByKeyRequests": "Usage by API Key (Requests)",
+      "usageByKeyTokens": "Usage by API Key (Tokens)",
+      "energyComparisons": "Energy Comparisons"
+    },
+    "noConcurrencyData": "No concurrency data available",
+    "legend": {
+      "requests": "Requests",
+      "tokens": "Tokens",
+      "totalTokens": "Total Tokens",
+      "input": "Input",
+      "output": "Output",
+      "cached": "Cached",
+      "cacheWrite": "Cache Write"
+    }
+  },
+  "performance": {
+    "title": "Performance",
+    "subtitle": "Compare provider speed for a given model by throughput and time-to-first-token.",
+    "filtersSummary": "Filters & Summary",
+    "noModelsAvailable": "No models available",
+    "refresh": "Refresh",
+    "clear": "Clear",
+    "providers": "Providers",
+    "samples": "Samples",
+    "cards": {
+      "fastestProviders": "Fastest Providers (tok/s)",
+      "fastestFirstToken": "Fastest First Token (TTFT)",
+      "selectedModel": "Selected Model"
+    },
+    "model": "Model",
+    "topThroughputProvider": "Top throughput provider",
+    "lowestTtftProvider": "Lowest TTFT provider",
+    "noPerformanceData": "No performance data for this model yet.",
+    "avgThroughput": "Avg throughput",
+    "avgTtft": "Avg TTFT",
+    "tokPerSec": "tok/s",
+    "dash": "—",
+    "clearConfirm": {
+      "title": "Clear performance data?",
+      "message": "Are you sure you want to clear all performance data for \"{{model}}\"?",
+      "confirmLabel": "Clear"
+    }
+  },
+  "live": {
+    "title": "Live Metrics",
+    "header": {
+      "windowLast": "Window: last {{minutes}}m",
+      "connected": "Live Polling Active",
+      "stale": "Live Polling Delayed",
+      "reconnecting": "Live Polling Reconnecting"
+    },
+    "toolbar": {
+      "refreshNow": "Refresh Now",
+      "poll": "Poll {{label}}",
+      "tabActive": "Tab active",
+      "tabHidden": "Tab hidden",
+      "dataRefreshHint": "{{state}} - data refresh resumes on focus."
+    },
+    "labels": {
+      "failedRequest": "Failed Request",
+      "unresolvedProvider": "Unresolved Provider",
+      "failedBeforeModelSelection": "Failed Before Model Selection",
+      "unresolvedModel": "Unresolved Model",
+      "unknown": "Unknown",
+      "allModels": "all models"
+    },
+    "cooldown": {
+      "clearThis": "Clear this cooldown",
+      "showDetails": "Show cooldown details",
+      "title": "Cooldown Details",
+      "errorLabel": "Error:",
+      "consecutiveFailures": "Consecutive failures",
+      "expiresAt": "Expires at"
+    },
+    "entity": {
+      "successLabel": "Success:",
+      "latency": "Latency: {{value}}",
+      "cost": "Cost: {{value}}",
+      "tps": "TPS: {{value}}",
+      "requestsShort": "{{value}} req"
+    },
+    "confirm": {
+      "clearAllTitle": "Clear ALL provider cooldowns?",
+      "clearAllMessage": "Cooldowns are shared across all API keys. Clearing them affects traffic for every key using those providers. If the underlying problem hasn't been resolved, cooldowns will simply re-establish on the next failure.",
+      "clearAllConfirm": "Clear all",
+      "clearSingleTitle": "Clear cooldown for {{provider}}?",
+      "clearSingleTitleWithModel": "Clear cooldown for {{provider}}:{{model}}?",
+      "clearSingleMessage": "This affects traffic for every API key using that provider. The cooldown will re-establish on the next failure if the issue isn't resolved.",
+      "clearSingleConfirm": "Clear"
+    },
+    "toast": {
+      "notPermitted": "Your API key is not permitted to clear cooldowns for provider '{{provider}}'.",
+      "failedClearAll": "Failed to clear cooldowns",
+      "failedClearSingle": "Failed to clear cooldown"
+    },
+    "modal": {
+      "closeAria": "Close modal",
+      "detailedUsage": "Detailed Usage",
+      "velocityTitle": "Request Velocity (Last 5 Minutes)",
+      "providerTitle": "Provider Pulse (5m)",
+      "modelTitle": "Model Pulse (5m)",
+      "timelineTitle": "Live Timeline",
+      "modelStackTitle": "Model Stack + Runtime",
+      "latestRequestsTitle": "Latest Requests",
+      "concurrencyTitle": "Concurrency",
+      "statsTitle": "Provider & Model Stats"
+    },
+    "analyze": {
+      "short": {
+        "analyze": "Analyze",
+        "logs": "Logs"
+      },
+      "full": {
+        "velocity": "Analyze Velocity Trends",
+        "provider": "Analyze Provider Performance",
+        "model": "Analyze Model Usage",
+        "modelstack": "Analyze Model Stack",
+        "timeline": "Analyze Timeline",
+        "requests": "View Detailed Logs",
+        "concurrency": "Analyze Concurrency",
+        "default": "Analyze in Detail"
+      }
+    },
+    "empty": {
+      "velocity": "No velocity data available",
+      "noModelTraffic": "No model traffic in the selected live window.",
+      "noProviderTraffic": "No provider traffic in the selected live window.",
+      "noConcurrencyData": "No concurrency data available",
+      "collectingConcurrency": "Collecting concurrency data...",
+      "loadingConcurrency": "Loading concurrency data...",
+      "noModelStack": "No model stack data in the selected live window.",
+      "loading": "Loading...",
+      "noRequestsObserved": "No requests observed yet.",
+      "noRequestsFilter": "No requests match the current filter.",
+      "noProviderActivity": "No provider activity in window",
+      "noModelActivity": "No model activity in window",
+      "noRequestsInMinutes": "No requests in the last {{minutes}} minutes",
+      "noModelStackInMinutes": "No model stack data in the last {{minutes}} minutes",
+      "noProviderActivityRecent": "No provider activity in the last {{minutes}} minutes."
+    },
+    "cards": {
+      "metrics": "Metrics",
+      "overview": "Overview",
+      "overviewLiveStats": "Overview & Live Stats",
+      "liveWindow": "Live ({{minutes}}m)",
+      "totalRequests": "Total Requests",
+      "totalTokens": "Total Tokens",
+      "requestsToday": "Requests Today",
+      "costToday": "Cost Today",
+      "requests": "Requests",
+      "successRate": "Success Rate",
+      "tokensPerMin": "Tokens / Min",
+      "avgLatency": "Avg Latency",
+      "alertsProviders": "Alerts & Providers",
+      "clearAll": "Clear All",
+      "velocity": "Request Velocity (Last 5 Minutes)",
+      "velocitySubtitle": "Minute-over-minute delta",
+      "providerPulse": "Provider Pulse (5m)",
+      "modelPulse": "Model Pulse (5m)",
+      "top8Providers": "Top 8 providers",
+      "top8Models": "Top 8 models",
+      "timeline": "Live Timeline",
+      "modelStack": "Model Stack",
+      "latestRequests": "Latest Requests",
+      "latest20": "Latest 20",
+      "all": "All",
+      "successFilter": "Success",
+      "errorsFilter": "Errors",
+      "concurrency": "Concurrency",
+      "autoRefresh10": "Auto-refresh: 10s",
+      "autoRefresh10Short": "10s",
+      "inFlightByProvider": "In-Flight by Provider",
+      "currentInFlight": "Current In-Flight",
+      "providerModelStats": "Provider & Model Stats",
+      "providerModelCount": "{{providers}} providers, {{models}} models",
+      "topProviders": "Top Providers",
+      "topModels": "Top Models"
+    },
+    "tooltip": {
+      "velocity": "Velocity",
+      "requests": "Requests",
+      "tokens": "Tokens",
+      "errors": "Errors",
+      "avgTtft": "Avg TTFT",
+      "avgTps": "Avg TPS"
+    },
+    "request": {
+      "idLabel": "ID: {{id}}...",
+      "tokens": "Tokens: {{value}}",
+      "cost": "Cost: {{value}}",
+      "latency": "Latency: {{value}}",
+      "ttft": "TTFT: {{value}}",
+      "tps": "TPS: {{value}}",
+      "requestsCount": "{{value}} requests",
+      "successPercent": "Success: {{value}}%"
+    }
+  },
+  "cards": {
+    "metricsOverview": {
+      "defaultTitle": "Key Metrics",
+      "trendFromLastWeek": "{{sign}}{{value}}% from last week"
+    },
+    "recentActivity": {
+      "noData": "No activity data available",
+      "requests": "Requests",
+      "tokens": "Tokens"
+    },
+    "serviceAlerts": {
+      "title": "Service Alerts",
+      "clearAll": "Clear All",
+      "allModels": "all models",
+      "statusMultipleAccounts": "{{model}} has {{count}} accounts on cooldown for up to {{time}}",
+      "statusSingleAccount": "{{model}} has 1 account on cooldown for {{time}}",
+      "statusModelCooldown": "{{model}} is on cooldown for {{time}}"
+    },
+    "timeRangeSelector": {
+      "custom": "Custom",
+      "quickSelect": "Quick Select",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "rangeError": "End date must be after start date and not in the future",
+      "ranges": {
+        "live": "Live",
+        "hour": "Hour",
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      },
+      "presets": {
+        "today": "Today",
+        "thisWeek": "This Week",
+        "thisMonth": "This Month",
+        "lastMonth": "Last Month"
+      }
+    }
+  }
+}

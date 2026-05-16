@@ -34,6 +34,7 @@
 import React from 'react';
 import { Button } from '../ui/Button';
 import { BarChart3, ExternalLink } from 'lucide-react';
+import { useT } from '../../i18n/useT';
 
 /**
  * Supported card types from Live Metrics that can navigate to Detailed Usage.
@@ -196,25 +197,6 @@ export const buildQueryString = (cardType: CardType, context?: AnalyzeContext): 
 };
 
 /**
- * Get human-readable label for the analysis action based on card type.
- * Returns [shortLabel, fullLabel] — the short label is shown on small screens
- * so the button doesn't blow out the card on mobile, and the full descriptive
- * label appears on `sm:` breakpoint and up.
- */
-const getAnalyzeLabel = (cardType: CardType): { short: string; full: string } => {
-  const labels: Record<CardType, { short: string; full: string }> = {
-    velocity: { short: 'Analyze', full: 'Analyze Velocity Trends' },
-    provider: { short: 'Analyze', full: 'Analyze Provider Performance' },
-    model: { short: 'Analyze', full: 'Analyze Model Usage' },
-    modelstack: { short: 'Analyze', full: 'Analyze Model Stack' },
-    timeline: { short: 'Analyze', full: 'Analyze Timeline' },
-    requests: { short: 'Logs', full: 'View Detailed Logs' },
-    concurrency: { short: 'Analyze', full: 'Analyze Concurrency' },
-  };
-  return labels[cardType] || { short: 'Analyze', full: 'Analyze in Detail' };
-};
-
-/**
  * AnalyzeButton - Navigation component for Live Metrics to Detailed Usage drill-down.
  *
  * Renders a styled button with a BarChart3 icon (left) and ExternalLink icon (right).
@@ -238,6 +220,10 @@ export const AnalyzeButton: React.FC<AnalyzeButtonProps> = ({
   className = '',
   onClick,
 }) => {
+  const { t } = useT('dashboard.live.analyze');
+  const short = cardType === 'requests' ? t('short.logs') : t('short.analyze');
+  const full = t(`full.${cardType}`, { defaultValue: t('full.default') });
+
   /**
    * Handle navigation to Detailed Usage.
    * If onClick is provided, use that (e.g., to open modal).
@@ -253,7 +239,6 @@ export const AnalyzeButton: React.FC<AnalyzeButtonProps> = ({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const { short, full } = getAnalyzeLabel(cardType);
   return (
     <Button
       size={size}

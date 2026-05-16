@@ -2,6 +2,7 @@ import { Edit2, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
 import type { Provider } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 interface Props {
   providers: Provider[];
@@ -25,13 +26,14 @@ export function ProviderList({
   onToggleEnabled,
   onDelete,
 }: Props) {
+  const { t } = useT('providers.list');
   return (
     <>
       {/* Mobile cards */}
       <div className="space-y-3 p-3 md:hidden">
         {providers.length === 0 ? (
           <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
-            No providers configured
+            {t('empty')}
           </div>
         ) : (
           providers.map((p) => (
@@ -58,12 +60,12 @@ export function ProviderList({
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-md bg-bg-subtle p-2">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">Models</div>
+                  <div className="text-[10px] uppercase tracking-wider text-text-muted">{t('models')}</div>
                   <div className="text-text">{countModels(p)}</div>
                 </div>
                 <div className="rounded-md bg-bg-subtle p-2">
                   <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                    Quota/Balance
+                    {t('quotaBalance')}
                   </div>
                   <div className="mt-1 min-h-5">{getQuotaDisplay(p) || '-'}</div>
                 </div>
@@ -78,7 +80,7 @@ export function ProviderList({
                   }}
                   className="text-danger"
                 >
-                  <Trash2 size={14} /> Delete
+                  <Trash2 size={14} /> {t('delete')}
                 </Button>
               </div>
             </article>
@@ -95,22 +97,22 @@ export function ProviderList({
                 className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                 style={{ paddingLeft: '24px' }}
               >
-                ID / Name
+                {t('columns.idName')}
               </th>
               <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                Status
+                {t('columns.status')}
               </th>
               <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                Models
+                {t('models')}
               </th>
               <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                Quota/Balance
+                {t('quotaBalance')}
               </th>
               <th
                 className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                 style={{ paddingRight: '24px', textAlign: 'right' }}
               >
-                Actions
+                {t('columns.actions')}
               </th>
             </tr>
           </thead>
@@ -161,6 +163,7 @@ export function ProviderList({
                         e.stopPropagation();
                         onDelete(p);
                       }}
+                      title={t('delete')}
                       style={{ color: 'var(--color-danger)' }}
                     >
                       <Trash2 size={14} />

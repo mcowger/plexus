@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Terminal, Pause, Play, Trash2, RotateCcw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -26,6 +27,7 @@ const LEVEL_CLASS: Record<string, string> = {
 };
 
 export const SystemLogs: React.FC = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isPaused, setIsPaused] = useState(false);
@@ -160,9 +162,9 @@ export const SystemLogs: React.FC = () => {
       setStartupLevel(state.startupLevel);
       setSupportedLevels(state.supportedLevels);
       setSelectedLevel(state.level);
-      toast.success(`Logging level set to ${state.level}`);
+      toast.success(t('systemLogs.toast.levelSet', { level: state.level }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to update logging level');
+      toast.error(e instanceof Error ? e.message : t('systemLogs.toast.levelSetFailed'));
     } finally {
       setIsUpdatingLevel(false);
     }
@@ -176,9 +178,9 @@ export const SystemLogs: React.FC = () => {
       setStartupLevel(state.startupLevel);
       setSupportedLevels(state.supportedLevels);
       setSelectedLevel(state.level);
-      toast.success(`Logging level reset to ${state.level}`);
+      toast.success(t('systemLogs.toast.levelReset', { level: state.level }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to reset logging level');
+      toast.error(e instanceof Error ? e.message : t('systemLogs.toast.levelResetFailed'));
     } finally {
       setIsUpdatingLevel(false);
     }
@@ -190,15 +192,17 @@ export const SystemLogs: React.FC = () => {
         title={
           <span className="inline-flex items-center gap-2">
             <Terminal size={20} className="text-primary" />
-            System Logs
+            {t('systemLogs.title')}
           </span>
         }
-        subtitle="Live tail · stderr+stdout"
+        subtitle={t('systemLogs.subtitle')}
       />
       <PageContainer>
         <div className="flex flex-col gap-3 glass-bg rounded-lg overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-border-glass px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-            <h3 className="font-heading text-h3 font-semibold text-text m-0">Live Output</h3>
+            <h3 className="font-heading text-h3 font-semibold text-text m-0">
+              {t('systemLogs.liveOutput')}
+            </h3>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="w-full sm:min-w-[120px]">
                 <Select
@@ -215,7 +219,7 @@ export const SystemLogs: React.FC = () => {
                 disabled={isUpdatingLevel || selectedLevel === currentLevel}
                 className="w-full sm:w-auto"
               >
-                Apply
+                {t('systemLogs.apply')}
               </Button>
               <Button
                 variant="secondary"
@@ -225,7 +229,7 @@ export const SystemLogs: React.FC = () => {
                 leftIcon={<RotateCcw size={14} />}
                 className="w-full sm:w-auto"
               >
-                Reset
+                {t('systemLogs.reset')}
               </Button>
               <Button
                 variant="secondary"
@@ -234,7 +238,7 @@ export const SystemLogs: React.FC = () => {
                 leftIcon={isPaused ? <Play size={14} /> : <Pause size={14} />}
                 className="w-full sm:w-auto"
               >
-                {isPaused ? 'Resume' : 'Pause'}
+                {isPaused ? t('systemLogs.resume') : t('systemLogs.pause')}
               </Button>
               <Button
                 variant="secondary"
@@ -243,16 +247,18 @@ export const SystemLogs: React.FC = () => {
                 leftIcon={<Trash2 size={14} />}
                 className="w-full sm:w-auto"
               >
-                Clear
+                {t('systemLogs.clear')}
               </Button>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 border-b border-border-glass px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div className="text-xs text-text-secondary">
-              Current level: <span className="text-text font-semibold">{currentLevel}</span> ·
-              Startup default: <span className="text-text font-semibold">{startupLevel}</span> ·
-              Runtime changes reset on restart.
+              {t('systemLogs.info.currentLevel')}{' '}
+              <span className="text-text font-semibold">{currentLevel}</span> ·{' '}
+              {t('systemLogs.info.startupDefault')}{' '}
+              <span className="text-text font-semibold">{startupLevel}</span> ·{' '}
+              {t('systemLogs.info.runtimeNote')}
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -286,7 +292,9 @@ export const SystemLogs: React.FC = () => {
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-text-muted italic">All modules</span>
+                  <span className="text-xs text-text-muted italic">
+                    {t('systemLogs.modules.all')}
+                  </span>
                 )}
               </div>
               <input
@@ -311,7 +319,7 @@ export const SystemLogs: React.FC = () => {
                     }
                   }
                 }}
-                placeholder="Add module..."
+                placeholder={t('systemLogs.modules.addPlaceholder')}
                 className="h-8 w-full rounded-md border border-border-glass bg-bg px-2 text-xs text-text outline-none transition-colors focus:border-primary sm:h-7 sm:w-32"
                 disabled={false}
               />
@@ -328,7 +336,7 @@ export const SystemLogs: React.FC = () => {
                   }}
                   className="text-xs text-text-secondary hover:text-danger transition-colors bg-transparent border-0 cursor-pointer"
                 >
-                  Clear
+                  {t('systemLogs.modules.clear')}
                 </button>
               )}
             </div>
@@ -336,7 +344,9 @@ export const SystemLogs: React.FC = () => {
 
           <div className="h-[55vh] min-h-[280px] max-h-[700px] overflow-y-auto bg-terminal-bg p-2 font-mono text-xs text-terminal-fg sm:h-[60vh] sm:min-h-[320px] sm:p-3">
             {logs.length === 0 && (
-              <div className="text-text-muted italic text-center mt-8">Waiting for logs...</div>
+              <div className="text-text-muted italic text-center mt-8">
+                {t('systemLogs.waitingForLogs')}
+              </div>
             )}
             {logs.map((log, i) => (
               <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">

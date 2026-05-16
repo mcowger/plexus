@@ -21,6 +21,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { Provider } from '../lib/api';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,6 +41,7 @@ interface DebugLogDetail extends DebugLogMeta {
 }
 
 export const Debug: React.FC = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const { isAdmin, principal } = useAuth();
   const [logs, setLogs] = useState<DebugLogMeta[]>([]);
@@ -270,11 +272,11 @@ export const Debug: React.FC = () => {
     <div className="flex flex-col min-h-[calc(100vh-3rem)]">
       <div className="shrink-0">
         <PageHeader
-          title="Traces"
+          title={t('debug.title')}
           subtitle={
             principal?.role === 'limited' && principal.keyName
-              ? `Traces for key "${principal.keyName}" only. Toggle capture in My Key.`
-              : 'Distributed spans · OTLP'
+              ? t('debug.subtitle.scoped', { keyName: principal.keyName })
+              : t('debug.subtitle.default')
           }
           actions={
             <>
@@ -290,7 +292,7 @@ export const Debug: React.FC = () => {
                     onClick={() => setIsFilterOpen(!isFilterOpen)}
                     leftIcon={<Filter size={14} />}
                   >
-                    Filter
+                    {t('debug.actions.filter')}
                     {selectedProviders.length > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-white rounded-full">
                         {selectedProviders.length}
@@ -301,19 +303,21 @@ export const Debug: React.FC = () => {
                   {isFilterOpen && (
                     <div className="absolute left-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-72 rounded-lg border border-border-glass bg-bg-surface p-4 shadow-lg sm:left-auto sm:right-0">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-text">Provider Filter</span>
+                        <span className="text-sm font-medium text-text">
+                          {t('debug.filterDropdown.title')}
+                        </span>
                         {selectedProviders.length > 0 && (
                           <button
                             onClick={clearProviderFilter}
                             className="text-xs text-text-muted hover:text-text transition-colors flex items-center gap-1"
                           >
                             <X size={12} />
-                            Clear
+                            {t('debug.filterDropdown.clear')}
                           </button>
                         )}
                       </div>
                       <p className="text-xs text-text-muted mb-3">
-                        Only log requests for selected providers
+                        {t('debug.filterDropdown.description')}
                       </p>
                       <div className="max-h-64 overflow-y-auto space-y-1">
                         {providers.map((provider) => (
@@ -339,14 +343,14 @@ export const Debug: React.FC = () => {
                           className="flex-1 text-xs"
                           onClick={() => setIsFilterOpen(false)}
                         >
-                          Cancel
+                          {t('debug.filterDropdown.cancel')}
                         </Button>
                         <Button
                           variant="primary"
                           className="flex-1 text-xs"
                           onClick={applyProviderFilter}
                         >
-                          Apply
+                          {t('debug.filterDropdown.apply')}
                         </Button>
                       </div>
                     </div>
@@ -368,7 +372,7 @@ export const Debug: React.FC = () => {
                       )
                     }
                   >
-                    {copiedAll ? 'Copied' : 'Copy All'}
+                    {copiedAll ? t('debug.actions.copied') : t('debug.actions.copyAll')}
                   </Button>
                   <Button
                     variant="secondary"
@@ -376,7 +380,7 @@ export const Debug: React.FC = () => {
                     onClick={handleDownloadAll}
                     leftIcon={<Download size={14} />}
                   >
-                    Download
+                    {t('debug.actions.download')}
                   </Button>
                 </>
               )}
@@ -388,7 +392,7 @@ export const Debug: React.FC = () => {
                   disabled={logs.length === 0}
                 >
                   <Trash2 size={16} />
-                  Delete All
+                  {t('debug.actions.deleteAll')}
                 </Button>
               )}
               <Button
@@ -396,7 +400,7 @@ export const Debug: React.FC = () => {
                 variant="secondary"
                 leftIcon={<RefreshCw size={16} className={clsx(loading && 'animate-spin')} />}
               >
-                Refresh
+                {t('debug.actions.refresh')}
               </Button>
             </>
           }
@@ -408,7 +412,7 @@ export const Debug: React.FC = () => {
         <div className="flex max-h-[34vh] w-full shrink-0 flex-col border-b border-border-glass bg-bg-surface md:max-h-none md:w-[320px] md:border-b-0 md:border-r">
           <div className="border-b border-border-glass p-3 sm:p-4">
             <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
-              Recent Requests
+              {t('debug.list.header')}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
@@ -432,7 +436,7 @@ export const Debug: React.FC = () => {
                     <button
                       onClick={(e) => handleDelete(e, log.requestId)}
                       className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                      title="Delete log"
+                      title={t('debug.list.deleteTooltip')}
                     >
                       <Trash2 size={12} />
                     </button>
@@ -445,7 +449,7 @@ export const Debug: React.FC = () => {
             ))}
             {logs.length === 0 && (
               <div className="text-center p-8 text-[var(--color-text-muted)] italic text-sm">
-                No debug logs found. Ensure Debug Mode is enabled.
+                {t('debug.list.empty')}
               </div>
             )}
           </div>
@@ -458,7 +462,7 @@ export const Debug: React.FC = () => {
               <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border-glass bg-bg-surface px-3 py-3 sm:px-4">
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
-                    Selected Trace
+                    {t('debug.details.selectedTrace')}
                   </span>
                   <span className="break-all text-xs font-mono text-text-secondary">
                     {detail.requestId}
@@ -466,37 +470,37 @@ export const Debug: React.FC = () => {
                 </div>
               </div>
               <AccordionPanel
-                title="Raw Request"
+                title={t('debug.details.panels.rawRequest')}
                 content={formatContent(detail.rawRequest)}
                 color="text-blue-400"
                 defaultOpen={true}
               />
               <AccordionPanel
-                title="Transformed Request"
+                title={t('debug.details.panels.transformedRequest')}
                 content={formatContent(detail.transformedRequest)}
                 color="text-purple-400"
               />
               <AccordionPanel
-                title="Raw Response"
+                title={t('debug.details.panels.rawResponse')}
                 content={formatContent(detail.rawResponse)}
                 color="text-orange-400"
               />
               {detail.rawResponseSnapshot && (
                 <AccordionPanel
-                  title="Raw Response (Reconstructed)"
+                  title={t('debug.details.panels.rawResponseSnapshot')}
                   content={formatContent(detail.rawResponseSnapshot)}
                   color="text-orange-400"
                 />
               )}
               <AccordionPanel
-                title="Transformed Response"
+                title={t('debug.details.panels.transformedResponse')}
                 content={formatContent(detail.transformedResponse)}
                 color="text-green-400"
                 defaultOpen={true}
               />
               {detail.transformedResponseSnapshot && (
                 <AccordionPanel
-                  title="Transformed Response (Reconstructed)"
+                  title={t('debug.details.panels.transformedResponseSnapshot')}
                   content={formatContent(detail.transformedResponseSnapshot)}
                   color="text-green-400"
                 />
@@ -505,7 +509,7 @@ export const Debug: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">
               <Database size={48} opacity={0.2} />
-              <p>Select a request trace to inspect details</p>
+              <p>{t('debug.details.selectPlaceholder')}</p>
             </div>
           )}
 
@@ -520,37 +524,41 @@ export const Debug: React.FC = () => {
       <Modal
         isOpen={isDeleteAllModalOpen}
         onClose={() => setIsDeleteAllModalOpen(false)}
-        title="Confirm Deletion"
+        title={t('debug.deleteAllModal.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsDeleteAllModalOpen(false)}>
-              Cancel
+              {t('debug.deleteAllModal.cancelButton')}
             </Button>
             <Button variant="danger" onClick={confirmDeleteAll} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete All Logs'}
+              {isDeleting
+                ? t('debug.deleteAllModal.deleting')
+                : t('debug.deleteAllModal.deleteButton')}
             </Button>
           </>
         }
       >
-        <p>Are you sure you want to delete ALL debug logs? This action cannot be undone.</p>
+        <p>{t('debug.deleteAllModal.body')}</p>
       </Modal>
 
       <Modal
         isOpen={isSingleDeleteModalOpen}
         onClose={() => setIsSingleDeleteModalOpen(false)}
-        title="Confirm Deletion"
+        title={t('debug.singleDeleteModal.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
-              Cancel
+              {t('debug.singleDeleteModal.cancelButton')}
             </Button>
             <Button variant="danger" onClick={confirmDeleteSingle} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete Log'}
+              {isDeleting
+                ? t('debug.singleDeleteModal.deleting')
+                : t('debug.singleDeleteModal.deleteButton')}
             </Button>
           </>
         }
       >
-        <p>Are you sure you want to delete this debug log? This action cannot be undone.</p>
+        <p>{t('debug.singleDeleteModal.body')}</p>
       </Modal>
     </div>
   );
@@ -562,6 +570,7 @@ const AccordionPanel: React.FC<{
   color: string;
   defaultOpen?: boolean;
 }> = ({ title, content, color, defaultOpen = false }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
   const [folded, setFolded] = useState(false);
@@ -610,7 +619,7 @@ const AccordionPanel: React.FC<{
           <button
             className="bg-transparent border-0 text-text-muted p-0.5 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
             onClick={handleToggleFold}
-            title={folded ? 'Unfold all' : 'Fold all'}
+            title={folded ? t('debug.details.panels.unfoldAll') : t('debug.details.panels.foldAll')}
           >
             {folded ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
           </button>
@@ -618,7 +627,7 @@ const AccordionPanel: React.FC<{
         <button
           className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
           onClick={handleCopy}
-          title="Copy to clipboard"
+          title={t('debug.details.panels.copyTooltip')}
         >
           {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
         </button>

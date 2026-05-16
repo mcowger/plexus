@@ -1,0 +1,155 @@
+{
+  "title": "Quotas",
+  "subtitle": "Provider balances and rate-quota allowances",
+  "refreshAll": "Refresh all",
+  "rateLimits": "Rate Limits",
+  "loading": "Loading quotas...",
+  "empty": {
+    "title": "No quota checkers configured",
+    "description": "Configure quota checkers in your provider settings to monitor usage."
+  },
+  "card": {
+    "refreshAria": "Refresh",
+    "pendingFirstCheck": "Pending first check...",
+    "checkFailed": "Check failed",
+    "noDataYet": "No data yet"
+  },
+  "legacy": {
+    "detectedPrefix": "Legacy quota data detected ({{count}} rows in ",
+    "detectedSuffix": ")",
+    "description": "Migrate this historical data into the new meter snapshots table to preserve it.",
+    "migrateNow": "Migrate now"
+  },
+  "migration": {
+    "completeNoSkipped": "Migration complete — {{inserted}} rows inserted.",
+    "completeWithSkipped": "Migration complete — {{inserted}} rows inserted, {{skipped}} already existed.",
+    "canTruncatePrefix": "You can now truncate the old ",
+    "canTruncateSuffix": " table to free up space.",
+    "truncated": "quota_snapshots truncated",
+    "truncate": "Truncate quota_snapshots"
+  },
+  "truncateConfirm": "Truncate quota_snapshots? This cannot be undone.",
+  "checkerCommon": {
+    "endpointOptional": "Endpoint (optional)",
+    "managementApiKey": "Management API Key",
+    "sessionCookie": "Session Cookie",
+    "organizationIdOptional": "Organization ID (optional)",
+    "userAgentOptional": "User Agent (optional)",
+    "userAgentHeaderOptional": "User-Agent (optional)",
+    "googApiClientOptional": "Goog API Client (optional)",
+    "clientMetadataOptional": "Client Metadata (optional)",
+    "editorVersionOptional": "Editor-Version (optional)",
+    "apiVersionOptional": "API Version (optional)",
+    "timeoutMsOptional": "Timeout (ms) (optional)",
+    "maxUtilizationPercentOptional": "Max Utilization Percent (optional)",
+    "quotaSource": "Quota Source",
+    "groupId": "Group ID",
+    "hertzSessionCookie": "HERTZ-SESSION Cookie",
+    "leaveBlankDefaultEndpoint": "Leave blank to use the default endpoint.",
+    "usesProviderApiKeyAuto": "Uses the provider's API key automatically. No additional configuration needed.",
+    "modeSubscription": "Subscription (quota only)",
+    "modePayg": "PAYG (balance only)"
+  },
+  "checkerConfigs": {
+    "naga": {
+      "provisioningApiKey": "Provisioning API Key",
+      "provisioningKeyPlaceholder": "Enter your Naga provisioning key",
+      "provisioningKeyHintBefore": "Required. Use a provisioning key from",
+      "provisioningKeyLink": "Naga Dashboard",
+      "provisioningKeyHintAfter": ".",
+      "endpointHint": "Custom endpoint URL. Defaults to Naga's API."
+    },
+    "openrouter": {
+      "managementKeyPlaceholder": "Enter your OpenRouter management key",
+      "managementKeyHintBefore": "Required. Use a management key from",
+      "managementKeyLink": "OpenRouter Dashboard",
+      "managementKeyHintAfter": "."
+    },
+    "ollama": {
+      "sessionCookiePlaceholder": "Paste your Ollama __Secure-session cookie",
+      "sessionCookieHint": "Required. Found in browser cookies after logging in to ollama.com. The cookie name is __Secure-session (with double underscores)."
+    },
+    "zenmux": {
+      "managementKeyPlaceholder": "Enter your Zenmux management API key",
+      "managementKeyHintBefore": "Required. Use a management API key from",
+      "managementKeyLink": "Zenmux Dashboard",
+      "managementKeyHintAfter": ".",
+      "endpointHint": "Custom endpoint URL. Defaults to Zenmux's API."
+    },
+    "zai": {
+      "endpointHint": "Custom endpoint URL. Defaults to Z.AI's quota API."
+    },
+    "wisdomgate": {
+      "sessionPlaceholder": "Paste your Wisdom Gate session cookie",
+      "sessionHint": "Required. Found in browser cookies after logging in to wisgate.ai."
+    },
+    "wafer": {
+      "endpointHint": "Custom endpoint URL. Defaults to Wafer.ai API."
+    },
+    "synthetic": {
+      "endpointHint": "Custom endpoint URL. Defaults to Synthetic's API.",
+      "maxUtilizationHint": "Threshold (1–100) to trigger cooldown. Default: 99. Set lower to reserve quota — e.g. 30 = provider cooled down at 30% usage, preserving 70%."
+    },
+    "opencode-go": {
+      "workspaceId": "Workspace ID",
+      "workspacePlaceholder": "Your OpenCode Go workspace ID",
+      "workspaceHintPart1": "Required. Find it in your",
+      "workspaceHintLink": "OpenCode dashboard",
+      "workspaceHintPart2": " URL (e.g. opencode.ai/workspace/",
+      "workspaceHintMono": "your-id",
+      "workspaceHintPart3": "/go).",
+      "authCookie": "Auth Cookie",
+      "authCookiePlaceholder": "Your OpenCode auth cookie value",
+      "authCookieHintBefore": "Required. Open your browser's DevTools (F12) → Application/Storage → Cookies → opencode.ai → copy the",
+      "authCookieMono": "auth",
+      "authCookieHintAfter": " cookie value. Treat it like a password.",
+      "endpointHint": "Custom dashboard URL. Defaults to the standard OpenCode Go dashboard."
+    },
+    "novita": {
+      "endpointHint": "Custom endpoint URL. Defaults to Novita API."
+    },
+    "neuralwatt": {
+      "formAriaLabel": "Neuralwatt quota checker options"
+    },
+    "poe": {
+      "formAriaLabel": "Poe quota checker options"
+    },
+    "nanogpt": {
+      "endpointHint": "Custom endpoint URL. Defaults to NanoGPT's API."
+    },
+    "moonshot": {
+      "endpointHint": "Custom endpoint URL. Defaults to Moonshot API."
+    },
+    "minimax": {
+      "groupIdPlaceholder": "Enter MiniMax GroupId",
+      "hertzSessionPlaceholder": "Paste HERTZ-SESSION cookie value",
+      "hertzSessionHint": "Treated as a password. Used to query MiniMax balance."
+    },
+    "minimax-coding": {
+      "endpointHint": "Custom endpoint URL. Defaults to MiniMax coding plan API."
+    },
+    "kimi-code": {
+      "endpointHint": "Custom endpoint URL. Defaults to Kimi's API."
+    },
+    "kilo": {
+      "orgIdPlaceholder": "org_...",
+      "orgIdHint": "If provided, sends `x-kilocode-organizationid` for team balance."
+    },
+    "gemini-cli": {
+      "formAriaLabel": "Gemini CLI quota checker options"
+    },
+    "antigravity": {
+      "endpointHint": "Override the Cloud Code endpoint. Leave blank to use the default with automatic sandbox fallback."
+    },
+    "apertis": {
+      "modeHint": "Subscription mode monitors the plan quota and triggers cooldowns when exhausted. PAYG mode only tracks the prepaid balance, ignoring the subscription."
+    },
+    "devpass": {
+      "sessionPlaceholder": "Paste your DevPass session cookie",
+      "sessionHint": "Required. The cookie name is <1>__Secure-better-auth.session_token</1>."
+    },
+    "copilot": {
+      "formAriaLabel": "GitHub Copilot quota checker options"
+    }
+  }
+}

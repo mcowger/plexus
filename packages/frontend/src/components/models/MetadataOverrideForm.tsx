@@ -1,6 +1,8 @@
 import type { MetadataOverrides } from '../../lib/api';
+import type { ReactNode } from 'react';
 import { Input } from '../ui/Input';
 import { TagSelect } from '../ui/TagSelect';
+import { useT } from '../../i18n';
 
 // Suggested values shown in the TagSelect dropdowns. Users can still enter
 // arbitrary strings via `allowCustom`; these are just hints for the common case.
@@ -50,7 +52,7 @@ interface Props {
   ) => void;
 }
 
-const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+const SectionLabel = ({ children }: { children: ReactNode }) => (
   <div
     className="font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted"
     style={{ marginBottom: '4px' }}
@@ -59,7 +61,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+const FieldLabel = ({ children }: { children: ReactNode }) => (
   <label
     className="font-body text-[11px] font-medium text-text-secondary"
     style={{ display: 'block', marginBottom: '2px' }}
@@ -83,9 +85,8 @@ export function MetadataOverrideForm({
   onSetArchitecture,
   onSetTopProvider,
 }: Props) {
-  const helperText = isCustom
-    ? 'All fields below come from your manual entry — no catalog is consulted.'
-    : 'Fields left blank fall back to the catalog value.';
+  const { t } = useT('models.metadataForm');
+  const helperText = isCustom ? t('helperCustom') : t('helperOverride');
 
   return (
     <div
@@ -98,47 +99,47 @@ export function MetadataOverrideForm({
 
       {/* Basic */}
       <div>
-        <SectionLabel>Basic</SectionLabel>
+        <SectionLabel>{t('sectionBasic')}</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <div>
-            <FieldLabel>Name</FieldLabel>
+            <FieldLabel>{t('fieldName')}</FieldLabel>
             <Input
               value={overrides.name ?? ''}
               onChange={(e) =>
                 onSetField('name', e.target.value === '' ? undefined : e.target.value)
               }
-              placeholder="Display name"
+              placeholder={t('placeholderDisplayName')}
             />
           </div>
           <div>
-            <FieldLabel>Context length (tokens)</FieldLabel>
+            <FieldLabel>{t('fieldContextLength')}</FieldLabel>
             <Input
               type="number"
               min={1}
               value={overrides.context_length ?? ''}
               onChange={(e) => onSetField('context_length', parseIntOrUndef(e.target.value))}
-              placeholder="e.g. 128000"
+              placeholder={t('placeholderExampleTokens')}
             />
           </div>
         </div>
         <div style={{ marginTop: '6px' }}>
-          <FieldLabel>Description</FieldLabel>
+          <FieldLabel>{t('fieldDescription')}</FieldLabel>
           <Input
             value={overrides.description ?? ''}
             onChange={(e) =>
               onSetField('description', e.target.value === '' ? undefined : e.target.value)
             }
-            placeholder="Short description"
+            placeholder={t('placeholderShortDescription')}
           />
         </div>
       </div>
 
       {/* Pricing */}
       <div>
-        <SectionLabel>Pricing ($/token)</SectionLabel>
+        <SectionLabel>{t('sectionPricing')}</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <div>
-            <FieldLabel>Prompt</FieldLabel>
+            <FieldLabel>{t('fieldPrompt')}</FieldLabel>
             <Input
               value={overrides.pricing?.prompt ?? ''}
               onChange={(e) =>
@@ -148,7 +149,7 @@ export function MetadataOverrideForm({
             />
           </div>
           <div>
-            <FieldLabel>Completion</FieldLabel>
+            <FieldLabel>{t('fieldCompletion')}</FieldLabel>
             <Input
               value={overrides.pricing?.completion ?? ''}
               onChange={(e) =>
@@ -158,7 +159,7 @@ export function MetadataOverrideForm({
             />
           </div>
           <div>
-            <FieldLabel>Input cache read</FieldLabel>
+            <FieldLabel>{t('fieldInputCacheRead')}</FieldLabel>
             <Input
               value={overrides.pricing?.input_cache_read ?? ''}
               onChange={(e) =>
@@ -168,7 +169,7 @@ export function MetadataOverrideForm({
             />
           </div>
           <div>
-            <FieldLabel>Input cache write</FieldLabel>
+            <FieldLabel>{t('fieldInputCacheWrite')}</FieldLabel>
             <Input
               value={overrides.pricing?.input_cache_write ?? ''}
               onChange={(e) =>
@@ -185,12 +186,12 @@ export function MetadataOverrideForm({
 
       {/* Architecture */}
       <div>
-        <SectionLabel>Architecture</SectionLabel>
+        <SectionLabel>{t('sectionArchitecture')}</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           <div>
-            <FieldLabel>Input modalities</FieldLabel>
+            <FieldLabel>{t('fieldInputModalities')}</FieldLabel>
             <TagSelect
-              placeholder="Add modalities..."
+              placeholder={t('placeholderModalities')}
               options={MODALITY_SUGGESTIONS}
               selected={overrides.architecture?.input_modalities ?? []}
               allowCustom
@@ -200,9 +201,9 @@ export function MetadataOverrideForm({
             />
           </div>
           <div>
-            <FieldLabel>Output modalities</FieldLabel>
+            <FieldLabel>{t('fieldOutputModalities')}</FieldLabel>
             <TagSelect
-              placeholder="Add modalities..."
+              placeholder={t('placeholderModalities')}
               options={MODALITY_SUGGESTIONS}
               selected={overrides.architecture?.output_modalities ?? []}
               allowCustom
@@ -212,13 +213,13 @@ export function MetadataOverrideForm({
             />
           </div>
           <div style={{ gridColumn: 'span 2' }}>
-            <FieldLabel>Tokenizer</FieldLabel>
+            <FieldLabel>{t('fieldTokenizer')}</FieldLabel>
             <Input
               value={overrides.architecture?.tokenizer ?? ''}
               onChange={(e) =>
                 onSetArchitecture('tokenizer', e.target.value === '' ? undefined : e.target.value)
               }
-              placeholder="e.g. cl100k_base"
+              placeholder={t('placeholderTokenizer')}
             />
           </div>
         </div>
@@ -226,12 +227,12 @@ export function MetadataOverrideForm({
 
       {/* Capabilities */}
       <div>
-        <SectionLabel>Capabilities</SectionLabel>
+        <SectionLabel>{t('sectionCapabilities')}</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px' }}>
           <div>
-            <FieldLabel>Supported parameters</FieldLabel>
+            <FieldLabel>{t('fieldSupportedParameters')}</FieldLabel>
             <TagSelect
-              placeholder="Add parameters..."
+              placeholder={t('placeholderParameters')}
               options={SUPPORTED_PARAM_SUGGESTIONS}
               selected={overrides.supported_parameters ?? []}
               allowCustom
@@ -242,7 +243,7 @@ export function MetadataOverrideForm({
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div>
-              <FieldLabel>Top provider context length</FieldLabel>
+              <FieldLabel>{t('fieldTopProviderContextLength')}</FieldLabel>
               <Input
                 type="number"
                 min={1}
@@ -250,11 +251,11 @@ export function MetadataOverrideForm({
                 onChange={(e) =>
                   onSetTopProvider('context_length', parseIntOrUndef(e.target.value))
                 }
-                placeholder="e.g. 128000"
+                placeholder={t('placeholderExampleTokens')}
               />
             </div>
             <div>
-              <FieldLabel>Max completion tokens</FieldLabel>
+              <FieldLabel>{t('fieldMaxCompletionTokens')}</FieldLabel>
               <Input
                 type="number"
                 min={1}
@@ -262,7 +263,7 @@ export function MetadataOverrideForm({
                 onChange={(e) =>
                   onSetTopProvider('max_completion_tokens', parseIntOrUndef(e.target.value))
                 }
-                placeholder="e.g. 16384"
+                placeholder={t('placeholderExampleCompletion')}
               />
             </div>
           </div>

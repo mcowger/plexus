@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { BookOpen, ChevronDown, ChevronRight, CheckCircle, X, Loader2 } from 'lucide-react';
+import { Trans } from 'react-i18next';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
@@ -14,6 +15,7 @@ import type {
   MetadataOverrides,
   PreferredApiValue,
 } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface Props {
   editingAlias: Alias;
@@ -22,6 +24,9 @@ interface Props {
 }
 
 export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen }: Props) {
+  const { t } = useT('models.metadataEditor');
+  const { t: tc } = useT('common');
+
   const [isOpen, setIsOpen] = useState(false);
   const {
     isOverrideOpen,
@@ -73,6 +78,9 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
       .finally(() => setPiModelsLoading(false));
   }, [editingAlias.pi_model?.provider]);
 
+  const mdSource = editingAlias.metadata?.source ?? 'openrouter';
+  const codeClass = 'text-primary';
+
   return (
     <>
       <div className="border border-border-glass rounded-sm overflow-hidden">
@@ -83,7 +91,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <BookOpen size={13} className="text-text-muted" />
-            <span className="font-body text-[13px] font-medium text-text-secondary">Metadata</span>
+            <span className="font-body text-[13px] font-medium text-text-secondary">{t('sectionTitle')}</span>
             {editingAlias.metadata && (
               <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
                 {editingAlias.metadata.source}
@@ -103,9 +111,12 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
             style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
           >
             <p className="font-body text-[11px] text-text-muted">
-              Link this alias to a model in an external catalog. When configured, Plexus includes
-              enriched metadata (name, context length, pricing, supported parameters) in the{' '}
-              <code className="text-primary">GET /v1/models</code> response.
+              <Trans
+                i18nKey="models.metadataEditor.intro"
+                components={{
+                  1: <code className={codeClass} />,
+                }}
+              />
             </p>
 
             {/* Source selector */}
@@ -114,7 +125,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                 className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ display: 'block', marginBottom: '4px' }}
               >
-                Source
+                {t('sourceLabel')}
               </label>
               <select
                 className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
@@ -168,17 +179,14 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                     };
                   }
                   setEditingAlias({ ...editingAlias, metadata: next });
-                  // Kill any pending search from the prior source.
                   if (prevSource !== source) {
-                    // The source change handler in useMetadataEditor handles
-                    // debounce cancellation via state resets.
                   }
                 }}
               >
-                <option value="openrouter">OpenRouter</option>
-                <option value="models.dev">models.dev</option>
-                <option value="catwalk">Catwalk (Charm)</option>
-                <option value="custom">Custom (manual entry)</option>
+                <option value="openrouter">{t('sourceOptionOpenrouter')}</option>
+                <option value="models.dev">{t('sourceOptionModelsDev')}</option>
+                <option value="catwalk">{t('sourceOptionCatwalk')}</option>
+                <option value="custom">{t('sourceOptionCustom')}</option>
               </select>
             </div>
 
@@ -189,7 +197,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   className="font-body text-[12px] font-medium text-text-secondary"
                   style={{ display: 'block', marginBottom: '4px' }}
                 >
-                  Model
+                  {t('modelLabel')}
                   {editingAlias.metadata?.source_path && (
                     <span className="ml-2 font-normal text-text-muted">
                       ({editingAlias.metadata.source_path})
@@ -217,7 +225,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                           setShowMetadataDropdown(true);
                         }
                       }}
-                      placeholder={`Search ${editingAlias.metadata?.source ?? 'openrouter'} catalog...`}
+                      placeholder={t('modelSearchPlaceholder', { source: mdSource })}
                       style={{
                         width: '100%',
                         paddingRight: isMetadataSearching ? '28px' : undefined,
@@ -243,7 +251,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                       size="sm"
                       onClick={clearMetadata}
                       style={{ color: 'var(--color-danger)', padding: '4px', minHeight: 'auto' }}
-                      title="Remove metadata"
+                      title={t('removeMetadataTitle')}
                     >
                       <X size={14} />
                     </Button>
@@ -266,7 +274,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                     <span>
                       {editingAlias.metadata.source === 'custom' ? (
                         <>
-                          Custom metadata
+                          {t('customMetadataLabel')}
                           {editingAlias.metadata.source_path && (
                             <>
                               :{' '}
@@ -278,7 +286,13 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                         </>
                       ) : (
                         <>
-                          Metadata assigned from <strong>{editingAlias.metadata.source}</strong>
+                          <Trans
+                            i18nKey="models.metadataEditor.assignedFromCatalog"
+                            values={{ source: editingAlias.metadata.source }}
+                            components={{
+                              1: <strong />,
+                            }}
+                          />
                           {editingAlias.metadata.source_path && (
                             <>
                               :{' '}
@@ -291,8 +305,8 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                       )}
                       {countOverrides(editingAlias.metadata) > 0 && (
                         <span className="ml-2 text-text-muted">
-                          + {countOverrides(editingAlias.metadata)} field
-                          {countOverrides(editingAlias.metadata) === 1 ? '' : 's'} overridden
+                          {' '}
+                          {t('overrides', { count: countOverrides(editingAlias.metadata) })}
                         </span>
                       )}
                     </span>
@@ -306,15 +320,18 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                 className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ display: 'block', marginBottom: '4px' }}
               >
-                Pi model
+                {t('piModelLabel')}
               </label>
               <p className="font-body text-[11px] text-text-muted" style={{ marginBottom: '6px' }}>
-                Link to a pi-ai model to include its compatibility options as{' '}
-                <code className="text-primary">pi_options</code> in{' '}
-                <code className="text-primary">GET /v1/models</code>.
+                <Trans
+                  i18nKey="models.metadataEditor.piModelIntro"
+                  components={{
+                    1: <code className={codeClass} />,
+                    2: <code className={codeClass} />,
+                  }}
+                />
               </p>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {/* Provider dropdown */}
                 <select
                   className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
                   style={{
@@ -334,7 +351,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                     }
                   }}
                 >
-                  <option value="">None</option>
+                  <option value="">{t('piNone')}</option>
                   {piProviders.map((p) => (
                     <option key={p} value={p}>
                       {p}
@@ -342,7 +359,6 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   ))}
                 </select>
 
-                {/* Model dropdown */}
                 {editingAlias.pi_model?.provider && (
                   <div style={{ position: 'relative', flex: 1 }}>
                     <select
@@ -361,7 +377,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                         });
                       }}
                     >
-                      <option value="">Select model...</option>
+                      <option value="">{t('piSelectModel')}</option>
                       {piModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name} ({m.id})
@@ -384,7 +400,6 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   </div>
                 )}
 
-                {/* Clear pi model */}
                 {editingAlias.pi_model?.model_id && (
                   <Button
                     variant="ghost"
@@ -399,14 +414,13 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                       minHeight: 'auto',
                       flex: '0 0 auto',
                     }}
-                    title="Remove pi model"
+                    title={t('removePiModelTitle')}
                   >
                     <X size={14} />
                   </Button>
                 )}
               </div>
 
-              {/* Confirmation badge */}
               {editingAlias.pi_model?.model_id && (
                 <div
                   className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
@@ -419,8 +433,9 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <CheckCircle size={12} className="text-success" />
                     <span>
-                      Pi model: <strong>{editingAlias.pi_model.provider}</strong>
-                      {' / '}
+                      {t('piModelBadge')}{' '}
+                      <strong>{editingAlias.pi_model.provider}</strong>
+                      {' / '}
                       <code className="text-primary">{editingAlias.pi_model.model_id}</code>
                     </span>
                   </div>
@@ -434,11 +449,10 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                 className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ display: 'block', marginBottom: '4px' }}
               >
-                Preferred API
+                {t('preferredApiLabel')}
               </label>
               <p className="font-body text-[11px] text-text-muted" style={{ marginBottom: '6px' }}>
-                Advertised in <code className="text-primary">/v1/models</code> to inform clients of
-                the recommended API surface for this alias.
+                <Trans i18nKey="models.metadataEditor.preferredApiIntro" components={{ 1: <code className={codeClass} /> }} />
               </p>
               <select
                 className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
@@ -452,11 +466,11 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   });
                 }}
               >
-                <option value="">None</option>
-                <option value="chat_completions">Chat Completions (/v1/chat/completions)</option>
-                <option value="messages">Messages (/v1/messages)</option>
-                <option value="gemini">Gemini (Google Gemini API)</option>
-                <option value="responses">Responses (/v1/responses)</option>
+                <option value="">{tc('none')}</option>
+                <option value="chat_completions">{t('preferredApiChatCompletions')}</option>
+                <option value="messages">{t('preferredApiMessages')}</option>
+                <option value="gemini">{t('preferredApiGemini')}</option>
+                <option value="responses">{t('preferredApiResponses')}</option>
               </select>
             </div>
 
@@ -471,11 +485,8 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                       alignItems: 'center',
                     }}
                   >
-                    <label
-                      className="font-body text-[12px] font-medium text-text-secondary"
-                      style={{ marginBottom: 0 }}
-                    >
-                      Override catalog fields
+                    <label className="font-body text-[12px] font-medium text-text-secondary" style={{ marginBottom: 0 }}>
+                      {t('overrideCatalogToggle')}
                     </label>
                     <Switch
                       checked={isOverrideOpen}
@@ -514,7 +525,6 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
         )}
       </div>
 
-      {/* Metadata autocomplete portal */}
       {showMetadataDropdown &&
         metadataResults.length > 0 &&
         dropdownRect &&

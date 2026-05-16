@@ -1,0 +1,92 @@
+{
+  "title": "Detailed Usage",
+  "subtitle": "Advanced analytics with customizable chart types",
+  "backToLiveCard": "Back to Live Card",
+  "returnToLiveMetrics": "Return to Live Metrics",
+  "liveData": "Live Data",
+  "lastUpdated": "Last updated: {{time}}",
+  "stats": {
+    "requests": "Requests",
+    "errors": "Errors",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "avgDuration": "Avg Duration",
+    "avgTtft": "Avg TTFT",
+    "avgTps": "Avg TPS",
+    "successRate": "Success Rate"
+  },
+  "config": {
+    "title": "Chart Configuration",
+    "timeRange": "Time Range",
+    "groupBy": "Group By",
+    "chartType": "Chart Type",
+    "view": "View",
+    "metrics": "Metrics"
+  },
+  "groupBy": {
+    "time": "Time",
+    "provider": "Provider",
+    "model": "Model",
+    "apiKey": "Api Key",
+    "status": "Status"
+  },
+  "chartTypes": {
+    "area": "Area",
+    "line": "Line",
+    "bar": "Bar",
+    "composed": "Mixed",
+    "pie": "Pie"
+  },
+  "viewModes": {
+    "chart": "Chart",
+    "list": "List"
+  },
+  "metrics": {
+    "requests": "Requests",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "duration": "Duration",
+    "ttft": "TTFT",
+    "tps": "TPS",
+    "errors": "Errors"
+  },
+  "chartCard": {
+    "titleByGroup": "Usage by {{group}}",
+    "refresh": "Refresh",
+    "noData": "No data available"
+  },
+  "list": {
+    "title": "Raw Request Log",
+    "count": "{{count}} requests",
+    "headers": {
+      "time": "Time",
+      "provider": "Provider",
+      "model": "Model",
+      "status": "Status",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "duration": "Duration",
+      "ttft": "TTFT",
+      "tps": "TPS"
+    }
+  },
+  "breakdown": {
+    "title": "Detailed Breakdown",
+    "labels": {
+      "requests": "Requests",
+      "success": "Success",
+      "tokens": "Tokens",
+      "cost": "Cost"
+    },
+    "headers": {
+      "requests": "Requests",
+      "errors": "Errors",
+      "successPct": "Success %",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "avgDuration": "Avg Duration",
+      "avgTtft": "Avg TTFT",
+      "avgTps": "Avg TPS"
+    }
+  }
+}

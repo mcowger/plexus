@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 export interface ZAIQuotaConfigProps {
   options: Record<string, unknown>;
@@ -7,6 +8,8 @@ export interface ZAIQuotaConfigProps {
 }
 
 export const ZAIQuotaConfig: React.FC<ZAIQuotaConfigProps> = ({ options, onChange }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };
@@ -15,16 +18,14 @@ export const ZAIQuotaConfig: React.FC<ZAIQuotaConfigProps> = ({ options, onChang
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://api.z.ai/api/monitor/usage/quota/limit"
         />
-        <span className="text-[10px] text-text-muted">
-          Custom endpoint URL. Defaults to Z.AI's quota API.
-        </span>
+        <span className="text-[10px] text-text-muted">{t('checkerConfigs.zai.endpointHint')}</span>
       </div>
     </div>
   );

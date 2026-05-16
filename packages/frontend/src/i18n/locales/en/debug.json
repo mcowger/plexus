@@ -1,0 +1,56 @@
+{
+  "title": "Traces",
+  "subtitle": {
+    "scoped": "Traces for key \"{{keyName}}\" only. Toggle capture in My Key.",
+    "default": "Distributed spans · OTLP"
+  },
+  "actions": {
+    "filter": "Filter",
+    "copyAll": "Copy All",
+    "copied": "Copied",
+    "download": "Download",
+    "deleteAll": "Delete All",
+    "refresh": "Refresh"
+  },
+  "filterDropdown": {
+    "title": "Provider Filter",
+    "clear": "Clear",
+    "description": "Only log requests for selected providers",
+    "cancel": "Cancel",
+    "apply": "Apply"
+  },
+  "list": {
+    "header": "Recent Requests",
+    "empty": "No debug logs found. Ensure Debug Mode is enabled.",
+    "deleteTooltip": "Delete log"
+  },
+  "details": {
+    "selectedTrace": "Selected Trace",
+    "selectPlaceholder": "Select a request trace to inspect details",
+    "panels": {
+      "rawRequest": "Raw Request",
+      "transformedRequest": "Transformed Request",
+      "rawResponse": "Raw Response",
+      "rawResponseSnapshot": "Raw Response (Reconstructed)",
+      "transformedResponse": "Transformed Response",
+      "transformedResponseSnapshot": "Transformed Response (Reconstructed)",
+      "copyTooltip": "Copy to clipboard",
+      "foldAll": "Fold all",
+      "unfoldAll": "Unfold all"
+    }
+  },
+  "deleteAllModal": {
+    "title": "Confirm Deletion",
+    "cancelButton": "Cancel",
+    "deleteButton": "Delete All Logs",
+    "deleting": "Deleting...",
+    "body": "Are you sure you want to delete ALL debug logs? This action cannot be undone."
+  },
+  "singleDeleteModal": {
+    "title": "Confirm Deletion",
+    "cancelButton": "Cancel",
+    "deleteButton": "Delete Log",
+    "deleting": "Deleting...",
+    "body": "Are you sure you want to delete this debug log? This action cannot be undone."
+  }
+}

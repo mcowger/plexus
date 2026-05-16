@@ -5,20 +5,9 @@ import { Input } from '../ui/Input';
 import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import type { Provider } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
-export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
-  {
-    value: 'reasoning_content',
-    label: 'Reasoning Content',
-    description:
-      'Maps reasoning ↔ reasoning_content on messages and responses (e.g. Fireworks DeepSeek-R1).',
-  },
-  {
-    value: 'suppress_developer_role',
-    label: 'Suppress Developer Role',
-    description: 'Rewrites the "developer" role to "system" for providers that do not support it.',
-  },
-];
+export const KNOWN_ADAPTER_KEYS = ['reasoning_content', 'suppress_developer_role'] as const;
 
 interface Props {
   editingProvider: Provider;
@@ -35,6 +24,7 @@ export function ProviderAdvancedEditor({
   updateKV,
   removeKV,
 }: Props) {
+  const { t } = useT('providers.advanced');
   const [isOpen, setIsOpen] = useState(false);
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
@@ -72,7 +62,7 @@ export function ProviderAdvancedEditor({
         onClick={() => setIsOpen((o) => !o)}
         className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
       >
-        <span className="font-body text-[13px] font-medium text-text-secondary">Advanced</span>
+        <span className="font-body text-[13px] font-medium text-text-secondary">{t('title')}</span>
         {isOpen ? (
           <ChevronDown size={14} className="text-text-muted" />
         ) : (
@@ -87,22 +77,20 @@ export function ProviderAdvancedEditor({
           {/* Provider Adapters */}
           <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
             <label className="font-body text-[13px] font-medium text-text-secondary block mb-2">
-              Provider Adapters
+              {t('adaptersTitle')}
             </label>
             <div
               className="font-body text-[11px] text-text-secondary mb-3"
               style={{ lineHeight: 1.4 }}
             >
-              Adapters rewrite requests and responses to fix provider-specific field-name
-              incompatibilities. Applied to every model under this provider unless overridden
-              per-model.
+              {t('adaptersHint')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {KNOWN_ADAPTERS.map((a) => {
-                const active = (editingProvider.adapter ?? []).includes(a.value);
+              {KNOWN_ADAPTER_KEYS.map((adapterKey) => {
+                const active = (editingProvider.adapter ?? []).includes(adapterKey);
                 return (
                   <label
-                    key={a.value}
+                    key={adapterKey}
                     style={{
                       display: 'flex',
                       alignItems: 'flex-start',
@@ -121,18 +109,20 @@ export function ProviderAdvancedEditor({
                       onChange={() => {
                         const current = editingProvider.adapter ?? [];
                         const next = active
-                          ? current.filter((v) => v !== a.value)
-                          : [...current, a.value];
+                          ? current.filter((v) => v !== adapterKey)
+                          : [...current, adapterKey];
                         setEditingProvider({ ...editingProvider, adapter: next });
                       }}
                     />
                     <div>
-                      <div className="font-body text-[12px] font-medium text-text">{a.label}</div>
+                      <div className="font-body text-[12px] font-medium text-text">
+                        {t(`adapters.${adapterKey}.label`)}
+                      </div>
                       <div
                         className="font-body text-[11px] text-text-secondary"
                         style={{ lineHeight: 1.35 }}
                       >
-                        {a.description}
+                        {t(`adapters.${adapterKey}.description`)}
                       </div>
                     </div>
                   </label>
@@ -145,9 +135,9 @@ export function ProviderAdvancedEditor({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px] sm:items-end">
             <div className="flex flex-col gap-1">
               <label className="font-body text-[11px] font-medium text-text-secondary">
-                Discount (%)
+                {t('discount')}
                 <span className="font-normal text-[10px] text-text-muted ml-1 block">
-                  e.g., 10 → pays 90%
+                  {t('discountHint')}
                 </span>
               </label>
               <div style={{ position: 'relative' }}>
@@ -182,15 +172,12 @@ export function ProviderAdvancedEditor({
           {/* Timeout Override */}
           <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
             <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text">
-                Upstream Timeout (seconds)
-              </label>
+              <label className="font-body text-[13px] font-medium text-text">{t('timeoutTitle')}</label>
               <div
                 className="font-body text-[11px] text-text-secondary"
                 style={{ lineHeight: 1.35, marginBottom: '4px' }}
               >
-                Override the global default timeout for this provider. Leave empty to use the global
-                default. Must be between 1 and 3600.
+                {t('timeoutHint')}
               </div>
               <input
                 className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
@@ -198,7 +185,7 @@ export function ProviderAdvancedEditor({
                 step="1"
                 min="1"
                 max="3600"
-                placeholder="Global default"
+                placeholder={t('globalDefault')}
                 value={
                   editingProvider.timeoutMs != null
                     ? Math.round(editingProvider.timeoutMs / 1000)
@@ -230,7 +217,7 @@ export function ProviderAdvancedEditor({
                 className="font-body text-[13px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
-                Stall Detection Overrides
+                {t('stallTitle')}
               </label>
               {(editingProvider.stallTtfbMs != null ||
                 editingProvider.stallTtfbBytes != null ||
@@ -238,7 +225,7 @@ export function ProviderAdvancedEditor({
                 editingProvider.stallWindowMs != null ||
                 editingProvider.stallGracePeriodMs != null) && (
                 <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                  Custom
+                  {t('customBadge')}
                 </Badge>
               )}
             </div>
@@ -257,25 +244,24 @@ export function ProviderAdvancedEditor({
                   className="font-body text-[11px] text-text-secondary"
                   style={{ lineHeight: 1.35, marginBottom: '2px' }}
                 >
-                  Override the global stall detection settings for this provider. Leave empty to use
-                  the global setting for each field.
+                  {t('stallHint')}
                 </div>
                 {/* TTFB Timeout */}
                 <div>
                   <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    TTFB Timeout (seconds)
+                    {t('ttfbTimeout')}
                   </label>
                   <div
                     className="font-body text-[10px] text-text-muted"
                     style={{ lineHeight: 1.3, marginBottom: '3px' }}
                   >
-                    5–120 seconds. Leave empty for global default.
+                    {t('ttfbTimeoutHint')}
                   </div>
                   <input
                     className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                     type="number"
                     step="1"
-                    placeholder="Global default"
+                    placeholder={t('globalDefault')}
                     value={stallTtfbDraft}
                     onChange={(e) => setStallTtfbDraft(e.target.value)}
                     onBlur={() => {
@@ -298,19 +284,19 @@ export function ProviderAdvancedEditor({
                 {/* TTFB Byte Threshold */}
                 <div>
                   <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    TTFB Byte Threshold
+                    {t('ttfbBytes')}
                   </label>
                   <div
                     className="font-body text-[10px] text-text-muted"
                     style={{ lineHeight: 1.3, marginBottom: '3px' }}
                   >
-                    50–10,000 bytes. Leave empty for global default.
+                    {t('ttfbBytesHint')}
                   </div>
                   <input
                     className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                     type="number"
                     step="1"
-                    placeholder="Global default"
+                    placeholder={t('globalDefault')}
                     value={stallTtfbBytesDraft}
                     onChange={(e) => setStallTtfbBytesDraft(e.target.value)}
                     onBlur={() => {
@@ -332,19 +318,19 @@ export function ProviderAdvancedEditor({
                 {/* Min Bytes/Sec */}
                 <div>
                   <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    Min Bytes Per Second
+                    {t('minBps')}
                   </label>
                   <div
                     className="font-body text-[10px] text-text-muted"
                     style={{ lineHeight: 1.3, marginBottom: '3px' }}
                   >
-                    50–5,000 B/s. Leave empty for global default.
+                    {t('minBpsHint')}
                   </div>
                   <input
                     className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                     type="number"
                     step="1"
-                    placeholder="Global default"
+                    placeholder={t('globalDefault')}
                     value={stallMinBpsDraft}
                     onChange={(e) => setStallMinBpsDraft(e.target.value)}
                     onBlur={() => {
@@ -366,19 +352,19 @@ export function ProviderAdvancedEditor({
                 {/* Stall Window */}
                 <div>
                   <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    Stall Window (seconds)
+                    {t('stallWindow')}
                   </label>
                   <div
                     className="font-body text-[10px] text-text-muted"
                     style={{ lineHeight: 1.3, marginBottom: '3px' }}
                   >
-                    3–30 seconds. Leave empty for global default.
+                    {t('stallWindowHint')}
                   </div>
                   <input
                     className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                     type="number"
                     step="1"
-                    placeholder="Global default"
+                    placeholder={t('globalDefault')}
                     value={stallWindowDraft}
                     onChange={(e) => setStallWindowDraft(e.target.value)}
                     onBlur={() => {
@@ -400,19 +386,19 @@ export function ProviderAdvancedEditor({
                 {/* Grace Period */}
                 <div>
                   <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    Stall Grace Period (seconds)
+                    {t('stallGrace')}
                   </label>
                   <div
                     className="font-body text-[10px] text-text-muted"
                     style={{ lineHeight: 1.3, marginBottom: '3px' }}
                   >
-                    0–120 seconds. Leave empty for global default.
+                    {t('stallGraceHint')}
                   </div>
                   <input
                     className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                     type="number"
                     step="1"
-                    placeholder="Global default"
+                    placeholder={t('globalDefault')}
                     value={stallGraceDraft}
                     onChange={(e) => setStallGraceDraft(e.target.value)}
                     onBlur={() => {
@@ -446,7 +432,7 @@ export function ProviderAdvancedEditor({
                 className="font-body text-[13px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
-                Custom Headers
+                {t('headersTitle')}
               </label>
               <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
                 {Object.keys(editingProvider.headers || {}).length}
@@ -476,19 +462,19 @@ export function ProviderAdvancedEditor({
               >
                 {Object.entries(editingProvider.headers || {}).length === 0 && (
                   <div className="font-body text-[11px] text-text-secondary italic">
-                    No custom headers configured.
+                    {t('noHeaders')}
                   </div>
                 )}
                 {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '6px' }}>
                     <Input
-                      placeholder="Header Name"
+                      placeholder={t('headerName')}
                       value={key}
                       onChange={(e) => updateKV('headers', key, e.target.value, val)}
                       style={{ flex: 1 }}
                     />
                     <Input
-                      placeholder="Value"
+                      placeholder={t('value')}
                       value={typeof val === 'object' ? JSON.stringify(val) : val}
                       onChange={(e) => {
                         const raw = e.target.value;
@@ -525,7 +511,7 @@ export function ProviderAdvancedEditor({
                 className="font-body text-[13px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
-                Extra Body Fields
+                {t('extraBodyTitle')}
               </label>
               <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
                 {Object.keys(editingProvider.extraBody || {}).length}
@@ -555,19 +541,19 @@ export function ProviderAdvancedEditor({
               >
                 {Object.entries(editingProvider.extraBody || {}).length === 0 && (
                   <div className="font-body text-[11px] text-text-secondary italic">
-                    No extra body fields configured.
+                    {t('noExtraBody')}
                   </div>
                 )}
                 {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '6px' }}>
                     <Input
-                      placeholder="Field Name"
+                      placeholder={t('fieldName')}
                       value={key}
                       onChange={(e) => updateKV('extraBody', key, e.target.value, val)}
                       style={{ flex: 1 }}
                     />
                     <Input
-                      placeholder="Value"
+                      placeholder={t('value')}
                       value={typeof val === 'object' ? JSON.stringify(val) : val}
                       onChange={(e) => {
                         const raw = e.target.value;
@@ -606,16 +592,16 @@ export function ProviderAdvancedEditor({
                 className="font-body text-[13px] font-medium text-text"
                 style={{ marginBottom: 0 }}
               >
-                Estimate Tokens
+                {t('estimateTokens')}
               </label>
             </div>
             <div
               className="font-body text-[11px] text-text-secondary"
               style={{ lineHeight: 1.35, marginTop: '4px' }}
             >
-              Enable token estimation only when a provider does not return usage data.
+              {t('estimateTokensHint')}
               <span className="text-warning" style={{ marginLeft: '6px' }}>
-                Use sparingly—this is rarely needed.
+                {t('estimateTokensWarn')}
               </span>
             </div>
           </div>
@@ -633,16 +619,16 @@ export function ProviderAdvancedEditor({
                 className="font-body text-[13px] font-medium text-text"
                 style={{ marginBottom: 0 }}
               >
-                Disable Cooldowns
+                {t('disableCooldown')}
               </label>
             </div>
             <div
               className="font-body text-[11px] text-text-secondary"
               style={{ lineHeight: 1.35, marginTop: '4px' }}
             >
-              When enabled, this provider will never be placed on cooldown.
+              {t('disableCooldownHint')}
               <span className="text-warning" style={{ marginLeft: '6px' }}>
-                Use only for providers with reliable external rate-limit handling.
+                {t('disableCooldownWarn')}
               </span>
             </div>
           </div>
@@ -660,17 +646,16 @@ export function ProviderAdvancedEditor({
                 className="font-body text-[13px] font-medium text-text"
                 style={{ marginBottom: 0 }}
               >
-                Use Claude Masking
+                {t('claudeMasking')}
               </label>
             </div>
             <div
               className="font-body text-[11px] text-text-secondary"
               style={{ lineHeight: 1.35, marginTop: '4px' }}
             >
-              When enabled, requests to this Anthropic provider will be masked as Claude Code CLI
-              sessions.
+              {t('claudeMaskingHint')}
               <span className="text-warning" style={{ marginLeft: '6px' }}>
-                Only effective for Anthropic providers.
+                {t('claudeMaskingWarn')}
               </span>
             </div>
           </div>

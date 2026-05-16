@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Zap, BarChart3, Gauge, LayoutDashboard } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { LiveTab } from '../components/dashboard/tabs/LiveTab';
 import { UsageTab } from '../components/dashboard/tabs/UsageTab';
 import { PerformanceTab } from '../components/dashboard/tabs/PerformanceTab';
@@ -13,51 +14,56 @@ type TabId = 'overall' | 'live' | 'usage' | 'performance';
 type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
 type LiveWindowPeriod = 5 | 15 | 30 | 1440 | 10080 | 43200;
 
-const BASE_TABS = [
-  {
-    value: 'live' as const,
-    label: (
-      <span className="inline-flex items-center gap-2">
-        <Zap size={14} /> Live Metrics
-      </span>
-    ),
-  },
-  {
-    value: 'usage' as const,
-    label: (
-      <span className="inline-flex items-center gap-2">
-        <BarChart3 size={14} /> Usage Analytics
-      </span>
-    ),
-  },
-  {
-    value: 'performance' as const,
-    label: (
-      <span className="inline-flex items-center gap-2">
-        <Gauge size={14} /> Performance
-      </span>
-    ),
-  },
-];
-
-const OVERALL_TAB = {
-  value: 'overall' as const,
-  label: (
-    <span className="inline-flex items-center gap-2">
-      <LayoutDashboard size={14} /> Overall
-    </span>
-  ),
-};
-
 const DEFAULT_POLL_INTERVAL = 10000;
 const DEFAULT_LIVE_WINDOW: LiveWindowPeriod = 5;
 
 export const Dashboard = () => {
   const { isLimited } = useAuth();
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as TabId | null;
 
-  const tabs = useMemo(() => (isLimited ? [OVERALL_TAB, ...BASE_TABS] : BASE_TABS), [isLimited]);
+  // Build tab labels inside the component so they re-render on language change.
+  const tabs = useMemo(() => {
+    const base = [
+      {
+        value: 'live' as const,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            <Zap size={14} /> {t('dashboard.tabs.live')}
+          </span>
+        ),
+      },
+      {
+        value: 'usage' as const,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            <BarChart3 size={14} /> {t('dashboard.tabs.usage')}
+          </span>
+        ),
+      },
+      {
+        value: 'performance' as const,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            <Gauge size={14} /> {t('dashboard.tabs.performance')}
+          </span>
+        ),
+      },
+    ];
+    if (!isLimited) return base;
+    return [
+      {
+        value: 'overall' as const,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            <LayoutDashboard size={14} /> {t('dashboard.tabs.overall')}
+          </span>
+        ),
+      },
+      ...base,
+    ];
+  }, [isLimited, t]);
 
   const defaultTabId: TabId = isLimited ? 'overall' : 'live';
   const activeTab: TabId =
@@ -83,10 +89,10 @@ export const Dashboard = () => {
           <div className="flex items-center justify-between gap-3 mb-2.5 sm:mb-3 flex-wrap">
             <div>
               <h1 className="font-heading text-lg sm:text-2xl font-semibold tracking-tight m-0 leading-tight">
-                Dashboard
+                {t('dashboard.title')}
               </h1>
               <p className="text-[11px] sm:text-xs text-text-secondary mt-0.5">
-                Real-time gateway traffic across all providers
+                {t('dashboard.subtitle')}
               </p>
             </div>
           </div>
@@ -96,7 +102,7 @@ export const Dashboard = () => {
             items={tabs}
             variant="underline"
             className="-mx-3 px-3 sm:mx-0 sm:px-0"
-            aria-label="Dashboard sections"
+            aria-label={t('dashboard.ariaSections')}
           />
         </div>
       </div>

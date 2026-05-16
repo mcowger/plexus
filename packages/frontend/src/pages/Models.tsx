@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
+import { useT } from '../i18n';
 import { Alias } from '../lib/api';
 import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
@@ -21,6 +23,9 @@ import { useToast } from '../contexts/ToastContext';
 import { Plus, Trash2, Zap, Download } from 'lucide-react';
 
 export const Models = () => {
+  const { t } = useTranslation();
+  const { t: tc } = useT('common');
+  const { t: tDel } = useT('models.deleteModal');
   const toast = useToast();
   const {
     aliases,
@@ -74,7 +79,7 @@ export const Models = () => {
     if (editingAlias.metadata?.source === 'custom') {
       const name = editingAlias.metadata.overrides?.name;
       if (!name || name.trim() === '') {
-        toast.error('Custom metadata requires a non-empty Name.');
+        toast.error(t('models.toast.customMetadataNameRequired'));
         return;
       }
     }
@@ -134,8 +139,8 @@ export const Models = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Models"
-        subtitle="Aliases that map gateway models to upstream provider models"
+        title={t('models.title')}
+        subtitle={t('models.subtitle')}
         actions={
           <>
             <Button
@@ -145,7 +150,7 @@ export const Models = () => {
               onClick={() => setIsDeleteAllModalOpen(true)}
               disabled={aliases.length === 0}
             >
-              Delete All
+              {t('models.deleteAll')}
             </Button>
             <Button
               variant="secondary"
@@ -153,10 +158,10 @@ export const Models = () => {
               leftIcon={<Download size={14} />}
               onClick={handleOpenImport}
             >
-              Import
+              {t('models.import')}
             </Button>
             <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
-              Add model
+              {t('models.addModel')}
             </Button>
           </>
         }
@@ -164,7 +169,7 @@ export const Models = () => {
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch sm:items-center">
           <div className="w-full sm:w-72">
             <SearchInput
-              placeholder="Search by alias, upstream id, tag…"
+              placeholder={t('models.searchPlaceholder')}
               value={search}
               onChange={setSearch}
             />
@@ -178,7 +183,9 @@ export const Models = () => {
           {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
             {sortedAliases.length === 0 ? (
-              <div className="py-10 text-center text-sm text-text-muted">No aliases found</div>
+              <div className="py-10 text-center text-sm text-text-muted">
+                {t('models.noAliases')}
+              </div>
             ) : (
               sortedAliases.map((alias) => (
                 <AliasMobileCard
@@ -206,25 +213,25 @@ export const Models = () => {
                     className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                     style={{ paddingLeft: '24px' }}
                   >
-                    Alias
+                    {t('models.table.alias')}
                   </th>
                   <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Type
+                    {t('models.table.type')}
                   </th>
                   <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Aliases
+                    {t('models.table.aliases')}
                   </th>
                   <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Selector
+                    {t('models.table.selector')}
                   </th>
                   <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Metadata
+                    {t('models.table.metadata')}
                   </th>
                   <th
                     className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                     style={{ paddingRight: '24px' }}
                   >
-                    Targets
+                    {t('models.table.targets')}
                   </th>
                 </tr>
               </thead>
@@ -246,7 +253,7 @@ export const Models = () => {
                 {sortedAliases.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center text-text-muted p-12">
-                      No aliases found
+                      {t('models.noAliases')}
                     </td>
                   </tr>
                 )}
@@ -259,15 +266,15 @@ export const Models = () => {
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          title={originalId ? 'Edit Model' : 'Add Model'}
+          title={originalId ? t('models.modal.editTitle') : t('models.modal.addTitle')}
           size="lg"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
-                Cancel
+                {tc('cancel')}
               </Button>
               <Button onClick={handleSave} isLoading={isSaving}>
-                Save Changes
+                {t('models.modal.saveChanges')}
               </Button>
             </div>
           }
@@ -276,19 +283,19 @@ export const Models = () => {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="flex flex-col gap-1">
                 <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Primary Name (ID)
+                  {t('models.modal.primaryName')}
                 </label>
                 <input
                   className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                   value={editingAlias.id}
                   onChange={(e) => setEditingAlias({ ...editingAlias, id: e.target.value })}
-                  placeholder="e.g. gpt-4-turbo"
+                  placeholder={t('models.modal.primaryNamePlaceholder')}
                 />
               </div>
 
               <div className="flex flex-col gap-1">
                 <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Model Type
+                  {t('models.modal.modelType')}
                 </label>
                 <select
                   className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
@@ -306,18 +313,18 @@ export const Models = () => {
                     })
                   }
                 >
-                  <option value="chat">Chat</option>
-                  <option value="embeddings">Embeddings</option>
-                  <option value="transcriptions">Transcriptions</option>
-                  <option value="speech">Speech</option>
-                  <option value="image">Image</option>
-                  <option value="responses">Responses</option>
+                  <option value="chat">{t('models.modal.types.chat')}</option>
+                  <option value="embeddings">{t('models.modal.types.embeddings')}</option>
+                  <option value="transcriptions">{t('models.modal.types.transcriptions')}</option>
+                  <option value="speech">{t('models.modal.types.speech')}</option>
+                  <option value="image">{t('models.modal.types.image')}</option>
+                  <option value="responses">{t('models.modal.types.responses')}</option>
                 </select>
               </div>
 
               <div className="flex flex-col gap-1">
                 <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Priority
+                  {t('models.modal.priority')}
                 </label>
                 <select
                   className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
@@ -326,15 +333,14 @@ export const Models = () => {
                     setEditingAlias({ ...editingAlias, priority: e.target.value as any })
                   }
                 >
-                  <option value="selector">Selector</option>
-                  <option value="api_match">API Match</option>
+                  <option value="selector">{t('models.modal.priorities.selector')}</option>
+                  <option value="api_match">{t('models.modal.priorities.apiMatch')}</option>
                 </select>
               </div>
             </div>
 
             <p className="text-xs text-text-muted" style={{ marginTop: '-4px' }}>
-              Priority: &ldquo;Selector&rdquo; uses the strategy above. &ldquo;API Match&rdquo;
-              matches provider type to incoming request format.
+              {t('models.modal.priorityHelp')}
             </p>
 
             <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
@@ -362,7 +368,7 @@ export const Models = () => {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="font-body text-[13px] font-medium text-text-secondary">
-                  Target Groups
+                  {t('models.modal.targetGroups')}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -371,7 +377,7 @@ export const Models = () => {
                     onClick={() => setIsAutoAddModalOpen(true)}
                     leftIcon={<Zap size={14} />}
                   >
-                    Auto Add
+                    {t('models.modal.autoAdd')}
                   </Button>
                 </div>
               </div>
@@ -412,14 +418,17 @@ export const Models = () => {
         <ConfirmDeleteModal
           isOpen={isDeleteAllModalOpen}
           onClose={() => setIsDeleteAllModalOpen(false)}
-          title="Delete All Models"
+          variant="all"
+          title={t('models.deleteAllModal.title')}
           message={
-            <>
-              This will permanently remove <strong>{aliases.length}</strong> model alias
-              {aliases.length !== 1 ? 'es' : ''} from the configuration.
-            </>
+            <Trans
+              i18nKey="models.deleteAllModal.message"
+              count={aliases.length}
+              values={{ count: aliases.length }}
+              components={{ 1: <strong /> }}
+            />
           }
-          confirmLabel="Delete All"
+          confirmLabel={t('models.deleteAllModal.confirmLabel')}
           onConfirm={handleConfirmDeleteAll}
           isLoading={isDeletingAll}
         />
@@ -428,13 +437,16 @@ export const Models = () => {
         <ConfirmDeleteModal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
-          title="Delete Model Alias"
+          variant="single"
+          title={t('models.deleteModal.title')}
           message={
-            <>
-              <strong>{aliasToDelete?.id}</strong> will be permanently removed from the
-              configuration.
-            </>
+            <Trans
+              i18nKey="models.deleteModal.message"
+              values={{ id: aliasToDelete?.id ?? '' }}
+              components={{ 1: <strong /> }}
+            />
           }
+          confirmLabel={tDel('confirmLabel')}
           onConfirm={handleConfirmDelete}
           isLoading={isDeleting}
         />

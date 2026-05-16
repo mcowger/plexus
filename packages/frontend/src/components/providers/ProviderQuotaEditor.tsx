@@ -21,6 +21,7 @@ import { NeuralwattQuotaConfig } from '../quota/NeuralwattQuotaConfig';
 import { ZenmuxQuotaConfig } from '../quota/ZenmuxQuotaConfig';
 import { WaferQuotaConfig } from '../quota/WaferQuotaConfig';
 import { OpenCodeGoQuotaConfig } from '../quota/OpenCodeGoQuotaConfig';
+import { useT } from '../../i18n/useT';
 
 interface Props {
   editingProvider: Provider;
@@ -72,6 +73,7 @@ export function ProviderQuotaEditor({
   oauthCheckerType,
   quotaValidationError,
 }: Props) {
+  const { t } = useT('providers.quota');
   const setQuotaType = (quotaType: string) => {
     if (!quotaType) {
       setEditingProvider({ ...editingProvider, quotaChecker: undefined });
@@ -113,16 +115,16 @@ export function ProviderQuotaEditor({
 
   return (
     <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
-      <label className="font-body text-[13px] font-medium text-text-secondary">Quota Checker</label>
+      <label className="font-body text-[13px] font-medium text-text-secondary">{t('title')}</label>
       <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px] sm:items-end">
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[11px] font-medium text-text-secondary">Type</label>
+          <label className="font-body text-[11px] font-medium text-text-secondary">{t('type')}</label>
           <select
             className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
             value={selectedQuotaCheckerType}
             onChange={(e) => setQuotaType(e.target.value)}
           >
-            <option value="">&lt;none&gt;</option>
+            <option value="">{t('noneOption')}</option>
             {selectableQuotaCheckerTypes.map((type) => (
               <option key={type} value={type}>
                 {type}
@@ -132,7 +134,7 @@ export function ProviderQuotaEditor({
         </div>
         <div className="flex flex-col gap-1">
           <label className="font-body text-[11px] font-medium text-text-secondary">
-            Interval (min)
+            {t('intervalMin')}
           </label>
           <input
             className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
@@ -154,12 +156,12 @@ export function ProviderQuotaEditor({
         }}
       >
         {isOAuthMode && oauthCheckerType
-          ? `Only the '${oauthCheckerType}' checker is available for this OAuth provider.`
+          ? t('oauthOnlyChecker', { checker: oauthCheckerType })
           : isOAuthMode
-            ? 'No quota checker is available for this OAuth provider type.'
+            ? t('oauthNoChecker')
             : selectedQuotaCheckerType
-              ? 'Quota checker is active for this provider.'
-              : 'Select <none> to disable provider quota checks.'}
+              ? t('active')
+              : t('selectNone')}
       </div>
 
       {QuotaConfigComponent && (

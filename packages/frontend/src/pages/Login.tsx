@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, AlertCircle, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
+import { useT } from '../i18n/useT';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { PlexusMark } from '../components/layout/PlexusMark';
+import { LanguageSwitcher } from '../components/layout/LanguageSwitcher';
 
 export const Login: React.FC = () => {
   const [key, setKey] = useState('');
@@ -12,6 +14,7 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useT('login');
 
   const from = (location.state as any)?.from?.pathname || '/';
   const appVersion: string =
@@ -27,12 +30,12 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!key.trim()) {
-      setError('Please enter a key');
+      setError(t('errors.empty'));
       return;
     }
     const valid = await login(key.trim());
     if (!valid) {
-      setError('Invalid key. Verify the prefix and try again.');
+      setError(t('errors.invalid'));
     }
   };
 
@@ -72,12 +75,19 @@ export const Login: React.FC = () => {
 
         {/* Card */}
         <div className="glass-bg rounded-xl p-5 shadow-2xl sm:rounded-2xl sm:p-8">
-          <div className="mb-6">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight mb-1.5">Sign in</h1>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Enter your admin key for full access, or an API key secret for a scoped view of your
-              key's activity.
-            </p>
+          <div className="mb-6 flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-heading text-2xl font-semibold tracking-tight mb-1.5">
+                {t('title')}
+              </h1>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                {t('description')}
+              </p>
+            </div>
+            {/* Inline switcher so users can change language before submitting. */}
+            <div className="flex-shrink-0">
+              <LanguageSwitcher />
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -95,7 +105,7 @@ export const Login: React.FC = () => {
                 htmlFor="adminKey"
                 className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider"
               >
-                Admin key or API key secret
+                {t('label')}
               </label>
               <div className="relative">
                 <KeyRound
@@ -111,7 +121,7 @@ export const Login: React.FC = () => {
                     setKey(e.target.value);
                     if (error) setError('');
                   }}
-                  placeholder="sk-admin-•••• or sk-•••••••••••••"
+                  placeholder={t('placeholder')}
                   autoFocus
                   className="w-full bg-slate-900/60 border border-border rounded-md py-3 pl-10 pr-10 text-text font-mono text-sm placeholder:text-text-muted hover:border-border-2 focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.18)] focus:outline-none transition-all duration-fast"
                 />
@@ -119,7 +129,7 @@ export const Login: React.FC = () => {
                   type="button"
                   onClick={() => setShowKey((v) => !v)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-slate-700/50 text-text-secondary"
-                  aria-label={showKey ? 'Hide key' : 'Show key'}
+                  aria-label={showKey ? t('hideKey') : t('showKey')}
                 >
                   {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -133,7 +143,7 @@ export const Login: React.FC = () => {
             </div>
 
             <Button type="submit" variant="primary" className="w-full py-3 text-sm font-semibold">
-              <span>Access Dashboard</span>
+              <span>{t('submit')}</span>
               <ArrowRight size={14} />
             </Button>
           </form>
@@ -141,14 +151,12 @@ export const Login: React.FC = () => {
           <div className="mt-6 flex flex-col gap-2 border-t border-white/5 pt-5 text-[11px] text-text-muted sm:flex-row sm:items-center sm:justify-between">
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck size={14} />
-              End-to-end encrypted
+              {t('encrypted')}
             </span>
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-text-muted">
-          © 2026 Plexus · Unified LLM Gateway
-        </p>
+        <p className="mt-6 text-center text-xs text-text-muted">{t('footer')}</p>
       </main>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Cpu, Gauge, AlertTriangle, DatabaseZap, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, fetchQuotaCheckers } from '../lib/api';
@@ -14,6 +15,7 @@ import { MeterHistoryModal } from '../components/quota/MeterHistoryModal';
 import { getCheckerDisplayName } from '../components/quota/checker-presentation';
 
 export const Quotas = () => {
+  const { t } = useTranslation();
   const [quotas, setQuotas] = useState<(QuotaCheckerInfo & { pending?: boolean })[]>([]);
   const [displayNameMap, setDisplayNameMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -71,7 +73,7 @@ export const Quotas = () => {
   };
 
   const handleTruncate = async () => {
-    if (!confirm('Truncate quota_snapshots? This cannot be undone.')) return;
+    if (!confirm(t('quotas.truncateConfirm'))) return;
     setTruncating(true);
     const ok = await api.truncateLegacySnapshots();
     setTruncating(false);
@@ -136,7 +138,7 @@ export const Quotas = () => {
           type="button"
           onClick={() => handleRefresh(quota.checkerId)}
           disabled={refreshing.has(quota.checkerId) || quota.pending}
-          aria-label="Refresh"
+          aria-label={t('quotas.card.refreshAria')}
           className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-bg-hover hover:text-text transition-colors duration-fast disabled:opacity-50"
         >
           <RefreshCw
@@ -147,17 +149,17 @@ export const Quotas = () => {
 
         <div className="pr-8">
           {quota.pending ? (
-            <span className="text-xs text-text-muted">Pending first check...</span>
+            <span className="text-xs text-text-muted">{t('quotas.card.pendingFirstCheck')}</span>
           ) : !quota.success ? (
             <div className="flex items-center gap-2 text-danger">
               <AlertTriangle size={14} />
-              <span className="text-xs">Check failed</span>
+              <span className="text-xs">{t('quotas.card.checkFailed')}</span>
               {quota.error && (
                 <span className="text-xs text-text-muted truncate">{quota.error}</span>
               )}
             </div>
           ) : allowances.length === 0 ? (
-            <span className="text-xs text-text-muted">No data yet</span>
+            <span className="text-xs text-text-muted">{t('quotas.card.noDataYet')}</span>
           ) : (
             <div className="space-y-2">
               {allowances.map((meter) => (
@@ -183,8 +185,8 @@ export const Quotas = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Quotas"
-        subtitle="Provider balances and rate-quota allowances"
+        title={t('quotas.title')}
+        subtitle={t('quotas.subtitle')}
         actions={
           <Button
             variant="secondary"
@@ -193,7 +195,7 @@ export const Quotas = () => {
             disabled={loading}
             leftIcon={<RefreshCw size={14} className={clsx(loading && 'animate-spin')} />}
           >
-            Refresh all
+            {t('quotas.refreshAll')}
           </Button>
         }
       />
@@ -204,13 +206,11 @@ export const Quotas = () => {
             <DatabaseZap size={16} className="mt-0.5 shrink-0 text-amber-400" />
             <div className="flex-1">
               <p className="font-medium text-amber-300">
-                Legacy quota data detected ({legacyRowCount.toLocaleString()} row
-                {legacyRowCount !== 1 ? 's' : ''} in{' '}
-                <code className="font-mono">quota_snapshots</code>)
+                {t('quotas.legacy.detectedPrefix', { count: legacyRowCount.toLocaleString() })}
+                <code className="font-mono">quota_snapshots</code>
+                {t('quotas.legacy.detectedSuffix')}
               </p>
-              <p className="mt-0.5 text-text-secondary">
-                Migrate this historical data into the new meter snapshots table to preserve it.
-              </p>
+              <p className="mt-0.5 text-text-secondary">{t('quotas.legacy.description')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
               <Button
@@ -240,7 +240,7 @@ export const Quotas = () => {
                 onClick={handleMigrate}
                 leftIcon={<DatabaseZap size={13} />}
               >
-                Migrate now
+                {t('quotas.legacy.migrateNow')}
               </Button>
             </div>
           </div>
@@ -251,22 +251,27 @@ export const Quotas = () => {
             <DatabaseZap size={16} className="mt-0.5 shrink-0 text-green-400" />
             <div className="flex-1">
               <p className="font-medium text-green-300">
-                Migration complete — {migrationResult.inserted.toLocaleString()} row
-                {migrationResult.inserted !== 1 ? 's' : ''} inserted
                 {migrationResult.skipped > 0
-                  ? `, ${migrationResult.skipped.toLocaleString()} already existed`
-                  : ''}
-                .
+                  ? t('quotas.migration.completeWithSkipped', {
+                      inserted: migrationResult.inserted.toLocaleString(),
+                      skipped: migrationResult.skipped.toLocaleString(),
+                    })
+                  : t('quotas.migration.completeNoSkipped', {
+                      inserted: migrationResult.inserted.toLocaleString(),
+                    })}
               </p>
               {!truncated && (
                 <p className="mt-0.5 text-text-secondary">
-                  You can now truncate the old <code className="font-mono">quota_snapshots</code>{' '}
-                  table to free up space.
+                  {t('quotas.migration.canTruncatePrefix')}
+                  <code className="font-mono">quota_snapshots</code>
+                  {t('quotas.migration.canTruncateSuffix')}
                 </p>
               )}
             </div>
             {truncated ? (
-              <span className="text-xs text-text-muted self-center">quota_snapshots truncated</span>
+              <span className="text-xs text-text-muted self-center">
+                {t('quotas.migration.truncated')}
+              </span>
             ) : (
               <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 <Button
@@ -290,7 +295,7 @@ export const Quotas = () => {
                   SQL
                 </Button>
                 <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
-                  Truncate quota_snapshots
+                  {t('quotas.migration.truncate')}
                 </Button>
               </div>
             )}
@@ -300,14 +305,14 @@ export const Quotas = () => {
         {loading && quotas.length === 0 ? (
           <div className="flex items-center justify-center h-64 gap-3">
             <RefreshCw size={20} className="animate-spin text-primary" />
-            <span className="text-text-secondary">Loading quotas...</span>
+            <span className="text-text-secondary">{t('quotas.loading')}</span>
           </div>
         ) : quotas.length === 0 ? (
           <Card>
             <EmptyState
               icon={<Gauge />}
-              title="No quota checkers configured"
-              description="Configure quota checkers in your provider settings to monitor usage."
+              title={t('quotas.empty.title')}
+              description={t('quotas.empty.description')}
             />
           </Card>
         ) : (
@@ -327,7 +332,9 @@ export const Quotas = () => {
               <section>
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border-glass">
                   <Cpu size={18} className="text-primary" />
-                  <h2 className="font-heading text-h2 font-semibold text-text">Rate Limits</h2>
+                  <h2 className="font-heading text-h2 font-semibold text-text">
+                    {t('quotas.rateLimits')}
+                  </h2>
                 </div>
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {allowanceGroups.map(([checkerType, quotasList]) => {

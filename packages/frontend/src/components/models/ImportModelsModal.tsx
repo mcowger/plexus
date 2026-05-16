@@ -1,6 +1,7 @@
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import type { OrphanGroup } from '../../hooks/useModels';
+import { useT } from '../../i18n';
 
 interface Props {
   isOpen: boolean;
@@ -21,16 +22,19 @@ export function ImportModelsModal({
   onImport,
   isImporting,
 }: Props) {
+  const { t } = useT('models.importModal');
+  const { t: tc } = useT('common');
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Import Orphaned Models"
+      title={t('title')}
       size="lg"
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </Button>
           <Button
             onClick={onImport}
@@ -40,16 +44,14 @@ export function ImportModelsModal({
               orphanGroups.length === 0
             }
           >
-            Import Selected
+            {t('importSelected')}
           </Button>
         </div>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {orphanGroups.length === 0 ? (
-          <div className="text-text-muted italic text-center text-sm py-8">
-            No orphaned models found — all provider models are covered by aliases.
-          </div>
+          <div className="text-text-muted italic text-center text-sm py-8">{t('emptyState')}</div>
         ) : (
           <div
             style={{
@@ -77,10 +79,10 @@ export function ImportModelsModal({
                     {' '}
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Model / Alias
+                    {t('modelAliasColumn')}
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Providers
+                    {t('providersColumn')}
                   </th>
                 </tr>
               </thead>
@@ -116,7 +118,7 @@ export function ImportModelsModal({
                         {group.existingAlias ? (
                           <>
                             <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
-                              Existing Alias
+                              {t('badgeExistingAlias')}
                             </span>
                             {group.matchReason && (
                               <div className="text-[11px] text-text-muted mt-0.5">
@@ -126,7 +128,7 @@ export function ImportModelsModal({
                           </>
                         ) : (
                           <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
-                            New Alias
+                            {t('badgeNewAlias')}
                           </span>
                         )}
                       </td>

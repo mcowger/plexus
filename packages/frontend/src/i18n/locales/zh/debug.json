@@ -1,0 +1,56 @@
+{
+  "title": "调用追踪",
+  "subtitle": {
+    "scoped": "仅显示密钥 \"{{keyName}}\" 的追踪。可在「我的密钥」中切换捕获开关。",
+    "default": "分布式 Span · OTLP"
+  },
+  "actions": {
+    "filter": "过滤",
+    "copyAll": "复制全部",
+    "copied": "已复制",
+    "download": "下载",
+    "deleteAll": "全部删除",
+    "refresh": "刷新"
+  },
+  "filterDropdown": {
+    "title": "服务商过滤",
+    "clear": "清除",
+    "description": "仅记录所选服务商的请求",
+    "cancel": "取消",
+    "apply": "应用"
+  },
+  "list": {
+    "header": "最近请求",
+    "empty": "未找到调试日志。请确保已开启调试模式。",
+    "deleteTooltip": "删除日志"
+  },
+  "details": {
+    "selectedTrace": "已选追踪",
+    "selectPlaceholder": "选择一个请求追踪以查看详情",
+    "panels": {
+      "rawRequest": "原始请求",
+      "transformedRequest": "转换后请求",
+      "rawResponse": "原始响应",
+      "rawResponseSnapshot": "原始响应（重建）",
+      "transformedResponse": "转换后响应",
+      "transformedResponseSnapshot": "转换后响应（重建）",
+      "copyTooltip": "复制到剪贴板",
+      "foldAll": "全部折叠",
+      "unfoldAll": "全部展开"
+    }
+  },
+  "deleteAllModal": {
+    "title": "确认删除",
+    "cancelButton": "取消",
+    "deleteButton": "删除全部日志",
+    "deleting": "删除中...",
+    "body": "确定要删除所有调试日志吗？此操作无法撤销。"
+  },
+  "singleDeleteModal": {
+    "title": "确认删除",
+    "cancelButton": "取消",
+    "deleteButton": "删除日志",
+    "deleting": "删除中...",
+    "body": "确定要删除此调试日志吗？此操作无法撤销。"
+  }
+}

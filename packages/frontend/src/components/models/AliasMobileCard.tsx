@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
 import { ModelTypeBadge } from './ModelTypeBadge';
 import type { Alias, Provider, Cooldown } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface Props {
   alias: Alias;
@@ -40,6 +41,13 @@ export const AliasMobileCard: React.FC<Props> = ({
   onTestTarget,
   onDismissTestMessage,
 }) => {
+  const { t } = useT('models.aliasMobileCard');
+  const { t: tm } = useT('models.modal');
+
+  const priorityKey = alias.priority || 'selector';
+  const priorityLabel =
+    priorityKey === 'api_match' ? tm('priorities.apiMatch') : tm('priorities.selector');
+
   return (
     <article key={alias.id} className="rounded-md border border-border-glass bg-bg-subtle p-3">
       <div className="flex items-start justify-between gap-3">
@@ -62,7 +70,7 @@ export const AliasMobileCard: React.FC<Props> = ({
           size="icon"
           onClick={() => onDelete(alias)}
           className="text-danger"
-          aria-label={`Delete ${alias.id}`}
+          aria-label={t('deleteAria', { id: alias.id })}
         >
           <Trash2 size={14} />
         </Button>
@@ -70,14 +78,13 @@ export const AliasMobileCard: React.FC<Props> = ({
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Selector</div>
+          <div className="text-[10px] uppercase tracking-wider text-text-muted">{t('selectorSection')}</div>
           <div className="truncate font-medium capitalize text-text-secondary">
-            {alias.target_groups.map((g) => `${g.name}: ${g.selector}`).join(', ')} /{' '}
-            {alias.priority || 'selector'}
+            {alias.target_groups.map((g) => `${g.name}: ${g.selector}`).join(', ')} / {priorityLabel}
           </div>
         </div>
         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Aliases</div>
+          <div className="text-[10px] uppercase tracking-wider text-text-muted">{t('aliasesSection')}</div>
           <div className="flex flex-wrap gap-1 font-medium text-text-secondary">
             {alias.aliases?.length
               ? alias.aliases.map((a) => (
@@ -93,7 +100,7 @@ export const AliasMobileCard: React.FC<Props> = ({
 
       <div className="mt-3">
         <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-          <span>Targets</span>
+          <span>{t('targetsHeading')}</span>
           {alias.target_groups[0] && (
             <>
               <span className="opacity-40 normal-case">
@@ -105,25 +112,25 @@ export const AliasMobileCard: React.FC<Props> = ({
         </div>
         {alias.target_groups.length === 0 || alias.target_groups[0].targets.length === 0 ? (
           <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">
-            No targets configured
+            {t('noTargets')}
           </div>
         ) : (
           <div className="space-y-2">
-            {alias.target_groups[0].targets.map((t, i) => {
-              const provider = providers.find((p) => p.id === t.provider);
+            {alias.target_groups[0].targets.map((tgt, i) => {
+              const provider = providers.find((p) => p.id === tgt.provider);
               const isProviderDisabled = provider?.enabled === false;
-              const isTargetDisabled = t.enabled === false;
+              const isTargetDisabled = tgt.enabled === false;
               const isDisabled = isProviderDisabled || isTargetDisabled;
-              const testKey = `${alias.id}-${i}`;
+              const testKey = `${alias.id}-mobile-${i}`;
               const testState = testStates[testKey];
               const cooldown = cooldowns.find(
-                (c) => c.provider === t.provider && c.model === t.model && !c.accountId
+                (c) => c.provider === tgt.provider && c.model === tgt.model && !c.accountId
               );
               const cooldownMinutes = cooldown ? Math.ceil(cooldown.timeRemainingMs / 60000) : 0;
 
               return (
                 <div
-                  key={`${t.provider}-${t.model}-${i}`}
+                  key={`${tgt.provider}-${tgt.model}-${i}`}
                   className={`rounded border border-border-glass bg-bg-glass px-2 py-2 ${
                     isDisabled ? 'opacity-70' : ''
                   }`}
@@ -135,15 +142,15 @@ export const AliasMobileCard: React.FC<Props> = ({
                           isDisabled ? 'text-danger line-through' : 'text-text-secondary'
                         }`}
                       >
-                        {t.provider || 'No provider'} <span className="text-text-muted">-&gt;</span>{' '}
-                        {t.model || 'No model'}
+                        {tgt.provider || t('noProvider')} <span className="text-text-muted">-&gt;</span>{' '}
+                        {tgt.model || t('noModel')}
                       </div>
                       {isProviderDisabled && (
-                        <div className="mt-1 text-[11px] text-danger">Provider disabled</div>
+                        <div className="mt-1 text-[11px] text-danger">{t('providerDisabled')}</div>
                       )}
                       {cooldown && (
                         <div className="mt-1 text-[11px] font-medium text-warning">
-                          Cooldown {cooldownMinutes}m
+                          {t('cooldownMinutes', { count: cooldownMinutes })}
                         </div>
                       )}
                       {testState?.showResult && testState.message && (
@@ -169,14 +176,14 @@ export const AliasMobileCard: React.FC<Props> = ({
                           onTestTarget(
                             alias.id,
                             `${alias.id}-mobile-${i}`,
-                            t.provider,
-                            t.model,
+                            tgt.provider,
+                            tgt.model,
                             testApiTypes
                           );
                         }}
                         disabled={isDisabled}
                         className="flex h-7 w-7 items-center justify-center rounded text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Test ${alias.id} target ${i + 1}`}
+                        aria-label={t('testTargetAria', { aliasId: alias.id, index: i + 1 })}
                       >
                         {testState?.loading ? (
                           <Loader2 size={14} className="animate-spin" />
@@ -189,7 +196,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                         )}
                       </button>
                       <Switch
-                        checked={t.enabled !== false}
+                        checked={tgt.enabled !== false}
                         onChange={(val) => onToggleTarget(alias, 0, i, val)}
                         size="sm"
                         disabled={isProviderDisabled}
@@ -203,7 +210,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                         onDismissTestMessage(testKey);
                       }}
                       className="mt-2 cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
-                      title="Click to dismiss"
+                      title={t('dismissErrorTitle')}
                     >
                       <span className="text-[11px] italic text-danger">
                         {testState.message} [×]

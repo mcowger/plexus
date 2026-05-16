@@ -3,6 +3,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import type { Provider, Model, AliasTargetGroup } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface Props {
   isOpen: boolean;
@@ -23,6 +24,9 @@ export function AutoAddModal({
   onAddTargets,
   preFillQuery = '',
 }: Props) {
+  const { t } = useT('models.autoAddModal');
+  const { t: tc } = useT('common');
+
   const [substring, setSubstring] = useState(preFillQuery);
   const [filteredModels, setFilteredModels] = useState<Array<{ model: Model; provider: Provider }>>(
     []
@@ -81,15 +85,15 @@ export function AutoAddModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Auto Add Targets"
+      title={t('title')}
       size="lg"
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </Button>
           <Button onClick={handleAddSelectedModels} disabled={selectedModels.size === 0}>
-            Add {selectedModels.size} Target{selectedModels.size !== 1 ? 's' : ''}
+            {t('addTargets', { count: selectedModels.size })}
           </Button>
         </div>
       }
@@ -98,14 +102,14 @@ export function AutoAddModal({
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="min-w-0 flex-1">
             <Input
-              placeholder="Search models (e.g. 'gpt-4', 'claude')"
+              placeholder={t('searchPlaceholder')}
               value={substring}
               onChange={(e) => setSubstring(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearchModels()}
             />
           </div>
           <Button onClick={() => handleSearchModels()} className="w-full sm:w-auto">
-            Search
+            {tc('search')}
           </Button>
         </div>
 
@@ -170,10 +174,10 @@ export function AutoAddModal({
                     />
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Provider
+                    {t('providerColumn')}
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Model
+                    {t('modelColumn')}
                   </th>
                 </tr>
               </thead>
@@ -212,7 +216,7 @@ export function AutoAddModal({
                               fontStyle: 'italic',
                             }}
                           >
-                            (already added)
+                            {t('alreadyAdded')}
                           </span>
                         )}
                       </td>
@@ -223,13 +227,9 @@ export function AutoAddModal({
             </table>
           </div>
         ) : substring ? (
-          <div className="text-text-muted italic text-center text-sm py-8">
-            No models found matching &quot;{substring}&quot;
-          </div>
+          <div className="text-text-muted italic text-center text-sm py-8">{t('noResults', { query: substring })}</div>
         ) : (
-          <div className="text-text-muted italic text-center text-sm py-8">
-            Enter a search term to find models
-          </div>
+          <div className="text-text-muted italic text-center text-sm py-8">{t('enterSearch')}</div>
         )}
       </div>
     </Modal>

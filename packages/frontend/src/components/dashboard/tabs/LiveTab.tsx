@@ -33,6 +33,8 @@
 //
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 //
 // IMPORTS -- Drag-and-Drop (@dnd-kit)
@@ -247,10 +249,10 @@ const normalizeTelemetryLabel = (value: string | null | undefined): string => {
 
 /**
  * Derives a display label for the provider of a request.
- * Falls back to "Failed Request" if the request errored before a provider was
- * resolved, or "Unresolved Provider" if the provider field is simply absent.
+ * Falls back to a translated "Failed Request" if the request errored before a
+ * provider was resolved, or "Unresolved Provider" if the field is simply absent.
  */
-const getProviderLabel = (request: UsageRecord): string => {
+const getProviderLabel = (request: UsageRecord, t: TFunction): string => {
   const provider = normalizeTelemetryLabel(request.provider);
   if (provider) {
     return provider;
@@ -258,19 +260,19 @@ const getProviderLabel = (request: UsageRecord): string => {
 
   const status = (request.responseStatus || '').toLowerCase();
   if (status && status !== 'success') {
-    return 'Failed Request';
+    return t('dashboard.live.labels.failedRequest');
   }
 
-  return 'Unresolved Provider';
+  return t('dashboard.live.labels.unresolvedProvider');
 };
 
 /**
  * Derives a display label for the model used in a request.
  * Prefers `selectedModelName` (the actual model dispatched to) over
- * `incomingModelAlias` (the alias the client requested). Falls back to
- * "Failed Before Model Selection" for errors, or "Unresolved Model" otherwise.
+ * `incomingModelAlias` (the alias the client requested). Falls back to a
+ * translated "Failed Before Model Selection" for errors, or "Unresolved Model".
  */
-const getModelLabel = (request: UsageRecord): string => {
+const getModelLabel = (request: UsageRecord, t: TFunction): string => {
   const model =
     normalizeTelemetryLabel(request.selectedModelName) ||
     normalizeTelemetryLabel(request.incomingModelAlias);
@@ -280,10 +282,10 @@ const getModelLabel = (request: UsageRecord): string => {
 
   const status = (request.responseStatus || '').toLowerCase();
   if (status && status !== 'success') {
-    return 'Failed Before Model Selection';
+    return t('dashboard.live.labels.failedBeforeModelSelection');
   }
 
-  return 'Unresolved Model';
+  return t('dashboard.live.labels.unresolvedModel');
 };
 
 //
@@ -338,7 +340,8 @@ interface EntityStats {
  */
 const aggregateByEntity = (
   requests: UsageRecord[],
-  entityType: 'provider' | 'model'
+  entityType: 'provider' | 'model',
+  t: TFunction
 ): EntityStats[] => {
   const grouped = new Map<
     string,
@@ -354,7 +357,8 @@ const aggregateByEntity = (
   >();
 
   requests.forEach((request) => {
-    const key = entityType === 'provider' ? getProviderLabel(request) : getModelLabel(request);
+    const key =
+      entityType === 'provider' ? getProviderLabel(request, t) : getModelLabel(request, t);
 
     const existing = grouped.get(key) || {
       requests: 0,
@@ -409,38 +413,43 @@ const aggregateByEntity = (
  * The name is truncated to 25 characters with an ellipsis and a title
  * attribute for the full string on hover.
  */
-const EntityRow: React.FC<{ entity: EntityStats; isModel?: boolean }> = ({ entity, isModel }) => (
-  <div className="rounded-md border border-border-glass bg-bg-glass/50 px-3 py-2 hover:bg-bg-glass transition-colors">
-    <div className="flex items-center justify-between gap-2 mb-1">
-      <div className="flex items-center gap-2 min-w-0">
-        {isModel ? (
-          <Cpu size={14} className="text-text-muted shrink-0" />
-        ) : (
-          <Server size={14} className="text-text-muted shrink-0" />
-        )}
-        <span className="text-sm text-text font-medium truncate" title={entity.name}>
-          {entity.name.length > 25 ? entity.name.slice(0, 22) + '...' : entity.name}
+const EntityRow: React.FC<{ entity: EntityStats; isModel?: boolean }> = ({ entity, isModel }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-md border border-border-glass bg-bg-glass/50 px-3 py-2 hover:bg-bg-glass transition-colors">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          {isModel ? (
+            <Cpu size={14} className="text-text-muted shrink-0" />
+          ) : (
+            <Server size={14} className="text-text-muted shrink-0" />
+          )}
+          <span className="text-sm text-text font-medium truncate" title={entity.name}>
+            {entity.name.length > 25 ? entity.name.slice(0, 22) + '...' : entity.name}
+          </span>
+        </div>
+        <span className="text-xs text-text-secondary">
+          {t('dashboard.live.entity.requestsShort', { value: formatNumber(entity.requests, 0) })}
         </span>
       </div>
-      <span className="text-xs text-text-secondary">{formatNumber(entity.requests, 0)} req</span>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
+        <span>
+          {t('dashboard.live.entity.successLabel')}{' '}
+          {entity.successRate >= 95 ? (
+            <span className="text-emerald-500 font-medium">{entity.successRate.toFixed(1)}%</span>
+          ) : entity.successRate >= 80 ? (
+            <span className="text-amber-500 font-medium">{entity.successRate.toFixed(1)}%</span>
+          ) : (
+            <span className="text-red-500 font-medium">{entity.successRate.toFixed(1)}%</span>
+          )}
+        </span>
+        <span>{t('dashboard.live.entity.latency', { value: formatMs(entity.avgLatency) })}</span>
+        <span>{t('dashboard.live.entity.cost', { value: formatCost(entity.cost, 4) })}</span>
+        <span>{t('dashboard.live.entity.tps', { value: formatNumber(entity.avgTps, 1) })}</span>
+      </div>
     </div>
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
-      <span>
-        Success:{' '}
-        {entity.successRate >= 95 ? (
-          <span className="text-emerald-500 font-medium">{entity.successRate.toFixed(1)}%</span>
-        ) : entity.successRate >= 80 ? (
-          <span className="text-amber-500 font-medium">{entity.successRate.toFixed(1)}%</span>
-        ) : (
-          <span className="text-red-500 font-medium">{entity.successRate.toFixed(1)}%</span>
-        )}
-      </span>
-      <span>Latency: {formatMs(entity.avgLatency)}</span>
-      <span>Cost: {formatCost(entity.cost, 4)}</span>
-      <span>TPS: {formatNumber(entity.avgTps, 1)}</span>
-    </div>
-  </div>
-);
+  );
+};
 
 /**
  * CooldownRow renders a single provider/model cooldown alert row.
@@ -466,6 +475,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
   expiryStr,
   onClear,
 }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const infoButtonRef = useRef<HTMLButtonElement>(null);
@@ -531,7 +541,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
             onClear();
           }}
           className="text-text-muted hover:text-danger transition-colors"
-          title="Clear this cooldown"
+          title={t('dashboard.live.cooldown.clearThis')}
         >
           <X size={13} />
         </button>
@@ -542,7 +552,7 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
             setOpen((v) => !v);
           }}
           className="text-text-muted hover:text-text transition-colors"
-          aria-label="Show cooldown details"
+          aria-label={t('dashboard.live.cooldown.showDetails')}
         >
           <Info size={13} />
         </button>
@@ -560,11 +570,13 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
               >
                 <div className="flex items-center gap-1.5 font-semibold text-warning">
                   <AlertTriangle size={12} />
-                  Cooldown Details
+                  {t('dashboard.live.cooldown.title')}
                 </div>
                 {lastError && (
                   <div>
-                    <span className="text-text-muted font-medium">Error:</span>
+                    <span className="text-text-muted font-medium">
+                      {t('dashboard.live.cooldown.errorLabel')}
+                    </span>
                     <p className="mt-0.5 text-text wrap-break-word whitespace-pre-wrap font-mono text-[11px] bg-bg-hover rounded p-1.5 max-h-32 overflow-y-auto">
                       {lastError}
                     </p>
@@ -572,12 +584,14 @@ const CooldownRow: React.FC<CooldownRowProps> = ({
                 )}
                 {consecutiveFailures !== undefined && (
                   <div className="flex justify-between gap-3">
-                    <span className="text-text-muted">Consecutive failures</span>
+                    <span className="text-text-muted">
+                      {t('dashboard.live.cooldown.consecutiveFailures')}
+                    </span>
                     <span className="font-semibold text-danger">{consecutiveFailures}</span>
                   </div>
                 )}
                 <div className="flex justify-between gap-3">
-                  <span className="text-text-muted">Expires at</span>
+                  <span className="text-text-muted">{t('dashboard.live.cooldown.expiresAt')}</span>
                   <span className="font-semibold text-text text-right">{expiryStr}</span>
                 </div>
               </div>,
@@ -607,6 +621,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   liveWindowPeriod = 5,
   onLiveWindowPeriodChange,
 }) => {
+  const { t } = useTranslation();
   const { isAdmin, principal } = useAuth();
   const toast = useToast();
   const limitedAllowedProviders =
@@ -1214,7 +1229,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   const modelTimeline = useMemo(() => {
     const modelCounts = new Map<string, number>();
     for (const request of liveRequests) {
-      const model = getModelLabel(request);
+      const model = getModelLabel(request, t);
       modelCounts.set(model, (modelCounts.get(model) || 0) + 1);
     }
 
@@ -1312,7 +1327,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
         Number(request.tokensCached || 0) +
         Number(request.tokensCacheWrite || 0);
 
-      const modelLabel = getModelLabel(request);
+      const modelLabel = getModelLabel(request, t);
       const seriesKey = seriesKeyByLabel.get(modelLabel);
       if (seriesKey) {
         bucket[seriesKey] = Number(bucket[seriesKey] || 0) + 1;
@@ -1410,7 +1425,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
     >();
 
     for (const request of liveRequests) {
-      const provider = getProviderLabel(request);
+      const provider = getProviderLabel(request, t);
       const row = providers.get(provider) || {
         requests: 0,
         success: 0,
@@ -1462,7 +1477,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   const providerPulseRows = useMemo(() => {
     const rows = new Map<string, { requests: number; success: number }>();
     for (const request of liveRequests) {
-      const provider = getProviderLabel(request);
+      const provider = getProviderLabel(request, t);
       const row = rows.get(provider) || { requests: 0, success: 0 };
       row.requests += 1;
       if ((request.responseStatus || '').toLowerCase() === 'success') {
@@ -1485,7 +1500,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   const modelPulseRows = useMemo(() => {
     const rows = new Map<string, { requests: number; success: number }>();
     for (const request of liveRequests) {
-      const model = getModelLabel(request);
+      const model = getModelLabel(request, t);
       const row = rows.get(model) || { requests: 0, success: 0 };
       row.requests += 1;
       if ((request.responseStatus || '').toLowerCase() === 'success') {
@@ -1521,10 +1536,13 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   }, [cooldowns]);
 
   /** Aggregated stats for the top 5 providers -- used by the "stats" card */
-  const providerStats = useMemo(() => aggregateByEntity(liveRequests, 'provider'), [liveRequests]);
+  const providerStats = useMemo(
+    () => aggregateByEntity(liveRequests, 'provider', t),
+    [liveRequests, t]
+  );
 
   /** Aggregated stats for the top 5 models -- used by the "stats" card */
-  const modelStats = useMemo(() => aggregateByEntity(liveRequests, 'model'), [liveRequests]);
+  const modelStats = useMemo(() => aggregateByEntity(liveRequests, 'model', t), [liveRequests, t]);
 
   const activeProviderCount = providerStats.filter((p) => p.requests > 0).length;
   const activeModelCount = modelStats.filter((m) => m.requests > 0).length;
@@ -1532,10 +1550,9 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   /** Prompts the user to confirm, then clears all active cooldowns via the API */
   const handleClearCooldowns = async () => {
     const ok = await toast.confirm({
-      title: 'Clear ALL provider cooldowns?',
-      message:
-        "Cooldowns are shared across all API keys. Clearing them affects traffic for every key using those providers. If the underlying problem hasn't been resolved, cooldowns will simply re-establish on the next failure.",
-      confirmLabel: 'Clear all',
+      title: t('dashboard.live.confirm.clearAllTitle'),
+      message: t('dashboard.live.confirm.clearAllMessage'),
+      confirmLabel: t('dashboard.live.confirm.clearAllConfirm'),
       variant: 'danger',
     });
     if (!ok) return;
@@ -1544,7 +1561,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       await api.clearCooldown();
       await loadData();
     } catch (e) {
-      toast.error('Failed to clear cooldowns');
+      toast.error(t('dashboard.live.toast.failedClearAll'));
       console.error('Failed to clear cooldowns', e);
     }
   };
@@ -1556,14 +1573,15 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       limitedAllowedProviders.length > 0 &&
       !limitedAllowedProviders.includes(provider)
     ) {
-      toast.error(`Your API key is not permitted to clear cooldowns for provider '${provider}'.`);
+      toast.error(t('dashboard.live.toast.notPermitted', { provider }));
       return;
     }
     const ok = await toast.confirm({
-      title: `Clear cooldown for ${provider}${model ? ':' + model : ''}?`,
-      message:
-        "This affects traffic for every API key using that provider. The cooldown will re-establish on the next failure if the issue isn't resolved.",
-      confirmLabel: 'Clear',
+      title: model
+        ? t('dashboard.live.confirm.clearSingleTitleWithModel', { provider, model })
+        : t('dashboard.live.confirm.clearSingleTitle', { provider }),
+      message: t('dashboard.live.confirm.clearSingleMessage'),
+      confirmLabel: t('dashboard.live.confirm.clearSingleConfirm'),
       variant: 'danger',
     });
     if (!ok) return;
@@ -1571,7 +1589,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       await api.clearCooldown(provider, model);
       await loadData();
     } catch (e) {
-      toast.error('Failed to clear cooldown');
+      toast.error(t('dashboard.live.toast.failedClearSingle'));
       console.error('Failed to clear cooldown', e);
     }
   };
@@ -1613,7 +1631,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-bg-hover transition-colors"
-              aria-label="Close modal"
+              aria-label={t('dashboard.live.modal.closeAria')}
             >
               <X size={24} className="text-text-secondary" />
             </button>
@@ -1635,25 +1653,25 @@ export const LiveTab: React.FC<LiveTabProps> = ({
    */
   const getModalTitle = () => {
     if (detailedUsageQuery) {
-      return 'Detailed Usage';
+      return t('dashboard.live.modal.detailedUsage');
     }
     switch (modalCard) {
       case 'velocity': // Minute-over-minute request rate changes
-        return 'Request Velocity (Last 5 Minutes)';
+        return t('dashboard.live.modal.velocityTitle');
       case 'provider': // Bar chart of top providers by request count
-        return 'Provider Pulse (5m)';
+        return t('dashboard.live.modal.providerTitle');
       case 'model': // Bar chart of top models by request count
-        return 'Model Pulse (5m)';
+        return t('dashboard.live.modal.modelTitle');
       case 'timeline': // Area chart of requests/errors/tokens over time
-        return 'Live Timeline';
+        return t('dashboard.live.modal.timelineTitle');
       case 'modelstack': // Stacked bar of model usage with TTFT/TPS overlay
-        return 'Model Stack + Runtime';
+        return t('dashboard.live.modal.modelStackTitle');
       case 'requests': // Scrollable list of recent individual requests
-        return 'Latest Requests';
+        return t('dashboard.live.modal.latestRequestsTitle');
       case 'concurrency': // Active in-flight request counts per provider
-        return 'Concurrency';
+        return t('dashboard.live.modal.concurrencyTitle');
       case 'stats': // Two-column provider/model statistics with EntityRow
-        return 'Provider & Model Stats';
+        return t('dashboard.live.modal.statsTitle');
       default:
         return '';
     }
@@ -1758,7 +1776,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
           <div className="h-[60vh]">
             {modelPulseRows.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary">
-                No model traffic in the selected live window.
+                {t('dashboard.live.empty.noModelTraffic')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -1770,11 +1788,15 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-base text-text font-medium">{row.label}</span>
                       <span className="text-sm text-text-secondary">
-                        {formatNumber(row.requests, 0)} requests
+                        {t('dashboard.live.request.requestsCount', {
+                          value: formatNumber(row.requests, 0),
+                        })}
                       </span>
                     </div>
                     <div className="mt-1 text-sm text-text-secondary">
-                      Success: {row.successRate.toFixed(1)}%
+                      {t('dashboard.live.request.successPercent', {
+                        value: row.successRate.toFixed(1),
+                      })}
                     </div>
                   </div>
                 ))}
@@ -1846,7 +1868,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
           <div className="h-[70vh]">
             {modelTimeline.series.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary">
-                No model stack data in the selected live window.
+                {t('dashboard.live.empty.noModelStack')}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -1872,10 +1894,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         return [formatNumber(numeric, 0), label];
                       }
                       if (name === 'avgTtftMs') {
-                        return [formatMs(numeric), 'Avg TTFT'];
+                        return [formatMs(numeric), t('dashboard.live.tooltip.avgTtft')];
                       }
                       if (name === 'avgTps') {
-                        return [formatTPS(numeric), 'Avg TPS'];
+                        return [formatTPS(numeric), t('dashboard.live.tooltip.avgTps')];
                       }
                       return [formatNumber(numeric, 0), String(name)];
                     }}
@@ -1921,8 +1943,8 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             {filteredLiveRequests.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary">
                 {liveRequests.length === 0
-                  ? 'No requests observed yet.'
-                  : 'No requests match the current filter.'}
+                  ? t('dashboard.live.empty.noRequestsObserved')
+                  : t('dashboard.live.empty.noRequestsFilter')}
               </div>
             ) : (
               filteredLiveRequests.map((request) => {
@@ -1931,8 +1953,8 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
                 );
                 const status = (request.responseStatus || 'errored').toLowerCase();
-                const providerLabel = getProviderLabel(request);
-                const modelLabel = getModelLabel(request);
+                const providerLabel = getProviderLabel(request, t);
+                const modelLabel = getModelLabel(request, t);
                 return (
                   <div
                     key={request.requestId}
@@ -1975,20 +1997,39 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                       </span>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
-                      <span>ID: {request.requestId.slice(0, 8)}...</span>
                       <span>
-                        Tokens:{' '}
-                        {formatTokens(
-                          Number(request.tokensInput || 0) +
-                            Number(request.tokensOutput || 0) +
-                            Number(request.tokensCached || 0) +
-                            Number(request.tokensCacheWrite || 0)
-                        )}
+                        {t('dashboard.live.request.idLabel', { id: request.requestId.slice(0, 8) })}
                       </span>
-                      <span>Cost: {formatCost(Number(request.costTotal || 0), 6)}</span>
-                      <span>Latency: {formatMs(Number(request.durationMs || 0))}</span>
-                      <span>TTFT: {formatMs(Number(request.ttftMs || 0))}</span>
-                      <span>TPS: {formatTPS(Number(request.tokensPerSec || 0))}</span>
+                      <span>
+                        {t('dashboard.live.request.tokens', {
+                          value: formatTokens(
+                            Number(request.tokensInput || 0) +
+                              Number(request.tokensOutput || 0) +
+                              Number(request.tokensCached || 0) +
+                              Number(request.tokensCacheWrite || 0)
+                          ),
+                        })}
+                      </span>
+                      <span>
+                        {t('dashboard.live.request.cost', {
+                          value: formatCost(Number(request.costTotal || 0), 6),
+                        })}
+                      </span>
+                      <span>
+                        {t('dashboard.live.request.latency', {
+                          value: formatMs(Number(request.durationMs || 0)),
+                        })}
+                      </span>
+                      <span>
+                        {t('dashboard.live.request.ttft', {
+                          value: formatMs(Number(request.ttftMs || 0)),
+                        })}
+                      </span>
+                      <span>
+                        {t('dashboard.live.request.tps', {
+                          value: formatTPS(Number(request.tokensPerSec || 0)),
+                        })}
+                      </span>
                     </div>
                   </div>
                 );
@@ -2002,12 +2043,14 @@ export const LiveTab: React.FC<LiveTabProps> = ({
           <div className="h-[60vh]">
             {concurrencyHistory.length === 0 ? (
               <div className="flex items-center justify-center h-full text-text-secondary">
-                Collecting concurrency data...
+                {t('dashboard.live.empty.collectingConcurrency')}
               </div>
             ) : (
               <div className="h-full flex flex-col">
                 <div className="flex items-center justify-between p-4 bg-bg-subtle rounded-lg mb-4">
-                  <span className="text-sm text-text-muted">Current In-Flight</span>
+                  <span className="text-sm text-text-muted">
+                    {t('dashboard.live.cards.currentInFlight')}
+                  </span>
                   <span className="text-2xl font-semibold text-text tabular-nums">
                     {formatNumber(totalConcurrentRequests, 0)}
                   </span>
@@ -2053,11 +2096,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             <div className="space-y-3">
               <h3 className="text-base font-semibold text-text flex items-center gap-2">
                 <Server size={18} className="text-primary" />
-                Top Providers
+                {t('dashboard.live.cards.topProviders')}
               </h3>
               {providerStats.length === 0 ? (
                 <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
-                  No provider activity in window
+                  {t('dashboard.live.empty.noProviderActivity')}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2070,11 +2113,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             <div className="space-y-3">
               <h3 className="text-base font-semibold text-text flex items-center gap-2">
                 <Cpu size={18} className="text-secondary" />
-                Top Models
+                {t('dashboard.live.cards.topModels')}
               </h3>
               {modelStats.length === 0 ? (
                 <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
-                  No model activity in window
+                  {t('dashboard.live.empty.noModelActivity')}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2122,12 +2165,12 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Metrics',
+              title: t('dashboard.live.cards.metrics'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Signal size={15} className="text-info" />
                   <span className="hidden text-[11px] text-text-muted sm:inline">
-                    Overview & Live Stats
+                    {t('dashboard.live.cards.overviewLiveStats')}
                   </span>
                 </div>
               ),
@@ -2140,29 +2183,37 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   <div className="divide-y divide-border">
                     <div className="px-3 py-1.5 bg-bg-subtle/50">
                       <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
-                        Overview
+                        {t('dashboard.live.cards.overview')}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Total Requests</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.totalRequests')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {totalRequestsValue}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Total Tokens</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.totalTokens')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {totalTokensValue}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Requests Today</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.requestsToday')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {formatNumber(todayMetrics.requests, 0)}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Cost Today</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.costToday')}
+                      </span>
                       <span className="text-sm font-semibold text-info tabular-nums">
                         {formatCost(todayMetrics.totalCost, 4)}
                       </span>
@@ -2172,29 +2223,37 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   <div className="divide-y divide-border">
                     <div className="px-3 py-1.5 bg-bg-subtle/50">
                       <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
-                        Live ({liveWindowMinutes}m)
+                        {t('dashboard.live.cards.liveWindow', { minutes: liveWindowMinutes })}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Requests</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.requests')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {formatNumber(summary.requestCount, 0)}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Success Rate</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.successRate')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {successRate.toFixed(1)}%
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Tokens / Min</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.tokensPerMin')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {formatTokens(tokensPerMinute)}
                       </span>
                     </div>
                     <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-text-muted">Avg Latency</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.avgLatency')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {formatMs(avgLatency)}
                       </span>
@@ -2214,7 +2273,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Alerts & Providers',
+              title: t('dashboard.live.cards.alertsProviders'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <AlertTriangle
@@ -2229,7 +2288,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                       }}
                       className="text-[11px] text-warning hover:text-warning/80 transition-colors"
                     >
-                      Clear All
+                      {t('dashboard.live.cards.clearAll')}
                     </button>
                   )}
                 </div>
@@ -2251,8 +2310,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         return (
                           <CooldownRow
                             key={key}
-                            provider={normalizeTelemetryLabel(provider) || 'Unknown'}
-                            modelDisplay={model || 'all models'}
+                            provider={
+                              normalizeTelemetryLabel(provider) ||
+                              t('dashboard.live.labels.unknown')
+                            }
+                            modelDisplay={model || t('dashboard.live.labels.allModels')}
                             timeDisplay={timeDisplay}
                             consecutiveFailures={representative.consecutiveFailures}
                             lastError={representative.lastError}
@@ -2266,7 +2328,9 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   <div className="flex-1 divide-y divide-border overflow-y-auto">
                     {providerRows.length === 0 ? (
                       <div className="px-3 py-3 text-xs text-text-muted">
-                        No provider activity in the last {liveWindowMinutes} minutes.
+                        {t('dashboard.live.empty.noProviderActivityRecent', {
+                          minutes: liveWindowMinutes,
+                        })}
                       </div>
                     ) : (
                       providerRows.map((row) => (
@@ -2274,7 +2338,9 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-medium text-text">{row.provider}</span>
                             <span className="text-xs text-text-muted tabular-nums">
-                              {formatNumber(row.requests, 0)} req
+                              {t('dashboard.live.entity.requestsShort', {
+                                value: formatNumber(row.requests, 0),
+                              })}
                             </span>
                           </div>
                           <div className="flex gap-3 mt-0.5 text-[11px] text-text-muted">
@@ -2301,11 +2367,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Request Velocity (Last 5 Minutes)',
+              title: t('dashboard.live.cards.velocity'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <span className="hidden text-xs text-text-secondary sm:inline">
-                    Minute-over-minute delta
+                    {t('dashboard.live.cards.velocitySubtitle')}
                   </span>
                   <AnalyzeButton
                     cardType="velocity"
@@ -2320,7 +2386,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               content:
                 velocitySeries.length === 0 ? (
                   <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                    No velocity data available
+                    {t('dashboard.live.empty.velocity')}
                   </div>
                 ) : (
                   <div className="h-48 sm:h-56">
@@ -2346,7 +2412,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                             borderRadius: '8px',
                           }}
                           labelStyle={{ color: 'var(--color-text)' }}
-                          formatter={(value) => [formatNumber(Number(value || 0), 0), 'Velocity']}
+                          formatter={(value) => [
+                            formatNumber(Number(value || 0), 0),
+                            t('dashboard.live.tooltip.velocity'),
+                          ]}
                         />
                         <Line
                           type="monotone"
@@ -2371,10 +2440,12 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Provider Pulse (5m)',
+              title: t('dashboard.live.cards.providerPulse'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className="text-xs text-text-secondary">Top 8 providers</span>
+                  <span className="text-xs text-text-secondary">
+                    {t('dashboard.live.cards.top8Providers')}
+                  </span>
                   <AnalyzeButton
                     cardType="provider"
                     size="sm"
@@ -2388,7 +2459,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               content:
                 providerPulseRows.length === 0 ? (
                   <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                    No provider traffic in the selected live window.
+                    {t('dashboard.live.empty.noProviderTraffic')}
                   </div>
                 ) : (
                   <div className="h-48 sm:h-56">
@@ -2418,7 +2489,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                             borderRadius: '8px',
                           }}
                           labelStyle={{ color: 'var(--color-text)' }}
-                          formatter={(value) => [formatNumber(Number(value || 0), 0), 'Requests']}
+                          formatter={(value) => [
+                            formatNumber(Number(value || 0), 0),
+                            t('dashboard.live.tooltip.requests'),
+                          ]}
                         />
                         <Bar dataKey="requests" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -2437,10 +2511,12 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Model Pulse (5m)',
+              title: t('dashboard.live.cards.modelPulse'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className="text-xs text-text-secondary">Top 8 models</span>
+                  <span className="text-xs text-text-secondary">
+                    {t('dashboard.live.cards.top8Models')}
+                  </span>
                   <AnalyzeButton
                     cardType="model"
                     size="sm"
@@ -2454,7 +2530,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               content:
                 modelPulseRows.length === 0 ? (
                   <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                    No model traffic in the selected live window.
+                    {t('dashboard.live.empty.noModelTraffic')}
                   </div>
                 ) : (
                   <div className="h-48 sm:h-56">
@@ -2484,7 +2560,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                             borderRadius: '8px',
                           }}
                           labelStyle={{ color: 'var(--color-text)' }}
-                          formatter={(value) => [formatNumber(Number(value || 0), 0), 'Requests']}
+                          formatter={(value) => [
+                            formatNumber(Number(value || 0), 0),
+                            t('dashboard.live.tooltip.requests'),
+                          ]}
                         />
                         <Bar dataKey="requests" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -2504,7 +2583,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Live Timeline',
+              title: t('dashboard.live.cards.timeline'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Clock size={16} className="text-primary" />
@@ -2520,11 +2599,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               className: 'min-w-0 hover:shadow-lg hover:border-primary/30 transition-all',
               content: loading ? (
                 <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                  Loading...
+                  {t('dashboard.live.empty.loading')}
                 </div>
               ) : minuteSeries.length === 0 ? (
                 <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                  No requests in the last {liveWindowMinutes} minutes
+                  {t('dashboard.live.empty.noRequestsInMinutes', { minutes: liveWindowMinutes })}
                 </div>
               ) : (
                 <div className="h-48 sm:h-56">
@@ -2569,12 +2648,17 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         labelStyle={{ color: 'var(--color-text)' }}
                         formatter={(value, name) => {
                           if (name === 'tokens') {
-                            return [formatTokens(Number(value || 0)), 'Tokens'];
+                            return [
+                              formatTokens(Number(value || 0)),
+                              t('dashboard.live.tooltip.tokens'),
+                            ];
                           }
 
                           return [
                             formatNumber(Number(value || 0), 0),
-                            name === 'requests' ? 'Requests' : 'Errors',
+                            name === 'requests'
+                              ? t('dashboard.live.tooltip.requests')
+                              : t('dashboard.live.tooltip.errors'),
                           ];
                         }}
                       />
@@ -2622,7 +2706,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Model Stack',
+              title: t('dashboard.live.cards.modelStack'),
               extra: (
                 <div className="flex items-center gap-2">
                   <Clock size={16} className="text-primary" />
@@ -2638,11 +2722,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               className: 'min-w-0 hover:shadow-lg hover:border-primary/30 transition-all',
               content: loading ? (
                 <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                  Loading...
+                  {t('dashboard.live.empty.loading')}
                 </div>
               ) : modelTimeline.series.length === 0 ? (
                 <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
-                  No model stack data in the last {liveWindowMinutes} minutes
+                  {t('dashboard.live.empty.noModelStackInMinutes', { minutes: liveWindowMinutes })}
                 </div>
               ) : (
                 <div className="h-48 sm:h-56">
@@ -2685,11 +2769,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                           }
 
                           if (name === 'avgTtftMs') {
-                            return [formatMs(numeric), 'Avg TTFT'];
+                            return [formatMs(numeric), t('dashboard.live.tooltip.avgTtft')];
                           }
 
                           if (name === 'avgTps') {
-                            return [formatTPS(numeric), 'Avg TPS'];
+                            return [formatTPS(numeric), t('dashboard.live.tooltip.avgTps')];
                           }
 
                           return [formatNumber(numeric, 0), String(name)];
@@ -2743,14 +2827,14 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Latest Requests',
+              title: t('dashboard.live.cards.latestRequests'),
               onClick: () => openModal('requests'),
               style: { cursor: 'pointer' },
               className: 'hover:shadow-lg hover:border-primary/30 transition-all',
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-1">
                   <span className="hidden text-xs text-text-secondary mr-1 sm:inline">
-                    Latest 20
+                    {t('dashboard.live.cards.latest20')}
                   </span>
                   <Button
                     size="sm"
@@ -2760,7 +2844,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                       setStreamFilter('all');
                     }}
                   >
-                    All
+                    {t('dashboard.live.cards.all')}
                   </Button>
                   <Button
                     size="sm"
@@ -2770,7 +2854,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                       setStreamFilter('success');
                     }}
                   >
-                    Success
+                    {t('dashboard.live.cards.successFilter')}
                   </Button>
                   <Button
                     size="sm"
@@ -2780,7 +2864,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                       setStreamFilter('error');
                     }}
                   >
-                    Errors
+                    {t('dashboard.live.cards.errorsFilter')}
                   </Button>
                   <AnalyzeButton
                     cardType="requests"
@@ -2793,8 +2877,8 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                 filteredLiveRequests.length === 0 ? (
                   <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
                     {liveRequests.length === 0
-                      ? 'No requests observed yet.'
-                      : 'No requests match the current filter.'}
+                      ? t('dashboard.live.empty.noRequestsObserved')
+                      : t('dashboard.live.empty.noRequestsFilter')}
                   </div>
                 ) : (
                   <div className="h-48 sm:h-56 space-y-2 overflow-y-auto pr-1">
@@ -2804,8 +2888,8 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
                       );
                       const status = (request.responseStatus || 'errored').toLowerCase();
-                      const providerLabel = getProviderLabel(request);
-                      const modelLabel = getModelLabel(request);
+                      const providerLabel = getProviderLabel(request, t);
+                      const modelLabel = getModelLabel(request, t);
 
                       return (
                         <div
@@ -2849,20 +2933,41 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                             </span>
                           </div>
                           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
-                            <span>ID: {request.requestId.slice(0, 8)}...</span>
                             <span>
-                              Tokens:{' '}
-                              {formatTokens(
-                                Number(request.tokensInput || 0) +
-                                  Number(request.tokensOutput || 0) +
-                                  Number(request.tokensCached || 0) +
-                                  Number(request.tokensCacheWrite || 0)
-                              )}
+                              {t('dashboard.live.request.idLabel', {
+                                id: request.requestId.slice(0, 8),
+                              })}
                             </span>
-                            <span>Cost: {formatCost(Number(request.costTotal || 0), 6)}</span>
-                            <span>Latency: {formatMs(Number(request.durationMs || 0))}</span>
-                            <span>TTFT: {formatMs(Number(request.ttftMs || 0))}</span>
-                            <span>TPS: {formatTPS(Number(request.tokensPerSec || 0))}</span>
+                            <span>
+                              {t('dashboard.live.request.tokens', {
+                                value: formatTokens(
+                                  Number(request.tokensInput || 0) +
+                                    Number(request.tokensOutput || 0) +
+                                    Number(request.tokensCached || 0) +
+                                    Number(request.tokensCacheWrite || 0)
+                                ),
+                              })}
+                            </span>
+                            <span>
+                              {t('dashboard.live.request.cost', {
+                                value: formatCost(Number(request.costTotal || 0), 6),
+                              })}
+                            </span>
+                            <span>
+                              {t('dashboard.live.request.latency', {
+                                value: formatMs(Number(request.durationMs || 0)),
+                              })}
+                            </span>
+                            <span>
+                              {t('dashboard.live.request.ttft', {
+                                value: formatMs(Number(request.ttftMs || 0)),
+                              })}
+                            </span>
+                            <span>
+                              {t('dashboard.live.request.tps', {
+                                value: formatTPS(Number(request.tokensPerSec || 0)),
+                              })}
+                            </span>
                           </div>
                         </div>
                       );
@@ -2882,12 +2987,16 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Concurrency',
+              title: t('dashboard.live.cards.concurrency'),
               extra: (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <span className="text-xs text-text-muted">
-                    <span className="sm:hidden">10s</span>
-                    <span className="hidden sm:inline">Auto-refresh: 10s</span>
+                    <span className="sm:hidden">
+                      {t('dashboard.live.cards.autoRefresh10Short')}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {t('dashboard.live.cards.autoRefresh10')}
+                    </span>
                   </span>
                   <AnalyzeButton
                     cardType="concurrency"
@@ -2902,16 +3011,18 @@ export const LiveTab: React.FC<LiveTabProps> = ({
               content:
                 concurrencyLoading && concurrencyHistory.length === 0 ? (
                   <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary text-sm">
-                    Loading concurrency data...
+                    {t('dashboard.live.empty.loadingConcurrency')}
                   </div>
                 ) : concurrencyHistory.length === 0 ? (
                   <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary text-sm">
-                    Collecting concurrency data...
+                    {t('dashboard.live.empty.collectingConcurrency')}
                   </div>
                 ) : (
                   <div className="h-48 sm:h-56">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-text-muted">In-Flight by Provider</span>
+                      <span className="text-xs text-text-muted">
+                        {t('dashboard.live.cards.inFlightByProvider')}
+                      </span>
                       <span className="text-sm font-semibold text-text tabular-nums">
                         {formatNumber(totalConcurrentRequests, 0)}
                       </span>
@@ -2959,10 +3070,13 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             key={'sortable-' + cardId}
             card={{
               id: cardId,
-              title: 'Provider & Model Stats',
+              title: t('dashboard.live.cards.providerModelStats'),
               extra: (
                 <span className="text-xs text-text-secondary">
-                  {activeProviderCount} providers, {activeModelCount} models
+                  {t('dashboard.live.cards.providerModelCount', {
+                    providers: activeProviderCount,
+                    models: activeModelCount,
+                  })}
                 </span>
               ),
               onClick: () => openModal('stats'),
@@ -2973,11 +3087,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   <div className="space-y-2">
                     <h4 className="text-sm font-semibold text-text flex items-center gap-2">
                       <Server size={16} className="text-primary" />
-                      Top Providers
+                      {t('dashboard.live.cards.topProviders')}
                     </h4>
                     {providerStats.length === 0 ? (
                       <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
-                        No provider activity in window
+                        {t('dashboard.live.empty.noProviderActivity')}
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
@@ -2990,11 +3104,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   <div className="space-y-2">
                     <h4 className="text-sm font-semibold text-text flex items-center gap-2">
                       <Cpu size={16} className="text-secondary" />
-                      Top Models
+                      {t('dashboard.live.cards.topModels')}
                     </h4>
                     {modelStats.length === 0 ? (
                       <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
-                        No model activity in window
+                        {t('dashboard.live.empty.noModelActivity')}
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
@@ -3045,20 +3159,20 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 sm:mb-8">
         <div className="header-left">
           <h1 className="font-heading text-xl sm:text-3xl font-bold text-text m-0 mb-2">
-            Live Metrics
+            {t('dashboard.live.title')}
           </h1>
         </div>
 
         <Badge
           status={isConnected && !isStale ? 'connected' : 'warning'}
-          secondaryText={'Window: last ' + liveWindowMinutes + 'm'}
+          secondaryText={t('dashboard.live.header.windowLast', { minutes: liveWindowMinutes })}
           className="w-full sm:w-auto sm:min-w-[210px]"
         >
           {isConnected
             ? isStale
-              ? 'Live Polling Delayed'
-              : 'Live Polling Active'
-            : 'Live Polling Reconnecting'}
+              ? t('dashboard.live.header.stale')
+              : t('dashboard.live.header.connected')
+            : t('dashboard.live.header.reconnecting')}
         </Badge>
       </div>
 
@@ -3070,7 +3184,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
           isLoading={isRefreshing}
         >
           <RefreshCw size={14} />
-          Refresh Now
+          {t('dashboard.live.toolbar.refreshNow')}
         </Button>
         {POLL_INTERVAL_OPTIONS.map((option) => {
           const label = String(Math.floor(option / 1000)) + 's';
@@ -3084,7 +3198,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                 onPollIntervalChange(option);
               }}
             >
-              Poll {label}
+              {t('dashboard.live.toolbar.poll', { label })}
             </Button>
           );
         })}
@@ -3103,7 +3217,11 @@ export const LiveTab: React.FC<LiveTabProps> = ({
           </Button>
         ))}
         <span className="hidden text-xs text-text-muted sm:inline">
-          {isVisible ? 'Tab active' : 'Tab hidden'} - data refresh resumes on focus.
+          {t('dashboard.live.toolbar.dataRefreshHint', {
+            state: isVisible
+              ? t('dashboard.live.toolbar.tabActive')
+              : t('dashboard.live.toolbar.tabHidden'),
+          })}
         </span>
       </div>
 

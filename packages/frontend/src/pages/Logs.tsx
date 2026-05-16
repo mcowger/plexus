@@ -69,6 +69,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import messagesLogo from '../assets/messages.svg';
@@ -113,6 +114,7 @@ const parseRetryHistory = (value?: string | null): RetryAttemptDetail[] => {
 };
 
 export const Logs = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { adminKey, isAdmin, isLimited, principal } = useAuth();
   const [logs, setLogs] = useState<UsageRecord[]>([]);
@@ -410,7 +412,7 @@ export const Logs = () => {
         type="button"
         onClick={() => handleSort(field)}
         className="inline-flex items-center justify-center gap-1 bg-transparent border-0 p-0 m-0 font-inherit text-inherit uppercase tracking-wider cursor-pointer"
-        title={`Sort by ${label.toLowerCase()}`}
+        title={t('logs.filters.sortBy', { label: label.toLowerCase() })}
       >
         <span>{label}</span>
         <ChevronDown
@@ -432,13 +434,14 @@ export const Logs = () => {
     if (!dateStr) return { time: '-', date: '-' };
     try {
       const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return { time: 'Invalid', date: 'Date' };
+      if (isNaN(d.getTime()))
+        return { time: t('logs.dateFormat.invalid'), date: t('logs.dateFormat.dateWord') };
       return {
         time: d.toLocaleTimeString(),
         date: d.toISOString().split('T')[0],
       };
     } catch (e) {
-      return { time: 'Error', date: 'Date' };
+      return { time: t('logs.dateFormat.errorWord'), date: t('logs.dateFormat.dateWord') };
     }
   };
 
@@ -447,11 +450,11 @@ export const Logs = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Logs"
+        title={t('logs.title')}
         subtitle={
           principal?.role === 'limited' && principal.keyName
-            ? `Scoped to key "${principal.keyName}"`
-            : 'All API requests routed through the gateway'
+            ? t('logs.subtitle.scoped', { keyName: principal.keyName })
+            : t('logs.subtitle.default')
         }
         actions={
           isAdmin ? (
@@ -463,7 +466,7 @@ export const Logs = () => {
               disabled={logs.length === 0}
               type="button"
             >
-              Delete All
+              {t('logs.actions.deleteAll')}
             </Button>
           ) : undefined
         }
@@ -475,7 +478,7 @@ export const Logs = () => {
           {!isLimited && (
             <div className="w-full sm:w-56">
               <SearchInput
-                placeholder="Filter by key…"
+                placeholder={t('logs.filters.byKey')}
                 value={filters.apiKey}
                 onChange={(v) => setFilters({ ...filters, apiKey: v })}
               />
@@ -483,14 +486,14 @@ export const Logs = () => {
           )}
           <div className="w-full sm:w-56">
             <SearchInput
-              placeholder="Filter by model…"
+              placeholder={t('logs.filters.byModel')}
               value={filters.incomingModelAlias}
               onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
             />
           </div>
           <div className="w-full sm:w-44">
             <SearchInput
-              placeholder="Filter by provider…"
+              placeholder={t('logs.filters.byProvider')}
               value={filters.provider}
               onChange={(v) => setFilters({ ...filters, provider: v })}
             />
@@ -501,7 +504,7 @@ export const Logs = () => {
               <DateTimePicker
                 value={filters.startDate}
                 onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
-                placeholder="Start date"
+                placeholder={t('logs.filters.startDate')}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -509,7 +512,7 @@ export const Logs = () => {
               <DateTimePicker
                 value={filters.endDate}
                 onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
-                placeholder="End date"
+                placeholder={t('logs.filters.endDate')}
               />
             </div>
             {(filters.startDate || filters.endDate) && (
@@ -517,14 +520,14 @@ export const Logs = () => {
                 type="button"
                 onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
                 className="rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
-                title="Clear date filters"
+                title={t('logs.filters.clearDates')}
               >
                 <X size={14} />
               </button>
             )}
           </div>
           <Button type="submit" variant="primary" size="sm" className="w-full sm:w-auto">
-            Search
+            {t('logs.actions.search')}
           </Button>
         </form>
       </PageHeader>
@@ -534,11 +537,11 @@ export const Logs = () => {
           <div className="space-y-3 p-3 lg:hidden">
             {loading ? (
               <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
-                Loading...
+                {t('logs.states.loading')}
               </div>
             ) : logs.length === 0 ? (
               <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
-                No logs found
+                {t('logs.states.noLogs')}
               </div>
             ) : (
               logs.map((log) => {
@@ -603,7 +606,7 @@ export const Logs = () => {
                     <div className="mt-3 space-y-2">
                       <div className="min-w-0">
                         <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-                          Model
+                          {t('logs.columns.model')}
                         </div>
                         <div className="truncate text-sm font-medium text-text">
                           {log.incomingModelAlias || '-'}
@@ -615,13 +618,13 @@ export const Logs = () => {
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Key
+                            {t('logs.columns.key')}
                           </div>
                           <div className="truncate text-text">{log.apiKey || '-'}</div>
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            API
+                            {t('logs.columns.api')}
                           </div>
                           <div className="truncate text-text">
                             {log.incomingApiType || '?'} {'->'} {log.outgoingApiType || '?'}
@@ -629,13 +632,13 @@ export const Logs = () => {
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Tokens
+                            {t('logs.columns.tokens')}
                           </div>
                           <div className="text-text">{formatLargeNumber(totalTokens)}</div>
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Cost
+                            {t('logs.columns.cost')}
                           </div>
                           <div className="text-text">
                             {log.costTotal == null || log.costTotal === 0
@@ -645,7 +648,7 @@ export const Logs = () => {
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Latency
+                            {t('logs.columns.latency')}
                           </div>
                           <div className="text-text">
                             {(() => {
@@ -697,7 +700,7 @@ export const Logs = () => {
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Meta
+                            {t('logs.columns.meta')}
                           </div>
                           <div className="text-text">
                             {(log.messageCount || 0) === 0 ? '-' : log.messageCount} msg /{' '}
@@ -721,7 +724,7 @@ export const Logs = () => {
                             }
                           >
                             <AlertTriangle size={12} />
-                            Error
+                            {t('logs.errorButton')}
                           </Button>
                         )}
                         {log.hasDebug && (
@@ -733,7 +736,7 @@ export const Logs = () => {
                             }
                           >
                             <Bug size={12} />
-                            Debug
+                            {t('logs.debugButton')}
                           </Button>
                         )}
                         <Button
@@ -757,38 +760,38 @@ export const Logs = () => {
               <thead>
                 <tr className="text-center border-b border-border">
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Date', 'date')}
+                    {renderSortableHeader(t('logs.columns.date'), 'date')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Key', 'apiKey')}
+                    {renderSortableHeader(t('logs.columns.key'), 'apiKey')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    API
+                    {t('logs.columns.api')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Model', 'incomingModelAlias')}
+                    {renderSortableHeader(t('logs.columns.model'), 'incomingModelAlias')}
                   </th>
                   {/* <th style={{ padding: '6px' }}>Provider</th> */}
                   <th
                     className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
                     style={{ width: '125px' }}
                   >
-                    Tokens
+                    {t('logs.columns.tokens')}
                   </th>
                   <th
                     className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
                     style={{ minWidth: '130px' }}
                   >
-                    {renderSortableHeader('Cost', 'costTotal')}
+                    {renderSortableHeader(t('logs.columns.cost'), 'costTotal')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Perf', 'durationMs')}
+                    {renderSortableHeader(t('logs.columns.perf'), 'durationMs')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    Meta
+                    {t('logs.columns.meta')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    Status
+                    {t('logs.columns.status')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -801,13 +804,13 @@ export const Logs = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={11} className="p-5 text-center">
-                      Loading...
+                      {t('logs.states.loading')}
                     </td>
                   </tr>
                 ) : logs.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="p-5 text-center">
-                      No logs found
+                      {t('logs.states.noLogs')}
                     </td>
                   </tr>
                 ) : (
@@ -847,7 +850,11 @@ export const Logs = () => {
                       </td>
                       <td
                         className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                        title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
+                        title={
+                          log.sourceIp
+                            ? t('logs.tooltips.ipAddress', { ip: log.sourceIp })
+                            : undefined
+                        }
                         style={log.sourceIp ? { cursor: 'help' } : undefined}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -863,7 +870,16 @@ export const Logs = () => {
                       </td>
                       <td
                         className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
-                        title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
+                        title={t('logs.tooltips.apiInfo', {
+                          incoming: log.incomingApiType || '?',
+                          outgoing: log.outgoingApiType || '?',
+                          streamMode: log.isStreamed
+                            ? t('logs.tooltips.streamed')
+                            : t('logs.tooltips.nonStreamed'),
+                          passthroughMode: log.isPassthrough
+                            ? t('logs.tooltips.passthrough')
+                            : t('logs.tooltips.translated'),
+                        })}
                         style={{ cursor: 'help' }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -966,7 +982,13 @@ export const Logs = () => {
                               >
                                 {log.isVisionFallthrough && (
                                   <div
-                                    title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}
+                                    title={t('logs.tooltips.visionFallthrough', {
+                                      via: log.visionFallthroughModel
+                                        ? t('logs.tooltips.visionVia', {
+                                            model: log.visionFallthroughModel,
+                                          })
+                                        : '',
+                                    })}
                                   >
                                     <ScanSearch size={12} className="text-amber-500" />
                                   </div>
@@ -977,7 +999,7 @@ export const Logs = () => {
                                 style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
                               >
                                 {log.isDescriptorRequest && (
-                                  <div title="Descriptor Request (Generated image description)">
+                                  <div title={t('logs.tooltips.descriptorRequest')}>
                                     <Eye size={12} className="text-blue-500" />
                                   </div>
                                 )}
@@ -999,8 +1021,8 @@ export const Logs = () => {
                                 className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
                                 title={
                                   isClipboardAvailable()
-                                    ? 'Copy incoming model alias'
-                                    : 'Copy requires HTTPS'
+                                    ? t('logs.tooltips.copyIncomingModel')
+                                    : t('logs.tooltips.copyRequiresHttps')
                                 }
                                 disabled={!isClipboardAvailable()}
                               >
@@ -1023,8 +1045,8 @@ export const Logs = () => {
                                 className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
                                 title={
                                   isClipboardAvailable()
-                                    ? 'Copy selected model name'
-                                    : 'Copy requires HTTPS'
+                                    ? t('logs.tooltips.copySelectedModel')
+                                    : t('logs.tooltips.copyRequiresHttps')
                                 }
                                 disabled={!isClipboardAvailable()}
                               >
@@ -1035,7 +1057,7 @@ export const Logs = () => {
                           {log.isVisionFallthrough && log.visionFallthroughModel && (
                             <div
                               className="group/vft flex items-center gap-1"
-                              title="Vision fallthrough descriptor model"
+                              title={t('logs.tooltips.visionFallthroughDescriptor')}
                             >
                               <ScanSearch size={10} className="text-amber-500 shrink-0" />
                               <span
@@ -1051,8 +1073,8 @@ export const Logs = () => {
                                 className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
                                 title={
                                   isClipboardAvailable()
-                                    ? 'Copy fallthrough model name'
-                                    : 'Copy requires HTTPS'
+                                    ? t('logs.tooltips.copyFallthroughModel')
+                                    : t('logs.tooltips.copyRequiresHttps')
                                 }
                                 disabled={!isClipboardAvailable()}
                               >
@@ -1064,7 +1086,30 @@ export const Logs = () => {
                       </td>
                       <td
                         className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                        title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)} • Cache Write: ${(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
+                        title={
+                          t('logs.tooltips.tokensTooltip', {
+                            input:
+                              (log.tokensInput || 0) === 0
+                                ? '-'
+                                : formatLargeNumber(log.tokensInput || 0),
+                            output:
+                              (log.tokensOutput || 0) === 0
+                                ? '-'
+                                : formatLargeNumber(log.tokensOutput || 0),
+                            reasoning:
+                              (log.tokensReasoning || 0) === 0
+                                ? '-'
+                                : formatLargeNumber(log.tokensReasoning || 0),
+                            cached:
+                              (log.tokensCached || 0) === 0
+                                ? '-'
+                                : formatLargeNumber(log.tokensCached || 0),
+                            cacheWrite:
+                              (log.tokensCacheWrite || 0) === 0
+                                ? '-'
+                                : formatLargeNumber(log.tokensCacheWrite || 0),
+                          }) + (log.tokensEstimated ? t('logs.tooltips.estimatedSuffix') : '')
+                        }
                         style={{ cursor: 'help' }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -1308,7 +1353,10 @@ export const Logs = () => {
                         className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
                         title={
                           log.kwhUsed != null && log.kwhUsed > 0
-                            ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${formatSlices(log.kwhUsed / KWH_PER_SLICE)} toast slices`
+                            ? t('logs.tooltips.energy', {
+                                energy: formatEnergy(log.kwhUsed),
+                                slices: formatSlices(log.kwhUsed / KWH_PER_SLICE),
+                              })
                             : undefined
                         }
                         style={
@@ -1390,7 +1438,7 @@ export const Logs = () => {
                                 onClick={() => handleRetryDetails(log)}
                                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                                 className="text-orange-500 bg-transparent border-0 p-0 cursor-pointer hover:text-orange-400 transition-colors"
-                                title="View retry history"
+                                title={t('logs.tooltips.viewRetryHistory')}
                               >
                                 <RotateCcw size={12} />
                                 <span
@@ -1415,7 +1463,7 @@ export const Logs = () => {
                                 'text-danger border-danger/30 bg-red-500/15 hover:bg-red-500/25'
                               )}
                               style={{ width: '52px' }}
-                              title="View Error Details"
+                              title={t('logs.tooltips.viewError')}
                             >
                               <AlertTriangle size={12} />
                               <span style={{ fontWeight: 600 }}>✗</span>
@@ -1431,7 +1479,7 @@ export const Logs = () => {
                                 'text-blue-400 border-blue-400/30 bg-blue-500/15 hover:bg-blue-500/25'
                               )}
                               style={{ width: '52px' }}
-                              title="View Debug Trace"
+                              title={t('logs.tooltips.viewDebug')}
                             >
                               <Bug size={12} />
                               <span style={{ fontWeight: 600 }}>✓</span>
@@ -1472,7 +1520,7 @@ export const Logs = () => {
                         <button
                           onClick={() => handleDelete(log.requestId)}
                           className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
-                          title="Delete log"
+                          title={t('logs.tooltips.deleteLog')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1486,7 +1534,10 @@ export const Logs = () => {
 
           <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-3 sm:justify-end">
             <span className="text-xs text-text-secondary font-mono">
-              Page {currentPage} of {Math.max(1, totalPages)}
+              {t('logs.pagination.summary', {
+                current: currentPage,
+                total: Math.max(1, totalPages),
+              })}
             </span>
             <div className="flex gap-1">
               <Button
@@ -1513,27 +1564,27 @@ export const Logs = () => {
       <Modal
         isOpen={isRetryModalOpen}
         onClose={() => setIsRetryModalOpen(false)}
-        title="Retry History"
+        title={t('logs.retryModal.title')}
         footer={
           <Button variant="secondary" onClick={() => setIsRetryModalOpen(false)}>
-            Close
+            {t('logs.retryModal.closeButton')}
           </Button>
         }
       >
         <div className="flex flex-col gap-4">
           <div className="text-sm text-text-secondary">
             <div>
-              Request: <span className="text-text">{selectedRetryLog?.requestId || '-'}</span>
+              {t('logs.retryModal.request')}{' '}
+              <span className="text-text">{selectedRetryLog?.requestId || '-'}</span>
             </div>
             <div>
-              Attempts: <span className="text-text">{selectedRetryLog?.attemptCount || 1}</span>
+              {t('logs.retryModal.attempts')}{' '}
+              <span className="text-text">{selectedRetryLog?.attemptCount || 1}</span>
             </div>
           </div>
 
           {selectedRetryHistory.length === 0 ? (
-            <div className="text-sm text-text-secondary">
-              No retry history is available for this request.
-            </div>
+            <div className="text-sm text-text-secondary">{t('logs.retryModal.empty')}</div>
           ) : (
             <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
               {selectedRetryHistory.map((attempt) => (
@@ -1550,17 +1601,29 @@ export const Logs = () => {
                 >
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <div className="font-medium text-sm text-text">
-                      Attempt {attempt.index}: {attempt.provider}/{attempt.model}
+                      {t('logs.retryModal.attemptHeader', {
+                        index: attempt.index,
+                        provider: attempt.provider,
+                        model: attempt.model,
+                      })}
                     </div>
                     <div className="text-xs uppercase tracking-wide text-text-secondary">
                       {attempt.status}
                     </div>
                   </div>
                   <div className="text-sm text-text-secondary">
-                    <div>API: {attempt.apiType || '-'}</div>
-                    {attempt.statusCode ? <div>Status Code: {attempt.statusCode}</div> : null}
+                    <div>{t('logs.retryModal.api', { value: attempt.apiType || '-' })}</div>
+                    {attempt.statusCode ? (
+                      <div>{t('logs.retryModal.statusCode', { code: attempt.statusCode })}</div>
+                    ) : null}
                     {attempt.retryable !== undefined ? (
-                      <div>Retryable: {attempt.retryable ? 'yes' : 'no'}</div>
+                      <div>
+                        {t('logs.retryModal.retryable', {
+                          value: attempt.retryable
+                            ? t('logs.retryModal.yes')
+                            : t('logs.retryModal.no'),
+                        })}
+                      </div>
                     ) : null}
                     <div className="mt-2 text-text">{attempt.reason}</div>
                   </div>
@@ -1574,20 +1637,20 @@ export const Logs = () => {
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirm Deletion"
+        title={t('logs.deleteModal.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancel
+              {t('logs.deleteModal.cancelButton')}
             </Button>
             <Button variant="danger" onClick={confirmDelete} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete Logs'}
+              {isDeleting ? t('logs.deleteModal.deleting') : t('logs.deleteModal.deleteButton')}
             </Button>
           </>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p>Select which logs you would like to delete:</p>
+          <p>{t('logs.deleteModal.intro')}</p>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
@@ -1597,7 +1660,7 @@ export const Logs = () => {
               checked={deleteMode === 'older'}
               onChange={() => setDeleteMode('older')}
             />
-            <label htmlFor="delete-older">Delete logs older than</label>
+            <label htmlFor="delete-older">{t('logs.deleteModal.olderLabel')}</label>
             <Input
               type="number"
               min="1"
@@ -1606,7 +1669,7 @@ export const Logs = () => {
               style={{ width: '60px', padding: '4px 8px' }}
               disabled={deleteMode !== 'older'}
             />
-            <span>days</span>
+            <span>{t('logs.deleteModal.daysSuffix')}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1618,7 +1681,7 @@ export const Logs = () => {
               onChange={() => setDeleteMode('all')}
             />
             <label htmlFor="delete-all" style={{ color: 'var(--color-danger)' }}>
-              Delete ALL logs (Cannot be undone)
+              {t('logs.deleteModal.allLabel')}
             </label>
           </div>
         </div>
@@ -1627,21 +1690,22 @@ export const Logs = () => {
       <Modal
         isOpen={isSingleDeleteModalOpen}
         onClose={() => setIsSingleDeleteModalOpen(false)}
-        title="Confirm Deletion"
+        title={t('logs.deleteModal.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
-              Cancel
+              {t('logs.deleteModal.cancelButton')}
             </Button>
             <Button variant="danger" onClick={confirmDeleteSingle} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete Log'}
+              {isDeleting ? t('logs.singleDelete.deleting') : t('logs.singleDelete.deleteButton')}
             </Button>
           </>
         }
       >
         <p>
-          Are you sure you want to delete log <strong>{selectedLogIdForDelete}</strong>? This action
-          cannot be undone.
+          {t('logs.singleDelete.confirmPrefix')}
+          <strong>{selectedLogIdForDelete}</strong>
+          {t('logs.singleDelete.confirmSuffix')}
         </p>
       </Modal>
     </div>

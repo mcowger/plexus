@@ -1,14 +1,29 @@
 import React from 'react';
 import { Badge as UIBadge } from '../ui/Badge';
 import { Alias } from '../../lib/api';
+import { useT } from '../../i18n';
 
 interface ModelTypeBadgeProps {
   type?: Alias['type'];
   className?: string;
 }
 
+const TYPE_KEYS = [
+  'chat',
+  'embeddings',
+  'transcriptions',
+  'speech',
+  'image',
+  'responses',
+] as const satisfies readonly Alias['type'][];
+
 export const ModelTypeBadge: React.FC<ModelTypeBadgeProps> = ({ type, className }) => {
-  const label = type || 'chat';
+  const { t } = useT('models.modal.types');
+  const normalized = type ?? 'chat';
+  const typeKey = (TYPE_KEYS as readonly string[]).includes(normalized)
+    ? (normalized as (typeof TYPE_KEYS)[number])
+    : 'chat';
+  const translated = t(typeKey);
 
   let status: 'connected' | 'disconnected' | 'connecting' | 'error' | 'neutral' | 'warning' =
     'neutral';
@@ -39,7 +54,7 @@ export const ModelTypeBadge: React.FC<ModelTypeBadgeProps> = ({ type, className 
       status={status}
       className={`${customClass} ${className} gap-1 px-2 py-0.5 rounded uppercase tracking-wider text-[10px]`}
     >
-      {label}
+      {translated}
     </UIBadge>
   );
 };

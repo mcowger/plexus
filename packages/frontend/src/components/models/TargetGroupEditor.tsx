@@ -3,6 +3,17 @@ import { GripVertical, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react
 import { Switch } from '../ui/Switch';
 import { Button } from '../ui/Button';
 import { AliasTargetGroup } from '../../lib/api';
+import { useT } from '../../i18n';
+
+const SELECTOR_KEYS = [
+  'random',
+  'in_order',
+  'cost',
+  'latency',
+  'usage',
+  'performance',
+  'e2e_performance',
+] as const;
 
 interface TargetGroupEditorProps {
   groups: AliasTargetGroup[];
@@ -11,22 +22,14 @@ interface TargetGroupEditorProps {
   onChange: (groups: AliasTargetGroup[]) => void;
 }
 
-const SELECTOR_LABELS: Record<string, string> = {
-  random: 'Random',
-  in_order: 'In Order',
-  cost: 'Lowest Cost',
-  latency: 'Lowest Latency',
-  usage: 'Usage Balanced',
-  performance: 'Best Performance (post-TTFT)',
-  e2e_performance: 'Best E2E Performance',
-};
-
 export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   groups,
   providers,
   availableModels,
   onChange,
 }) => {
+  const { t } = useT('models.targetGroup');
+
   const [dragState, setDragState] = useState<{
     mode: 'group' | 'target';
     groupIdx: number;
@@ -45,7 +48,11 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   const addGroup = () => {
     setGroups((prev) => [
       ...prev,
-      { name: `Group ${prev.length + 1}`, selector: 'random', targets: [] },
+      {
+        name: t('defaultGroupName', { number: prev.length + 1 }),
+        selector: 'random',
+        targets: [],
+      },
     ]);
   };
 
@@ -238,16 +245,16 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                 className="flex-1 min-w-0 py-1 px-2 font-body text-sm font-medium text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 value={group.name}
                 onChange={(e) => updateGroupField(groupIdx, 'name', e.target.value)}
-                placeholder="Group name"
+                placeholder={t('groupNamePlaceholder')}
               />
               <select
                 className="py-1 px-2 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 value={group.selector}
                 onChange={(e) => updateGroupField(groupIdx, 'selector', e.target.value)}
               >
-                {Object.entries(SELECTOR_LABELS).map(([key, label]) => (
+                {SELECTOR_KEYS.map((key) => (
                   <option key={key} value={key}>
-                    {label}
+                    {t(`selectors.${key}`)}
                   </option>
                 ))}
               </select>
@@ -257,7 +264,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   onClick={() => moveGroup(groupIdx, 'up')}
                   disabled={groupIdx === 0}
                   className="hover:text-primary disabled:opacity-30 disabled:hover:text-text-secondary transition-colors p-1"
-                  title="Move group up"
+                  title={t('moveGroupUp')}
                 >
                   <ChevronUp size={14} />
                 </button>
@@ -266,7 +273,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   onClick={() => moveGroup(groupIdx, 'down')}
                   disabled={groupIdx === groups.length - 1}
                   className="hover:text-primary disabled:opacity-30 disabled:hover:text-text-secondary transition-colors p-1"
-                  title="Move group down"
+                  title={t('moveGroupDown')}
                 >
                   <ChevronDown size={14} />
                 </button>
@@ -276,7 +283,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   type="button"
                   onClick={() => removeGroup(groupIdx)}
                   className="hover:text-danger text-text-secondary transition-colors p-1"
-                  title="Remove group"
+                  title={t('removeGroup')}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -286,7 +293,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
             {/* Targets list */}
             <div className="px-3 py-2 flex flex-col gap-1">
               {group.targets.length === 0 && (
-                <div className="text-text-muted italic text-xs py-1">No targets in this group</div>
+                <div className="text-text-muted italic text-xs py-1">{t('emptyTargets')}</div>
               )}
               {group.targets.map((target, targetIdx) => {
                 const isTargetDrag =
@@ -360,7 +367,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                         updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
                       }
                     >
-                      <option value="">Provider...</option>
+                      <option value="">{t('providerPlaceholder')}</option>
                       {providers.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
@@ -374,7 +381,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                       onChange={(e) => updateTarget(groupIdx, targetIdx, 'model', e.target.value)}
                       disabled={!target.provider}
                     >
-                      <option value="">Model...</option>
+                      <option value="">{t('modelPlaceholder')}</option>
                       {availableModels
                         .filter((m) => m.providerId === target.provider)
                         .map((m) => (
@@ -406,7 +413,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                 leftIcon={<Plus size={13} />}
                 className="mt-1 justify-start text-xs text-text-secondary hover:text-text"
               >
-                Add target
+                {t('addTarget')}
               </Button>
             </div>
           </div>
@@ -420,7 +427,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
         leftIcon={<Plus size={14} />}
         className="self-start"
       >
-        Add Target Group
+        {t('addTargetGroup')}
       </Button>
     </div>
   );

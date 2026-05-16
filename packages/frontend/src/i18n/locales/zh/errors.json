@@ -1,0 +1,53 @@
+{
+  "title": "错误日志",
+  "subtitle": {
+    "scoped": "仅显示密钥 \"{{keyName}}\" 的错误",
+    "default": "按签名分组 · 最近 24 小时"
+  },
+  "actions": {
+    "deleteAll": "全部删除",
+    "refresh": "刷新"
+  },
+  "list": {
+    "header": "最近错误",
+    "empty": "未找到错误。",
+    "deleteTooltip": "删除错误日志"
+  },
+  "details": {
+    "title": "错误详情",
+    "requestId": "请求 ID:",
+    "time": "时间:",
+    "selectPlaceholder": "选择一个错误查看详情",
+    "routing": {
+      "title": "路由信息",
+      "provider": "服务商:",
+      "targetModel": "目标模型:",
+      "targetApi": "目标 API:",
+      "statusCode": "状态码:",
+      "url": "请求 URL:"
+    },
+    "panels": {
+      "message": "错误消息",
+      "stackTrace": "堆栈追踪",
+      "noStack": "（无可用堆栈追踪）",
+      "providerResponse": "服务商响应",
+      "headers": "请求头",
+      "additional": "其他详情",
+      "copyTooltip": "复制到剪贴板"
+    }
+  },
+  "deleteAllModal": {
+    "title": "确认删除",
+    "cancelButton": "取消",
+    "deleteButton": "删除全部错误",
+    "deleting": "删除中...",
+    "body": "确定要删除所有错误日志吗？此操作无法撤销。"
+  },
+  "singleDeleteModal": {
+    "title": "确认删除",
+    "cancelButton": "取消",
+    "deleteButton": "删除错误日志",
+    "deleting": "删除中...",
+    "body": "确定要删除此错误日志吗？此操作无法撤销。"
+  }
+}

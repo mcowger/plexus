@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, KeyConfig, UserQuota } from '../lib/api';
 import { Input } from '../components/ui/Input';
 import { TagSelect } from '../components/ui/TagSelect';
@@ -50,6 +51,7 @@ interface QuotaStatus {
 
 export const Keys = () => {
   const toast = useToast();
+  const { t } = useTranslation();
   const [keys, setKeys] = useState<KeyConfig[]>([]);
   const [quotas, setQuotas] = useState<Record<string, UserQuota>>({});
   const [quotaStatuses, setQuotaStatuses] = useState<Record<string, QuotaStatus>>({});
@@ -141,7 +143,7 @@ export const Keys = () => {
       setIsKeyModalOpen(false);
     } catch (e) {
       console.error('Failed to save key', e);
-      toast.error('Failed to save key');
+      toast.error(t('keys.deleteKey.saveFailed'));
     } finally {
       setIsSavingKey(false);
     }
@@ -149,9 +151,9 @@ export const Keys = () => {
 
   const handleDeleteKey = async (keyName: string) => {
     const _ok = await toast.confirm({
-      title: 'Delete key?',
-      message: `Are you sure you want to delete key '${keyName}'? This cannot be undone.`,
-      confirmLabel: 'Delete',
+      title: t('keys.deleteKey.title'),
+      message: t('keys.deleteKey.message', { name: keyName }),
+      confirmLabel: t('keys.deleteKey.confirmLabel'),
       variant: 'danger',
     });
     if (!_ok) return;
@@ -161,7 +163,7 @@ export const Keys = () => {
       await loadData();
     } catch (e) {
       console.error('Failed to delete key', e);
-      toast.error('Failed to delete key');
+      toast.error(t('keys.deleteKey.deleteFailed'));
     }
   };
 
@@ -183,7 +185,7 @@ export const Keys = () => {
 
     // Validate based on type
     if (editingQuota.type === 'rolling' && !editingQuota.duration) {
-      toast.error('Rolling quotas require a duration');
+      toast.error(t('keys.deleteQuota.rollingNeedsDuration'));
       return;
     }
 
@@ -201,7 +203,7 @@ export const Keys = () => {
       setIsQuotaModalOpen(false);
     } catch (e: any) {
       console.error('Failed to save quota', e);
-      toast.error(e.message || 'Failed to save quota');
+      toast.error(e.message || t('keys.deleteQuota.saveFailed'));
     } finally {
       setIsSavingQuota(false);
     }
@@ -209,9 +211,9 @@ export const Keys = () => {
 
   const handleDeleteQuota = async (name: string) => {
     const _okq = await toast.confirm({
-      title: 'Delete quota?',
-      message: `Are you sure you want to delete quota '${name}'? This cannot be undone.`,
-      confirmLabel: 'Delete',
+      title: t('keys.deleteQuota.title'),
+      message: t('keys.deleteQuota.message', { name }),
+      confirmLabel: t('keys.deleteQuota.confirmLabel'),
       variant: 'danger',
     });
     if (!_okq) return;
@@ -221,15 +223,15 @@ export const Keys = () => {
       await loadData();
     } catch (e: any) {
       console.error('Failed to delete quota', e);
-      toast.error(e.message || 'Failed to delete quota');
+      toast.error(e.message || t('keys.deleteQuota.deleteFailed'));
     }
   };
 
   const handleClearQuota = async (keyName: string) => {
     const _okr = await toast.confirm({
-      title: 'Reset quota?',
-      message: `Reset quota usage for key '${keyName}'?`,
-      confirmLabel: 'Reset',
+      title: t('keys.resetQuotaConfirm.title'),
+      message: t('keys.resetQuotaConfirm.message', { name: keyName }),
+      confirmLabel: t('keys.resetQuotaConfirm.confirmLabel'),
     });
     if (!_okr) return;
 
@@ -238,7 +240,7 @@ export const Keys = () => {
       await loadData();
     } catch (e) {
       console.error('Failed to clear quota', e);
-      toast.error('Failed to clear quota');
+      toast.error(t('keys.resetQuotaConfirm.failed'));
     }
   };
 
@@ -296,16 +298,16 @@ export const Keys = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="Access Control"
-        subtitle="API keys issued for downstream consumers"
+        title={t('keys.title')}
+        subtitle={t('keys.subtitle')}
         actions={
           activeTab === 'keys' ? (
             <Button leftIcon={<Plus size={14} />} onClick={handleAddNewKey} size="sm">
-              Create key
+              {t('keys.createKey')}
             </Button>
           ) : (
             <Button leftIcon={<Plus size={14} />} onClick={handleAddNewQuota} size="sm">
-              Add quota
+              {t('keys.addQuota')}
             </Button>
           )
         }
@@ -314,8 +316,8 @@ export const Keys = () => {
           value={activeTab}
           onChange={(v) => setActiveTab(v as 'keys' | 'quotas')}
           items={[
-            { value: 'keys', label: `API Keys (${keys.length})` },
-            { value: 'quotas', label: `Quotas (${Object.keys(quotas).length})` },
+            { value: 'keys', label: t('keys.tabKeys', { count: keys.length }) },
+            { value: 'quotas', label: t('keys.tabQuotas', { count: Object.keys(quotas).length }) },
           ]}
         />
       </PageHeader>
@@ -332,7 +334,7 @@ export const Keys = () => {
               }`}
               onClick={() => setActiveTab('keys')}
             >
-              API Keys ({keys.length})
+              {t('keys.tabKeys', { count: keys.length })}
             </button>
             <button
               className={`px-4 py-2 font-body text-sm font-medium transition-colors ${
@@ -342,7 +344,7 @@ export const Keys = () => {
               }`}
               onClick={() => setActiveTab('quotas')}
             >
-              Quotas ({Object.keys(quotas).length})
+              {t('keys.tabQuotas', { count: Object.keys(quotas).length })}
             </button>
           </div>
         </div>
@@ -361,7 +363,11 @@ export const Keys = () => {
               }}
             />
             <Input
-              placeholder={activeTab === 'keys' ? 'Search keys...' : 'Search quotas...'}
+              placeholder={
+                activeTab === 'keys'
+                  ? t('keys.searchKeysPlaceholder')
+                  : t('keys.searchQuotasPlaceholder')
+              }
               style={{ paddingLeft: '36px' }}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -371,10 +377,12 @@ export const Keys = () => {
 
         {/* Keys Tab */}
         {activeTab === 'keys' && (
-          <Card title="Active Keys" className="mb-6">
+          <Card title={t('keys.keysSection.title')} className="mb-6">
             <div className="space-y-3 md:hidden">
               {filteredKeys.length === 0 ? (
-                <div className="py-10 text-center text-sm text-text-muted">No keys found</div>
+                <div className="py-10 text-center text-sm text-text-muted">
+                  {t('keys.keysSection.empty')}
+                </div>
               ) : (
                 filteredKeys.map((key) => {
                   const status = quotaStatuses[key.key];
@@ -405,7 +413,7 @@ export const Keys = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEditKey(key)}
-                            aria-label={`Edit ${key.key}`}
+                            aria-label={t('keys.keysSection.ariaEdit', { name: key.key })}
                           >
                             <Edit2 size={14} />
                           </Button>
@@ -414,7 +422,7 @@ export const Keys = () => {
                             size="icon"
                             onClick={() => handleDeleteKey(key.key)}
                             className="text-danger"
-                            aria-label={`Delete ${key.key}`}
+                            aria-label={t('keys.keysSection.ariaDelete', { name: key.key })}
                           >
                             <Trash2 size={14} />
                           </Button>
@@ -424,7 +432,7 @@ export const Keys = () => {
                       <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
                         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Secret
+                            {t('keys.keysSection.secret')}
                           </div>
                           <div className="mt-1 flex items-center gap-2">
                             <span className="min-w-0 truncate font-mono text-text">
@@ -433,7 +441,7 @@ export const Keys = () => {
                             <button
                               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-primary"
                               onClick={() => handleCopy(key.secret, key.key)}
-                              title="Copy secret"
+                              title={t('keys.keysSection.copySecret')}
                               type="button"
                             >
                               {copiedKey === key.key ? <Check size={14} /> : <Copy size={14} />}
@@ -442,7 +450,7 @@ export const Keys = () => {
                         </div>
                         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Quota
+                            {t('keys.keysSection.quota')}
                           </div>
                           <div className="mt-1 truncate font-medium text-text-secondary">
                             {key.quota || '-'}
@@ -454,7 +462,7 @@ export const Keys = () => {
                         {status ? (
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between gap-2 text-xs">
-                              <span className="text-text-muted">Usage</span>
+                              <span className="text-text-muted">{t('keys.keysSection.usage')}</span>
                               <span className="font-medium text-text">
                                 {quotas[key.quota || '']?.limitType === 'cost'
                                   ? `${formatCost(status.current_usage, 5)} / ${formatCost(status.limit || 0, 5)}`
@@ -477,7 +485,7 @@ export const Keys = () => {
                                 onClick={() => handleViewQuotaStatus(key.key)}
                                 leftIcon={<BarChart3 size={14} />}
                               >
-                                Details
+                                {t('keys.keysSection.details')}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -485,13 +493,15 @@ export const Keys = () => {
                                 onClick={() => handleClearQuota(key.key)}
                                 leftIcon={<RefreshCw size={14} />}
                               >
-                                Reset
+                                {t('keys.keysSection.reset')}
                               </Button>
                             </div>
                           </div>
                         ) : (
                           <div className="text-xs text-text-muted">
-                            {key.quota ? 'Loading quota status...' : 'No quota assigned'}
+                            {key.quota
+                              ? t('keys.keysSection.loadingQuotaStatus')
+                              : t('keys.keysSection.noQuotaAssigned')}
                           </div>
                         )}
                       </div>
@@ -509,22 +519,22 @@ export const Keys = () => {
                       className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                       style={{ paddingLeft: '24px' }}
                     >
-                      Key Name
+                      {t('keys.keysSection.table.keyName')}
                     </th>
                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Secret
+                      {t('keys.keysSection.table.secret')}
                     </th>
                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Quota
+                      {t('keys.keysSection.table.quota')}
                     </th>
                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Status
+                      {t('keys.keysSection.table.status')}
                     </th>
                     <th
                       className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                       style={{ paddingRight: '24px', textAlign: 'right' }}
                     >
-                      Actions
+                      {t('keys.keysSection.table.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -559,7 +569,7 @@ export const Keys = () => {
                             <button
                               className="bg-transparent border-0 text-text-muted p-1.5 rounded-sm cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-bg-hover hover:text-primary active:scale-95"
                               onClick={() => handleCopy(key.secret, key.key)}
-                              title="Copy Secret"
+                              title={t('keys.keysSection.copySecretTitle')}
                               style={copiedKey === key.key ? { color: 'var(--color-success)' } : {}}
                             >
                               {copiedKey === key.key ? <Check size={14} /> : <Copy size={14} />}
@@ -597,14 +607,14 @@ export const Keys = () => {
                               <button
                                 className="bg-transparent border-0 text-text-muted p-1 rounded-sm cursor-pointer hover:text-primary"
                                 onClick={() => handleViewQuotaStatus(key.key)}
-                                title="View details"
+                                title={t('keys.keysSection.viewDetails')}
                               >
                                 <BarChart3 size={14} />
                               </button>
                             </div>
                           ) : key.quota ? (
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-                              Loading...
+                              {t('keys.keysSection.loading')}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
@@ -625,7 +635,7 @@ export const Keys = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleClearQuota(key.key)}
-                                title="Reset quota"
+                                title={t('keys.keysSection.resetQuota')}
                               >
                                 <RefreshCw size={14} />
                               </Button>
@@ -646,7 +656,7 @@ export const Keys = () => {
                   {filteredKeys.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center text-text-muted p-12">
-                        No keys found
+                        {t('keys.keysSection.empty')}
                       </td>
                     </tr>
                   )}
@@ -658,11 +668,13 @@ export const Keys = () => {
 
         {/* Quotas Tab */}
         {activeTab === 'quotas' && (
-          <Card title="User Quotas" className="mb-6">
+          <Card title={t('keys.quotasSection.title')} className="mb-6">
             <div className="space-y-3 md:hidden">
               {filteredQuotas.length === 0 ? (
                 <div className="py-10 text-center text-sm text-text-muted">
-                  {Object.keys(quotas).length === 0 ? 'No quotas defined yet' : 'No quotas found'}
+                  {Object.keys(quotas).length === 0
+                    ? t('keys.quotasSection.emptyDefined')
+                    : t('keys.quotasSection.emptySearch')}
                 </div>
               ) : (
                 filteredQuotas.map(([name, quota]) => {
@@ -690,7 +702,7 @@ export const Keys = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEditQuota(name, quota)}
-                            aria-label={`Edit ${name}`}
+                            aria-label={t('keys.quotasSection.ariaEdit', { name })}
                           >
                             <Edit2 size={14} />
                           </Button>
@@ -699,7 +711,7 @@ export const Keys = () => {
                             size="icon"
                             onClick={() => handleDeleteQuota(name)}
                             className="text-danger"
-                            aria-label={`Delete ${name}`}
+                            aria-label={t('keys.quotasSection.ariaDelete', { name })}
                           >
                             <Trash2 size={14} />
                           </Button>
@@ -708,7 +720,7 @@ export const Keys = () => {
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Limit
+                            {t('keys.quotasSection.limit')}
                           </div>
                           <div className="truncate font-mono text-text">
                             {quota.limitType === 'cost'
@@ -718,10 +730,10 @@ export const Keys = () => {
                         </div>
                         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Keys
+                            {t('keys.quotasSection.keys')}
                           </div>
                           <div className="truncate font-medium text-text-secondary">
-                            {keysUsingQuota} key{keysUsingQuota !== 1 ? 's' : ''}
+                            {t('keys.quotasSection.keysCount', { count: keysUsingQuota })}
                           </div>
                         </div>
                       </div>
@@ -739,22 +751,22 @@ export const Keys = () => {
                       className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                       style={{ paddingLeft: '24px' }}
                     >
-                      Name
+                      {t('keys.quotasSection.table.name')}
                     </th>
                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Type
+                      {t('keys.quotasSection.table.type')}
                     </th>
                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Limit
+                      {t('keys.quotasSection.table.limit')}
                     </th>
                     <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Keys Using
+                      {t('keys.quotasSection.table.keysUsing')}
                     </th>
                     <th
                       className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                       style={{ paddingRight: '24px', textAlign: 'right' }}
                     >
-                      Actions
+                      {t('keys.quotasSection.table.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -793,7 +805,7 @@ export const Keys = () => {
                                 : 'bg-bg-subtle text-text-muted'
                             }`}
                           >
-                            {keysUsingQuota} key{keysUsingQuota !== 1 ? 's' : ''}
+                            {t('keys.quotasSection.keysCount', { count: keysUsingQuota })}
                           </span>
                         </td>
                         <td
@@ -825,8 +837,8 @@ export const Keys = () => {
                     <tr>
                       <td colSpan={5} className="text-center text-text-muted p-12">
                         {Object.keys(quotas).length === 0
-                          ? 'No quotas defined yet'
-                          : 'No quotas found'}
+                          ? t('keys.quotasSection.emptyDefined')
+                          : t('keys.quotasSection.emptySearch')}
                       </td>
                     </tr>
                   )}
@@ -840,19 +852,19 @@ export const Keys = () => {
         <Modal
           isOpen={isKeyModalOpen}
           onClose={() => setIsKeyModalOpen(false)}
-          title={originalKeyName ? 'Edit Key' : 'Add Key'}
+          title={originalKeyName ? t('keys.keyModal.titleEdit') : t('keys.keyModal.titleAdd')}
           size="md"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="ghost" onClick={() => setIsKeyModalOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleSaveKey}
                 isLoading={isSavingKey}
                 disabled={!editingKey.key || !editingKey.secret}
               >
-                Save Key
+                {t('keys.keyModal.save')}
               </Button>
             </div>
           }
@@ -860,56 +872,54 @@ export const Keys = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="flex flex-col gap-2">
               <Input
-                label="Key Name (ID)"
+                label={t('keys.keyModal.keyNameLabel')}
                 value={editingKey.key}
                 onChange={(e) => setEditingKey({ ...editingKey, key: e.target.value })}
-                placeholder="e.g. production-app-1"
+                placeholder={t('keys.keyModal.keyNamePlaceholder')}
                 disabled={!!originalKeyName}
               />
               <p className="text-xs text-text-muted">
                 {originalKeyName
-                  ? 'Key ID cannot be changed once created.'
-                  : 'A unique identifier for this key.'}
+                  ? t('keys.keyModal.keyNameHelpLocked')
+                  : t('keys.keyModal.keyNameHelpNew')}
               </p>
             </div>
 
             <div className="flex flex-col gap-2">
               <label className="font-body text-[13px] font-medium text-text-secondary">
-                Secret Key
+                {t('keys.keyModal.secretLabel')}
               </label>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <div className="min-w-0 flex-1">
                   <Input
                     value={editingKey.secret}
                     onChange={(e) => setEditingKey({ ...editingKey, secret: e.target.value })}
-                    placeholder="sk-..."
+                    placeholder={t('keys.keyModal.secretPlaceholder')}
                     type="password"
                   />
                 </div>
                 <Button
                   variant="secondary"
                   onClick={generateKey}
-                  title="Generate new key"
+                  title={t('keys.keyModal.generateTitle')}
                   className="w-full sm:w-auto"
                 >
                   <RefreshCw size={16} />
                 </Button>
               </div>
-              <p className="text-xs text-text-muted mt-1">
-                The secret used to authenticate. Click refresh to generate a secure random key.
-              </p>
+              <p className="text-xs text-text-muted mt-1">{t('keys.keyModal.secretHelp')}</p>
             </div>
 
             <Input
-              label="Comment"
+              label={t('keys.keyModal.commentLabel')}
               value={editingKey.comment || ''}
               onChange={(e) => setEditingKey({ ...editingKey, comment: e.target.value })}
-              placeholder="Optional description..."
+              placeholder={t('keys.keyModal.commentPlaceholder')}
             />
 
             <TagSelect
-              label="Excluded Model Aliases"
-              placeholder="Optional: select model aliases to exclude..."
+              label={t('keys.keyModal.excludedModelsLabel')}
+              placeholder={t('keys.keyModal.excludedModelsPlaceholder')}
               options={aliasIds}
               selected={editingKey.excludedModels || []}
               onChange={(excludedModels) =>
@@ -919,13 +929,11 @@ export const Keys = () => {
                 })
               }
             />
-            <p className="text-xs text-text-muted -mt-1">
-              Optional denylist. If set, this key cannot use these model aliases.
-            </p>
+            <p className="text-xs text-text-muted -mt-1">{t('keys.keyModal.excludedModelsHelp')}</p>
 
             <TagSelect
-              label="Allowed Model Aliases"
-              placeholder="Optional: select model aliases..."
+              label={t('keys.keyModal.allowedModelsLabel')}
+              placeholder={t('keys.keyModal.allowedModelsPlaceholder')}
               options={aliasIds}
               selected={editingKey.allowedModels || []}
               onChange={(allowedModels) =>
@@ -935,13 +943,11 @@ export const Keys = () => {
                 })
               }
             />
-            <p className="text-xs text-text-muted -mt-1">
-              Optional allowlist. If set, this key can only use these configured model aliases.
-            </p>
+            <p className="text-xs text-text-muted -mt-1">{t('keys.keyModal.allowedModelsHelp')}</p>
 
             <TagSelect
-              label="Excluded Providers"
-              placeholder="Optional: select providers to exclude..."
+              label={t('keys.keyModal.excludedProvidersLabel')}
+              placeholder={t('keys.keyModal.excludedProvidersPlaceholder')}
               options={providerIds}
               selected={editingKey.excludedProviders || []}
               onChange={(excludedProviders) =>
@@ -952,12 +958,12 @@ export const Keys = () => {
               }
             />
             <p className="text-xs text-text-muted -mt-1">
-              Optional denylist. If set, routing will not use these provider IDs.
+              {t('keys.keyModal.excludedProvidersHelp')}
             </p>
 
             <TagSelect
-              label="Allowed Providers"
-              placeholder="Optional: select providers..."
+              label={t('keys.keyModal.allowedProvidersLabel')}
+              placeholder={t('keys.keyModal.allowedProvidersPlaceholder')}
               options={providerIds}
               selected={editingKey.allowedProviders || []}
               onChange={(allowedProviders) =>
@@ -968,12 +974,12 @@ export const Keys = () => {
               }
             />
             <p className="text-xs text-text-muted -mt-1">
-              Optional allowlist. If set, routing is limited to these provider IDs.
+              {t('keys.keyModal.allowedProvidersHelp')}
             </p>
 
             <div className="flex flex-col gap-2">
               <label className="font-body text-[13px] font-medium text-text-secondary">
-                Quota Assignment
+                {t('keys.keyModal.quotaAssignmentLabel')}
               </label>
               <select
                 className="w-full px-3 py-2 bg-bg-subtle border border-border-glass rounded-md font-body text-sm text-text focus:border-primary focus:outline-none"
@@ -982,7 +988,7 @@ export const Keys = () => {
                   setEditingKey({ ...editingKey, quota: e.target.value || undefined })
                 }
               >
-                <option value="">&lt;None&gt;</option>
+                <option value="">{t('keys.keyModal.quotaNoneOption')}</option>
                 {Object.entries(quotas).map(([name, quota]) => (
                   <option key={name} value={name}>
                     {name} ({quota.type},{' '}
@@ -993,10 +999,7 @@ export const Keys = () => {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-text-muted">
-                Optional: assign a quota to this key. Allowlist/denylist checks run before and
-                during routing.
-              </p>
+              <p className="text-xs text-text-muted">{t('keys.keyModal.quotaAssignmentHelp')}</p>
             </div>
           </div>
         </Modal>
@@ -1005,19 +1008,19 @@ export const Keys = () => {
         <Modal
           isOpen={isQuotaModalOpen}
           onClose={() => setIsQuotaModalOpen(false)}
-          title={originalQuotaName ? 'Edit Quota' : 'Add Quota'}
+          title={originalQuotaName ? t('keys.quotaModal.titleEdit') : t('keys.quotaModal.titleAdd')}
           size="md"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="ghost" onClick={() => setIsQuotaModalOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleSaveQuota}
                 isLoading={isSavingQuota}
                 disabled={!editingQuota.name}
               >
-                Save Quota
+                {t('keys.quotaModal.save')}
               </Button>
             </div>
           }
@@ -1025,22 +1028,22 @@ export const Keys = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="flex flex-col gap-2">
               <Input
-                label="Quota Name"
+                label={t('keys.quotaModal.nameLabel')}
                 value={editingQuota.name}
                 onChange={(e) => setEditingQuota({ ...editingQuota, name: e.target.value })}
-                placeholder="e.g. daily-1000"
+                placeholder={t('keys.quotaModal.namePlaceholder')}
                 disabled={!!originalQuotaName}
               />
               <p className="text-xs text-text-muted">
                 {originalQuotaName
-                  ? 'Quota name cannot be changed once created.'
-                  : 'A unique identifier for this quota. Use lowercase letters, numbers, hyphens.'}
+                  ? t('keys.quotaModal.nameHelpLocked')
+                  : t('keys.quotaModal.nameHelpNew')}
               </p>
             </div>
 
             <div className="flex flex-col gap-2">
               <label className="font-body text-[13px] font-medium text-text-secondary">
-                Quota Type
+                {t('keys.quotaModal.typeLabel')}
               </label>
               <select
                 className="w-full px-3 py-2 bg-bg-subtle border border-border-glass rounded-md font-body text-sm text-text focus:border-primary focus:outline-none"
@@ -1049,37 +1052,31 @@ export const Keys = () => {
                   setEditingQuota({ ...editingQuota, type: e.target.value as UserQuota['type'] })
                 }
               >
-                <option value="rolling">Rolling Window</option>
-                <option value="daily">Daily (UTC)</option>
-                <option value="weekly">Weekly (UTC)</option>
-                <option value="monthly">Monthly (UTC)</option>
+                <option value="rolling">{t('keys.quotaModal.typeOptions.rolling')}</option>
+                <option value="daily">{t('keys.quotaModal.typeOptions.daily')}</option>
+                <option value="weekly">{t('keys.quotaModal.typeOptions.weekly')}</option>
+                <option value="monthly">{t('keys.quotaModal.typeOptions.monthly')}</option>
               </select>
               <p className="text-xs text-text-muted">
-                {editingQuota.type === 'rolling' && 'Limits usage over a sliding time window'}
-                {editingQuota.type === 'daily' && 'Resets at midnight UTC each day'}
-                {editingQuota.type === 'weekly' && 'Resets at midnight UTC on Monday'}
-                {editingQuota.type === 'monthly' &&
-                  'Resets at midnight UTC on the 1st of each month'}
+                {t(`keys.quotaModal.typeDescription.${editingQuota.type}`)}
               </p>
             </div>
 
             {editingQuota.type === 'rolling' && (
               <div className="flex flex-col gap-2">
                 <Input
-                  label="Duration"
+                  label={t('keys.quotaModal.durationLabel')}
                   value={editingQuota.duration || ''}
                   onChange={(e) => setEditingQuota({ ...editingQuota, duration: e.target.value })}
-                  placeholder="e.g. 1h, 30m, 1d"
+                  placeholder={t('keys.quotaModal.durationPlaceholder')}
                 />
-                <p className="text-xs text-text-muted">
-                  Duration of the rolling window (e.g., 1h, 30m, 2h30m, 1d)
-                </p>
+                <p className="text-xs text-text-muted">{t('keys.quotaModal.durationHelp')}</p>
               </div>
             )}
 
             <div className="flex flex-col gap-2">
               <label className="font-body text-[13px] font-medium text-text-secondary">
-                Limit Type
+                {t('keys.quotaModal.limitTypeLabel')}
               </label>
               <select
                 className="w-full px-3 py-2 bg-bg-subtle border border-border-glass rounded-md font-body text-sm text-text focus:border-primary focus:outline-none"
@@ -1091,25 +1088,26 @@ export const Keys = () => {
                   })
                 }
               >
-                <option value="requests">Requests</option>
-                <option value="tokens">Tokens</option>
-                <option value="cost">Cost ($)</option>
+                <option value="requests">{t('keys.quotaModal.limitTypeOptions.requests')}</option>
+                <option value="tokens">{t('keys.quotaModal.limitTypeOptions.tokens')}</option>
+                <option value="cost">{t('keys.quotaModal.limitTypeOptions.cost')}</option>
               </select>
             </div>
 
             <div className="flex flex-col gap-2">
               <Input
-                label="Limit"
+                label={t('keys.quotaModal.limitLabel')}
                 type="number"
                 value={editingQuota.limit}
                 onChange={(e) =>
                   setEditingQuota({ ...editingQuota, limit: parseInt(e.target.value) || 0 })
                 }
-                placeholder="1000"
+                placeholder={t('keys.quotaModal.limitPlaceholder')}
               />
               <p className="text-xs text-text-muted">
-                Maximum {editingQuota.limitType === 'cost' ? 'cost ($)' : editingQuota.limitType}{' '}
-                allowed
+                {t('keys.quotaModal.maxAllowed', {
+                  type: t(`keys.quotaModal.maxAllowedType.${editingQuota.limitType}`),
+                })}
               </p>
             </div>
           </div>
@@ -1119,12 +1117,12 @@ export const Keys = () => {
         <Modal
           isOpen={isQuotaDetailOpen}
           onClose={() => setIsQuotaDetailOpen(false)}
-          title={`Quota Status: ${selectedQuotaName}`}
+          title={t('keys.quotaDetailModal.title', { name: selectedQuotaName ?? '' })}
           size="sm"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="ghost" onClick={() => setIsQuotaDetailOpen(false)}>
-                Close
+                {t('common.close')}
               </Button>
               {selectedQuotaStatus && (
                 <Button
@@ -1134,7 +1132,7 @@ export const Keys = () => {
                   }}
                   variant="secondary"
                 >
-                  Reset Usage
+                  {t('keys.quotaDetailModal.resetUsage')}
                 </Button>
               )}
             </div>
@@ -1150,7 +1148,9 @@ export const Keys = () => {
                 )}
                 <div>
                   <p className="font-medium text-text">
-                    {selectedQuotaStatus.allowed ? 'Quota Active' : 'Quota Exhausted'}
+                    {selectedQuotaStatus.allowed
+                      ? t('keys.quotaDetailModal.active')
+                      : t('keys.quotaDetailModal.exhausted')}
                   </p>
                   <p className="text-sm text-text-secondary">{selectedQuotaStatus.quota_name}</p>
                 </div>
@@ -1159,7 +1159,7 @@ export const Keys = () => {
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-text-secondary">Usage</span>
+                    <span className="text-text-secondary">{t('keys.quotaDetailModal.usage')}</span>
                     <span className="font-medium text-text">
                       {quotas[selectedQuotaStatus.quota_name || '']?.limitType === 'cost'
                         ? `${formatCost(selectedQuotaStatus.current_usage, 5)} / ${formatCost(selectedQuotaStatus.limit || 0, 5)}`
@@ -1181,7 +1181,9 @@ export const Keys = () => {
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <div className="p-3 bg-bg-subtle rounded-md">
-                    <p className="text-xs text-text-secondary mb-1">Remaining</p>
+                    <p className="text-xs text-text-secondary mb-1">
+                      {t('keys.quotaDetailModal.remaining')}
+                    </p>
                     <p className="font-mono text-lg text-text">
                       {selectedQuotaStatus.remaining !== null
                         ? quotas[selectedQuotaStatus.quota_name || '']?.limitType === 'cost'
@@ -1191,7 +1193,9 @@ export const Keys = () => {
                     </p>
                   </div>
                   <div className="p-3 bg-bg-subtle rounded-md">
-                    <p className="text-xs text-text-secondary mb-1">Resets At</p>
+                    <p className="text-xs text-text-secondary mb-1">
+                      {t('keys.quotaDetailModal.resetsAt')}
+                    </p>
                     <p className="font-mono text-sm text-text">
                       {selectedQuotaStatus.resets_at
                         ? new Date(selectedQuotaStatus.resets_at).toLocaleString()

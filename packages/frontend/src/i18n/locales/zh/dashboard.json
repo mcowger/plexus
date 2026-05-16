@@ -1,0 +1,327 @@
+{
+  "title": "仪表盘",
+  "subtitle": "覆盖所有服务商的实时网关流量",
+  "ariaSections": "仪表盘分区",
+  "tabs": {
+    "overall": "总览",
+    "live": "实时指标",
+    "usage": "用量分析",
+    "performance": "性能"
+  },
+  "overall": {
+    "title": "总览",
+    "subtitle": "你的 API 密钥的访问权限、用量和配额汇总。",
+    "loading": "加载中…",
+    "dash": "—",
+    "cards": {
+      "key": "密钥",
+      "quota": "配额",
+      "allowedProviders": "允许的服务商",
+      "allowedModels": "允许的模型",
+      "totals": "汇总（{{range}}）",
+      "requestsByProvider": "按服务商统计请求数",
+      "tokensByProvider": "按服务商统计令牌",
+      "requestsByModelAlias": "按模型别名统计请求数",
+      "tokensByModelAlias": "按模型别名统计令牌"
+    },
+    "fields": {
+      "name": "名称",
+      "quota": "配额",
+      "comment": "备注",
+      "noneAssigned": "未分配"
+    },
+    "quota": {
+      "loadError": "无法加载配额状态。如果此密钥已分配配额,当前用量未在此处显示——请尝试刷新。",
+      "noneAssigned": "此密钥未分配配额——请求不受配额策略限制。",
+      "assignedLabel": "已分配:",
+      "notResolved": "配额定义尚未解析,当前状态不可用。",
+      "usageLabel": "用量",
+      "labelTemplate": "{{name}}({{type}})",
+      "remaining": "剩余:",
+      "resets": "{{value}}重置",
+      "exhausted": "配额已耗尽——在重置之前,新请求将被拒绝。",
+      "resetting": "正在重置",
+      "resetOnDate": "于 {{date}}",
+      "resetInDaysHours": "{{days}} 天 {{hours}} 小时后",
+      "resetInHoursMinutes": "{{hours}} 小时 {{minutes}} 分钟后",
+      "resetInMinutes": "{{minutes}} 分钟后"
+    },
+    "access": {
+      "anyProvider": "任意服务商(无限制)——此密钥可路由到网关已知的所有服务商。",
+      "anyModel": "任意模型(无限制)——此密钥可请求网关上配置的所有模型别名。"
+    },
+    "totals": {
+      "noUsage": "此时间范围内未记录任何用量。",
+      "requests": "请求数",
+      "totalTokens": "总令牌",
+      "input": "输入",
+      "output": "输出",
+      "cached": "缓存读取",
+      "cachedSub": "缓存读取量",
+      "cacheWrite": "缓存写入",
+      "cacheWriteSub": "新增缓存条目",
+      "costToday": "今日费用",
+      "costTodaySub": "归属于此密钥"
+    },
+    "breakdown": {
+      "noProviderRequests": "此时间范围内没有任何服务商的请求记录。",
+      "noProviderTokens": "此时间范围内没有任何服务商的令牌记录。",
+      "noModelRequests": "此时间范围内没有任何模型别名的请求记录。",
+      "noModelTokens": "此时间范围内没有任何模型别名的令牌记录。"
+    },
+    "range": {
+      "hour": "最近 1 小时",
+      "day": "最近 1 天",
+      "week": "最近 1 周",
+      "month": "最近 1 月"
+    }
+  },
+  "usage": {
+    "title": "用量分析",
+    "subtitle": "随时间变化的令牌用量和请求统计。",
+    "cards": {
+      "requestsOverTime": "请求数随时间变化",
+      "concurrencyByProvider": "按服务商统计并发",
+      "concurrencyByModel": "按模型统计并发",
+      "tokenUsage": "令牌用量",
+      "usageByModelRequests": "按模型别名统计用量(请求数)",
+      "usageByModelTokens": "按模型别名统计用量(token)",
+      "usageByProviderRequests": "按服务商统计用量(请求数)",
+      "usageByProviderTokens": "按服务商统计用量(token)",
+      "usageByKeyRequests": "按 API 密钥统计用量(请求数)",
+      "usageByKeyTokens": "按 API 密钥统计用量(token)",
+      "energyComparisons": "能耗对比"
+    },
+    "noConcurrencyData": "暂无并发数据",
+    "legend": {
+      "requests": "请求数",
+      "tokens": "令牌",
+      "totalTokens": "总令牌",
+      "input": "输入",
+      "output": "输出",
+      "cached": "缓存读取",
+      "cacheWrite": "缓存写入"
+    }
+  },
+  "performance": {
+    "title": "性能",
+    "subtitle": "针对指定模型,对比各服务商在吞吐量和首字延迟上的速度表现。",
+    "filtersSummary": "筛选与汇总",
+    "noModelsAvailable": "暂无可用模型",
+    "refresh": "刷新",
+    "clear": "清除",
+    "providers": "服务商",
+    "samples": "样本数",
+    "cards": {
+      "fastestProviders": "最快服务商(tok/s)",
+      "fastestFirstToken": "首字延迟最低(TTFT)",
+      "selectedModel": "已选模型"
+    },
+    "model": "模型",
+    "topThroughputProvider": "吞吐量最高的服务商",
+    "lowestTtftProvider": "TTFT 最低的服务商",
+    "noPerformanceData": "此模型暂无性能数据。",
+    "avgThroughput": "平均吞吐量",
+    "avgTtft": "平均 TTFT",
+    "tokPerSec": "tok/s",
+    "dash": "—",
+    "clearConfirm": {
+      "title": "清除性能数据?",
+      "message": "确定要清除“{{model}}”的所有性能数据吗?",
+      "confirmLabel": "清除"
+    }
+  },
+  "live": {
+    "title": "实时指标",
+    "header": {
+      "windowLast": "时间窗口:最近 {{minutes}} 分钟",
+      "connected": "实时轮询运行中",
+      "stale": "实时轮询延迟",
+      "reconnecting": "实时轮询重连中"
+    },
+    "toolbar": {
+      "refreshNow": "立即刷新",
+      "poll": "轮询 {{label}}",
+      "tabActive": "标签页活动",
+      "tabHidden": "标签页隐藏",
+      "dataRefreshHint": "{{state}} - 数据刷新将在重新聚焦后恢复。"
+    },
+    "labels": {
+      "failedRequest": "失败请求",
+      "unresolvedProvider": "未解析的服务商",
+      "failedBeforeModelSelection": "在选择模型前失败",
+      "unresolvedModel": "未解析的模型",
+      "unknown": "未知",
+      "allModels": "所有模型"
+    },
+    "cooldown": {
+      "clearThis": "清除此冷却",
+      "showDetails": "查看冷却详情",
+      "title": "冷却详情",
+      "errorLabel": "错误:",
+      "consecutiveFailures": "连续失败次数",
+      "expiresAt": "到期时间"
+    },
+    "entity": {
+      "successLabel": "成功率:",
+      "latency": "延迟:{{value}}",
+      "cost": "费用:{{value}}",
+      "tps": "TPS:{{value}}",
+      "requestsShort": "{{value}} 请求"
+    },
+    "confirm": {
+      "clearAllTitle": "清除所有服务商冷却?",
+      "clearAllMessage": "冷却状态在所有 API 密钥之间共享。清除冷却将影响使用这些服务商的每个密钥的流量。如果底层问题尚未解决,冷却会在下一次失败时重新建立。",
+      "clearAllConfirm": "全部清除",
+      "clearSingleTitle": "清除 {{provider}} 的冷却?",
+      "clearSingleTitleWithModel": "清除 {{provider}}:{{model}} 的冷却?",
+      "clearSingleMessage": "这将影响使用该服务商的每个 API 密钥的流量。如果问题尚未解决,冷却会在下一次失败时重新建立。",
+      "clearSingleConfirm": "清除"
+    },
+    "toast": {
+      "notPermitted": "你的 API 密钥不允许清除服务商 '{{provider}}' 的冷却。",
+      "failedClearAll": "清除冷却失败",
+      "failedClearSingle": "清除冷却失败"
+    },
+    "modal": {
+      "closeAria": "关闭弹窗",
+      "detailedUsage": "详细用量",
+      "velocityTitle": "请求速率(最近 5 分钟)",
+      "providerTitle": "服务商心跳(5 分钟)",
+      "modelTitle": "模型心跳(5 分钟)",
+      "timelineTitle": "实时时间线",
+      "modelStackTitle": "模型堆叠 + 运行指标",
+      "latestRequestsTitle": "最近请求",
+      "concurrencyTitle": "并发",
+      "statsTitle": "服务商与模型统计"
+    },
+    "analyze": {
+      "short": {
+        "analyze": "分析",
+        "logs": "日志"
+      },
+      "full": {
+        "velocity": "分析速率趋势",
+        "provider": "分析服务商表现",
+        "model": "分析模型用量",
+        "modelstack": "分析模型堆叠",
+        "timeline": "分析时间线",
+        "requests": "查看详细日志",
+        "concurrency": "分析并发",
+        "default": "详细分析"
+      }
+    },
+    "empty": {
+      "velocity": "暂无速率数据",
+      "noModelTraffic": "所选实时窗口内没有模型流量。",
+      "noProviderTraffic": "所选实时窗口内没有服务商流量。",
+      "noConcurrencyData": "暂无并发数据",
+      "collectingConcurrency": "正在采集并发数据...",
+      "loadingConcurrency": "正在加载并发数据...",
+      "noModelStack": "所选实时窗口内没有模型堆叠数据。",
+      "loading": "加载中...",
+      "noRequestsObserved": "尚未观察到请求。",
+      "noRequestsFilter": "没有符合当前筛选条件的请求。",
+      "noProviderActivity": "窗口内无服务商活动",
+      "noModelActivity": "窗口内无模型活动",
+      "noRequestsInMinutes": "最近 {{minutes}} 分钟内无请求",
+      "noModelStackInMinutes": "最近 {{minutes}} 分钟内无模型堆叠数据",
+      "noProviderActivityRecent": "最近 {{minutes}} 分钟内无服务商活动。"
+    },
+    "cards": {
+      "metrics": "指标",
+      "overview": "概览",
+      "overviewLiveStats": "概览与实时统计",
+      "liveWindow": "实时({{minutes}} 分钟)",
+      "totalRequests": "总请求数",
+      "totalTokens": "总令牌",
+      "requestsToday": "今日请求数",
+      "costToday": "今日费用",
+      "requests": "请求数",
+      "successRate": "成功率",
+      "tokensPerMin": "令牌 / 分钟",
+      "avgLatency": "平均延迟",
+      "alertsProviders": "告警与服务商",
+      "clearAll": "全部清除",
+      "velocity": "请求速率(最近 5 分钟)",
+      "velocitySubtitle": "分钟间的增减量",
+      "providerPulse": "服务商心跳(5 分钟)",
+      "modelPulse": "模型心跳(5 分钟)",
+      "top8Providers": "前 8 个服务商",
+      "top8Models": "前 8 个模型",
+      "timeline": "实时时间线",
+      "modelStack": "模型堆叠",
+      "latestRequests": "最近请求",
+      "latest20": "最近 20 条",
+      "all": "全部",
+      "successFilter": "成功",
+      "errorsFilter": "错误",
+      "concurrency": "并发",
+      "autoRefresh10": "自动刷新:10 秒",
+      "autoRefresh10Short": "10 秒",
+      "inFlightByProvider": "按服务商统计在途请求",
+      "currentInFlight": "当前在途",
+      "providerModelStats": "服务商与模型统计",
+      "providerModelCount": "{{providers}} 个服务商,{{models}} 个模型",
+      "topProviders": "热门服务商",
+      "topModels": "热门模型"
+    },
+    "tooltip": {
+      "velocity": "速率",
+      "requests": "请求数",
+      "tokens": "令牌",
+      "errors": "错误",
+      "avgTtft": "平均 TTFT",
+      "avgTps": "平均 TPS"
+    },
+    "request": {
+      "idLabel": "ID:{{id}}...",
+      "tokens": "令牌:{{value}}",
+      "cost": "费用:{{value}}",
+      "latency": "延迟:{{value}}",
+      "ttft": "TTFT:{{value}}",
+      "tps": "TPS:{{value}}",
+      "requestsCount": "{{value}} 请求",
+      "successPercent": "成功:{{value}}%"
+    }
+  },
+  "cards": {
+    "metricsOverview": {
+      "defaultTitle": "关键指标",
+      "trendFromLastWeek": "较上周 {{sign}}{{value}}%"
+    },
+    "recentActivity": {
+      "noData": "暂无活动数据",
+      "requests": "请求数",
+      "tokens": "令牌"
+    },
+    "serviceAlerts": {
+      "title": "服务告警",
+      "clearAll": "全部清除",
+      "allModels": "所有模型",
+      "statusMultipleAccounts": "{{model}} 有 {{count}} 个账号正在冷却,最长 {{time}}",
+      "statusSingleAccount": "{{model}} 有 1 个账号正在冷却,剩余 {{time}}",
+      "statusModelCooldown": "{{model}} 正在冷却,剩余 {{time}}"
+    },
+    "timeRangeSelector": {
+      "custom": "自定义",
+      "quickSelect": "快速选择",
+      "startDate": "起始日期",
+      "endDate": "结束日期",
+      "rangeError": "结束日期必须晚于起始日期且不能在未来",
+      "ranges": {
+        "live": "实时",
+        "hour": "最近 1 小时",
+        "day": "最近 1 天",
+        "week": "最近 1 周",
+        "month": "最近 1 月"
+      },
+      "presets": {
+        "today": "今天",
+        "thisWeek": "本周",
+        "thisMonth": "本月",
+        "lastMonth": "上月"
+      }
+    }
+  }
+}

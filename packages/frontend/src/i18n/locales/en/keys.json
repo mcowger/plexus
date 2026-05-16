@@ -1,0 +1,152 @@
+{
+  "title": "Access Control",
+  "subtitle": "API keys issued for downstream consumers",
+  "createKey": "Create key",
+  "addQuota": "Add quota",
+  "tabKeys": "API Keys ({{count}})",
+  "tabQuotas": "Quotas ({{count}})",
+  "searchKeysPlaceholder": "Search keys...",
+  "searchQuotasPlaceholder": "Search quotas...",
+  "keysSection": {
+    "title": "Active Keys",
+    "empty": "No keys found",
+    "secret": "Secret",
+    "quota": "Quota",
+    "usage": "Usage",
+    "loadingQuotaStatus": "Loading quota status...",
+    "noQuotaAssigned": "No quota assigned",
+    "loading": "Loading...",
+    "details": "Details",
+    "reset": "Reset",
+    "copySecret": "Copy secret",
+    "copySecretTitle": "Copy Secret",
+    "viewDetails": "View details",
+    "resetQuota": "Reset quota",
+    "ariaEdit": "Edit {{name}}",
+    "ariaDelete": "Delete {{name}}",
+    "table": {
+      "keyName": "Key Name",
+      "secret": "Secret",
+      "quota": "Quota",
+      "status": "Status",
+      "actions": "Actions"
+    }
+  },
+  "quotasSection": {
+    "title": "User Quotas",
+    "emptyDefined": "No quotas defined yet",
+    "emptySearch": "No quotas found",
+    "limit": "Limit",
+    "keys": "Keys",
+    "ariaEdit": "Edit {{name}}",
+    "ariaDelete": "Delete {{name}}",
+    "keysCount_one": "{{count}} key",
+    "keysCount_other": "{{count}} keys",
+    "table": {
+      "name": "Name",
+      "type": "Type",
+      "limit": "Limit",
+      "keysUsing": "Keys Using",
+      "actions": "Actions"
+    }
+  },
+  "deleteKey": {
+    "title": "Delete key?",
+    "message": "Are you sure you want to delete key '{{name}}'? This cannot be undone.",
+    "confirmLabel": "Delete",
+    "saveFailed": "Failed to save key",
+    "deleteFailed": "Failed to delete key"
+  },
+  "deleteQuota": {
+    "title": "Delete quota?",
+    "message": "Are you sure you want to delete quota '{{name}}'? This cannot be undone.",
+    "confirmLabel": "Delete",
+    "saveFailed": "Failed to save quota",
+    "deleteFailed": "Failed to delete quota",
+    "rollingNeedsDuration": "Rolling quotas require a duration"
+  },
+  "resetQuotaConfirm": {
+    "title": "Reset quota?",
+    "message": "Reset quota usage for key '{{name}}'?",
+    "confirmLabel": "Reset",
+    "failed": "Failed to clear quota"
+  },
+  "keyModal": {
+    "titleEdit": "Edit Key",
+    "titleAdd": "Add Key",
+    "save": "Save Key",
+    "keyNameLabel": "Key Name (ID)",
+    "keyNamePlaceholder": "e.g. production-app-1",
+    "keyNameHelpLocked": "Key ID cannot be changed once created.",
+    "keyNameHelpNew": "A unique identifier for this key.",
+    "secretLabel": "Secret Key",
+    "secretPlaceholder": "sk-...",
+    "generateTitle": "Generate new key",
+    "secretHelp": "The secret used to authenticate. Click refresh to generate a secure random key.",
+    "commentLabel": "Comment",
+    "commentPlaceholder": "Optional description...",
+    "excludedModelsLabel": "Excluded Model Aliases",
+    "excludedModelsPlaceholder": "Optional: select model aliases to exclude...",
+    "excludedModelsHelp": "Optional denylist. If set, this key cannot use these model aliases.",
+    "allowedModelsLabel": "Allowed Model Aliases",
+    "allowedModelsPlaceholder": "Optional: select model aliases...",
+    "allowedModelsHelp": "Optional allowlist. If set, this key can only use these configured model aliases.",
+    "excludedProvidersLabel": "Excluded Providers",
+    "excludedProvidersPlaceholder": "Optional: select providers to exclude...",
+    "excludedProvidersHelp": "Optional denylist. If set, routing will not use these provider IDs.",
+    "allowedProvidersLabel": "Allowed Providers",
+    "allowedProvidersPlaceholder": "Optional: select providers...",
+    "allowedProvidersHelp": "Optional allowlist. If set, routing is limited to these provider IDs.",
+    "quotaAssignmentLabel": "Quota Assignment",
+    "quotaNoneOption": "<None>",
+    "quotaAssignmentHelp": "Optional: assign a quota to this key. Allowlist/denylist checks run before and during routing."
+  },
+  "quotaModal": {
+    "titleEdit": "Edit Quota",
+    "titleAdd": "Add Quota",
+    "save": "Save Quota",
+    "nameLabel": "Quota Name",
+    "namePlaceholder": "e.g. daily-1000",
+    "nameHelpLocked": "Quota name cannot be changed once created.",
+    "nameHelpNew": "A unique identifier for this quota. Use lowercase letters, numbers, hyphens.",
+    "typeLabel": "Quota Type",
+    "typeOptions": {
+      "rolling": "Rolling Window",
+      "daily": "Daily (UTC)",
+      "weekly": "Weekly (UTC)",
+      "monthly": "Monthly (UTC)"
+    },
+    "typeDescription": {
+      "rolling": "Limits usage over a sliding time window",
+      "daily": "Resets at midnight UTC each day",
+      "weekly": "Resets at midnight UTC on Monday",
+      "monthly": "Resets at midnight UTC on the 1st of each month"
+    },
+    "durationLabel": "Duration",
+    "durationPlaceholder": "e.g. 1h, 30m, 1d",
+    "durationHelp": "Duration of the rolling window (e.g., 1h, 30m, 2h30m, 1d)",
+    "limitTypeLabel": "Limit Type",
+    "limitTypeOptions": {
+      "requests": "Requests",
+      "tokens": "Tokens",
+      "cost": "Cost ($)"
+    },
+    "limitLabel": "Limit",
+    "limitPlaceholder": "1000",
+    "maxAllowed": "Maximum {{type}} allowed",
+    "maxAllowedType": {
+      "requests": "requests",
+      "tokens": "tokens",
+      "cost": "cost ($)"
+    }
+  },
+  "quotaDetailModal": {
+    "title": "Quota Status: {{name}}",
+    "resetUsage": "Reset Usage",
+    "active": "Quota Active",
+    "exhausted": "Quota Exhausted",
+    "usage": "Usage",
+    "remaining": "Remaining",
+    "resetsAt": "Resets At"
+  }
+}

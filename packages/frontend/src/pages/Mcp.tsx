@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, McpServer, McpLogRecord } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -33,6 +34,7 @@ const EMPTY_SERVER: McpServer = {
 };
 
 export const McpPage: React.FC = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const [servers, setServers] = useState<Record<string, McpServer>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -173,17 +175,15 @@ export const McpPage: React.FC = () => {
   const handleSave = async () => {
     const nameToSave = editingServerName || serverNameInput;
     if (!nameToSave || !nameToSave.trim()) {
-      toast.error('Server Name is required');
+      toast.error(t('mcp.toast.serverNameRequired'));
       return;
     }
     if (!editingServerName && !isValidServerName(nameToSave)) {
-      toast.error(
-        'Invalid server name. Use lowercase letters, numbers, hyphens, and underscores (2-63 characters, must start with letter or number)'
-      );
+      toast.error(t('mcp.toast.invalidServerName'));
       return;
     }
     if (!editingServer.upstream_url || !editingServer.upstream_url.trim()) {
-      toast.error('Upstream URL is required');
+      toast.error(t('mcp.toast.upstreamUrlRequired'));
       return;
     }
 
@@ -204,7 +204,7 @@ export const McpPage: React.FC = () => {
       setIsModalOpen(false);
     } catch (e) {
       console.error('Save error', e);
-      toast.error(`Failed to save MCP server: ${e}`);
+      toast.error(t('mcp.toast.saveFailed', { error: String(e) }));
     } finally {
       setIsSaving(false);
     }
@@ -212,19 +212,19 @@ export const McpPage: React.FC = () => {
 
   const handleDelete = async (serverName: string) => {
     const ok = await toast.confirm({
-      title: 'Delete MCP server?',
-      message: `Are you sure you want to delete the MCP server "${serverName}"?`,
-      confirmLabel: 'Delete',
+      title: t('mcp.confirm.deleteTitle'),
+      message: t('mcp.confirm.deleteMessage', { name: serverName }),
+      confirmLabel: t('mcp.confirm.deleteLabel'),
       variant: 'danger',
     });
     if (!ok) return;
     try {
       await api.deleteMcpServer(serverName);
       await loadData();
-      toast.success(`Deleted ${serverName}`);
+      toast.success(t('mcp.toast.deleted', { name: serverName }));
     } catch (e) {
       console.error('Delete error', e);
-      toast.error(`Failed to delete MCP server: ${e}`);
+      toast.error(t('mcp.toast.deleteFailed', { error: String(e) }));
     }
   };
 
@@ -240,7 +240,7 @@ export const McpPage: React.FC = () => {
       await loadData();
     } catch (e) {
       console.error('Toggle error', e);
-      toast.error(`Failed to update MCP server: ${e}`);
+      toast.error(t('mcp.toast.updateFailed', { error: String(e) }));
     }
   };
 
@@ -284,8 +284,8 @@ export const McpPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen p-6 transition-all duration-300 bg-gradient-to-br from-bg-deep to-bg-surface">
-        <Card title="MCP Servers">
-          <div className="p-4 text-text-secondary">Loading...</div>
+        <Card title={t('mcp.serversCardTitle')}>
+          <div className="p-4 text-text-secondary">{t('mcp.loading')}</div>
         </Card>
       </div>
     );
@@ -294,22 +294,20 @@ export const McpPage: React.FC = () => {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="MCP servers"
-        subtitle="Model Context Protocol connections — exposes tools and resources to clients"
+        title={t('mcp.title')}
+        subtitle={t('mcp.subtitle')}
         actions={
           <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
-            Add server
+            {t('mcp.addServer')}
           </Button>
         }
       />
       <PageContainer>
         <div className="flex flex-col gap-5">
           {/* Servers Config Card */}
-          <Card title="MCP Servers">
+          <Card title={t('mcp.serversCardTitle')}>
             {serverNames.length === 0 ? (
-              <div className="p-4 text-text-secondary text-center">
-                No MCP servers configured. Click "Add MCP Server" to create one.
-              </div>
+              <div className="p-4 text-text-secondary text-center">{t('mcp.noServers')}</div>
             ) : (
               <>
                 <div className="space-y-3 md:hidden">
@@ -349,16 +347,18 @@ export const McpPage: React.FC = () => {
                               variant="ghost"
                               onClick={() => handleDelete(name)}
                               className="text-danger"
-                              aria-label={`Delete ${name}`}
+                              aria-label={t('mcp.deleteAria', { name })}
                             >
                               <Trash2 size={14} />
                             </Button>
                           </div>
                         </div>
                         <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-1.5 text-xs">
-                          <span className="text-text-muted">Headers: </span>
+                          <span className="text-text-muted">{t('mcp.headersLabel')}</span>
                           <span className="font-medium text-text-secondary">
-                            {headerCount > 0 ? `${headerCount} configured` : '-'}
+                            {headerCount > 0
+                              ? t('mcp.table.headersConfigured', { count: headerCount })
+                              : t('mcp.table.dash')}
                           </span>
                         </div>
                       </article>
@@ -374,22 +374,22 @@ export const McpPage: React.FC = () => {
                           className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                           style={{ paddingLeft: '24px' }}
                         >
-                          Name
+                          {t('mcp.table.name')}
                         </th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Upstream URL
+                          {t('mcp.table.upstreamUrl')}
                         </th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Status
+                          {t('mcp.table.status')}
                         </th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Headers
+                          {t('mcp.table.headers')}
                         </th>
                         <th
                           className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                           style={{ paddingRight: '24px', textAlign: 'right' }}
                         >
-                          Actions
+                          {t('mcp.table.actions')}
                         </th>
                       </tr>
                     </thead>
@@ -435,7 +435,9 @@ export const McpPage: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                              {headerCount > 0 ? `${headerCount} header(s)` : '-'}
+                              {headerCount > 0
+                                ? t('mcp.table.headersCount', { count: headerCount })
+                                : t('mcp.table.dash')}
                             </td>
                             <td
                               className="px-4 py-3 text-left border-b border-border-glass text-text"
@@ -471,7 +473,7 @@ export const McpPage: React.FC = () => {
           <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
             <div className="mb-2">
               <h2 className="font-heading text-lg font-semibold text-text m-0 mb-3">
-                MCP Usage Logs
+                {t('mcp.logs.cardTitle')}
               </h2>
               <form
                 onSubmit={handleLogSearch}
@@ -490,7 +492,7 @@ export const McpPage: React.FC = () => {
                       }}
                     />
                     <Input
-                      placeholder="Filter by Server..."
+                      placeholder={t('mcp.logs.filterByServer')}
                       value={logsFilters.serverName}
                       onChange={(e) =>
                         setLogsFilters({ ...logsFilters, serverName: e.target.value })
@@ -510,14 +512,14 @@ export const McpPage: React.FC = () => {
                       }}
                     />
                     <Input
-                      placeholder="Filter by Key..."
+                      placeholder={t('mcp.logs.filterByKey')}
                       value={logsFilters.apiKey}
                       onChange={(e) => setLogsFilters({ ...logsFilters, apiKey: e.target.value })}
                       style={{ paddingLeft: '32px' }}
                     />
                   </div>
                   <Button type="submit" variant="primary" className="w-full sm:w-auto">
-                    Search
+                    {t('mcp.logs.search')}
                   </Button>
                 </div>
                 <Button
@@ -528,17 +530,19 @@ export const McpPage: React.FC = () => {
                   type="button"
                 >
                   <Trash2 size={16} />
-                  Delete All
+                  {t('mcp.logs.deleteAll')}
                 </Button>
               </form>
             </div>
 
             <div className="space-y-3 lg:hidden">
               {logsLoading ? (
-                <div className="py-8 text-center text-sm text-text-secondary">Loading...</div>
+                <div className="py-8 text-center text-sm text-text-secondary">
+                  {t('mcp.logs.loading')}
+                </div>
               ) : logs.length === 0 ? (
                 <div className="py-8 text-center text-sm text-text-secondary">
-                  No MCP logs found
+                  {t('mcp.logs.empty')}
                 </div>
               ) : (
                 logs.map((log) => (
@@ -560,7 +564,7 @@ export const McpPage: React.FC = () => {
                         variant="ghost"
                         onClick={() => handleDeleteLog(log.request_id)}
                         className="text-danger"
-                        aria-label="Delete MCP log"
+                        aria-label={t('mcp.logs.deleteAria')}
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -569,7 +573,7 @@ export const McpPage: React.FC = () => {
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                       <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                         <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Server
+                          {t('mcp.logs.labels.server')}
                         </div>
                         <div className="truncate font-medium text-text-secondary">
                           {log.server_name}
@@ -577,15 +581,16 @@ export const McpPage: React.FC = () => {
                       </div>
                       <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                         <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Method
+                          {t('mcp.logs.labels.method')}
                         </div>
                         <div className="truncate font-medium text-text-secondary">
-                          {log.method} {log.is_streamed ? 'streamed' : 'buffered'}
+                          {log.method}{' '}
+                          {log.is_streamed ? t('mcp.logs.streamed') : t('mcp.logs.buffered')}
                         </div>
                       </div>
                       <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                         <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          RPC
+                          {t('mcp.logs.labels.rpc')}
                         </div>
                         <div className="truncate font-mono text-text">
                           {log.jsonrpc_method || '-'}
@@ -593,7 +598,7 @@ export const McpPage: React.FC = () => {
                       </div>
                       <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                         <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Duration
+                          {t('mcp.logs.labels.duration')}
                         </div>
                         <div className="truncate font-medium text-text">
                           {log.duration_ms != null ? formatMs(log.duration_ms) : '-'}
@@ -603,7 +608,7 @@ export const McpPage: React.FC = () => {
 
                     <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs">
                       <span className={clsx('font-semibold', statusColor(log.response_status))}>
-                        Status {log.response_status ?? '?'}
+                        {t('mcp.logs.statusLabel', { status: log.response_status ?? '?' })}
                       </span>
                       {log.error_message && (
                         <span className="min-w-0 truncate text-danger" title={log.error_message}>
@@ -621,25 +626,25 @@ export const McpPage: React.FC = () => {
                 <thead>
                   <tr className="text-center border-b border-border">
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Date
+                      {t('mcp.logs.labels.date')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Key
+                      {t('mcp.logs.labels.key')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Server
+                      {t('mcp.logs.labels.server')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Method
+                      {t('mcp.logs.labels.method')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      RPC Method
+                      {t('mcp.logs.labels.rpcMethod')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Duration
+                      {t('mcp.logs.labels.duration')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Status
+                      {t('mcp.logs.labels.status')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                       <div className="flex justify-center">
@@ -652,13 +657,13 @@ export const McpPage: React.FC = () => {
                   {logsLoading ? (
                     <tr>
                       <td colSpan={8} className="p-5 text-center">
-                        Loading...
+                        {t('mcp.logs.loading')}
                       </td>
                     </tr>
                   ) : logs.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-5 text-center text-text-secondary">
-                        No MCP logs found
+                        {t('mcp.logs.empty')}
                       </td>
                     </tr>
                   ) : (
@@ -732,7 +737,7 @@ export const McpPage: React.FC = () => {
                                 <ZapOff size={11} className="text-gray-400" />
                               )}
                               <span className="text-text-secondary" style={{ fontSize: '0.8em' }}>
-                                {log.is_streamed ? 'streamed' : 'buffered'}
+                                {log.is_streamed ? t('mcp.logs.streamed') : t('mcp.logs.buffered')}
                               </span>
                             </div>
                           </div>
@@ -818,7 +823,7 @@ export const McpPage: React.FC = () => {
                           <button
                             onClick={() => handleDeleteLog(log.request_id)}
                             className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-                            title="Delete log"
+                            title={t('mcp.logs.deleteTitle')}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -832,7 +837,10 @@ export const McpPage: React.FC = () => {
 
             <div className="flex flex-col items-stretch gap-3 mt-3 sm:flex-row sm:items-center sm:justify-end">
               <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                Page {logsCurrentPage} of {Math.max(1, logsTotalPages)}
+                {t('mcp.logs.page', {
+                  current: logsCurrentPage,
+                  total: Math.max(1, logsTotalPages),
+                })}
               </span>
               <div className="flex gap-1">
                 <Button
@@ -857,14 +865,18 @@ export const McpPage: React.FC = () => {
           <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title={editingServerName ? `Edit ${editingServerName}` : 'Add MCP Server'}
+            title={
+              editingServerName
+                ? t('mcp.modal.editTitle', { name: editingServerName })
+                : t('mcp.modal.addTitle')
+            }
             footer={
               <>
                 <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {isSaving ? t('mcp.modal.saving') : t('common.save')}
                 </Button>
               </>
             }
@@ -872,39 +884,39 @@ export const McpPage: React.FC = () => {
             <div className="space-y-4">
               {!editingServerName && (
                 <Input
-                  label="Server Name"
+                  label={t('mcp.modal.fields.serverName')}
                   value={serverNameInput}
                   onChange={(e) =>
                     setServerNameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))
                   }
-                  placeholder="my-mcp-server"
+                  placeholder={t('mcp.modal.fields.serverNamePlaceholder')}
                 />
               )}
 
               <Input
-                label="Upstream URL"
+                label={t('mcp.modal.fields.upstreamUrl')}
                 value={editingServer.upstream_url}
                 onChange={(e) =>
                   setEditingServer({ ...editingServer, upstream_url: e.target.value })
                 }
-                placeholder="https://mcp.example.com/mcp"
+                placeholder={t('mcp.modal.fields.upstreamUrlPlaceholder')}
               />
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                   <Input
-                    label="Header Key"
+                    label={t('mcp.modal.fields.headerKey')}
                     value={headerKey}
                     onChange={(e) => setHeaderKey(e.target.value)}
-                    placeholder="Authorization"
+                    placeholder={t('mcp.modal.fields.headerKeyPlaceholder')}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
                   <Input
-                    label="Header Value"
+                    label={t('mcp.modal.fields.headerValue')}
                     value={headerValue}
                     onChange={(e) => setHeaderValue(e.target.value)}
-                    placeholder="Bearer token..."
+                    placeholder={t('mcp.modal.fields.headerValuePlaceholder')}
                   />
                 </div>
                 <Button
@@ -920,7 +932,7 @@ export const McpPage: React.FC = () => {
               {editingServer.headers && Object.keys(editingServer.headers).length > 0 && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-text-secondary">
-                    Configured Headers
+                    {t('mcp.modal.fields.configuredHeaders')}
                   </label>
                   {Object.entries(editingServer.headers).map(([key, value]) => (
                     <div
@@ -948,20 +960,22 @@ export const McpPage: React.FC = () => {
           <Modal
             isOpen={isDeleteLogsModalOpen}
             onClose={() => setIsDeleteLogsModalOpen(false)}
-            title="Confirm Deletion"
+            title={t('mcp.deleteLogsModal.title')}
             footer={
               <>
                 <Button variant="secondary" onClick={() => setIsDeleteLogsModalOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button variant="danger" onClick={confirmDeleteAllLogs} disabled={isDeletingLogs}>
-                  {isDeletingLogs ? 'Deleting...' : 'Delete Logs'}
+                  {isDeletingLogs
+                    ? t('mcp.deleteLogsModal.deleting')
+                    : t('mcp.deleteLogsModal.deleteLogs')}
                 </Button>
               </>
             }
           >
             <div className="flex flex-col gap-4">
-              <p>Select which MCP logs you would like to delete:</p>
+              <p>{t('mcp.deleteLogsModal.intro')}</p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -971,7 +985,7 @@ export const McpPage: React.FC = () => {
                   checked={deleteLogsMode === 'older'}
                   onChange={() => setDeleteLogsMode('older')}
                 />
-                <label htmlFor="mcp-delete-older">Delete logs older than</label>
+                <label htmlFor="mcp-delete-older">{t('mcp.deleteLogsModal.deleteOlder')}</label>
                 <Input
                   type="number"
                   min="1"
@@ -980,7 +994,7 @@ export const McpPage: React.FC = () => {
                   style={{ width: '60px', padding: '4px 8px' }}
                   disabled={deleteLogsMode !== 'older'}
                 />
-                <span>days</span>
+                <span>{t('mcp.deleteLogsModal.days')}</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -992,7 +1006,7 @@ export const McpPage: React.FC = () => {
                   onChange={() => setDeleteLogsMode('all')}
                 />
                 <label htmlFor="mcp-delete-all" style={{ color: 'var(--color-danger)' }}>
-                  Delete ALL logs (Cannot be undone)
+                  {t('mcp.deleteLogsModal.deleteAll')}
                 </label>
               </div>
             </div>
@@ -1002,19 +1016,21 @@ export const McpPage: React.FC = () => {
           <Modal
             isOpen={isSingleDeleteModalOpen}
             onClose={() => setIsSingleDeleteModalOpen(false)}
-            title="Confirm Deletion"
+            title={t('mcp.singleDeleteModal.title')}
             footer={
               <>
                 <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button variant="danger" onClick={confirmDeleteSingleLog} disabled={isDeletingLogs}>
-                  {isDeletingLogs ? 'Deleting...' : 'Delete Log'}
+                  {isDeletingLogs
+                    ? t('mcp.singleDeleteModal.deleting')
+                    : t('mcp.singleDeleteModal.deleteLog')}
                 </Button>
               </>
             }
           >
-            <p>Are you sure you want to delete this MCP log entry?</p>
+            <p>{t('mcp.singleDeleteModal.message')}</p>
           </Modal>
         </div>
       </PageContainer>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '../ui/Input';
+import { useT } from '../../i18n';
 
 export interface KiloQuotaConfigProps {
   options: Record<string, unknown>;
@@ -7,6 +8,8 @@ export interface KiloQuotaConfigProps {
 }
 
 export const KiloQuotaConfig: React.FC<KiloQuotaConfigProps> = ({ options, onChange }) => {
+  const { t } = useT('quotas');
+
   const handleChange = (key: string, value: string) => {
     onChange({ ...options, [key]: value });
   };
@@ -15,7 +18,7 @@ export const KiloQuotaConfig: React.FC<KiloQuotaConfigProps> = ({ options, onCha
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Endpoint (optional)
+          {t('checkerCommon.endpointOptional')}
         </label>
         <Input
           value={(options.endpoint as string) ?? ''}
@@ -26,16 +29,14 @@ export const KiloQuotaConfig: React.FC<KiloQuotaConfigProps> = ({ options, onCha
 
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Organization ID (optional)
+          {t('checkerCommon.organizationIdOptional')}
         </label>
         <Input
           value={(options.organizationId as string) ?? ''}
           onChange={(e) => handleChange('organizationId', e.target.value)}
-          placeholder="org_..."
+          placeholder={t('checkerConfigs.kilo.orgIdPlaceholder')}
         />
-        <span className="text-[10px] text-text-muted">
-          If provided, sends `x-kilocode-organizationid` for team balance.
-        </span>
+        <span className="text-[10px] text-text-muted">{t('checkerConfigs.kilo.orgIdHint')}</span>
       </div>
     </div>
   );

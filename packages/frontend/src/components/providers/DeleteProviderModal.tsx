@@ -1,6 +1,7 @@
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import type { Provider } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 interface Props {
   provider: Provider | null;
@@ -17,19 +18,22 @@ export function DeleteProviderModal({
   onClose,
   onDelete,
 }: Props) {
+  const { t } = useT('providers.delete');
+  const { t: tc } = useT('common');
+
   if (!provider) return null;
+
+  const nameOrId = provider.name || provider.id || '';
 
   return (
     <Modal
       isOpen={!!provider}
       onClose={onClose}
-      title={`Delete Provider: ${provider.name || provider.id || ''}`}
+      title={t('title', { name: nameOrId })}
       size="lg"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-          Choose how to delete this provider. The action cannot be undone.
-        </div>
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>{t('intro')}</div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div
             style={{
@@ -42,15 +46,15 @@ export function DeleteProviderModal({
             }}
           >
             <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-danger)' }}>
-              Delete Provider (Cascade)
+              {t('cascadeTitle')}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-              Removes this provider AND deletes all model alias targets that reference it.
+              {t('cascadeBody')}
             </div>
             {affectedAliases.length > 0 ? (
               <div style={{ fontSize: '13px' }}>
                 <div style={{ fontWeight: 500, marginBottom: '4px' }}>
-                  This will affect {affectedAliases.length} model alias(es):
+                  {t('affected', { count: affectedAliases.length })}
                 </div>
                 <ul
                   style={{
@@ -62,7 +66,7 @@ export function DeleteProviderModal({
                 >
                   {affectedAliases.map((a) => (
                     <li key={a.aliasId}>
-                      {a.aliasId} ({a.targetsCount} target(s))
+                      {t('targetCount', { aliasId: a.aliasId, count: a.targetsCount })}
                     </li>
                   ))}
                 </ul>
@@ -75,7 +79,7 @@ export function DeleteProviderModal({
                   fontStyle: 'italic',
                 }}
               >
-                No model aliases reference this provider.
+                {t('noAliases')}
               </div>
             )}
             <Button
@@ -83,7 +87,7 @@ export function DeleteProviderModal({
               isLoading={deleteModalLoading}
               style={{ backgroundColor: 'var(--color-danger)', marginTop: 'auto' }}
             >
-              Delete (Cascade)
+              {t('cascadeButton')}
             </Button>
           </div>
           <div
@@ -97,15 +101,14 @@ export function DeleteProviderModal({
             }}
           >
             <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--color-text)' }}>
-              Delete (Retain Targets)
+              {t('retainTitle')}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-              Removes only the provider. Model alias targets that reference this provider will
-              remain but may cause errors.
+              {t('retainBody')}
             </div>
             {affectedAliases.length > 0 && (
               <div style={{ fontSize: '12px', color: 'var(--color-warning)', fontStyle: 'italic' }}>
-                {affectedAliases.length} model alias(es) will have orphaned targets.
+                {t('orphaned', { count: affectedAliases.length })}
               </div>
             )}
             <Button
@@ -114,13 +117,13 @@ export function DeleteProviderModal({
               isLoading={deleteModalLoading}
               style={{ marginTop: 'auto' }}
             >
-              Delete (Retain)
+              {t('retainButton')}
             </Button>
           </div>
         </div>
         <div className="flex justify-end">
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </Button>
         </div>
       </div>

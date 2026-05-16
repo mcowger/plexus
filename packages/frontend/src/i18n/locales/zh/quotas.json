@@ -1,0 +1,155 @@
+{
+  "title": "配额",
+  "subtitle": "服务商余额与速率配额可用额度",
+  "refreshAll": "全部刷新",
+  "rateLimits": "速率限制",
+  "loading": "正在加载配额...",
+  "empty": {
+    "title": "未配置配额检查器",
+    "description": "请在服务商设置中配置配额检查器以监控使用情况。"
+  },
+  "card": {
+    "refreshAria": "刷新",
+    "pendingFirstCheck": "等待首次检查...",
+    "checkFailed": "检查失败",
+    "noDataYet": "暂无数据"
+  },
+  "legacy": {
+    "detectedPrefix": "检测到旧版配额数据（共 {{count}} 行，位于 ",
+    "detectedSuffix": "）",
+    "description": "请将这些历史数据迁移到新的计量快照表以便保留。",
+    "migrateNow": "立即迁移"
+  },
+  "migration": {
+    "completeNoSkipped": "迁移完成 — 已插入 {{inserted}} 行。",
+    "completeWithSkipped": "迁移完成 — 已插入 {{inserted}} 行，{{skipped}} 行已存在。",
+    "canTruncatePrefix": "现在可以清空旧的 ",
+    "canTruncateSuffix": " 表以释放空间。",
+    "truncated": "已清空 quota_snapshots",
+    "truncate": "清空 quota_snapshots"
+  },
+  "truncateConfirm": "清空 quota_snapshots？此操作无法撤销。",
+  "checkerCommon": {
+    "endpointOptional": "接口地址（可选）",
+    "managementApiKey": "管理 API 密钥",
+    "sessionCookie": "会话 Cookie",
+    "organizationIdOptional": "组织 ID（可选）",
+    "userAgentOptional": "User-Agent（可选）",
+    "userAgentHeaderOptional": "User-Agent（可选）",
+    "googApiClientOptional": "Goog API Client（可选）",
+    "clientMetadataOptional": "客户端元数据（可选）",
+    "editorVersionOptional": "编辑器版本（可选）",
+    "apiVersionOptional": "API 版本（可选）",
+    "timeoutMsOptional": "超时（毫秒，可选）",
+    "maxUtilizationPercentOptional": "最大利用率百分比（可选）",
+    "quotaSource": "配额来源",
+    "groupId": "组 ID",
+    "hertzSessionCookie": "HERTZ-SESSION Cookie",
+    "leaveBlankDefaultEndpoint": "留空则使用默认接口地址。",
+    "usesProviderApiKeyAuto": "自动使用服务商的 API 密钥，无需额外配置。",
+    "modeSubscription": "订阅（仅配额）",
+    "modePayg": "按量付费（仅余额）"
+  },
+  "checkerConfigs": {
+    "naga": {
+      "provisioningApiKey": "开通（Provisioning）API 密钥",
+      "provisioningKeyPlaceholder": "填写 Naga 开通密钥",
+      "provisioningKeyHintBefore": "必填。请从",
+      "provisioningKeyLink": "Naga 控制台",
+      "provisioningKeyHintAfter": "获取开通密钥。",
+      "endpointHint": "自定义接口 URL，留空则使用 Naga 默认 API。"
+    },
+    "openrouter": {
+      "managementKeyPlaceholder": "填写 OpenRouter 管理密钥",
+      "managementKeyHintBefore": "必填。请从",
+      "managementKeyLink": "OpenRouter 控制台",
+      "managementKeyHintAfter": "获取管理密钥。"
+    },
+    "ollama": {
+      "sessionCookiePlaceholder": "粘贴 Ollama 的 __Secure-session Cookie",
+      "sessionCookieHint": "必填。登录 ollama.com 后从浏览器 Cookie 中获取，名称为 __Secure-session（双下划线）。"
+    },
+    "zenmux": {
+      "managementKeyPlaceholder": "填写 Zenmux 管理 API 密钥",
+      "managementKeyHintBefore": "必填。请从",
+      "managementKeyLink": "Zenmux 控制台",
+      "managementKeyHintAfter": "获取管理 API 密钥。",
+      "endpointHint": "自定义接口 URL，留空则使用 Zenmux 默认 API。"
+    },
+    "zai": {
+      "endpointHint": "自定义接口 URL，留空则使用 Z.AI 默认配额接口。"
+    },
+    "wisdomgate": {
+      "sessionPlaceholder": "粘贴 Wisdom Gate 会话 Cookie",
+      "sessionHint": "必填。登录 wisgate.ai 后从浏览器 Cookie 中获取。"
+    },
+    "wafer": {
+      "endpointHint": "自定义接口 URL，留空则使用 Wafer.ai 默认 API。"
+    },
+    "synthetic": {
+      "endpointHint": "自定义接口 URL，留空则使用 Synthetic 默认 API。",
+      "maxUtilizationHint": "触发冷却的利用率阈值（1–100）。默认 99。调低可为配额留余量——例如 30 表示使用率达 30% 即冷却，保留约 70%。"
+    },
+    "opencode-go": {
+      "workspaceId": "工作区 ID",
+      "workspacePlaceholder": "OpenCode Go 工作区 ID",
+      "workspaceHintPart1": "必填。在",
+      "workspaceHintLink": "OpenCode 控制台",
+      "workspaceHintPart2": "的 URL 中查看（例如 opencode.ai/workspace/",
+      "workspaceHintMono": "your-id",
+      "workspaceHintPart3": "/go）。",
+      "authCookie": "认证 Cookie",
+      "authCookiePlaceholder": "OpenCode 认证 Cookie 的值",
+      "authCookieHintBefore": "必填。在浏览器开发者工具 (F12) → 应用程序/存储 → Cookie → opencode.ai 中复制",
+      "authCookieMono": "auth",
+      "authCookieHintAfter": " Cookie 的值，请妥善保管。",
+      "endpointHint": "自定义控制台 URL，留空则使用标准 OpenCode Go 控制台地址。"
+    },
+    "novita": {
+      "endpointHint": "自定义接口 URL，留空则使用 Novita 默认 API。"
+    },
+    "neuralwatt": {
+      "formAriaLabel": "Neuralwatt 配额检查选项"
+    },
+    "poe": {
+      "formAriaLabel": "Poe 配额检查选项"
+    },
+    "nanogpt": {
+      "endpointHint": "自定义接口 URL，留空则使用 NanoGPT 默认 API。"
+    },
+    "moonshot": {
+      "endpointHint": "自定义接口 URL，留空则使用 Moonshot 默认 API。"
+    },
+    "minimax": {
+      "groupIdPlaceholder": "填写 MiniMax GroupId",
+      "hertzSessionPlaceholder": "粘贴 HERTZ-SESSION Cookie 的值",
+      "hertzSessionHint": "视为密码保管，用于查询 MiniMax 余额。"
+    },
+    "minimax-coding": {
+      "endpointHint": "自定义接口 URL，留空则使用 MiniMax 编程套餐默认 API。"
+    },
+    "kimi-code": {
+      "endpointHint": "自定义接口 URL，留空则使用 Kimi 默认 API。"
+    },
+    "kilo": {
+      "orgIdPlaceholder": "org_...",
+      "orgIdHint": "若填写，将发送 `x-kilocode-organizationid` 以查询团队余额。"
+    },
+    "gemini-cli": {
+      "formAriaLabel": "Gemini CLI 配额检查选项"
+    },
+    "antigravity": {
+      "endpointHint": "覆盖 Cloud Code 接口地址。留空则使用默认值并自动回退沙箱。"
+    },
+    "apertis": {
+      "modeHint": "订阅模式监控套餐配额，用尽时触发冷却；按量付费模式仅跟踪预付费余额，忽略订阅配额。"
+    },
+    "devpass": {
+      "sessionPlaceholder": "粘贴 DevPass 会话 Cookie",
+      "sessionHint": "必填。Cookie 名称为 <1>__Secure-better-auth.session_token</1>。"
+    },
+    "copilot": {
+      "formAriaLabel": "GitHub Copilot 配额检查选项"
+    }
+  }
+}

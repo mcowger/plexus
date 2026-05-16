@@ -2,6 +2,7 @@ import { Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import type { Provider, OAuthSession } from '../../lib/api';
+import { useT } from '../../i18n/useT';
 
 interface Props {
   editingProvider: Provider;
@@ -44,6 +45,8 @@ export function ProviderOAuthEditor({
   onSubmitManualCode,
   onCancel,
 }: Props) {
+  const { t } = useT('providers.oauth');
+  const { t: tc } = useT('common');
   return (
     <div
       className="border border-border-glass rounded-md p-3 bg-bg-subtle"
@@ -59,10 +62,8 @@ export function ProviderOAuthEditor({
         }}
       >
         <div>
-          <div className="font-body text-[13px] font-medium text-text">OAuth Authentication</div>
-          <div className="text-[11px] text-text-secondary">
-            Tokens are saved to auth.json after login.
-          </div>
+          <div className="font-body text-[13px] font-medium text-text">{t('title')}</div>
+          <div className="text-[11px] text-text-secondary">{t('tokensHint')}</div>
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -96,7 +97,7 @@ export function ProviderOAuthEditor({
 
       {oauthSession?.authInfo && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-          <Input label="Authorization URL" value={oauthSession.authInfo.url} readOnly />
+          <Input label={t('authUrl')} value={oauthSession.authInfo.url} readOnly />
           {oauthSession.authInfo.instructions && (
             <div className="text-[11px] text-text-secondary flex items-center gap-1">
               <Info size={12} />
@@ -121,7 +122,7 @@ export function ProviderOAuthEditor({
             onClick={onSubmitPrompt}
             disabled={oauthBusy || (!oauthSession.prompt.allowEmpty && !oauthPromptValue)}
           >
-            Submit
+            {t('submit')}
           </Button>
         </div>
       )}
@@ -130,21 +131,21 @@ export function ProviderOAuthEditor({
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px' }}>
           <div style={{ flex: 1 }}>
             <Input
-              label="Paste redirect URL or code"
+              label={t('pasteRedirect')}
               value={oauthManualCode}
               onChange={(e) => setOauthManualCode(e.target.value)}
-              placeholder="https://..."
+              placeholder={t('redirectPlaceholder')}
             />
           </div>
           <Button size="sm" onClick={onSubmitManualCode} disabled={oauthBusy || !oauthManualCode}>
-            Submit
+            {t('submit')}
           </Button>
         </div>
       )}
 
       {oauthSession?.progress && oauthSession.progress.length > 0 && (
         <div style={{ marginBottom: '8px' }}>
-          <div className="text-[11px] text-text-secondary">Progress</div>
+          <div className="text-[11px] text-text-secondary">{t('progress')}</div>
           <div className="text-[11px] text-text" style={{ marginTop: '4px' }}>
             {(oauthSession.progress ?? []).slice(-3).map((message, idx) => (
               <div key={`${message}-${idx}`}>{message}</div>
@@ -155,7 +156,7 @@ export function ProviderOAuthEditor({
 
       {oauthStatus === 'success' && (
         <div className="text-[11px] text-success" style={{ marginBottom: '8px' }}>
-          Authentication complete. Tokens saved to auth.json.
+          {t('complete')}
         </div>
       )}
 
@@ -168,14 +169,14 @@ export function ProviderOAuthEditor({
           disabled={oauthBusy || (!!oauthSessionId && !oauthIsTerminal)}
         >
           {oauthSessionId && !oauthIsTerminal
-            ? 'OAuth in progress'
+            ? t('inProgress')
             : oauthCredentialReady
-              ? 'Restart OAuth'
-              : 'Start OAuth'}
+              ? t('restart')
+              : t('start')}
         </Button>
         {oauthSessionId && !oauthIsTerminal && (
           <Button size="sm" variant="ghost" onClick={onCancel} disabled={oauthBusy}>
-            Cancel
+            {tc('cancel')}
           </Button>
         )}
       </div>
