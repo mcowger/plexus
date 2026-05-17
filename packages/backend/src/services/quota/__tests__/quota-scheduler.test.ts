@@ -62,6 +62,32 @@ const makeMeterResult = (
   meters: [makeMeter(utilizationPercent)],
 });
 
+const makeRoutingRunMeter = (
+  key: 'daily' | 'hourly' | 'minute',
+  utilizationPercent: number,
+  resetsAtMs: number
+): Meter => ({
+  ...makeMeter(utilizationPercent, resetsAtMs),
+  key,
+  label: `Routing.run ${key} quota`,
+  periodValue: 1,
+  periodUnit: key === 'daily' ? 'day' : key === 'hourly' ? 'hour' : 'minute',
+  periodCycle: key === 'daily' ? 'fixed' : 'rolling',
+});
+
+const makeRoutingRunMeterResult = (
+  meters: Meter[],
+  checkerId = 'routing-run-checker',
+  provider = 'routing-run-provider'
+): MeterCheckResult => ({
+  checkerId,
+  checkerType: 'routing-run',
+  provider,
+  checkedAt: new Date().toISOString(),
+  success: true,
+  meters,
+});
+
 describe('QuotaScheduler persistence', () => {
   beforeEach(async () => {
     await closeDatabase();
@@ -131,6 +157,8 @@ describe('QuotaScheduler persistence', () => {
 
 describe('QuotaScheduler maxUtilizationPercent', () => {
   const PROVIDER = 'threshold-test-provider';
+  const ROUTING_RUN_PROVIDER = 'routing-run-provider';
+  const ROUTING_RUN_CHECKER_ID = 'routing-run-checker';
 
   beforeEach(async () => {
     await closeDatabase();
@@ -147,6 +175,7 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
     QuotaScheduler.getInstance().stop();
     const cooldownManager = CooldownManager.getInstance();
     await cooldownManager.markProviderSuccess(PROVIDER, '');
+    await cooldownManager.markProviderSuccess(ROUTING_RUN_PROVIDER, '');
     await closeDatabase();
   });
 
@@ -247,6 +276,86 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
 
     const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
     expect(isHealthy).toBe(false);
+  });
+
+  describe('Routing.run cooldown regression', () => {
+    const makeRoutingRunConfig = () =>
+      makeConfig({ id: ROUTING_RUN_CHECKER_ID, provider: ROUTING_RUN_PROVIDER });
+
+    it('triggers provider cooldown when the daily meter is exhausted', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeRoutingRunConfig();
+      scheduler.configs.set(ROUTING_RUN_CHECKER_ID, config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeRoutingRunMeterResult([
+          makeRoutingRunMeter('daily', 100, Date.now() + 24 * 60 * 60 * 1000),
+        ]),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        ROUTING_RUN_PROVIDER,
+        ''
+      );
+      expect(isHealthy).toBe(false);
+    });
+
+    it('triggers provider cooldown when the hourly meter is exhausted', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeRoutingRunConfig();
+      scheduler.configs.set(ROUTING_RUN_CHECKER_ID, config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeRoutingRunMeterResult([
+          makeRoutingRunMeter('hourly', 100, Date.now() + 60 * 60 * 1000),
+        ]),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        ROUTING_RUN_PROVIDER,
+        ''
+      );
+      expect(isHealthy).toBe(false);
+    });
+
+    it('triggers provider cooldown when the minute meter is exhausted', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeRoutingRunConfig();
+      scheduler.configs.set(ROUTING_RUN_CHECKER_ID, config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeRoutingRunMeterResult([makeRoutingRunMeter('minute', 100, Date.now() + 60 * 1000)]),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        ROUTING_RUN_PROVIDER,
+        ''
+      );
+      expect(isHealthy).toBe(false);
+    });
+
+    it('keeps Lite plan provider healthy when daily and minute meters are below threshold', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeRoutingRunConfig();
+      scheduler.configs.set(ROUTING_RUN_CHECKER_ID, config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeRoutingRunMeterResult([
+          makeRoutingRunMeter('daily', 30, Date.now() + 24 * 60 * 60 * 1000),
+          makeRoutingRunMeter('minute', 30, Date.now() + 60 * 1000),
+        ]),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        ROUTING_RUN_PROVIDER,
+        ''
+      );
+      expect(isHealthy).toBe(true);
+    });
   });
 
   it('prevents lenient checker from clearing strict checker cooldown', async () => {

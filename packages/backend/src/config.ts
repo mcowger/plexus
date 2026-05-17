@@ -202,6 +202,10 @@ const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const RoutingRunQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const DevPassQuotaCheckerOptionsSchema = z.object({
   session: z.string().trim().min(1, 'DevPass session cookie is required'),
   endpoint: z.string().url().optional(),
@@ -332,6 +336,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: PoeQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('routing-run'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: RoutingRunQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('gemini-cli'),

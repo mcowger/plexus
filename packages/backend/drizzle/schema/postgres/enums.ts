@@ -26,6 +26,7 @@ export const quotaCheckerTypeEnum = pgEnum('quota_checker_type', [
   'apertis',
   'apertis-coding-plan',
   'poe',
+  'routing-run',
   'gemini-cli',
   'antigravity',
   'novita',
