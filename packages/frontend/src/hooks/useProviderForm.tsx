@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, Provider, OAuthSession, fetchQuotaCheckers } from '../lib/api';
-import type { QuotaCheckerInfo } from '../types/quota';
+import type { QuotaCheckerInfo, Meter } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../contexts/ToastContext';
@@ -783,39 +783,56 @@ export function useProviderForm() {
       e.stopPropagation();
       navigate('/quotas');
     };
-    const balanceMeter = quota.meters.find(
-      (m) => m.kind === 'balance' && m.remaining !== undefined
-    );
-    if (balanceMeter && balanceMeter.remaining !== undefined) {
+
+    let target: Meter | undefined;
+    if (quota.primaryMeterKey) {
+      target = quota.meters.find((m) => m.key === quota.primaryMeterKey);
+    }
+    if (!target) {
+      // Find balance meter
+      target = quota.meters.find(
+        (m) => m.kind === 'balance' && m.remaining !== undefined
+      );
+    }
+    if (!target) {
+      // Find (worst) allowance meter 
+      const allowances = quota.meters.filter((m) => m.kind === 'allowance');
+      target = allowances.reduce<(typeof allowances)[0] | undefined>((worst, m) => {
+        if (!worst) return m;
+        const wu = typeof worst.utilizationPercent === 'number' ? worst.utilizationPercent : 0;
+        const mu = typeof m.utilizationPercent === 'number' ? m.utilizationPercent : 0;
+        return mu > wu ? m : worst;
+      }, undefined);
+    }
+
+    if (!target) return null;
+
+    // Display balance meter
+    if (target.remaining !== undefined) {
       return (
         <Badge
           status="neutral"
           className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2 bg-bg-subtle border border-border text-text-secondary"
           onClick={handleQuotaClick}
         >
-          {formatMeterValue(balanceMeter.remaining, balanceMeter.unit)}
+          {formatMeterValue(target.remaining, target.unit)}
+        </Badge>
+      );
+    } else if (typeof target.utilizationPercent === 'number') {
+      const pct = Math.round(target.utilizationPercent);
+      const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
+      return (
+        <Badge
+          status={status}
+          className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
+          onClick={handleQuotaClick}
+        >
+          {pct}%
         </Badge>
       );
     }
-    const allowances = quota.meters.filter((m) => m.kind === 'allowance');
-    const primary = allowances.reduce<(typeof allowances)[0] | undefined>((worst, m) => {
-      if (!worst) return m;
-      const wu = typeof worst.utilizationPercent === 'number' ? worst.utilizationPercent : 0;
-      const mu = typeof m.utilizationPercent === 'number' ? m.utilizationPercent : 0;
-      return mu > wu ? m : worst;
-    }, undefined);
-    if (!primary || typeof primary.utilizationPercent !== 'number') return null;
-    const pct = Math.round(primary.utilizationPercent);
-    const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
-    return (
-      <Badge
-        status={status}
-        className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
-        onClick={handleQuotaClick}
-      >
-        {pct}%
-      </Badge>
-    );
+
+    return null;
   };
 
   const sortedProviders = [...providers].sort((a, b) => a.id.localeCompare(b.id));

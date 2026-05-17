@@ -30,6 +30,7 @@ export interface QuotaCheckerInfo {
   meters: Meter[];
   oauthAccountId?: string;
   oauthProvider?: string;
+  primaryMeterKey?: string;
 }
 
 export interface QuotaWindow {

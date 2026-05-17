@@ -46,6 +46,7 @@ interface AllowanceParams {
 export interface CheckerDefinition<TOptions extends z.ZodTypeAny = z.ZodTypeAny> {
   type: string;
   displayName: string;
+  primaryMeterKey?: string;
   optionsSchema: TOptions;
   check(ctx: MeterContext): Promise<Meter[]>;
 }

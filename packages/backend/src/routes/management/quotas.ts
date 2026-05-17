@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
-import { getCheckerDefinitions } from '../../services/quota/checker-registry';
+import { getCheckerDefinitions, getCheckerDefinition } from '../../services/quota/checker-registry';
 import {
   getLegacySnapshotStatus,
   migrateLegacySnapshots,
@@ -83,11 +83,14 @@ export async function registerQuotaRoutes(
       for (const checkerId of checkerIds) {
         try {
           const latest = await quotaScheduler.getLatestQuota(checkerId);
+          const checkerType = getCheckerType(checkerId);
+          const def = checkerType ? getCheckerDefinition(checkerType) : undefined;
           results.push({
             ...getOAuthMetadata(checkerId),
             ...(latest ?? { success: false, meters: [] }),
             checkerId,
-            checkerType: getCheckerType(checkerId),
+            checkerType,
+            primaryMeterKey: def?.primaryMeterKey,
           });
         } catch (error) {
           logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
@@ -113,11 +116,14 @@ export async function registerQuotaRoutes(
     try {
       const { checkerId } = request.params as { checkerId: string };
       const latest = await quotaScheduler.getLatestQuota(checkerId);
+      const checkerType = getCheckerType(checkerId);
+      const def = checkerType ? getCheckerDefinition(checkerType) : undefined;
       return {
         ...getOAuthMetadata(checkerId),
         ...(latest ?? { success: false, meters: [] }),
         checkerId,
-        checkerType: getCheckerType(checkerId),
+        checkerType,
+        primaryMeterKey: def?.primaryMeterKey,
       };
     } catch (error) {
       logger.error(`Failed to get quota for '${(request.params as any).checkerId}': ${error}`);
