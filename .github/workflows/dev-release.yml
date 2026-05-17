@@ -62,10 +62,12 @@ jobs:
         run: bun install --frozen-lockfile
         working-directory: ./packages/frontend
 
+      - name: Build frontend
+        run: bun run build:frontend
+
       - name: Compile Binaries
         # compiling each platform separately
-        # Note: Each compile script in package.json runs build:frontend.
-        # This is acceptable for correctness to ensure each binary is built with the latest assets.
+        # Frontend is built above; compile:* scripts skip the rebuild in CI via build:frontend:if-needed.
         env:
           APP_VERSION: dev-${{ steps.sha.outputs.sha }}
         run: |

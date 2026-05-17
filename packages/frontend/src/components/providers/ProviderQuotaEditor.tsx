@@ -15,6 +15,7 @@ import { AntigravityQuotaConfig } from '../quota/AntigravityQuotaConfig';
 import { ApertisQuotaConfig } from '../quota/ApertisQuotaConfig';
 import { KimiCodeQuotaConfig } from '../quota/KimiCodeQuotaConfig';
 import { PoeQuotaConfig } from '../quota/PoeQuotaConfig';
+import { RoutingRunQuotaConfig } from '../quota/RoutingRunQuotaConfig';
 import { OllamaQuotaConfig } from '../quota/OllamaQuotaConfig';
 import { DevPassQuotaConfig } from '../quota/DevPassQuotaConfig';
 import { NeuralwattQuotaConfig } from '../quota/NeuralwattQuotaConfig';
@@ -55,6 +56,7 @@ const QUOTA_CONFIG_MAP: Record<
   apertis: ApertisQuotaConfig,
   'kimi-code': KimiCodeQuotaConfig,
   poe: PoeQuotaConfig,
+  'routing-run': RoutingRunQuotaConfig,
   ollama: OllamaQuotaConfig,
   devpass: DevPassQuotaConfig,
   neuralwatt: NeuralwattQuotaConfig,

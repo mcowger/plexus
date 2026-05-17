@@ -470,16 +470,23 @@ export async function registerUsageRoutes(
     }, 1000);
     progressInterval.unref?.();
 
-    request.raw.on('close', () => {
+    // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
+    // and as a fallback for other disconnect scenarios.
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       clearInterval(progressInterval);
       usageStorage.off('started', startedListener);
       usageStorage.off('updated', updatedListener);
       usageStorage.off('completed', completedListener);
       usageStorage.off('created', completedListener);
-    });
+    };
+
+    reply.raw.on('close', cleanup);
 
     // Keep connection alive with periodic pings
-    while (!request.raw.destroyed) {
+    while (!reply.raw.destroyed) {
       await new Promise((resolve) => setTimeout(resolve, 10000));
       if (!reply.raw.destroyed) {
         reply.raw.write(
@@ -491,6 +498,9 @@ export async function registerUsageRoutes(
         );
       }
     }
+
+    // Cleanup: socket destroyed (client disconnect or server shutdown)
+    cleanup();
   });
 
   /**

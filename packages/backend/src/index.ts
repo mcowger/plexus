@@ -99,6 +99,7 @@ logger.debug(`PORT: ${process.env.PORT || '4000'}`);
 const fastify = Fastify({
   logger: false, // We use a custom winston-based logger
   bodyLimit: 30 * 1024 * 1024, // 30MB to accommodate 25MB audio files + metadata
+  forceCloseConnections: true, // Destroy all open sockets on shutdown (fixes SSE hang)
 });
 
 // --- Plugin Registration ---
@@ -202,9 +203,7 @@ try {
 // Initialize quota checkers (requires DB to be ready)
 try {
   const config = getConfig();
-  if (config.quotas && config.quotas.length > 0) {
-    await quotaScheduler.initialize(config.quotas);
-  }
+  await quotaScheduler.initialize(config.quotas ?? []);
 } catch (e) {
   logger.error('Failed to initialize quota checkers', e);
 }

@@ -178,4 +178,83 @@ describe('config quota checker validation', () => {
       },
     });
   });
+
+  describe('routing-run quota checker', () => {
+    it('accepts routing-run without options and injects the provider api key', () => {
+      const config = validateConfig(
+        JSON.stringify({
+          providers: {
+            'routing-provider': {
+              api_base_url: 'https://api.routing.run',
+              api_key: 'routing-secret',
+              quota_checker: {
+                type: 'routing-run',
+              },
+            },
+          },
+          models: {},
+          keys: {},
+        })
+      );
+
+      expect(config.quotas).toHaveLength(1);
+      expect(config.quotas[0]).toMatchObject({
+        provider: 'routing-provider',
+        type: 'routing-run',
+        intervalMinutes: 30,
+      });
+      expect(config.quotas[0]?.options).toMatchObject({
+        apiKey: 'routing-secret',
+      });
+    });
+
+    it('accepts a valid endpoint and preserves it', () => {
+      const config = validateConfig(
+        JSON.stringify({
+          providers: {
+            'routing-provider': {
+              api_base_url: 'https://api.routing.run',
+              api_key: 'routing-secret',
+              quota_checker: {
+                type: 'routing-run',
+                options: {
+                  endpoint: 'https://api.routing.run/v1/key',
+                },
+              },
+            },
+          },
+          models: {},
+          keys: {},
+        })
+      );
+
+      expect(config.quotas[0]?.options).toMatchObject({
+        endpoint: 'https://api.routing.run/v1/key',
+        apiKey: 'routing-secret',
+      });
+    });
+
+    it('rejects an invalid endpoint', () => {
+      expect(() =>
+        validateConfig(
+          JSON.stringify({
+            providers: {
+              'routing-provider': {
+                api_base_url: 'https://api.routing.run',
+                api_key: 'routing-secret',
+                quota_checker: {
+                  type: 'routing-run',
+                  options: {
+                    endpoint: 'not-a-url',
+                  },
+                },
+              },
+            },
+            models: {},
+            keys: {},
+          })
+        )
+      ).toThrow('endpoint');
+    });
+  });
 });

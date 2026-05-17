@@ -11,6 +11,7 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
       'Access-Control-Allow-Origin': '*',
     });
 
+    let cleanedUp = false;
     const listener = async (log: any) => {
       if (reply.raw.destroyed) return;
       reply.raw.write(
@@ -22,13 +23,19 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
       );
     };
 
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      logEmitter.off('log', listener);
+    };
+
     logEmitter.on('log', listener);
 
-    request.raw.on('close', () => {
-      logEmitter.off('log', listener);
-    });
+    // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
+    // and as a fallback for other disconnect scenarios.
+    reply.raw.on('close', cleanup);
 
-    while (!request.raw.destroyed) {
+    while (!reply.raw.destroyed) {
       await new Promise((resolve) => setTimeout(resolve, 10000));
       if (!reply.raw.destroyed) {
         reply.raw.write(
@@ -40,5 +47,8 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
         );
       }
     }
+
+    // Cleanup: socket destroyed (client disconnect or server shutdown)
+    cleanup();
   });
 }
