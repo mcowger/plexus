@@ -135,6 +135,7 @@ describe('ConfigService write coalescing', () => {
       api_base_url: 'https://api.synthetic.new',
       api_key: 'synthetic-key',
       disable_cooldown: false,
+      stall_cooldown: false,
       estimateTokens: false,
       useClaudeMasking: false,
       quota_checker: {

@@ -601,10 +601,9 @@ export class Dispatcher {
                   visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
                 });
                 this.appendFailureAttempt(retryHistory, route, stallError, targetApiType, true);
-                CooldownManager.getInstance().markProviderFailure(
+                CooldownManager.getInstance().markProviderStallFailure(
                   route.provider,
                   route.model,
-                  undefined,
                   this.formatFailureReason(stallError)
                 );
                 this.saveIntermediateError(
@@ -717,13 +716,20 @@ export class Dispatcher {
                 visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
               this.appendFailureAttempt(retryHistory, route, error, targetApiType, true);
-              // Always mark as failed when retrying — provider couldn't serve this request
-              CooldownManager.getInstance().markProviderFailure(
-                route.provider,
-                route.model,
-                undefined,
-                this.formatFailureReason(error)
-              );
+              if (error.message?.includes('stalled')) {
+                CooldownManager.getInstance().markProviderStallFailure(
+                  route.provider,
+                  route.model,
+                  this.formatFailureReason(error)
+                );
+              } else {
+                CooldownManager.getInstance().markProviderFailure(
+                  route.provider,
+                  route.model,
+                  undefined,
+                  this.formatFailureReason(error)
+                );
+              }
               this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', error);
               logger.warn(
                 `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
@@ -804,12 +810,20 @@ export class Dispatcher {
 
         if (!isHttpError) {
           // Pure network/transport error — mark the provider as failed
-          CooldownManager.getInstance().markProviderFailure(
-            route.provider,
-            route.model,
-            undefined,
-            this.formatFailureReason(error)
-          );
+          if (error.message?.includes('stalled')) {
+            CooldownManager.getInstance().markProviderStallFailure(
+              route.provider,
+              route.model,
+              this.formatFailureReason(error)
+            );
+          } else {
+            CooldownManager.getInstance().markProviderFailure(
+              route.provider,
+              route.model,
+              undefined,
+              this.formatFailureReason(error)
+            );
+          }
         }
         await this.recordAttemptMetric(route, currentRequest.requestId, false, {
           isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,

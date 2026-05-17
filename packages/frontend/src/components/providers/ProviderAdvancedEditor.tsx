@@ -647,6 +647,30 @@ export function ProviderAdvancedEditor({
             </div>
           </div>
 
+          {/* Stall Cooldown */}
+          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
+            <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
+              <Switch
+                checked={editingProvider.stallCooldown || false}
+                onChange={(checked) =>
+                  setEditingProvider({ ...editingProvider, stallCooldown: checked })
+                }
+              />
+              <label
+                className="font-body text-[13px] font-medium text-text"
+                style={{ marginBottom: 0 }}
+              >
+                Cooldown on Stall
+              </label>
+            </div>
+            <div
+              className="font-body text-[11px] text-text-secondary"
+              style={{ lineHeight: 1.35, marginTop: '4px' }}
+            >
+              When enabled, stall detection cancellations will trigger cooldown for this provider.
+            </div>
+          </div>
+
           {/* Use Claude Masking */}
           <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
             <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
