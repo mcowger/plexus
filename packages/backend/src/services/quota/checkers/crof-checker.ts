@@ -10,7 +10,6 @@ interface CrofUsageResponse {
 export default defineChecker({
   type: 'crof',
   displayName: 'Crof',
-  primaryMeterKey: 'daily_requests',
   optionsSchema: z.object({
     endpoint: z.string().url().optional(),
   }),
@@ -28,7 +27,9 @@ export default defineChecker({
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      throw new Error(`HTTP ${response.status}: ${response.statusText}${text ? ` - ${text.slice(0, 200)}` : ''}`);
+      throw new Error(
+        `HTTP ${response.status}: ${response.statusText}${text ? ` - ${text.slice(0, 200)}` : ''}`
+      );
     }
 
     const data: CrofUsageResponse = await response.json();
