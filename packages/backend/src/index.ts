@@ -99,6 +99,7 @@ logger.debug(`PORT: ${process.env.PORT || '4000'}`);
 const fastify = Fastify({
   logger: false, // We use a custom winston-based logger
   bodyLimit: 30 * 1024 * 1024, // 30MB to accommodate 25MB audio files + metadata
+  forceCloseConnections: true, // Destroy all open sockets on shutdown (fixes SSE hang)
 });
 
 // --- Plugin Registration ---
