@@ -272,6 +272,10 @@ export class QuotaScheduler {
     return Array.from(this.configs.keys());
   }
 
+  isInitialized(): boolean {
+    return this.checkersLoaded;
+  }
+
   async getLatestQuota(checkerId: string): Promise<MeterCheckResult | null> {
     try {
       const { db, schema } = this.ensureDb();
@@ -397,32 +401,11 @@ export class QuotaScheduler {
     }
 
     const existingIds = new Set(this.configs.keys());
-    const newConfigs = quotaConfigs.filter((c) => !existingIds.has(c.id) && c.enabled);
+    const activeConfigs = quotaConfigs.filter((c) => c.enabled);
+    const activeIds = new Set(activeConfigs.map((c) => c.id));
 
-    for (const config of newConfigs) {
-      if (!getCheckerDefinition(config.type)) {
-        logger.error(`Unknown quota checker type '${config.type}' for checker '${config.id}'`);
-        continue;
-      }
-      this.configs.set(config.id, config);
-      logger.info(
-        `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
-      );
-
-      const intervalMs = config.intervalMinutes * 60 * 1000;
-      const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
-      this.intervals.set(config.id, intervalId);
-      logger.info(
-        `Scheduled quota checker '${config.id}' to run every ${config.intervalMinutes} minutes`
-      );
-      this.runCheckNow(config.id).catch((error) => {
-        logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
-      });
-    }
-
-    const loadedIds = new Set(quotaConfigs.filter((c) => c.enabled).map((c) => c.id));
     for (const id of existingIds) {
-      if (!loadedIds.has(id)) {
+      if (!activeIds.has(id)) {
         const intervalId = this.intervals.get(id);
         if (intervalId) {
           clearInterval(intervalId);
@@ -430,6 +413,52 @@ export class QuotaScheduler {
         }
         this.configs.delete(id);
         logger.info(`Removed quota checker '${id}' on reload`);
+      }
+    }
+
+    for (const config of activeConfigs) {
+      if (!getCheckerDefinition(config.type)) {
+        logger.error(`Unknown quota checker type '${config.type}' for checker '${config.id}'`);
+        continue;
+      }
+
+      const existingConfig = this.configs.get(config.id);
+      const intervalChanged = existingConfig?.intervalMinutes !== config.intervalMinutes;
+
+      this.configs.set(config.id, config);
+
+      if (existingConfig && !intervalChanged) {
+        logger.debug(`Updated quota checker '${config.id}' on reload`);
+        continue;
+      }
+
+      if (existingConfig && intervalChanged) {
+        const intervalId = this.intervals.get(config.id);
+        if (intervalId) clearInterval(intervalId);
+        this.intervals.delete(config.id);
+        logger.info(
+          `Rescheduled quota checker '${config.id}' from ${existingConfig.intervalMinutes} to ${config.intervalMinutes} minutes`
+        );
+      } else {
+        logger.info(
+          `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
+        );
+      }
+
+      if (this.intervals.has(config.id)) continue;
+
+      logger.info(
+        `Scheduled quota checker '${config.id}' to run every ${config.intervalMinutes} minutes`
+      );
+
+      const intervalMs = config.intervalMinutes * 60 * 1000;
+      const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
+      this.intervals.set(config.id, intervalId);
+
+      if (!existingConfig) {
+        this.runCheckNow(config.id).catch((error) => {
+          logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
+        });
       }
     }
   }

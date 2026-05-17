@@ -12,6 +12,7 @@ import { QuotaScheduler } from '../quota-scheduler';
 import { CooldownManager } from '../../cooldown-manager';
 import type { MeterCheckResult, Meter } from '../../../types/meter';
 import type { QuotaConfig } from '../../../config';
+import { registerSpy } from '../../../../test/test-utils';
 
 const CHECKER_ID = 'quota-persistence-checker';
 
@@ -126,6 +127,60 @@ describe('QuotaScheduler persistence', () => {
     expect(rows[0]?.success).toBe(true);
     expect(rows[0]?.utilizationState).toBe('reported');
     expect(rows[0]?.utilizationPercent).toBeCloseTo(15);
+  });
+
+  it('marks scheduler initialized when initialize receives no quota configs', async () => {
+    const scheduler = QuotaScheduler.getInstance();
+
+    await scheduler.initialize([]);
+
+    expect(scheduler.isInitialized()).toBe(true);
+    expect(scheduler.getCheckerIds()).toEqual([]);
+  });
+
+  it('updates existing checker options and reschedules interval changes on reload', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const scheduler = QuotaScheduler.getInstance();
+      const runCheckNow = registerSpy(scheduler, 'runCheckNow').mockResolvedValue(null);
+      const initialConfig: QuotaConfig = {
+        id: 'synthetic-reload-checker',
+        provider: 'synthetic-provider',
+        type: 'synthetic',
+        enabled: true,
+        intervalMinutes: 60,
+        options: {
+          apiKey: 'synthetic-key',
+          endpoint: 'https://old.example.com/v2/quotas',
+        },
+      };
+
+      await scheduler.initialize([initialConfig]);
+      runCheckNow.mockClear();
+
+      await scheduler.reload([
+        {
+          ...initialConfig,
+          intervalMinutes: 1,
+          options: {
+            apiKey: 'synthetic-key',
+            endpoint: 'https://new.example.com/v2/quotas',
+          },
+        },
+      ]);
+
+      const configs = Reflect.get(scheduler, 'configs') as Map<string, QuotaConfig>;
+      const updatedConfig = configs.get('synthetic-reload-checker');
+      expect(updatedConfig?.intervalMinutes).toBe(1);
+      expect(updatedConfig?.options.endpoint).toBe('https://new.example.com/v2/quotas');
+
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(runCheckNow).toHaveBeenCalledWith('synthetic-reload-checker');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
