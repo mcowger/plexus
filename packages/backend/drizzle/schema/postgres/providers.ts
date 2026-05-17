@@ -28,6 +28,7 @@ export const providers = pgTable(
     }),
     enabled: boolean('enabled').notNull().default(true),
     disableCooldown: boolean('disable_cooldown').notNull().default(false),
+    stallCooldown: boolean('stall_cooldown').notNull().default(false),
     discount: real('discount'),
     estimateTokens: boolean('estimate_tokens').notNull().default(false),
     useClaudeMasking: boolean('use_claude_masking').notNull().default(false),

@@ -80,6 +80,29 @@ export class CooldownManager {
     }
   }
 
+  private isStallCooldownEnabledForProvider(provider: string): boolean {
+    try {
+      const config = getConfig();
+      return config.providers?.[provider]?.stall_cooldown === true;
+    } catch {
+      return false;
+    }
+  }
+
+  public async markProviderStallFailure(
+    provider: string,
+    model: string,
+    lastError?: string
+  ): Promise<void> {
+    if (!this.isStallCooldownEnabledForProvider(provider)) {
+      logger.debug(
+        `Skipping stall cooldown for provider '${provider}' model '${model}' (stall_cooldown not enabled)`
+      );
+      return;
+    }
+    await this.markProviderFailure(provider, model, undefined, lastError);
+  }
+
   private async pruneDisabledProviders(): Promise<void> {
     const keysToDelete: string[] = [];
 

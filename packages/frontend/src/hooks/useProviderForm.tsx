@@ -63,6 +63,7 @@ export const EMPTY_PROVIDER: Provider = {
   oauthAccount: '',
   enabled: true,
   disableCooldown: false,
+  stallCooldown: false,
   estimateTokens: false,
   useClaudeMasking: false,
   apiBaseUrl: {},

@@ -8,6 +8,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'https://api.openai.com/v1',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -19,6 +20,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'https://ollama.com/v1',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -30,6 +32,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'http://localhost:11434/v1',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -41,6 +44,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'https://my-ollama-proxy.example.com/v1',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -52,6 +56,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'http://192.168.1.100:11434/v1',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -63,6 +68,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'https://api.anthropic.com/v1',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -74,6 +80,7 @@ describe('getProviderTypes', () => {
         api_base_url: 'https://generativelanguage.googleapis.com/v1beta',
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -86,6 +93,7 @@ describe('getProviderTypes', () => {
         api_key: 'oauth',
         oauth_provider: 'anthropic',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -99,6 +107,7 @@ describe('getProviderTypes', () => {
         api_base_url: { ollama: 'http://localhost:11434' },
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -113,6 +122,7 @@ describe('getProviderTypes', () => {
         },
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -126,6 +136,7 @@ describe('getProviderTypes', () => {
         api_base_url: { chat: 'https://api.openai.com/v1' },
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -137,6 +148,7 @@ describe('getProviderTypes', () => {
         api_base_url: { messages: 'https://api.anthropic.com/v1' },
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -148,6 +160,7 @@ describe('getProviderTypes', () => {
         api_base_url: { ollama: '', chat: 'https://api.openai.com/v1' },
         api_key: 'test-key',
         disable_cooldown: false,
+        stall_cooldown: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };

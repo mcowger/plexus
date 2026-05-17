@@ -217,6 +217,7 @@ export interface Provider {
   oauthAccount?: string;
   enabled: boolean;
   disableCooldown?: boolean;
+  stallCooldown?: boolean;
   estimateTokens?: boolean;
   useClaudeMasking?: boolean;
   geminiThinkingEnabled?: boolean;
@@ -1665,6 +1666,7 @@ export const api = {
           useClaudeMasking: val.useClaudeMasking === true,
           geminiThinkingEnabled: val.gemini_thinking_enabled === true,
           disableCooldown: val.disable_cooldown === true,
+          stallCooldown: val.stall_cooldown === true,
           discount: val.discount,
           headers: val.headers,
           extraBody:
@@ -1700,6 +1702,7 @@ export const api = {
       useClaudeMasking: provider.useClaudeMasking,
       geminiThinkingEnabled: provider.geminiThinkingEnabled,
       disable_cooldown: provider.disableCooldown === true ? true : undefined,
+      stall_cooldown: provider.stallCooldown === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,

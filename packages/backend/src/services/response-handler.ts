@@ -16,6 +16,7 @@ import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { recordQuotaUsage } from '../services/quota/quota-middleware';
+import { CooldownManager } from './cooldown-manager';
 /**
  * handleResponse
  *
@@ -331,6 +332,13 @@ export async function handleResponse(
       // Set responseStatus before destroy so UsageInspector._destroy() sees it.
       if (isStall) {
         usageRecord.responseStatus = 'stall';
+        if (usageRecord.provider && usageRecord.selectedModelName) {
+          CooldownManager.getInstance().markProviderStallFailure(
+            usageRecord.provider,
+            usageRecord.selectedModelName,
+            abortController?.signal?.reason?.message || 'Stream stalled'
+          );
+        }
       } else if (isTimeout) {
         usageRecord.responseStatus = 'timeout';
       }

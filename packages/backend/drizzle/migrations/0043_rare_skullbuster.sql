@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `stall_cooldown` integer DEFAULT 0 NOT NULL;
