@@ -94,6 +94,7 @@ interface StallConfig {
   minBytesPerSecond: number | null;
   windowSeconds: number;
   gracePeriodSeconds: number;
+  stallCooldown: boolean;
 }
 
 const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
@@ -106,6 +107,7 @@ const DEFAULT_STALL_CONFIG: StallConfig = {
   minBytesPerSecond: null,
   windowSeconds: 10,
   gracePeriodSeconds: 30,
+  stallCooldown: false,
 };
 
 const DEFAULT_BACKGROUND_EXPLORATION: BackgroundExplorationConfig = {
@@ -507,6 +509,7 @@ export const Config = () => {
       ) {
         updates.gracePeriodSeconds = stallGraceValidation.value;
       }
+      updates.stallCooldown = stallConfig.stallCooldown;
 
       const updated = await api.patchStallConfig(updates);
       setStallConfig(updated);
@@ -1146,6 +1149,27 @@ export const Config = () => {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Cooldown on Stall */}
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-bg-glass/40 p-3">
+              <div className="flex items-start gap-2">
+                <Timer size={16} className="text-primary mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-text">Cooldown on Stall</p>
+                  <p className="text-xs text-text-muted">
+                    When enabled, stall detection cancellations will trigger cooldown for providers
+                    (unless the provider explicitly overrides this).
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={stallConfig.stallCooldown}
+                onChange={(checked) =>
+                  setStallConfig((prev) => ({ ...prev, stallCooldown: checked }))
+                }
+                aria-label="Toggle cooldown on stall"
+              />
             </div>
 
             {/* TTFB Seconds */}

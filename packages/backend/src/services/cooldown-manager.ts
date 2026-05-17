@@ -83,7 +83,8 @@ export class CooldownManager {
   private isStallCooldownEnabledForProvider(provider: string): boolean {
     try {
       const config = getConfig();
-      return config.providers?.[provider]?.stall_cooldown === true;
+      if (config.providers?.[provider]?.stall_cooldown === true) return true;
+      return config.stall?.stallCooldown === true;
     } catch {
       return false;
     }
