@@ -903,28 +903,22 @@ export function ProviderModelsEditor({
                                           alignItems: 'center',
                                         }}
                                       >
-                                        <Input
-                                          placeholder="Match model (e.g. deepseek-r1)"
-                                          value={rule.model ?? ''}
-                                          onChange={(e: any) => {
-                                            const updated = [...rules];
-                                            updated[rIdx] = {
-                                              ...updated[rIdx],
-                                              model: e.target.value,
-                                            };
-                                            const newAdapters = modelAdapters.map((entry: any) =>
-                                              typeof entry !== 'string' &&
-                                              entry.name === 'model_override'
-                                                ? {
-                                                    ...entry,
-                                                    options: { ...entry.options, rules: updated },
-                                                  }
-                                                : entry
-                                            );
-                                            updateModelConfig(mId, { adapter: newAdapters });
+                                        <div
+                                          className="font-body text-[12px] text-text-muted"
+                                          style={{
+                                            flex: 2,
+                                            padding: '5px 8px',
+                                            background: 'var(--color-bg-glass)',
+                                            border: '1px solid var(--color-border-glass)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
                                           }}
-                                          style={{ flex: 2 }}
-                                        />
+                                          title={mId}
+                                        >
+                                          {mId}
+                                        </div>
                                         <span className="font-body text-[11px] text-text-muted">
                                           →
                                         </span>
@@ -1155,7 +1149,7 @@ export function ProviderModelsEditor({
                                     size="sm"
                                     onClick={() => {
                                       const newRule = {
-                                        model: '',
+                                        model: mId,
                                         rewriteTo: '',
                                         conditions: [{ field: '' }],
                                       };
