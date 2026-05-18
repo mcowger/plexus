@@ -168,6 +168,9 @@ export function ProviderModelsEditor({
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <Button variant="secondary" size="sm" leftIcon={<Plus size={14} />} onClick={addModel}>
+              Add Model
+            </Button>
             {Object.entries(editingProvider.models || {}).map(([mId, mCfg]: [string, any]) => {
               const testKey = `${editingProvider.id}-${mId}`;
               const testState = testStates[testKey];
@@ -925,9 +928,6 @@ export function ProviderModelsEditor({
                 </div>
               );
             })}
-            <Button variant="secondary" size="sm" leftIcon={<Plus size={14} />} onClick={addModel}>
-              Add Model Mapping
-            </Button>
           </div>
         </div>
       )}
