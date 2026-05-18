@@ -50,11 +50,7 @@ export default async function globalSetup() {
   process.env.LOG_LEVEL = 'error';
 
   try {
-    execSync('bunx drizzle-kit generate --config=drizzle.config.sqlite.ts', {
-      cwd: backendRoot,
-      stdio: 'pipe',
-    });
-    execSync('bunx drizzle-kit generate --config=drizzle.config.postgres.ts', {
+    execSync('bun run generate-migrations --name test_setup', {
       cwd: backendRoot,
       stdio: 'pipe',
     });

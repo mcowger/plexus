@@ -26,6 +26,30 @@
 
 ---
 
+## Migration Naming Convention
+
+All database migrations **must** be generated using the wrapper script to ensure descriptive naming:
+
+```bash
+bun run generate-migrations
+```
+
+**Do not** run `drizzle-kit generate` directly. The wrapper auto-derives a descriptive name from the git branch (e.g., `pi/issue-424-1779050379120` → `auto_issue_424`). You can also specify a name explicitly:
+
+```bash
+bun run generate-migrations --name add_quota_checkers
+```
+
+On the `main` branch, `--name` is required (auto-naming is not available). Random names like `rare_skullbuster` are rejected by CI.
+
+The `lint:migrations` script checks all migration files for compliance. Run it locally with:
+
+```bash
+bun run lint:migrations
+```
+
+---
+
 ## Efficiency & Batching
 
 Think ahead and **perform multiple reads, edits, and commands in the same response** whenever they don't depend on each other's results. Minimize round-trips by:

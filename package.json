@@ -33,16 +33,19 @@
     "prep-dev:reset": "bun run scripts/prep-dev.ts --reset",
     "prep-dev:save": "bun run scripts/prep-dev.ts --save",
     "prep-dev:live": "bun run scripts/prep-dev.ts --live",
+    "postinstall": "bun run scripts/wrap-drizzle-kit.ts",
     "prepare": "if [ -z \"$CI\" ]; then lefthook install; fi",
     "format": "bunx biome format --write .",
     "format:check": "bunx biome format .",
     "lint": "bunx biome lint --write .",
     "lint:check": "bunx biome lint .",
+    "lint:migrations": "bun run scripts/lint-migrations.ts",
     "lint:openapi": "bunx @redocly/cli lint docs/openapi/openapi.yaml",
     "bundle:openapi": "bunx @redocly/cli bundle docs/openapi/openapi.yaml -o docs/openapi.yaml",
     "preview:openapi": "bunx @redocly/cli preview-docs docs/openapi/openapi.yaml",
     "sync:openapi": "bun run scripts/sync-openapi.ts",
-    "sync:openapi:write": "bun run scripts/sync-openapi.ts --write"
+    "sync:openapi:write": "bun run scripts/sync-openapi.ts --write",
+    "generate-migrations": "bun run scripts/generate-migrations.ts"
   },
   "type": "module",
   "workspaces": [

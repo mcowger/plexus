@@ -10,7 +10,9 @@
     "test:force-all": "bunx --bun vitest run --config vitest.config.ts",
     "test:watch": "bunx --bun vitest --config vitest.config.ts",
     "rekey": "bun run src/cli/rekey.ts",
-    "backup": "bun run src/cli/backup.ts"
+    "backup": "bun run src/cli/backup.ts",
+    "generate-migrations": "cd ../.. && bun run scripts/generate-migrations.ts",
+    "lint:migrations": "cd ../.. && bun run scripts/lint-migrations.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.74.0",

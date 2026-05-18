@@ -19,6 +19,6 @@ jobs:
           echo "Community PRs should only modify schema .ts files in drizzle/schema/."
           echo "Migrations are auto-generated after merge by CI."
           echo ""
-          echo "To test locally: run 'bunx drizzle-kit generate' but do not commit the output."
+          echo "To test locally: run 'bun run generate-migrations' but do not commit the output."
           echo "If this is a maintainer PR that intentionally includes migrations, add the 'migrations-ok' label."
           exit 1

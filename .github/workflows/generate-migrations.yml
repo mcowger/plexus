@@ -33,13 +33,8 @@ jobs:
           bun install --frozen-lockfile
           cd packages/backend && bun install --frozen-lockfile
 
-      - name: Generate SQLite migrations
-        working-directory: packages/backend
-        run: bunx drizzle-kit generate --config drizzle.config.sqlite.ts
-
-      - name: Generate PostgreSQL migrations
-        working-directory: packages/backend
-        run: bunx drizzle-kit generate --config drizzle.config.postgres.ts
+      - name: Generate migrations
+        run: bun run generate-migrations --name auto_schema_update
 
       - name: Check for new migrations
         id: check
