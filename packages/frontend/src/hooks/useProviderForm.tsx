@@ -384,7 +384,7 @@ export function useProviderForm() {
       );
       const allSuccess = results.every((r) => r.success);
       const firstError = results.find((r) => !r.success);
-      const totalDuration = results.reduce((sum, r) => sum + r.durationMs, 0);
+      const totalDuration = results.reduce((sum, r) => sum + (r.durationMs || 0), 0);
       const avgDuration = Math.round(totalDuration / results.length);
       setTestStates((prev) => ({
         ...prev,

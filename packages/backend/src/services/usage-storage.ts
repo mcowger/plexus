@@ -654,7 +654,7 @@ export class UsageStorageService extends EventEmitter {
         costSource: row.costSource,
         costMetadata: row.costMetadata,
         startTime: row.startTime,
-        durationMs: row.durationMs ?? 0,
+        durationMs: row.durationMs,
         isStreamed: !!row.isStreamed,
         responseStatus: row.responseStatus ?? '',
         ttftMs: row.ttftMs,

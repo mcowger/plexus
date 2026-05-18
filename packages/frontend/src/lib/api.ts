@@ -461,7 +461,7 @@ export interface UsageRecord {
   costSource?: string;
   costMetadata?: string;
   startTime: number;
-  durationMs: number;
+  durationMs: number | null;
   isStreamed: boolean;
   responseStatus: string;
   ttftMs?: number;
@@ -2241,7 +2241,7 @@ export const api = {
   ): Promise<{
     success: boolean;
     error?: string;
-    durationMs: number;
+    durationMs: number | null;
     response?: string;
     apiType?: string;
   }> => {

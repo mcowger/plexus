@@ -654,7 +654,9 @@ export const Logs = () => {
                                   ? progressMapRef.current.get(log.requestId)
                                   : undefined;
                               const liveDuration = formatMs(
-                                log.durationMs != null ? log.durationMs : Date.now() - log.startTime
+                                log.durationMs != null && log.durationMs > 0
+                                  ? log.durationMs
+                                  : Date.now() - log.startTime
                               );
                               if (progress) {
                                 return (
@@ -1240,7 +1242,9 @@ export const Logs = () => {
                               ? progressMapRef.current.get(log.requestId)
                               : undefined;
                           const liveDuration = formatMs(
-                            log.durationMs != null ? log.durationMs : Date.now() - log.startTime
+                            log.durationMs != null && log.durationMs > 0
+                              ? log.durationMs
+                              : Date.now() - log.startTime
                           );
                           if (progress) {
                             return (
