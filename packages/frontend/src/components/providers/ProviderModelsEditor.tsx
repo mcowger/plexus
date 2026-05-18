@@ -1040,7 +1040,7 @@ export function ProviderModelsEditor({
                                               );
                                               updateModelConfig(mId, { adapter: newAdapters });
                                             }}
-                                            style={{ flex: 1 }}
+                                            style={{ flex: 2 }}
                                           />
                                           <Input
                                             placeholder="e.g. false, 0, none"
