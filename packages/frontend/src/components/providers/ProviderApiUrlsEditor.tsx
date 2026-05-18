@@ -48,7 +48,7 @@ export function ProviderApiUrlsEditor({
           Connection Type
         </label>
         <select
-          className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+          className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
           value={isOAuthMode ? 'oauth' : 'url'}
           onChange={(e) => {
             if (e.target.value === 'oauth') {
@@ -115,7 +115,7 @@ export function ProviderApiUrlsEditor({
               OAuth Provider
             </label>
             <select
-              className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+              className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
               value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
               onChange={(e) =>
                 setEditingProvider({ ...editingProvider, oauthProvider: e.target.value })
@@ -199,7 +199,7 @@ export function ProviderApiUrlsEditor({
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <select
-                        className="w-full py-1.5 px-3 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                         value={apiType}
                         onChange={(e) =>
                           updateApiBaseUrlEntry(
@@ -216,7 +216,7 @@ export function ProviderApiUrlsEditor({
                         ))}
                       </select>
                       <input
-                        className="w-full py-1.5 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                        className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                         placeholder={
                           apiType === 'ollama'
                             ? 'http://localhost:11434'

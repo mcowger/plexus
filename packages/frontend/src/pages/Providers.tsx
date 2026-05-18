@@ -10,7 +10,6 @@ import { ProviderList } from '../components/providers/ProviderList';
 import { ProviderApiUrlsEditor } from '../components/providers/ProviderApiUrlsEditor';
 import { ProviderOAuthEditor } from '../components/providers/ProviderOAuthEditor';
 import { ProviderQuotaEditor } from '../components/providers/ProviderQuotaEditor';
-import { ProviderGpuProfileEditor } from '../components/providers/ProviderGpuProfileEditor';
 import { ProviderAdvancedEditor } from '../components/providers/ProviderAdvancedEditor';
 import { ProviderModelsEditor } from '../components/providers/ProviderModelsEditor';
 import { FetchModelsModal } from '../components/providers/FetchModelsModal';
@@ -161,12 +160,6 @@ export const Providers = () => {
                 onCancel={f.handleCancelOAuth}
               />
             )}
-
-            {/* GPU Profile */}
-            <ProviderGpuProfileEditor
-              editingProvider={f.editingProvider}
-              setEditingProvider={f.setEditingProvider}
-            />
 
             {/* Advanced */}
             <ProviderAdvancedEditor

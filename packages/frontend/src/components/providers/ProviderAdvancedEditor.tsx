@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
+import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
 import type { Provider } from '../../lib/api';
 
 export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
@@ -36,6 +37,7 @@ export function ProviderAdvancedEditor({
   removeKV,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAdaptersOpen, setIsAdaptersOpen] = useState(false);
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
   const [isStallOpen, setIsStallOpen] = useState(false);
@@ -81,145 +83,93 @@ export function ProviderAdvancedEditor({
       </button>
       {isOpen && (
         <div
-          className="px-3 py-3 border-t border-border-glass"
-          style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+          className="px-3 py-2 border-t border-border-glass"
+          style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
         >
           {/* Provider Adapters */}
-          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-            <label className="font-body text-[13px] font-medium text-text-secondary block mb-2">
-              Provider Adapters
-            </label>
+          <div className="border border-border-glass rounded-md overflow-hidden">
             <div
-              className="font-body text-[11px] text-text-secondary mb-3"
-              style={{ lineHeight: 1.4 }}
+              className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+              onClick={() => setIsAdaptersOpen(!isAdaptersOpen)}
             >
-              Adapters rewrite requests and responses to fix provider-specific field-name
-              incompatibilities. Applied to every model under this provider unless overridden
-              per-model.
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {KNOWN_ADAPTERS.map((a) => {
-                const active = (editingProvider.adapter ?? []).includes(a.value);
-                return (
-                  <label
-                    key={a.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      cursor: 'pointer',
-                      padding: '6px 8px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--color-border-glass)',
-                      background: active ? 'var(--color-bg-hover)' : 'var(--color-bg-deep)',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      style={{ marginTop: '2px', flexShrink: 0 }}
-                      onChange={() => {
-                        const current = editingProvider.adapter ?? [];
-                        const next = active
-                          ? current.filter((v) => v !== a.value)
-                          : [...current, a.value];
-                        setEditingProvider({ ...editingProvider, adapter: next });
-                      }}
-                    />
-                    <div>
-                      <div className="font-body text-[12px] font-medium text-text">{a.label}</div>
-                      <div
-                        className="font-body text-[11px] text-text-secondary"
-                        style={{ lineHeight: 1.35 }}
-                      >
-                        {a.description}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Discount */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px] sm:items-end">
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[11px] font-medium text-text-secondary">
-                Discount (%)
-                <span className="font-normal text-[10px] text-text-muted ml-1 block">
-                  e.g., 10 → pays 90%
-                </span>
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  className="w-full py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                  type="number"
-                  step="1"
-                  min="0"
-                  max="100"
-                  value={Math.round((editingProvider.discount ?? 0) * 100)}
-                  onChange={(e) => {
-                    const clamped = Math.min(100, Math.max(0, Number(e.target.value || '0')));
-                    setEditingProvider({ ...editingProvider, discount: clamped / 100 });
-                  }}
-                />
-                <span
-                  className="font-body text-[12px] text-text-secondary"
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  %
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Timeout Override */}
-          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-            <div className="flex flex-col gap-1">
-              <label className="font-body text-[13px] font-medium text-text">
-                Upstream Timeout (seconds)
-              </label>
-              <div
-                className="font-body text-[11px] text-text-secondary"
-                style={{ lineHeight: 1.35, marginBottom: '4px' }}
+              {isAdaptersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <label
+                className="font-body text-[12px] font-medium text-text-secondary"
+                style={{ marginBottom: 0, flex: 1 }}
               >
-                Override the global default timeout for this provider. Leave empty to use the global
-                default. Must be between 1 and 3600.
-              </div>
-              <input
-                className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                type="number"
-                step="1"
-                min="1"
-                max="3600"
-                placeholder="Global default"
-                value={
-                  editingProvider.timeoutMs != null
-                    ? Math.round(editingProvider.timeoutMs / 1000)
-                    : ''
-                }
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === '') {
-                    setEditingProvider({ ...editingProvider, timeoutMs: undefined });
-                  } else {
-                    const seconds = Number(raw);
-                    if (Number.isFinite(seconds) && seconds >= 1 && seconds <= 3600) {
-                      setEditingProvider({ ...editingProvider, timeoutMs: seconds * 1000 });
-                    }
-                  }
-                }}
-              />
+                Provider Adapters
+              </label>
+              {(editingProvider.adapter ?? []).length > 0 && (
+                <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                  {(editingProvider.adapter ?? []).length}
+                </Badge>
+              )}
             </div>
+            {isAdaptersOpen && (
+              <div
+                style={{
+                  padding: '8px',
+                  borderTop: '1px solid var(--color-border-glass)',
+                  background: 'var(--color-bg-subtle)',
+                }}
+              >
+                <div
+                  className="font-body text-[11px] text-text-secondary mb-2"
+                  style={{ lineHeight: 1.4 }}
+                >
+                  Adapters rewrite requests and responses to fix provider-specific field-name
+                  incompatibilities. Applied to every model under this provider unless overridden
+                  per-model.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                  {KNOWN_ADAPTERS.map((a) => {
+                    const active = (editingProvider.adapter ?? []).includes(a.value);
+                    return (
+                      <label
+                        key={a.value}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-border-glass)',
+                          background: active ? 'var(--color-bg-hover)' : 'var(--color-bg-glass)',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          style={{ marginTop: '2px', flexShrink: 0 }}
+                          onChange={() => {
+                            const current = editingProvider.adapter ?? [];
+                            const next = active
+                              ? current.filter((v) => v !== a.value)
+                              : [...current, a.value];
+                            setEditingProvider({ ...editingProvider, adapter: next });
+                          }}
+                        />
+                        <div>
+                          <div className="font-body text-[12px] font-medium text-text">
+                            {a.label}
+                          </div>
+                          <div
+                            className="font-body text-[11px] text-text-secondary"
+                            style={{ lineHeight: 1.35 }}
+                          >
+                            {a.description}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Stall Detection Overrides */}
+          {/* Stall Detection Overrides — with Cooldown on Stall toggle in header */}
           <div className="border border-border-glass rounded-md overflow-hidden">
             <div
               className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
@@ -227,11 +177,27 @@ export function ProviderAdvancedEditor({
             >
               {isStallOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <label
-                className="font-body text-[13px] font-medium text-text-secondary"
+                className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
                 Stall Detection Overrides
               </label>
+              {/* Cooldown on Stall toggle — moved here from its own section */}
+              <div
+                className="flex items-center gap-1.5"
+                onClick={(e) => e.stopPropagation()}
+                title="When enabled, stall detection cancellations will trigger cooldown for this provider."
+              >
+                <Switch
+                  checked={editingProvider.stallCooldown || false}
+                  onChange={(checked) =>
+                    setEditingProvider({ ...editingProvider, stallCooldown: checked })
+                  }
+                />
+                <span className="font-body text-[11px] text-text-secondary whitespace-nowrap">
+                  Cooldown on Stall
+                </span>
+              </div>
               {(editingProvider.stallTtfbMs != null ||
                 editingProvider.stallTtfbBytes != null ||
                 editingProvider.stallMinBps != null ||
@@ -247,189 +213,169 @@ export function ProviderAdvancedEditor({
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '6px',
                   padding: '8px',
                   borderTop: '1px solid var(--color-border-glass)',
-                  background: 'var(--color-bg-deep)',
+                  background: 'var(--color-bg-subtle)',
                 }}
               >
                 <div
                   className="font-body text-[11px] text-text-secondary"
-                  style={{ lineHeight: 1.35, marginBottom: '2px' }}
+                  style={{ lineHeight: 1.35 }}
                 >
                   Override the global stall detection settings for this provider. Leave empty to use
                   the global setting for each field.
                 </div>
-                {/* TTFB Timeout */}
-                <div>
-                  <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    TTFB Timeout (seconds)
-                  </label>
-                  <div
-                    className="font-body text-[10px] text-text-muted"
-                    style={{ lineHeight: 1.3, marginBottom: '3px' }}
-                  >
-                    5–120 seconds. Leave empty for global default.
+                {/* Stall inputs — two-column grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {/* TTFB Timeout */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      TTFB Timeout (s)
+                      <span className="font-normal text-[10px] text-text-muted ml-1">5–120</span>
+                    </label>
+                    <input
+                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      placeholder="Global default"
+                      value={stallTtfbDraft}
+                      onChange={(e) => setStallTtfbDraft(e.target.value)}
+                      onBlur={() => {
+                        const num = Number(stallTtfbDraft);
+                        if (stallTtfbDraft === '') {
+                          setEditingProvider({ ...editingProvider, stallTtfbMs: undefined });
+                        } else if (Number.isFinite(num) && num >= 5 && num <= 120) {
+                          setEditingProvider({ ...editingProvider, stallTtfbMs: num * 1000 });
+                        } else {
+                          setStallTtfbDraft(
+                            editingProvider.stallTtfbMs != null
+                              ? String(Math.round(editingProvider.stallTtfbMs / 1000))
+                              : ''
+                          );
+                        }
+                      }}
+                    />
                   </div>
-                  <input
-                    className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                    type="number"
-                    step="1"
-                    placeholder="Global default"
-                    value={stallTtfbDraft}
-                    onChange={(e) => setStallTtfbDraft(e.target.value)}
-                    onBlur={() => {
-                      const num = Number(stallTtfbDraft);
-                      if (stallTtfbDraft === '') {
-                        setEditingProvider({ ...editingProvider, stallTtfbMs: undefined });
-                      } else if (Number.isFinite(num) && num >= 5 && num <= 120) {
-                        setEditingProvider({ ...editingProvider, stallTtfbMs: num * 1000 });
-                      } else {
-                        // Revert to current value
-                        setStallTtfbDraft(
-                          editingProvider.stallTtfbMs != null
-                            ? String(Math.round(editingProvider.stallTtfbMs / 1000))
-                            : ''
-                        );
-                      }
-                    }}
-                  />
-                </div>
-                {/* TTFB Byte Threshold */}
-                <div>
-                  <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    TTFB Byte Threshold
-                  </label>
-                  <div
-                    className="font-body text-[10px] text-text-muted"
-                    style={{ lineHeight: 1.3, marginBottom: '3px' }}
-                  >
-                    50–10,000 bytes. Leave empty for global default.
+                  {/* TTFB Byte Threshold */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      TTFB Byte Threshold
+                      <span className="font-normal text-[10px] text-text-muted ml-1">50–10k</span>
+                    </label>
+                    <input
+                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      placeholder="Global default"
+                      value={stallTtfbBytesDraft}
+                      onChange={(e) => setStallTtfbBytesDraft(e.target.value)}
+                      onBlur={() => {
+                        const num = Number(stallTtfbBytesDraft);
+                        if (stallTtfbBytesDraft === '') {
+                          setEditingProvider({ ...editingProvider, stallTtfbBytes: undefined });
+                        } else if (Number.isFinite(num) && num >= 50 && num <= 10000) {
+                          setEditingProvider({ ...editingProvider, stallTtfbBytes: num });
+                        } else {
+                          setStallTtfbBytesDraft(
+                            editingProvider.stallTtfbBytes != null
+                              ? String(editingProvider.stallTtfbBytes)
+                              : ''
+                          );
+                        }
+                      }}
+                    />
                   </div>
-                  <input
-                    className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                    type="number"
-                    step="1"
-                    placeholder="Global default"
-                    value={stallTtfbBytesDraft}
-                    onChange={(e) => setStallTtfbBytesDraft(e.target.value)}
-                    onBlur={() => {
-                      const num = Number(stallTtfbBytesDraft);
-                      if (stallTtfbBytesDraft === '') {
-                        setEditingProvider({ ...editingProvider, stallTtfbBytes: undefined });
-                      } else if (Number.isFinite(num) && num >= 50 && num <= 10000) {
-                        setEditingProvider({ ...editingProvider, stallTtfbBytes: num });
-                      } else {
-                        setStallTtfbBytesDraft(
-                          editingProvider.stallTtfbBytes != null
-                            ? String(editingProvider.stallTtfbBytes)
-                            : ''
-                        );
-                      }
-                    }}
-                  />
-                </div>
-                {/* Min Bytes/Sec */}
-                <div>
-                  <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    Min Bytes Per Second
-                  </label>
-                  <div
-                    className="font-body text-[10px] text-text-muted"
-                    style={{ lineHeight: 1.3, marginBottom: '3px' }}
-                  >
-                    50–5,000 B/s. Leave empty for global default.
+                  {/* Min Bytes/Sec */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Min Bytes/Sec
+                      <span className="font-normal text-[10px] text-text-muted ml-1">50–5k</span>
+                    </label>
+                    <input
+                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      placeholder="Global default"
+                      value={stallMinBpsDraft}
+                      onChange={(e) => setStallMinBpsDraft(e.target.value)}
+                      onBlur={() => {
+                        const num = Number(stallMinBpsDraft);
+                        if (stallMinBpsDraft === '') {
+                          setEditingProvider({ ...editingProvider, stallMinBps: undefined });
+                        } else if (Number.isFinite(num) && num >= 50 && num <= 5000) {
+                          setEditingProvider({ ...editingProvider, stallMinBps: num });
+                        } else {
+                          setStallMinBpsDraft(
+                            editingProvider.stallMinBps != null
+                              ? String(editingProvider.stallMinBps)
+                              : ''
+                          );
+                        }
+                      }}
+                    />
                   </div>
-                  <input
-                    className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                    type="number"
-                    step="1"
-                    placeholder="Global default"
-                    value={stallMinBpsDraft}
-                    onChange={(e) => setStallMinBpsDraft(e.target.value)}
-                    onBlur={() => {
-                      const num = Number(stallMinBpsDraft);
-                      if (stallMinBpsDraft === '') {
-                        setEditingProvider({ ...editingProvider, stallMinBps: undefined });
-                      } else if (Number.isFinite(num) && num >= 50 && num <= 5000) {
-                        setEditingProvider({ ...editingProvider, stallMinBps: num });
-                      } else {
-                        setStallMinBpsDraft(
-                          editingProvider.stallMinBps != null
-                            ? String(editingProvider.stallMinBps)
-                            : ''
-                        );
-                      }
-                    }}
-                  />
-                </div>
-                {/* Stall Window */}
-                <div>
-                  <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    Stall Window (seconds)
-                  </label>
-                  <div
-                    className="font-body text-[10px] text-text-muted"
-                    style={{ lineHeight: 1.3, marginBottom: '3px' }}
-                  >
-                    3–30 seconds. Leave empty for global default.
+                  {/* Stall Window */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Stall Window (s)
+                      <span className="font-normal text-[10px] text-text-muted ml-1">3–30</span>
+                    </label>
+                    <input
+                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      placeholder="Global default"
+                      value={stallWindowDraft}
+                      onChange={(e) => setStallWindowDraft(e.target.value)}
+                      onBlur={() => {
+                        const num = Number(stallWindowDraft);
+                        if (stallWindowDraft === '') {
+                          setEditingProvider({ ...editingProvider, stallWindowMs: undefined });
+                        } else if (Number.isFinite(num) && num >= 3 && num <= 30) {
+                          setEditingProvider({ ...editingProvider, stallWindowMs: num * 1000 });
+                        } else {
+                          setStallWindowDraft(
+                            editingProvider.stallWindowMs != null
+                              ? String(Math.round(editingProvider.stallWindowMs / 1000))
+                              : ''
+                          );
+                        }
+                      }}
+                    />
                   </div>
-                  <input
-                    className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                    type="number"
-                    step="1"
-                    placeholder="Global default"
-                    value={stallWindowDraft}
-                    onChange={(e) => setStallWindowDraft(e.target.value)}
-                    onBlur={() => {
-                      const num = Number(stallWindowDraft);
-                      if (stallWindowDraft === '') {
-                        setEditingProvider({ ...editingProvider, stallWindowMs: undefined });
-                      } else if (Number.isFinite(num) && num >= 3 && num <= 30) {
-                        setEditingProvider({ ...editingProvider, stallWindowMs: num * 1000 });
-                      } else {
-                        setStallWindowDraft(
-                          editingProvider.stallWindowMs != null
-                            ? String(Math.round(editingProvider.stallWindowMs / 1000))
-                            : ''
-                        );
-                      }
-                    }}
-                  />
-                </div>
-                {/* Grace Period */}
-                <div>
-                  <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
-                    Stall Grace Period (seconds)
-                  </label>
-                  <div
-                    className="font-body text-[10px] text-text-muted"
-                    style={{ lineHeight: 1.3, marginBottom: '3px' }}
-                  >
-                    0–120 seconds. Leave empty for global default.
+                  {/* Grace Period */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Grace Period (s)
+                      <span className="font-normal text-[10px] text-text-muted ml-1">0–120</span>
+                    </label>
+                    <input
+                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      placeholder="Global default"
+                      value={stallGraceDraft}
+                      onChange={(e) => setStallGraceDraft(e.target.value)}
+                      onBlur={() => {
+                        const num = Number(stallGraceDraft);
+                        if (stallGraceDraft === '') {
+                          setEditingProvider({ ...editingProvider, stallGracePeriodMs: undefined });
+                        } else if (Number.isFinite(num) && num >= 0 && num <= 120) {
+                          setEditingProvider({
+                            ...editingProvider,
+                            stallGracePeriodMs: num * 1000,
+                          });
+                        } else {
+                          setStallGraceDraft(
+                            editingProvider.stallGracePeriodMs != null
+                              ? String(Math.round(editingProvider.stallGracePeriodMs / 1000))
+                              : ''
+                          );
+                        }
+                      }}
+                    />
                   </div>
-                  <input
-                    className="w-full max-w-[200px] py-2 pl-3 pr-7 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                    type="number"
-                    step="1"
-                    placeholder="Global default"
-                    value={stallGraceDraft}
-                    onChange={(e) => setStallGraceDraft(e.target.value)}
-                    onBlur={() => {
-                      const num = Number(stallGraceDraft);
-                      if (stallGraceDraft === '') {
-                        setEditingProvider({ ...editingProvider, stallGracePeriodMs: undefined });
-                      } else if (Number.isFinite(num) && num >= 0 && num <= 120) {
-                        setEditingProvider({ ...editingProvider, stallGracePeriodMs: num * 1000 });
-                      } else {
-                        setStallGraceDraft(
-                          editingProvider.stallGracePeriodMs != null
-                            ? String(Math.round(editingProvider.stallGracePeriodMs / 1000))
-                            : ''
-                        );
-                      }
-                    }}
-                  />
                 </div>
               </div>
             )}
@@ -443,7 +389,7 @@ export function ProviderAdvancedEditor({
             >
               {isHeadersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <label
-                className="font-body text-[13px] font-medium text-text-secondary"
+                className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
                 Custom Headers
@@ -522,7 +468,7 @@ export function ProviderAdvancedEditor({
             >
               {isExtraBodyOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <label
-                className="font-body text-[13px] font-medium text-text-secondary"
+                className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
                 Extra Body Fields
@@ -593,111 +539,283 @@ export function ProviderAdvancedEditor({
             )}
           </div>
 
-          {/* Estimate Tokens */}
-          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-            <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-              <Switch
-                checked={editingProvider.estimateTokens || false}
-                onChange={(checked) =>
-                  setEditingProvider({ ...editingProvider, estimateTokens: checked })
-                }
-              />
-              <label
-                className="font-body text-[13px] font-medium text-text"
-                style={{ marginBottom: 0 }}
+          {/* Compact settings card — toggles left, value inputs right */}
+          <div className="border border-border-glass rounded-md p-2 bg-bg-subtle">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+              {/* Left: toggles */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label className="flex items-start gap-2 py-1 cursor-pointer">
+                  <Switch
+                    checked={editingProvider.estimateTokens || false}
+                    onChange={(checked) =>
+                      setEditingProvider({ ...editingProvider, estimateTokens: checked })
+                    }
+                  />
+                  <div>
+                    <div className="font-body text-[12px] text-text">Estimate Tokens</div>
+                    <div
+                      className="font-body text-[11px] text-text-muted"
+                      style={{ lineHeight: 1.35 }}
+                    >
+                      Only when provider doesn't return usage data. Use sparingly.
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 py-1 cursor-pointer">
+                  <Switch
+                    checked={editingProvider.disableCooldown || false}
+                    onChange={(checked) =>
+                      setEditingProvider({ ...editingProvider, disableCooldown: checked })
+                    }
+                  />
+                  <div>
+                    <div className="font-body text-[12px] text-text">Disable Cooldowns</div>
+                    <div
+                      className="font-body text-[11px] text-text-muted"
+                      style={{ lineHeight: 1.35 }}
+                    >
+                      Provider will never be placed on cooldown.
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 py-1 cursor-pointer">
+                  <Switch
+                    checked={editingProvider.useClaudeMasking || false}
+                    onChange={(checked) =>
+                      setEditingProvider({ ...editingProvider, useClaudeMasking: checked })
+                    }
+                  />
+                  <div>
+                    <div className="font-body text-[12px] text-text">Use Claude Masking</div>
+                    <div
+                      className="font-body text-[11px] text-text-muted"
+                      style={{ lineHeight: 1.35 }}
+                    >
+                      Mask requests as Claude Code CLI sessions. Anthropic only.
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Right: inputs */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  justifyContent: 'center',
+                }}
               >
-                Estimate Tokens
-              </label>
-            </div>
-            <div
-              className="font-body text-[11px] text-text-secondary"
-              style={{ lineHeight: 1.35, marginTop: '4px' }}
-            >
-              Enable token estimation only when a provider does not return usage data.
-              <span className="text-warning" style={{ marginLeft: '6px' }}>
-                Use sparingly—this is rarely needed.
-              </span>
+                {/* GPU Profile */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    GPU Profile
+                  </label>
+                  <select
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={editingProvider.gpu_profile || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (!value) {
+                        const resolved = resolveGpuParams('B200');
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_profile: undefined,
+                          gpu_ram_gb: resolved.ram_gb,
+                          gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                          gpu_flops_tflop: resolved.flops_tflop,
+                          gpu_power_draw_watts: resolved.power_draw_watts,
+                        });
+                      } else if (value === 'custom') {
+                        const resolved = resolveGpuParams('custom', {
+                          ram_gb: editingProvider.gpu_ram_gb,
+                          bandwidth_tb_s: editingProvider.gpu_bandwidth_tb_s,
+                          flops_tflop: editingProvider.gpu_flops_tflop,
+                          power_draw_watts: editingProvider.gpu_power_draw_watts,
+                        });
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_profile: 'custom',
+                          gpu_ram_gb: resolved.ram_gb,
+                          gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                          gpu_flops_tflop: resolved.flops_tflop,
+                          gpu_power_draw_watts: resolved.power_draw_watts,
+                        });
+                      } else {
+                        const resolved = resolveGpuParams(value);
+                        setEditingProvider({
+                          ...editingProvider,
+                          gpu_profile: value,
+                          gpu_ram_gb: resolved.ram_gb,
+                          gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
+                          gpu_flops_tflop: resolved.flops_tflop,
+                          gpu_power_draw_watts: resolved.power_draw_watts,
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">Default (B200)</option>
+                    {GPU_PROFILE_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* Discount */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Discount
+                    <span className="font-normal text-[10px] text-text-muted ml-1">
+                      e.g. 10 → pays 90%
+                    </span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="w-full py-1 pl-2 pr-5 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      value={Math.round((editingProvider.discount ?? 0) * 100)}
+                      onChange={(e) => {
+                        const clamped = Math.min(100, Math.max(0, Number(e.target.value || '0')));
+                        setEditingProvider({ ...editingProvider, discount: clamped / 100 });
+                      }}
+                    />
+                    <span
+                      className="font-body text-[11px] text-text-muted"
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      %
+                    </span>
+                  </div>
+                </div>
+                {/* Upstream Timeout */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Timeout
+                    <span className="font-normal text-[10px] text-text-muted ml-1">1–3600s</span>
+                  </label>
+                  <input
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="3600"
+                    placeholder="Global default"
+                    value={
+                      editingProvider.timeoutMs != null
+                        ? Math.round(editingProvider.timeoutMs / 1000)
+                        : ''
+                    }
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setEditingProvider({ ...editingProvider, timeoutMs: undefined });
+                      } else {
+                        const seconds = Number(raw);
+                        if (Number.isFinite(seconds) && seconds >= 1 && seconds <= 3600) {
+                          setEditingProvider({ ...editingProvider, timeoutMs: seconds * 1000 });
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Disable Cooldown */}
-          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-            <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-              <Switch
-                checked={editingProvider.disableCooldown || false}
-                onChange={(checked) =>
-                  setEditingProvider({ ...editingProvider, disableCooldown: checked })
-                }
-              />
-              <label
-                className="font-body text-[13px] font-medium text-text"
-                style={{ marginBottom: 0 }}
-              >
-                Disable Cooldowns
-              </label>
-            </div>
+          {/* Custom GPU fields — only when gpu_profile === 'custom' */}
+          {editingProvider.gpu_profile === 'custom' && (
             <div
-              className="font-body text-[11px] text-text-secondary"
-              style={{ lineHeight: 1.35, marginTop: '4px' }}
+              className="border border-border-glass rounded-md p-2 bg-bg-subtle"
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}
             >
-              When enabled, this provider will never be placed on cooldown.
-              <span className="text-warning" style={{ marginLeft: '6px' }}>
-                Use only for providers with reliable external rate-limit handling.
-              </span>
+              <div className="flex flex-col gap-0.5">
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  RAM (GB)
+                </label>
+                <input
+                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="1"
+                  min="1"
+                  placeholder="e.g. 80"
+                  value={editingProvider.gpu_ram_gb || ''}
+                  onChange={(e) =>
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_ram_gb: parseFloat(e.target.value) || undefined,
+                    })
+                  }
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Bandwidth (TB/s)
+                </label>
+                <input
+                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  placeholder="e.g. 3.35"
+                  value={editingProvider.gpu_bandwidth_tb_s || ''}
+                  onChange={(e) =>
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_bandwidth_tb_s: parseFloat(e.target.value) || undefined,
+                    })
+                  }
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  FLOPS (TFLOPs)
+                </label>
+                <input
+                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="100"
+                  min="1"
+                  placeholder="e.g. 4000"
+                  value={editingProvider.gpu_flops_tflop || ''}
+                  onChange={(e) =>
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_flops_tflop: parseFloat(e.target.value) || undefined,
+                    })
+                  }
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="font-body text-[11px] font-medium text-text-secondary">
+                  Power (Watts)
+                </label>
+                <input
+                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  type="number"
+                  step="10"
+                  min="1"
+                  placeholder="e.g. 700"
+                  value={editingProvider.gpu_power_draw_watts || ''}
+                  onChange={(e) =>
+                    setEditingProvider({
+                      ...editingProvider,
+                      gpu_power_draw_watts: parseInt(e.target.value, 10) || undefined,
+                    })
+                  }
+                />
+              </div>
             </div>
-          </div>
-
-          {/* Stall Cooldown */}
-          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-            <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-              <Switch
-                checked={editingProvider.stallCooldown || false}
-                onChange={(checked) =>
-                  setEditingProvider({ ...editingProvider, stallCooldown: checked })
-                }
-              />
-              <label
-                className="font-body text-[13px] font-medium text-text"
-                style={{ marginBottom: 0 }}
-              >
-                Cooldown on Stall
-              </label>
-            </div>
-            <div
-              className="font-body text-[11px] text-text-secondary"
-              style={{ lineHeight: 1.35, marginTop: '4px' }}
-            >
-              When enabled, stall detection cancellations will trigger cooldown for this provider.
-            </div>
-          </div>
-
-          {/* Use Claude Masking */}
-          <div className="border border-border-glass rounded-md p-3 bg-bg-subtle">
-            <div className="flex items-center gap-2" style={{ minHeight: '38px' }}>
-              <Switch
-                checked={editingProvider.useClaudeMasking || false}
-                onChange={(checked) =>
-                  setEditingProvider({ ...editingProvider, useClaudeMasking: checked })
-                }
-              />
-              <label
-                className="font-body text-[13px] font-medium text-text"
-                style={{ marginBottom: 0 }}
-              >
-                Use Claude Masking
-              </label>
-            </div>
-            <div
-              className="font-body text-[11px] text-text-secondary"
-              style={{ lineHeight: 1.35, marginTop: '4px' }}
-            >
-              When enabled, requests to this Anthropic provider will be masked as Claude Code CLI
-              sessions.
-              <span className="text-warning" style={{ marginLeft: '6px' }}>
-                Only effective for Anthropic providers.
-              </span>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>

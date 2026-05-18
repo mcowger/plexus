@@ -20,18 +20,6 @@ import { OpenRouterSlugInput } from '../ui/OpenRouterSlugInput';
 import type { Provider } from '../../lib/api';
 import { KNOWN_ADAPTERS } from './ProviderAdvancedEditor';
 
-const KNOWN_APIS = [
-  'chat',
-  'messages',
-  'gemini',
-  'embeddings',
-  'transcriptions',
-  'speech',
-  'images',
-  'responses',
-  'ollama',
-];
-
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
   switch (apiType.toLowerCase()) {
     case 'messages':
@@ -57,8 +45,12 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
   }
 };
 
-// ── ModelIdInput (extracted inline component) ──
-function ModelIdInput({
+// Consistent compact field class used everywhere in the model editor
+const FIELD_CLS =
+  'w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary';
+
+// ── ModelIdInputCompact ──
+function ModelIdInputCompact({
   modelId,
   onCommit,
 }: {
@@ -74,8 +66,8 @@ function ModelIdInput({
     onCommit(modelId, draftId);
   };
   return (
-    <Input
-      label="Model ID"
+    <input
+      className={FIELD_CLS}
       value={draftId}
       onChange={(e) => setDraftId(e.target.value)}
       onBlur={commit}
@@ -143,6 +135,8 @@ export function ProviderModelsEditor({
   onDismissTestMessage,
   getApiBaseUrlMap,
 }: Props) {
+  const [modelAdaptersOpen, setModelAdaptersOpen] = useState<Record<string, boolean>>({});
+
   return (
     <div className="border border-border-glass rounded-md">
       <div
@@ -170,7 +164,7 @@ export function ProviderModelsEditor({
           style={{
             padding: '8px',
             borderTop: '1px solid var(--color-border-glass)',
-            background: 'var(--color-bg-deep)',
+            background: 'var(--color-bg-subtle)',
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -261,164 +255,89 @@ export function ProviderModelsEditor({
                         gap: '6px',
                       }}
                     >
-                      <ModelIdInput modelId={mId} onCommit={updateModelId} />
-
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="font-body text-[13px] font-medium text-text-secondary">
-                            Model Type
-                          </label>
-                          <select
-                            className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                            value={mCfg.type || 'chat'}
-                            onChange={(e) => {
-                              const newType = e.target.value as
-                                | 'chat'
-                                | 'embeddings'
-                                | 'transcriptions'
-                                | 'speech'
-                                | 'image'
-                                | 'responses';
-                              if (newType === 'embeddings')
-                                updateModelConfig(mId, {
-                                  type: newType,
-                                  access_via: ['embeddings'],
-                                });
-                              else if (newType === 'transcriptions')
-                                updateModelConfig(mId, {
-                                  type: newType,
-                                  access_via: ['transcriptions'],
-                                });
-                              else if (newType === 'speech')
-                                updateModelConfig(mId, { type: newType, access_via: ['speech'] });
-                              else if (newType === 'image')
-                                updateModelConfig(mId, { type: newType, access_via: ['images'] });
-                              else if (newType === 'responses')
-                                updateModelConfig(mId, {
-                                  type: newType,
-                                  access_via: ['responses'],
-                                });
-                              else updateModelConfig(mId, { type: newType });
-                            }}
-                          >
-                            <option value="chat">Chat</option>
-                            <option value="embeddings">Embeddings</option>
-                            <option value="transcriptions">Transcriptions</option>
-                            <option value="speech">Speech</option>
-                            <option value="image">Image</option>
-                            <option value="responses">Responses</option>
-                          </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="font-body text-[13px] font-medium text-text-secondary">
-                            Pricing Source
-                          </label>
-                          <select
-                            className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                            value={mCfg.pricing?.source || 'simple'}
-                            onChange={(e) => {
-                              const newSource = e.target.value;
-                              let newPricing: any;
-                              if (newSource === 'simple')
-                                newPricing = {
-                                  source: 'simple',
-                                  input: mCfg.pricing?.input || 0,
-                                  output: mCfg.pricing?.output || 0,
-                                  cached: mCfg.pricing?.cached || 0,
-                                  cache_write: mCfg.pricing?.cache_write || 0,
-                                };
-                              else if (newSource === 'openrouter')
-                                newPricing = {
-                                  source: 'openrouter',
-                                  slug: mCfg.pricing?.slug || '',
-                                  ...(mCfg.pricing?.discount !== undefined && {
-                                    discount: mCfg.pricing.discount,
-                                  }),
-                                };
-                              else if (newSource === 'defined')
-                                newPricing = {
-                                  source: 'defined',
-                                  range: mCfg.pricing?.range || [],
-                                };
-                              else if (newSource === 'per_request')
-                                newPricing = {
-                                  source: 'per_request',
-                                  amount: mCfg.pricing?.amount || 0,
-                                };
-                              updateModelConfig(mId, { pricing: newPricing });
-                            }}
-                          >
-                            <option value="simple">Simple</option>
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="defined">Ranges (Complex)</option>
-                            <option value="per_request">Per Request (Flat Fee)</option>
-                          </select>
-                        </div>
-                        {mCfg.type !== 'embeddings' &&
-                          mCfg.type !== 'transcriptions' &&
-                          mCfg.type !== 'speech' &&
-                          mCfg.type !== 'image' &&
-                          mCfg.type !== 'responses' && (
+                      {/* 2-column primary layout: left = meta, right = pricing */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '8px',
+                          alignItems: 'start',
+                        }}
+                      >
+                        {/* Left: Model ID + Type + Access Via */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {/* Compact Model ID — bypasses Input component's py-2 */}
+                          <div className="flex flex-col gap-1">
+                            <label className="font-body text-[11px] font-medium text-text-secondary">
+                              Model ID
+                            </label>
+                            <ModelIdInputCompact modelId={mId} onCommit={updateModelId} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="font-body text-[11px] font-medium text-text-secondary">
+                              Model Type
+                            </label>
+                            <select
+                              className={FIELD_CLS}
+                              value={mCfg.type || 'chat'}
+                              onChange={(e) => {
+                                const newType = e.target.value as
+                                  | 'chat'
+                                  | 'embeddings'
+                                  | 'transcriptions'
+                                  | 'speech'
+                                  | 'image';
+                                if (newType === 'embeddings')
+                                  updateModelConfig(mId, {
+                                    type: newType,
+                                    access_via: ['embeddings'],
+                                  });
+                                else if (newType === 'transcriptions')
+                                  updateModelConfig(mId, {
+                                    type: newType,
+                                    access_via: ['transcriptions'],
+                                  });
+                                else if (newType === 'speech')
+                                  updateModelConfig(mId, { type: newType, access_via: ['speech'] });
+                                else if (newType === 'image')
+                                  updateModelConfig(mId, { type: newType, access_via: ['images'] });
+                                else updateModelConfig(mId, { type: newType });
+                              }}
+                            >
+                              <option value="chat">Chat</option>
+                              <option value="embeddings">Embeddings</option>
+                              <option value="transcriptions">Transcriptions</option>
+                              <option value="speech">Speech</option>
+                              <option value="image">Image</option>
+                            </select>
+                          </div>
+                          {(!mCfg.type || mCfg.type === 'chat') && (
                             <div className="flex flex-col gap-1">
-                              <label className="font-body text-[13px] font-medium text-text-secondary">
-                                Access Via (APIs)
+                              <label className="font-body text-[11px] font-medium text-text-secondary">
+                                Access Via
                               </label>
                               <div
                                 style={{
-                                  fontSize: '11px',
-                                  color: 'var(--color-text-secondary)',
-                                  marginBottom: '4px',
-                                  lineHeight: '1.4',
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(5, auto)',
+                                  gap: '4px',
+                                  justifyContent: 'start',
                                 }}
                               >
-                                Choose which API protocols this model should use.
-                              </div>
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  gap: '6px',
-                                  flexWrap: 'wrap',
-                                  marginTop: '4px',
-                                }}
-                              >
-                                {KNOWN_APIS.filter((apiType) => {
-                                  if (mCfg.type === 'chat')
-                                    return [
-                                      'messages',
-                                      'chat',
-                                      'gemini',
-                                      'responses',
-                                      'ollama',
-                                    ].includes(apiType);
-                                  return true;
-                                }).map((apiType) => {
-                                  const isEmbeddingsModel = mCfg.type === 'embeddings';
-                                  const isTranscriptionsModel = mCfg.type === 'transcriptions';
-                                  const isSpeechModel = mCfg.type === 'speech';
-                                  const isImageModel = mCfg.type === 'image';
-                                  const isResponsesModel = mCfg.type === 'responses';
-                                  const isDisabled =
-                                    (isEmbeddingsModel && apiType !== 'embeddings') ||
-                                    (isTranscriptionsModel && apiType !== 'transcriptions') ||
-                                    (isSpeechModel && apiType !== 'speech') ||
-                                    (isImageModel && apiType !== 'images') ||
-                                    (isResponsesModel && apiType !== 'responses');
-                                  return (
+                                {['chat', 'messages', 'gemini', 'responses', 'ollama'].map(
+                                  (apiType) => (
                                     <label
                                       key={apiType}
                                       style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '3px',
-                                        fontSize: '11px',
-                                        opacity: isDisabled ? 0.4 : 1,
-                                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                        cursor: 'pointer',
                                       }}
                                     >
                                       <input
                                         type="checkbox"
                                         checked={(mCfg.access_via || []).includes(apiType)}
-                                        disabled={isDisabled}
                                         onChange={() => {
                                           const current = mCfg.access_via || [];
                                           const next = current.includes(apiType)
@@ -428,7 +347,7 @@ export function ProviderModelsEditor({
                                         }}
                                       />
                                       <span
-                                        className="inline-flex items-center py-1.5 px-3 rounded-xl text-xs font-medium"
+                                        className="inline-flex items-center rounded-xl font-medium"
                                         style={{
                                           ...getApiBadgeStyle(apiType),
                                           fontSize: '10px',
@@ -441,45 +360,30 @@ export function ProviderModelsEditor({
                                         {apiType}
                                       </span>
                                     </label>
-                                  );
-                                })}
+                                  )
+                                )}
                               </div>
                               {(!mCfg.access_via || mCfg.access_via.length === 0) && (
-                                <div
-                                  style={{
-                                    fontSize: '11px',
-                                    color: 'var(--color-text-secondary)',
-                                    marginTop: '4px',
-                                    fontStyle: 'italic',
-                                  }}
-                                >
-                                  Empty selection — Plexus will use any API type configured for this
-                                  provider.
-                                </div>
+                                <span className="font-body text-[11px] text-text-muted italic">
+                                  empty = use any provider API
+                                </span>
                               )}
                               {(() => {
                                 const providerBaseUrlMap = getApiBaseUrlMap();
                                 const hasOllamaBaseUrl = Object.entries(providerBaseUrlMap).some(
                                   ([type, url]) => type === 'ollama' && url && url.trim() !== ''
                                 );
-                                const accessVia = mCfg.access_via || [];
                                 if (
                                   hasOllamaBaseUrl &&
-                                  !accessVia.includes('ollama') &&
-                                  mCfg.type !== 'embeddings' &&
-                                  mCfg.type !== 'transcriptions' &&
-                                  mCfg.type !== 'speech' &&
-                                  mCfg.type !== 'image' &&
-                                  mCfg.type !== 'responses'
+                                  !(mCfg.access_via || []).includes('ollama')
                                 ) {
                                   return (
-                                    <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm mt-2">
+                                    <div className="flex items-start gap-2 py-1.5 px-2 bg-info/10 border border-info/30 rounded-sm">
                                       <Info size={14} className="text-info shrink-0 mt-0.5" />
                                       <span className="text-[11px] text-info">
-                                        Provider has a native Ollama URL. If you want this model to
-                                        use native Ollama, select{' '}
-                                        <span style={{ fontWeight: 600 }}>ollama</span> in Access
-                                        Via above.
+                                        Provider has a native Ollama URL — select{' '}
+                                        <span style={{ fontWeight: 600 }}>ollama</span> above to use
+                                        it.
                                       </span>
                                     </div>
                                   );
@@ -488,397 +392,449 @@ export function ProviderModelsEditor({
                               })()}
                             </div>
                           )}
-                      </div>
+                        </div>
 
-                      {/* Pricing forms */}
-                      {mCfg.pricing?.source === 'simple' && (
-                        <div
-                          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
-                          style={{
-                            background: 'var(--color-bg-subtle)',
-                            padding: '12px',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                        >
-                          <Input
-                            label="Input $/M"
-                            type="number"
-                            step="0.000001"
-                            value={mCfg.pricing.input || 0}
-                            onChange={(e) =>
-                              updateModelConfig(mId, {
-                                pricing: { ...mCfg.pricing, input: parseFloat(e.target.value) },
-                              })
-                            }
-                          />
-                          <Input
-                            label="Output $/M"
-                            type="number"
-                            step="0.000001"
-                            value={mCfg.pricing.output || 0}
-                            onChange={(e) =>
-                              updateModelConfig(mId, {
-                                pricing: { ...mCfg.pricing, output: parseFloat(e.target.value) },
-                              })
-                            }
-                          />
-                          <Input
-                            label="Cached $/M"
-                            type="number"
-                            step="0.000001"
-                            value={mCfg.pricing.cached || 0}
-                            onChange={(e) =>
-                              updateModelConfig(mId, {
-                                pricing: { ...mCfg.pricing, cached: parseFloat(e.target.value) },
-                              })
-                            }
-                          />
-                          <Input
-                            label="Cache Write $/M"
-                            type="number"
-                            step="0.000001"
-                            value={mCfg.pricing.cache_write || 0}
-                            onChange={(e) =>
-                              updateModelConfig(mId, {
-                                pricing: {
-                                  ...mCfg.pricing,
-                                  cache_write: parseFloat(e.target.value),
-                                },
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-                      {mCfg.pricing?.source === 'openrouter' && (
-                        <div
-                          className="flex flex-col gap-3 sm:flex-row sm:items-end"
-                          style={{
-                            background: 'var(--color-bg-subtle)',
-                            padding: '12px',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <OpenRouterSlugInput
-                              label="OpenRouter Model Slug"
-                              placeholder="e.g. anthropic/claude-3.5-sonnet"
-                              value={mCfg.pricing.slug || ''}
-                              onChange={(value) =>
-                                updateModelConfig(mId, {
-                                  pricing: { ...mCfg.pricing, slug: value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="w-full sm:w-24">
-                            <Input
-                              label="Discount (0-1)"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="1"
-                              value={mCfg.pricing.discount ?? ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === '') {
-                                  const { discount, ...rest } = mCfg.pricing;
-                                  updateModelConfig(mId, { pricing: rest });
-                                } else
-                                  updateModelConfig(mId, {
-                                    pricing: { ...mCfg.pricing, discount: parseFloat(val) },
-                                  });
-                              }}
-                            />
-                            <span className="text-[10px] text-text-muted">0.1 = 10% off</span>
-                          </div>
-                        </div>
-                      )}
-                      {mCfg.pricing?.source === 'defined' && (
-                        <div
-                          style={{
-                            background: 'var(--color-bg-subtle)',
-                            padding: '12px',
-                            borderRadius: 'var(--radius-sm)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <label
-                              className="font-body text-[13px] font-medium text-text-secondary"
-                              style={{ marginBottom: 0 }}
-                            >
-                              Pricing Ranges
+                        {/* Right: Pricing Source + Pricing Inputs */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div className="flex flex-col gap-1">
+                            <label className="font-body text-[11px] font-medium text-text-secondary">
+                              Pricing Source
                             </label>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                const currentRanges = mCfg.pricing.range || [];
-                                updateModelConfig(mId, {
-                                  pricing: {
-                                    ...mCfg.pricing,
-                                    range: [
-                                      ...currentRanges,
-                                      {
-                                        lower_bound: 0,
-                                        upper_bound: 0,
-                                        input_per_m: 0,
-                                        output_per_m: 0,
-                                        cache_write_per_m: 0,
-                                      },
-                                    ],
-                                  },
-                                });
+                            <select
+                              className={FIELD_CLS}
+                              value={mCfg.pricing?.source || 'simple'}
+                              onChange={(e) => {
+                                const newSource = e.target.value;
+                                let newPricing: any;
+                                if (newSource === 'simple')
+                                  newPricing = {
+                                    source: 'simple',
+                                    input: mCfg.pricing?.input || 0,
+                                    output: mCfg.pricing?.output || 0,
+                                    cached: mCfg.pricing?.cached || 0,
+                                    cache_write: mCfg.pricing?.cache_write || 0,
+                                  };
+                                else if (newSource === 'openrouter')
+                                  newPricing = {
+                                    source: 'openrouter',
+                                    slug: mCfg.pricing?.slug || '',
+                                    ...(mCfg.pricing?.discount !== undefined && {
+                                      discount: mCfg.pricing.discount,
+                                    }),
+                                  };
+                                else if (newSource === 'defined')
+                                  newPricing = {
+                                    source: 'defined',
+                                    range: mCfg.pricing?.range || [],
+                                  };
+                                else if (newSource === 'per_request')
+                                  newPricing = {
+                                    source: 'per_request',
+                                    amount: mCfg.pricing?.amount || 0,
+                                  };
+                                updateModelConfig(mId, { pricing: newPricing });
                               }}
-                              leftIcon={<Plus size={14} />}
                             >
-                              Add Range
-                            </Button>
+                              <option value="simple">Simple</option>
+                              <option value="openrouter">OpenRouter</option>
+                              <option value="defined">Ranges (Complex)</option>
+                              <option value="per_request">Per Request (Flat Fee)</option>
+                            </select>
                           </div>
-                          {(mCfg.pricing.range || []).map((range: any, idx: number) => (
+
+                          {/* Simple pricing */}
+                          {mCfg.pricing?.source === 'simple' && (
                             <div
-                              key={idx}
+                              className="grid grid-cols-2"
                               style={{
-                                border: '1px solid var(--color-border-glass)',
-                                padding: '12px',
+                                background: 'var(--color-bg-subtle)',
+                                padding: '8px',
                                 borderRadius: 'var(--radius-sm)',
-                                position: 'relative',
+                                gap: '6px',
                               }}
                             >
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                style={{
-                                  position: 'absolute',
-                                  top: '8px',
-                                  right: '8px',
-                                  color: 'var(--color-danger)',
-                                  padding: '4px',
-                                }}
-                                onClick={() => {
-                                  const newRanges = [...mCfg.pricing.range];
-                                  newRanges.splice(idx, 1);
-                                  updateModelConfig(mId, {
-                                    pricing: { ...mCfg.pricing, range: newRanges },
-                                  });
-                                }}
-                              >
-                                <X size={14} />
-                              </Button>
-                              <div
-                                className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-                                style={{ marginBottom: '8px' }}
-                              >
-                                <Input
-                                  label="Lower Bound"
-                                  type="number"
-                                  value={range.lower_bound}
-                                  onChange={(e) => {
-                                    const r = [...mCfg.pricing.range];
-                                    r[idx] = { ...range, lower_bound: parseFloat(e.target.value) };
+                              {[
+                                { label: 'Input $/M', key: 'input' },
+                                { label: 'Output $/M', key: 'output' },
+                                { label: 'Cached $/M', key: 'cached' },
+                                { label: 'Cache Write $/M', key: 'cache_write' },
+                              ].map(({ label, key }) => (
+                                <div key={key} className="flex flex-col gap-0.5">
+                                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                                    {label}
+                                  </label>
+                                  <input
+                                    className={FIELD_CLS}
+                                    type="number"
+                                    step="0.000001"
+                                    value={(mCfg.pricing as any)[key] || 0}
+                                    onChange={(e) =>
+                                      updateModelConfig(mId, {
+                                        pricing: {
+                                          ...mCfg.pricing,
+                                          [key]: parseFloat(e.target.value),
+                                        },
+                                      })
+                                    }
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* OpenRouter pricing */}
+                          {mCfg.pricing?.source === 'openrouter' && (
+                            <div
+                              style={{
+                                background: 'var(--color-bg-subtle)',
+                                padding: '8px',
+                                borderRadius: 'var(--radius-sm)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                              }}
+                            >
+                              <div className="flex flex-col gap-0.5">
+                                <label className="font-body text-[11px] font-medium text-text-secondary">
+                                  OpenRouter Model Slug
+                                </label>
+                                <OpenRouterSlugInput
+                                  placeholder="e.g. anthropic/claude-3.5-sonnet"
+                                  value={mCfg.pricing.slug || ''}
+                                  onChange={(value) =>
                                     updateModelConfig(mId, {
-                                      pricing: { ...mCfg.pricing, range: r },
-                                    });
-                                  }}
-                                />
-                                <Input
-                                  label="Upper Bound (0 = Infinite)"
-                                  type="number"
-                                  value={range.upper_bound === Infinity ? 0 : range.upper_bound}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value);
-                                    const r = [...mCfg.pricing.range];
-                                    r[idx] = { ...range, upper_bound: val === 0 ? Infinity : val };
-                                    updateModelConfig(mId, {
-                                      pricing: { ...mCfg.pricing, range: r },
-                                    });
-                                  }}
+                                      pricing: { ...mCfg.pricing, slug: value },
+                                    })
+                                  }
                                 />
                               </div>
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                                <Input
-                                  label="Input $/M"
+                              <div className="flex flex-col gap-0.5">
+                                <label className="font-body text-[11px] font-medium text-text-secondary">
+                                  Discount{' '}
+                                  <span className="font-normal text-text-muted">
+                                    (0.1 = 10% off)
+                                  </span>
+                                </label>
+                                <input
+                                  className="w-full py-1 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                                   type="number"
-                                  step="0.000001"
-                                  value={range.input_per_m}
+                                  step="0.01"
+                                  min="0"
+                                  max="1"
+                                  value={mCfg.pricing.discount ?? ''}
                                   onChange={(e) => {
-                                    const r = [...mCfg.pricing.range];
-                                    r[idx] = { ...range, input_per_m: parseFloat(e.target.value) };
-                                    updateModelConfig(mId, {
-                                      pricing: { ...mCfg.pricing, range: r },
-                                    });
-                                  }}
-                                />
-                                <Input
-                                  label="Output $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={range.output_per_m}
-                                  onChange={(e) => {
-                                    const r = [...mCfg.pricing.range];
-                                    r[idx] = { ...range, output_per_m: parseFloat(e.target.value) };
-                                    updateModelConfig(mId, {
-                                      pricing: { ...mCfg.pricing, range: r },
-                                    });
-                                  }}
-                                />
-                                <Input
-                                  label="Cached $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={range.cached_per_m || 0}
-                                  onChange={(e) => {
-                                    const r = [...mCfg.pricing.range];
-                                    r[idx] = { ...range, cached_per_m: parseFloat(e.target.value) };
-                                    updateModelConfig(mId, {
-                                      pricing: { ...mCfg.pricing, range: r },
-                                    });
-                                  }}
-                                />
-                                <Input
-                                  label="Cache Write $/M"
-                                  type="number"
-                                  step="0.000001"
-                                  value={range.cache_write_per_m || 0}
-                                  onChange={(e) => {
-                                    const nextValue = Number(e.target.value);
-                                    const r = [...mCfg.pricing.range];
-                                    r[idx] = {
-                                      ...range,
-                                      cache_write_per_m: Number.isFinite(nextValue) ? nextValue : 0,
-                                    };
-                                    updateModelConfig(mId, {
-                                      pricing: { ...mCfg.pricing, range: r },
-                                    });
+                                    const val = e.target.value;
+                                    if (val === '') {
+                                      const { discount, ...rest } = mCfg.pricing;
+                                      updateModelConfig(mId, { pricing: rest });
+                                    } else
+                                      updateModelConfig(mId, {
+                                        pricing: { ...mCfg.pricing, discount: parseFloat(val) },
+                                      });
                                   }}
                                 />
                               </div>
                             </div>
-                          ))}
-                          {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
-                            <div className="text-text-muted italic text-center text-sm p-4">
-                              No ranges defined. Pricing will likely default to 0.
+                          )}
+
+                          {/* Defined/ranges pricing */}
+                          {mCfg.pricing?.source === 'defined' && (
+                            <div
+                              style={{
+                                background: 'var(--color-bg-subtle)',
+                                padding: '8px',
+                                borderRadius: 'var(--radius-sm)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <span className="font-body text-[11px] font-medium text-text-secondary">
+                                  Pricing Ranges
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    const currentRanges = mCfg.pricing.range || [];
+                                    updateModelConfig(mId, {
+                                      pricing: {
+                                        ...mCfg.pricing,
+                                        range: [
+                                          ...currentRanges,
+                                          {
+                                            lower_bound: 0,
+                                            upper_bound: 0,
+                                            input_per_m: 0,
+                                            output_per_m: 0,
+                                            cache_write_per_m: 0,
+                                          },
+                                        ],
+                                      },
+                                    });
+                                  }}
+                                  leftIcon={<Plus size={14} />}
+                                >
+                                  Add Range
+                                </Button>
+                              </div>
+                              {(mCfg.pricing.range || []).map((range: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    border: '1px solid var(--color-border-glass)',
+                                    padding: '8px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    position: 'relative',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px',
+                                  }}
+                                >
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '6px',
+                                      right: '6px',
+                                      color: 'var(--color-danger)',
+                                      padding: '4px',
+                                    }}
+                                    onClick={() => {
+                                      const r = [...mCfg.pricing.range];
+                                      r.splice(idx, 1);
+                                      updateModelConfig(mId, {
+                                        pricing: { ...mCfg.pricing, range: r },
+                                      });
+                                    }}
+                                  >
+                                    <X size={14} />
+                                  </Button>
+                                  <div className="grid grid-cols-2" style={{ gap: '6px' }}>
+                                    {[
+                                      {
+                                        label: 'Lower Bound',
+                                        field: 'lower_bound',
+                                        val: range.lower_bound,
+                                      },
+                                      {
+                                        label: 'Upper Bound (0=∞)',
+                                        field: 'upper_bound',
+                                        val: range.upper_bound === Infinity ? 0 : range.upper_bound,
+                                      },
+                                      {
+                                        label: 'Input $/M',
+                                        field: 'input_per_m',
+                                        val: range.input_per_m,
+                                      },
+                                      {
+                                        label: 'Output $/M',
+                                        field: 'output_per_m',
+                                        val: range.output_per_m,
+                                      },
+                                      {
+                                        label: 'Cached $/M',
+                                        field: 'cached_per_m',
+                                        val: range.cached_per_m || 0,
+                                      },
+                                      {
+                                        label: 'Cache Write $/M',
+                                        field: 'cache_write_per_m',
+                                        val: range.cache_write_per_m || 0,
+                                      },
+                                    ].map(({ label, field, val }) => (
+                                      <div key={field} className="flex flex-col gap-0.5">
+                                        <label className="font-body text-[10px] font-medium text-text-secondary">
+                                          {label}
+                                        </label>
+                                        <input
+                                          className="w-full py-1 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                                          type="number"
+                                          step="0.000001"
+                                          value={val}
+                                          onChange={(e) => {
+                                            const r = [...mCfg.pricing.range];
+                                            const v =
+                                              field === 'upper_bound'
+                                                ? parseFloat(e.target.value) === 0
+                                                  ? Infinity
+                                                  : parseFloat(e.target.value)
+                                                : parseFloat(e.target.value);
+                                            r[idx] = {
+                                              ...range,
+                                              [field]: Number.isFinite(v)
+                                                ? v
+                                                : field === 'upper_bound'
+                                                  ? Infinity
+                                                  : 0,
+                                            };
+                                            updateModelConfig(mId, {
+                                              pricing: { ...mCfg.pricing, range: r },
+                                            });
+                                          }}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
+                                <div className="text-text-muted italic text-center text-[11px] py-2">
+                                  No ranges defined.
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Per Request pricing */}
+                          {mCfg.pricing?.source === 'per_request' && (
+                            <div
+                              style={{
+                                background: 'var(--color-bg-subtle)',
+                                padding: '8px',
+                                borderRadius: 'var(--radius-sm)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                              }}
+                            >
+                              <div className="flex flex-col gap-0.5">
+                                <label className="font-body text-[11px] font-medium text-text-secondary">
+                                  Cost Per Request ($)
+                                </label>
+                                <input
+                                  className="w-full py-1 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                                  type="number"
+                                  step="0.000001"
+                                  min="0"
+                                  value={mCfg.pricing.amount || 0}
+                                  onChange={(e) =>
+                                    updateModelConfig(mId, {
+                                      pricing: {
+                                        ...mCfg.pricing,
+                                        amount: parseFloat(e.target.value) || 0,
+                                      },
+                                    })
+                                  }
+                                />
+                              </div>
+                              <span className="font-body text-[11px] text-text-muted italic">
+                                Flat fee per API call, regardless of token count.
+                              </span>
                             </div>
                           )}
                         </div>
-                      )}
-                      {mCfg.pricing?.source === 'per_request' && (
-                        <div
-                          className="grid grid-cols-1 gap-4"
-                          style={{
-                            background: 'var(--color-bg-subtle)',
-                            padding: '12px',
-                            borderRadius: 'var(--radius-sm)',
-                          }}
-                        >
-                          <Input
-                            label="Cost Per Request ($)"
-                            type="number"
-                            step="0.000001"
-                            min="0"
-                            value={mCfg.pricing.amount || 0}
-                            onChange={(e) =>
-                              updateModelConfig(mId, {
-                                pricing: {
-                                  ...mCfg.pricing,
-                                  amount: parseFloat(e.target.value) || 0,
-                                },
-                              })
-                            }
-                          />
-                          <div
-                            className="font-body text-[11px] text-text-secondary"
-                            style={{ fontStyle: 'italic' }}
-                          >
-                            A flat fee charged per API call, regardless of token count.
-                          </div>
-                        </div>
-                      )}
+                      </div>
 
-                      {/* Per-Model Adapters */}
-                      <div
-                        className="border border-border-glass rounded-md p-3 bg-bg-subtle"
-                        style={{ marginTop: '12px' }}
-                      >
-                        <label className="font-body text-[13px] font-medium text-text-secondary block mb-1">
-                          Model Adapters
-                        </label>
+                      {/* Per-Model Adapters — disclosure */}
+                      <div className="border border-border-glass rounded-md overflow-hidden">
                         <div
-                          className="font-body text-[11px] text-text-secondary mb-2"
-                          style={{ lineHeight: 1.4 }}
+                          className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+                          onClick={() =>
+                            setModelAdaptersOpen((prev) => ({ ...prev, [mId]: !prev[mId] }))
+                          }
                         >
-                          Override or extend provider-level adapters for this specific model.
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {KNOWN_ADAPTERS.map((a) => {
+                          {modelAdaptersOpen[mId] ? (
+                            <ChevronDown size={14} />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
+                          <span className="font-body text-[12px] font-medium text-text-secondary flex-1">
+                            Model Adapters
+                          </span>
+                          {(() => {
                             const modelAdapters: string[] = mCfg.adapter
                               ? Array.isArray(mCfg.adapter)
                                 ? mCfg.adapter
                                 : [mCfg.adapter]
                               : [];
-                            const active = modelAdapters.includes(a.value);
-                            return (
-                              <label
-                                key={a.value}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'flex-start',
-                                  gap: '8px',
-                                  cursor: 'pointer',
-                                  padding: '5px 7px',
-                                  borderRadius: 'var(--radius-sm)',
-                                  border: '1px solid var(--color-border-glass)',
-                                  background: active
-                                    ? 'var(--color-bg-hover)'
-                                    : 'var(--color-bg-deep)',
-                                }}
+                            return modelAdapters.length > 0 ? (
+                              <Badge
+                                status="neutral"
+                                style={{ fontSize: '10px', padding: '2px 8px' }}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={active}
-                                  style={{ marginTop: '2px', flexShrink: 0 }}
-                                  onChange={() => {
-                                    const next = active
-                                      ? modelAdapters.filter((v) => v !== a.value)
-                                      : [...modelAdapters, a.value];
-                                    updateModelConfig(mId, {
-                                      adapter: next.length > 0 ? next : undefined,
-                                    });
-                                  }}
-                                />
-                                <div>
-                                  <div className="font-body text-[12px] font-medium text-text">
-                                    {a.label}
-                                  </div>
-                                  <div
-                                    className="font-body text-[11px] text-text-secondary"
-                                    style={{ lineHeight: 1.35 }}
-                                  >
-                                    {a.description}
-                                  </div>
-                                </div>
-                              </label>
-                            );
-                          })}
+                                {modelAdapters.length}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </div>
+                        {modelAdaptersOpen[mId] && (
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '4px',
+                              padding: '8px',
+                              borderTop: '1px solid var(--color-border-glass)',
+                              background: 'var(--color-bg-subtle)',
+                            }}
+                          >
+                            {KNOWN_ADAPTERS.map((a) => {
+                              const modelAdapters: string[] = mCfg.adapter
+                                ? Array.isArray(mCfg.adapter)
+                                  ? mCfg.adapter
+                                  : [mCfg.adapter]
+                                : [];
+                              const active = modelAdapters.includes(a.value);
+                              return (
+                                <label
+                                  key={a.value}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '8px',
+                                    cursor: 'pointer',
+                                    padding: '4px 8px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    border: '1px solid var(--color-border-glass)',
+                                    background: active
+                                      ? 'var(--color-bg-hover)'
+                                      : 'var(--color-bg-glass)',
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={active}
+                                    style={{ marginTop: '2px', flexShrink: 0 }}
+                                    onChange={() => {
+                                      const next = active
+                                        ? modelAdapters.filter((v) => v !== a.value)
+                                        : [...modelAdapters, a.value];
+                                      updateModelConfig(mId, {
+                                        adapter: next.length > 0 ? next : undefined,
+                                      });
+                                    }}
+                                  />
+                                  <div>
+                                    <div className="font-body text-[12px] font-medium text-text">
+                                      {a.label}
+                                    </div>
+                                    <div
+                                      className="font-body text-[11px] text-text-secondary"
+                                      style={{ lineHeight: 1.35 }}
+                                    >
+                                      {a.description}
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Per-Model Extra Body Fields */}
-                      <div
-                        className="border border-border-glass rounded-md p-3 bg-bg-subtle"
-                        style={{ marginTop: '12px' }}
-                      >
+                      <div className="border border-border-glass rounded-md overflow-hidden">
                         <div
-                          className="flex items-center gap-2 cursor-pointer"
-                          style={{ minHeight: '38px' }}
+                          className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
                           onClick={() =>
                             setIsModelExtraBodyOpen({
                               ...isModelExtraBodyOpen,
@@ -891,18 +847,16 @@ export function ProviderModelsEditor({
                           ) : (
                             <ChevronRight size={14} />
                           )}
-                          <label
-                            className="font-body text-[13px] font-medium text-text-secondary"
-                            style={{ marginBottom: 0, flex: 1, cursor: 'pointer' }}
-                          >
+                          <span className="font-body text-[12px] font-medium text-text-secondary flex-1">
                             Extra Body Fields
-                          </label>
+                          </span>
                           <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
                             {Object.keys(mCfg.extraBody || {}).length}
                           </Badge>
                           <Button
                             size="sm"
                             variant="secondary"
+                            style={{ padding: '2px 6px', lineHeight: 1 }}
                             onClick={(e) => {
                               e.stopPropagation();
                               addModelKV(mId);
@@ -920,7 +874,7 @@ export function ProviderModelsEditor({
                               gap: '4px',
                               padding: '8px',
                               borderTop: '1px solid var(--color-border-glass)',
-                              background: 'var(--color-bg-deep)',
+                              background: 'var(--color-bg-subtle)',
                             }}
                           >
                             {Object.entries(mCfg.extraBody || {}).length === 0 && (

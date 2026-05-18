@@ -122,7 +122,7 @@ export function ProviderQuotaEditor({
         <div className="flex flex-col gap-1">
           <label className="font-body text-[11px] font-medium text-text-secondary">Type</label>
           <select
-            className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+            className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
             value={selectedQuotaCheckerType}
             onChange={(e) => setQuotaType(e.target.value)}
           >
@@ -139,7 +139,7 @@ export function ProviderQuotaEditor({
             Interval (min)
           </label>
           <input
-            className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+            className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
             type="number"
             min={1}
             step={1}
