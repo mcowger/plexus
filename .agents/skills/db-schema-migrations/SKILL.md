@@ -29,7 +29,7 @@ Always edit the correct dialect subdirectory. When adding a new table, **update 
 ### The Only Correct Workflow
 
 1. Edit schema `.ts` files in `postgres/` or `sqlite/`.
-2. Validate locally (optional): `bun run generate-migrations --name <descriptive-name>` — verify the SQL looks right, then **discard the output** (do not commit). **Never run `drizzle-kit generate` directly.**
+2. Validate locally (optional): `bun run generate-migrations` — verify the SQL looks right, then **discard the output** (do not commit). **Never run `drizzle-kit generate` directly.**
 3. Commit only the schema `.ts` changes. The pre-commit hook blocks migration artifacts.
 4. After the PR merges to `main`, CI auto-generates and commits the migrations.
 
@@ -38,12 +38,16 @@ Always edit the correct dialect subdirectory. When adding a new table, **update 
 Migrations **must** have a descriptive, semantic name. The wrapper script enforces this:
 
 ```bash
-bun run generate-migrations --name add_quota_checkers
+bun run generate-migrations                        # auto-derives name from branch
+bun run generate-migrations --name add_quota_checkers  # explicit name
 ```
 
-This produces files like `0044_add_quota_checkers.sql` instead of `0044_rare_skullbuster.sql`.
+If `--name` is omitted, the script derives a name from the current git branch (e.g., `pi/issue-424-1779050379120` → `auto_issue_424`). On the `main` branch, `--name` is required.
+
+This produces files like `0044_add_quota_checkers.sql` or `0044_auto_issue_424.sql` instead of `0044_rare_skullbuster.sql`.
 
 - Use `snake_case` starting with a verb: `add_`, `create_`, `drop_`, `rename_`, `update_`, `fix_`, `remove_`, `convert_`, `jsonb_`, etc.
+- Auto-derived names use the `auto_` prefix.
 - Do **not** use random or meaningless names. The `lint:migrations` script rejects them.
 
 **Bypasses (maintainers only):**

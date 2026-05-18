@@ -33,6 +33,7 @@
     "prep-dev:reset": "bun run scripts/prep-dev.ts --reset",
     "prep-dev:save": "bun run scripts/prep-dev.ts --save",
     "prep-dev:live": "bun run scripts/prep-dev.ts --live",
+    "postinstall": "bun run scripts/wrap-drizzle-kit.ts",
     "prepare": "if [ -z \"$CI\" ]; then lefthook install; fi",
     "format": "bunx biome format --write .",
     "format:check": "bunx biome format .",

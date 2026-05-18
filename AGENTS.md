@@ -31,10 +31,16 @@
 All database migrations **must** be generated using the wrapper script to ensure descriptive naming:
 
 ```bash
-bun run generate-migrations --name <descriptive_snake_case_name>
+bun run generate-migrations
 ```
 
-**Do not** run `drizzle-kit generate` directly. The wrapper enforces a `--name` flag and validates that names are descriptive (e.g., `add_quota_checkers`, `fix_user_index`, `jsonb_to_text_encrypted`). Random names like `rare_skullbuster` are rejected by CI.
+**Do not** run `drizzle-kit generate` directly. The wrapper auto-derives a descriptive name from the git branch (e.g., `pi/issue-424-1779050379120` → `auto_issue_424`). You can also specify a name explicitly:
+
+```bash
+bun run generate-migrations --name add_quota_checkers
+```
+
+On the `main` branch, `--name` is required (auto-naming is not available). Random names like `rare_skullbuster` are rejected by CI.
 
 The `lint:migrations` script checks all migration files for compliance. Run it locally with:
 
