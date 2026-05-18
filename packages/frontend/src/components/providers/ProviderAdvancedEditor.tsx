@@ -19,6 +19,12 @@ export const KNOWN_ADAPTERS: { value: string; label: string; description: string
     label: 'Suppress Developer Role',
     description: 'Rewrites the "developer" role to "system" for providers that do not support it.',
   },
+  {
+    value: 'model_override',
+    label: 'Model Override',
+    description:
+      'Conditionally rewrites the model name based on request fields (e.g. switching to a -fast variant when reasoning is disabled).',
+  },
 ];
 
 interface Props {
@@ -122,8 +128,11 @@ export function ProviderAdvancedEditor({
                   per-model.
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  {KNOWN_ADAPTERS.map((a) => {
-                    const active = (editingProvider.adapter ?? []).includes(a.value);
+                  {KNOWN_ADAPTERS.filter((a) => a.value !== 'model_override').map((a) => {
+                    const adapterEntries: any[] = editingProvider.adapter ?? [];
+                    const active = adapterEntries.some(
+                      (e: any) => (typeof e === 'string' ? e : e.name) === a.value
+                    );
                     return (
                       <label
                         key={a.value}
@@ -143,10 +152,12 @@ export function ProviderAdvancedEditor({
                           checked={active}
                           style={{ marginTop: '2px', flexShrink: 0 }}
                           onChange={() => {
-                            const current = editingProvider.adapter ?? [];
+                            const current: any[] = editingProvider.adapter ?? [];
                             const next = active
-                              ? current.filter((v) => v !== a.value)
-                              : [...current, a.value];
+                              ? current.filter(
+                                  (e: any) => (typeof e === 'string' ? e : e.name) !== a.value
+                                )
+                              : [...current, { name: a.value, options: {} }];
                             setEditingProvider({ ...editingProvider, adapter: next });
                           }}
                         />

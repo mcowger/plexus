@@ -24,7 +24,7 @@ import type { ProviderAdapter } from '../../types/provider-adapter';
 export const reasoningContentAdapter: ProviderAdapter = {
   name: 'reasoning_content',
 
-  preDispatch(payload: Record<string, any>): Record<string, any> {
+  preDispatch(payload: Record<string, any>, _options?: Record<string, any>): Record<string, any> {
     if (!Array.isArray(payload.messages)) return payload;
 
     const messages = payload.messages.map((msg: any) => {
@@ -47,14 +47,14 @@ export const reasoningContentAdapter: ProviderAdapter = {
     return { ...payload, messages };
   },
 
-  postDispatch(response: Record<string, any>): Record<string, any> {
+  postDispatch(response: Record<string, any>, _options?: Record<string, any>): Record<string, any> {
     // The OpenAI transformer's transformResponse() already reads
     // `message.reasoning_content` natively, so no field rename is needed
     // on the inbound path. This is intentionally a no-op.
     return response;
   },
 
-  preDispatchStreamChunk(line: string): string {
+  preDispatchStreamChunk(line: string, _options?: Record<string, any>): string {
     // Replace `"reasoning":` with `"reasoning_content":` in the JSON payload
     // of SSE data lines so the provider receives the correct field name.
     if (!line.startsWith('data:')) return line;

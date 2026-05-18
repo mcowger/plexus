@@ -756,7 +756,7 @@ export function ProviderModelsEditor({
                             Model Adapters
                           </span>
                           {(() => {
-                            const modelAdapters: string[] = mCfg.adapter
+                            const modelAdapters: any[] = mCfg.adapter
                               ? Array.isArray(mCfg.adapter)
                                 ? mCfg.adapter
                                 : [mCfg.adapter]
@@ -783,12 +783,14 @@ export function ProviderModelsEditor({
                             }}
                           >
                             {KNOWN_ADAPTERS.map((a) => {
-                              const modelAdapters: string[] = mCfg.adapter
+                              const modelAdapters: any[] = mCfg.adapter
                                 ? Array.isArray(mCfg.adapter)
                                   ? mCfg.adapter
                                   : [mCfg.adapter]
                                 : [];
-                              const active = modelAdapters.includes(a.value);
+                              const active = modelAdapters.some(
+                                (e: any) => (typeof e === 'string' ? e : e.name) === a.value
+                              );
                               return (
                                 <label
                                   key={a.value}
@@ -810,9 +812,24 @@ export function ProviderModelsEditor({
                                     checked={active}
                                     style={{ marginTop: '2px', flexShrink: 0 }}
                                     onChange={() => {
+                                      const modelAdapters: any[] = mCfg.adapter
+                                        ? Array.isArray(mCfg.adapter)
+                                          ? mCfg.adapter
+                                          : [mCfg.adapter]
+                                        : [];
                                       const next = active
-                                        ? modelAdapters.filter((v) => v !== a.value)
-                                        : [...modelAdapters, a.value];
+                                        ? modelAdapters.filter(
+                                            (e: any) =>
+                                              (typeof e === 'string' ? e : e.name) !== a.value
+                                          )
+                                        : [
+                                            ...modelAdapters,
+                                            {
+                                              name: a.value,
+                                              options:
+                                                a.value === 'model_override' ? { rules: [] } : {},
+                                            },
+                                          ];
                                       updateModelConfig(mId, {
                                         adapter: next.length > 0 ? next : undefined,
                                       });
@@ -832,6 +849,296 @@ export function ProviderModelsEditor({
                                 </label>
                               );
                             })}
+                            {/* model_override rules editor */}
+                            {(() => {
+                              const modelAdapters: any[] = mCfg.adapter
+                                ? Array.isArray(mCfg.adapter)
+                                  ? mCfg.adapter
+                                  : [mCfg.adapter]
+                                : [];
+                              const overrideEntry = modelAdapters.find(
+                                (e: any) =>
+                                  (typeof e === 'string' ? e : e.name) === 'model_override'
+                              );
+                              if (!overrideEntry || typeof overrideEntry === 'string') return null;
+                              const rules: any[] = overrideEntry.options?.rules ?? [];
+                              return (
+                                <div
+                                  style={{
+                                    gridColumn: '1 / -1',
+                                    borderTop: '1px solid var(--color-border-glass)',
+                                    marginTop: '4px',
+                                    paddingTop: '6px',
+                                  }}
+                                >
+                                  <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
+                                    Model Override Rules
+                                  </div>
+                                  <div
+                                    className="font-body text-[10px] text-text-muted mb-2"
+                                    style={{ lineHeight: 1.3 }}
+                                  >
+                                    When ANY condition matches, rewrite the model name. Use dotted
+                                    paths like reasoning.enabled.
+                                  </div>
+                                  {rules.map((rule: any, rIdx: number) => (
+                                    <div
+                                      key={rIdx}
+                                      style={{
+                                        border: '1px solid var(--color-border-glass)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        padding: '6px',
+                                        marginBottom: '4px',
+                                        background: 'var(--color-bg-deep)',
+                                      }}
+                                    >
+                                      <div
+                                        style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}
+                                      >
+                                        <Input
+                                          placeholder="Match model (e.g. deepseek-r1)"
+                                          value={rule.model ?? ''}
+                                          onChange={(e: any) => {
+                                            const updated = [...rules];
+                                            updated[rIdx] = {
+                                              ...updated[rIdx],
+                                              model: e.target.value,
+                                            };
+                                            const newAdapters = modelAdapters.map((entry: any) =>
+                                              typeof entry !== 'string' &&
+                                              entry.name === 'model_override'
+                                                ? {
+                                                    ...entry,
+                                                    options: { ...entry.options, rules: updated },
+                                                  }
+                                                : entry
+                                            );
+                                            updateModelConfig(mId, { adapter: newAdapters });
+                                          }}
+                                          style={{ flex: 1 }}
+                                        />
+                                        <span
+                                          className="font-body text-[11px] text-text-muted"
+                                          style={{ lineHeight: '28px' }}
+                                        >
+                                          →
+                                        </span>
+                                        <Input
+                                          placeholder="Rewrite to (e.g. deepseek-r1-fast)"
+                                          value={rule.rewriteTo ?? ''}
+                                          onChange={(e: any) => {
+                                            const updated = [...rules];
+                                            updated[rIdx] = {
+                                              ...updated[rIdx],
+                                              rewriteTo: e.target.value,
+                                            };
+                                            const newAdapters = modelAdapters.map((entry: any) =>
+                                              typeof entry !== 'string' &&
+                                              entry.name === 'model_override'
+                                                ? {
+                                                    ...entry,
+                                                    options: { ...entry.options, rules: updated },
+                                                  }
+                                                : entry
+                                            );
+                                            updateModelConfig(mId, { adapter: newAdapters });
+                                          }}
+                                          style={{ flex: 1 }}
+                                        />
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            const updated = rules.filter(
+                                              (_: any, i: number) => i !== rIdx
+                                            );
+                                            const newAdapters = modelAdapters.map((entry: any) =>
+                                              typeof entry !== 'string' &&
+                                              entry.name === 'model_override'
+                                                ? {
+                                                    ...entry,
+                                                    options: { ...entry.options, rules: updated },
+                                                  }
+                                                : entry
+                                            );
+                                            updateModelConfig(mId, { adapter: newAdapters });
+                                          }}
+                                          style={{ padding: '4px' }}
+                                        >
+                                          <Trash2
+                                            size={14}
+                                            style={{ color: 'var(--color-danger)' }}
+                                          />
+                                        </Button>
+                                      </div>
+                                      {/* Conditions */}
+                                      {(rule.conditions ?? []).map((cond: any, cIdx: number) => (
+                                        <div
+                                          key={cIdx}
+                                          style={{
+                                            display: 'flex',
+                                            gap: '4px',
+                                            marginBottom: '2px',
+                                            marginLeft: '8px',
+                                          }}
+                                        >
+                                          <Input
+                                            placeholder="Field path (e.g. reasoning.enabled)"
+                                            value={cond.field ?? ''}
+                                            onChange={(e: any) => {
+                                              const updated = [...rules];
+                                              const newConditions = [...updated[rIdx].conditions];
+                                              newConditions[cIdx] = {
+                                                ...newConditions[cIdx],
+                                                field: e.target.value,
+                                              };
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                conditions: newConditions,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'model_override'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                            style={{ flex: 1 }}
+                                          />
+                                          <Input
+                                            placeholder="Value (empty = presence check)"
+                                            value={
+                                              cond.value !== undefined ? String(cond.value) : ''
+                                            }
+                                            onChange={(e: any) => {
+                                              const raw = e.target.value;
+                                              const parsed =
+                                                raw === ''
+                                                  ? undefined
+                                                  : raw === 'true'
+                                                    ? true
+                                                    : raw === 'false'
+                                                      ? false
+                                                      : isNaN(Number(raw))
+                                                        ? raw
+                                                        : Number(raw);
+                                              const updated = [...rules];
+                                              const newConditions = [...updated[rIdx].conditions];
+                                              newConditions[cIdx] = {
+                                                field: newConditions[cIdx].field,
+                                                value: parsed,
+                                              };
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                conditions: newConditions,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'model_override'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                            style={{ flex: 1 }}
+                                          />
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              const updated = [...rules];
+                                              const newConditions = updated[rIdx].conditions.filter(
+                                                (_: any, i: number) => i !== cIdx
+                                              );
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                conditions: newConditions,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'model_override'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                            style={{ padding: '4px' }}
+                                          >
+                                            <Trash2
+                                              size={12}
+                                              style={{ color: 'var(--color-danger)' }}
+                                            />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const updated = [...rules];
+                                          updated[rIdx] = {
+                                            ...updated[rIdx],
+                                            conditions: [
+                                              ...(updated[rIdx].conditions ?? []),
+                                              { field: '' },
+                                            ],
+                                          };
+                                          const newAdapters = modelAdapters.map((entry: any) =>
+                                            typeof entry !== 'string' &&
+                                            entry.name === 'model_override'
+                                              ? {
+                                                  ...entry,
+                                                  options: { ...entry.options, rules: updated },
+                                                }
+                                              : entry
+                                          );
+                                          updateModelConfig(mId, { adapter: newAdapters });
+                                        }}
+                                        style={{ marginLeft: '8px', padding: '2px 6px' }}
+                                      >
+                                        <Plus size={12} />{' '}
+                                        <span className="font-body text-[10px]">Condition</span>
+                                      </Button>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newRule = {
+                                        model: '',
+                                        rewriteTo: '',
+                                        conditions: [{ field: '' }],
+                                      };
+                                      const updated = [...rules, newRule];
+                                      const newAdapters = modelAdapters.map((entry: any) =>
+                                        typeof entry !== 'string' && entry.name === 'model_override'
+                                          ? {
+                                              ...entry,
+                                              options: { ...entry.options, rules: updated },
+                                            }
+                                          : entry
+                                      );
+                                      updateModelConfig(mId, { adapter: newAdapters });
+                                    }}
+                                    style={{ marginTop: '2px' }}
+                                  >
+                                    <Plus size={12} />{' '}
+                                    <span className="font-body text-[10px]">Rule</span>
+                                  </Button>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>

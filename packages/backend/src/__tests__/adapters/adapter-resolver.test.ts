@@ -3,10 +3,7 @@ import { resolveAdapters } from '../../services/adapter-resolver';
 import type { RouteResult } from '../../services/router';
 
 // Minimal RouteResult factory
-function makeRoute(
-  providerAdapter?: string | string[],
-  modelAdapter?: string | string[]
-): RouteResult {
+function makeRoute(providerAdapter?: any[], modelAdapter?: any[]): RouteResult {
   return {
     provider: 'test-provider',
     model: 'test-model',
@@ -29,48 +26,86 @@ describe('resolveAdapters', () => {
     expect(resolveAdapters(route)).toHaveLength(0);
   });
 
-  it('resolves a provider-level string adapter', () => {
-    const route = makeRoute('reasoning_content');
-    const adapters = resolveAdapters(route);
-    expect(adapters).toHaveLength(1);
-    expect(adapters[0]!.name).toBe('reasoning_content');
+  it('resolves a provider-level adapter entry', () => {
+    const route = makeRoute([{ name: 'reasoning_content', options: {} }]);
+    const resolved = resolveAdapters(route);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]!.adapter.name).toBe('reasoning_content');
+    expect(resolved[0]!.options).toEqual({});
   });
 
-  it('resolves a provider-level array adapter', () => {
-    const route = makeRoute(['reasoning_content', 'suppress_developer_role']);
-    const adapters = resolveAdapters(route);
-    expect(adapters.map((a) => a.name)).toEqual(['reasoning_content', 'suppress_developer_role']);
-  });
-
-  it('resolves a model-level string adapter', () => {
-    const route = makeRoute(undefined, 'suppress_developer_role');
-    const adapters = resolveAdapters(route);
-    expect(adapters).toHaveLength(1);
-    expect(adapters[0]!.name).toBe('suppress_developer_role');
+  it('resolves a model-level adapter entry', () => {
+    const route = makeRoute(undefined, [{ name: 'suppress_developer_role', options: {} }]);
+    const resolved = resolveAdapters(route);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]!.adapter.name).toBe('suppress_developer_role');
+    expect(resolved[0]!.options).toEqual({});
   });
 
   it('merges provider-level then model-level adapters in order', () => {
-    const route = makeRoute('reasoning_content', 'suppress_developer_role');
-    const adapters = resolveAdapters(route);
-    expect(adapters.map((a) => a.name)).toEqual(['reasoning_content', 'suppress_developer_role']);
+    const route = makeRoute(
+      [{ name: 'reasoning_content', options: {} }],
+      [{ name: 'suppress_developer_role', options: {} }]
+    );
+    const resolved = resolveAdapters(route);
+    expect(resolved.map((r) => r.adapter.name)).toEqual([
+      'reasoning_content',
+      'suppress_developer_role',
+    ]);
+  });
+
+  it('passes options through from config', () => {
+    const rules = [
+      {
+        model: 'deepseek-r1',
+        rewriteTo: 'deepseek-r1-fast',
+        conditions: [{ field: 'reasoning.enabled', value: false }],
+      },
+    ];
+    const route = makeRoute([{ name: 'model_override', options: { rules } }]);
+    const resolved = resolveAdapters(route);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]!.adapter.name).toBe('model_override');
+    expect(resolved[0]!.options).toEqual({ rules });
   });
 
   it('skips and warns on unknown adapter names (does not throw)', () => {
-    const route = makeRoute('nonexistent_adapter');
-    // Should not throw; unknown names are skipped
-    const adapters = resolveAdapters(route);
-    expect(adapters).toHaveLength(0);
+    const route = makeRoute([{ name: 'nonexistent_adapter', options: {} }]);
+    const resolved = resolveAdapters(route);
+    expect(resolved).toHaveLength(0);
   });
 
   it('handles mixed valid and invalid adapter names', () => {
-    const route = makeRoute(['reasoning_content', 'bogus'], 'suppress_developer_role');
-    const adapters = resolveAdapters(route);
-    expect(adapters.map((a) => a.name)).toEqual(['reasoning_content', 'suppress_developer_role']);
+    const route = makeRoute(
+      [
+        { name: 'reasoning_content', options: {} },
+        { name: 'bogus', options: {} },
+      ],
+      [{ name: 'suppress_developer_role', options: {} }]
+    );
+    const resolved = resolveAdapters(route);
+    expect(resolved.map((r) => r.adapter.name)).toEqual([
+      'reasoning_content',
+      'suppress_developer_role',
+    ]);
   });
 
-  it('handles model-level array adapters', () => {
-    const route = makeRoute(undefined, ['reasoning_content', 'suppress_developer_role']);
-    const adapters = resolveAdapters(route);
-    expect(adapters.map((a) => a.name)).toEqual(['reasoning_content', 'suppress_developer_role']);
+  it('handles multiple provider-level adapter entries', () => {
+    const route = makeRoute([
+      { name: 'reasoning_content', options: {} },
+      { name: 'suppress_developer_role', options: {} },
+    ]);
+    const resolved = resolveAdapters(route);
+    expect(resolved.map((r) => r.adapter.name)).toEqual([
+      'reasoning_content',
+      'suppress_developer_role',
+    ]);
+  });
+
+  it('resolves model_override adapter', () => {
+    const route = makeRoute([{ name: 'model_override', options: { rules: [] } }]);
+    const resolved = resolveAdapters(route);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]!.adapter.name).toBe('model_override');
   });
 });
