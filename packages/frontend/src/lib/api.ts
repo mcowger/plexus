@@ -3209,6 +3209,7 @@ export const api = {
     minBytesPerSecond: number | null;
     windowSeconds: number;
     gracePeriodSeconds: number;
+    stallCooldown: boolean;
   }> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config/stall`);
     if (!res.ok) throw new Error('Failed to fetch stall detection settings');
@@ -3222,12 +3223,14 @@ export const api = {
     minBytesPerSecond?: number | null;
     windowSeconds?: number;
     gracePeriodSeconds?: number;
+    stallCooldown?: boolean;
   }): Promise<{
     ttfbSeconds: number | null;
     ttfbBytes: number;
     minBytesPerSecond: number | null;
     windowSeconds: number;
     gracePeriodSeconds: number;
+    stallCooldown: boolean;
   }> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config/stall`, {
       method: 'PATCH',

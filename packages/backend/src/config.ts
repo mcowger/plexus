@@ -717,6 +717,7 @@ const StallConfigSchema = z.object({
   minBytesPerSecond: z.number().int().min(50).max(5000).nullable().optional(),
   windowSeconds: z.number().int().min(3).max(30).default(10).optional(),
   gracePeriodSeconds: z.number().int().min(0).max(120).default(30).optional(),
+  stallCooldown: z.boolean().default(false).optional(),
 });
 
 const RawPlexusConfigSchema = z
@@ -748,6 +749,7 @@ export type StallConfigType = {
   minBytesPerSecond?: number | null;
   windowSeconds?: number;
   gracePeriodSeconds?: number;
+  stallCooldown?: boolean;
 };
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;

@@ -692,6 +692,14 @@ export async function registerConfigRoutes(
         }
         await configService.setSetting('stall.gracePeriodSeconds', val);
       }
+      if (body.stallCooldown !== undefined) {
+        if (typeof body.stallCooldown !== 'boolean') {
+          return reply
+            .code(400)
+            .send({ error: 'stallCooldown must be a boolean' });
+        }
+        await configService.setSetting('stall.stallCooldown', body.stallCooldown);
+      }
 
       const updated = await configService.getRepository().getStallConfig();
       logger.debug('Stall config updated via API');
