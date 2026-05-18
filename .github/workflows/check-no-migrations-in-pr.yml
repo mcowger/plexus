@@ -16,8 +16,9 @@ jobs:
         id: author-check
         run: |
           ASSOC="${{ github.event.pull_request.author_association }}"
+          SENDER="${{ github.event.pull_request.user.login }}"
           echo "association=$ASSOC" >> "$GITHUB_OUTPUT"
-          if [[ "$ASSOC" == "COLLABORATOR" || "$ASSOC" == "OWNER" || "$ASSOC" == "MEMBER" ]]; then
+          if [[ "$ASSOC" == "COLLABORATOR" || "$ASSOC" == "OWNER" || "$ASSOC" == "MEMBER" || "$SENDER" == "app/github-actions" || "$SENDER" == "github-actions[bot]" ]]; then
             echo "is_internal=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_internal=false" >> "$GITHUB_OUTPUT"
