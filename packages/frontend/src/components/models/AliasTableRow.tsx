@@ -46,25 +46,20 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
         className="px-4 py-3 text-left border-b border-border-glass text-text"
         style={{ fontWeight: 600, paddingLeft: '24px' }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <div
-            onClick={() => onEdit(alias)}
-            className="flex items-center gap-2 cursor-pointer flex-1"
-          >
+        <div className="flex items-center gap-2">
+          <div onClick={() => onEdit(alias)} className="flex items-center gap-2 cursor-pointer">
             <Edit2 size={12} className="opacity-50" />
             <ModelTypeBadge type={alias.type} />
             {alias.id}
           </div>
-          <div className="flex items-center gap-1">
-            <CopyButton value={alias.id} size="sm" />
-            <button
-              onClick={() => onDelete(alias)}
-              className="bg-none border-none cursor-pointer p-1 rounded color-danger opacity-60 transition-opacity hover:opacity-100"
-              title="Delete alias"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
+          <CopyButton value={alias.id} size="sm" />
+          <button
+            onClick={() => onDelete(alias)}
+            className="bg-none border-none cursor-pointer p-1 rounded color-danger opacity-60 transition-opacity hover:opacity-100"
+            title="Delete alias"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
         {alias.metadata && (
           <div className="pl-5 mt-0.5 text-[10px]">
