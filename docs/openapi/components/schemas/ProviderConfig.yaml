@@ -109,11 +109,25 @@ properties:
                 - type: string
                 - type: array
                   items:
-                    type: string
+                    oneOf:
+                      - type: string
+                      - type: object
+                        required:
+                          - name
+                        properties:
+                          name:
+                            type: string
+                            description: Adapter name.
+                          options:
+                            type: object
+                            additionalProperties: true
+                            description: Adapter-specific options.
               description: >
                 Adapter name(s) applied to this specific model. Appended after
-                any provider-level adapters. See the provider-level `adapter`
-                field for available values.
+                any provider-level adapters. Accepts bare strings or
+                `{ name, options }` objects for parameterized adapters
+                (e.g. `model_override` with rules). See the provider-level
+                `adapter` field for available values.
         description: >
           Map of model ID → per-model configuration. Allows per-model pricing
           overrides and access aliases.
@@ -176,12 +190,27 @@ properties:
       - type: string
       - type: array
         items:
-          type: string
+          oneOf:
+            - type: string
+            - type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Adapter name.
+                options:
+                  type: object
+                  additionalProperties: true
+                  description: Adapter-specific options.
     description: >
       Adapter name(s) applied to every model under this provider.
       Adapters rewrite outbound request payloads (preDispatch) and inbound
       provider responses (postDispatch) to fix provider-specific field-name
       incompatibilities. Applied before model-level adapters.
+
+      Adapters can be specified as bare strings (backward compatible) or as
+      objects with `{ name, options }` for adapters that require configuration.
 
       Available adapters:
 
@@ -191,6 +220,13 @@ properties:
 
       - `suppress_developer_role` — Rewrites the `developer` role to `system`
         for providers that do not support the OpenAI `developer` role.
+
+      - `model_override` — Conditionally rewrites the provider model name
+        based on request payload fields. Accepts a `rules` array in options
+        where each rule specifies a `model` to match, a `rewriteTo` model name,
+        and an array of `conditions` (OR semantics) using dotted field paths.
+        Used for providers that expose reasoning variants as separate model
+        names rather than respecting reasoning-related request fields.
 
       Pass-through optimisation is automatically disabled when any adapter
       is active.

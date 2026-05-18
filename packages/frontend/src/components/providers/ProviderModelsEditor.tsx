@@ -889,11 +889,19 @@ export function ProviderModelsEditor({
                                         borderRadius: 'var(--radius-sm)',
                                         padding: '6px',
                                         marginBottom: '4px',
-                                        background: 'var(--color-bg-deep)',
+                                        background: 'var(--color-bg-subtle)',
                                       }}
                                     >
+                                      {/* Rewrite rule */}
+                                      <div className="font-body text-[10px] font-medium text-text-muted mb-1">
+                                        Rewrite
+                                      </div>
                                       <div
-                                        style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}
+                                        style={{
+                                          display: 'flex',
+                                          gap: '4px',
+                                          alignItems: 'center',
+                                        }}
                                       >
                                         <Input
                                           placeholder="Match model (e.g. deepseek-r1)"
@@ -915,12 +923,9 @@ export function ProviderModelsEditor({
                                             );
                                             updateModelConfig(mId, { adapter: newAdapters });
                                           }}
-                                          style={{ flex: 1 }}
+                                          style={{ flex: 2 }}
                                         />
-                                        <span
-                                          className="font-body text-[11px] text-text-muted"
-                                          style={{ lineHeight: '28px' }}
-                                        >
+                                        <span className="font-body text-[11px] text-text-muted">
                                           →
                                         </span>
                                         <Input
@@ -971,6 +976,40 @@ export function ProviderModelsEditor({
                                           />
                                         </Button>
                                       </div>
+                                      {/* Conditions separator */}
+                                      <div
+                                        style={{
+                                          borderTop: '1px solid var(--color-border-glass)',
+                                          margin: '6px 0 4px 0',
+                                        }}
+                                      />
+                                      <div className="font-body text-[10px] font-medium text-text-muted mb-1">
+                                        Conditions (any match triggers rewrite)
+                                      </div>
+                                      {/* Condition column headers */}
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: '4px',
+                                          marginBottom: '2px',
+                                          marginLeft: '8px',
+                                        }}
+                                      >
+                                        <span
+                                          className="font-body text-[9px] font-medium text-text-muted"
+                                          style={{ flex: 1, paddingLeft: '8px' }}
+                                        >
+                                          Field path (dotted)
+                                        </span>
+                                        <span
+                                          className="font-body text-[9px] font-medium text-text-muted"
+                                          style={{ flex: 1, paddingLeft: '8px' }}
+                                        >
+                                          Value (blank = presence check)
+                                        </span>
+                                        {/* spacer for delete button column */}
+                                        <span style={{ width: '28px' }} />
+                                      </div>
                                       {/* Conditions */}
                                       {(rule.conditions ?? []).map((cond: any, cIdx: number) => (
                                         <div
@@ -983,7 +1022,7 @@ export function ProviderModelsEditor({
                                           }}
                                         >
                                           <Input
-                                            placeholder="Field path (e.g. reasoning.enabled)"
+                                            placeholder="e.g. reasoning.enabled"
                                             value={cond.field ?? ''}
                                             onChange={(e: any) => {
                                               const updated = [...rules];
@@ -1010,7 +1049,7 @@ export function ProviderModelsEditor({
                                             style={{ flex: 1 }}
                                           />
                                           <Input
-                                            placeholder="Value (empty = presence check)"
+                                            placeholder="e.g. false, 0, none"
                                             value={
                                               cond.value !== undefined ? String(cond.value) : ''
                                             }

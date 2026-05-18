@@ -140,6 +140,7 @@ Adapters can be set at **provider level** (applied to every model under the prov
 |---------|-------------|
 | `reasoning_content` | Renames `reasoning` / `thinking.content` → `reasoning_content` on outbound assistant messages for providers that use Fireworks/DeepSeek field naming (e.g. Fireworks DeepSeek-R1). Fixes *"Extra inputs are not permitted, field: messages[N].reasoning"* errors. |
 | `suppress_developer_role` | Rewrites the `developer` role to `system` on outbound messages for providers that do not support the newer OpenAI `developer` role. |
+| `model_override` | Conditionally rewrites the provider model name based on request payload fields. Used for providers that expose reasoning variants as separate model names rather than respecting reasoning-related fields in the request body. See [Model Override Adapter](#model-override-adapter) below. |
 
 **Example — provider-level:**
 ```json
@@ -163,6 +164,66 @@ PUT /v0/management/providers/fireworks
 ```
 
 Adapters are applied in order on outbound (preDispatch) and in reverse on inbound (postDispatch). Pass-through optimisation is automatically disabled when any adapter is active.
+
+### Model Override Adapter
+
+The `model_override` adapter conditionally rewrites the provider model name based on the values or presence of fields in the request payload. This is useful for providers that expose reasoning variants as **separate model names** (e.g. `model-name` with reasoning, `model-name-fast` without) rather than respecting reasoning-related fields in the request body.
+
+**How it works:**
+
+When the resolved provider model matches a rule's `model` field AND **any** of the rule's conditions are satisfied (OR semantics), the model name is rewritten to `rewriteTo`. Conditions use dotted paths into the request payload.
+
+**Configuration:**
+
+The `model_override` adapter is configured at **model level** only (not provider level). It accepts a `rules` array in its options:
+
+```json
+{
+  "models": {
+    "zai-org/GLM-5.1-FP8": {
+      "adapter": [
+        {
+          "name": "model_override",
+          "options": {
+            "rules": [
+              {
+                "model": "zai-org/GLM-5.1-FP8",
+                "rewriteTo": "glm-5.1-fast",
+                "conditions": [
+                  { "field": "enable_thinking", "value": false },
+                  { "field": "reasoning.enabled", "value": false },
+                  { "field": "reasoning.effort", "value": "none" },
+                  { "field": "budget_tokens", "value": 0 }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+**Rule fields:**
+
+| Field | Description |
+|-------|-------------|
+| `model` | The provider model name to match against (must match the resolved target model) |
+| `rewriteTo` | The model name to send to the provider instead |
+| `conditions` | Array of conditions; **any** match triggers the rewrite |
+
+**Condition fields:**
+
+| Field | Description |
+|-------|-------------|
+| `field` | Dotted path into the request payload (e.g. `reasoning.enabled`, `chat_template_kwargs.enable_thinking`) |
+| `value` | Value to match (strict equality). If omitted, the condition matches when the field is present (any value) |
+
+**Notes:**
+- The adapter operates on the **transformed provider payload**, so fields must survive API transformation to be matchable. For chat-to-chat requests, all fields from the original request body are preserved (including non-standard fields like `enable_thinking`, `thinking_budget`, etc.).
+- Multiple rules are evaluated in order; only the first matching rule applies.
+- The rewrite is transparent to the client — billing and usage tracking still reference the original canonical model name.
 
 ### Provider Quota Checkers
 
