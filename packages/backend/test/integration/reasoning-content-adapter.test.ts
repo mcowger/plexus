@@ -36,7 +36,7 @@ const BASE_CONFIG = {
           pricing: { source: 'simple', input: 0, output: 0 },
           access_via: ['chat'],
           // adapter configured at model level — matches the real production setup
-          adapter: ['reasoning_content'],
+          adapter: [{ name: 'reasoning_content', options: {} }],
         },
       },
     },

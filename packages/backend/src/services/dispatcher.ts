@@ -24,7 +24,7 @@ import { CooldownParserRegistry } from './cooldown-parsers';
 import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
 import { resolveAdapters } from './adapter-resolver';
-import type { ProviderAdapter } from '../types/provider-adapter';
+import type { ResolvedAdapter } from '../types/provider-adapter';
 import { getModels } from '@earendil-works/pi-ai';
 import type { StallConfig } from './inspectors/stall-inspector';
 import { VisionDescriptorService } from './vision-descriptor-service';
@@ -2325,7 +2325,7 @@ export class Dispatcher {
     route: RouteResult,
     transformer: any,
     targetApiType: string,
-    adapters: ProviderAdapter[] = []
+    adapters: ResolvedAdapter[] = []
   ): Promise<{ payload: any; bypassTransformation: boolean }> {
     let providerPayload: any;
     let bypassTransformation = false;
@@ -2399,13 +2399,13 @@ export class Dispatcher {
     }
 
     // Apply provider/model adapters (preDispatch) in configured order
-    for (const adapter of adapters) {
-      providerPayload = adapter.preDispatch(providerPayload);
+    for (const { adapter, options } of adapters) {
+      providerPayload = adapter.preDispatch(providerPayload, options);
     }
 
     if (adapters.length > 0) {
       logger.debug(
-        `Adapters applied (preDispatch): [${adapters.map((a) => a.name).join(', ')}] ` +
+        `Adapters applied (preDispatch): [${adapters.map((a) => a.adapter.name).join(', ')}] ` +
           `for ${route.provider}/${route.model}`
       );
     }
@@ -2634,7 +2634,7 @@ export class Dispatcher {
     route: RouteResult,
     targetApiType: string,
     bypassTransformation: boolean,
-    adapters: ProviderAdapter[] = []
+    adapters: ResolvedAdapter[] = []
   ): UnifiedChatResponse {
     logger.debug('Streaming response detected');
 
@@ -2642,11 +2642,11 @@ export class Dispatcher {
 
     // If any adapter defines preDispatchStreamChunk, pipe the raw SSE stream
     // through a rewrite transform before it reaches transformStream().
-    const streamAdapters = adapters.filter((a) => a.preDispatchStreamChunk);
+    const streamAdapters = adapters.filter((a) => a.adapter.preDispatchStreamChunk);
     if (streamAdapters.length > 0) {
       rawStream = rawStream.pipeThrough(this.buildSseRewriteTransform(streamAdapters));
       logger.debug(
-        `Stream adapters applied (preDispatchStreamChunk): [${streamAdapters.map((a) => a.name).join(', ')}] ` +
+        `Stream adapters applied (preDispatchStreamChunk): [${streamAdapters.map((a) => a.adapter.name).join(', ')}] ` +
           `for ${route.provider}/${route.model}`
       );
     }
@@ -2670,7 +2670,7 @@ export class Dispatcher {
    * Handles chunked delivery — lines may arrive split across multiple chunks.
    */
   private buildSseRewriteTransform(
-    adapters: ProviderAdapter[]
+    adapters: ResolvedAdapter[]
   ): TransformStream<Uint8Array, Uint8Array> {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
@@ -2684,8 +2684,8 @@ export class Dispatcher {
         buffer = lines.pop() ?? '';
         for (const line of lines) {
           let rewritten = line;
-          for (const adapter of adapters) {
-            rewritten = adapter.preDispatchStreamChunk!(rewritten);
+          for (const { adapter, options } of adapters) {
+            rewritten = adapter.preDispatchStreamChunk!(rewritten, options);
           }
           controller.enqueue(encoder.encode(rewritten + '\n'));
         }
@@ -2693,8 +2693,8 @@ export class Dispatcher {
       flush(controller) {
         if (buffer.length > 0) {
           let rewritten = buffer;
-          for (const adapter of adapters) {
-            rewritten = adapter.preDispatchStreamChunk!(rewritten);
+          for (const { adapter, options } of adapters) {
+            rewritten = adapter.preDispatchStreamChunk!(rewritten, options);
           }
           controller.enqueue(encoder.encode(rewritten));
         }
@@ -2712,7 +2712,7 @@ export class Dispatcher {
     targetApiType: string,
     transformer: any,
     bypassTransformation: boolean,
-    adapters: ProviderAdapter[] = []
+    adapters: ResolvedAdapter[] = []
   ): Promise<UnifiedChatResponse> {
     let responseBody = await this.parseJsonResponseBody(
       response,
@@ -2725,12 +2725,12 @@ export class Dispatcher {
     // Apply provider/model adapters (postDispatch) in reverse order
     if (adapters.length > 0) {
       for (let i = adapters.length - 1; i >= 0; i--) {
-        responseBody = adapters[i]!.postDispatch(responseBody);
+        responseBody = adapters[i]!.adapter.postDispatch(responseBody, adapters[i]!.options);
       }
       logger.debug(
         `Adapters applied (postDispatch): [${[...adapters]
           .reverse()
-          .map((a) => a.name)
+          .map((a) => a.adapter.name)
           .join(', ')}] ` + `for ${route.provider}/${route.model}`
       );
     }

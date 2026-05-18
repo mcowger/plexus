@@ -51,6 +51,43 @@ function toJson(value: unknown): string | unknown {
 }
 
 /**
+ * Normalize adapter entries from DB storage to the canonical { name, options } form.
+ *
+ * Legacy rows stored adapter entries as bare strings (e.g. ["reasoning_content"]).
+ * This function converts them to the uniform object form:
+ * [{ name: "reasoning_content", options: {} }]
+ *
+ * Rows are self-healing: on next save through the API, the normalized form
+ * is persisted back to the DB.
+ */
+function normalizeAdapterEntries(
+  raw: unknown
+): Array<{ name: string; options: Record<string, any> }> | null {
+  if (raw === null || raw === undefined) return null;
+  const arr = Array.isArray(raw) ? raw : [raw];
+  if (arr.length === 0) return null;
+
+  return arr
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        // Legacy bare-string form
+        return { name: entry, options: {} };
+      }
+      if (entry && typeof entry === 'object' && 'name' in entry) {
+        // Already in object form
+        return {
+          name: (entry as any).name,
+          options: (entry as any).options ?? {},
+        };
+      }
+      // Malformed entry — skip with a warning (don't crash)
+      logger.warn(`Skipping malformed adapter entry: ${JSON.stringify(entry)}`);
+      return null;
+    })
+    .filter((e): e is { name: string; options: Record<string, any> } => e !== null);
+}
+
+/**
  * Encrypt a JSON value for storage in a TEXT column.
  * JSON-serializes the value, then encrypts the resulting string.
  * If encryption is disabled, returns the JSON string as-is.
@@ -311,8 +348,8 @@ export class ConfigRepository {
       gpuFlopsTflop: config.gpu_flops_tflop ?? null,
       gpuPowerDrawWatts: config.gpu_power_draw_watts ?? null,
       adapter:
-        config.adapter && (Array.isArray(config.adapter) ? config.adapter.length > 0 : true)
-          ? toJson(Array.isArray(config.adapter) ? config.adapter : [config.adapter])
+        config.adapter && Array.isArray(config.adapter) && config.adapter.length > 0
+          ? toJson(config.adapter)
           : null,
       timeoutMs: config.timeoutMs ?? null,
       maxConcurrency: config.maxConcurrency ?? null,
@@ -375,8 +412,8 @@ export class ConfigRepository {
           accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
           extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
           adapter:
-            cfg.adapter && (Array.isArray(cfg.adapter) ? cfg.adapter.length > 0 : true)
-              ? toJson(Array.isArray(cfg.adapter) ? cfg.adapter : [cfg.adapter])
+            cfg.adapter && Array.isArray(cfg.adapter) && cfg.adapter.length > 0
+              ? toJson(cfg.adapter)
               : null,
           maxConcurrency: cfg.maxConcurrency ?? null,
           sortOrder: idx,
@@ -450,7 +487,7 @@ export class ConfigRepository {
             ...(m.modelType ? { type: m.modelType } : {}),
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
-            ...(m.adapter ? { adapter: parseJson(m.adapter) } : {}),
+            ...(m.adapter ? { adapter: normalizeAdapterEntries(parseJson(m.adapter)) } : {}),
             ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
           };
         }
@@ -495,8 +532,9 @@ export class ConfigRepository {
       })(),
       ...(quota_checker ? { quota_checker } : {}),
       ...(() => {
-        const adapterVal = parseJson<string[]>(row.adapter);
-        return Array.isArray(adapterVal) && adapterVal.length > 0 ? { adapter: adapterVal } : {};
+        const adapterVal = parseJson(row.adapter);
+        const normalized = normalizeAdapterEntries(adapterVal);
+        return normalized && normalized.length > 0 ? { adapter: normalized } : {};
       })(),
       // GPU Profile settings — resolve named profiles to concrete values for
       // backward compatibility with existing DB rows that may only have gpuProfile

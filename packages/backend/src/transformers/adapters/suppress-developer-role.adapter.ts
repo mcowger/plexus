@@ -20,7 +20,7 @@ import type { ProviderAdapter } from '../../types/provider-adapter';
 export const suppressDeveloperRoleAdapter: ProviderAdapter = {
   name: 'suppress_developer_role',
 
-  preDispatch(payload: Record<string, any>): Record<string, any> {
+  preDispatch(payload: Record<string, any>, _options?: Record<string, any>): Record<string, any> {
     if (!Array.isArray(payload.messages)) return payload;
 
     const messages = payload.messages.map((msg: any) => {
@@ -31,11 +31,11 @@ export const suppressDeveloperRoleAdapter: ProviderAdapter = {
     return { ...payload, messages };
   },
 
-  postDispatch(response: Record<string, any>): Record<string, any> {
+  postDispatch(response: Record<string, any>, _options?: Record<string, any>): Record<string, any> {
     return response;
   },
 
-  preDispatchStreamChunk(line: string): string {
+  preDispatchStreamChunk(line: string, _options?: Record<string, any>): string {
     if (!line.startsWith('data:')) return line;
     return line.replace(/"role":"developer"/g, '"role":"system"');
   },

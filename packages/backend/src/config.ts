@@ -61,7 +61,61 @@ const PricingSchema = z.discriminatedUnion('source', [
   }),
 ]);
 
-const AdapterConfigSchema = z.union([z.string(), z.array(z.string())]).optional();
+// ─── Adapter Config ─────────────────────────────────────────────────
+// Adapters are configured as an array of { name, options } entries.
+// Legacy bare-string forms are normalized at read time in config-repository.
+
+const ModelOverrideConditionSchema = z.object({
+  /** JSON dotted path into the payload (e.g. "reasoning.enabled", "reasoning.effort"). */
+  field: z.string().min(1),
+  /** If omitted, matches when the field is present (any value). If set, matches when value equals this. */
+  value: z.any().optional(),
+});
+
+const ModelOverrideRuleSchema = z.object({
+  /** The model name in the payload to match against (e.g. "deepseek-r1"). */
+  model: z.string().min(1),
+  /** The model name to rewrite to when conditions match (e.g. "deepseek-r1-fast"). */
+  rewriteTo: z.string().min(1),
+  /** Conditions — ANY match triggers the rewrite (OR semantics). */
+  conditions: z.array(ModelOverrideConditionSchema).min(1),
+});
+
+const ModelOverrideOptionsSchema = z.object({
+  rules: z.array(ModelOverrideRuleSchema).min(1),
+});
+
+const AdapterEntrySchema = z.object({
+  name: z.string().min(1),
+  options: z.record(z.string(), z.any()).default({}),
+});
+
+/**
+ * Accepts both the legacy format (string | string[]) and the new
+ * uniform format ({ name, options }[]) and normalizes everything
+ * to AdapterEntry[]. This ensures backward compatibility with
+ * existing YAML configs while enforcing the canonical shape at
+ * validation time.
+ */
+const AdapterConfigSchema = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined;
+  // Already an array (or single entry) — normalize each element
+  const arr = Array.isArray(val) ? val : [val];
+  return arr.map((entry: any) => {
+    if (typeof entry === 'string') {
+      return { name: entry, options: {} };
+    }
+    if (entry && typeof entry === 'object' && 'name' in entry) {
+      return { name: entry.name, options: entry.options ?? {} };
+    }
+    return entry; // Let Zod produce a clear validation error
+  });
+}, z.array(AdapterEntrySchema).optional());
+
+export type ModelOverrideCondition = z.infer<typeof ModelOverrideConditionSchema>;
+export type ModelOverrideRule = z.infer<typeof ModelOverrideRuleSchema>;
+export type ModelOverrideOptions = z.infer<typeof ModelOverrideOptionsSchema>;
+export type AdapterEntry = z.infer<typeof AdapterEntrySchema>;
 
 const ModelProviderConfigSchema = z.object({
   pricing: PricingSchema.default({
