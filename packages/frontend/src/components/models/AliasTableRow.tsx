@@ -71,22 +71,18 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             </button>
           </div>
         </div>
-      </td>
-      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-        {alias.aliases && alias.aliases.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
+        {alias.aliases && alias.aliases.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5 pl-5">
             {alias.aliases.map((a) => (
               <span
                 key={a}
-                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium border border-border-glass text-text-secondary text-[10px]"
+                className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-text-secondary"
               >
                 {a}
                 <CopyButton value={a} size="sm" />
               </span>
             ))}
           </div>
-        ) : (
-          <span className="text-text-secondary text-xs">-</span>
         )}
       </td>
 
