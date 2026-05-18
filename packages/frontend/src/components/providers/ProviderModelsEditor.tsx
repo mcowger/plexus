@@ -922,28 +922,29 @@ export function ProviderModelsEditor({
                                         <span className="font-body text-[11px] text-text-muted">
                                           →
                                         </span>
-                                        <Input
-                                          placeholder="Rewrite to (e.g. deepseek-r1-fast)"
-                                          value={rule.rewriteTo ?? ''}
-                                          onChange={(e: any) => {
-                                            const updated = [...rules];
-                                            updated[rIdx] = {
-                                              ...updated[rIdx],
-                                              rewriteTo: e.target.value,
-                                            };
-                                            const newAdapters = modelAdapters.map((entry: any) =>
-                                              typeof entry !== 'string' &&
-                                              entry.name === 'model_override'
-                                                ? {
-                                                    ...entry,
-                                                    options: { ...entry.options, rules: updated },
-                                                  }
-                                                : entry
-                                            );
-                                            updateModelConfig(mId, { adapter: newAdapters });
-                                          }}
-                                          style={{ flex: 1 }}
-                                        />
+                                        <div style={{ flex: 1 }}>
+                                          <Input
+                                            placeholder="Rewrite to (e.g. deepseek-r1-fast)"
+                                            value={rule.rewriteTo ?? ''}
+                                            onChange={(e: any) => {
+                                              const updated = [...rules];
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                rewriteTo: e.target.value,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'model_override'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                          />
+                                        </div>
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -1015,73 +1016,83 @@ export function ProviderModelsEditor({
                                             marginLeft: '8px',
                                           }}
                                         >
-                                          <Input
-                                            placeholder="e.g. reasoning.enabled"
-                                            value={cond.field ?? ''}
-                                            onChange={(e: any) => {
-                                              const updated = [...rules];
-                                              const newConditions = [...updated[rIdx].conditions];
-                                              newConditions[cIdx] = {
-                                                ...newConditions[cIdx],
-                                                field: e.target.value,
-                                              };
-                                              updated[rIdx] = {
-                                                ...updated[rIdx],
-                                                conditions: newConditions,
-                                              };
-                                              const newAdapters = modelAdapters.map((entry: any) =>
-                                                typeof entry !== 'string' &&
-                                                entry.name === 'model_override'
-                                                  ? {
-                                                      ...entry,
-                                                      options: { ...entry.options, rules: updated },
-                                                    }
-                                                  : entry
-                                              );
-                                              updateModelConfig(mId, { adapter: newAdapters });
-                                            }}
-                                            style={{ flex: 2 }}
-                                          />
-                                          <Input
-                                            placeholder="e.g. false, 0, none"
-                                            value={
-                                              cond.value !== undefined ? String(cond.value) : ''
-                                            }
-                                            onChange={(e: any) => {
-                                              const raw = e.target.value;
-                                              const parsed =
-                                                raw === ''
-                                                  ? undefined
-                                                  : raw === 'true'
-                                                    ? true
-                                                    : raw === 'false'
-                                                      ? false
-                                                      : isNaN(Number(raw))
-                                                        ? raw
-                                                        : Number(raw);
-                                              const updated = [...rules];
-                                              const newConditions = [...updated[rIdx].conditions];
-                                              newConditions[cIdx] = {
-                                                field: newConditions[cIdx].field,
-                                                value: parsed,
-                                              };
-                                              updated[rIdx] = {
-                                                ...updated[rIdx],
-                                                conditions: newConditions,
-                                              };
-                                              const newAdapters = modelAdapters.map((entry: any) =>
-                                                typeof entry !== 'string' &&
-                                                entry.name === 'model_override'
-                                                  ? {
-                                                      ...entry,
-                                                      options: { ...entry.options, rules: updated },
-                                                    }
-                                                  : entry
-                                              );
-                                              updateModelConfig(mId, { adapter: newAdapters });
-                                            }}
-                                            style={{ flex: 1 }}
-                                          />
+                                          <div style={{ flex: 2 }}>
+                                            <Input
+                                              placeholder="e.g. reasoning.enabled"
+                                              value={cond.field ?? ''}
+                                              onChange={(e: any) => {
+                                                const updated = [...rules];
+                                                const newConditions = [...updated[rIdx].conditions];
+                                                newConditions[cIdx] = {
+                                                  ...newConditions[cIdx],
+                                                  field: e.target.value,
+                                                };
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  conditions: newConditions,
+                                                };
+                                                const newAdapters = modelAdapters.map(
+                                                  (entry: any) =>
+                                                    typeof entry !== 'string' &&
+                                                    entry.name === 'model_override'
+                                                      ? {
+                                                          ...entry,
+                                                          options: {
+                                                            ...entry.options,
+                                                            rules: updated,
+                                                          },
+                                                        }
+                                                      : entry
+                                                );
+                                                updateModelConfig(mId, { adapter: newAdapters });
+                                              }}
+                                            />
+                                          </div>
+                                          <div style={{ flex: 1 }}>
+                                            <Input
+                                              placeholder="e.g. false, 0, none"
+                                              value={
+                                                cond.value !== undefined ? String(cond.value) : ''
+                                              }
+                                              onChange={(e: any) => {
+                                                const raw = e.target.value;
+                                                const parsed =
+                                                  raw === ''
+                                                    ? undefined
+                                                    : raw === 'true'
+                                                      ? true
+                                                      : raw === 'false'
+                                                        ? false
+                                                        : isNaN(Number(raw))
+                                                          ? raw
+                                                          : Number(raw);
+                                                const updated = [...rules];
+                                                const newConditions = [...updated[rIdx].conditions];
+                                                newConditions[cIdx] = {
+                                                  field: newConditions[cIdx].field,
+                                                  value: parsed,
+                                                };
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  conditions: newConditions,
+                                                };
+                                                const newAdapters = modelAdapters.map(
+                                                  (entry: any) =>
+                                                    typeof entry !== 'string' &&
+                                                    entry.name === 'model_override'
+                                                      ? {
+                                                          ...entry,
+                                                          options: {
+                                                            ...entry.options,
+                                                            rules: updated,
+                                                          },
+                                                        }
+                                                      : entry
+                                                );
+                                                updateModelConfig(mId, { adapter: newAdapters });
+                                              }}
+                                            />
+                                          </div>
                                           <Button
                                             variant="ghost"
                                             size="sm"
