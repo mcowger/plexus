@@ -232,7 +232,7 @@ describe('extractUsageCostDetails', () => {
       cost_details: {
         upstream_inference_completions_cost: 0.004354,
         upstream_inference_cost: null,
-        upstream_inference_prompt_cost: 4.25e-6,
+        upstream_inference_prompt_cost: 4.25e-06,
       },
       is_byok: false,
       prompt_tokens: 17,
@@ -244,7 +244,7 @@ describe('extractUsageCostDetails', () => {
     expect(result!.total_cost).toBe(0.00435825);
     expect(result!.input_cost).toBeNull();
     expect(result!.output_cost).toBeNull();
-    expect(result!.upstream_inference_prompt_cost).toBe(4.25e-6);
+    expect(result!.upstream_inference_prompt_cost).toBe(4.25e-06);
     expect(result!.upstream_inference_completions_cost).toBe(0.004354);
   });
 
@@ -278,7 +278,7 @@ describe('extractUsageCostDetails', () => {
       cost_details: {
         upstream_inference_completions_cost: 0.0002275,
         upstream_inference_cost: 0.0003253,
-        upstream_inference_prompt_cost: 9.78e-5,
+        upstream_inference_prompt_cost: 9.78e-05,
       },
       is_byok: true,
       prompt_tokens: 326,
@@ -290,7 +290,7 @@ describe('extractUsageCostDetails', () => {
     expect(result!.total_cost).toBe(0.0003253);
     expect(result!.input_cost).toBeNull();
     expect(result!.output_cost).toBeNull();
-    expect(result!.upstream_inference_prompt_cost).toBe(9.78e-5);
+    expect(result!.upstream_inference_prompt_cost).toBe(9.78e-05);
     expect(result!.upstream_inference_completions_cost).toBe(0.0002275);
   });
 
@@ -352,37 +352,38 @@ describe('extractUsageCostDetails', () => {
 });
 
 describe('applyUsageCostDetails', () => {
-  test('overrides costs with provider cost_details breakdown', () => {
+  test('applies gateway input/output/cached costs directly when full breakdown is present', () => {
     const record = createUsageRecord();
+    // Extracted from: glm-5.1 via LLM Gateway (real response)
     const costDetails: ProviderCostDetails = {
-      total_cost: 0.00017465,
-      input_cost: 0.00002415,
-      output_cost: 0.0001505,
-      cached_input_cost: 0,
+      total_cost: 0.022101624,
+      input_cost: 0.00073836,
+      output_cost: 0.00041184,
+      cached_input_cost: 0.020951424,
       cache_write_input_cost: 0,
-      upstream_inference_cost: 0.00017465,
-      upstream_inference_prompt_cost: 0.00002415,
-      upstream_inference_completions_cost: 0.0001505,
+      upstream_inference_cost: 0.022101624,
+      upstream_inference_prompt_cost: 0.021689784,
+      upstream_inference_completions_cost: 0.00041184,
       request_cost: 0,
       web_search_cost: 0,
       image_input_cost: null,
       image_output_cost: null,
       audio_input_cost: null,
-      data_storage_cost: 0.00000106,
+      data_storage_cost: null,
     };
 
     applyUsageCostDetails(record, costDetails);
 
-    expect(record.costTotal).toBe(0.00017465);
+    expect(record.costTotal).toBeCloseTo(0.022101624, 8);
     expect(record.costSource).toBe('provider_reported');
-    expect(record.providerReportedCost).toBe(0.00017465);
-    expect(record.costInput).toBe(0.00002415);
-    expect(record.costOutput).toBe(0.0001505);
-    expect(record.costCached).toBe(0);
+    expect(record.providerReportedCost).toBe(0.022101624);
+    expect(record.costInput).toBe(0.00073836);
+    expect(record.costOutput).toBe(0.00041184);
+    expect(record.costCached).toBeCloseTo(0.020951424, 8);
     expect(record.costCacheWrite).toBe(0);
   });
 
-  test('falls back to proportional distribution when no breakdown available', () => {
+  test('falls back to proportional distribution when no cost breakdown available', () => {
     const record = createUsageRecord();
     // costInput=0.001, costOutput=0.002, costCached=0.0005, total=0.0035
     const costDetails: ProviderCostDetails = {
@@ -411,7 +412,7 @@ describe('applyUsageCostDetails', () => {
     expect(record.costCached).toBeCloseTo((0.0005 / 0.0035) * 0.007, 8);
   });
 
-  test('attributes full cost to input when no breakdown and no prior costs', () => {
+  test('attributes full cost to input when no cost breakdown and no prior costs', () => {
     const record = createUsageRecord({
       costInput: 0,
       costOutput: 0,
@@ -445,7 +446,69 @@ describe('applyUsageCostDetails', () => {
     expect(record.costCacheWrite).toBe(0);
   });
 
-  test('uses partial breakdown — only input_cost provided', () => {
+  test('splits upstream prompt cost between input and cached using existing cost ratio', () => {
+    const record = createUsageRecord();
+    // createUsageRecord defaults: costInput=0.001, costCached=0.0005
+    // Prompt ratio: input=0.001/(0.001+0.0005)=2/3, cached=0.0005/(0.001+0.0005)=1/3
+    // Extracted from: z-ai/glm-5-turbo-20260315 (real response, cached_tokens=128/173 prompt tokens)
+    const costDetails: ProviderCostDetails = {
+      total_cost: 0.00021672,
+      input_cost: null,
+      output_cost: null,
+      cached_input_cost: null,
+      cache_write_input_cost: null,
+      upstream_inference_cost: 0.00021672,
+      upstream_inference_prompt_cost: 0.00008472,
+      upstream_inference_completions_cost: 0.000132,
+      request_cost: null,
+      web_search_cost: null,
+      image_input_cost: null,
+      image_output_cost: null,
+      audio_input_cost: null,
+      data_storage_cost: null,
+    };
+
+    applyUsageCostDetails(record, costDetails);
+
+    expect(record.costTotal).toBe(0.00021672);
+    expect(record.costSource).toBe('provider_reported');
+    expect(record.costOutput).toBe(0.000132);
+    // Prompt (0.00008472) split by record ratio: input=2/3, cached=1/3
+    expect(record.costInput).toBeCloseTo((2 / 3) * 0.00008472, 8);
+    expect(record.costCached).toBeCloseTo((1 / 3) * 0.00008472, 8);
+    expect(record.costCacheWrite).toBe(0);
+  });
+
+  test('attributes full upstream prompt cost to input when no cached tokens', () => {
+    const record = createUsageRecord({ costCached: 0, costCacheWrite: 0, costTotal: 0.003 });
+    // Extracted from: normal-tier real response (cached_tokens=0)
+    const costDetails: ProviderCostDetails = {
+      total_cost: 0.00435825,
+      input_cost: null,
+      output_cost: null,
+      cached_input_cost: null,
+      cache_write_input_cost: null,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: 4.25e-06,
+      upstream_inference_completions_cost: 0.004354,
+      request_cost: null,
+      web_search_cost: null,
+      image_input_cost: null,
+      image_output_cost: null,
+      audio_input_cost: null,
+      data_storage_cost: null,
+    };
+
+    applyUsageCostDetails(record, costDetails);
+
+    expect(record.costTotal).toBe(0.00435825);
+    expect(record.costOutput).toBe(0.004354);
+    expect(record.costInput).toBe(4.25e-06);
+    expect(record.costCached).toBe(0);
+    expect(record.costCacheWrite).toBe(0);
+  });
+
+  test('uses partial gateway breakdown when only some per-bucket costs are available', () => {
     const record = createUsageRecord();
     const costDetails: ProviderCostDetails = {
       total_cost: 0.005,
@@ -481,9 +544,6 @@ describe('applyUsageCostDetails', () => {
       output_cost: 0.002,
       cached_input_cost: null,
       cache_write_input_cost: null,
-      upstream_inference_cost: null,
-      upstream_inference_prompt_cost: null,
-      upstream_inference_completions_cost: null,
       request_cost: null,
       web_search_cost: null,
       image_input_cost: null,
@@ -514,15 +574,12 @@ describe('applyUsageCostDetails', () => {
       output_cost: 0.0001505,
       cached_input_cost: 0,
       cache_write_input_cost: 0,
-      upstream_inference_cost: 0.00017465,
-      upstream_inference_prompt_cost: 0.00002415,
-      upstream_inference_completions_cost: 0.0001505,
       request_cost: 0,
       web_search_cost: 0,
-      image_input_cost: null,
-      image_output_cost: null,
-      audio_input_cost: null,
-      data_storage_cost: 0.00000106,
+      image_input_cost: 0,
+      image_output_cost: 0,
+      audio_input_cost: 0,
+      data_storage_cost: 0,
     };
 
     applyUsageCostDetails(record, costDetails);
@@ -542,14 +599,11 @@ describe('applyUsageCostDetails', () => {
       output_cost: 0,
       cached_input_cost: 0,
       cache_write_input_cost: 0,
-      upstream_inference_cost: 0,
-      upstream_inference_prompt_cost: 0,
-      upstream_inference_completions_cost: 0,
       request_cost: 0,
       web_search_cost: 0,
-      image_input_cost: null,
-      image_output_cost: null,
-      audio_input_cost: null,
+      image_input_cost: 0,
+      image_output_cost: 0,
+      audio_input_cost: 0,
       data_storage_cost: 0,
     };
 
