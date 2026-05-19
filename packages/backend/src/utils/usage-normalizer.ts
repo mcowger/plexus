@@ -72,13 +72,20 @@ export function extractUsageCostDetails(usage: any): ProviderCostDetails | null 
 
   return {
     total_cost: totalCost,
-    input_cost: safeCost(details.input_cost ?? details.upstream_inference_prompt_cost),
-    output_cost: safeCost(details.output_cost ?? details.upstream_inference_completions_cost),
+    // upstream_inference_prompt_cost includes cached tokens (input_cost + cached_input_cost),
+    // so it can't be mapped directly to input_cost. The upstream fields are preserved
+    // here and dispatched separately in applyUsageCostDetails().
+    input_cost: safeCost(details.input_cost),
+    output_cost: safeCost(details.output_cost),
     cached_input_cost: safeCost(details.cached_input_cost),
     cache_write_input_cost: safeCost(details.cache_write_input_cost),
     upstream_inference_cost: safeCost(details.upstream_inference_cost),
-    upstream_inference_prompt_cost: safeCost(details.upstream_inference_prompt_cost),
-    upstream_inference_completions_cost: safeCost(details.upstream_inference_completions_cost),
+    upstream_inference_prompt_cost: safeCost(
+      details.upstream_inference_prompt_cost ?? details.upstream_inference_input_cost
+    ),
+    upstream_inference_completions_cost: safeCost(
+      details.upstream_inference_completions_cost ?? details.upstream_inference_output_cost
+    ),
     request_cost: safeCost(details.request_cost),
     web_search_cost: safeCost(details.web_search_cost),
     image_input_cost: safeCost(details.image_input_cost),

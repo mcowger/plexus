@@ -124,42 +124,43 @@ describe('applyProviderReportedCost', () => {
 
 describe('extractUsageCostDetails', () => {
   test('extracts cost_details from the new usage format', () => {
+    // Real response: glm-5.1 via LLM Gateway (has both gateway and upstream fields)
     const usage = {
-      prompt_tokens: 23,
-      total_tokens: 66,
-      completion_tokens: 43,
-      estimated_cost: 0.00017465,
+      prompt_tokens: 90122,
+      completion_tokens: 104,
+      total_tokens: 90226,
+      cost: 0.022101624,
       prompt_tokens_details: {
-        cached_tokens: 0,
+        cached_tokens: 89536,
         cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+        image_tokens: 0,
       },
-      cost: 0.00017465,
       cost_details: {
-        upstream_inference_cost: 0.00017465,
-        upstream_inference_prompt_cost: 0.00002415,
-        upstream_inference_completions_cost: 0.0001505,
-        total_cost: 0.00017465,
-        input_cost: 0.00002415,
-        output_cost: 0.0001505,
-        cached_input_cost: 0,
+        upstream_inference_cost: 0.022101624,
+        upstream_inference_prompt_cost: 0.021689784,
+        upstream_inference_completions_cost: 0.00041184,
+        total_cost: 0.022101624,
+        input_cost: 0.00073836,
+        output_cost: 0.00041184,
+        cached_input_cost: 0.020951424,
         cache_write_input_cost: 0,
         request_cost: 0,
         web_search_cost: 0,
         image_input_cost: null,
         image_output_cost: null,
         audio_input_cost: null,
-        data_storage_cost: 0.00000106,
       },
     };
 
     const result = extractUsageCostDetails(usage);
     expect(result).not.toBeNull();
-    expect(result!.total_cost).toBe(0.00017465);
-    expect(result!.input_cost).toBe(0.00002415);
-    expect(result!.output_cost).toBe(0.0001505);
-    expect(result!.cached_input_cost).toBe(0);
+    expect(result!.total_cost).toBe(0.022101624);
+    expect(result!.input_cost).toBe(0.00073836);
+    expect(result!.output_cost).toBe(0.00041184);
+    expect(result!.cached_input_cost).toBe(0.020951424);
     expect(result!.cache_write_input_cost).toBe(0);
-    expect(result!.data_storage_cost).toBe(0.00000106);
   });
 
   test('falls back to usage.cost when cost_details.total_cost is missing', () => {
@@ -223,25 +224,40 @@ describe('extractUsageCostDetails', () => {
     expect(extractUsageCostDetails(undefined)).toBeNull();
   });
 
-  test('maps upstream_inference_prompt_cost as fallback for input_cost', () => {
+  test('keeps upstream prompt/completions fields separate from input_cost/output_cost', () => {
+    // Real response: normal-tier (no gateway input_cost/output_cost fields)
     const usage = {
-      cost: 0.01,
+      completion_tokens: 2177,
+      cost: 0.00435825,
       cost_details: {
-        upstream_inference_prompt_cost: 0.003,
-        upstream_inference_completions_cost: 0.007,
+        upstream_inference_completions_cost: 0.004354,
+        upstream_inference_cost: null,
+        upstream_inference_prompt_cost: 4.25e-6,
       },
+      is_byok: false,
+      prompt_tokens: 17,
+      prompt_tokens_details: { cached_tokens: 0 },
     };
 
     const result = extractUsageCostDetails(usage);
-    expect(result!.input_cost).toBe(0.003);
-    expect(result!.output_cost).toBe(0.007);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.00435825);
+    expect(result!.input_cost).toBeNull();
+    expect(result!.output_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBe(4.25e-6);
+    expect(result!.upstream_inference_completions_cost).toBe(0.004354);
   });
 
   test('preserves null values for optional cost fields', () => {
+    // Real response: LLM Gateway — image/audio costs null for text-only models
     const usage = {
-      cost: 0.01,
+      cost: 0.022101624,
       cost_details: {
-        total_cost: 0.01,
+        total_cost: 0.022101624,
+        input_cost: 0.00073836,
+        output_cost: 0.00041184,
+        cached_input_cost: 0.020951424,
+        cache_write_input_cost: 0,
         image_input_cost: null,
         image_output_cost: null,
         audio_input_cost: null,
@@ -252,6 +268,76 @@ describe('extractUsageCostDetails', () => {
     expect(result!.image_input_cost).toBeNull();
     expect(result!.image_output_cost).toBeNull();
     expect(result!.audio_input_cost).toBeNull();
+  });
+
+  test('uses upstream_inference_cost as total when usage.cost is 0 (BYOK)', () => {
+    // Real response: BYOK — Plexus charges $0, actual cost reported in upstream_inference_cost
+    const usage = {
+      completion_tokens: 91,
+      cost: 0,
+      cost_details: {
+        upstream_inference_completions_cost: 0.0002275,
+        upstream_inference_cost: 0.0003253,
+        upstream_inference_prompt_cost: 9.78e-5,
+      },
+      is_byok: true,
+      prompt_tokens: 326,
+      prompt_tokens_details: { cached_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.0003253);
+    expect(result!.input_cost).toBeNull();
+    expect(result!.output_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBe(9.78e-5);
+    expect(result!.upstream_inference_completions_cost).toBe(0.0002275);
+  });
+
+  test('aliases upstream_inference_input/output_cost to prompt/completions (Responses API)', () => {
+    // Real response: OpenAI Responses API uses _input/_output suffix rather than _prompt/_completions
+    const usage = {
+      input_tokens: 78,
+      input_tokens_details: { cached_tokens: 0 },
+      output_tokens: 37,
+      total_tokens: 115,
+      cost: 0.0000113,
+      is_byok: false,
+      cost_details: {
+        upstream_inference_cost: null,
+        upstream_inference_input_cost: 0.0000039,
+        upstream_inference_output_cost: 0.0000074,
+      },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.0000113);
+    expect(result!.input_cost).toBeNull();
+    expect(result!.output_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBe(0.0000039);
+    expect(result!.upstream_inference_completions_cost).toBe(0.0000074);
+  });
+
+  test('uses input_cost/output_cost directly when present alongside upstream fields', () => {
+    // Real response: LLM Gateway includes both gateway fields (input_cost/output_cost/cached_input_cost)
+    // and upstream fields (upstream_inference_prompt/completions_cost); gateway fields take priority
+    const usage = {
+      cost: 0.022101624,
+      cost_details: {
+        total_cost: 0.022101624,
+        input_cost: 0.00073836,
+        output_cost: 0.00041184,
+        cached_input_cost: 0.020951424,
+        upstream_inference_prompt_cost: 0.021689784,
+        upstream_inference_completions_cost: 0.00041184,
+      },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result!.input_cost).toBe(0.00073836);
+    expect(result!.output_cost).toBe(0.00041184);
+    expect(result!.cached_input_cost).toBe(0.020951424);
   });
 
   test('returns null for negative total_cost', () => {
