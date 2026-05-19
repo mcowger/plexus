@@ -90,20 +90,55 @@ export function applyUsageCostDetails(
   usageRecord.costSource = 'provider_reported';
   usageRecord.providerReportedCost = totalCost;
 
-  // Use the detailed cost breakdown when available
+  // Three tiers of provider cost reporting:
+  // 1. Superset: explicit per-bucket breakdown (input_cost, output_cost, cached_input_cost, cache_write_input_cost)
+  // 2. Normal: upstream_inference_prompt_cost/completions_cost split, but no cache granularity
+  // 3. Minimal: no breakdown at all — distribute proportionally from previously calculated costs
+
   const inputCost = costDetails.input_cost;
   const outputCost = costDetails.output_cost;
   const cachedCost = costDetails.cached_input_cost;
   const cacheWriteCost = costDetails.cache_write_input_cost;
 
-  if (inputCost !== null || outputCost !== null || cachedCost !== null || cacheWriteCost !== null) {
-    // Provider gave us an explicit per-bucket breakdown — use it directly
+  if (inputCost !== null || cachedCost !== null || cacheWriteCost !== null) {
+    // Superset: provider gave us an explicit per-bucket breakdown — use it directly
+    // Note: output_cost alone being non-null is not enough to identify superset;
+    // it's also reported by normal-tier as upstream_inference_completions_cost.
+    // Check the input-side fields (which normal-tier does not report separately).
     usageRecord.costInput = Number((inputCost ?? 0).toFixed(8));
     usageRecord.costOutput = Number((outputCost ?? 0).toFixed(8));
     usageRecord.costCached = Number((cachedCost ?? 0).toFixed(8));
     usageRecord.costCacheWrite = Number((cacheWriteCost ?? 0).toFixed(8));
+  } else if (
+    costDetails.upstream_inference_prompt_cost != null ||
+    costDetails.upstream_inference_completions_cost != null
+  ) {
+    // Normal: upstream gave us prompt vs completions split, but no cache granularity.
+    // Use the upstream split for the input vs output totals, then preserve Plexus's
+    // own calculated ratio within the prompt portion for cache/non-cache distribution.
+    const promptTotal = costDetails.upstream_inference_prompt_cost ?? 0;
+    const completionsTotal = costDetails.upstream_inference_completions_cost ?? 0;
+
+    usageRecord.costOutput = Number((completionsTotal ?? 0).toFixed(8));
+
+    // Split the prompt portion by Plexus's own input/cached/cacheWrite ratio
+    const prevInput = usageRecord.costInput || 0;
+    const prevCached = usageRecord.costCached || 0;
+    const prevCacheWrite = usageRecord.costCacheWrite || 0;
+    const prevPromptTotal = prevInput + prevCached + prevCacheWrite;
+
+    if (prevPromptTotal > 0) {
+      usageRecord.costInput = Number(((prevInput / prevPromptTotal) * promptTotal).toFixed(8));
+      usageRecord.costCached = Number(((prevCached / prevPromptTotal) * promptTotal).toFixed(8));
+      usageRecord.costCacheWrite = Number(((prevCacheWrite / prevPromptTotal) * promptTotal).toFixed(8));
+    } else {
+      // No prior breakdown — attribute full prompt cost to input
+      usageRecord.costInput = Number(promptTotal.toFixed(8));
+      usageRecord.costCached = 0;
+      usageRecord.costCacheWrite = 0;
+    }
   } else {
-    // No breakdown — distribute proportionally like we do for SSE `: cost` comments
+    // Minimal: no breakdown — distribute proportionally from previously calculated costs
     const prevInputCost = usageRecord.costInput || 0;
     const prevOutputCost = usageRecord.costOutput || 0;
     const prevCachedCost = usageRecord.costCached || 0;
