@@ -53,8 +53,21 @@ export function extractUsageCostDetails(usage: any): ProviderCostDetails | null 
   const details = usage?.cost_details;
   if (!details || typeof details !== 'object') return null;
 
-  // Validate that at least one cost field is a valid number
-  const totalCost = safeCost(details.total_cost ?? usage?.cost ?? usage?.estimated_cost);
+  // Determine total cost:
+  // 1. cost_details.total_cost
+  // 2. usage.cost or usage.estimated_cost (standard path)
+  // 3. cost_details.upstream_inference_cost (OpenRouter quirk)
+  let totalCost = safeCost(details.total_cost);
+
+  const costFromUsage = safeCost(usage?.cost ?? usage?.estimated_cost);
+  const upstreamInferenceCost = safeCost(details.upstream_inference_cost);
+
+  if (totalCost === null) {
+    // || not ?? — BYOK keys report usage.cost=0 (Plexus charges nothing), so a
+    // falsy 0 should fall through to upstreamInferenceCost which carries the
+    // actual provider cost.
+    totalCost = costFromUsage || upstreamInferenceCost;
+  }
   if (totalCost === null) return null;
 
   return {
