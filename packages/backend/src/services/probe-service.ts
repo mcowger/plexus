@@ -232,6 +232,20 @@ export class ProbeService {
         response = await this.dispatcher.dispatch(unifiedRequest);
       }
 
+      // For streaming responses, cancel the stream to release the concurrency
+      // slot. The probe only needs routing metadata (plexus.*), not the stream
+      // content. Without this, the dispatcher's stream wrapper never fires its
+      // release callback, leaking the concurrency slot permanently.
+      if (response?.stream && typeof response.stream.cancel === 'function') {
+        try {
+          await response.stream.cancel();
+        } catch (e) {
+          // Slot is already released by the dispatcher's wrapper before the
+          // underlying stream is cancelled; cancellation failure is non-fatal.
+          logger.warn('Probe stream cancellation failed (slot already released):', e);
+        }
+      }
+
       const durationMs = Date.now() - startTime;
 
       usageRecord.provider = response.plexus?.provider;

@@ -153,4 +153,97 @@ describe('ProbeService', () => {
     expect(result.success).toBe(false);
     expect(dispatcher.dispatch).not.toHaveBeenCalled();
   });
+
+  test('runProbe cancels streaming response to release concurrency slot', async () => {
+    const cancelSpy = vi.fn(async () => {});
+    const { usageStorage, dispatcher } = makeMocks();
+    (dispatcher.dispatch as any).mockResolvedValueOnce({
+      id: 'r',
+      model: 'test-model',
+      created: Date.now(),
+      content: null,
+      stream: { cancel: cancelSpy },
+      usage: undefined,
+      plexus: {
+        provider: 'p1',
+        model: 'm1',
+        apiType: 'chat',
+        canonicalModel: 'm1',
+        attemptCount: 1,
+      },
+    });
+
+    const svc = new ProbeService(dispatcher, usageStorage);
+    const result = await svc.runProbe({
+      provider: 'p1',
+      model: 'm1',
+      apiType: 'chat',
+      source: 'background',
+    });
+
+    expect(result.success).toBe(true);
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('runProbe skips cancellation when stream has no cancel method', async () => {
+    const { usageStorage, dispatcher } = makeMocks();
+    (dispatcher.dispatch as any).mockResolvedValueOnce({
+      id: 'r',
+      model: 'test-model',
+      created: Date.now(),
+      content: null,
+      stream: {},
+      usage: undefined,
+      plexus: {
+        provider: 'p1',
+        model: 'm1',
+        apiType: 'chat',
+        canonicalModel: 'm1',
+        attemptCount: 1,
+      },
+    });
+
+    const svc = new ProbeService(dispatcher, usageStorage);
+    const result = await svc.runProbe({
+      provider: 'p1',
+      model: 'm1',
+      apiType: 'chat',
+      source: 'background',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  test('runProbe swallows stream cancellation errors', async () => {
+    const cancelSpy = vi.fn(async () => {
+      throw new Error('stream already closed');
+    });
+    const { usageStorage, dispatcher } = makeMocks();
+    (dispatcher.dispatch as any).mockResolvedValueOnce({
+      id: 'r',
+      model: 'test-model',
+      created: Date.now(),
+      content: null,
+      stream: { cancel: cancelSpy },
+      usage: undefined,
+      plexus: {
+        provider: 'p1',
+        model: 'm1',
+        apiType: 'chat',
+        canonicalModel: 'm1',
+        attemptCount: 1,
+      },
+    });
+
+    const svc = new ProbeService(dispatcher, usageStorage);
+    const result = await svc.runProbe({
+      provider: 'p1',
+      model: 'm1',
+      apiType: 'chat',
+      source: 'background',
+    });
+
+    expect(result.success).toBe(true);
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+  });
 });
