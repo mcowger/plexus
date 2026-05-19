@@ -32,7 +32,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # pi-lens AI coding agent
 .pi-lens/
-
+.pi/
 # Finder (MacOS) folder config
 .DS_Store
 config/plexus.yaml
