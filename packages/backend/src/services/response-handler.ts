@@ -10,7 +10,8 @@ import { DebugLoggingInspector, UsageInspector } from './inspectors';
 import { Readable } from 'stream';
 import { DebugManager } from './debug-manager';
 import { estimateKwhUsed } from './inference-energy';
-import { applyProviderReportedCost } from '../utils/provider-cost';
+import { applyProviderReportedCost, applyUsageCostDetails } from '../utils/provider-cost';
+import { extractUsageCostDetails } from '../utils/usage-normalizer';
 import { StallInspector, type StallConfig } from './inspectors/stall-inspector';
 import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 import type { GpuParams } from '@plexus/shared';
@@ -501,6 +502,14 @@ async function finalizeUsage(
   const reconstructed = debugManager.getReconstructedRawResponse(usageRecord.requestId!);
   if (reconstructed?.providerReportedCost) {
     applyProviderReportedCost(usageRecord, reconstructed.providerReportedCost);
+  }
+
+  // Also check for cost_details in the usage block (some providers embed costs there)
+  if (!usageRecord.providerReportedCost && reconstructed?.usage) {
+    const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+    if (usageCostDetails) {
+      applyUsageCostDetails(usageRecord, usageCostDetails);
+    }
   }
   usageRecord.responseStatus = 'success';
   usageRecord.durationMs = Date.now() - startTime;

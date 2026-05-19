@@ -10,9 +10,10 @@ import {
   normalizeGeminiUsage,
   normalizeOpenAIChatUsage,
   normalizeOpenAIResponsesUsage,
+  extractUsageCostDetails,
 } from '../../utils/usage-normalizer';
 import { estimateKwhUsed } from '../inference-energy';
-import { applyProviderReportedCost } from '../../utils/provider-cost';
+import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
 import { DEFAULT_MODEL, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import { recordQuotaUsage } from '../quota/quota-middleware';
 
@@ -147,6 +148,15 @@ export class UsageInspector extends PassThrough {
       // Some providers emit `: cost {"request_cost_usd": ...}` as SSE comments
       if (reconstructed?.providerReportedCost) {
         applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
+      }
+
+      // Override with provider-reported cost from usage.cost_details if available
+      // Some providers include detailed cost breakdowns in the usage block
+      if (!this.usageRecord.providerReportedCost && reconstructed?.usage) {
+        const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+        if (usageCostDetails) {
+          applyUsageCostDetails(this.usageRecord, usageCostDetails);
+        }
       }
 
       // Use provider-reported energy if available, otherwise estimate

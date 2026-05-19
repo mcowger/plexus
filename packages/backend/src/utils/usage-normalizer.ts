@@ -16,11 +16,71 @@ const safeToken = (value: unknown): number => {
   return Math.max(0, Math.floor(num));
 };
 
+const safeCost = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return null;
+  return num;
+};
+
+export interface ProviderCostDetails {
+  total_cost: number | null;
+  input_cost: number | null;
+  output_cost: number | null;
+  cached_input_cost: number | null;
+  cache_write_input_cost: number | null;
+  upstream_inference_cost: number | null;
+  upstream_inference_prompt_cost: number | null;
+  upstream_inference_completions_cost: number | null;
+  request_cost: number | null;
+  web_search_cost: number | null;
+  image_input_cost: number | null;
+  image_output_cost: number | null;
+  audio_input_cost: number | null;
+  data_storage_cost: number | null;
+}
+
+export interface UsageWithCostDetails extends UsageSubset {
+  provider_cost_details: ProviderCostDetails | null;
+}
+
+/**
+ * Extract provider-reported cost details from the usage.cost_details block.
+ * Some providers (e.g., openrouter-like proxies) include detailed cost
+ * breakdowns directly in the usage object.
+ */
+export function extractUsageCostDetails(usage: any): ProviderCostDetails | null {
+  const details = usage?.cost_details;
+  if (!details || typeof details !== 'object') return null;
+
+  // Validate that at least one cost field is a valid number
+  const totalCost = safeCost(details.total_cost ?? usage?.cost ?? usage?.estimated_cost);
+  if (totalCost === null) return null;
+
+  return {
+    total_cost: totalCost,
+    input_cost: safeCost(details.input_cost ?? details.upstream_inference_prompt_cost),
+    output_cost: safeCost(details.output_cost ?? details.upstream_inference_completions_cost),
+    cached_input_cost: safeCost(details.cached_input_cost),
+    cache_write_input_cost: safeCost(details.cache_write_input_cost),
+    upstream_inference_cost: safeCost(details.upstream_inference_cost),
+    upstream_inference_prompt_cost: safeCost(details.upstream_inference_prompt_cost),
+    upstream_inference_completions_cost: safeCost(details.upstream_inference_completions_cost),
+    request_cost: safeCost(details.request_cost),
+    web_search_cost: safeCost(details.web_search_cost),
+    image_input_cost: safeCost(details.image_input_cost),
+    image_output_cost: safeCost(details.image_output_cost),
+    audio_input_cost: safeCost(details.audio_input_cost),
+    data_storage_cost: safeCost(details.data_storage_cost),
+  };
+}
+
 export function normalizeOpenAIChatUsage(usage: any): UsageSubset {
   const promptTokens = safeToken(usage?.prompt_tokens);
   const cachedTokens = safeToken(
     usage?.prompt_tokens_details?.cached_tokens ?? usage?.cached_tokens
   );
+  const cacheWriteTokens = safeToken(usage?.prompt_tokens_details?.cache_write_tokens);
   const outputTokens = safeToken(usage?.completion_tokens);
   const reasoningTokens = safeToken(usage?.completion_tokens_details?.reasoning_tokens);
 
@@ -34,7 +94,7 @@ export function normalizeOpenAIChatUsage(usage: any): UsageSubset {
     total_tokens: safeToken(usage?.total_tokens) || inputTokens + cachedTokens + outputTokens,
     reasoning_tokens: reasoningTokens,
     cached_tokens: cachedTokens,
-    cache_creation_tokens: 0,
+    cache_creation_tokens: cacheWriteTokens,
   };
 }
 

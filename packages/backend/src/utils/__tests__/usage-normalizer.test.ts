@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { normalizeGeminiUsage, normalizeOpenAIResponsesUsage } from '../usage-normalizer';
+import {
+  normalizeGeminiUsage,
+  normalizeOpenAIChatUsage,
+  normalizeOpenAIResponsesUsage,
+  extractUsageCostDetails,
+} from '../usage-normalizer';
 
 describe('usage-normalizer - OpenAI Responses usage', () => {
   test('normalizes when input_tokens includes cached tokens', () => {
@@ -78,5 +83,94 @@ describe('usage-normalizer - Gemini usage', () => {
     expect(normalized.output_tokens).toBe(336);
     expect(normalized.reasoning_tokens).toBe(684);
     expect(normalized.total_tokens).toBe(1027);
+  });
+});
+
+describe('usage-normalizer - OpenAI Chat usage', () => {
+  test('normalizes prompt_tokens_details with cached_tokens', () => {
+    const normalized = normalizeOpenAIChatUsage({
+      prompt_tokens: 2006,
+      completion_tokens: 300,
+      total_tokens: 2306,
+      prompt_tokens_details: {
+        cached_tokens: 1920,
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 0,
+      },
+    });
+
+    expect(normalized.input_tokens).toBe(86);
+    expect(normalized.cached_tokens).toBe(1920);
+    expect(normalized.output_tokens).toBe(300);
+    expect(normalized.total_tokens).toBe(2306);
+    expect(normalized.reasoning_tokens).toBe(0);
+    expect(normalized.cache_creation_tokens).toBe(0);
+  });
+
+  test('extracts cache_write_tokens from prompt_tokens_details', () => {
+    const normalized = normalizeOpenAIChatUsage({
+      prompt_tokens: 2006,
+      completion_tokens: 300,
+      total_tokens: 2306,
+      prompt_tokens_details: {
+        cached_tokens: 1920,
+        cache_write_tokens: 50,
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 10,
+      },
+    });
+
+    expect(normalized.cache_creation_tokens).toBe(50);
+    expect(normalized.cached_tokens).toBe(1920);
+    expect(normalized.reasoning_tokens).toBe(10);
+  });
+
+  test('defaults cache_write_tokens to 0 when not present', () => {
+    const normalized = normalizeOpenAIChatUsage({
+      prompt_tokens: 100,
+      completion_tokens: 50,
+      total_tokens: 150,
+      prompt_tokens_details: {
+        cached_tokens: 20,
+      },
+    });
+
+    expect(normalized.cache_creation_tokens).toBe(0);
+  });
+
+  test('handles new usage format with cost_details (tokens only)', () => {
+    const normalized = normalizeOpenAIChatUsage({
+      prompt_tokens: 23,
+      total_tokens: 66,
+      completion_tokens: 43,
+      estimated_cost: 0.00017465,
+      prompt_tokens_details: {
+        cached_tokens: 0,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+        image_tokens: 0,
+      },
+      cost: 0.00017465,
+      cost_details: {
+        total_cost: 0.00017465,
+        input_cost: 0.00002415,
+        output_cost: 0.0001505,
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 0,
+        image_tokens: 0,
+        audio_tokens: 0,
+      },
+    });
+
+    expect(normalized.input_tokens).toBe(23);
+    expect(normalized.output_tokens).toBe(43);
+    expect(normalized.cached_tokens).toBe(0);
+    expect(normalized.cache_creation_tokens).toBe(0);
+    expect(normalized.reasoning_tokens).toBe(0);
+    expect(normalized.total_tokens).toBe(66);
   });
 });
