@@ -642,9 +642,10 @@ export class Dispatcher {
                 logger.info(
                   `TTFB stall: fetch timed out after ${ttfbMs}ms for ${route.provider}/${route.model}, retrying with next provider`
                 );
+                doRelease();
                 continue;
               }
-
+              doRelease();
               throw stallError;
             }
             throw fetchError;

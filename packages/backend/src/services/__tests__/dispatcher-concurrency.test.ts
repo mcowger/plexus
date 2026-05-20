@@ -361,4 +361,43 @@ describe('Dispatcher concurrency slot release', () => {
     expect(tracker.getTargetCount('p1', 'model-a')).toBe(0);
     expect(tracker.getProviderCount('p1')).toBe(0);
   });
+
+  test('TTFB stall timeout releases concurrency slot', async () => {
+    // Enable stall detection with a very short TTFB timeout so the
+    // fetch itself gets aborted before the provider responds.
+    setConfigForTesting({
+      ...makeConfig(2),
+      stall: { ttfbSeconds: 0.05, ttfbBytes: 100 },
+    } as any);
+
+    // Simulate a slow provider that respects abort signals.
+    // The stall timeout will abort before this resolves.
+    fetchMock.mockImplementation(async (_url: string, opts: any) => {
+      return new Promise((_resolve, reject) => {
+        const timer = setTimeout(() => {
+          _resolve(streamingResponse());
+        }, 500);
+        opts?.signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new DOMException('The operation was aborted', 'AbortError'));
+        });
+      });
+    });
+
+    const tracker = ConcurrencyTracker.getInstance();
+    expect(tracker.getTargetCount('p1', 'model-a')).toBe(0);
+
+    const dispatcher = new Dispatcher();
+    try {
+      await dispatcher.dispatch(makeChatRequest(true));
+    } catch {
+      // Expected — stall timeout error propagates
+    }
+
+    // The slot must be released after the TTFB stall abort
+    expect(tracker.getTargetCount('p1', 'model-a')).toBe(0);
+    expect(tracker.getProviderCount('p1')).toBe(0);
+    expect(tracker.getTargetCount('p2', 'model-b')).toBe(0);
+    expect(tracker.getProviderCount('p2')).toBe(0);
+  });
 });
