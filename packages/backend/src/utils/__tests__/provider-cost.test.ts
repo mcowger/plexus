@@ -232,7 +232,7 @@ describe('extractUsageCostDetails', () => {
       cost_details: {
         upstream_inference_completions_cost: 0.004354,
         upstream_inference_cost: null,
-        upstream_inference_prompt_cost: 4.25e-06,
+        upstream_inference_prompt_cost: 4.25e-6,
       },
       is_byok: false,
       prompt_tokens: 17,
@@ -244,7 +244,7 @@ describe('extractUsageCostDetails', () => {
     expect(result!.total_cost).toBe(0.00435825);
     expect(result!.input_cost).toBeNull();
     expect(result!.output_cost).toBeNull();
-    expect(result!.upstream_inference_prompt_cost).toBe(4.25e-06);
+    expect(result!.upstream_inference_prompt_cost).toBe(4.25e-6);
     expect(result!.upstream_inference_completions_cost).toBe(0.004354);
   });
 
@@ -278,7 +278,7 @@ describe('extractUsageCostDetails', () => {
       cost_details: {
         upstream_inference_completions_cost: 0.0002275,
         upstream_inference_cost: 0.0003253,
-        upstream_inference_prompt_cost: 9.78e-05,
+        upstream_inference_prompt_cost: 9.78e-5,
       },
       is_byok: true,
       prompt_tokens: 326,
@@ -290,7 +290,7 @@ describe('extractUsageCostDetails', () => {
     expect(result!.total_cost).toBe(0.0003253);
     expect(result!.input_cost).toBeNull();
     expect(result!.output_cost).toBeNull();
-    expect(result!.upstream_inference_prompt_cost).toBe(9.78e-05);
+    expect(result!.upstream_inference_prompt_cost).toBe(9.78e-5);
     expect(result!.upstream_inference_completions_cost).toBe(0.0002275);
   });
 
@@ -338,6 +338,89 @@ describe('extractUsageCostDetails', () => {
     expect(result!.input_cost).toBe(0.00073836);
     expect(result!.output_cost).toBe(0.00041184);
     expect(result!.cached_input_cost).toBe(0.020951424);
+  });
+
+  test('returns null when cost is 0 and upstream_inference_cost is null (non-BYOK zero-cost)', () => {
+    // Real response: stream_error — non-BYOK request that genuinely cost $0.
+    // The || fallback in total cost detection causes 0 || null → null, so extract
+    // returns null. This is acceptable: zero-cost requests have nothing to report.
+    const usage = {
+      prompt_tokens: 43,
+      completion_tokens: 10,
+      total_tokens: 53,
+      cost: 0,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: null,
+        upstream_inference_prompt_cost: 0,
+        upstream_inference_completions_cost: 0,
+      },
+      completion_tokens_details: { reasoning_tokens: 11, image_tokens: 0 },
+    };
+
+    expect(extractUsageCostDetails(usage)).toBeNull();
+  });
+
+  test('handles cost much larger than upstream sum (OpenRouter markup)', () => {
+    // Real response: file_annotation — OpenRouter's cost includes provider overhead/markup
+    // that is not reflected in the upstream_inference_prompt/completions_cost fields.
+    // cost ($0.00216775) is ~13x the upstream sum ($0.00016775).
+    const usage = {
+      completion_tokens: 80,
+      completion_tokens_details: { image_tokens: 0, reasoning_tokens: 64 },
+      cost: 0.00216775,
+      cost_details: {
+        upstream_inference_completions_cost: 0.00016,
+        upstream_inference_cost: null,
+        upstream_inference_prompt_cost: 7.75e-6,
+      },
+      is_byok: false,
+      prompt_tokens: 31,
+      prompt_tokens_details: { audio_tokens: 0, cached_tokens: 0, video_tokens: 0 },
+      total_tokens: 111,
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    // total_cost comes from usage.cost (not upstream sum)
+    expect(result!.total_cost).toBe(0.00216775);
+    // upstream fields preserved separately
+    expect(result!.upstream_inference_prompt_cost).toBe(7.75e-6);
+    expect(result!.upstream_inference_completions_cost).toBe(0.00016);
+    // no gateway fields
+    expect(result!.input_cost).toBeNull();
+    expect(result!.output_cost).toBeNull();
+  });
+
+  test('handles zero prompt tokens with all cost on completions', () => {
+    // Real response: video_url_public_api — prompt_tokens=0, all cost on output side.
+    // upstream_inference_prompt_cost=0, upstream_inference_cost equals cost.
+    const usage = {
+      completion_tokens: 180,
+      completion_tokens_details: { image_tokens: 0, reasoning_tokens: 0 },
+      cost: 0.00045,
+      cost_details: {
+        upstream_inference_completions_cost: 0.00045,
+        upstream_inference_cost: 0.00045,
+        upstream_inference_prompt_cost: 0,
+      },
+      is_byok: false,
+      prompt_tokens: 0,
+      prompt_tokens_details: {
+        audio_tokens: 0,
+        cache_write_tokens: 0,
+        cached_tokens: 0,
+        video_tokens: 0,
+      },
+      total_tokens: 180,
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.00045);
+    expect(result!.upstream_inference_prompt_cost).toBe(0);
+    expect(result!.upstream_inference_completions_cost).toBe(0.00045);
   });
 
   test('returns null for negative total_cost', () => {
@@ -479,6 +562,45 @@ describe('applyUsageCostDetails', () => {
     expect(record.costCacheWrite).toBe(0);
   });
 
+  test('splits upstream prompt cost by ratio when upstream_inference_cost is null (heavy cache hit)', () => {
+    // Real response: x-ai/grok-4 via OpenRouter — 679/687 prompt tokens cached.
+    // upstream_inference_cost is null; total comes from usage.cost instead.
+    // Prior costs use token-proportional amounts: costInput=0.00008 (8 tokens),
+    // costCached=0.00679 (679 tokens), prevPromptTotal=0.00687.
+    const record = createUsageRecord({
+      costInput: 0.00008,
+      costCached: 0.00679,
+      costCacheWrite: 0,
+      costTotal: 0.00687,
+    });
+    const costDetails: ProviderCostDetails = {
+      total_cost: 0.00333825,
+      input_cost: null,
+      output_cost: null,
+      cached_input_cost: null,
+      cache_write_input_cost: null,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: 0.00053325,
+      upstream_inference_completions_cost: 0.002805,
+      request_cost: null,
+      web_search_cost: null,
+      image_input_cost: null,
+      image_output_cost: null,
+      audio_input_cost: null,
+      data_storage_cost: null,
+    };
+
+    applyUsageCostDetails(record, costDetails);
+
+    expect(record.costTotal).toBe(0.00333825);
+    expect(record.costSource).toBe('provider_reported');
+    expect(record.costOutput).toBe(0.002805);
+    // Prompt (0.00053325) split by prior ratio: input=0.00008/0.00687, cached=0.00679/0.00687
+    expect(record.costInput).toBeCloseTo((0.00008 / 0.00687) * 0.00053325, 8);
+    expect(record.costCached).toBeCloseTo((0.00679 / 0.00687) * 0.00053325, 8);
+    expect(record.costCacheWrite).toBe(0);
+  });
+
   test('attributes full upstream prompt cost to input when no cached tokens', () => {
     const record = createUsageRecord({ costCached: 0, costCacheWrite: 0, costTotal: 0.003 });
     // Extracted from: normal-tier real response (cached_tokens=0)
@@ -489,7 +611,7 @@ describe('applyUsageCostDetails', () => {
       cached_input_cost: null,
       cache_write_input_cost: null,
       upstream_inference_cost: null,
-      upstream_inference_prompt_cost: 4.25e-06,
+      upstream_inference_prompt_cost: 4.25e-6,
       upstream_inference_completions_cost: 0.004354,
       request_cost: null,
       web_search_cost: null,
@@ -503,9 +625,85 @@ describe('applyUsageCostDetails', () => {
 
     expect(record.costTotal).toBe(0.00435825);
     expect(record.costOutput).toBe(0.004354);
-    expect(record.costInput).toBe(4.25e-06);
+    expect(record.costInput).toBe(4.25e-6);
     expect(record.costCached).toBe(0);
     expect(record.costCacheWrite).toBe(0);
+  });
+
+  test('end-to-end BYOK: extract + apply uses upstream cost when usage.cost is 0', () => {
+    // Real response: google_nested_schema BYOK — cost=0, real cost in upstream_inference_cost.
+    // extractUsageCostDetails picks upstream_inference_cost as total;
+    // applyUsageCostDetails hits the normal-tier branch (no gateway fields, only upstream).
+    const usage = {
+      completion_tokens: 91,
+      cost: 0,
+      cost_details: {
+        upstream_inference_completions_cost: 0.0002275,
+        upstream_inference_cost: 0.0003253,
+        upstream_inference_prompt_cost: 9.78e-5,
+      },
+      is_byok: true,
+      prompt_tokens: 326,
+      prompt_tokens_details: { cached_tokens: 0 },
+    };
+
+    const extracted = extractUsageCostDetails(usage);
+    expect(extracted).not.toBeNull();
+    expect(extracted!.total_cost).toBe(0.0003253);
+
+    // Record has no prior cost breakdown (fresh record from a BYOK provider)
+    const record = createUsageRecord({
+      costInput: 0,
+      costOutput: 0,
+      costCached: 0,
+      costCacheWrite: 0,
+      costTotal: 0,
+    });
+    applyUsageCostDetails(record, extracted!);
+
+    expect(record.costTotal).toBe(0.0003253);
+    expect(record.costSource).toBe('provider_reported');
+    // Normal-tier: output from upstream, full prompt portion to input (no cached tokens in record)
+    expect(record.costOutput).toBe(0.0002275);
+    expect(record.costInput).toBe(9.78e-5);
+    expect(record.costCached).toBe(0);
+    expect(record.costCacheWrite).toBe(0);
+  });
+
+  test('end-to-end non-BYOK normal-tier: extract + apply', () => {
+    // Real response: usage.yaml second interaction — cost=0.00435825, only upstream fields.
+    // upstream_inference_cost is null (not BYOK), total comes from usage.cost.
+    const usage = {
+      completion_tokens: 2177,
+      cost: 0.00435825,
+      cost_details: {
+        upstream_inference_completions_cost: 0.004354,
+        upstream_inference_cost: null,
+        upstream_inference_prompt_cost: 4.25e-6,
+      },
+      is_byok: false,
+      prompt_tokens: 17,
+      prompt_tokens_details: { cached_tokens: 0 },
+    };
+
+    const extracted = extractUsageCostDetails(usage);
+    expect(extracted).not.toBeNull();
+    expect(extracted!.total_cost).toBe(0.00435825);
+
+    // Record with no prior breakdown
+    const record = createUsageRecord({
+      costInput: 0,
+      costOutput: 0,
+      costCached: 0,
+      costCacheWrite: 0,
+      costTotal: 0,
+    });
+    applyUsageCostDetails(record, extracted!);
+
+    expect(record.costTotal).toBe(0.00435825);
+    expect(record.costOutput).toBe(0.004354);
+    expect(record.costInput).toBe(4.25e-6);
+    expect(record.costCached).toBe(0);
   });
 
   test('uses partial gateway breakdown when only some per-bucket costs are available', () => {
@@ -550,6 +748,9 @@ describe('applyUsageCostDetails', () => {
       image_output_cost: null,
       audio_input_cost: null,
       data_storage_cost: null,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: null,
+      upstream_inference_completions_cost: null,
     };
 
     applyUsageCostDetails(record, costDetails);
@@ -580,6 +781,9 @@ describe('applyUsageCostDetails', () => {
       image_output_cost: 0,
       audio_input_cost: 0,
       data_storage_cost: 0,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: null,
+      upstream_inference_completions_cost: null,
     };
 
     applyUsageCostDetails(record, costDetails);
@@ -605,6 +809,9 @@ describe('applyUsageCostDetails', () => {
       image_output_cost: 0,
       audio_input_cost: 0,
       data_storage_cost: 0,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: null,
+      upstream_inference_completions_cost: null,
     };
 
     applyUsageCostDetails(record, costDetails);
