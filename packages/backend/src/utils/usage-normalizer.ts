@@ -51,7 +51,36 @@ export interface UsageWithCostDetails extends UsageSubset {
  */
 export function extractUsageCostDetails(usage: any): ProviderCostDetails | null {
   const details = usage?.cost_details;
-  if (!details || typeof details !== 'object') return null;
+
+  if (!details || typeof details !== 'object') {
+    // No cost_details block — check top-level cost fields from providers that omit cost_details:
+    // - usage.cost: OpenRouter-routed providers (e.g. Kimi/Avian) that don't surface cost_details
+    // - usage.cost_in_usd_ticks: xAI grok models; 1 USD = 10^10 ticks per xAI API docs.
+    const topLevelCost = safeCost(usage?.cost ?? usage?.estimated_cost);
+    const xaiTicks =
+      typeof usage?.cost_in_usd_ticks === 'number'
+        ? safeCost(usage.cost_in_usd_ticks / 10_000_000_000)
+        : null;
+    const totalCost = topLevelCost || xaiTicks;
+    if (totalCost === null) return null;
+
+    return {
+      total_cost: totalCost,
+      input_cost: null,
+      output_cost: null,
+      cached_input_cost: null,
+      cache_write_input_cost: null,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: null,
+      upstream_inference_completions_cost: null,
+      request_cost: null,
+      web_search_cost: null,
+      image_input_cost: null,
+      image_output_cost: null,
+      audio_input_cost: null,
+      data_storage_cost: null,
+    };
+  }
 
   // Determine total cost:
   // 1. cost_details.total_cost

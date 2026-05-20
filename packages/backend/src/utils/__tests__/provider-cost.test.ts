@@ -432,6 +432,54 @@ describe('extractUsageCostDetails', () => {
 
     expect(extractUsageCostDetails(usage)).toBeNull();
   });
+
+  test('captures usage.cost when cost_details block is absent (Kimi/Avian shape)', () => {
+    // Real response: Kimi-k2.5 via OpenRouter — usage.cost present but no cost_details block.
+    const usage = {
+      prompt_tokens: 154,
+      completion_tokens: 131,
+      total_tokens: 285,
+      cost: 0.0003287,
+      prompt_tokens_details: { cached_tokens: 128, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 87, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.0003287);
+    expect(result!.input_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBeNull();
+  });
+
+  test('captures cost_in_usd_ticks when cost_details block is absent (xAI grok shape)', () => {
+    // Real response: xai-grok-4-fast — cost reported as integer ticks, no cost_details block.
+    // 1 USD = 10^10 ticks per xAI API docs.
+    const usage = {
+      prompt_tokens: 165,
+      completion_tokens: 2,
+      total_tokens: 296,
+      prompt_tokens_details: { text_tokens: 165, audio_tokens: 0, image_tokens: 0, cached_tokens: 164 },
+      completion_tokens_details: { reasoning_tokens: 129, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
+      num_sources_used: 0,
+      cost_in_usd_ticks: 739000,
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBeCloseTo(739000 / 10_000_000_000, 10);
+    expect(result!.input_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBeNull();
+  });
+
+  test('returns null when neither cost_details nor top-level cost fields are present', () => {
+    const usage = {
+      prompt_tokens: 100,
+      completion_tokens: 50,
+      total_tokens: 150,
+    };
+
+    expect(extractUsageCostDetails(usage)).toBeNull();
+  });
 });
 
 describe('applyUsageCostDetails', () => {
