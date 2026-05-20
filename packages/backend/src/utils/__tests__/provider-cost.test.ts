@@ -822,6 +822,43 @@ describe('applyUsageCostDetails', () => {
     expect(record.costOutput).toBe(0);
   });
 
+  test('falls back to proportional distribution when upstream costs are all zero (Vercel shape)', () => {
+    // Real response: Vercel AI Gateway — cost is non-zero but upstream_inference_* fields are
+    // all 0 (gateway doesn't pass through upstream cost breakdown). Without the > 0 guard,
+    // the Normal tier would fire and produce zero sub-costs despite total_cost being correct.
+    const record = createUsageRecord();
+    // costInput=0.001, costOutput=0.002, costCached=0.0005, total=0.0035
+    const costDetails: ProviderCostDetails = {
+      total_cost: 0.003561,
+      input_cost: null,
+      output_cost: null,
+      cached_input_cost: null,
+      cache_write_input_cost: null,
+      upstream_inference_cost: null,
+      upstream_inference_prompt_cost: 0,
+      upstream_inference_completions_cost: 0,
+      request_cost: null,
+      web_search_cost: null,
+      image_input_cost: null,
+      image_output_cost: null,
+      audio_input_cost: null,
+      data_storage_cost: null,
+    };
+
+    applyUsageCostDetails(record, costDetails);
+
+    expect(record.costTotal).toBe(0.003561);
+    expect(record.costSource).toBe('provider_reported');
+    // Should use Minimal tier (proportional distribution), not Normal tier (which would zero everything)
+    expect(record.costInput).toBeGreaterThan(0);
+    expect(record.costOutput).toBeGreaterThan(0);
+    expect(record.costCached).toBeGreaterThan(0);
+    // Proportional: input=1/3.5, output=2/3.5, cached=0.5/3.5
+    expect(record.costInput).toBeCloseTo((0.001 / 0.0035) * 0.003561, 8);
+    expect(record.costOutput).toBeCloseTo((0.002 / 0.0035) * 0.003561, 8);
+    expect(record.costCached).toBeCloseTo((0.0005 / 0.0035) * 0.003561, 8);
+  });
+
   test('SSE : cost comments take precedence over cost_details', () => {
     const record = createUsageRecord();
     // SSE comment cost applied first

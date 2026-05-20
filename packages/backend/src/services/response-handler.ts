@@ -502,6 +502,15 @@ async function finalizeUsage(
   const reconstructed = debugManager.getReconstructedRawResponse(usageRecord.requestId!);
   if (reconstructed?.providerReportedCost) {
     applyProviderReportedCost(usageRecord, reconstructed.providerReportedCost);
+    if (reconstructed?.usage) {
+      const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+      if (usageCostDetails) {
+        logger.warn(
+          `[ProviderCost] Both SSE :cost and usage.cost_details present for ${usageRecord.requestId}; ` +
+            `SSE value ($${usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
+        );
+      }
+    }
   }
 
   // Also check for cost_details in the usage block (some providers embed costs there)

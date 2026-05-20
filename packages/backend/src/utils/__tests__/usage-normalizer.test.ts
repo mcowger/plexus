@@ -127,6 +127,24 @@ describe('usage-normalizer - OpenAI Chat usage', () => {
     expect(normalized.reasoning_tokens).toBe(10);
   });
 
+  test('normalizes DeepSeek top-level prompt_cache_hit_tokens / prompt_cache_miss_tokens', () => {
+    // DeepSeek reports cache at the top level instead of under prompt_tokens_details.
+    // prompt_tokens = hit + miss; input_tokens should be the miss (uncached) portion.
+    const normalized = normalizeOpenAIChatUsage({
+      prompt_tokens: 1000,
+      completion_tokens: 200,
+      total_tokens: 1200,
+      prompt_cache_hit_tokens: 800,
+      prompt_cache_miss_tokens: 200,
+    });
+
+    expect(normalized.cached_tokens).toBe(800);
+    expect(normalized.input_tokens).toBe(200);
+    expect(normalized.output_tokens).toBe(200);
+    expect(normalized.total_tokens).toBe(1200);
+    expect(normalized.cache_creation_tokens).toBe(0);
+  });
+
   test('defaults cache_write_tokens to 0 when not present', () => {
     const normalized = normalizeOpenAIChatUsage({
       prompt_tokens: 100,

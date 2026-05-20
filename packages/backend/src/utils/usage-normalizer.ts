@@ -98,7 +98,9 @@ export function extractUsageCostDetails(usage: any): ProviderCostDetails | null 
 export function normalizeOpenAIChatUsage(usage: any): UsageSubset {
   const promptTokens = safeToken(usage?.prompt_tokens);
   const cachedTokens = safeToken(
-    usage?.prompt_tokens_details?.cached_tokens ?? usage?.cached_tokens
+    usage?.prompt_tokens_details?.cached_tokens ??
+      usage?.cached_tokens ??
+      usage?.prompt_cache_hit_tokens
   );
   const cacheWriteTokens = safeToken(usage?.prompt_tokens_details?.cache_write_tokens);
   const outputTokens = safeToken(usage?.completion_tokens);

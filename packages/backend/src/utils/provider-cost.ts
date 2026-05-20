@@ -110,8 +110,10 @@ export function applyUsageCostDetails(
     usageRecord.costCached = Number((cachedCost ?? 0).toFixed(8));
     usageRecord.costCacheWrite = Number((cacheWriteCost ?? 0).toFixed(8));
   } else if (
-    costDetails.upstream_inference_prompt_cost != null ||
-    costDetails.upstream_inference_completions_cost != null
+    (costDetails.upstream_inference_prompt_cost != null &&
+      costDetails.upstream_inference_prompt_cost > 0) ||
+    (costDetails.upstream_inference_completions_cost != null &&
+      costDetails.upstream_inference_completions_cost > 0)
   ) {
     // Normal: upstream gave us prompt vs completions split, but no cache granularity.
     // Use the upstream split for the input vs output totals, then preserve Plexus's

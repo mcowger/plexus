@@ -148,6 +148,15 @@ export class UsageInspector extends PassThrough {
       // Some providers emit `: cost {"request_cost_usd": ...}` as SSE comments
       if (reconstructed?.providerReportedCost) {
         applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
+        if (reconstructed?.usage) {
+          const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+          if (usageCostDetails) {
+            logger.warn(
+              `[ProviderCost] Both SSE :cost and usage.cost_details present for ${this.usageRecord.requestId}; ` +
+                `SSE value ($${this.usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
+            );
+          }
+        }
       }
 
       // Override with provider-reported cost from usage.cost_details if available
