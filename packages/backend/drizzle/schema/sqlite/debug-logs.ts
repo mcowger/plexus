@@ -13,6 +13,7 @@ export const debugLogs = sqliteTable(
     transformedResponse: text('transformed_response'),
     rawResponseSnapshot: text('raw_response_snapshot'),
     transformedResponseSnapshot: text('transformed_response_snapshot'),
+    responseHeaders: text('response_headers'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => ({

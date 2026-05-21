@@ -13,6 +13,7 @@ export interface DebugLogRecord {
   transformedResponse?: any;
   rawResponseSnapshot?: any;
   transformedResponseSnapshot?: any;
+  responseHeaders?: Record<string, string> | null;
   provider?: string;
   createdAt?: number;
 }
@@ -169,6 +170,12 @@ export class DebugManager {
     // ALWAYS save to memory for usage extraction/estimation
     const log = this.ensureLog(requestId);
     log.transformedResponseSnapshot = payload;
+  }
+
+  addResponseHeaders(requestId: string, headers: Record<string, string>): void {
+    if (!this.isCaptureEnabled()) return;
+    const log = this.ensureLog(requestId);
+    log.responseHeaders = headers;
   }
 
   flush(requestId: string) {

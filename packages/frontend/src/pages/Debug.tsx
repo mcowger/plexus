@@ -37,6 +37,7 @@ interface DebugLogDetail extends DebugLogMeta {
   transformedResponse: string | object;
   rawResponseSnapshot?: string | object;
   transformedResponseSnapshot?: string | object;
+  responseHeaders?: string | object;
 }
 
 export const Debug: React.FC = () => {
@@ -241,6 +242,7 @@ export const Debug: React.FC = () => {
       rawResponseSnapshot: normalizeExportContent(detail.rawResponseSnapshot),
       transformedResponse: normalizeExportContent(detail.transformedResponse),
       transformedResponseSnapshot: normalizeExportContent(detail.transformedResponseSnapshot),
+      responseHeaders: normalizeExportContent(detail.responseHeaders),
     };
     return JSON.stringify(payload, null, 2);
   }, [detail]);
@@ -499,6 +501,13 @@ export const Debug: React.FC = () => {
                   title="Transformed Response (Reconstructed)"
                   content={formatContent(detail.transformedResponseSnapshot)}
                   color="text-green-400"
+                />
+              )}
+              {detail.responseHeaders && (
+                <AccordionPanel
+                  title="Response Headers"
+                  content={formatContent(detail.responseHeaders)}
+                  color="text-yellow-400"
                 />
               )}
             </div>

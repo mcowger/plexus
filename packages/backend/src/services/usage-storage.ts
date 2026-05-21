@@ -292,6 +292,7 @@ export class UsageStorageService extends EventEmitter {
           transformedResponseSnapshot: record.transformedResponseSnapshot
             ? JSON.stringify(record.transformedResponseSnapshot)
             : null,
+          responseHeaders: record.responseHeaders ? JSON.stringify(record.responseHeaders) : null,
           createdAt: record.createdAt || Date.now(),
         });
 
@@ -471,6 +472,7 @@ export class UsageStorageService extends EventEmitter {
         transformedResponse: row.transformedResponse,
         rawResponseSnapshot: row.rawResponseSnapshot,
         transformedResponseSnapshot: row.transformedResponseSnapshot,
+        responseHeaders: row.responseHeaders,
       };
     } catch (error) {
       logger.error(`Failed to get debug log for ${requestId}`, error);

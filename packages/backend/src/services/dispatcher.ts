@@ -780,6 +780,14 @@ export class Dispatcher {
             adapters
           );
 
+          // Record upstream response headers for debug tracing
+          if (currentRequest.requestId) {
+            DebugManager.getInstance().addResponseHeaders(
+              currentRequest.requestId,
+              this.extractResponseHeaders(streamProbe.response)
+            );
+          }
+
           // Wrap the stream to release the concurrency slot when the stream
           // is fully consumed, cancelled, or errors out. Without this, the
           // slot would never be released for streaming responses.
@@ -832,6 +840,14 @@ export class Dispatcher {
             targetApiType
           );
           return streamResponse;
+        }
+
+        // Record upstream response headers for debug tracing
+        if (currentRequest.requestId) {
+          DebugManager.getInstance().addResponseHeaders(
+            currentRequest.requestId,
+            this.extractResponseHeaders(response)
+          );
         }
 
         const nonStreamingResponse = await this.handleNonStreamingResponse(
