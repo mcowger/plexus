@@ -485,7 +485,7 @@ describe('extractUsageCostDetails', () => {
 describe('applyUsageCostDetails', () => {
   test('applies gateway input/output/cached costs directly when full breakdown is present', () => {
     const record = createUsageRecord();
-    // Extracted from: glm-5.1 via LLM Gateway (real response)
+    // Extracted from: glm-5.1 via LLM Gateway
     const costDetails: ProviderCostDetails = {
       total_cost: 0.022101624,
       input_cost: 0.00073836,
@@ -581,7 +581,7 @@ describe('applyUsageCostDetails', () => {
     const record = createUsageRecord();
     // createUsageRecord defaults: costInput=0.001, costCached=0.0005
     // Prompt ratio: input=0.001/(0.001+0.0005)=2/3, cached=0.0005/(0.001+0.0005)=1/3
-    // Extracted from: z-ai/glm-5-turbo-20260315 (real response, cached_tokens=128/173 prompt tokens)
+    // Extracted from: z-ai/glm-5-turbo-20260315 (cached_tokens=128/173 prompt tokens)
     const costDetails: ProviderCostDetails = {
       total_cost: 0.00021672,
       input_cost: null,
@@ -651,7 +651,7 @@ describe('applyUsageCostDetails', () => {
 
   test('attributes full upstream prompt cost to input when no cached tokens', () => {
     const record = createUsageRecord({ costCached: 0, costCacheWrite: 0, costTotal: 0.003 });
-    // Extracted from: normal-tier real response (cached_tokens=0)
+    // Extracted from: normal-tier (cached_tokens=0)
     const costDetails: ProviderCostDetails = {
       total_cost: 0.00435825,
       input_cost: null,
@@ -1113,5 +1113,237 @@ describe('extractProviderEnergyFromSSEComments (via DebugLoggingInspector)', () 
     }
 
     expect(lastEnergy.energy_kwh).toBe(5.2904e-5);
+  });
+});
+
+describe('extractUsageCostDetails - real-world cassette shapes', () => {
+  test('Vercel market_cost field does not interfere with cost extraction', () => {
+    // Vercel AI Gateway adds market_cost alongside cost and cost_details.
+    // The normalizer should extract cost as total and ignore market_cost.
+    const usage = {
+      prompt_tokens: 16,
+      completion_tokens: 33,
+      total_tokens: 49,
+      cost: 0.000543,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: null,
+        upstream_inference_prompt_cost: 0,
+        upstream_inference_completions_cost: 0,
+      },
+      completion_tokens_details: { reasoning_tokens: 0, image_tokens: 0 },
+      cache_creation_input_tokens: 0,
+      market_cost: 0.000543,
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.000543);
+    // upstream_inference fields are both 0, so normal tier guard prevents zeroing
+    // Falls back to minimal tier (proportional). But there are no prior calculated costs.
+  });
+
+  test('Vercel GPT-5 with non-zero cost and zero upstream breakdown', () => {
+    const usage = {
+      prompt_tokens: 113,
+      completion_tokens: 327,
+      total_tokens: 440,
+      cost: 0.00597125,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: null,
+        upstream_inference_prompt_cost: 0,
+        upstream_inference_completions_cost: 0,
+      },
+      completion_tokens_details: { reasoning_tokens: 256, image_tokens: 0 },
+      cache_creation_input_tokens: 0,
+      market_cost: 0.00597125,
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.00597125);
+    // upstream fields are 0, should NOT be used as breakdown (Vercel shape)
+    expect(result!.input_cost).toBeNull();
+    expect(result!.output_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBe(0);
+    expect(result!.upstream_inference_completions_cost).toBe(0);
+  });
+
+  test('OpenRouter Grok with cached tokens in prompt_tokens_details', () => {
+    // OpenRouter passes cached_tokens in prompt_tokens_details alongside cost_details.
+    const usage = {
+      prompt_tokens: 445,
+      completion_tokens: 278,
+      total_tokens: 723,
+      cost: 0.00020535,
+      is_byok: false,
+      prompt_tokens_details: {
+        cached_tokens: 151,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
+      cost_details: {
+        upstream_inference_cost: 0.00020535,
+        upstream_inference_prompt_cost: 0.00006635,
+        upstream_inference_completions_cost: 0.000139,
+      },
+      completion_tokens_details: { reasoning_tokens: 210, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.00020535);
+    // upstream fields preserved separately (normal tier)
+    expect(result!.upstream_inference_prompt_cost).toBe(0.00006635);
+    expect(result!.upstream_inference_completions_cost).toBe(0.000139);
+    // No gateway-level input_cost/output_cost on OpenRouter
+    expect(result!.input_cost).toBeNull();
+    expect(result!.output_cost).toBeNull();
+  });
+
+  test('xAI grok-4-fast cost_in_usd_ticks with cached tokens', () => {
+    // xAI reports cost as cost_in_usd_ticks (no cost_details block).
+    const usage = {
+      prompt_tokens: 468,
+      completion_tokens: 82,
+      total_tokens: 870,
+      prompt_tokens_details: {
+        text_tokens: 468,
+        audio_tokens: 0,
+        image_tokens: 0,
+        cached_tokens: 305,
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 320,
+        audio_tokens: 0,
+        accepted_prediction_tokens: 0,
+        rejected_prediction_tokens: 0,
+      },
+      num_sources_used: 0,
+      cost_in_usd_ticks: 2488500,
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    // 2488500 / 10_000_000_000 = 0.00024885
+    expect(result!.total_cost).toBeCloseTo(2488500 / 10_000_000_000, 10);
+    expect(result!.input_cost).toBeNull();
+  });
+
+  test('Avian Kimi (via OpenRouter) with top-level cost and no cost_details', () => {
+    // Avian/Kimi reports cost at the top level but has no cost_details block.
+    const usage = {
+      prompt_tokens: 154,
+      completion_tokens: 131,
+      total_tokens: 285,
+      cost: 0.0003287,
+      prompt_tokens_details: {
+        cached_tokens: 128,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
+      completion_tokens_details: { reasoning_tokens: 87, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.0003287);
+    expect(result!.input_cost).toBeNull();
+    expect(result!.upstream_inference_prompt_cost).toBeNull();
+  });
+
+  test('OpenRouter Anthropic Thinking with reasoning tokens', () => {
+    const usage = {
+      prompt_tokens: 607,
+      completion_tokens: 143,
+      total_tokens: 750,
+      cost: 0.001322,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: 0.001322,
+        upstream_inference_prompt_cost: 0.000607,
+        upstream_inference_completions_cost: 0.000715,
+      },
+      completion_tokens_details: { reasoning_tokens: 99, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.001322);
+    expect(result!.upstream_inference_cost).toBe(0.001322);
+    expect(result!.upstream_inference_prompt_cost).toBe(0.000607);
+    expect(result!.upstream_inference_completions_cost).toBe(0.000715);
+  });
+
+  test('OpenRouter Gemini with upstream fields matching total', () => {
+    const usage = {
+      prompt_tokens: 161,
+      completion_tokens: 32,
+      total_tokens: 193,
+      cost: 0.00008825,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: 0.00008825,
+        upstream_inference_prompt_cost: 0.00004025,
+        upstream_inference_completions_cost: 0.000048,
+      },
+      completion_tokens_details: { reasoning_tokens: 0, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.00008825);
+    expect(result!.upstream_inference_cost).toBe(0.00008825);
+    expect(result!.upstream_inference_prompt_cost).toBe(0.00004025);
+    expect(result!.upstream_inference_completions_cost).toBe(0.000048);
+  });
+
+  test('OpenRouter GLM with reasoning tokens', () => {
+    const usage = {
+      prompt_tokens: 279,
+      completion_tokens: 72,
+      total_tokens: 351,
+      cost: 0.0006228,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: 0.0006228,
+        upstream_inference_prompt_cost: 0.0003348,
+        upstream_inference_completions_cost: 0.000288,
+      },
+      completion_tokens_details: { reasoning_tokens: 25, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.0006228);
+  });
+
+  test('OpenRouter OpenAI model with cached tokens and reasoning tokens', () => {
+    const usage = {
+      prompt_tokens: 113,
+      completion_tokens: 54,
+      total_tokens: 167,
+      cost: 0.0000901,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      cost_details: {
+        upstream_inference_cost: 0.0000901,
+        upstream_inference_prompt_cost: 0.0000226,
+        upstream_inference_completions_cost: 0.0000675,
+      },
+      completion_tokens_details: { reasoning_tokens: 0, image_tokens: 0, audio_tokens: 0 },
+    };
+
+    const result = extractUsageCostDetails(usage);
+    expect(result).not.toBeNull();
+    expect(result!.total_cost).toBe(0.0000901);
   });
 });

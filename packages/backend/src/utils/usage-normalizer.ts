@@ -152,24 +152,28 @@ export function normalizeOpenAIChatUsage(usage: any): UsageSubset {
 export function normalizeOpenAIResponsesUsage(usage: any): UsageSubset {
   const reportedInputTokens = safeToken(usage?.input_tokens);
   const cachedTokens = safeToken(usage?.input_tokens_details?.cached_tokens);
+  const cacheWriteTokens = safeToken(usage?.input_tokens_details?.cache_write_tokens);
   const outputTokens = safeToken(usage?.output_tokens);
   const reasoningTokens = safeToken(usage?.output_tokens_details?.reasoning_tokens);
 
+  // Responses API input_tokens includes cached reads and cache writes.
   // Responses payloads may appear in two shapes depending on source:
-  // - total input tokens with cached included
-  // - uncached input tokens with cached reported separately
+  // - total input tokens with cached/write included → subtract both
+  // - uncached input tokens with cached/write reported separately → keep as-is
+  const combinedNonNew = cachedTokens + cacheWriteTokens;
   const inputTokens =
-    cachedTokens > reportedInputTokens
+    combinedNonNew > reportedInputTokens
       ? reportedInputTokens
-      : Math.max(0, reportedInputTokens - cachedTokens);
+      : Math.max(0, reportedInputTokens - combinedNonNew);
 
   return {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
-    total_tokens: safeToken(usage?.total_tokens) || inputTokens + cachedTokens + outputTokens,
+    total_tokens:
+      safeToken(usage?.total_tokens) || inputTokens + cachedTokens + cacheWriteTokens + outputTokens,
     reasoning_tokens: reasoningTokens,
     cached_tokens: cachedTokens,
-    cache_creation_tokens: 0,
+    cache_creation_tokens: cacheWriteTokens,
   };
 }
 
