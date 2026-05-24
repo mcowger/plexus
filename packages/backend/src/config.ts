@@ -330,7 +330,6 @@ const CrofQuotaCheckerOptionsSchema = z.object({
 });
 
 const ExeDevQuotaCheckerOptionsSchema = z.object({
-  apiKey: z.string().min(1, 'exe.dev API bearer token is required'),
   endpoint: z.string().url().optional(),
 });
 
@@ -529,7 +528,7 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
-    options: ExeDevQuotaCheckerOptionsSchema,
+    options: ExeDevQuotaCheckerOptionsSchema.optional().default({}),
   }),
 ]);
 

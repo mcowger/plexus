@@ -241,23 +241,15 @@ console.log('Watching for changes...');
 
 // --- Auto-open browser (unless --no-open) ---
 
-function openBrowser(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let proc: ChildProcess;
-    if (process.platform === 'win32') {
-      proc = nodeSpawn('cmd', ['/c', 'start', '""', url], { detached: true, stdio: 'ignore' });
-    } else {
-      proc = nodeSpawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], {
-        detached: true,
-        stdio: 'ignore',
-      });
-    }
-    proc.on('error', reject);
-    proc.on('spawn', () => {
-      proc.unref();
-      resolve();
-    });
-  });
+function openBrowser(url: string) {
+  if (process.platform === 'win32') {
+    nodeSpawn('cmd', ['/c', 'start', '""', url], { detached: true, stdio: 'ignore' }).unref();
+  } else {
+    nodeSpawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+  }
 }
 
 if (!noOpen) {
@@ -267,7 +259,7 @@ if (!noOpen) {
       await waitForServer();
       const url = `http://localhost:${process.env.PORT}/ui/login?token=${encodeURIComponent(process.env.ADMIN_KEY!)}`;
       console.log(`[dev] Server ready. Opening browser: ${url}`);
-      await openBrowser(url);
+      openBrowser(url);
     } catch (err) {
       console.error(`[dev] ${err instanceof Error ? err.message : err}. Not opening browser.`);
     }

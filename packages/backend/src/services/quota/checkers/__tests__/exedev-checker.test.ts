@@ -95,7 +95,9 @@ describe('exedev checker', () => {
       async () => new Response('unauthorized', { status: 401, statusText: 'Unauthorized' })
     );
 
-    await expect(checkerDef.check(makeCtx())).rejects.toThrow('HTTP 401: Unauthorized');
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow(
+      'HTTP 401: Unauthorized - unauthorized'
+    );
   });
 
   it('uses custom endpoint when provided', async () => {
@@ -128,6 +130,17 @@ describe('exedev checker', () => {
     setFetchMock(
       async () =>
         new Response(JSON.stringify({ ...mockCreditsResponse, monthly_allowance_usd: 'bad' }), {
+          status: 200,
+        })
+    );
+
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow('Invalid monthly_allowance_usd');
+  });
+
+  it('throws on negative monthly_allowance_usd', async () => {
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({ ...mockCreditsResponse, monthly_allowance_usd: -5 }), {
           status: 200,
         })
     );

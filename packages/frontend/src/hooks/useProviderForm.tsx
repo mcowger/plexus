@@ -767,8 +767,6 @@ export function useProviderForm() {
       return 'Session cookie is required for Wisdom Gate quota checker';
     if (quotaType === 'devpass' && (!options.session || !(options.session as string).trim()))
       return 'Session cookie is required for DevPass quota checker';
-    if (quotaType === 'exedev' && (!options.apiKey || !(options.apiKey as string).trim()))
-      return 'API bearer token is required for exe.dev quota checker';
     if (quotaType === 'opencode-go') {
       if (!options.workspaceId || !(options.workspaceId as string).trim())
         return 'Workspace ID is required for OpenCode Go quota checker';
