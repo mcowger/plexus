@@ -505,7 +505,7 @@ async function finalizeUsage(
     if (reconstructed?.usage) {
       const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
       if (usageCostDetails) {
-        logger.warn(
+        logger.debug(
           `[ProviderCost] Both SSE :cost and usage.cost_details present for ${usageRecord.requestId}; ` +
             `SSE value ($${usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
         );
