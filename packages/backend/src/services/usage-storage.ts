@@ -261,37 +261,26 @@ export class UsageStorageService extends EventEmitter {
 
   async saveDebugLog(record: DebugLogRecord) {
     try {
+      const serialize = (data: any): string | null => {
+        if (!data) return null;
+        if (typeof data === 'string') return data;
+        return JSON.stringify(data);
+      };
+
       await this.ensureDb()
         .insert(this.schema.debugLogs)
         .values({
           requestId: record.requestId,
           apiKey: record.apiKey ?? null,
-          rawRequest: record.rawRequest
-            ? typeof record.rawRequest === 'string'
-              ? record.rawRequest
-              : JSON.stringify(record.rawRequest)
-            : null,
-          transformedRequest: record.transformedRequest
-            ? typeof record.transformedRequest === 'string'
-              ? record.transformedRequest
-              : JSON.stringify(record.transformedRequest)
-            : null,
-          rawResponse: record.rawResponse
-            ? typeof record.rawResponse === 'string'
-              ? record.rawResponse
-              : JSON.stringify(record.rawResponse)
-            : null,
-          transformedResponse: record.transformedResponse
-            ? typeof record.transformedResponse === 'string'
-              ? record.transformedResponse
-              : JSON.stringify(record.transformedResponse)
-            : null,
-          rawResponseSnapshot: record.rawResponseSnapshot
-            ? JSON.stringify(record.rawResponseSnapshot)
-            : null,
-          transformedResponseSnapshot: record.transformedResponseSnapshot
-            ? JSON.stringify(record.transformedResponseSnapshot)
-            : null,
+          rawRequest: serialize(record.rawRequest),
+          transformedRequest: serialize(record.transformedRequest),
+          rawResponse: serialize(record.rawResponse),
+          transformedResponse: serialize(record.transformedResponse),
+          rawResponseSnapshot: serialize(record.rawResponseSnapshot),
+          transformedResponseSnapshot: serialize(record.transformedResponseSnapshot),
+          requestHeaders: serialize(record.requestHeaders),
+          responseHeaders: serialize(record.responseHeaders),
+          responseStatus: record.responseStatus ?? null,
           createdAt: record.createdAt || Date.now(),
         });
 
@@ -471,6 +460,9 @@ export class UsageStorageService extends EventEmitter {
         transformedResponse: row.transformedResponse,
         rawResponseSnapshot: row.rawResponseSnapshot,
         transformedResponseSnapshot: row.transformedResponseSnapshot,
+        requestHeaders: row.requestHeaders,
+        responseHeaders: row.responseHeaders,
+        responseStatus: row.responseStatus,
       };
     } catch (error) {
       logger.error(`Failed to get debug log for ${requestId}`, error);

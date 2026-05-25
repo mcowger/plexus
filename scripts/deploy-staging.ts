@@ -44,11 +44,58 @@ function optionalEnv(name: string, defaultValue: string): string {
 const CTX = requireEnv('PLEXUS_STAGING_DOCKER_CONTEXT');
 const STAGING_URL = requireEnv('PLEXUS_STAGING_URL').replace(/\/$/, '');
 const STAGING_ADMIN_KEY = requireEnv('PLEXUS_STAGING_ADMIN_KEY');
-const CONTAINER_NAME = optionalEnv('PLEXUS_STAGING_CONTAINER_NAME', 'plexus');
 const BACKUP_RETAIN = parseInt(optionalEnv('PLEXUS_STAGING_BACKUP_RETAIN', '3'), 10);
 const IMAGE_RETAIN = parseInt(optionalEnv('PLEXUS_STAGING_IMAGE_RETAIN', '3'), 10);
 const BACKUP_DIR = optionalEnv('PLEXUS_STAGING_BACKUP_DIR', '.staging-backups');
 const HEALTH_TIMEOUT = parseInt(optionalEnv('PLEXUS_STAGING_HEALTH_TIMEOUT', '60'), 10);
+
+function resolveContainerName(): string {
+  const envName = process.env.PLEXUS_STAGING_CONTAINER_NAME;
+  if (envName) return envName;
+
+  const detectResult = spawnSync(
+    'docker',
+    [
+      '--context',
+      CTX,
+      'ps',
+      '-a',
+      '--filter',
+      'ancestor=plexus:staging-latest',
+      '--format',
+      '{{.Names}}',
+    ],
+    { encoding: 'utf-8' }
+  );
+  const detected = detectResult.stdout?.trim();
+  if (detected) {
+    const names = detected
+      .split('\n')
+      .map((n) => n.trim())
+      .filter(Boolean);
+    if (names.length === 1) return names[0]!;
+    if (names.length > 1) {
+      console.warn(`  ⚠️  Multiple containers match (plexus:staging-latest): ${names.join(', ')}`);
+      console.warn(`     Using first: ${names[0]}`);
+      return names[0]!;
+    }
+  }
+
+  const fallbackResult = spawnSync(
+    'docker',
+    ['--context', CTX, 'ps', '-a', '--format', '{{.Names}}\t{{.Image}}'],
+    { encoding: 'utf-8' }
+  );
+  const lines = (fallbackResult.stdout ?? '').trim().split('\n').filter(Boolean);
+  for (const line of lines) {
+    const [name, image] = line.split('\t');
+    if (name && image?.startsWith('plexus:')) return name;
+  }
+
+  return 'Plexus';
+}
+
+const CONTAINER_NAME = resolveContainerName();
 
 // Timestamp-based tag — works for uncommitted work, always sortable
 const now = new Date();
@@ -133,7 +180,9 @@ console.log('╚═════════════════════�
 console.log();
 console.log(`  Docker context:  ${CTX}`);
 console.log(`  Staging URL:     ${STAGING_URL}`);
-console.log(`  Container:       ${CONTAINER_NAME}`);
+console.log(
+  `  Container:       ${CONTAINER_NAME}${process.env.PLEXUS_STAGING_CONTAINER_NAME ? '' : ' (auto-detected)'}`
+);
 console.log(`  New image tag:   ${NEW_TAG}`);
 console.log();
 
@@ -213,11 +262,9 @@ if (inspectResult.success && inspectResult.stdout) {
   if (info) {
     previousImage = info.Config?.Image ?? null;
 
-    // Reconstruct a docker run command from the live container config
     const parts: string[] = [`docker --context ${CTX} run -d`];
     parts.push(`  --name ${CONTAINER_NAME}`);
 
-    // Restart policy
     const restartPolicy = info.HostConfig?.RestartPolicy?.Name;
     if (restartPolicy && restartPolicy !== 'no') {
       const maxRetries = info.HostConfig.RestartPolicy.MaximumRetryCount;
@@ -226,7 +273,6 @@ if (inspectResult.success && inspectResult.stdout) {
       parts.push(`  --restart ${policyStr}`);
     }
 
-    // Port bindings
     const portBindings = info.HostConfig?.PortBindings ?? {};
     for (const [containerPort, bindings] of Object.entries(portBindings)) {
       for (const binding of (bindings as any[]) ?? []) {
@@ -237,7 +283,6 @@ if (inspectResult.success && inspectResult.stdout) {
       }
     }
 
-    // Mounts / volumes
     const mounts = info.Mounts ?? [];
     for (const m of mounts) {
       if (m.Type === 'bind') {
@@ -249,7 +294,6 @@ if (inspectResult.success && inspectResult.stdout) {
       }
     }
 
-    // Environment variables (skip internal Docker bookkeeping vars)
     const skipEnvPrefixes = ['PATH=', 'HOSTNAME=', 'HOME='];
     const envVars: string[] = info.Config?.Env ?? [];
     for (const e of envVars) {
@@ -285,10 +329,10 @@ docker(['build', '--build-arg', `APP_VERSION=${TIMESTAMP}`, '-t', NEW_TAG, '-t',
 console.log(`  ✓ Built ${NEW_TAG}`);
 
 // ---------------------------------------------------------------------------
-// Phase 4: Deploy via Watchtower --run-once
+// Phase 4: Deploy via Watchtower --run-once --no-pull
 // ---------------------------------------------------------------------------
 
-step(4, 'Deploy via Watchtower --run-once');
+step(4, 'Deploy via Watchtower --run-once --no-pull');
 
 docker(
   [
@@ -298,6 +342,7 @@ docker(
     '/var/run/docker.sock:/var/run/docker.sock',
     'containrrr/watchtower',
     '--run-once',
+    '--no-pull',
     CONTAINER_NAME,
   ],
   { fatal: true }

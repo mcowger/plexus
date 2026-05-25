@@ -414,6 +414,13 @@
       "when": 1779665076807,
       "tag": "0058_test_setup",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1779666862922,
+      "tag": "0059_add_debug_log_http_metadata",
+      "breakpoints": true
     }
   ]
 }

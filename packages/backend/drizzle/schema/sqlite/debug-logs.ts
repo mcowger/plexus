@@ -13,6 +13,9 @@ export const debugLogs = sqliteTable(
     transformedResponse: text('transformed_response'),
     rawResponseSnapshot: text('raw_response_snapshot'),
     transformedResponseSnapshot: text('transformed_response_snapshot'),
+    requestHeaders: text('request_headers'),
+    responseHeaders: text('response_headers'),
+    responseStatus: integer('response_status'),
     createdAt: integer('created_at').notNull(),
   },
   (table) => ({

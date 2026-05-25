@@ -132,7 +132,9 @@ export function applyUsageCostDetails(
     if (prevPromptTotal > 0) {
       usageRecord.costInput = Number(((prevInput / prevPromptTotal) * promptTotal).toFixed(8));
       usageRecord.costCached = Number(((prevCached / prevPromptTotal) * promptTotal).toFixed(8));
-      usageRecord.costCacheWrite = Number(((prevCacheWrite / prevPromptTotal) * promptTotal).toFixed(8));
+      usageRecord.costCacheWrite = Number(
+        ((prevCacheWrite / prevPromptTotal) * promptTotal).toFixed(8)
+      );
     } else {
       // No prior breakdown — attribute full prompt cost to input
       usageRecord.costInput = Number(promptTotal.toFixed(8));

@@ -37,6 +37,9 @@ interface DebugLogDetail extends DebugLogMeta {
   transformedResponse: string | object;
   rawResponseSnapshot?: string | object;
   transformedResponseSnapshot?: string | object;
+  requestHeaders?: string | object;
+  responseHeaders?: string | object;
+  responseStatus?: number;
 }
 
 export const Debug: React.FC = () => {
@@ -241,6 +244,9 @@ export const Debug: React.FC = () => {
       rawResponseSnapshot: normalizeExportContent(detail.rawResponseSnapshot),
       transformedResponse: normalizeExportContent(detail.transformedResponse),
       transformedResponseSnapshot: normalizeExportContent(detail.transformedResponseSnapshot),
+      requestHeaders: normalizeExportContent(detail.requestHeaders),
+      responseHeaders: normalizeExportContent(detail.responseHeaders),
+      responseStatus: detail.responseStatus,
     };
     return JSON.stringify(payload, null, 2);
   }, [detail]);
@@ -471,6 +477,13 @@ export const Debug: React.FC = () => {
                 color="text-blue-400"
                 defaultOpen={true}
               />
+              {detail.requestHeaders && (
+                <AccordionPanel
+                  title="Request Headers"
+                  content={formatContent(detail.requestHeaders)}
+                  color="text-blue-400"
+                />
+              )}
               <AccordionPanel
                 title="Transformed Request"
                 content={formatContent(detail.transformedRequest)}
@@ -486,6 +499,13 @@ export const Debug: React.FC = () => {
                   title="Raw Response (Reconstructed)"
                   content={formatContent(detail.rawResponseSnapshot)}
                   color="text-orange-400"
+                />
+              )}
+              {detail.responseHeaders && (
+                <AccordionPanel
+                  title="Response Headers"
+                  content={formatContent(detail.responseHeaders)}
+                  color="text-yellow-400"
                 />
               )}
               <AccordionPanel

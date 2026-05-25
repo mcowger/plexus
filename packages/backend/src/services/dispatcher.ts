@@ -37,6 +37,7 @@ import { calculateCosts } from '../utils/calculate-costs';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { GpuParams, ModelParams } from '@plexus/shared';
 import { ConcurrencyTracker } from './concurrency-tracker';
+import { sanitizeHeaders } from '../utils/sanitize-headers';
 
 interface RetryAttemptRecord {
   index: number;
@@ -2823,7 +2824,7 @@ export class Dispatcher {
       targetModel: route.model,
       targetApiType: targetApiType,
       url: url,
-      headers: this.sanitizeHeaders(headers || {}),
+      headers: sanitizeHeaders(headers || {}),
       statusCode: response.status,
       providerResponse: errorText,
       providerResponseHeaders: this.extractResponseHeaders(response),
@@ -2832,6 +2833,11 @@ export class Dispatcher {
 
     // Capture the raw error response for debug logs
     if (requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
       DebugManager.getInstance().addRawResponse(requestId, errorText);
     }
 
@@ -2847,42 +2853,6 @@ export class Dispatcher {
       headers[key] = value;
     });
     return headers;
-  }
-
-  /**
-   * Sanitize headers to remove sensitive information before logging
-   */
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
-    const sanitized = { ...headers };
-
-    // Mask sensitive headers
-    if (sanitized['x-api-key']) {
-      sanitized['x-api-key'] = this.maskSecret(sanitized['x-api-key']);
-    }
-    if (sanitized['Authorization']) {
-      sanitized['Authorization'] = this.maskSecret(sanitized['Authorization']);
-    }
-    if (sanitized['x-goog-api-key']) {
-      sanitized['x-goog-api-key'] = this.maskSecret(sanitized['x-goog-api-key']);
-    }
-
-    return sanitized;
-  }
-
-  /**
-   * Mask secret values, showing only first and last few characters
-   */
-  private maskSecret(value: string): string {
-    if (value.length <= 8) return '***';
-
-    // For Bearer tokens, preserve the "Bearer " prefix
-    if (value.startsWith('Bearer ')) {
-      const token = value.substring(7);
-      if (token.length <= 8) return 'Bearer ***';
-      return `Bearer ${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
-    }
-
-    return `${value.substring(0, 4)}...${value.substring(value.length - 4)}`;
   }
 
   /**
@@ -2916,6 +2886,15 @@ export class Dispatcher {
     adapters: ResolvedAdapter[] = []
   ): UnifiedChatResponse {
     logger.debug('Streaming response detected');
+
+    // Capture response metadata for debug logging
+    if (request.requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        request.requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
+    }
 
     let rawStream: ReadableStream = response.body!;
 
@@ -2993,6 +2972,15 @@ export class Dispatcher {
     bypassTransformation: boolean,
     adapters: ResolvedAdapter[] = []
   ): Promise<UnifiedChatResponse> {
+    // Capture response metadata for debug logging
+    if (request.requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        request.requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
+    }
+
     let responseBody = await this.parseJsonResponseBody(
       response,
       request.requestId,
@@ -3015,6 +3003,11 @@ export class Dispatcher {
     }
 
     if (request.requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        request.requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
       DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
     }
 
@@ -3153,6 +3146,15 @@ export class Dispatcher {
         }
 
         const response = await this.executeProviderRequest(url, headers, payload);
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3384,6 +3386,15 @@ export class Dispatcher {
           headers,
           body: formData,
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3624,6 +3635,15 @@ export class Dispatcher {
           headers,
           body: JSON.stringify(payload),
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3900,6 +3920,15 @@ export class Dispatcher {
           body: JSON.stringify(payload),
         });
 
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
+
         if (!response.ok) {
           const errorText = await response.text();
           const canRetry =
@@ -4121,6 +4150,15 @@ export class Dispatcher {
           headers,
           body: formData,
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();

@@ -440,7 +440,12 @@ describe('extractUsageCostDetails', () => {
       completion_tokens: 131,
       total_tokens: 285,
       cost: 0.0003287,
-      prompt_tokens_details: { cached_tokens: 128, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      prompt_tokens_details: {
+        cached_tokens: 128,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
       completion_tokens_details: { reasoning_tokens: 87, image_tokens: 0, audio_tokens: 0 },
     };
 
@@ -458,8 +463,18 @@ describe('extractUsageCostDetails', () => {
       prompt_tokens: 165,
       completion_tokens: 2,
       total_tokens: 296,
-      prompt_tokens_details: { text_tokens: 165, audio_tokens: 0, image_tokens: 0, cached_tokens: 164 },
-      completion_tokens_details: { reasoning_tokens: 129, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
+      prompt_tokens_details: {
+        text_tokens: 165,
+        audio_tokens: 0,
+        image_tokens: 0,
+        cached_tokens: 164,
+      },
+      completion_tokens_details: {
+        reasoning_tokens: 129,
+        audio_tokens: 0,
+        accepted_prediction_tokens: 0,
+        rejected_prediction_tokens: 0,
+      },
       num_sources_used: 0,
       cost_in_usd_ticks: 739000,
     };
@@ -1264,7 +1279,12 @@ describe('extractUsageCostDetails - real-world cassette shapes', () => {
       total_tokens: 750,
       cost: 0.001322,
       is_byok: false,
-      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      prompt_tokens_details: {
+        cached_tokens: 0,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
       cost_details: {
         upstream_inference_cost: 0.001322,
         upstream_inference_prompt_cost: 0.000607,
@@ -1288,7 +1308,12 @@ describe('extractUsageCostDetails - real-world cassette shapes', () => {
       total_tokens: 193,
       cost: 0.00008825,
       is_byok: false,
-      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      prompt_tokens_details: {
+        cached_tokens: 0,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
       cost_details: {
         upstream_inference_cost: 0.00008825,
         upstream_inference_prompt_cost: 0.00004025,
@@ -1312,7 +1337,12 @@ describe('extractUsageCostDetails - real-world cassette shapes', () => {
       total_tokens: 351,
       cost: 0.0006228,
       is_byok: false,
-      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      prompt_tokens_details: {
+        cached_tokens: 0,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
       cost_details: {
         upstream_inference_cost: 0.0006228,
         upstream_inference_prompt_cost: 0.0003348,
@@ -1333,7 +1363,12 @@ describe('extractUsageCostDetails - real-world cassette shapes', () => {
       total_tokens: 167,
       cost: 0.0000901,
       is_byok: false,
-      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 0, audio_tokens: 0, video_tokens: 0 },
+      prompt_tokens_details: {
+        cached_tokens: 0,
+        cache_write_tokens: 0,
+        audio_tokens: 0,
+        video_tokens: 0,
+      },
       cost_details: {
         upstream_inference_cost: 0.0000901,
         upstream_inference_prompt_cost: 0.0000226,

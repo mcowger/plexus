@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, index } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, bigint, integer, index } from 'drizzle-orm/pg-core';
 
 export const debugLogs = pgTable(
   'debug_logs',
@@ -12,6 +12,9 @@ export const debugLogs = pgTable(
     transformedResponse: text('transformed_response'),
     rawResponseSnapshot: text('raw_response_snapshot'),
     transformedResponseSnapshot: text('transformed_response_snapshot'),
+    requestHeaders: text('request_headers'),
+    responseHeaders: text('response_headers'),
+    responseStatus: integer('response_status'),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   },
   (table) => ({

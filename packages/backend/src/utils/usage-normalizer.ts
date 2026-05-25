@@ -170,7 +170,8 @@ export function normalizeOpenAIResponsesUsage(usage: any): UsageSubset {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     total_tokens:
-      safeToken(usage?.total_tokens) || inputTokens + cachedTokens + cacheWriteTokens + outputTokens,
+      safeToken(usage?.total_tokens) ||
+      inputTokens + cachedTokens + cacheWriteTokens + outputTokens,
     reasoning_tokens: reasoningTokens,
     cached_tokens: cachedTokens,
     cache_creation_tokens: cacheWriteTokens,
