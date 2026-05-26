@@ -304,6 +304,7 @@ const ZenmuxQuotaCheckerOptionsSchema = z.object({
 
 const WaferQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
+  includeAllowance: z.boolean().optional(),
 });
 
 const PoeQuotaCheckerOptionsSchema = z.object({
