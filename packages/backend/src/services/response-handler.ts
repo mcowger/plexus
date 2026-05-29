@@ -290,9 +290,8 @@ export async function handleResponse(
     // abort signal is consumed by fetch() at call time; aborting it afterwards has
     // no effect on the streaming body read. nodeStream.destroy() is required in all
     // cases. We wire abortController.signal's 'abort' event to onDisconnect() so
-    // that any future timeout wiring (e.g. AbortSignal.any([signal, AbortSignal.timeout(ms)]))
-    // at the route level will automatically flow through the correct cancellation path
-    // with no further changes needed here. See test-timeout-*.ts.
+    // that route-level timeout wiring automatically flows through the correct
+    // cancellation path with no further changes needed here. See test-timeout-*.ts.
     // =============================================================================
     let disconnected = false;
     let disconnectPoll: ReturnType<typeof setInterval> | null = null;

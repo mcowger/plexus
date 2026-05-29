@@ -60,6 +60,8 @@ interface RetryHistoryLikeEntry {
   reason?: unknown;
 }
 
+type ResolveTimeoutMs = (timeoutMs?: number | null) => number;
+
 /**
  * Strips trailing /v1beta* path segments from Gemini base URLs.
  * Gemini's transformer adds /v1beta to the path, so we need to ensure
@@ -247,7 +249,7 @@ export class Dispatcher {
   async dispatch(
     request: UnifiedChatRequest,
     signal?: AbortSignal,
-    addTimeoutSource?: (timeoutMs: number) => void,
+    resolveTimeoutMs?: ResolveTimeoutMs,
     addStallConfig?: (providerOverrides: {
       stallTtfbMs?: number | null;
       stallTtfbBytes?: number | null;
@@ -292,6 +294,11 @@ export class Dispatcher {
       if (signal?.aborted) throw this.buildCancelledError(signal);
       let currentRequest = { ...request };
       const route = targets[i]!;
+      const attemptTimeout = this.createAttemptTimeout(
+        signal,
+        route.config.timeoutMs,
+        resolveTimeoutMs
+      );
 
       // Vision Fallthrough (Image-to-Text Preprocessing)
       // Check if:
@@ -349,6 +356,7 @@ export class Dispatcher {
         route.model
       );
       if (!isHealthy) {
+        attemptTimeout.cleanup();
         logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
         lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
         this.appendSkippedAttempt(
@@ -374,6 +382,7 @@ export class Dispatcher {
       // Acquire concurrency slot before upstream request
       const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
       if (!acquired) {
+        attemptTimeout.cleanup();
         logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
         lastError = new Error(
           `Provider ${route.provider}/${route.model} concurrency limit exceeded`
@@ -436,13 +445,6 @@ export class Dispatcher {
           );
         }
 
-        // Wire per-provider timeout override if set. This fires sooner than the
-        // global timeout and aborts the upstream fetch + the route's AbortController
-        // (via addTimeoutSource) so response-handler.ts stream monitoring detects it.
-        if (route.config.timeoutMs && addTimeoutSource) {
-          addTimeoutSource(route.config.timeoutMs);
-        }
-
         // Wire per-provider stall detection overrides. Always call addStallConfig
         // so the StallInspector is reset on each failover iteration — even when
         // the current provider has no overrides, this clears a previous provider's
@@ -492,9 +494,10 @@ export class Dispatcher {
               route,
               targetApiType,
               transformer,
-              signal,
+              attemptTimeout.signal,
               effectiveStallConfig
             );
+            attemptTimeout.cleanup();
             await this.recordAttemptMetric(route, currentRequest.requestId, true, {
               isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
               isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -511,22 +514,26 @@ export class Dispatcher {
             doRelease();
             return oauthResponse;
           } catch (oauthError: any) {
+            const effectiveOAuthError = attemptTimeout.isTimedOut()
+              ? this.buildTimeoutError()
+              : oauthError;
             if (signal?.aborted) throw this.buildCancelledError(signal);
-            lastError = oauthError;
+            lastError = effectiveOAuthError;
 
             // Handle TTFB stall errors with failover support
-            const isStallError = (oauthError as any).isStallError === true;
+            const isStallError = (effectiveOAuthError as any).isStallError === true;
             if (isStallError) {
               const canRetryStall = failoverEnabled && i < targets.length - 1;
               this.appendFailureAttempt(
                 retryHistory,
                 route,
-                oauthError,
+                effectiveOAuthError,
                 targetApiType,
                 canRetryStall
               );
 
               if (canRetryStall) {
+                attemptTimeout.cleanup();
                 await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                   isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                   isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -535,12 +542,12 @@ export class Dispatcher {
                 CooldownManager.getInstance().markProviderStallFailure(
                   route.provider,
                   route.model,
-                  this.formatFailureReason(oauthError)
+                  this.formatFailureReason(effectiveOAuthError)
                 );
                 this.saveIntermediateError(
                   currentRequest.requestId,
                   targetApiType || 'chat',
-                  oauthError
+                  effectiveOAuthError
                 );
                 logger.info(
                   `TTFB stall: OAuth request timed out for ${route.provider}/${route.model}, retrying`
@@ -555,38 +562,48 @@ export class Dispatcher {
               CooldownManager.getInstance().markProviderStallFailure(
                 route.provider,
                 route.model,
-                this.formatFailureReason(oauthError)
+                this.formatFailureReason(effectiveOAuthError)
               );
-              throw oauthError;
+              throw effectiveOAuthError;
             }
 
             const canRetry =
-              failoverEnabled && i < targets.length - 1 && this.isRetryableOAuthError(oauthError);
+              failoverEnabled &&
+              i < targets.length - 1 &&
+              (attemptTimeout.isTimedOut() || this.isRetryableOAuthError(effectiveOAuthError));
 
-            this.appendFailureAttempt(retryHistory, route, oauthError, targetApiType, canRetry);
+            this.appendFailureAttempt(
+              retryHistory,
+              route,
+              effectiveOAuthError,
+              targetApiType,
+              canRetry
+            );
 
             if (canRetry) {
+              attemptTimeout.cleanup();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
                 visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
-              await this.markOAuthProviderFailure(route, oauthError);
+              await this.markOAuthProviderFailure(route, effectiveOAuthError);
               this.saveIntermediateError(
                 currentRequest.requestId,
                 targetApiType || 'chat',
-                oauthError
+                effectiveOAuthError
               );
               logger.warn(
-                `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
+                `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${effectiveOAuthError.message}`
               );
               doRelease();
               continue;
             }
 
-            await this.markOAuthProviderFailure(route, oauthError);
+            attemptTimeout.cleanup();
+            await this.markOAuthProviderFailure(route, effectiveOAuthError);
             doRelease();
-            throw oauthError;
+            throw effectiveOAuthError;
           }
         }
 
@@ -617,9 +634,10 @@ export class Dispatcher {
           // means the client disconnected — we need a distinct signal for
           // "provider is too slow to start responding".
           stallAbortController = new AbortController();
-          const combinedSignal = signal
-            ? AbortSignal.any([signal, stallAbortController.signal])
-            : stallAbortController.signal;
+          const combinedSignal = AbortSignal.any([
+            attemptTimeout.signal,
+            stallAbortController.signal,
+          ]);
 
           const ttfbMs = effectiveStallConfig.ttfbMs!;
           ttfbTimerId = setTimeout(() => {
@@ -663,6 +681,7 @@ export class Dispatcher {
                   stallError.message?.includes('stalled'));
 
               if (canRetryStall) {
+                attemptTimeout.cleanup();
                 await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                   isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                   isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -708,7 +727,12 @@ export class Dispatcher {
             effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: remainingTtfbMs };
           }
         } else {
-          response = await this.executeProviderRequest(url, headers, providerPayload, signal);
+          response = await this.executeProviderRequest(
+            url,
+            headers,
+            providerPayload,
+            attemptTimeout.signal
+          );
         }
 
         if (!response.ok) {
@@ -734,6 +758,7 @@ export class Dispatcher {
             this.appendFailureAttempt(retryHistory, route, e, targetApiType, canRetry);
 
             if (canRetry) {
+              attemptTimeout.cleanup();
               doRelease();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
@@ -781,6 +806,7 @@ export class Dispatcher {
                 error.message?.includes('stalled'));
 
             if (canRetry) {
+              attemptTimeout.cleanup();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -873,6 +899,7 @@ export class Dispatcher {
             route,
             targetApiType
           );
+          attemptTimeout.cleanup();
           return streamResponse;
         }
 
@@ -906,9 +933,12 @@ export class Dispatcher {
           targetApiType
         );
         doRelease();
+        attemptTimeout.cleanup();
         return nonStreamingResponse;
       } catch (error: any) {
-        lastError = error;
+        const effectiveError = attemptTimeout.isTimedOut() ? this.buildTimeoutError() : error;
+        lastError = effectiveError;
+        attemptTimeout.cleanup();
         doRelease();
 
         // If the client disconnected (abort signal), don't treat this as a
@@ -918,22 +948,23 @@ export class Dispatcher {
 
         // If the error came from handleProviderError, it already called markProviderFailure.
         // Only call it here for network/transport errors that have no HTTP status code.
-        const isHttpError = error?.routingContext?.statusCode !== undefined;
+        const isHttpError = effectiveError?.routingContext?.statusCode !== undefined;
+        const isUpstreamTimeout = effectiveError?.routingContext?.code === 'upstream_timeout';
 
-        if (!isHttpError) {
+        if (!isHttpError || isUpstreamTimeout) {
           // Pure network/transport error — mark the provider as failed
-          if (error.message?.includes('stalled')) {
+          if (effectiveError.message?.includes('stalled')) {
             CooldownManager.getInstance().markProviderStallFailure(
               route.provider,
               route.model,
-              this.formatFailureReason(error)
+              this.formatFailureReason(effectiveError)
             );
           } else {
             CooldownManager.getInstance().markProviderFailure(
               route.provider,
               route.model,
               undefined,
-              this.formatFailureReason(error)
+              this.formatFailureReason(effectiveError)
             );
           }
         }
@@ -946,19 +977,20 @@ export class Dispatcher {
         const canRetryNetwork =
           failoverEnabled &&
           i < targets.length - 1 &&
-          (this.isRetryableNetworkError(error, failover?.retryableErrors || []) ||
-            error.message?.includes('stalled'));
+          (isUpstreamTimeout ||
+            this.isRetryableNetworkError(effectiveError, failover?.retryableErrors || []) ||
+            effectiveError.message?.includes('stalled'));
 
-        this.appendFailureAttempt(retryHistory, route, error, undefined, canRetryNetwork);
+        this.appendFailureAttempt(retryHistory, route, effectiveError, undefined, canRetryNetwork);
 
         if (canRetryNetwork) {
           this.saveIntermediateError(
             currentRequest.requestId,
-            error?.routingContext?.targetApiType || 'chat',
-            error
+            effectiveError?.routingContext?.targetApiType || 'chat',
+            effectiveError
           );
           logger.warn(
-            `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+            `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${effectiveError.message}`
           );
           continue;
         }
@@ -2392,6 +2424,38 @@ export class Dispatcher {
     } catch (error: any) {
       throw this.wrapOAuthError(error, route, targetApiType);
     }
+  }
+
+  private createAttemptTimeout(
+    signal: AbortSignal | undefined,
+    providerTimeoutMs: number | null | undefined,
+    resolveTimeoutMs?: ResolveTimeoutMs
+  ): { signal: AbortSignal; isTimedOut: () => boolean; cleanup: () => void } {
+    const timeoutMs = resolveTimeoutMs
+      ? resolveTimeoutMs(providerTimeoutMs ?? null)
+      : (providerTimeoutMs ?? (getConfig().timeout?.defaultSeconds ?? 300) * 1000);
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      timeoutController.abort(new DOMException('Upstream request timed out', 'TimeoutError'));
+    }, timeoutMs);
+    timeoutId.unref?.();
+
+    return {
+      signal: signal
+        ? AbortSignal.any([signal, timeoutController.signal])
+        : timeoutController.signal,
+      isTimedOut: () => timeoutController.signal.aborted,
+      cleanup: () => clearTimeout(timeoutId),
+    };
+  }
+
+  private buildTimeoutError(): Error {
+    const err = new Error('Upstream timeout') as any;
+    err.routingContext = {
+      statusCode: 504,
+      code: 'upstream_timeout',
+    };
+    return err;
   }
 
   private buildCancelledError(signal: AbortSignal): Error {

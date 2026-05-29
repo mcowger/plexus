@@ -1,4 +1,4 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Dispatcher } from '../dispatcher';
 
 // Prevent real network calls
@@ -9,6 +9,10 @@ describe('Dispatcher — AbortSignal / cancellation', () => {
 
   beforeEach(() => {
     dispatcher = new Dispatcher();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   test('buildCancelledError returns 499 and client_disconnected for a plain abort', () => {
@@ -30,6 +34,31 @@ describe('Dispatcher — AbortSignal / cancellation', () => {
     controller.abort(timeoutReason);
 
     const err = (dispatcher as any).buildCancelledError(controller.signal);
+    expect(err.message).toBe('Upstream timeout');
+    expect(err.routingContext.statusCode).toBe(504);
+    expect(err.routingContext.code).toBe('upstream_timeout');
+  });
+
+  test('per-attempt timeout does not abort the route signal', async () => {
+    vi.useFakeTimers();
+    const routeController = new AbortController();
+
+    const attemptTimeout = (dispatcher as any).createAttemptTimeout(
+      routeController.signal,
+      35_000,
+      () => 4_000
+    );
+
+    await vi.advanceTimersByTimeAsync(4_000);
+
+    expect(attemptTimeout.isTimedOut()).toBe(true);
+    expect(attemptTimeout.signal.aborted).toBe(true);
+    expect(routeController.signal.aborted).toBe(false);
+  });
+
+  test('buildTimeoutError returns retryable upstream timeout metadata', () => {
+    const err = (dispatcher as any).buildTimeoutError();
+
     expect(err.message).toBe('Upstream timeout');
     expect(err.routingContext.statusCode).toBe(504);
     expect(err.routingContext.code).toBe('upstream_timeout');

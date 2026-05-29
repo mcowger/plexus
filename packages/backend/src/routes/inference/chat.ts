@@ -91,13 +91,13 @@ export async function registerChatRoute(
       }
 
       const abortController = new AbortController();
-      const { signal: dispatchSignal, addTimeoutSource } = wireUpstreamTimeout(abortController);
+      const { signal: dispatchSignal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
       earlyDisconnect = wireEarlyDisconnectDetection(request, abortController);
       const stallDetectionResult = wireStallDetection(abortController, getGlobalStallConfig());
       const unifiedResponse = await dispatcher.dispatch(
         unifiedRequest,
         dispatchSignal,
-        addTimeoutSource,
+        resolveTimeoutMs,
         stallDetectionResult?.addStallConfig
       );
 
@@ -138,12 +138,8 @@ export async function registerChatRoute(
       return result;
     } catch (e: any) {
       earlyDisconnect?.cleanup();
-      if (
-        e?.routingContext?.code === 'client_disconnected' ||
-        e?.routingContext?.code === 'upstream_timeout'
-      ) {
-        usageRecord.responseStatus =
-          e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'cancelled';
+      if (e?.routingContext?.code === 'client_disconnected') {
+        usageRecord.responseStatus = 'cancelled';
         usageRecord.durationMs = Date.now() - startTime;
         usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
         usageRecord.retryHistory =
@@ -154,7 +150,8 @@ export async function registerChatRoute(
         );
         return;
       }
-      usageRecord.responseStatus = 'error';
+      usageRecord.responseStatus =
+        e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'error';
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
       usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;
