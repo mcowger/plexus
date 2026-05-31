@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 interface DebugLogMeta {
   requestId: string;
   createdAt: number;
+  responseStatus?: number | null;
 }
 
 interface DebugLogDetail extends DebugLogMeta {
@@ -39,7 +40,6 @@ interface DebugLogDetail extends DebugLogMeta {
   transformedResponseSnapshot?: string | object;
   requestHeaders?: string | object;
   responseHeaders?: string | object;
-  responseStatus?: number;
 }
 
 export const Debug: React.FC = () => {
@@ -233,6 +233,25 @@ export const Debug: React.FC = () => {
     return content;
   };
 
+  const getHttpStatusBadgeClasses = (status?: number | null) => {
+    if (status == null) {
+      return 'border-border-glass bg-bg-glass text-text-muted';
+    }
+    if (status >= 100 && status < 200) {
+      return 'border-border-glass bg-bg-glass text-text-muted';
+    }
+    if (status >= 200 && status < 300) {
+      return 'border-success/30 bg-emerald-500/15 text-success';
+    }
+    if (status >= 300 && status < 400) {
+      return 'border-blue-400/30 bg-blue-500/15 text-blue-400';
+    }
+    if (status >= 400 && status < 500) {
+      return 'border-warning/30 bg-yellow-500/15 text-warning';
+    }
+    return 'border-danger/30 bg-red-500/15 text-danger';
+  };
+
   const exportContent = useMemo(() => {
     if (!detail) return '';
     const payload = {
@@ -246,7 +265,7 @@ export const Debug: React.FC = () => {
       transformedResponseSnapshot: normalizeExportContent(detail.transformedResponseSnapshot),
       requestHeaders: normalizeExportContent(detail.requestHeaders),
       responseHeaders: normalizeExportContent(detail.responseHeaders),
-      responseStatus: detail.responseStatus,
+      httpStatusCode: detail.responseStatus ?? null,
     };
     return JSON.stringify(payload, null, 2);
   }, [detail]);
@@ -446,6 +465,16 @@ export const Debug: React.FC = () => {
                   <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1">
                     {log.requestId?.substring(0, 8) ?? '-'}...
                   </div>
+                  <div className="mt-2">
+                    <span
+                      className={clsx(
+                        'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold',
+                        getHttpStatusBadgeClasses(log.responseStatus)
+                      )}
+                    >
+                      HTTP {log.responseStatus ?? '?'}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -469,6 +498,25 @@ export const Debug: React.FC = () => {
                   <span className="break-all text-xs font-mono text-text-secondary">
                     {detail.requestId}
                   </span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-text-secondary">
+                  <div className="min-w-0">
+                    <span className="text-text-muted">Captured:</span>
+                    <span className="ml-2 font-mono">
+                      {new Date(detail.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="text-text-muted">HTTP Status:</span>
+                    <span
+                      className={clsx(
+                        'inline-flex items-center rounded-md border px-2 py-0.5 font-mono font-semibold',
+                        getHttpStatusBadgeClasses(detail.responseStatus)
+                      )}
+                    >
+                      {detail.responseStatus ?? 'Not captured'}
+                    </span>
+                  </div>
                 </div>
               </div>
               <AccordionPanel
