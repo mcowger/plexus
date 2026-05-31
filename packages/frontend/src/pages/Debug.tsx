@@ -237,6 +237,9 @@ export const Debug: React.FC = () => {
     if (status == null) {
       return 'border-border-glass bg-bg-glass text-text-muted';
     }
+    if (status >= 100 && status < 200) {
+      return 'border-border-glass bg-bg-glass text-text-muted';
+    }
     if (status >= 200 && status < 300) {
       return 'border-success/30 bg-emerald-500/15 text-success';
     }
