@@ -1991,7 +1991,7 @@ export const api = {
   getDebugLogs: async (
     limit: number = 50,
     offset: number = 0
-  ): Promise<{ requestId: string; createdAt: number }[]> => {
+  ): Promise<{ requestId: string; createdAt: number; responseStatus: number | null }[]> => {
     try {
       const res = await fetchWithAuth(
         `${API_BASE}/v0/management/debug/logs?limit=${limit}&offset=${offset}`

@@ -414,7 +414,7 @@ export class UsageStorageService extends EventEmitter {
     limit: number = 50,
     offset: number = 0,
     apiKey?: string
-  ): Promise<{ requestId: string; createdAt: number }[]> {
+  ): Promise<{ requestId: string; createdAt: number; responseStatus: number | null }[]> {
     try {
       const db = this.ensureDb();
       const where = apiKey ? eq(this.schema.debugLogs.apiKey, apiKey) : undefined;
@@ -422,6 +422,7 @@ export class UsageStorageService extends EventEmitter {
         .select({
           requestId: this.schema.debugLogs.requestId,
           createdAt: this.schema.debugLogs.createdAt,
+          responseStatus: this.schema.debugLogs.responseStatus,
         })
         .from(this.schema.debugLogs)
         .orderBy(desc(this.schema.debugLogs.createdAt))
@@ -432,6 +433,7 @@ export class UsageStorageService extends EventEmitter {
       return results.map((row: any) => ({
         requestId: row.requestId,
         createdAt: row.createdAt,
+        responseStatus: row.responseStatus,
       }));
     } catch (error) {
       logger.error('Failed to get debug logs', error);
