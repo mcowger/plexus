@@ -274,6 +274,8 @@ jobs:
     name: Build Binaries
     needs: [setup, quality-gates]
     runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ needs.setup.outputs.tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -290,8 +292,6 @@ jobs:
         run: bun run build:frontend
 
       - name: Compile all binaries
-        env:
-          APP_VERSION: ${{ needs.setup.outputs.tag }}
         run: |
           bun run compile:linux-amd64
           bun run compile:linux-arm64
