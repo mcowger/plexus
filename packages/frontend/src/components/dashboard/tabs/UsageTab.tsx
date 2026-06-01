@@ -385,7 +385,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       return null;
     };
 
-    const total = data.reduce((sum, d) => sum + (d[dataKey] as number), 0);
     const sortedData = [...data].sort((a, b) => (b[dataKey] as number) - (a[dataKey] as number));
 
     const toggleBtnStyle = (active: boolean): React.CSSProperties => ({
