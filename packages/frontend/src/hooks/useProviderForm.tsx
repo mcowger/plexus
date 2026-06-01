@@ -760,8 +760,8 @@ export function useProviderForm() {
     if (quotaType === 'minimax') {
       if (!options.groupid || !(options.groupid as string).trim())
         return 'Group ID is required for MiniMax quota checker';
-      if (!options.hertzSession || !(options.hertzSession as string).trim())
-        return 'HERTZ-SESSION cookie value is required for MiniMax quota checker';
+      if (!options.token || !(options.token as string).trim())
+        return '_token cookie value is required for MiniMax quota checker';
     }
     if (quotaType === 'wisdomgate' && (!options.session || !(options.session as string).trim()))
       return 'Session cookie is required for Wisdom Gate quota checker';
