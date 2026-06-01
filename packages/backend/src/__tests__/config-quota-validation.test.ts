@@ -72,11 +72,11 @@ describe('config quota checker validation', () => {
     });
   });
 
-  it('accepts minimax quota checker when groupid and hertzSession are provided', () => {
+  it('accepts minimax quota checker when groupid and token are provided', () => {
     const config = validateConfig(
       makeConfigJson({
         groupid: 'group-123',
-        hertzSession: 'session-secret',
+        token: 'jwt-token-secret',
       })
     );
 
@@ -87,21 +87,19 @@ describe('config quota checker validation', () => {
       type: 'minimax',
       options: {
         groupid: 'group-123',
-        hertzSession: 'session-secret',
+        token: 'jwt-token-secret',
       },
     });
   });
 
   it('rejects minimax quota checker when groupid is missing', () => {
-    expect(() => validateConfig(makeConfigJson({ hertzSession: 'session-secret' }))).toThrow(
+    expect(() => validateConfig(makeConfigJson({ token: 'jwt-token-secret' }))).toThrow(
       '"groupid"'
     );
   });
 
-  it('rejects minimax quota checker when hertzSession is missing', () => {
-    expect(() => validateConfig(makeConfigJson({ groupid: 'group-123' }))).toThrow(
-      '"hertzSession"'
-    );
+  it('rejects minimax quota checker when token is missing', () => {
+    expect(() => validateConfig(makeConfigJson({ groupid: 'group-123' }))).toThrow('"token"');
   });
 
   it('rejects minimax quota checker when required fields are empty strings', () => {
@@ -109,7 +107,7 @@ describe('config quota checker validation', () => {
       validateConfig(
         makeConfigJson({
           groupid: '   ',
-          hertzSession: '   ',
+          token: '   ',
         })
       )
     ).toThrow('MiniMax groupid is required');

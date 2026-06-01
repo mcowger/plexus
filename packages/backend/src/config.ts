@@ -229,7 +229,7 @@ const NovitaQuotaCheckerOptionsSchema = z.object({
 
 const MiniMaxQuotaCheckerOptionsSchema = z.object({
   groupid: z.string().trim().min(1, 'MiniMax groupid is required'),
-  hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),
+  token: z.string().trim().min(1, 'MiniMax _token cookie value is required'),
 });
 
 const MiniMaxCodingQuotaCheckerOptionsSchema = z.object({
