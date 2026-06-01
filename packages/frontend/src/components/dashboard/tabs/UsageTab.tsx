@@ -354,8 +354,13 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     const CustomTooltip = ({ active, payload }: any) => {
       if (active && payload && payload.length) {
         const value = payload[0].value;
-        const label = payload[0].name;
+        const name = payload[0].payload?.name || payload[0].name;
         const formattedValue = dataKey === 'requests' ? formatNumber(value) : formatTokens(value);
+        const total = sortedData.reduce(
+          (sum, d) => sum + (d[dataKey as keyof PieChartDataPoint] as number),
+          0
+        );
+        const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
         return (
           <div
             style={{
@@ -366,10 +371,13 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             }}
           >
             <p style={{ margin: 0, color: '#ffffff', fontSize: '14px' }}>
-              <strong>{label}</strong>
+              <strong>{name}</strong>
             </p>
             <p style={{ margin: '4px 0 0 0', color: '#ffffff', fontSize: '13px' }}>
               {dataKey === 'requests' ? 'Requests' : 'Tokens'}: {formattedValue}
+            </p>
+            <p style={{ margin: '2px 0 0 0', color: '#ffffff', fontSize: '13px' }}>
+              ({percent}%)
             </p>
           </div>
         );
@@ -377,6 +385,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       return null;
     };
 
+    const total = data.reduce((sum, d) => sum + (d[dataKey] as number), 0);
     const sortedData = [...data].sort((a, b) => (b[dataKey] as number) - (a[dataKey] as number));
 
     const toggleBtnStyle = (active: boolean): React.CSSProperties => ({
@@ -418,22 +427,17 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                   dataKey={dataKey}
                   nameKey="name"
                 >
-                  {data.map((_entry, index) => (
+                  {sortedData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Legend
-                  verticalAlign="bottom"
                   align="left"
-                  height={36}
-                  formatter={(value) => {
+                  formatter={(value: string) => {
                     const item = sortedData.find((d) => d.name === value);
                     if (!item) return value;
-                    const itemValue = item[dataKey as keyof PieChartDataPoint] as number;
-                    const total = sortedData.reduce(
-                      (sum, d) => sum + (d[dataKey as keyof PieChartDataPoint] as number),
-                      0
-                    );
+                    const itemValue = item[dataKey] as number;
+                    const total = sortedData.reduce((sum, d) => sum + (d[dataKey] as number), 0);
                     const percent = total > 0 ? ((itemValue / total) * 100).toFixed(0) : 0;
                     return `${value} (${percent}%)`;
                   }}
@@ -445,7 +449,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sortedData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                <XAxis dataKey="name" stroke="var(--color-text-secondary)" />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" angle={-35} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
                 <YAxis
                   stroke="var(--color-text-secondary)"
                   tickFormatter={(v) =>
@@ -454,7 +458,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey={dataKey} radius={[4, 4, 0, 0]} activeBar={false}>
-                  {data.map((_entry, index) => (
+                  {sortedData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
@@ -561,7 +565,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                       borderRadius: '8px',
                     }}
                   />
-                  <Legend />
+                  <Legend align="left" />
                   {providerKeys.map((provider, index) => (
                     <Area
                       key={provider}
@@ -615,7 +619,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
                       borderRadius: '8px',
                     }}
                   />
-                  <Legend />
+                  <Legend align="left" />
                   {modelKeys.map((model, index) => (
                     <Bar
                       key={model}
