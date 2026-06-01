@@ -26,13 +26,13 @@ export const MiniMaxQuotaConfig: React.FC<MiniMaxQuotaConfigProps> = ({ options,
 
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          HERTZ-SESSION Cookie <span className="text-danger">*</span>
+          _token Cookie <span className="text-danger">*</span>
         </label>
         <Input
           type="password"
-          value={(options.hertzSession as string) ?? ''}
-          onChange={(e) => handleChange('hertzSession', e.target.value)}
-          placeholder="Paste HERTZ-SESSION cookie value"
+          value={(options.token as string) ?? ''}
+          onChange={(e) => handleChange('token', e.target.value)}
+          placeholder="Paste _token cookie value"
         />
         <span className="text-[10px] text-text-muted">
           Treated as a password. Used to query MiniMax balance.
