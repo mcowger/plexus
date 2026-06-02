@@ -277,9 +277,12 @@ export const Logs = () => {
       );
     };
 
-    // Attempt a single SSE connection. Returns true if it connected successfully
-    // (even if the stream subsequently ended), false if the connection itself failed.
-    const connectOnce = async (): Promise<boolean> => {
+    // Attempt a single SSE connection.
+    // Returns:
+    //   true  — connected and stream ended (transient; safe to retry)
+    //   false — connection-level error (transient; safe to retry)
+    //   null  — permanent server error (4xx); stop retrying
+    const connectOnce = async (): Promise<boolean | null> => {
       try {
         const response = await fetch('/v0/management/events', {
           headers: { 'x-admin-key': adminKey },
@@ -287,6 +290,12 @@ export const Logs = () => {
         });
 
         if (!response.ok) {
+          // Non-transient HTTP errors (401, 403, 404, etc.) — no point retrying.
+          if (response.status >= 400 && response.status < 500) {
+            handleDisconnect();
+            console.error(`SSE: permanent error ${response.status} — stopping reconnect`);
+            return null;
+          }
           throw new Error(`Failed to connect: ${response.statusText}`);
         }
 
@@ -416,14 +425,23 @@ export const Logs = () => {
     };
 
     // Reconnect loop with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (cap).
+    // Delay resets to 1s after any successful connection so a brief outage
+    // following a long stable session doesn't start with an accumulated delay.
     const run = async () => {
       const MAX_DELAY_MS = 30_000;
       let delay = 1_000;
 
       while (!controller.signal.aborted) {
-        await connectOnce();
+        const result = await connectOnce();
 
         if (controller.signal.aborted) break;
+
+        // Permanent server error (4xx) — stop retrying entirely.
+        if (result === null) break;
+
+        // Reset backoff after a successful connection so the next drop after a
+        // long stable session starts back at 1 s instead of the accumulated delay.
+        if (result === true) delay = 1_000;
 
         // Stream ended unexpectedly — start reconnecting.
         setSseStatus('reconnecting');
