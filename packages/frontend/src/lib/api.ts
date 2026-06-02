@@ -1442,8 +1442,13 @@ export const api = {
       const aggregated: Record<string, PieChartDataPoint> = {};
 
       records.forEach((r) => {
-        const name = r.apiKey ? (r.apiKey.length > 8 ? `${r.apiKey.slice(0, 8)}...` : r.apiKey) : 'Unknown';
         if (r.apiKey === 'probe') return;
+
+        const name = r.apiKey
+          ? r.apiKey.length > 8
+            ? `${r.apiKey.slice(0, 8)}...`
+            : r.apiKey
+          : 'Unknown';
         if (!aggregated[name]) {
           aggregated[name] = { name, requests: 0, tokens: 0 };
         }

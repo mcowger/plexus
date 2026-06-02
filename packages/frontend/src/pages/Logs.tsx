@@ -71,7 +71,7 @@ import {
   Loader,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import messagesLogo from '../assets/messages.svg';
@@ -115,14 +115,74 @@ const parseRetryHistory = (value?: string | null): RetryAttemptDetail[] => {
   }
 };
 
+const getOffsetFromSearchParams = (searchParams: URLSearchParams) => {
+  const offsetParam = searchParams.get('offset');
+  if (!offsetParam) return 0;
+
+  const parsedOffset = Number(offsetParam);
+  if (!Number.isFinite(parsedOffset) || parsedOffset < 0) return 0;
+
+  return Math.floor(parsedOffset);
+};
+
+interface PaginationControlsProps {
+  position: 'top' | 'bottom';
+  currentPage: number;
+  totalPages: number;
+  offset: number;
+  limit: number;
+  total: number;
+  onOffsetChange: (offset: number) => void;
+}
+
+const PaginationControls = ({
+  position,
+  currentPage,
+  totalPages,
+  offset,
+  limit,
+  total,
+  onOffsetChange,
+}: PaginationControlsProps) => (
+  <div
+    className={clsx(
+      'flex items-center justify-between gap-3 px-3 py-3 sm:justify-end',
+      position === 'top' ? 'border-b border-border' : 'border-t border-border'
+    )}
+  >
+    <span className="text-xs text-text-secondary font-mono">
+      Page {currentPage} of {Math.max(1, totalPages)}
+    </span>
+    <div className="flex gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={offset === 0}
+        onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+      >
+        <ChevronLeft size={16} />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={offset + limit >= total}
+        onClick={() => onOffsetChange(offset + limit)}
+      >
+        <ChevronRight size={16} />
+      </Button>
+    </div>
+  </div>
+);
+
 export const Logs = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { adminKey, isAdmin, isLimited, principal } = useAuth();
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [limit] = useState(20);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(() => getOffsetFromSearchParams(searchParams));
   const [newestLogId, setNewestLogId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<UsageSortField>('date');
   const [sortDir, setSortDir] = useState<UsageSortDirection>('desc');
@@ -189,6 +249,25 @@ export const Logs = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const nextOffset = getOffsetFromSearchParams(searchParams);
+    setOffset((currentOffset) => (currentOffset === nextOffset ? currentOffset : nextOffset));
+  }, [searchParams]);
+
+  const updateOffset = (nextOffset: number) => {
+    const normalizedOffset = Math.max(0, Math.floor(nextOffset));
+    setOffset(normalizedOffset);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (normalizedOffset === 0) {
+        nextParams.delete('offset');
+      } else {
+        nextParams.set('offset', String(normalizedOffset));
+      }
+      return nextParams;
+    });
+  };
+
   const loadLogs = async () => {
     setLoading(true);
     try {
@@ -222,7 +301,7 @@ export const Logs = () => {
         await api.deleteAllUsageLogs(olderThanDays);
       }
       // Reset to first page
-      setOffset(0);
+      updateOffset(0);
       await loadLogs();
       setIsDeleteModalOpen(false);
     } finally {
@@ -490,12 +569,15 @@ export const Logs = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setOffset(0); // Reset to first page
-    loadLogs();
+    if (offset === 0) {
+      loadLogs();
+      return;
+    }
+    updateOffset(0);
   };
 
   const handleSort = (field: UsageSortField) => {
-    setOffset(0);
+    updateOffset(0);
     if (sortBy === field) {
       setSortDir((current) => (current === 'desc' ? 'asc' : 'desc'));
       return;
@@ -667,6 +749,16 @@ export const Logs = () => {
 
       <PageContainer>
         <Card flush>
+          <PaginationControls
+            position="top"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            offset={offset}
+            limit={limit}
+            total={total}
+            onOffsetChange={updateOffset}
+          />
+
           <div className="space-y-3 p-3 lg:hidden">
             {loading ? (
               <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
@@ -1630,29 +1722,15 @@ export const Logs = () => {
             </table>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-3 sm:justify-end">
-            <span className="text-xs text-text-secondary font-mono">
-              Page {currentPage} of {Math.max(1, totalPages)}
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-              >
-                <ChevronLeft size={16} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={offset + limit >= total}
-                onClick={() => setOffset(offset + limit)}
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
+          <PaginationControls
+            position="bottom"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            offset={offset}
+            limit={limit}
+            total={total}
+            onOffsetChange={updateOffset}
+          />
         </Card>
       </PageContainer>
 
