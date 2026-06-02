@@ -431,10 +431,14 @@ export const Logs = () => {
         // Wait before retrying, but bail early if aborted.
         await new Promise<void>((resolve) => {
           const timer = setTimeout(resolve, delay);
-          controller.signal.addEventListener('abort', () => {
-            clearTimeout(timer);
-            resolve();
-          });
+          controller.signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true }
+          );
         });
 
         if (!controller.signal.aborted) {
@@ -537,7 +541,7 @@ export const Logs = () => {
         actions={
           <>
             {/* SSE live-update connection status — only visible when on page 1, sorted by date desc */}
-            {offset === 0 && sortBy === 'date' && sortDir === 'desc' && (
+            {!!adminKey && offset === 0 && sortBy === 'date' && sortDir === 'desc' && (
               <span
                 className={clsx(
                   'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border select-none',
