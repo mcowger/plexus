@@ -376,9 +376,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             <p style={{ margin: '4px 0 0 0', color: '#ffffff', fontSize: '13px' }}>
               {dataKey === 'requests' ? 'Requests' : 'Tokens'}: {formattedValue}
             </p>
-            <p style={{ margin: '2px 0 0 0', color: '#ffffff', fontSize: '13px' }}>
-              ({percent}%)
-            </p>
+            <p style={{ margin: '2px 0 0 0', color: '#ffffff', fontSize: '13px' }}>({percent}%)</p>
           </div>
         );
       }
@@ -448,7 +446,14 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sortedData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                <XAxis dataKey="name" stroke="var(--color-text-secondary)" angle={-35} textAnchor="end" height={60} tick={{ fontSize: 11 }} />
+                <XAxis
+                  dataKey="name"
+                  stroke="var(--color-text-secondary)"
+                  angle={-35}
+                  textAnchor="end"
+                  height={60}
+                  tick={{ fontSize: 11 }}
+                />
                 <YAxis
                   stroke="var(--color-text-secondary)"
                   tickFormatter={(v) =>
