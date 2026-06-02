@@ -66,6 +66,9 @@ import {
   CheckCircle,
   XCircle,
   Gauge,
+  Wifi,
+  WifiOff,
+  Loader,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
@@ -151,6 +154,13 @@ export const Logs = () => {
   const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
 
   const filtersRef = useRef(filters);
+  // sseConnected tracks whether the live-update SSE stream is currently active.
+  // Used to stop the liveTick timer when the stream drops so duration counters freeze.
+  const sseConnected = useRef(false);
+  // sseStatus drives the visible connection indicator in the UI.
+  const [sseStatus, setSseStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>(
+    'disconnected'
+  );
 
   useEffect(() => {
     filtersRef.current = filters;
@@ -172,7 +182,10 @@ export const Logs = () => {
   const [, setLiveTick] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => setLiveTick((t) => t + 1), 100);
+    // Only tick while the SSE stream is active so duration counters freeze when it drops.
+    const interval = setInterval(() => {
+      if (sseConnected.current) setLiveTick((t) => t + 1);
+    }, 100);
     return () => clearInterval(interval);
   }, []);
 
@@ -252,12 +265,24 @@ export const Logs = () => {
 
     const controller = new AbortController();
 
-    const connect = async () => {
+    // Freeze pending logs and update connection status when the stream drops.
+    const handleDisconnect = () => {
+      sseConnected.current = false;
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.responseStatus === 'pending' && log.durationMs == null
+            ? { ...log, durationMs: Date.now() - log.startTime }
+            : log
+        )
+      );
+    };
+
+    // Attempt a single SSE connection. Returns true if it connected successfully
+    // (even if the stream subsequently ended), false if the connection itself failed.
+    const connectOnce = async (): Promise<boolean> => {
       try {
         const response = await fetch('/v0/management/events', {
-          headers: {
-            'x-admin-key': adminKey,
-          },
+          headers: { 'x-admin-key': adminKey },
           signal: controller.signal,
         });
 
@@ -266,14 +291,20 @@ export const Logs = () => {
         }
 
         const reader = response.body?.getReader();
-        if (!reader) return;
+        if (!reader) return false;
+
+        sseConnected.current = true;
+        setSseStatus('connected');
 
         const decoder = new TextDecoder();
         let buffer = '';
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            handleDisconnect();
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n\n'); // SSE messages are separated by double newline
@@ -371,17 +402,67 @@ export const Logs = () => {
             }
           }
         }
+
+        return true;
       } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          console.error('Log stream error:', err);
+        handleDisconnect();
+        if (err.name === 'AbortError') {
+          // Intentional teardown — do not retry.
+          throw err;
         }
+        console.error('Log stream error:', err);
+        return false;
       }
     };
 
-    connect();
+    // Reconnect loop with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (cap).
+    const run = async () => {
+      const MAX_DELAY_MS = 30_000;
+      let delay = 1_000;
+
+      while (!controller.signal.aborted) {
+        await connectOnce();
+
+        if (controller.signal.aborted) break;
+
+        // Stream ended unexpectedly — start reconnecting.
+        setSseStatus('reconnecting');
+
+        // Wait before retrying, but bail early if aborted.
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, delay);
+          controller.signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+
+        if (!controller.signal.aborted) {
+          delay = Math.min(delay * 2, MAX_DELAY_MS);
+        }
+      }
+
+      setSseStatus('disconnected');
+    };
+
+    run().catch(() => {
+      // AbortError from intentional teardown — suppress.
+      setSseStatus('disconnected');
+    });
 
     return () => {
+      sseConnected.current = false;
+      setSseStatus('disconnected');
       controller.abort();
+      // Freeze any in-flight logs that are still 'pending' so their duration
+      // counter stops at the moment the stream dropped rather than continuing forever.
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.responseStatus === 'pending' && log.durationMs == null
+            ? { ...log, durationMs: Date.now() - log.startTime }
+            : log
+        )
+      );
     };
   }, [offset, limit, adminKey, sortBy, sortDir]);
 
@@ -454,18 +535,51 @@ export const Logs = () => {
             : 'All API requests routed through the gateway'
         }
         actions={
-          isAdmin ? (
-            <Button
-              onClick={handleDeleteAll}
-              variant="danger"
-              size="sm"
-              leftIcon={<Trash2 size={14} />}
-              disabled={logs.length === 0}
-              type="button"
-            >
-              Delete All
-            </Button>
-          ) : undefined
+          <>
+            {/* SSE live-update connection status — only visible when on page 1, sorted by date desc */}
+            {offset === 0 && sortBy === 'date' && sortDir === 'desc' && (
+              <span
+                className={clsx(
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border select-none',
+                  sseStatus === 'connected' && 'bg-green-500/10 text-green-400 border-green-500/20',
+                  sseStatus === 'reconnecting' &&
+                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                  sseStatus === 'disconnected' &&
+                    'bg-red-500/10 text-text-muted border-border-glass'
+                )}
+                title={
+                  sseStatus === 'connected'
+                    ? 'Live updates active'
+                    : sseStatus === 'reconnecting'
+                      ? 'Reconnecting to live updates…'
+                      : 'Live updates disconnected'
+                }
+              >
+                {sseStatus === 'connected' && <Wifi size={12} />}
+                {sseStatus === 'reconnecting' && <Loader size={12} className="animate-spin" />}
+                {sseStatus === 'disconnected' && <WifiOff size={12} />}
+                <span className="hidden sm:inline">
+                  {sseStatus === 'connected'
+                    ? 'Live'
+                    : sseStatus === 'reconnecting'
+                      ? 'Reconnecting…'
+                      : 'Disconnected'}
+                </span>
+              </span>
+            )}
+            {isAdmin && (
+              <Button
+                onClick={handleDeleteAll}
+                variant="danger"
+                size="sm"
+                leftIcon={<Trash2 size={14} />}
+                disabled={logs.length === 0}
+                type="button"
+              >
+                Delete All
+              </Button>
+            )}
+          </>
         }
       >
         <form
@@ -653,11 +767,14 @@ export const Logs = () => {
                                 log.responseStatus === 'pending'
                                   ? progressMapRef.current.get(log.requestId)
                                   : undefined;
-                              const liveDuration = formatMs(
+                              const rawDurationMs =
                                 log.durationMs != null && log.durationMs > 0
                                   ? log.durationMs
-                                  : Date.now() - log.startTime
-                              );
+                                  : log.responseStatus === 'pending'
+                                    ? Date.now() - log.startTime
+                                    : null;
+                              const liveDuration =
+                                rawDurationMs != null ? formatMs(rawDurationMs) : '-';
                               if (progress) {
                                 return (
                                   <div
@@ -1241,11 +1358,14 @@ export const Logs = () => {
                             log.responseStatus === 'pending'
                               ? progressMapRef.current.get(log.requestId)
                               : undefined;
-                          const liveDuration = formatMs(
+                          const rawDurationMs =
                             log.durationMs != null && log.durationMs > 0
                               ? log.durationMs
-                              : Date.now() - log.startTime
-                          );
+                              : log.responseStatus === 'pending'
+                                ? Date.now() - log.startTime
+                                : null;
+                          const liveDuration =
+                            rawDurationMs != null ? formatMs(rawDurationMs) : '-';
                           if (progress) {
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
