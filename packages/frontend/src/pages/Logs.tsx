@@ -125,6 +125,55 @@ const getOffsetFromSearchParams = (searchParams: URLSearchParams) => {
   return Math.floor(parsedOffset);
 };
 
+interface PaginationControlsProps {
+  position: 'top' | 'bottom';
+  currentPage: number;
+  totalPages: number;
+  offset: number;
+  limit: number;
+  total: number;
+  onOffsetChange: (offset: number) => void;
+}
+
+const PaginationControls = ({
+  position,
+  currentPage,
+  totalPages,
+  offset,
+  limit,
+  total,
+  onOffsetChange,
+}: PaginationControlsProps) => (
+  <div
+    className={clsx(
+      'flex items-center justify-between gap-3 px-3 py-3 sm:justify-end',
+      position === 'top' ? 'border-b border-border' : 'border-t border-border'
+    )}
+  >
+    <span className="text-xs text-text-secondary font-mono">
+      Page {currentPage} of {Math.max(1, totalPages)}
+    </span>
+    <div className="flex gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={offset === 0}
+        onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+      >
+        <ChevronLeft size={16} />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={offset + limit >= total}
+        onClick={() => onOffsetChange(offset + limit)}
+      >
+        <ChevronRight size={16} />
+      </Button>
+    </div>
+  </div>
+);
+
 export const Logs = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -564,37 +613,6 @@ export const Logs = () => {
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
 
-  const renderPaginationControls = (position: 'top' | 'bottom') => (
-    <div
-      className={clsx(
-        'flex items-center justify-between gap-3 px-3 py-3 sm:justify-end',
-        position === 'top' ? 'border-b border-border' : 'border-t border-border'
-      )}
-    >
-      <span className="text-xs text-text-secondary font-mono">
-        Page {currentPage} of {Math.max(1, totalPages)}
-      </span>
-      <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={offset === 0}
-          onClick={() => updateOffset(Math.max(0, offset - limit))}
-        >
-          <ChevronLeft size={16} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={offset + limit >= total}
-          onClick={() => updateOffset(offset + limit)}
-        >
-          <ChevronRight size={16} />
-        </Button>
-      </div>
-    </div>
-  );
-
   const formatDateSafely = (dateStr: string | undefined | null) => {
     if (!dateStr) return { time: '-', date: '-' };
     try {
@@ -731,7 +749,15 @@ export const Logs = () => {
 
       <PageContainer>
         <Card flush>
-          {renderPaginationControls('top')}
+          <PaginationControls
+            position="top"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            offset={offset}
+            limit={limit}
+            total={total}
+            onOffsetChange={updateOffset}
+          />
 
           <div className="space-y-3 p-3 lg:hidden">
             {loading ? (
@@ -1696,7 +1722,15 @@ export const Logs = () => {
             </table>
           </div>
 
-          {renderPaginationControls('bottom')}
+          <PaginationControls
+            position="bottom"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            offset={offset}
+            limit={limit}
+            total={total}
+            onOffsetChange={updateOffset}
+          />
         </Card>
       </PageContainer>
 
