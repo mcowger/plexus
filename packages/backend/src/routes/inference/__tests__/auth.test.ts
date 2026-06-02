@@ -604,3 +604,199 @@ describe('Key Access Policy Exclusion Propagation', () => {
     });
   });
 });
+
+describe('Key IP Allowlist', () => {
+  let fastify: FastifyInstance;
+  let mockUsageStorage: UsageStorageService;
+
+  beforeAll(async () => {
+    fastify = Fastify();
+
+    const mockDispatcher = {
+      dispatch: vi.fn(async () => ({
+        id: '123',
+        model: 'gpt-4',
+        created: 123,
+        content: 'test content',
+        usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 },
+      })),
+    } as unknown as Dispatcher;
+
+    mockUsageStorage = {
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
+    } as unknown as UsageStorageService;
+
+    DebugManager.getInstance().setStorage(mockUsageStorage);
+    SelectorFactory.setUsageStorage(mockUsageStorage);
+
+    setConfigForTesting({
+      providers: {},
+      models: {
+        'gpt-4': {
+          priority: 'selector',
+          targets: [{ provider: 'openai', model: 'gpt-4' }],
+        },
+      },
+      keys: {
+        'ip-restricted': { secret: 'sk-ip-restricted', allowedIps: ['10.0.0.0/8'] },
+        'ip-open': { secret: 'sk-ip-open', allowedIps: ['0.0.0.0/0'] },
+        'ip-none': { secret: 'sk-ip-none' },
+      },
+      failover: {
+        enabled: false,
+        retryableStatusCodes: [429, 500, 502, 503, 504],
+        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+      },
+      quotas: [],
+    });
+
+    await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
+    await fastify.ready();
+  });
+
+  const post = (secret: string, forwardedFor?: string) =>
+    fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: {
+        authorization: `Bearer ${secret}`,
+        'content-type': 'application/json',
+        ...(forwardedFor ? { 'x-forwarded-for': forwardedFor } : {}),
+      },
+      payload: { model: 'gpt-4', messages: [] },
+    });
+
+  it('allows a request from an IP inside the allowlist', async () => {
+    const res = await post('sk-ip-restricted', '10.1.2.3');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects a request from an IP outside the allowlist', async () => {
+    const res = await post('sk-ip-restricted', '8.8.8.8');
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('allows any IP when the allowlist is 0.0.0.0/0', async () => {
+    const res = await post('sk-ip-open', '8.8.8.8');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('allows any IP when no allowlist is configured', async () => {
+    const res = await post('sk-ip-none', '8.8.8.8');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects a restricted key when the request IP is not in range (no forwarding header)', async () => {
+    // Without a proxy header the resolved IP is loopback (or null), neither of
+    // which is in 10.0.0.0/8 — restricted keys are denied (fail-closed).
+    const res = await post('sk-ip-restricted');
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('Trusted Proxy Header Handling', () => {
+  let fastify: FastifyInstance;
+  let mockUsageStorage: UsageStorageService;
+
+  // Reconfigure the global config (the auth hook reads it per request) with a
+  // key locked to 10.0.0.0/8 and a given trusted-proxy list.
+  const configure = (trustedProxies?: string[]) =>
+    setConfigForTesting({
+      providers: {},
+      models: {
+        'gpt-4': {
+          priority: 'selector',
+          targets: [{ provider: 'openai', model: 'gpt-4' }],
+        },
+      },
+      keys: {
+        'ip-restricted': { secret: 'sk-ip-restricted', allowedIps: ['10.0.0.0/8'] },
+      },
+      failover: {
+        enabled: false,
+        retryableStatusCodes: [429, 500, 502, 503, 504],
+        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+      },
+      quotas: [],
+      ...(trustedProxies !== undefined ? { trustedProxies } : {}),
+    });
+
+  beforeAll(async () => {
+    fastify = Fastify();
+
+    const mockDispatcher = {
+      dispatch: vi.fn(async () => ({
+        id: '123',
+        model: 'gpt-4',
+        created: 123,
+        content: 'test content',
+        usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20 },
+      })),
+    } as unknown as Dispatcher;
+
+    mockUsageStorage = {
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+      emitStartedAsync: vi.fn(),
+      emitUpdatedAsync: vi.fn(),
+    } as unknown as UsageStorageService;
+
+    DebugManager.getInstance().setStorage(mockUsageStorage);
+    SelectorFactory.setUsageStorage(mockUsageStorage);
+
+    configure(['0.0.0.0/0']);
+    await registerInferenceRoutes(fastify, mockDispatcher, mockUsageStorage);
+    await fastify.ready();
+  });
+
+  // fastify.inject connects over loopback, so request.ip is 127.0.0.1.
+  const inject = (forwardedFor: string) =>
+    fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: {
+        authorization: 'Bearer sk-ip-restricted',
+        'content-type': 'application/json',
+        'x-forwarded-for': forwardedFor,
+      },
+      payload: { model: 'gpt-4', messages: [] },
+    });
+
+  it('honors X-Forwarded-For when all proxies are trusted (0.0.0.0/0)', async () => {
+    configure(['0.0.0.0/0']);
+    const res = await inject('10.1.2.3');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('ignores a spoofed X-Forwarded-For when no proxies are trusted', async () => {
+    configure([]);
+    // The loopback peer is used instead of the spoofed 10.1.2.3, so the key's
+    // 10.0.0.0/8 allowlist rejects the request.
+    const res = await inject('10.1.2.3');
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('honors X-Forwarded-For when the peer matches a trusted proxy', async () => {
+    configure(['127.0.0.0/8']);
+    const res = await inject('10.1.2.3');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('ignores a spoofed prepended X-Forwarded-For entry (walks right-to-left)', async () => {
+    configure(['127.0.0.0/8']); // loopback peer is a trusted proxy
+    // Attacker prepends an allowed IP; the trusted proxy appended the real client.
+    const res = await inject('10.0.0.5, 8.8.8.8');
+    expect(res.statusCode).toBe(401); // real client 8.8.8.8 is not in 10.0.0.0/8
+  });
+
+  it('resolves the right-most real client behind a trusted proxy', async () => {
+    configure(['127.0.0.0/8']);
+    const res = await inject('8.8.8.8, 10.0.0.5'); // real client 10.0.0.5 is allowed
+    expect(res.statusCode).toBe(200);
+  });
+});

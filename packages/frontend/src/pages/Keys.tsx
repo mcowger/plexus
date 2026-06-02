@@ -127,7 +127,9 @@ export const Keys = () => {
 
   const handleAddNewKey = () => {
     setOriginalKeyName(null);
-    setEditingKey({ ...EMPTY_KEY });
+    // New keys default to an open allowlist (0.0.0.0/0 = allow all). Existing
+    // keys are loaded as-stored, so an empty allowlist stays empty.
+    setEditingKey({ ...EMPTY_KEY, allowedIps: ['0.0.0.0/0'] });
     setIsKeyModalOpen(true);
   };
 
@@ -141,7 +143,7 @@ export const Keys = () => {
       setIsKeyModalOpen(false);
     } catch (e) {
       console.error('Failed to save key', e);
-      toast.error('Failed to save key');
+      toast.error(e instanceof Error ? e.message : 'Failed to save key');
     } finally {
       setIsSavingKey(false);
     }
@@ -969,6 +971,26 @@ export const Keys = () => {
             />
             <p className="text-xs text-text-muted -mt-1">
               Optional allowlist. If set, routing is limited to these provider IDs.
+            </p>
+
+            <TagSelect
+              label="Allowed IPs"
+              placeholder="e.g. 192.168.1.10  10.0.0.0/8  10.1.0.10-20"
+              options={[]}
+              selected={editingKey.allowedIps || []}
+              allowCustom
+              splitOnSpace
+              onChange={(allowedIps) =>
+                setEditingKey({
+                  ...editingKey,
+                  allowedIps: allowedIps.length > 0 ? allowedIps : undefined,
+                })
+              }
+            />
+            <p className="text-xs text-text-muted -mt-1">
+              Optional allowlist. Type entries separated by spaces. Empty or <code>0.0.0.0/0</code>{' '}
+              means allow all. Accepts IPv4/IPv6, CIDR (e.g. <code>10.0.0.0/8</code>), and ranges
+              (e.g. <code>10.1.0.10-20</code>).
             </p>
 
             <div className="flex flex-col gap-2">

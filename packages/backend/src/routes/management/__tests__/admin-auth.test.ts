@@ -182,6 +182,67 @@ describe('GET /v0/management/auth/verify', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Suite: Limited management auth enforces IP allowlists
+// ---------------------------------------------------------------------------
+
+describe('Limited management key IP allowlist', () => {
+  let fastify: FastifyInstance;
+
+  beforeEach(async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
+    setConfigForTesting({
+      ...BASE_CONFIG,
+      trustedProxies: ['127.0.0.0/8'],
+      keys: {
+        'ip-limited-key': {
+          secret: 'sk-ip-limited',
+          comment: 'IP limited key',
+          allowedIps: ['10.0.0.0/8'],
+        },
+      },
+    });
+    fastify = Fastify();
+    const { mockUsageStorage, mockDispatcher, mockProbeService } = makeMockDeps();
+    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher, mockProbeService);
+    await fastify.ready();
+  });
+
+  afterEach(async () => {
+    await closeFastify(fastify);
+  });
+
+  it('allows a limited management key from an allowed forwarded IP', async () => {
+    const res = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/auth/verify',
+      headers: {
+        'x-admin-key': 'sk-ip-limited',
+        'x-forwarded-for': '10.1.2.3',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { ok: boolean; role: string; keyName: string };
+    expect(body.ok).toBe(true);
+    expect(body.role).toBe('limited');
+    expect(body.keyName).toBe('ip-limited-key');
+  });
+
+  it('rejects a limited management key from a disallowed forwarded IP', async () => {
+    const res = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/auth/verify',
+      headers: {
+        'x-admin-key': 'sk-ip-limited',
+        'x-forwarded-for': '8.8.8.8',
+      },
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Suite: Protected management routes enforce admin key
 // ---------------------------------------------------------------------------
 

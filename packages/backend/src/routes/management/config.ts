@@ -7,6 +7,7 @@ import {
   McpServerConfigSchema,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
+import { isValidIpRule } from '../../utils/ip-match';
 import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
@@ -393,6 +394,46 @@ export async function registerConfigRoutes(
       return reply.send(updated);
     } catch (e: any) {
       logger.error('Failed to patch failover config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Trusted Proxies ──────────────────────────────────────────────
+  fastify.get('/v0/management/config/trusted-proxies', async (_request, reply) => {
+    try {
+      const trustedProxies = await configService.getRepository().getTrustedProxies();
+      return reply.send({ trustedProxies });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/trusted-proxies', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    const value = (body as { trustedProxies?: unknown }).trustedProxies;
+    if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+      return reply.code(400).send({ error: 'trustedProxies must be an array of strings' });
+    }
+
+    const normalized = (value as string[]).map((v) => v.trim()).filter(Boolean);
+    const invalid = normalized.find((entry) => !isValidIpRule(entry));
+    if (invalid) {
+      return reply.code(400).send({
+        error: `Invalid IP rule: ${invalid}. Use IPv4/IPv6, CIDR (a.b.c.d/n, ::/n), or a range (a.b.c.d-N or addr-addr).`,
+      });
+    }
+
+    try {
+      await configService.setSetting('trustedProxies', normalized);
+      const trustedProxies = await configService.getRepository().getTrustedProxies();
+      logger.debug('Trusted proxies updated via API');
+      return reply.send({ trustedProxies });
+    } catch (e: any) {
+      logger.error('Failed to patch trusted-proxies config', e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

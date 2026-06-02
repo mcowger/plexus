@@ -11,6 +11,7 @@ export const apiKeys = pgTable('api_keys', {
   allowedProviders: text('allowed_providers'),
   excludedModels: text('excluded_models'),
   excludedProviders: text('excluded_providers'),
+  allowedIps: text('allowed_ips'),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

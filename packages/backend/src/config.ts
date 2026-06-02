@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
+import { isValidIpRule } from './utils/ip-match';
 import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
 import type { ModelArchitecture } from '@plexus/shared';
 
@@ -802,6 +803,14 @@ export const KeyConfigSchema = z.object({
   allowedProviders: z.array(z.string().min(1)).optional(),
   excludedModels: z.array(z.string().min(1)).optional(),
   excludedProviders: z.array(z.string().min(1)).optional(),
+  allowedIps: z
+    .array(
+      z.string().min(1).refine(isValidIpRule, {
+        message:
+          'Invalid IP rule. Use IPv4/IPv6, CIDR (a.b.c.d/n, ::/n), or a range (a.b.c.d-N or addr-addr).',
+      })
+    )
+    .optional(),
 });
 
 const QuotaConfigSchema = z.object({
@@ -882,6 +891,14 @@ export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   stall?: StallConfigType;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
+  // Immediate-peer IPs/CIDRs whose forwarding headers are trusted when
+  // resolving the client IP. Semantics:
+  //  - undefined: legacy trust-all before DB-backed config is loaded
+  //  - ['0.0.0.0/0', '::/0']: explicit trust-all database default
+  //  - []: trust no proxies, use peer IP only
+  //  - specific CIDRs: trust only matching peers
+  // See getTrustedClientIp for enforcement.
+  trustedProxies?: string[];
 };
 export type DatabaseConfig = {
   connectionString: string;

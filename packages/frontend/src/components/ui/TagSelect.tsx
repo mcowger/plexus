@@ -15,6 +15,13 @@ interface TagSelectProps {
    * new tag, and the dropdown shows a "Create '<search>'" affordance.
    */
   allowCustom?: boolean;
+  /**
+   * When true (and `allowCustom` is set), a space also commits the current
+   * text as a tag — handy for token-style inputs (e.g. IP allowlists) where
+   * values never contain spaces. Enter and comma keep working. Leave off for
+   * dropdowns whose option labels may legitimately contain spaces.
+   */
+  splitOnSpace?: boolean;
 }
 
 export const TagSelect: React.FC<TagSelectProps> = ({
@@ -25,6 +32,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
   onChange,
   className,
   allowCustom = false,
+  splitOnSpace = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -106,7 +114,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!allowCustom) return;
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ',' || (splitOnSpace && e.key === ' ')) {
       e.preventDefault();
       commitCustom(search);
     } else if (e.key === 'Backspace' && search === '' && selected.length > 0) {
@@ -117,11 +125,13 @@ export const TagSelect: React.FC<TagSelectProps> = ({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.value;
-    // Commit on comma even inside onChange (handles paste of "a, b, c"). Batch
-    // all new tags into a single onChange so later calls don't overwrite
-    // earlier ones via the stale `selected` snapshot.
-    if (allowCustom && next.includes(',')) {
-      const parts = next.split(',');
+    // Commit on separator even inside onChange (handles paste of "a, b, c" and,
+    // when splitOnSpace is set, whitespace-separated input). Batch all new tags
+    // into a single onChange so later calls don't overwrite earlier ones via the
+    // stale `selected` snapshot.
+    const splitRe = splitOnSpace ? /[,\s]/ : /,/;
+    if (allowCustom && splitRe.test(next)) {
+      const parts = next.split(splitRe);
       const tail = parts.pop() ?? '';
       addCustomTags(parts);
       setSearch(tail);

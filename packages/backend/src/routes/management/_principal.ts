@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
 import { logger } from '../../utils/logger';
 import { getConfig } from '../../config';
+import { isRequestIpAllowed } from '../../utils/auth';
 
 /**
  * Sentinel error thrown by authenticate/requireAdmin so that Fastify's error
@@ -100,7 +101,14 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
       excludedModels?: string[];
       quota?: string | null;
       comment?: string | null;
+      allowedIps?: string[];
     };
+    // Enforce the key's IP allowlist for the management API too, so a wrong-IP
+    // key can neither call inference nor administer.
+    if (!isRequestIpAllowed(request, cfg.allowedIps, config.trustedProxies)) {
+      logger.silly(`Rejected limited key ${matched.name} - client IP not in allowlist`);
+      return null;
+    }
     return {
       role: 'limited',
       keyName: matched.name,
