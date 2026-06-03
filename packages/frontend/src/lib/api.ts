@@ -231,6 +231,10 @@ export interface Provider {
     intervalMinutes: number;
     options?: Record<string, unknown>;
   };
+  modelAutosync?: {
+    enabled: boolean;
+    intervalMinutes: number;
+  };
   // GPU Profile settings for inference energy calculation
   gpu_profile?: string;
   gpu_ram_gb?: number;
@@ -1690,6 +1694,12 @@ export const api = {
               : {},
           models: normalizedModels,
           quotaChecker: normalizeProviderQuotaChecker(val.quota_checker),
+          modelAutosync: val.model_autosync
+            ? {
+                enabled: val.model_autosync.enabled === true,
+                intervalMinutes: Math.max(1, val.model_autosync.intervalMinutes || 60),
+              }
+            : { enabled: false, intervalMinutes: 60 },
           adapter: val.adapter ? (Array.isArray(val.adapter) ? val.adapter : [val.adapter]) : [],
           timeoutMs: val.timeoutMs ?? undefined,
           maxConcurrency: val.maxConcurrency ?? undefined,
@@ -1731,6 +1741,10 @@ export const api = {
             options: provider.quotaChecker.options,
           }
         : undefined,
+      model_autosync: {
+        enabled: provider.modelAutosync?.enabled === true,
+        intervalMinutes: Math.max(1, provider.modelAutosync?.intervalMinutes || 60),
+      },
       // GPU Profile settings — always send resolved numeric fields so backend
       // never needs to resolve profile names. gpu_profile is a display hint only.
       ...(provider.gpu_profile ? { gpu_profile: provider.gpu_profile } : {}),

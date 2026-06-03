@@ -1,0 +1,2 @@
+ALTER TABLE "providers" ADD COLUMN "model_autosync_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "providers" ADD COLUMN "model_autosync_interval" integer DEFAULT 60 NOT NULL;

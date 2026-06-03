@@ -545,6 +545,11 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+const ModelAutosyncSchema = z.object({
+  enabled: z.boolean().default(false),
+  intervalMinutes: z.number().int().min(1).default(60),
+});
+
 export const ProviderConfigSchema = z
   .object({
     display_name: z.string().optional(),
@@ -569,6 +574,7 @@ export const ProviderConfigSchema = z
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
+    model_autosync: ModelAutosyncSchema.optional(),
     // GPU Profile settings — gpu_profile is a display hint (e.g. 'H100', 'custom').
     // The 4 numeric fields are the source of truth; the frontend resolves named
     // profiles to concrete values before saving. The backend never resolves.

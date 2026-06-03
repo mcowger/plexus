@@ -73,6 +73,57 @@ export function ProviderAdvancedEditor({
           className="px-3 py-2 border-t border-border-glass"
           style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
         >
+          {/* Model Autosync */}
+          <div className="border border-border-glass rounded-md overflow-hidden">
+            <div className="p-2 px-3 flex flex-wrap items-center gap-3 bg-bg-hover">
+              <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-[190px]">
+                <input
+                  type="checkbox"
+                  checked={editingProvider.modelAutosync?.enabled === true}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setEditingProvider({
+                      ...editingProvider,
+                      modelAutosync: {
+                        enabled,
+                        intervalMinutes: Math.max(
+                          1,
+                          editingProvider.modelAutosync?.intervalMinutes || 60
+                        ),
+                      },
+                    });
+                  }}
+                />
+                <span className="font-body text-[12px] font-medium text-text-secondary">
+                  Enable Model Autosync
+                </span>
+              </label>
+              <div className="flex items-center gap-2">
+                <DebouncedInput
+                  type="number"
+                  min={1}
+                  step={1}
+                  disabled={editingProvider.modelAutosync?.enabled !== true}
+                  value={String(editingProvider.modelAutosync?.intervalMinutes || 60)}
+                  onChange={(val: string) => {
+                    const intervalMinutes = Math.max(1, parseInt(val, 10) || 60);
+                    setEditingProvider({
+                      ...editingProvider,
+                      modelAutosync: {
+                        enabled: editingProvider.modelAutosync?.enabled === true,
+                        intervalMinutes,
+                      },
+                    });
+                  }}
+                  style={{ width: '76px' }}
+                />
+                <span className="font-body text-[11px] text-text-secondary whitespace-nowrap">
+                  Sync Interval Minutes
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Provider Adapters */}
           <div className="border border-border-glass rounded-md overflow-hidden">
             <div

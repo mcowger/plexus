@@ -40,6 +40,8 @@ export const providers = pgTable(
     quotaCheckerEnabled: boolean('quota_checker_enabled').notNull().default(true),
     quotaCheckerInterval: integer('quota_checker_interval').notNull().default(30),
     quotaCheckerOptions: text('quota_checker_options'), // JSON or encrypted string
+    modelAutosyncEnabled: boolean('model_autosync_enabled').notNull().default(false),
+    modelAutosyncInterval: integer('model_autosync_interval').notNull().default(60),
     // GPU Profile settings — display hint + resolved numeric params
     // gpu_profile is kept as a display hint; the 4 numeric fields are the source of truth.
     gpuProfile: text('gpu_profile'), // GPU profile name (e.g. 'H100', 'custom') — display hint only

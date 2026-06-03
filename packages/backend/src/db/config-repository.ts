@@ -341,6 +341,8 @@ export class ConfigRepository {
       quotaCheckerOptions: config.quota_checker?.options
         ? encryptJsonField(config.quota_checker.options)
         : null,
+      modelAutosyncEnabled: fromBool(config.model_autosync?.enabled === true),
+      modelAutosyncInterval: Math.max(1, config.model_autosync?.intervalMinutes ?? 60),
       // GPU Profile settings for inference energy calculation
       gpuProfile: config.gpu_profile ?? null,
       gpuRamGb: config.gpu_ram_gb ?? null,
@@ -472,6 +474,52 @@ export class ConfigRepository {
     }));
   }
 
+  async addMissingProviderModels(providerSlug: string, modelNames: string[]): Promise<number> {
+    const schema = this.schema();
+    const normalizedNames = Array.from(
+      new Set(modelNames.map((name) => name.trim()).filter((name) => name.length > 0))
+    );
+    if (normalizedNames.length === 0) return 0;
+
+    const provider = await this.db()
+      .select()
+      .from(schema.providers)
+      .where(eq(schema.providers.slug, providerSlug))
+      .limit(1);
+
+    if (provider.length === 0) return 0;
+
+    const providerId = provider[0]!.id;
+    const existing = await this.db()
+      .select()
+      .from(schema.providerModels)
+      .where(eq(schema.providerModels.providerId, providerId))
+      .orderBy(schema.providerModels.sortOrder);
+
+    const existingNames = new Set(existing.map((row: any) => row.modelName));
+    const missingNames = normalizedNames.filter((name) => !existingNames.has(name));
+    if (missingNames.length === 0) return 0;
+
+    const maxSortOrder = existing.reduce(
+      (max: number, row: any) => Math.max(max, row.sortOrder ?? -1),
+      -1
+    );
+
+    await this.db()
+      .insert(schema.providerModels)
+      .values(
+        missingNames.map((modelName, idx) => ({
+          providerId,
+          modelName,
+          pricingConfig: toJson({ source: 'simple', input: 0, output: 0 }),
+          accessVia: toJson([]),
+          sortOrder: maxSortOrder + idx + 1,
+        }))
+      );
+
+    return missingNames.length;
+  }
+
   private rowToProviderConfig(row: any, modelRows: any[], oauthAccountId?: string): ProviderConfig {
     const apiBaseUrl = parseJson<string | Record<string, string>>(row.apiBaseUrl);
 
@@ -531,6 +579,10 @@ export class ConfigRepository {
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
       ...(quota_checker ? { quota_checker } : {}),
+      model_autosync: {
+        enabled: toBool(row.modelAutosyncEnabled),
+        intervalMinutes: Math.max(1, row.modelAutosyncInterval ?? 60),
+      },
       ...(() => {
         const adapterVal = parseJson(row.adapter);
         const normalized = normalizeAdapterEntries(adapterVal);

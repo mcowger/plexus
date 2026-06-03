@@ -15,6 +15,7 @@ import type {
 } from '../config';
 
 import { QuotaScheduler } from './quota/quota-scheduler';
+import { ModelAutosyncScheduler } from './model-autosync-scheduler';
 
 /**
  * ConfigService — In-memory cache + DB sync.
@@ -415,6 +416,17 @@ export class ConfigService {
       scheduler.reload(quotas).catch((err) => {
         logger.warn(`Failed to reload QuotaScheduler after config change: ${err}`);
       });
+    }
+
+    const modelAutosyncScheduler = ModelAutosyncScheduler.getInstance();
+    const onModelsChanged = () => {
+      this.pendingWrites++;
+      this.rebuildCache();
+    };
+    if (modelAutosyncScheduler.isInitialized()) {
+      modelAutosyncScheduler.reload(providers, onModelsChanged);
+    } else {
+      modelAutosyncScheduler.initialize(providers, onModelsChanged);
     }
   }
 

@@ -183,6 +183,21 @@ properties:
       Optional provider-level quota checker configuration. References a
       quota checker type from `GET /v0/management/quota-checker-types`.
     additionalProperties: true
+  model_autosync:
+    type: object
+    description: >
+      Optional provider-level model discovery sync. When enabled, Plexus
+      periodically fetches the provider's known model list and adds any missing
+      models to this provider's `models` configuration without removing or
+      overwriting existing model entries.
+    properties:
+      enabled:
+        type: boolean
+        default: false
+      intervalMinutes:
+        type: integer
+        minimum: 1
+        default: 60
   gpu_profile:
     type: string
     description: >

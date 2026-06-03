@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { OAuthLoginSessionManager } from '../../services/oauth-login-session';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 import type { OAuthProvider, OAuthProviderId } from '@earendil-works/pi-ai/oauth';
-import { getModels } from '@earendil-works/pi-ai';
+import { getOAuthProviderModels } from '../../services/provider-model-discovery';
 
 const startSessionSchema = z.object({
   providerId: z.string().min(1),
@@ -173,18 +173,7 @@ export async function registerOAuthRoutes(
     }
 
     try {
-      const models = getModels(parsed.data.providerId as any);
-      const modelList = models.map((model) => ({
-        id: model.id,
-        name: model.name,
-        context_length: model.contextWindow,
-        pricing: model.cost
-          ? {
-              prompt: model.cost.input.toString(),
-              completion: model.cost.output.toString(),
-            }
-          : undefined,
-      }));
+      const modelList = getOAuthProviderModels(parsed.data.providerId);
       return reply.send({ data: modelList });
     } catch (error) {
       return reply

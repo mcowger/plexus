@@ -337,6 +337,13 @@
       "when": 1780438860221,
       "tag": "0047_auto_darkspadez_main",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1780504406426,
+      "tag": "0048_auto_provider_model_autosync_advanced_option",
+      "breakpoints": true
     }
   ]
 }
