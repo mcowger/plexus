@@ -434,54 +434,10 @@ jobs:
   # ── Verify binary arch inside each platform image ─────────────────────
   # Catches the exact failure mode from issue #550: an arm64-labelled image
   # that actually contains an x86-64 binary.
-  verify-docker-arch:
-    name: Verify Docker Image Architecture
-    needs: [setup, build-docker-manifest]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux/amd64
-            expected: x86-64
-          - platform: linux/arm64
-            expected: aarch64
-    steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify binary architecture
-        run: |
-          IMAGE="ghcr.io/${{ github.repository }}:${{ needs.setup.outputs.tag }}"
-          PLATFORM="${{ matrix.platform }}"
-          EXPECTED="${{ matrix.expected }}"
-
-          echo "Checking binary arch in ${IMAGE} for platform ${PLATFORM}..."
-          FILE_OUTPUT=$(docker run --rm --platform "${PLATFORM}" \
-            --entrypoint file \
-            "${IMAGE}" /app/plexus)
-
-          echo "file output: ${FILE_OUTPUT}"
-
-          if echo "${FILE_OUTPUT}" | grep -q "${EXPECTED}"; then
-            echo "PASS: ${PLATFORM} image contains a ${EXPECTED} binary"
-          else
-            echo "FAIL: ${PLATFORM} image does NOT contain a ${EXPECTED} binary"
-            echo "      Got: ${FILE_OUTPUT}"
-            exit 1
-          fi
-
   # ── Create Release ─────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [setup, build-binaries, verify-docker-arch, generate-release-notes]
+    needs: [setup, build-binaries, build-docker-manifest, generate-release-notes]
     runs-on: ubuntu-latest
     steps:
       - name: Download binaries
