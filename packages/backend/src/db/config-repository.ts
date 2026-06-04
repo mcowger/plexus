@@ -325,6 +325,7 @@ export class ConfigRepository {
       apiKey: encryptField(config.api_key ?? null),
       oauthProviderType: config.oauth_provider ?? null,
       oauthCredentialId,
+      piAiProvider: config.pi_ai_provider ?? null,
       enabled: fromBool(config.enabled !== false),
       disableCooldown: fromBool(config.disable_cooldown === true),
       stallCooldown: fromBool(config.stall_cooldown === true),
@@ -418,6 +419,7 @@ export class ConfigRepository {
               ? toJson(cfg.adapter)
               : null,
           maxConcurrency: cfg.maxConcurrency ?? null,
+          piAiModelId: cfg.pi_ai_model_id ?? null,
           sortOrder: idx,
         }));
         if (modelRows.length > 0) {
@@ -537,6 +539,7 @@ export class ConfigRepository {
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
             ...(m.adapter ? { adapter: normalizeAdapterEntries(parseJson(m.adapter)) } : {}),
             ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
+            ...(m.piAiModelId ? { pi_ai_model_id: m.piAiModelId } : {}),
           };
         }
       } else {
@@ -565,6 +568,7 @@ export class ConfigRepository {
       ...(decryptedApiKey ? { api_key: decryptedApiKey } : {}),
       ...(row.oauthProviderType ? { oauth_provider: row.oauthProviderType } : {}),
       ...(oauthAccountId ? { oauth_account: oauthAccountId } : {}),
+      ...(row.piAiProvider ? { pi_ai_provider: row.piAiProvider } : {}),
       enabled: toBool(row.enabled),
       disable_cooldown: toBool(row.disableCooldown),
       stall_cooldown: toBool(row.stallCooldown),

@@ -781,6 +781,29 @@ export function ProviderAdvancedEditor({
                 </div>
               </div>
             </div>
+
+            {/* Beta path — pi-ai provider hint */}
+            <div className="flex flex-col gap-0.5">
+              <label className="font-body text-[11px] font-medium text-text-secondary">
+                pi-ai Provider
+                <span className="font-normal text-[10px] text-text-muted ml-1">
+                  beta inference path
+                </span>
+              </label>
+              <input
+                className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                type="text"
+                placeholder="e.g. openai, anthropic"
+                value={editingProvider.pi_ai_provider || ''}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  setEditingProvider({
+                    ...editingProvider,
+                    pi_ai_provider: val || undefined,
+                  });
+                }}
+              />
+            </div>
           </div>
 
           {/* Custom GPU fields — only when gpu_profile === 'custom' */}

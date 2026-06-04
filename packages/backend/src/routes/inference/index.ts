@@ -13,6 +13,7 @@ import { registerTranscriptionsRoute } from './transcriptions';
 import { registerSpeechRoute } from './speech';
 import { registerImagesRoute } from './images';
 import { registerResponsesRoute } from './responses';
+import { registerBetaRoutes } from '../../beta';
 
 export async function registerInferenceRoutes(
   fastify: FastifyInstance,
@@ -39,5 +40,6 @@ export async function registerInferenceRoutes(
     await registerTranscriptionsRoute(protectedRoutes, dispatcher, usageStorage);
     await registerSpeechRoute(protectedRoutes, dispatcher, usageStorage);
     await registerImagesRoute(protectedRoutes, dispatcher, usageStorage);
+    await registerBetaRoutes(protectedRoutes, usageStorage);
   });
 }

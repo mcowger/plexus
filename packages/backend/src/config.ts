@@ -182,6 +182,9 @@ const ModelProviderConfigSchema = z.object({
   extraBody: z.record(z.string(), z.any()).optional(),
   adapter: AdapterConfigSchema,
   maxConcurrency: z.number().int().positive().nullable().optional(),
+  // pi-ai model id for the beta inference path. Paired with the provider-level
+  // `pi_ai_provider` to resolve a pi-ai model via getModel(provider, model_id).
+  pi_ai_model_id: z.string().min(1).optional(),
 });
 
 const OAuthProviderSchema = z.enum([
@@ -562,6 +565,10 @@ export const ProviderConfigSchema = z
     api_key: z.string().optional(),
     oauth_provider: OAuthProviderSchema.optional(),
     oauth_account: z.string().min(1).optional(),
+    // pi-ai provider name (KnownProvider, e.g. "openai", "anthropic") for the beta
+    // inference path. Paired with each model's `pi_ai_model_id` to resolve a pi-ai
+    // model via getModel(pi_ai_provider, pi_ai_model_id).
+    pi_ai_provider: z.string().min(1).optional(),
     enabled: z.boolean().default(true).optional(),
     disable_cooldown: z.boolean().optional().default(false),
     stall_cooldown: z.boolean().optional().default(false),

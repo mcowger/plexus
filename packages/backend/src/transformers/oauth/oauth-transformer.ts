@@ -41,7 +41,7 @@ import { CodexVersionService } from '../../services/codex-version-service';
  *
  * `reasoning` is always included for streamSimple* compatibility.
  */
-function buildThinkingOptions(
+export function buildThinkingOptions(
   modelApi: string | undefined,
   modelId: string | undefined,
   effort: string,

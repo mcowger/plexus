@@ -26,6 +26,7 @@ export const providers = pgTable(
     oauthCredentialId: integer('oauth_credential_id').references(() => oauthCredentials.id, {
       onDelete: 'set null',
     }),
+    piAiProvider: text('pi_ai_provider'), // pi-ai provider name for the beta inference path (NULL = not configured)
     enabled: boolean('enabled').notNull().default(true),
     disableCooldown: boolean('disable_cooldown').notNull().default(false),
     stallCooldown: boolean('stall_cooldown').notNull().default(false),

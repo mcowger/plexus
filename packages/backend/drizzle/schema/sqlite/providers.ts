@@ -13,6 +13,7 @@ export const providers = sqliteTable(
     oauthCredentialId: integer('oauth_credential_id').references(() => oauthCredentials.id, {
       onDelete: 'set null',
     }),
+    piAiProvider: text('pi_ai_provider'), // pi-ai provider name for the beta inference path (NULL = not configured)
     enabled: integer('enabled').notNull().default(1),
     disableCooldown: integer('disable_cooldown').notNull().default(0),
     stallCooldown: integer('stall_cooldown').notNull().default(0),

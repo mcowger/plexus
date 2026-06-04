@@ -2068,6 +2068,29 @@ export function ProviderModelsEditor({
                                 provider-wide limit or no limit.
                               </span>
                             </div>
+
+                            {/* pi-ai model id for beta inference path */}
+                            <div className="flex flex-col gap-0.5">
+                              <label className="font-body text-[11px] font-medium text-text-secondary">
+                                pi-ai Model ID
+                                <span className="font-normal text-[10px] text-text-muted ml-1">
+                                  beta inference path
+                                </span>
+                              </label>
+                              <input
+                                className={FIELD_CLS}
+                                type="text"
+                                placeholder="e.g. gpt-4o, claude-opus-4-6-20250514"
+                                value={(mCfg as any).pi_ai_model_id || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  updateModelConfig(mId, { pi_ai_model_id: val || undefined });
+                                }}
+                              />
+                              <span className="font-body text-[11px] text-text-muted italic">
+                                pi-ai model identifier used with getModel() on the beta path.
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>

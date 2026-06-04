@@ -231,7 +231,7 @@ function unifiedMessageToToolResult(msg: UnifiedMessage): ToolResultMessage {
  * arrays). This recursive converter ensures tool parameter schemas match the format
  * that pi-coding-agent uses successfully.
  */
-function jsonSchemaToTypeBox(schema: any): any {
+export function jsonSchemaToTypeBox(schema: any): any {
   if (!schema || typeof schema !== 'object') return Type.Any();
 
   const opts: Record<string, any> = {};

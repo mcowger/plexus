@@ -15,6 +15,7 @@ export const providerModels = sqliteTable(
     extraBody: text('extra_body'), // JSON: Record<string, any>
     adapter: text('adapter'), // JSON: string[] — model-level adapter names
     maxConcurrency: integer('max_concurrency'), // Max concurrent requests for this model (NULL = no limit)
+    piAiModelId: text('pi_ai_model_id'), // pi-ai model id for the beta inference path (NULL = not configured)
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({
