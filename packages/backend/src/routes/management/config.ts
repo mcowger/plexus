@@ -10,6 +10,7 @@ import { ConfigService } from '../../services/config-service';
 import { isValidIpRule } from '../../utils/ip-match';
 import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
+import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
 
@@ -790,10 +791,10 @@ export async function registerConfigRoutes(
   fastify.put('/v0/management/mcp-servers/:serverName', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
 
-    if (!/^[a-z0-9][a-z0-9-_]{1,62}$/.test(serverName)) {
+    if (!validateServerName(serverName)) {
       return reply.code(400).send({
         error:
-          'Invalid server name. Must be a slug (lowercase letters, numbers, hyphens, underscores, 2-63 characters)',
+          'Invalid server name. Must be a non-reserved slug (lowercase letters, numbers, hyphens, underscores, 2-63 characters)',
       });
     }
 

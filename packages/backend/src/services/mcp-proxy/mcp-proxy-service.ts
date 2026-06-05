@@ -18,7 +18,13 @@ const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'set-cookie', 'x-a
 
 const CLIENT_AUTH_HEADERS = new Set(['authorization', 'x-api-key', 'proxy-authorization']);
 
+const RESERVED_SERVER_NAMES = new Set(['plexus']);
+
 export function getMcpServerConfig(serverName: string): McpServerConfig | null {
+  if (RESERVED_SERVER_NAMES.has(serverName)) {
+    return null;
+  }
+
   const config = getConfig();
   const mcpServers = config.mcpServers;
 
@@ -41,7 +47,7 @@ export function getMcpServerConfig(serverName: string): McpServerConfig | null {
 
 export function validateServerName(name: string): boolean {
   const slugRegex = /^[a-z0-9][a-z0-9-_]{1,62}$/;
-  return slugRegex.test(name);
+  return slugRegex.test(name) && !RESERVED_SERVER_NAMES.has(name);
 }
 
 export function filterHopByHopHeaders(

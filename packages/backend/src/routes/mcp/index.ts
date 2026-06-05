@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
 import { getClientIp } from '../../utils/ip';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
+import { registerPlexusMcpRoutes } from './plexus';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 
@@ -58,6 +59,8 @@ export async function registerMcpRoutes(
       token_endpoint_auth_method: 'none',
     });
   });
+
+  await registerPlexusMcpRoutes(fastify);
 
   fastify.register(async (protectedRoutes) => {
     const auth = createAuthHook();
