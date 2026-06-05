@@ -200,6 +200,7 @@ Common patch bodies:
 | Set runtime log level | `PUT` | `/v0/management/logging/level` |
 | Reset runtime log level | `DELETE` | `/v0/management/logging/level` |
 | Module log filters | `GET`, `PUT` | `/v0/management/logging/modules` |
+| Clear module log filters | `DELETE` | `/v0/management/logging/modules` |
 | Reset request/error/debug logs | `DELETE` | `/v0/management/logs/reset` |
 | Stream system logs | `GET` | `/v0/system/logs/stream` |
 
