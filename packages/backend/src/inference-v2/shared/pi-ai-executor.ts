@@ -265,7 +265,13 @@ function nextWithTtfbTimeout<T>(
 ): Promise<IteratorResult<T>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      onTimeout();
+      // Wrap in try/catch so a throwing callback cannot escape the setTimeout
+      // handler as an unhandled exception before reject() is called.
+      try {
+        onTimeout();
+      } catch {
+        // onTimeout must not throw; swallow and fall through to reject below.
+      }
       const stallErr = new Error(`Stream stalled: no content event within ${ttfbMs}ms`) as any;
       stallErr.isStallError = true;
       stallErr.name = 'StallError';
@@ -753,18 +759,12 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
       // ── TTFB stall detection ───────────────────────────────────────────
       let nextResult: IteratorResult<AssistantMessageEvent>;
       if (stallTtfbMs != null && !sawContentEvent) {
-        const abortCtrl = new AbortController();
         nextResult = await nextWithTtfbTimeout(
           iterator.next() as Promise<IteratorResult<AssistantMessageEvent>>,
           stallTtfbMs,
           () => {
-            // Abort the upstream via the attempt signal
-            abortCtrl.abort();
-            const stallErr = new Error(
-              `Stream stalled: no content event within ${stallTtfbMs}ms`
-            ) as any;
-            stallErr.isStallError = true;
-            throw stallErr;
+            // Side-effects only — do not throw here.
+            // nextWithTtfbTimeout creates and rejects with the StallError itself.
           }
         );
       } else {

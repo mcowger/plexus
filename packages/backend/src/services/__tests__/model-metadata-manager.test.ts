@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, afterEach } from 'vitest';
+import { describe, expect, test, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import { ModelMetadataManager, mergeOverrides } from '../model-metadata-manager';
 import type { NormalizedModelMetadata } from '../model-metadata-manager';
@@ -11,7 +11,7 @@ const modelsDevFixture = path.join(FIXTURES, 'models-dev-sample.json');
 const catwalkFixture = path.join(FIXTURES, 'catwalk-sample.json');
 
 // Reset the singleton between test suites so each describe block gets a fresh instance
-afterEach(() => {
+afterAll(() => {
   ModelMetadataManager.resetForTesting();
 });
 
@@ -341,7 +341,11 @@ describe('ModelMetadataManager – singleton', () => {
   test('resetForTesting creates a fresh instance', async () => {
     ModelMetadataManager.resetForTesting();
     const mgr = ModelMetadataManager.getInstance();
-    await mgr.loadAll({ openrouter: openrouterFixture });
+    await mgr.loadAll({
+      openrouter: openrouterFixture,
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
     expect(mgr.isInitialized('openrouter')).toBe(true);
 
     ModelMetadataManager.resetForTesting();
