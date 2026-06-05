@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { getConfig } from '../../config';
+import { ConfigService } from '../../services/config-service';
 import { logger } from '../../utils/logger';
 
 /**
@@ -10,6 +10,8 @@ export async function registerQuotaEnforcementRoutes(
   fastify: FastifyInstance,
   quotaEnforcer: QuotaEnforcer
 ) {
+  const configService = ConfigService.getInstance();
+
   /**
    * POST /v0/management/quota/clear
    * Reset quota usage for a key.
@@ -29,6 +31,7 @@ export async function registerQuotaEnforcementRoutes(
           });
         }
 
+        await configService.flush();
         await quotaEnforcer.clearQuota(body.key);
 
         return reply.send({
@@ -67,7 +70,8 @@ export async function registerQuotaEnforcementRoutes(
           });
         }
 
-        const config = getConfig();
+        await configService.flush();
+        const config = configService.getConfig();
         const keyConfig = config.keys?.[key];
 
         // Key not found
