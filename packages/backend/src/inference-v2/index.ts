@@ -7,8 +7,8 @@
  *   POST /beta/v1/chat/completions              — Stage 1 (OpenAI chat-completions via pi-ai)
  *   POST /beta/v1/messages                      — Stage 2 (Anthropic messages via pi-ai)
  *   POST /beta/v1/responses                     — Stage 3 (OpenAI Responses API via pi-ai)
- *   POST /v1beta/models/:model/generateContent  — Stage 4 (Gemini via pi-ai, non-streaming)
- *   POST /v1beta/models/:model/streamGenerateContent — Stage 4 (Gemini via pi-ai, streaming)
+ *   POST /beta/v1beta/models/:model:generateContent  — Stage 4 (Gemini via pi-ai, non-streaming)
+ *   POST /beta/v1beta/models/:model:streamGenerateContent — Stage 4 (Gemini via pi-ai, streaming)
  *
  * Each handler:
  *  1. Sets x-request-id.
@@ -741,12 +741,13 @@ export async function registerInferenceV2Routes(
     handleBetaResponses(request, reply, deps)
   );
 
-  fastify.post('/v1beta/models/:model/generateContent', async (request: FastifyRequest, reply) =>
-    handleBetaGeminiRequest(request, reply, false, deps)
-  );
-
-  fastify.post(
-    '/v1beta/models/:model/streamGenerateContent',
-    async (request: FastifyRequest, reply) => handleBetaGeminiRequest(request, reply, true, deps)
-  );
+  fastify.post('/beta/v1beta/models/:modelWithAction', async (request: FastifyRequest, reply) => {
+    const modelWithAction = (request.params as any).modelWithAction as string;
+    return handleBetaGeminiRequest(
+      request,
+      reply,
+      modelWithAction.includes('streamGenerateContent'),
+      deps
+    );
+  });
 }

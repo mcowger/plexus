@@ -147,6 +147,37 @@ describe('beta key stable route routing', () => {
     await fastify.close();
   });
 
+  it.each([
+    {
+      name: 'gemini generateContent',
+      url: '/beta/v1beta/models/test-model:generateContent',
+      payload: { contents: [{ role: 'user', parts: [{ text: 'hi' }] }] },
+    },
+    {
+      name: 'gemini streamGenerateContent',
+      url: '/beta/v1beta/models/test-model:streamGenerateContent',
+      payload: { contents: [{ role: 'user', parts: [{ text: 'hi' }] }] },
+    },
+  ])('routes explicit beta $name path through pi-ai beta handler', async (testCase) => {
+    const { fastify, dispatch } = await createApp();
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: testCase.url,
+      headers: { authorization: 'Bearer sk-stable', 'content-type': 'application/json' },
+      payload: testCase.payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(runPiAiExecutor).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(runPiAiExecutor).mock.calls[0]![0]).toMatchObject({
+      incomingApiType: 'gemini',
+      modelAlias: 'test-model',
+    });
+    await fastify.close();
+  });
+
   it('saves terminal error usage when beta executor fails before completion', async () => {
     const error = new Error('No beta-compatible candidate found') as Error & {
       routingContext?: Record<string, unknown>;
