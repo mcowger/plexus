@@ -193,6 +193,18 @@ describe('Plexus management MCP routes', () => {
     );
   });
 
+  test('ignores unsupported x-forwarded-proto values', async () => {
+    const response = await postPlexusMcp(
+      { method: 'tools/list', id: 1 },
+      { ...adminHeaders(), 'x-forwarded-proto': 'javascript' }
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.tools).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'plexus_config' })])
+    );
+  });
+
   test('lists prompt resources and returns the management guide prompt', async () => {
     const listResponse = await postPlexusMcp({ method: 'prompts/list', id: 1 }, adminHeaders());
     const listBody = parseJsonRpcResponse(listResponse);

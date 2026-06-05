@@ -123,6 +123,9 @@ class McpToolError extends Error {
   }
 }
 
+const plexusMcpServer = createPlexusMcpServer();
+let transportQueue = Promise.resolve();
+
 export async function registerPlexusMcpRoutes(fastify: FastifyInstance) {
   fastify.register(async (plexusMcp) => {
     plexusMcp.setErrorHandler(async (error, _request, reply) => {
@@ -142,23 +145,35 @@ export async function registerPlexusMcpRoutes(fastify: FastifyInstance) {
 }
 
 async function handlePlexusMcpRequest(request: FastifyRequest, reply: FastifyReply) {
-  const server = createPlexusMcpServer();
+  const result = transportQueue.then(() => handlePlexusMcpRequestSerialized(request, reply));
+  transportQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
+
+async function handlePlexusMcpRequestSerialized(request: FastifyRequest, reply: FastifyReply) {
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
     sessionIdGenerator: undefined,
   });
 
-  await server.connect(transport);
+  await plexusMcpServer.connect(transport);
 
-  const webRequest = toWebRequest(request);
-  const webResponse = await transport.handleRequest(webRequest, { parsedBody: request.body });
+  try {
+    const webRequest = toWebRequest(request);
+    const webResponse = await transport.handleRequest(webRequest, { parsedBody: request.body });
 
-  for (const [key, value] of webResponse.headers.entries()) {
-    reply.header(key, value);
+    for (const [key, value] of webResponse.headers.entries()) {
+      reply.header(key, value);
+    }
+
+    const body = await webResponse.text();
+    return reply.code(webResponse.status).send(body || undefined);
+  } finally {
+    await plexusMcpServer.close();
   }
-
-  const body = await webResponse.text();
-  return reply.code(webResponse.status).send(body || undefined);
 }
 
 function createPlexusMcpServer() {
@@ -562,7 +577,9 @@ function toWebRequest(request: FastifyRequest) {
     }
   }
 
-  const protocol = (request.headers['x-forwarded-proto'] as string | undefined) ?? 'http';
+  const rawProtoHeader = request.headers['x-forwarded-proto'];
+  const rawProto = Array.isArray(rawProtoHeader) ? rawProtoHeader[0] : rawProtoHeader;
+  const protocol = rawProto === 'https' ? 'https' : 'http';
   const host = request.headers.host ?? 'localhost';
   const url = `${protocol}://${host}${request.url}`;
 
