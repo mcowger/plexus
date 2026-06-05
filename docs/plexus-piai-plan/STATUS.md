@@ -1,7 +1,7 @@
 # pi-ai native inference path — implementation status
 
 Branch: `chore/plexus-planning`
-Last updated: 2026-06-05
+Last updated: 2026-06-05 (frontend verification complete)
 
 ---
 
@@ -16,6 +16,8 @@ Last updated: 2026-06-05
 | M5 | `POST /v1beta/models/:model/generateContent` + `:streamGenerateContent` (Gemini Stage 4) | Done | `01276e5a` |
 | Migrations | SQLite `0049_add_pi_ai_hint`, Postgres `0063_add_pi_ai_hint` | Done | `94651adc` |
 | Refactor | `beta/` → `inference-v2/`; subdirectory layout; full unit test suite | Done | `01276e5a` |
+| Staging validation | All 8 beta routes confirmed working (4 wire formats × streaming/non-streaming) | Done | — |
+| Frontend icons | Outgoing API type icons for all 4 inference-v2 types (`google-generative-ai`, `openai-completions`, `anthropic-messages`, `openai-responses`) | Done | `fef48063` |
 | M6 | Production promotion (one stage at a time) | Not started | — |
 
 ---
@@ -70,6 +72,25 @@ src/inference-v2/
 - `config-repository.ts`: persists and deserialises both fields
 - Frontend `Provider` interface, `ProviderAdvancedEditor`, `ProviderModelsEditor`: dropdowns for both fields
 - `transformers/oauth/oauth-transformer.ts`: `buildThinkingOptions` re-exported from `inference-v2/shared/pi-ai-utils`
+
+### Manual staging validation (2026-06-05)
+
+All 8 beta route combinations confirmed working on `https://plexus.home.cowger.us`:
+
+| Route | Streaming | Result |
+|---|---|---|
+| `POST /beta/v1/chat/completions` | No | OK |
+| `POST /beta/v1/chat/completions` | Yes | OK |
+| `POST /beta/v1/messages` | No | OK |
+| `POST /beta/v1/messages` | Yes | OK |
+| `POST /beta/v1/responses` | No | OK |
+| `POST /beta/v1/responses` | Yes | OK |
+| `POST /v1beta/models/:model/generateContent` | No | OK |
+| `POST /v1beta/models/:model/streamGenerateContent` | Yes | OK |
+
+Usage logs healthy. `outgoingApiType`, `tokensInput`, `tokensOutput`, and `responseStatus` all recorded correctly. Known instrumentation gaps documented in `docs/BUGS.md`.
+
+Native Anthropic provider (`pi_ai_provider: "anthropic"`) also validated — produces `outgoingApiType: "anthropic-messages"` as expected.
 
 ### Test coverage
 
