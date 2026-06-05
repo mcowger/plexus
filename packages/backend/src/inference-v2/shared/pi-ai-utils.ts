@@ -10,7 +10,7 @@
 
 import { getModel } from '@earendil-works/pi-ai';
 import type { Model as PiAiModel } from '@earendil-works/pi-ai';
-import type { ProviderConfig } from '../config';
+import type { ProviderConfig } from '../../config';
 
 // ─── buildThinkingOptions ─────────────────────────────────────────────────────
 //

@@ -15,7 +15,7 @@
  *  - installFetchTap() is idempotent — safe to call multiple times.
  */
 
-import { DebugManager } from '../services/debug-manager';
+import { DebugManager } from '../../services/debug-manager';
 import { debugRequestIdStorage } from './pi-ai-executor';
 
 let installed = false;

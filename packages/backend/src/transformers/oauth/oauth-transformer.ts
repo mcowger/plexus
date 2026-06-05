@@ -27,7 +27,7 @@ import {
   type ClaudeOAuthContext,
 } from './oauth-claude';
 import { CodexVersionService } from '../../services/codex-version-service';
-import { buildThinkingOptions } from '../../beta/pi-ai-utils';
+import { buildThinkingOptions } from '../../inference-v2/shared/pi-ai-utils';
 
 export { buildThinkingOptions };
 

@@ -1,11 +1,14 @@
 /**
- * Beta route registration.
+ * inference-v2 route registration — the pi-ai native inference path.
  *
- * Exports `registerBetaRoutes(fastify, usageStorage, quotaEnforcer?)`.
+ * Exports `registerInferenceV2Routes(fastify, usageStorage, quotaEnforcer?)`.
  *
  * Routes:
- *   POST /beta/v1/chat/completions  — Stage 1 (OpenAI chat-completions via pi-ai)
- *   POST /beta/v1/messages          — Stage 2 (Anthropic messages via pi-ai)
+ *   POST /beta/v1/chat/completions              — Stage 1 (OpenAI chat-completions via pi-ai)
+ *   POST /beta/v1/messages                      — Stage 2 (Anthropic messages via pi-ai)
+ *   POST /beta/v1/responses                     — Stage 3 (OpenAI Responses API via pi-ai)
+ *   POST /v1beta/models/:model/generateContent  — Stage 4 (Gemini via pi-ai, non-streaming)
+ *   POST /v1beta/models/:model/streamGenerateContent — Stage 4 (Gemini via pi-ai, streaming)
  *
  * Each handler:
  *  1. Sets x-request-id.
@@ -14,10 +17,12 @@
  *  4. wireUpstreamTimeout + wireEarlyDisconnectDetection.
  *  5. Parses body via the stage-specific parser.
  *  6. Calls runPiAiExecutor() with serializeMessage / serializeChunks callbacks.
- *  7. Writes JSON or pumps SSE stream.
+ *  7. Writes JSON or pumps SSE/NDJSON stream.
  *  8. Error shape is protocol-specific:
- *       Stage 1 → OpenAI  { error: { message, type } }
- *       Stage 2 → Anthropic { type:"error", error:{ type, message } }
+ *       Stage 1 → OpenAI     { error: { message, type } }
+ *       Stage 2 → Anthropic  { type:"error", error:{ type, message } }
+ *       Stage 3 → Responses  { error: { message, type, code } }
+ *       Stage 4 → Gemini     { error: { code, message, status } }
  */
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -29,34 +34,40 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../utils/time
 import { getClientIp } from '../utils/ip';
 import { sanitizeHeaders } from '../utils/sanitize-headers';
 import { logger } from '../utils/logger';
-import { openaiRequestToContext } from './openai-to-context';
+import { openaiRequestToContext } from './openai/openai-to-context';
 import {
   messageToCompletion,
   eventToChunks,
   chunkToSSE,
   makeChunkSerialiserState,
   SSE_DONE,
-} from './context-to-openai';
-import { anthropicRequestToContext } from './anthropic-to-context';
+} from './openai/context-to-openai';
+import { anthropicRequestToContext } from './anthropic/anthropic-to-context';
 import {
   messageToAnthropicResponse,
   eventToAnthropicSSE,
   makeAnthropicChunkSerialiserState,
-} from './context-to-anthropic';
-import { responsesToContext, normalizeResponsesInput } from './responses-to-context';
+} from './anthropic/context-to-anthropic';
+import { responsesToContext, normalizeResponsesInput } from './responses/responses-to-context';
 import {
   messageToResponsesObject,
   eventToResponsesSSE,
   makeResponsesChunkSerialiserState,
-} from './context-to-responses';
+} from './responses/context-to-responses';
 import { ResponsesStorageService } from '../services/responses-storage';
-import { runPiAiExecutor } from './pi-ai-executor';
-import { installFetchTap } from './fetch-tap';
+import { geminiRequestToContext } from './gemini/gemini-to-context';
+import {
+  messageToGeminiResponse,
+  eventToGeminiNDJSON,
+  makeGeminiChunkSerialiserState,
+} from './gemini/context-to-gemini';
+import { runPiAiExecutor } from './shared/pi-ai-executor';
+import { installFetchTap } from './shared/fetch-tap';
 
 // Install the global fetch tap once when this module loads
 installFetchTap();
 
-export async function registerBetaRoutes(
+export async function registerInferenceV2Routes(
   fastify: FastifyInstance,
   usageStorage: UsageStorageService,
   quotaEnforcer?: QuotaEnforcer
@@ -509,4 +520,143 @@ export async function registerBetaRoutes(
       });
     }
   });
+
+  // ── Stage 4: Gemini-compatible routes ────────────────────────────────────────
+
+  /**
+   * Shared handler for Gemini generateContent and streamGenerateContent.
+   *
+   * URL patterns:
+   *   POST /v1beta/models/:model/generateContent
+   *   POST /v1beta/models/:model/streamGenerateContent
+   *
+   * Streaming is detected from the URL suffix — `streaming` is passed in directly.
+   * Error shape: Gemini { error: { code, message, status } }.
+   */
+  async function handleGeminiRequest(
+    request: FastifyRequest,
+    reply: any,
+    streaming: boolean
+  ): Promise<unknown> {
+    const requestId = crypto.randomUUID();
+    reply.header('x-request-id', requestId);
+
+    const debug = DebugManager.getInstance();
+    const body = request.body as any;
+    // Model alias comes from the URL param — inject into body for the parser
+    const modelAlias: string = (request.params as any)?.model ?? body.model ?? '';
+    body.model = modelAlias;
+
+    debug.startLog(requestId, body, sanitizeHeaders(request.headers as any));
+
+    // ── Quota check ──────────────────────────────────────────────────────────
+    if (quotaEnforcer) {
+      const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+      if (!allowed) return;
+    }
+
+    // ── Wire abort / disconnect ──────────────────────────────────────────────
+    const abortController = new AbortController();
+    const { signal } = wireUpstreamTimeout(abortController);
+    const earlyDisconnect = wireEarlyDisconnectDetection(request, abortController);
+
+    try {
+      // ── Parse inbound ────────────────────────────────────────────────────
+      const parsed = geminiRequestToContext(body, streaming);
+
+      // ── Serialiser state ─────────────────────────────────────────────────
+      const chunkState = makeGeminiChunkSerialiserState(modelAlias);
+
+      // ── Execute ──────────────────────────────────────────────────────────
+      const result = await runPiAiExecutor({
+        requestId,
+        incomingApiType: 'gemini',
+        modelAlias,
+        context: parsed.context,
+        streamOptions: parsed.streamOptions,
+        reasoningEffort: parsed.reasoningEffort,
+        streaming: parsed.streaming,
+        request,
+        usageStorage,
+        quotaEnforcer,
+        signal,
+        toolsDefined: parsed.toolsDefined,
+        messageCount: parsed.messageCount,
+        onSuccess: async () => {
+          // No post-response storage for Gemini
+        },
+        serializeMessage: (msg) => messageToGeminiResponse(msg, modelAlias),
+        serializeChunks: (event) => eventToGeminiNDJSON(event, chunkState),
+      });
+
+      earlyDisconnect.cleanup();
+
+      if (result.response != null) {
+        return reply.code(200).header('content-type', 'application/json').send(result.response);
+      }
+
+      if (result.stream != null) {
+        // Gemini streaming uses NDJSON (application/x-ndjson), not SSE
+        reply
+          .code(200)
+          .header('content-type', 'application/x-ndjson')
+          .header('cache-control', 'no-cache')
+          .header('connection', 'keep-alive')
+          .header('x-accel-buffering', 'no');
+
+        const readable = new ReadableStream<string>({
+          async start(controller) {
+            try {
+              for await (const frame of result.stream!) {
+                controller.enqueue(frame);
+              }
+            } catch (e: any) {
+              logger.error('[beta/gemini] Stream error during pump', e);
+            } finally {
+              controller.close();
+            }
+          },
+        });
+
+        return reply.send(readable.pipeThrough(new TextEncoderStream()));
+      }
+
+      return reply.code(500).send({
+        error: { code: 500, message: 'Executor returned no result', status: 'INTERNAL' },
+      });
+    } catch (e: any) {
+      earlyDisconnect.cleanup();
+      logger.error('[beta/gemini] Error processing request', e);
+      const statusCode = e?.routingContext?.statusCode ?? 500;
+      const geminiStatus =
+        statusCode === 401
+          ? 'UNAUTHENTICATED'
+          : statusCode === 403
+            ? 'PERMISSION_DENIED'
+            : statusCode === 400
+              ? 'INVALID_ARGUMENT'
+              : statusCode === 429
+                ? 'RESOURCE_EXHAUSTED'
+                : 'INTERNAL';
+      usageStorage
+        .saveError(requestId, e, { apiType: 'gemini', ...(e?.routingContext ?? {}) })
+        .catch(() => {});
+      return reply.code(statusCode).send({
+        error: {
+          code: statusCode,
+          message: e?.message ?? 'Internal server error',
+          status: geminiStatus,
+        },
+      });
+    }
+  }
+
+  fastify.post('/v1beta/models/:model/generateContent', async (request: FastifyRequest, reply) =>
+    handleGeminiRequest(request, reply, false)
+  );
+
+  fastify.post(
+    '/v1beta/models/:model/streamGenerateContent',
+    async (request: FastifyRequest, reply) => handleGeminiRequest(request, reply, true)
+  );
 }

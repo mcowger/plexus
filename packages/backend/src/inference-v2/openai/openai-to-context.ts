@@ -25,7 +25,7 @@ import type {
   ProviderStreamOptions,
   Tool,
 } from '@earendil-works/pi-ai';
-import { jsonSchemaToTypeBox } from '../transformers/oauth/type-mappers';
+import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
 
 // ─── public result type ───────────────────────────────────────────────────────
 
