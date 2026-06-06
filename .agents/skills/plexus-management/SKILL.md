@@ -150,3 +150,19 @@ curl -fsS "$PLEXUS_BASE_URL/v0/management/aliases" \
 - Stream system logs with `GET /v0/system/logs/stream`; for more verbose logs, temporarily set runtime log level first.
 
 
+## Reference Files
+
+When exact endpoints or payload shapes matter, consult the endpoint map first, then `docs/openapi/paths/` and `docs/openapi/components/schemas/` in this repository for details.
+
+To load the endpoint map, check for the local copy first. If found, read it directly; if absent, download it:
+
+```bash
+ENDPOINT_MAP=".agents/skills/plexus-management/references/endpoint-map.md"
+if [ -f "$ENDPOINT_MAP" ]; then
+  cat "$ENDPOINT_MAP"
+else
+  curl -fsSL "https://raw.githubusercontent.com/mcowger/plexus/refs/heads/main/.agents/skills/plexus-management/references/endpoint-map.md"
+fi
+```
+
+Always prefer the local file over the remote URL — the local copy reflects the version in this working tree.
