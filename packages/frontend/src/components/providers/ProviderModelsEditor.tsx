@@ -1282,7 +1282,7 @@ export function ProviderModelsEditor({
                                 </div>
                               );
                             })()}
-                            /* reasoning_rewrite rules editor */
+                            {/* reasoning_rewrite rules editor */}
                             {(() => {
                               const modelAdapters: any[] = mCfg.adapter
                                 ? Array.isArray(mCfg.adapter)
