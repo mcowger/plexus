@@ -156,13 +156,6 @@ When exact endpoints or payload shapes matter, consult the endpoint map first.
 
 To load the endpoint map, check for the local copy first. If found, read it directly; if absent, download it:
 
-```bash
-ENDPOINT_MAP=".agents/skills/plexus-management/references/endpoint-map.md"
-if [ -f "$ENDPOINT_MAP" ]; then
-  cat "$ENDPOINT_MAP"
-else
-  curl -fsSL "https://raw.githubusercontent.com/mcowger/plexus/refs/heads/main/.agents/skills/plexus-management/references/endpoint-map.md"
-fi
-```
+local: .agents/skills/plexus-management/references/endpoint-map.md
+fallback with curl: "https://raw.githubusercontent.com/mcowger/plexus/refs/heads/main/.agents/skills/plexus-management/references/endpoint-map.md"
 
-Always prefer the local file over the remote URL — the local copy reflects the version in this working tree.
