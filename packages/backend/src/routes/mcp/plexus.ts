@@ -123,9 +123,6 @@ class McpToolError extends Error {
   }
 }
 
-const plexusMcpServer = createPlexusMcpServer();
-let transportQueue = Promise.resolve();
-
 export async function registerPlexusMcpRoutes(fastify: FastifyInstance) {
   fastify.register(async (plexusMcp) => {
     plexusMcp.setErrorHandler(async (error, _request, reply) => {
@@ -145,21 +142,15 @@ export async function registerPlexusMcpRoutes(fastify: FastifyInstance) {
 }
 
 async function handlePlexusMcpRequest(request: FastifyRequest, reply: FastifyReply) {
-  const result = transportQueue.then(() => handlePlexusMcpRequestSerialized(request, reply));
-  transportQueue = result.then(
-    () => undefined,
-    () => undefined
-  );
-  return result;
-}
-
-async function handlePlexusMcpRequestSerialized(request: FastifyRequest, reply: FastifyReply) {
+  // The SDK server owns one active transport at a time. A singleton would need
+  // close/reconnect queueing, so stateless per-request servers are simpler and safer.
+  const server = createPlexusMcpServer();
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
     sessionIdGenerator: undefined,
   });
 
-  await plexusMcpServer.connect(transport);
+  await server.connect(transport);
 
   try {
     const webRequest = toWebRequest(request);
@@ -172,7 +163,7 @@ async function handlePlexusMcpRequestSerialized(request: FastifyRequest, reply: 
     const body = await webResponse.text();
     return reply.code(webResponse.status).send(body || undefined);
   } finally {
-    await plexusMcpServer.close();
+    await server.close();
   }
 }
 
