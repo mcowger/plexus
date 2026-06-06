@@ -152,7 +152,7 @@ curl -fsS "$PLEXUS_BASE_URL/v0/management/aliases" \
 
 ## Reference Files
 
-When exact endpoints or payload shapes matter, consult the endpoint map first, then `docs/openapi/paths/` and `docs/openapi/components/schemas/` in this repository for details.
+When exact endpoints or payload shapes matter, consult the endpoint map first.
 
 To load the endpoint map, check for the local copy first. If found, read it directly; if absent, download it:
 
