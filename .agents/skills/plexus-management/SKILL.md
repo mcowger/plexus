@@ -149,6 +149,4 @@ curl -fsS "$PLEXUS_BASE_URL/v0/management/aliases" \
 - Restore full backup: `POST /v0/management/restore` with `content-type: application/gzip` and `--data-binary @file.tar.gz`.
 - Stream system logs with `GET /v0/system/logs/stream`; for more verbose logs, temporarily set runtime log level first.
 
-## Reference Files
 
-When exact endpoints or payload shapes matter, read `references/endpoint-map.md` first, then consult `docs/openapi/paths/` and `docs/openapi/components/schemas/` in this repository for details.
