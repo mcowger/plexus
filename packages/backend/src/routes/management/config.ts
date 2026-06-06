@@ -826,6 +826,37 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── MCP Server Enabled ──────────────────────────────────────────
+
+  fastify.get('/v0/management/config/mcp-enabled', async (_request, reply) => {
+    try {
+      const enabled = await configService.getSetting<boolean>('mcpEnabled', true);
+      return reply.send({ enabled });
+    } catch (e: any) {
+      logger.error('Failed to read mcp-enabled setting', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/mcp-enabled', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+    if (typeof body.enabled !== 'boolean') {
+      return reply.code(400).send({ error: 'enabled must be a boolean' });
+    }
+
+    try {
+      await configService.setSetting('mcpEnabled', body.enabled);
+      logger.debug(`MCP server ${body.enabled ? 'enabled' : 'disabled'} via API`);
+      return reply.send({ enabled: body.enabled });
+    } catch (e: any) {
+      logger.error('Failed to update mcp-enabled setting', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Quota Checker Types ──────────────────────────────────────────
 
   fastify.get('/v0/management/quota-checker-types', async (_request, reply) => {

@@ -3264,6 +3264,26 @@ export const api = {
     return res.json();
   },
 
+  // ─── MCP Server Enabled ───────────────────────────────────────────
+
+  /** Fetch current MCP server enabled state. */
+  getMcpEnabled: async (): Promise<{ enabled: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/mcp-enabled`);
+    if (!res.ok) throw new Error('Failed to fetch MCP enabled state');
+    return res.json();
+  },
+
+  /** Enable or disable the MCP server. */
+  patchMcpEnabled: async (enabled: boolean): Promise<{ enabled: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/mcp-enabled`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) throw new Error('Failed to update MCP enabled state');
+    return res.json();
+  },
+
   // ─── Stall Detection Settings ────────────────────────────────────
 
   /** Fetch current stall detection settings. */

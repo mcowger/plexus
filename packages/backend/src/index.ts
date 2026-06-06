@@ -268,7 +268,7 @@ fastify.setErrorHandler((error, request, reply) => {
 await registerInferenceRoutes(fastify, dispatcher, usageStorage, quotaEnforcer);
 
 // --- Routes: MCP Proxy ---
-await registerMcpRoutes(fastify, mcpUsageStorage);
+await registerMcpRoutes(fastify, mcpUsageStorage, usageStorage);
 
 // --- Response Storage Cleanup ---
 // Start cleanup job (runs every hour, deletes responses older than 7 days)

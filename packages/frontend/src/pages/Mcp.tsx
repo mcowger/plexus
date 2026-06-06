@@ -41,6 +41,7 @@ export const McpPage: React.FC = () => {
   const toast = useToast();
   const [servers, setServers] = useState<Record<string, McpServer>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [mcpEnabled, setMcpEnabled] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingServerName, setEditingServerName] = useState<string | null>(null);
   const [serverNameInput, setServerNameInput] = useState('');
@@ -83,8 +84,9 @@ export const McpPage: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await api.getMcpServers();
+      const [data, enabled] = await Promise.all([api.getMcpServers(), api.getMcpEnabled()]);
       setServers(data);
+      setMcpEnabled(enabled.enabled);
     } catch (e) {
       console.error('Failed to load MCP servers', e);
     } finally {
@@ -249,6 +251,17 @@ export const McpPage: React.FC = () => {
     }
   };
 
+  const handleToggleMcpEnabled = async (enabled: boolean) => {
+    setMcpEnabled(enabled);
+    try {
+      await api.patchMcpEnabled(enabled);
+      toast.success(`MCP server ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (e) {
+      setMcpEnabled(!enabled); // revert on failure
+      toast.error((e as Error).message, 'Failed to update MCP server state');
+    }
+  };
+
   const isValidServerName = (name: string): boolean => {
     return /^[a-z0-9][a-z0-9-_]{1,62}$/.test(name);
   };
@@ -369,6 +382,38 @@ export const McpPage: React.FC = () => {
         <div className="flex flex-col gap-5">
           {/* Servers Config Card */}
           <Card title="MCP Servers">
+            {/* Plexus Management MCP — global enable/disable, always visible */}
+            <article className="rounded-md border border-primary/30 bg-primary/5 p-3 mb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate font-heading text-sm font-semibold text-text">
+                      Plexus Management MCP
+                    </span>
+                    <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      ADMIN
+                    </span>
+                  </div>
+                  <div className="mt-1 break-all text-xs text-text-muted">
+                    /mcp/plexus — admin-only management endpoint
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Switch
+                    checked={mcpEnabled}
+                    onChange={(val) => handleToggleMcpEnabled(val)}
+                    size="sm"
+                  />
+                </div>
+              </div>
+              <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-1.5 text-xs">
+                <span className="text-text-muted">
+                  Master toggle for all MCP endpoints. When disabled, all /mcp/* routes respond with
+                  HTTP 418.
+                </span>
+              </div>
+            </article>
+
             {serverNames.length === 0 ? (
               <div className="p-4 text-text-secondary text-center">
                 No MCP servers configured. Click "Add MCP Server" to create one.
@@ -457,6 +502,40 @@ export const McpPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
+                      {/* Plexus Management MCP — fixed row */}
+                      <tr className="bg-primary/5 border-b border-primary/30">
+                        <td
+                          className="px-4 py-3 text-left border-b border-border-glass text-text"
+                          style={{ paddingLeft: '24px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontWeight: 600 }}>Plexus Management MCP</div>
+                            <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              ADMIN
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
+                          /mcp/plexus — admin-only management endpoint
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                          <Switch
+                            checked={mcpEnabled}
+                            onChange={(val) => handleToggleMcpEnabled(val)}
+                            size="sm"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
+                          Master toggle — disables all /mcp/* when off
+                        </td>
+                        <td
+                          className="px-4 py-3 text-left border-b border-border-glass text-text"
+                          style={{ paddingRight: '24px', textAlign: 'right' }}
+                        >
+                          —
+                        </td>
+                      </tr>
+
                       {serverNames.map((name) => {
                         const server = servers[name];
                         const headerCount = server.headers ? Object.keys(server.headers).length : 0;

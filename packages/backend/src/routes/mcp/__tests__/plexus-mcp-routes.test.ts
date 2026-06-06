@@ -4,12 +4,17 @@ import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import { registerMcpRoutes } from '../index';
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
+import { UsageStorageService } from '../../../services/usage-storage';
 import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
+import { DebugManager } from '../../../services/debug-manager';
+import { CooldownManager } from '../../../services/cooldown-manager';
+import { BackupService } from '../../../services/backup-service';
 
 describe('Plexus management MCP routes', () => {
   let fastify: FastifyInstance;
   let originalAdminKey: string | undefined;
   let mockMcpUsageStorage: McpUsageStorageService;
+  let mockUsageStorage: UsageStorageService;
 
   beforeAll(async () => {
     originalAdminKey = process.env.ADMIN_KEY;
@@ -23,6 +28,33 @@ describe('Plexus management MCP routes', () => {
       deleteLog: vi.fn(),
       deleteAllLogs: vi.fn(),
     } as unknown as McpUsageStorageService;
+
+    mockUsageStorage = {
+      getUsage: vi.fn(async () => ({
+        data: [{ requestId: 'req-1', provider: 'openrouter', apiKey: 'test-key' }],
+        total: 1,
+      })),
+      getDb: vi.fn(() => ({
+        select: vi.fn(() => ({
+          from: vi.fn(() => ({
+            where: vi.fn(() => ({
+              groupBy: vi.fn(() => ({ orderBy: vi.fn(async () => []) })),
+            })),
+          })),
+        })),
+      })),
+      deleteUsageLog: vi.fn(async () => true),
+      deleteAllUsageLogs: vi.fn(async () => true),
+      getDebugLogs: vi.fn(async () => [
+        { requestId: 'req-debug', createdAt: 123, responseStatus: 200 },
+      ]),
+      getDebugLog: vi.fn(async (requestId: string) =>
+        requestId === 'req-debug' ? { requestId, createdAt: 123, responseStatus: 200 } : null
+      ),
+      deleteDebugLog: vi.fn(async () => true),
+      deleteAllDebugLogs: vi.fn(async () => true),
+      deleteAllErrors: vi.fn(async () => true),
+    } as unknown as UsageStorageService;
 
     setConfigForTesting({
       providers: {
@@ -86,11 +118,13 @@ describe('Plexus management MCP routes', () => {
       },
     });
 
-    await registerMcpRoutes(fastify, mockMcpUsageStorage);
+    await registerMcpRoutes(fastify, mockMcpUsageStorage, mockUsageStorage);
     await fastify.ready();
   });
 
   beforeEach(() => {
+    DebugManager.getInstance().setEnabled(false);
+    DebugManager.getInstance().setProviderFilter(null);
     registerSpy(mcpProxyService, 'proxyMcpRequest').mockResolvedValue({
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -188,8 +222,10 @@ describe('Plexus management MCP routes', () => {
         'plexus_mcp_gateway',
         'plexus_settings',
         'plexus_operations',
-        'plexus_system_logs',
       ])
+    );
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).not.toContain(
+      'plexus_system_logs'
     );
   });
 
@@ -299,8 +335,181 @@ describe('Plexus management MCP routes', () => {
     );
     const body = parseJsonRpcResponse(response);
 
-    expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.type).toBe('not_implemented');
+    expect(body.result.isError).toBe(false);
+    expect(body.result.structuredContent.data.success).toBe(true);
+  });
+
+  test('implements plexus_usage list', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_usage',
+          arguments: { operation: 'list', query: { limit: 10 } },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.structuredContent.ok).toBe(true);
+    expect(body.result.structuredContent.data.total).toBe(1);
+    expect(mockUsageStorage.getUsage).toHaveBeenCalled();
+  });
+
+  test('implements plexus_debug state and update', async () => {
+    const updateResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_debug',
+          arguments: {
+            operation: 'update',
+            body: { enabled: true, providers: ['openrouter'] },
+          },
+        },
+      },
+      adminHeaders()
+    );
+    const updateBody = parseJsonRpcResponse(updateResponse);
+    expect(updateBody.result.structuredContent.ok).toBe(true);
+    expect(updateBody.result.structuredContent.data.enabledGlobal).toBe(true);
+    expect(updateBody.result.structuredContent.data.providers).toEqual(['openrouter']);
+
+    const stateResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 2,
+        params: {
+          name: 'plexus_debug',
+          arguments: { operation: 'state' },
+        },
+      },
+      adminHeaders()
+    );
+    const stateBody = parseJsonRpcResponse(stateResponse);
+    expect(stateBody.result.structuredContent.ok).toBe(true);
+    expect(stateBody.result.structuredContent.data.enabledGlobal).toBe(true);
+  });
+
+  test('implements plexus_debug log operations', async () => {
+    const logsResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_debug',
+          arguments: { operation: 'logs' },
+        },
+      },
+      adminHeaders()
+    );
+    const logsBody = parseJsonRpcResponse(logsResponse);
+    expect(logsBody.result.structuredContent.data[0].requestId).toBe('req-debug');
+
+    const getResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 2,
+        params: {
+          name: 'plexus_debug',
+          arguments: { operation: 'get_log', id: 'req-debug' },
+        },
+      },
+      adminHeaders()
+    );
+    const getBody = parseJsonRpcResponse(getResponse);
+    expect(getBody.result.structuredContent.data.requestId).toBe('req-debug');
+  });
+
+  test('implements plexus_operations cooldown operations', async () => {
+    const cooldownSpy = registerSpy(
+      CooldownManager.getInstance(),
+      'clearCooldown'
+    ).mockResolvedValue();
+
+    const listResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_operations',
+          arguments: { operation: 'list_cooldowns' },
+        },
+      },
+      adminHeaders()
+    );
+    const listBody = parseJsonRpcResponse(listResponse);
+    expect(listBody.result.structuredContent.ok).toBe(true);
+
+    const clearResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 2,
+        params: {
+          name: 'plexus_operations',
+          arguments: {
+            operation: 'clear_cooldowns',
+            destructive: 'acknowledged',
+            query: { provider: 'openrouter', model: 'openai/gpt-5' },
+          },
+        },
+      },
+      adminHeaders()
+    );
+    const clearBody = parseJsonRpcResponse(clearResponse);
+    expect(clearBody.result.structuredContent.data.success).toBe(true);
+    expect(cooldownSpy).toHaveBeenCalledWith('openrouter', 'openai/gpt-5');
+  });
+
+  test('implements plexus_operations backup and restart response', async () => {
+    registerSpy(BackupService.prototype, 'exportConfigBackup').mockResolvedValue({
+      plexus_backup: true,
+      version: 1,
+      created_at: '2026-01-01T00:00:00.000Z',
+      dialect: 'sqlite',
+      data: {
+        providers: {},
+        models: {},
+        keys: {},
+        user_quotas: {},
+        mcp_servers: {},
+        settings: {},
+        oauth_credentials: [],
+      },
+    });
+
+    const backupResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_operations',
+          arguments: { operation: 'backup' },
+        },
+      },
+      adminHeaders()
+    );
+    const backupBody = parseJsonRpcResponse(backupResponse);
+    expect(backupBody.result.structuredContent.ok).toBe(true);
+    expect(backupBody.result.structuredContent.data.full).toBe(false);
+
+    const restartResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 2,
+        params: {
+          name: 'plexus_operations',
+          arguments: { operation: 'restart', destructive: 'acknowledged' },
+        },
+      },
+      adminHeaders()
+    );
+    const restartBody = parseJsonRpcResponse(restartResponse);
+    expect(restartBody.result.structuredContent.ok).toBe(true);
+    expect(restartBody.result.structuredContent.data.supported).toBe(false);
   });
 
   function postPlexusMcp(payload: Record<string, unknown>, headers: Record<string, string> = {}) {

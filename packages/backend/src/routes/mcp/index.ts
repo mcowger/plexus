@@ -5,13 +5,15 @@ import { logger } from '../../utils/logger';
 import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
 import { getClientIp } from '../../utils/ip';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
+import { UsageStorageService } from '../../services/usage-storage';
 import { registerPlexusMcpRoutes } from './plexus';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 
 export async function registerMcpRoutes(
   fastify: FastifyInstance,
-  mcpUsageStorage: McpUsageStorageService
+  mcpUsageStorage: McpUsageStorageService,
+  usageStorage?: UsageStorageService
 ) {
   // OAuth 2.0 Discovery endpoints (public, no auth required)
   // These inform clients that we use Bearer token auth, not OAuth flow
@@ -60,7 +62,7 @@ export async function registerMcpRoutes(
     });
   });
 
-  await registerPlexusMcpRoutes(fastify);
+  await registerPlexusMcpRoutes(fastify, usageStorage);
 
   fastify.register(async (protectedRoutes) => {
     const auth = createAuthHook();
