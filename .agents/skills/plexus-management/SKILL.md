@@ -40,7 +40,20 @@ curl -fsS "$PLEXUS_BASE_URL/v0/management/providers" \
 
 ## Common Command Patterns
 
+### Usage Summary For Totals
+
+Prefer the summary endpoint whenever the user wants totals, rollups, dashboards, or time-window aggregates. It performs aggregation server-side and avoids undercounting that can happen if you inspect only the first page of raw usage rows.
+
+```bash
+curl -fsS "$PLEXUS_BASE_URL/v0/management/usage/summary?range=week" \
+  -H "x-admin-key: $PLEXUS_ADMIN_KEY" | jq .
+```
+
+Use `range=hour|day|week|month`, or `range=custom&startDate=...&endDate=...` when the user needs a specific window.
+
 ### Pretty Read
+
+Use raw usage reads for request-level inspection, spot checks, and debugging individual calls.
 
 ```bash
 curl -fsS "$PLEXUS_BASE_URL/v0/management/usage?limit=20&sortDir=desc" \
@@ -78,7 +91,9 @@ curl -fsS "$PLEXUS_BASE_URL/v0/management/aliases" \
 
 ### Review Request Logs
 
-- Start with `GET /v0/management/usage` using `limit`, `sortDir=desc`, and targeted filters such as `requestId`, `apiKey`, `provider`, `incomingModelAlias`, `responseStatus`, or duration bounds.
+- If the user wants totals, trends, token rollups, latency aggregates, dashboard numbers, or anything phrased as "how much" over a time window, start with `GET /v0/management/usage/summary` instead of paging through raw usage rows.
+- Use `range=hour|day|week|month`, or `range=custom&startDate=...&endDate=...` for exact windows.
+- Start with `GET /v0/management/usage` only when the task is request-level inspection, forensics, or debugging specific calls. Use `limit`, `sortDir=desc`, and targeted filters such as `requestId`, `apiKey`, `provider`, `incomingModelAlias`, `responseStatus`, or duration bounds.
 - Use `fields` to reduce noise, for example `fields=requestId,date,apiKey,provider,incomingModelAlias,responseStatus,durationMs,costTotal`.
 - For error investigation, also check `GET /v0/management/errors?limit=...` and debug logs if enabled.
 

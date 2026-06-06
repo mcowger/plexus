@@ -1013,33 +1013,15 @@ export const api = {
 
   getStats: async (): Promise<Stat[]> => {
     try {
-      const now = normalizeNow();
-      const startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 7);
-      const usageResponse = await fetchUsageRecords({
-        limit: 1000,
-        startDate: startDate.toISOString(),
-        fields: ['tokensInput', 'tokensOutput', 'tokensCached', 'tokensCacheWrite', 'durationMs'],
-        cache: true,
-      });
-
-      const config = await fetchConfigCached();
+      const [summary, config] = await Promise.all([
+        fetchUsageSummary('week', true),
+        fetchConfigCached(),
+      ]);
       const activeProviders = config ? Object.keys(config.providers || {}).length : '-';
 
-      const records = usageResponse.data || [];
-      const totalRequests = usageResponse.total;
-      const totalTokens = records.reduce(
-        (acc, r) =>
-          acc +
-          (r.tokensInput || 0) +
-          (r.tokensOutput || 0) +
-          (r.tokensCached || 0) +
-          (r.tokensCacheWrite || 0),
-        0
-      );
-      const avgLatency = records.length
-        ? Math.round(records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / records.length)
-        : 0;
+      const totalRequests = summary.stats.totalRequests || 0;
+      const totalTokens = summary.stats.totalTokens || 0;
+      const avgLatency = Math.round(summary.stats.avgDurationMs || 0);
 
       return [
         { label: STAT_LABELS.REQUESTS, value: formatNumber(totalRequests, 0) },
