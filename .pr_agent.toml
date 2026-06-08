@@ -1,0 +1,7 @@
+[config]
+output_relevant_configurations = true
+ai_timeout = 300
+
+[pr_code_suggestions]
+num_code_suggestions = 3
+suggestions_score_threshold = 7
