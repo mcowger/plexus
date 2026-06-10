@@ -178,11 +178,11 @@ try {
   await OAuthAuthManager.getInstance().initialize();
   await PricingManager.getInstance().loadPricing();
   // Load model metadata from all configured sources (non-fatal on failure)
-  ModelMetadataManager.getInstance()
-    .loadAll()
-    .catch((e) => {
-      logger.error('Failed to load model metadata', e);
-    });
+  const modelMetadataManager = ModelMetadataManager.getInstance();
+  modelMetadataManager.startAutoRefresh(60);
+  modelMetadataManager.refreshAll(undefined, 'startup').catch((e) => {
+    logger.error('Failed to load model metadata', e);
+  });
   CodexVersionService.getInstance()
     .fetchVersion()
     .catch((e) => {

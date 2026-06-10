@@ -134,6 +134,7 @@ export const Config = () => {
   const [isFullBackupLoading, setIsFullBackupLoading] = useState(false);
   const [isRestoreLoading, setIsRestoreLoading] = useState(false);
   const [isResetLogsLoading, setIsResetLogsLoading] = useState(false);
+  const [isMetadataRefreshLoading, setIsMetadataRefreshLoading] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
 
   // Failover settings state
@@ -833,6 +834,22 @@ export const Config = () => {
     }
   };
 
+  const handleRefreshMetadata = async () => {
+    setIsMetadataRefreshLoading(true);
+    try {
+      const result = await api.refreshModelMetadata();
+      if (result.hadErrors) {
+        toast.warning(result.message);
+      } else {
+        toast.success(result.message);
+      }
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to refresh model metadata');
+    } finally {
+      setIsMetadataRefreshLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
@@ -1419,6 +1436,26 @@ export const Config = () => {
               </div>
             </div>
           </Disclosure>
+
+          <Card
+            title="Model Metadata"
+            extra={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleRefreshMetadata}
+                isLoading={isMetadataRefreshLoading}
+                leftIcon={<RefreshCw size={14} />}
+              >
+                Refresh Metadata
+              </Button>
+            }
+          >
+            <p className="text-sm text-text-secondary">
+              Catalog metadata for model aliases auto-refreshes every 60 minutes. Use this to
+              trigger an immediate reload from OpenRouter, models.dev, and Catwalk.
+            </p>
+          </Card>
 
           <Card title="Backup & Restore">
             <div className="flex items-center gap-2">

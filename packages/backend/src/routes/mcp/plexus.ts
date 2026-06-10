@@ -30,7 +30,7 @@ Common workflows:
 - Inspect recent system logs with plexus_system_logs recent.
 - Inspect or change the runtime logging level with plexus_system_logs level, set_level, or reset_level.
 - Use plexus_debug state before enabling debug tracing.
-- Use plexus_operations backup, restore, list_cooldowns, or clear_cooldowns for operational actions.
+- Use plexus_operations backup, restore, refresh_metadata, list_cooldowns, or clear_cooldowns for operational actions.
 
 Best practices:
 - Keep changes narrow and reversible.
@@ -561,6 +561,11 @@ async function handleOperationsTool(
         input.operation,
         await callManagementRoute(shimContext, 'POST', '/v0/management/restart')
       );
+    case 'refresh_metadata':
+      return successResponse(
+        input.operation,
+        await callManagementRoute(shimContext, 'POST', '/v0/management/models/metadata/refresh')
+      );
     case 'list_cooldowns':
       return successResponse(
         input.operation,
@@ -592,6 +597,7 @@ async function handleOperationsTool(
         'backup',
         'restore',
         'restart',
+        'refresh_metadata',
         'list_cooldowns',
         'clear_cooldowns',
         'reset_logs',
@@ -1344,7 +1350,7 @@ function getToolDescription(toolName: string) {
     case 'plexus_system_logs':
       return 'Inspect recent Plexus system logs and control runtime log verbosity. Operations: recent, level, set_level, reset_level.';
     case 'plexus_operations':
-      return 'Run high-impact operational actions. Operations: backup, restore, restart, list_cooldowns, clear_cooldowns, reset_logs.';
+      return 'Run high-impact operational actions. Operations: backup, restore, restart, refresh_metadata, list_cooldowns, clear_cooldowns, reset_logs.';
     default:
       return 'Plexus management tool.';
   }

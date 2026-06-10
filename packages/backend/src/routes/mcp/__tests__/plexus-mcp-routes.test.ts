@@ -9,6 +9,7 @@ import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service'
 import { DebugManager } from '../../../services/debug-manager';
 import { CooldownManager } from '../../../services/cooldown-manager';
 import { BackupService } from '../../../services/backup-service';
+import { ModelMetadataManager } from '../../../services/model-metadata-manager';
 
 describe('Plexus management MCP routes', () => {
   let fastify: FastifyInstance;
@@ -376,6 +377,22 @@ describe('Plexus management MCP routes', () => {
       }
       if (method === 'POST' && path === '/v0/management/restart') {
         return json({ success: true, message: 'Server is restarting' });
+      }
+      if (method === 'POST' && path === '/v0/management/models/metadata/refresh') {
+        return json({
+          success: true,
+          message: 'Model metadata refresh completed successfully',
+          trigger: 'manual',
+          refreshedAt: '2026-06-10T12:00:00.000Z',
+          durationMs: 25,
+          intervalMinutes: 60,
+          hadErrors: false,
+          sources: {
+            openrouter: { source: 'openrouter', initialized: true, count: 10 },
+            modelsDev: { source: 'models.dev', initialized: true, count: 20 },
+            catwalk: { source: 'catwalk', initialized: true, count: 30 },
+          },
+        });
       }
 
       return json({ error: `Unhandled management route in test: ${method} ${url}` }, 404);
@@ -845,6 +862,40 @@ describe('Plexus management MCP routes', () => {
     expect(restartBody.result.structuredContent.ok).toBe(true);
     expect(restartBody.result.structuredContent.data.success).toBe(true);
     expect(restartBody.result.structuredContent.data.message).toContain('restarting');
+  });
+
+  test('implements plexus_operations refresh_metadata response', async () => {
+    registerSpy(ModelMetadataManager.getInstance(), 'refreshAll').mockResolvedValue({
+      success: true,
+      message: 'Model metadata refresh completed successfully',
+      trigger: 'manual',
+      refreshedAt: '2026-06-10T12:00:00.000Z',
+      durationMs: 25,
+      intervalMinutes: 60,
+      hadErrors: false,
+      sources: {
+        openrouter: { source: 'openrouter', initialized: true, count: 10 },
+        modelsDev: { source: 'models.dev', initialized: true, count: 20 },
+        catwalk: { source: 'catwalk', initialized: true, count: 30 },
+      },
+    });
+
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 3,
+        params: {
+          name: 'plexus_operations',
+          arguments: { operation: 'refresh_metadata' },
+        },
+      },
+      adminHeaders()
+    );
+
+    const body = parseJsonRpcResponse(response);
+    expect(body.result.structuredContent.ok).toBe(true);
+    expect(body.result.structuredContent.data.message).toContain('refresh completed');
+    expect(body.result.structuredContent.data.sources.modelsDev.count).toBe(20);
   });
 
   test('implements plexus_key update through the management shim', async () => {

@@ -16,6 +16,7 @@ afterAll(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -423,6 +424,64 @@ describe('ModelMetadataManager – error handling', () => {
     const mgr = ModelMetadataManager.getInstance();
     const meta = mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet');
     expect(meta).toBeUndefined();
+  });
+
+  test('failed refresh preserves the previously loaded metadata', async () => {
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    await mgr.refreshAll({
+      openrouter: openrouterFixture,
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    const before = mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet');
+    expect(before?.name).toBe('Anthropic: Claude 3.5 Sonnet');
+
+    const result = await mgr.refreshAll({
+      openrouter: '/nonexistent/path/openrouter.json',
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    expect(result.hadErrors).toBe(true);
+    expect(result.sources.openrouter.initialized).toBe(true);
+    expect(result.sources.openrouter.count).toBeGreaterThan(0);
+    expect(mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet')).toEqual(before);
+  });
+
+  test('startAutoRefresh schedules refresh every 60 minutes', async () => {
+    vi.useFakeTimers();
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    const fetchMock = vi.fn(async (_input: string | URL | Request) => {
+      return new Response(
+        JSON.stringify({
+          data: [{ id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await mgr.refreshAll({
+      openrouter: 'https://example.com/openrouter.json',
+      modelsDev: 'https://example.com/models-dev.json',
+      catwalk: 'https://example.com/catwalk.json',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    mgr.startAutoRefresh(60);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    mgr.stopAutoRefresh();
   });
 });
 

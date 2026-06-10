@@ -1,0 +1,108 @@
+post:
+  tags:
+    - Management — Models
+  summary: Refresh external model metadata catalogs (admin only)
+  description: |
+    Triggers an immediate reload of external model metadata from the configured
+    catalog sources:
+
+    - OpenRouter
+    - models.dev
+    - Catwalk
+
+    Plexus also runs this refresh automatically every 60 minutes. This endpoint
+    is useful when you want newly published catalog metadata to be available
+    immediately in the admin UI and metadata lookup APIs.
+
+    The response includes per-source counts and any source-specific refresh
+    errors. A partial failure still returns `200` so callers can inspect which
+    sources succeeded.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Refresh completed (possibly with per-source errors).
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - success
+              - message
+              - trigger
+              - refreshedAt
+              - durationMs
+              - intervalMinutes
+              - hadErrors
+              - sources
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+              trigger:
+                type: string
+                enum: [startup, scheduled, manual]
+              refreshedAt:
+                type: string
+                format: date-time
+              durationMs:
+                type: integer
+              intervalMinutes:
+                type: integer
+                minimum: 1
+              hadErrors:
+                type: boolean
+              sources:
+                type: object
+                required:
+                  - openrouter
+                  - modelsDev
+                  - catwalk
+                properties:
+                  openrouter:
+                    type: object
+                    required: [source, initialized, count]
+                    properties:
+                      source:
+                        type: string
+                        enum: [openrouter, models.dev, catwalk]
+                      initialized:
+                        type: boolean
+                      count:
+                        type: integer
+                      error:
+                        type: string
+                  modelsDev:
+                    type: object
+                    required: [source, initialized, count]
+                    properties:
+                      source:
+                        type: string
+                        enum: [openrouter, models.dev, catwalk]
+                      initialized:
+                        type: boolean
+                      count:
+                        type: integer
+                      error:
+                        type: string
+                  catwalk:
+                    type: object
+                    required: [source, initialized, count]
+                    properties:
+                      source:
+                        type: string
+                        enum: [openrouter, models.dev, catwalk]
+                      initialized:
+                        type: boolean
+                      count:
+                        type: integer
+                      error:
+                        type: string
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals cannot access this endpoint.
+  operationId: postV0ManagementModelsMetadataRefresh

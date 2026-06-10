@@ -438,6 +438,8 @@ paths:
     $ref: paths/v0_management_models_{aliasId}.yaml
   /v0/management/models/huggingface/{modelId}:
     $ref: paths/v0_management_models_huggingface_{modelId}.yaml
+  /v0/management/models/metadata/refresh:
+    $ref: paths/v0_management_models_metadata_refresh.yaml
   /v0/management/keys:
     $ref: paths/v0_management_keys.yaml
   /v0/management/keys/{name}:

@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../../utils/logger';
 import { HuggingFaceModelFetcher } from '../../services/huggingface-model-fetcher';
+import { ModelMetadataManager } from '../../services/model-metadata-manager';
 import { getModels, getProviders } from '@earendil-works/pi-ai';
 
 interface FetchModelRequest {
@@ -10,6 +11,11 @@ interface FetchModelRequest {
 }
 
 export async function registerModelRoutes(fastify: FastifyInstance) {
+  fastify.post('/v0/management/models/metadata/refresh', async (_request, reply) => {
+    const result = await ModelMetadataManager.getInstance().refreshAll(undefined, 'manual');
+    return reply.send(result);
+  });
+
   // Fetch model architecture from Hugging Face
   fastify.get(
     '/v0/management/models/huggingface/:modelId',

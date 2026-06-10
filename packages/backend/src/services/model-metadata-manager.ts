@@ -1,6 +1,42 @@
 import { logger } from '../utils/logger';
 import type { MetadataOverrides } from '../config';
 
+type MetadataSourceId = 'openrouter' | 'models.dev' | 'catwalk';
+
+interface MetadataCatalogSources {
+  openrouter: string;
+  modelsDev: string;
+  catwalk: string;
+}
+
+export interface MetadataSourceRefreshSummary {
+  source: MetadataSourceId;
+  initialized: boolean;
+  count: number;
+  error?: string;
+}
+
+export interface ModelMetadataRefreshResult {
+  success: boolean;
+  message: string;
+  trigger: 'startup' | 'scheduled' | 'manual';
+  refreshedAt: string;
+  durationMs: number;
+  intervalMinutes: number;
+  hadErrors: boolean;
+  sources: {
+    openrouter: MetadataSourceRefreshSummary;
+    modelsDev: MetadataSourceRefreshSummary;
+    catwalk: MetadataSourceRefreshSummary;
+  };
+}
+
+const DEFAULT_METADATA_SOURCES: MetadataCatalogSources = {
+  openrouter: 'https://openrouter.ai/api/v1/models',
+  modelsDev: 'https://models.dev/api.json',
+  catwalk: 'https://catwalk.charm.sh/v2/providers',
+};
+
 // ─── Normalized model metadata (OpenRouter-style) ──────────────────────────
 // All three sources are normalized into this shape.
 
@@ -269,7 +305,11 @@ export class ModelMetadataManager {
   private modelsDevMap: Map<string, NormalizedModelMetadata> = new Map();
   private catwalkMap: Map<string, NormalizedModelMetadata> = new Map();
 
-  private initializedSources: Set<'openrouter' | 'models.dev' | 'catwalk'> = new Set();
+  private initializedSources: Set<MetadataSourceId> = new Set();
+  private sourceConfig: MetadataCatalogSources = { ...DEFAULT_METADATA_SOURCES };
+  private autoRefreshIntervalMinutes = 60;
+  private autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  private inFlightRefresh: Promise<ModelMetadataRefreshResult> | null = null;
 
   private constructor() {}
 
@@ -282,6 +322,7 @@ export class ModelMetadataManager {
 
   /** Reset the singleton (used in tests) */
   public static resetForTesting(): void {
+    ModelMetadataManager.instance?.stopAutoRefresh();
     ModelMetadataManager.instance = new ModelMetadataManager();
   }
 
@@ -289,30 +330,104 @@ export class ModelMetadataManager {
    * Load all three metadata sources. Each source is loaded independently;
    * failure of one does not prevent the others from loading.
    */
-  public async loadAll(sources?: {
-    openrouter?: string;
-    modelsDev?: string;
-    catwalk?: string;
-  }): Promise<void> {
-    const {
-      openrouter = 'https://openrouter.ai/api/v1/models',
-      modelsDev = 'https://models.dev/api.json',
-      catwalk = 'https://catwalk.charm.sh/v2/providers',
-    } = sources ?? {};
+  public async loadAll(sources?: Partial<MetadataCatalogSources>): Promise<void> {
+    await this.refreshAll(sources, 'manual');
+  }
 
-    await Promise.all([
-      this.loadOpenRouter(openrouter),
-      this.loadModelsDev(modelsDev),
-      this.loadCatwalk(catwalk),
-    ]);
+  public async refreshAll(
+    sources?: Partial<MetadataCatalogSources>,
+    trigger: 'startup' | 'scheduled' | 'manual' = 'manual'
+  ): Promise<ModelMetadataRefreshResult> {
+    if (sources) {
+      this.sourceConfig = {
+        ...this.sourceConfig,
+        ...sources,
+      };
+    }
+
+    if (this.inFlightRefresh) {
+      return this.inFlightRefresh;
+    }
+
+    this.inFlightRefresh = (async () => {
+      const startedAt = Date.now();
+      const refreshedAt = new Date(startedAt).toISOString();
+      const [openrouter, modelsDev, catwalk] = await Promise.all([
+        this.loadOpenRouter(this.sourceConfig.openrouter),
+        this.loadModelsDev(this.sourceConfig.modelsDev),
+        this.loadCatwalk(this.sourceConfig.catwalk),
+      ]);
+
+      const hadErrors = [openrouter, modelsDev, catwalk].some((source) => !!source.error);
+      const durationMs = Date.now() - startedAt;
+      const result: ModelMetadataRefreshResult = {
+        success: !hadErrors,
+        message: hadErrors
+          ? 'Model metadata refresh completed with errors'
+          : 'Model metadata refresh completed successfully',
+        trigger,
+        refreshedAt,
+        durationMs,
+        intervalMinutes: this.autoRefreshIntervalMinutes,
+        hadErrors,
+        sources: {
+          openrouter,
+          modelsDev,
+          catwalk,
+        },
+      };
+
+      if (hadErrors) {
+        logger.warn(`Model metadata refresh (${trigger}) completed with errors`, result);
+      } else {
+        logger.info(`Model metadata refresh (${trigger}) completed in ${durationMs}ms`);
+      }
+
+      return result;
+    })().finally(() => {
+      this.inFlightRefresh = null;
+    });
+
+    return this.inFlightRefresh;
+  }
+
+  public startAutoRefresh(intervalMinutes = 60, sources?: Partial<MetadataCatalogSources>): void {
+    if (sources) {
+      this.sourceConfig = {
+        ...this.sourceConfig,
+        ...sources,
+      };
+    }
+
+    this.stopAutoRefresh();
+    this.autoRefreshIntervalMinutes = Math.max(1, intervalMinutes);
+    this.autoRefreshTimer = setInterval(
+      () => {
+        this.refreshAll(undefined, 'scheduled').catch((error) => {
+          logger.error('Scheduled model metadata refresh failed', error);
+        });
+      },
+      this.autoRefreshIntervalMinutes * 60 * 1000
+    );
+
+    logger.info(
+      `Scheduled model metadata auto-refresh every ${this.autoRefreshIntervalMinutes} minutes`
+    );
+  }
+
+  public stopAutoRefresh(): void {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
   }
 
   // ─── Loaders ────────────────────────────────────
 
-  private async loadOpenRouter(source: string): Promise<void> {
+  private async loadOpenRouter(source: string): Promise<MetadataSourceRefreshSummary> {
     try {
       logger.debug(`Loading OpenRouter metadata from ${source}`);
-      this.openrouterMap.clear();
+      const nextMap: Map<string, NormalizedModelMetadata> = new Map();
 
       const loadCatalog = async (
         catalogSource: string,
@@ -325,7 +440,7 @@ export class ModelMetadataManager {
         }
         for (const model of raw.data) {
           if (model.id) {
-            this.openrouterMap.set(model.id, normalizeOpenRouterModel(model, kind));
+            nextMap.set(model.id, normalizeOpenRouterModel(model, kind));
           }
         }
       };
@@ -340,25 +455,39 @@ export class ModelMetadataManager {
         }
       }
 
-      if (this.openrouterMap.size === 0) {
+      if (nextMap.size === 0) {
         logger.warn('Invalid OpenRouter response format');
-        return;
+        return this.toSourceSummary('openrouter', nextMap, 'Invalid OpenRouter response format');
       }
+
+      this.openrouterMap = nextMap;
       this.initializedSources.add('openrouter');
       logger.debug(`Loaded ${this.openrouterMap.size} OpenRouter models`);
+      return this.toSourceSummary('openrouter', this.openrouterMap);
     } catch (error) {
       logger.error('Failed to load OpenRouter metadata', error);
+      return this.toSourceSummary(
+        'openrouter',
+        this.openrouterMap,
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
-  private async loadModelsDev(source: string): Promise<void> {
+
+  private async loadModelsDev(source: string): Promise<MetadataSourceRefreshSummary> {
     try {
       logger.debug(`Loading models.dev metadata from ${source}`);
       const raw = await this.fetchOrReadJson<Record<string, ModelsDevProvider>>(source);
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
         logger.warn('Invalid models.dev response format');
-        return;
+        return this.toSourceSummary(
+          'models.dev',
+          this.modelsDevMap,
+          'Invalid models.dev response format'
+        );
       }
-      this.modelsDevMap.clear();
+
+      const nextMap: Map<string, NormalizedModelMetadata> = new Map();
       for (const [providerId, provider] of Object.entries(raw)) {
         const models = provider?.models;
         if (!models) continue;
@@ -367,47 +496,64 @@ export class ModelMetadataManager {
           for (const model of models) {
             if (model?.id) {
               const key = `${providerId}.${model.id}`;
-              this.modelsDevMap.set(key, normalizeModelsDevModel(providerId, model.id, model));
+              nextMap.set(key, normalizeModelsDevModel(providerId, model.id, model));
             }
           }
         } else if (typeof models === 'object') {
           for (const [modelId, model] of Object.entries(models)) {
             if (model) {
               const key = `${providerId}.${modelId}`;
-              this.modelsDevMap.set(key, normalizeModelsDevModel(providerId, modelId, model));
+              nextMap.set(key, normalizeModelsDevModel(providerId, modelId, model));
             }
           }
         }
       }
+
+      this.modelsDevMap = nextMap;
       this.initializedSources.add('models.dev');
       logger.debug(`Loaded ${this.modelsDevMap.size} models.dev models`);
+      return this.toSourceSummary('models.dev', this.modelsDevMap);
     } catch (error) {
       logger.error('Failed to load models.dev metadata', error);
+      return this.toSourceSummary(
+        'models.dev',
+        this.modelsDevMap,
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
 
-  private async loadCatwalk(source: string): Promise<void> {
+  private async loadCatwalk(source: string): Promise<MetadataSourceRefreshSummary> {
     try {
       logger.debug(`Loading Catwalk metadata from ${source}`);
       const raw = await this.fetchOrReadJson<CatwalkProvider[]>(source);
       if (!raw || !Array.isArray(raw)) {
         logger.warn('Invalid Catwalk response format');
-        return;
+        return this.toSourceSummary('catwalk', this.catwalkMap, 'Invalid Catwalk response format');
       }
-      this.catwalkMap.clear();
+
+      const nextMap: Map<string, NormalizedModelMetadata> = new Map();
       for (const provider of raw) {
         if (!provider?.id || !Array.isArray(provider.models)) continue;
         for (const model of provider.models) {
           if (model?.id) {
             const key = `${provider.id}.${model.id}`;
-            this.catwalkMap.set(key, normalizeCatwalkModel(provider.id, model));
+            nextMap.set(key, normalizeCatwalkModel(provider.id, model));
           }
         }
       }
+
+      this.catwalkMap = nextMap;
       this.initializedSources.add('catwalk');
       logger.debug(`Loaded ${this.catwalkMap.size} Catwalk models`);
+      return this.toSourceSummary('catwalk', this.catwalkMap);
     } catch (error) {
       logger.error('Failed to load Catwalk metadata', error);
+      return this.toSourceSummary(
+        'catwalk',
+        this.catwalkMap,
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
 
@@ -449,9 +595,7 @@ export class ModelMetadataManager {
     return file.json() as Promise<T>;
   }
 
-  private getMap(
-    source: 'openrouter' | 'models.dev' | 'catwalk'
-  ): Map<string, NormalizedModelMetadata> {
+  private getMap(source: MetadataSourceId): Map<string, NormalizedModelMetadata> {
     switch (source) {
       case 'openrouter':
         return this.openrouterMap;
@@ -533,6 +677,25 @@ export class ModelMetadataManager {
 
   public getAllIds(source: 'openrouter' | 'models.dev' | 'catwalk'): string[] {
     return Array.from(this.getMap(source).keys());
+  }
+
+  private toSourceSummary(
+    source: MetadataSourceId,
+    map: Map<string, NormalizedModelMetadata>,
+    error?: string
+  ): MetadataSourceRefreshSummary {
+    const initialized = map.size > 0 || this.initializedSources.has(source);
+
+    if (!initialized) {
+      this.initializedSources.delete(source);
+    }
+
+    return {
+      source,
+      initialized,
+      count: map.size,
+      ...(error ? { error } : {}),
+    };
   }
 }
 

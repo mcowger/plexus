@@ -361,6 +361,28 @@ export interface NormalizedModelMetadata {
   };
 }
 
+export interface ModelMetadataRefreshSourceSummary {
+  source: Exclude<MetadataSource, 'custom'>;
+  initialized: boolean;
+  count: number;
+  error?: string;
+}
+
+export interface ModelMetadataRefreshResult {
+  success: boolean;
+  message: string;
+  trigger: 'startup' | 'scheduled' | 'manual';
+  refreshedAt: string;
+  durationMs: number;
+  intervalMinutes: number;
+  hadErrors: boolean;
+  sources: {
+    openrouter: ModelMetadataRefreshSourceSummary;
+    modelsDev: ModelMetadataRefreshSourceSummary;
+    catwalk: ModelMetadataRefreshSourceSummary;
+  };
+}
+
 // Discriminated union mirrors backend validation: catalog-backed sources
 // must carry a non-empty source_path; 'custom' may omit it but MUST carry
 // an overrides blob with a non-empty `name` (there is no catalog fallback).
@@ -2579,6 +2601,17 @@ export const api = {
     }
     const json = (await res.json()) as { data: NormalizedModelMetadata };
     return json.data;
+  },
+
+  refreshModelMetadata: async (): Promise<ModelMetadataRefreshResult> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/models/metadata/refresh`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to refresh model metadata');
+    }
+    return (await res.json()) as ModelMetadataRefreshResult;
   },
 
   getPiProviders: async (): Promise<string[]> => {
