@@ -448,7 +448,76 @@ describe('ModelMetadataManager – error handling', () => {
     expect(result.hadErrors).toBe(true);
     expect(result.sources.openrouter.initialized).toBe(true);
     expect(result.sources.openrouter.count).toBeGreaterThan(0);
+    expect(result.sources.openrouter.count).toBe(mgr.getAllIds('openrouter').length);
     expect(mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet')).toEqual(before);
+  });
+
+  test('empty models.dev refresh preserves the previously loaded metadata', async () => {
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    await mgr.refreshAll({
+      openrouter: '/dev/null-nonexistent',
+      modelsDev: modelsDevFixture,
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    const before = mgr.getMetadata('models.dev', 'anthropic.claude-3-5-haiku-20241022');
+    expect(before?.name).toBe('Claude Haiku 3.5');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ anthropic: { models: {} } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
+
+    const result = await mgr.refreshAll({
+      modelsDev: 'https://example.com/models-dev-empty.json',
+    });
+
+    expect(result.hadErrors).toBe(true);
+    expect(result.sources.modelsDev.initialized).toBe(true);
+    expect(result.sources.modelsDev.count).toBe(mgr.getAllIds('models.dev').length);
+    expect(mgr.getMetadata('models.dev', 'anthropic.claude-3-5-haiku-20241022')).toEqual(before);
+  });
+
+  test('empty catwalk refresh preserves the previously loaded metadata', async () => {
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    await mgr.refreshAll({
+      openrouter: '/dev/null-nonexistent',
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: catwalkFixture,
+    });
+
+    const before = mgr.getMetadata('catwalk', 'anthropic.claude-3-5-haiku-20241022');
+    expect(before?.name).toBe('Claude 3.5 Haiku');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
+
+    const result = await mgr.refreshAll({
+      catwalk: 'https://example.com/catwalk-empty.json',
+    });
+
+    expect(result.hadErrors).toBe(true);
+    expect(result.sources.catwalk.initialized).toBe(true);
+    expect(result.sources.catwalk.count).toBe(mgr.getAllIds('catwalk').length);
+    expect(mgr.getMetadata('catwalk', 'anthropic.claude-3-5-haiku-20241022')).toEqual(before);
   });
 
   test('startAutoRefresh schedules refresh every 60 minutes', async () => {

@@ -457,7 +457,11 @@ export class ModelMetadataManager {
 
       if (nextMap.size === 0) {
         logger.warn('Invalid OpenRouter response format');
-        return this.toSourceSummary('openrouter', nextMap, 'Invalid OpenRouter response format');
+        return this.toSourceSummary(
+          'openrouter',
+          this.openrouterMap,
+          'Invalid OpenRouter response format'
+        );
       }
 
       this.openrouterMap = nextMap;
@@ -509,6 +513,15 @@ export class ModelMetadataManager {
         }
       }
 
+      if (nextMap.size === 0) {
+        logger.warn('Invalid models.dev response format');
+        return this.toSourceSummary(
+          'models.dev',
+          this.modelsDevMap,
+          'Invalid models.dev response format'
+        );
+      }
+
       this.modelsDevMap = nextMap;
       this.initializedSources.add('models.dev');
       logger.debug(`Loaded ${this.modelsDevMap.size} models.dev models`);
@@ -541,6 +554,11 @@ export class ModelMetadataManager {
             nextMap.set(key, normalizeCatwalkModel(provider.id, model));
           }
         }
+      }
+
+      if (nextMap.size === 0) {
+        logger.warn('Invalid Catwalk response format');
+        return this.toSourceSummary('catwalk', this.catwalkMap, 'Invalid Catwalk response format');
       }
 
       this.catwalkMap = nextMap;
