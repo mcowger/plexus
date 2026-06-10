@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, afterAll } from 'vitest';
+import { describe, expect, test, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import path from 'path';
 import { ModelMetadataManager, mergeOverrides } from '../model-metadata-manager';
 import type { NormalizedModelMetadata } from '../model-metadata-manager';
@@ -13,6 +13,10 @@ const catwalkFixture = path.join(FIXTURES, 'catwalk-sample.json');
 // Reset the singleton between test suites so each describe block gets a fresh instance
 afterAll(() => {
   ModelMetadataManager.resetForTesting();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 // ─── OpenRouter ──────────────────────────────────────────────────
@@ -58,9 +62,18 @@ describe('ModelMetadataManager – OpenRouter source', () => {
 
   test('getMetadata returns architecture with modalities', () => {
     const meta = mgr.getMetadata('openrouter', 'openai/gpt-4.1-nano');
+    expect(meta!.architecture?.modality).toBe('text+image->text');
     expect(meta!.architecture?.input_modalities).toContain('text');
     expect(meta!.architecture?.input_modalities).toContain('image');
     expect(meta!.architecture?.output_modalities).toContain('text');
+  });
+
+  test('getMetadata preserves non-text OpenRouter modalities', () => {
+    const meta = mgr.getMetadata('openrouter', 'openai/gpt-audio');
+    expect(meta).toBeDefined();
+    expect(meta!.architecture?.modality).toBe('text+audio->text+audio');
+    expect(meta!.architecture?.input_modalities).toContain('audio');
+    expect(meta!.architecture?.output_modalities).toContain('audio');
   });
 
   test('getMetadata returns supported_parameters', () => {
@@ -96,6 +109,16 @@ describe('ModelMetadataManager – OpenRouter source', () => {
     ).toBe(true);
   });
 
+  test('search matches OpenRouter architecture modalities', () => {
+    const results = mgr.search('openrouter', 'audio');
+    expect(results.map((r) => r.id)).toContain('openai/gpt-audio');
+  });
+
+  test('search matches OpenRouter descriptions', () => {
+    const results = mgr.search('openrouter', 'transcribe');
+    expect(results.map((r) => r.id)).toContain('mistralai/voxtral-small-24b-2507');
+  });
+
   test('search is case-insensitive', () => {
     const lower = mgr.search('openrouter', 'claude');
     const upper = mgr.search('openrouter', 'CLAUDE');
@@ -122,6 +145,81 @@ describe('ModelMetadataManager – OpenRouter source', () => {
     expect(ids).toContain('anthropic/claude-3.5-sonnet');
     expect(ids).toContain('openai/gpt-4.1-nano');
     expect(ids).toContain('google/gemini-pro');
+  });
+
+  test('loadAll merges OpenRouter embeddings and videos catalog endpoints', async () => {
+    ModelMetadataManager.resetForTesting();
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/api/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'openai/gpt-4o', name: 'GPT-4o' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/api/v1/embeddings/models')) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: 'google/gemini-embedding-2',
+                name: 'Google: Gemini Embedding 2',
+                description: 'Multimodal embedding model',
+                context_length: 8192,
+                architecture: {
+                  modality: 'text+image+file+audio+video->embeddings',
+                  input_modalities: ['text', 'image', 'file', 'audio', 'video'],
+                  output_modalities: ['embeddings'],
+                  tokenizer: 'Gemini',
+                  instruct_type: null,
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.endsWith('/api/v1/videos/models')) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: 'google/veo-3.1-fast',
+                name: 'Google: Veo 3.1 Fast',
+                description: 'Video generation model',
+                supported_frame_images: ['first_frame'],
+                generate_audio: true,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response('{}', { status: 404, statusText: 'Not Found' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const manager = ModelMetadataManager.getInstance();
+    await manager.loadAll({
+      openrouter: 'https://openrouter.ai/api/v1/models',
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    expect(manager.getAllIds('openrouter')).toEqual([
+      'openai/gpt-4o',
+      'google/gemini-embedding-2',
+      'google/veo-3.1-fast',
+    ]);
+    expect(manager.search('openrouter', 'embed').map((r) => r.id)).toContain(
+      'google/gemini-embedding-2'
+    );
+    expect(manager.search('openrouter', 'video').map((r) => r.id)).toContain('google/veo-3.1-fast');
+    expect(manager.getMetadata('openrouter', 'google/veo-3.1-fast')?.architecture).toEqual({
+      modality: 'text+image->video+audio',
+      input_modalities: ['text', 'image'],
+      output_modalities: ['video', 'audio'],
+    });
   });
 });
 

@@ -440,6 +440,35 @@ describe('GET /v1/metadata/search', () => {
     expect(json.data[0]).toHaveProperty('name');
   });
 
+  it('should return OpenRouter non-chat models matched by modality or description', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterMetadataFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const audioResponse = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/search?source=openrouter&q=audio',
+    });
+    expect(audioResponse.statusCode).toBe(200);
+    expect(audioResponse.json().data.map((r: any) => r.id)).toContain('openai/gpt-audio');
+
+    const transcriptionResponse = await fastify.inject({
+      method: 'GET',
+      url: '/v1/metadata/search?source=openrouter&q=transcribe',
+    });
+    expect(transcriptionResponse.statusCode).toBe(200);
+    expect(transcriptionResponse.json().data.map((r: any) => r.id)).toContain(
+      'mistralai/voxtral-small-24b-2507'
+    );
+  });
+
   it('should return all models when no q param given', async () => {
     const mgr = ModelMetadataManager.getInstance();
     await mgr.loadAll({

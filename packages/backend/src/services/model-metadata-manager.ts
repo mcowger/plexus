@@ -14,6 +14,7 @@ export interface NormalizedModelMetadata {
   /** Maximum context window in tokens */
   context_length?: number;
   architecture?: {
+    modality?: string;
     input_modalities?: string[];
     output_modalities?: string[];
     tokenizer?: string;
@@ -41,6 +42,7 @@ interface OpenRouterRawModel {
   description?: string;
   context_length?: number;
   architecture?: {
+    modality?: string;
     input_modalities?: string[];
     output_modalities?: string[];
     tokenizer?: string;
@@ -58,11 +60,15 @@ interface OpenRouterRawModel {
     context_length?: number;
     max_completion_tokens?: number;
   };
+  supported_frame_images?: string[];
+  generate_audio?: boolean | null;
 }
 
 interface OpenRouterResponse {
   data: OpenRouterRawModel[];
 }
+
+type OpenRouterCatalogKind = 'models' | 'embeddings' | 'videos';
 
 interface ModelsDevModel {
   id: string;
@@ -114,13 +120,37 @@ interface CatwalkProvider {
 }
 
 // ─── Normalizers ───────────────────────────────────────
-function normalizeOpenRouterModel(raw: OpenRouterRawModel): NormalizedModelMetadata {
+function inferOpenRouterArchitecture(
+  raw: OpenRouterRawModel,
+  kind: OpenRouterCatalogKind
+): OpenRouterRawModel['architecture'] {
+  if (raw.architecture) return raw.architecture;
+  if (kind !== 'videos') return undefined;
+
+  const inputModalities = ['text'];
+  if (raw.supported_frame_images?.length) inputModalities.push('image');
+  const outputModalities = ['video'];
+  if (raw.generate_audio) outputModalities.push('audio');
+
+  return {
+    modality: `${inputModalities.join('+')}->${outputModalities.join('+')}`,
+    input_modalities: inputModalities,
+    output_modalities: outputModalities,
+  };
+}
+
+function normalizeOpenRouterModel(
+  raw: OpenRouterRawModel,
+  kind: OpenRouterCatalogKind = 'models'
+): NormalizedModelMetadata {
+  const architecture = inferOpenRouterArchitecture(raw, kind);
+
   return {
     id: raw.id,
     name: raw.name ?? raw.id,
     description: raw.description,
     context_length: raw.context_length,
-    architecture: raw.architecture,
+    architecture,
     pricing: raw.pricing
       ? {
           prompt: raw.pricing.prompt,
@@ -152,13 +182,20 @@ function normalizeModelsDevModel(
   if (raw.reasoning) params.push('reasoning');
   if (raw.attachment) params.push('image'); // attachment support implies image input
 
+  const inputModalities = raw.modalities?.input;
+  const outputModalities = raw.modalities?.output;
+
   return {
     id: `${providerId}.${modelId}`,
     name: raw.name ?? raw.id ?? modelId,
     context_length: raw.limit?.context,
     architecture: {
-      input_modalities: raw.modalities?.input,
-      output_modalities: raw.modalities?.output,
+      modality:
+        inputModalities?.length || outputModalities?.length
+          ? `${inputModalities?.join('+') ?? ''}->${outputModalities?.join('+') ?? ''}`
+          : undefined,
+      input_modalities: inputModalities,
+      output_modalities: outputModalities,
     },
     pricing:
       raw.cost?.input != null || raw.cost?.output != null
@@ -192,14 +229,16 @@ function normalizeCatwalkModel(providerId: string, raw: CatwalkModel): Normalize
 
   const inputModalities = ['text'];
   if (raw.supports_attachments) inputModalities.push('image');
+  const outputModalities = ['text'];
 
   return {
     id: `${providerId}.${raw.id}`,
     name: raw.name ?? raw.id,
     context_length: raw.context_window,
     architecture: {
+      modality: `${inputModalities.join('+')}->${outputModalities.join('+')}`,
       input_modalities: inputModalities,
-      output_modalities: ['text'],
+      output_modalities: outputModalities,
     },
     pricing:
       raw.cost_per_1m_in != null || raw.cost_per_1m_out != null
@@ -273,16 +312,37 @@ export class ModelMetadataManager {
   private async loadOpenRouter(source: string): Promise<void> {
     try {
       logger.debug(`Loading OpenRouter metadata from ${source}`);
-      const raw = await this.fetchOrReadJson<OpenRouterResponse>(source);
-      if (!raw || !Array.isArray(raw.data)) {
+      this.openrouterMap.clear();
+
+      const loadCatalog = async (
+        catalogSource: string,
+        kind: OpenRouterCatalogKind
+      ): Promise<void> => {
+        const raw = await this.fetchOrReadJson<OpenRouterResponse>(catalogSource);
+        if (!raw || !Array.isArray(raw.data)) {
+          logger.warn(`Invalid OpenRouter ${kind} response format`);
+          return;
+        }
+        for (const model of raw.data) {
+          if (model.id) {
+            this.openrouterMap.set(model.id, normalizeOpenRouterModel(model, kind));
+          }
+        }
+      };
+
+      await loadCatalog(source, 'models');
+
+      for (const auxiliary of this.getOpenRouterAuxiliarySources(source)) {
+        try {
+          await loadCatalog(auxiliary.source, auxiliary.kind);
+        } catch (error) {
+          logger.warn(`Failed to load OpenRouter ${auxiliary.kind} metadata`, error);
+        }
+      }
+
+      if (this.openrouterMap.size === 0) {
         logger.warn('Invalid OpenRouter response format');
         return;
-      }
-      this.openrouterMap.clear();
-      for (const model of raw.data) {
-        if (model.id) {
-          this.openrouterMap.set(model.id, normalizeOpenRouterModel(model));
-        }
       }
       this.initializedSources.add('openrouter');
       logger.debug(`Loaded ${this.openrouterMap.size} OpenRouter models`);
@@ -353,6 +413,26 @@ export class ModelMetadataManager {
 
   // ─── Helpers ─────────────────────────────────────────
 
+  private getOpenRouterAuxiliarySources(
+    source: string
+  ): Array<{ source: string; kind: Exclude<OpenRouterCatalogKind, 'models'> }> {
+    if (!source.startsWith('http://') && !source.startsWith('https://')) return [];
+
+    const url = new URL(source);
+    if (!url.pathname.endsWith('/models')) return [];
+
+    const embeddings = new URL(url);
+    embeddings.pathname = url.pathname.replace(/\/models$/, '/embeddings/models');
+
+    const videos = new URL(url);
+    videos.pathname = url.pathname.replace(/\/models$/, '/videos/models');
+
+    return [
+      { source: embeddings.toString(), kind: 'embeddings' },
+      { source: videos.toString(), kind: 'videos' },
+    ];
+  }
+
   private async fetchOrReadJson<T>(source: string): Promise<T> {
     if (source.startsWith('http://') || source.startsWith('https://')) {
       const response = await fetch(source);
@@ -417,17 +497,25 @@ export class ModelMetadataManager {
     const results: Array<{ id: string; name: string }> = [];
 
     for (const [key, meta] of map) {
-      if (
-        !query ||
-        key.toLowerCase().includes(lowerQuery) ||
-        meta.name.toLowerCase().includes(lowerQuery)
-      ) {
+      const architecture = meta.architecture;
+      const searchableText = [
+        key,
+        meta.name,
+        meta.description,
+        architecture?.modality,
+        ...(architecture?.input_modalities ?? []),
+        ...(architecture?.output_modalities ?? []),
+      ]
+        .filter((value): value is string => typeof value === 'string')
+        .join(' ')
+        .toLowerCase();
+      if (!query || searchableText.includes(lowerQuery)) {
         results.push({ id: key, name: meta.name });
-        if (results.length >= limit) break;
       }
     }
 
-    // Prioritize matches that start with the query
+    // Prioritize matches that start with the query, then cap after ranking so
+    // broad searches don't hide later multimodal models due to catalog order.
     if (query) {
       results.sort((a, b) => {
         const aStarts =
@@ -440,7 +528,7 @@ export class ModelMetadataManager {
       });
     }
 
-    return results;
+    return results.slice(0, limit);
   }
 
   public getAllIds(source: 'openrouter' | 'models.dev' | 'catwalk'): string[] {
