@@ -9,7 +9,7 @@ on:
 
 jobs:
   pr-agent:
-    if: github.event.sender.type != 'Bot'
+    if: github.event.sender.type != 'Bot' || github.event.sender.login == 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
       PR_AGENT_LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
@@ -38,6 +38,9 @@ jobs:
 
               if (pull.draft) {
                 reason = 'Skipping draft PR until it is marked ready for review';
+              } else if (pull.user.login === 'github-actions[bot]') {
+                shouldRun = true;
+                reason = 'Trusted PR author: github-actions[bot]';
               } else if (trustedAssociations.has(pull.author_association)) {
                 shouldRun = true;
                 reason = `Trusted PR author association: ${pull.author_association}`;
