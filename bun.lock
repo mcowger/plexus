@@ -7,7 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "2.4.16",
         "@redocly/cli": "^2.31.5",
-        "agent-browser": "^0.27.0",
+        "agent-browser": "^0.27.2",
         "bun-types": "1.3.14",
         "lefthook": "^2.1.9",
         "octokit": "^5.0.5",
@@ -618,7 +618,7 @@
 
     "agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
 
-    "agent-browser": ["agent-browser@0.27.0", "", { "bin": { "agent-browser": "bin/agent-browser.js" } }, "sha512-mmHzVsYFVA6nshNNGJzg83aVMgKpf4h98ytY3pvtJB1Cot0ZyA2bfnkbSngGD56Azkj+GlhVH6qx9DfKOVE0yg=="],
+    "agent-browser": ["agent-browser@0.27.2", "", { "bin": { "agent-browser": "bin/agent-browser.js" } }, "sha512-RZNxZFvnspSxSmpjkZjM0Lv69ArwYr8t+Ndavko/NGrfkdUkp5lVGJAs4f88tJNNcBVFcn92hhS+3pulVF9oSw=="],
 
     "ajv": ["@redocly/ajv@8.18.1", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Ifm/pP/tul1qmAecpbVxCBluVE32rKfjf8gYXH4xI2gCv9mRWFhJMHzkPDM4TXlxwPQYIFegymlsy8lXz7optA=="],
 
