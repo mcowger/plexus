@@ -41,7 +41,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.6",
+    "@electric-sql/pglite": "^0.5.2",
     "@types/bun": "latest",
     "@types/node": "^25.8.0",
     "@types/winston": "^2.4.4",
