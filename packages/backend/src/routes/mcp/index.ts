@@ -178,6 +178,7 @@ export async function registerMcpRoutes(
 
         if (result.stream) {
           logger.silly(`Sending streaming response`);
+          reply.code(result.status);
           reply.header('Content-Type', 'text/event-stream');
           reply.header('Cache-Control', 'no-cache');
           reply.header('Connection', 'keep-alive');
@@ -265,6 +266,7 @@ export async function registerMcpRoutes(
         }
 
         if (result.stream) {
+          reply.code(result.status);
           reply.header('Content-Type', 'text/event-stream');
           reply.header('Cache-Control', 'no-cache');
           reply.header('Connection', 'keep-alive');

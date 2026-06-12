@@ -318,6 +318,33 @@ describe('MCP Routes', () => {
       expect(mockProxyMcpRequest).toHaveBeenCalled();
     });
 
+    test('GET /mcp/:name should forward upstream status for streamed responses', async () => {
+      // Regression: a 405 standalone-SSE response from the upstream must not
+      // be rewritten to 200, otherwise strict MCP clients try to parse the
+      // error body as an SSE stream and the session fails.
+      (mockProxyMcpRequest as any).mockClear();
+      (mockProxyMcpRequest as any).mockResolvedValueOnce({
+        status: 405,
+        headers: {},
+        stream: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('Method Not Allowed'));
+            controller.close();
+          },
+        }),
+      });
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer sk-valid-key',
+        },
+      });
+
+      expect(response.statusCode).toBe(405);
+    });
+
     test('DELETE /mcp/:name should proxy DELETE requests', async () => {
       const response = await fastify.inject({
         method: 'DELETE',
