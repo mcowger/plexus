@@ -3,14 +3,29 @@ import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 
 function extractUsage(html: string, label: string): { percent: number; resetsAt?: string } | null {
+  // Primary: use aria-label (e.g. 'Session usage 4.4% used') — most robust against HTML changes
+  const ariaPattern = new RegExp(`aria-label="${label} ([\\d.]+)% used"`);
+  const ariaMatch = html.match(ariaPattern);
+  if (ariaMatch) {
+    const percent = parseFloat(ariaMatch[1]!);
+    // data-time is on a sibling element after the usage meter, search the broader area
+    const labelIndex = html.indexOf(label);
+    const resetMatch = labelIndex !== -1 ? html.slice(labelIndex, labelIndex + 3000).match(/data-time="([^"]+)"/) : null;
+    const resetsAt = resetMatch ? new Date(resetMatch[1]!).toISOString() : undefined;
+
+    logger.silly(`${label}: ${percent}% (aria-label), resets at ${resetsAt}`);
+    return { percent, resetsAt };
+  }
+
+  // Fallback: find label text, then look for style="width: X%" in a wider window
   const labelIndex = html.indexOf(label);
   if (labelIndex === -1) {
     logger.debug(`Label "${label}" not found in HTML`);
     return null;
   }
 
-  const snippet = html.slice(labelIndex, labelIndex + 1000);
-  const percentMatch = snippet.match(/style="width:\s*([\d.]+)%"/);
+  const snippet = html.slice(labelIndex, labelIndex + 2000);
+  const percentMatch = snippet.match(/style="width:\s*([\d.]+)%/);
   if (!percentMatch) {
     logger.debug(`Could not extract usage percent for ${label}`);
     return null;
@@ -20,7 +35,7 @@ function extractUsage(html: string, label: string): { percent: number; resetsAt?
   const resetMatch = snippet.match(/data-time="([^"]+)"/);
   const resetsAt = resetMatch ? new Date(resetMatch[1]!).toISOString() : undefined;
 
-  logger.silly(`${label}: ${percent}%, resets at ${resetsAt}`);
+  logger.silly(`${label}: ${percent}% (style), resets at ${resetsAt}`);
   return { percent, resetsAt };
 }
 
