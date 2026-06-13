@@ -47,7 +47,7 @@ jobs:
           HEAD_SHA=$(echo "$PR_DATA" | jq -r '.headRefOid')
 
           if [ "$HEAD_SHA" != "$WORKFLOW_HEAD_SHA" ]; then
-            echo "::notice::PR head changed since this workflow run ($WORKFLOW_HEAD_SHA -> $HEAD_SHA), skipping"
+            echo "::notice::PR head changed since test run ($WORKFLOW_HEAD_SHA -> $HEAD_SHA), skipping"
             exit 0
           fi
 
@@ -60,4 +60,5 @@ jobs:
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
