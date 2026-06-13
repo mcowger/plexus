@@ -43,7 +43,7 @@ export default defineChecker({
       ctx.balance({
         key: 'balance',
         label: 'Account balance',
-        unit: 'hypercredits',
+        unit: 'credits',
         remaining,
       }),
     ];

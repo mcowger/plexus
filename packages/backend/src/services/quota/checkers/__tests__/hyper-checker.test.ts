@@ -38,7 +38,7 @@ describe('hyper checker', () => {
     expect(capturedAuth).toBe('Bearer hyper-api-key');
     expect(meters).toHaveLength(1);
     expect(meters[0]?.kind).toBe('balance');
-    expect(meters[0]?.unit).toBe('hypercredits');
+    expect(meters[0]?.unit).toBe('credits');
     expect(meters[0]?.remaining).toBe(1711);
     expect(meters[0]?.label).toBe('Account balance');
   });
