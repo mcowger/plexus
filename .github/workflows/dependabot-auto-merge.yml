@@ -42,7 +42,15 @@ jobs:
       - name: Enable auto-merge for Dependabot PRs
         if: steps.pr.outputs.skip == 'false'
         run: |
-          AUTHOR=$(gh pr view "$PR_NUMBER" --json author -q '.author.login')
+          PR_DATA=$(gh pr view "$PR_NUMBER" --json author,headRefOid)
+          AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          HEAD_SHA=$(echo "$PR_DATA" | jq -r '.headRefOid')
+
+          if [ "$HEAD_SHA" != "$WORKFLOW_HEAD_SHA" ]; then
+            echo "::notice::PR head changed since this workflow run ($WORKFLOW_HEAD_SHA -> $HEAD_SHA), skipping"
+            exit 0
+          fi
+
           if [ "$AUTHOR" = "dependabot[bot]" ]; then
             echo "Enabling auto-merge for Dependabot PR #$PR_NUMBER"
             gh pr merge --auto --squash "$PR_NUMBER"
@@ -51,4 +59,5 @@ jobs:
           fi
         env:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
