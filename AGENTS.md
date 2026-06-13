@@ -99,6 +99,7 @@ Use these commands exactly:
 - Dev port: `PORT=$(bun run dev:get:port)`
 - Dev DB path: `DB_PATH=$(bun run dev:get:db_path)`
 - Tests: `bun run test`
+- Type check: `bun run typecheck`
 - Format: `bun run format`
 - Format check: `bun run format:check`
 

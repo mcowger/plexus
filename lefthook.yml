@@ -77,4 +77,4 @@ pre-commit:
     # --- Backend tests (only when backend source changes) --------------------
     backend-tests:
       glob: "packages/backend/src/**"
-      run: cd packages/backend && bun run test
+      run: bun run test
