@@ -14,12 +14,11 @@ const DEFAULT_TIMEOUT_MS = 120000;
 // reply.send() buffers a streamed response head until the first body chunk,
 // which strands clients on MCP's long-lived idle SSE channels.
 async function streamUpstreamResponse(
-  request: FastifyRequest,
   reply: FastifyReply,
   status: number,
   upstreamHeaders: Record<string, string>,
   stream: ReadableStream<Uint8Array>
-): Promise<FastifyReply> {
+): Promise<void> {
   const headers: Record<string, string> = { ...upstreamHeaders };
 
   // Preserve the upstream content-type (it carries the session-bound SSE
@@ -44,7 +43,7 @@ async function streamUpstreamResponse(
   const onClose = () => {
     reader.cancel().catch(() => {});
   };
-  request.raw.on('close', onClose);
+  reply.raw.on('close', onClose);
 
   try {
     for (;;) {
@@ -59,11 +58,9 @@ async function streamUpstreamResponse(
   } catch (error) {
     logger.silly(`[mcp] Upstream stream error: ${(error as Error).message}`);
   } finally {
-    request.raw.removeListener('close', onClose);
+    reply.raw.removeListener('close', onClose);
     reply.raw.end();
   }
-
-  return reply;
 }
 
 export async function registerMcpRoutes(
@@ -235,13 +232,7 @@ export async function registerMcpRoutes(
 
         if (result.stream) {
           logger.silly(`Sending streaming response`);
-          return streamUpstreamResponse(
-            request,
-            reply,
-            result.status,
-            result.headers,
-            result.stream
-          );
+          return streamUpstreamResponse(reply, result.status, result.headers, result.stream);
         }
 
         if (result.body !== undefined) {
@@ -325,13 +316,7 @@ export async function registerMcpRoutes(
         }
 
         if (result.stream) {
-          return streamUpstreamResponse(
-            request,
-            reply,
-            result.status,
-            result.headers,
-            result.stream
-          );
+          return streamUpstreamResponse(reply, result.status, result.headers, result.stream);
         }
 
         if (result.body !== undefined) {
