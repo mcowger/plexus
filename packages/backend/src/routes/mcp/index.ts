@@ -9,6 +9,63 @@ import { registerPlexusMcpRoutes } from './plexus';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 
+// streamUpstreamResponse proxies an upstream MCP event-stream to the client,
+// writing the head via reply.raw so it is flushed immediately. Fastify's
+// reply.send() buffers a streamed response head until the first body chunk,
+// which strands clients on MCP's long-lived idle SSE channels.
+async function streamUpstreamResponse(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  status: number,
+  upstreamHeaders: Record<string, string>,
+  stream: ReadableStream<Uint8Array>
+): Promise<FastifyReply> {
+  const headers: Record<string, string> = { ...upstreamHeaders };
+
+  // Preserve the upstream content-type (it carries the session-bound SSE
+  // framing); only default it when the upstream omitted one.
+  if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
+    headers['Content-Type'] = 'text/event-stream';
+  }
+  headers['Cache-Control'] = 'no-cache';
+  headers['Connection'] = 'keep-alive';
+
+  // Take over the response lifecycle so Fastify does not also try to send a
+  // reply, and write the head directly so it reaches the client immediately
+  // instead of being buffered until the first stream chunk.
+  reply.hijack();
+  reply.raw.writeHead(status, headers);
+  reply.raw.flushHeaders();
+
+  const reader = stream.getReader();
+
+  // Cancel the upstream read when the client disconnects so we do not leak the
+  // upstream fetch connection or its MCP session.
+  const onClose = () => {
+    reader.cancel().catch(() => {});
+  };
+  request.raw.on('close', onClose);
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (value) {
+        reply.raw.write(value);
+      }
+    }
+  } catch (error) {
+    logger.silly(`[mcp] Upstream stream error: ${(error as Error).message}`);
+  } finally {
+    request.raw.removeListener('close', onClose);
+    reply.raw.end();
+  }
+
+  return reply;
+}
+
 export async function registerMcpRoutes(
   fastify: FastifyInstance,
   mcpUsageStorage: McpUsageStorageService
@@ -178,11 +235,13 @@ export async function registerMcpRoutes(
 
         if (result.stream) {
           logger.silly(`Sending streaming response`);
-          reply.code(result.status);
-          reply.header('Content-Type', 'text/event-stream');
-          reply.header('Cache-Control', 'no-cache');
-          reply.header('Connection', 'keep-alive');
-          return reply.send(result.stream);
+          return streamUpstreamResponse(
+            request,
+            reply,
+            result.status,
+            result.headers,
+            result.stream
+          );
         }
 
         if (result.body !== undefined) {
@@ -266,11 +325,13 @@ export async function registerMcpRoutes(
         }
 
         if (result.stream) {
-          reply.code(result.status);
-          reply.header('Content-Type', 'text/event-stream');
-          reply.header('Cache-Control', 'no-cache');
-          reply.header('Connection', 'keep-alive');
-          return reply.send(result.stream);
+          return streamUpstreamResponse(
+            request,
+            reply,
+            result.status,
+            result.headers,
+            result.stream
+          );
         }
 
         if (result.body !== undefined) {
