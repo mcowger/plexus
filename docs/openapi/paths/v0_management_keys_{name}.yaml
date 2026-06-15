@@ -5,6 +5,35 @@ parameters:
     schema:
       type: string
     description: API key name (e.g. "sk-prod", "sk-dev").
+get:
+  tags:
+    - Management — Config
+  summary: Get an API key by name (admin only)
+  description: |
+    Returns a single API key record by name.
+
+    The stored secret is returned decrypted by the HTTP management API.
+    Clients that need redaction should apply it themselves or use the MCP
+    management surface instead.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: API key configuration.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - type: object
+                properties:
+                  name:
+                    type: string
+              - $ref: ../components/schemas/KeyConfig.yaml
+    '404':
+      description: API key not found.
+  operationId: getV0ManagementKeysByname
 put:
   tags:
     - Management — Config
@@ -72,6 +101,45 @@ put:
     '401':
       description: Authentication required or invalid credentials.
   operationId: putV0ManagementKeysByname
+patch:
+  tags:
+    - Management — Config
+  summary: Merge updates into an API key (admin only)
+  description: |
+    Merges the request body into the existing API key configuration, then
+    validates the result against `KeyConfig`.
+
+    PATCH performs a shallow merge; fields omitted from the request keep their
+    existing values.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+    '400':
+      description: Validation failed.
+    '404':
+      description: API key not found.
+  operationId: patchV0ManagementKeysByname
 delete:
   tags:
     - Management — Config

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
-import { Input } from '../ui/Input';
-import { Button } from '../ui/Button';
+import { ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/Switch';
+import { ModelArchitectureEditor } from './ModelArchitectureEditor';
+import { AliasExtraBodyEditor } from './AliasExtraBodyEditor';
 import type { Alias, AliasBehavior } from '../../lib/api';
 
 interface Props {
@@ -24,25 +24,6 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
       ? [...without, { type, enabled: true } as AliasBehavior]
       : without;
     setEditingAlias({ ...editingAlias, advanced: next });
-  };
-
-  const addAlias = () => {
-    setEditingAlias({
-      ...editingAlias,
-      aliases: [...(editingAlias.aliases || []), ''],
-    });
-  };
-
-  const updateAlias = (index: number, value: string) => {
-    const newAliases = [...(editingAlias.aliases || [])];
-    newAliases[index] = value;
-    setEditingAlias({ ...editingAlias, aliases: newAliases });
-  };
-
-  const removeAlias = (index: number) => {
-    const newAliases = [...(editingAlias.aliases || [])];
-    newAliases.splice(index, 1);
-    setEditingAlias({ ...editingAlias, aliases: newAliases });
   };
 
   return (
@@ -122,7 +103,7 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                       style={{ color: 'var(--color-warning)' }}
                     >
                       <AlertTriangle size={12} />
-                      No context_length found in metadata — this toggle will have no effect until a
+                      No context_length found in metadata - this toggle will have no effect until a
                       metadata source with a known context_length is configured.
                     </p>
                   )}
@@ -133,57 +114,33 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                 size="sm"
               />
             </div>
+
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <span className="font-body text-[13px] text-text">Sticky Session</span>
+                <p className="font-body text-[11px] text-text-muted mt-0.5">
+                  For multi-turn conversations, prefer the same provider/model used on the previous
+                  turn (when still healthy) for better prompt-cache hit rates and consistent model
+                  behaviour. Session continuity is tracked in memory only.
+                </p>
+              </div>
+              <Switch
+                checked={editingAlias.sticky_session || false}
+                onChange={(val) => setEditingAlias({ ...editingAlias, sticky_session: val })}
+                size="sm"
+              />
+            </div>
           </div>
 
           <div className="h-px bg-border-glass"></div>
 
-          {/* ── Additional Aliases ── */}
-          <div>
-            <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <label
-                className="font-body text-[13px] font-medium text-text-secondary"
-                style={{ marginBottom: 0 }}
-              >
-                Additional Aliases
-              </label>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={addAlias}
-                leftIcon={<Plus size={14} />}
-              >
-                Add Alias
-              </Button>
-            </div>
+          {/* ── Model Architecture ── */}
+          <ModelArchitectureEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
 
-            {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
-              <div className="text-text-muted italic text-center text-sm py-2">
-                No additional aliases
-              </div>
-            )}
+          <div className="h-px bg-border-glass"></div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {editingAlias.aliases?.map((alias, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      value={alias}
-                      onChange={(e) => updateAlias(idx, e.target.value)}
-                      placeholder="e.g. gpt4"
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeAlias(idx)}
-                    style={{ color: 'var(--color-danger)' }}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* ── Extra Body Fields ── */}
+          <AliasExtraBodyEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
         </div>
       )}
     </div>

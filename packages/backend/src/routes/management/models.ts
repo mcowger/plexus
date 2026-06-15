@@ -1,6 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../../utils/logger';
 import { HuggingFaceModelFetcher } from '../../services/huggingface-model-fetcher';
+import { ModelMetadataManager } from '../../services/model-metadata-manager';
+import { getModels, getProviders } from '@earendil-works/pi-ai';
 
 interface FetchModelRequest {
   Params: {
@@ -9,6 +11,11 @@ interface FetchModelRequest {
 }
 
 export async function registerModelRoutes(fastify: FastifyInstance) {
+  fastify.post('/v0/management/models/metadata/refresh', async (_request, reply) => {
+    const result = await ModelMetadataManager.getInstance().refreshAll(undefined, 'manual');
+    return reply.send(result);
+  });
+
   // Fetch model architecture from Hugging Face
   fastify.get(
     '/v0/management/models/huggingface/:modelId',
@@ -67,4 +74,43 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  /**
+   * GET /v0/management/pi/providers
+   * Returns the list of provider IDs known to the pi-ai library.
+   */
+  fastify.get('/v0/management/pi/providers', async (_request, reply) => {
+    return reply.send({ data: getProviders() });
+  });
+
+  /**
+   * GET /v0/management/pi/models
+   * Returns models for a given pi provider, optionally filtered by a search query.
+   *
+   * Query parameters:
+   *   - provider (required): pi provider id (e.g. "openai", "anthropic")
+   *   - q (optional): substring filter on id or name
+   */
+  fastify.get('/v0/management/pi/models', async (request, reply) => {
+    const query = request.query as { provider?: string; q?: string };
+    if (!query.provider) {
+      return reply.status(400).send({ error: `Missing 'provider' parameter` });
+    }
+    let models: ReturnType<typeof getModels>;
+    try {
+      models = getModels(query.provider as any);
+    } catch {
+      return reply.status(400).send({ error: `Unknown pi provider '${query.provider}'` });
+    }
+    if (!models || models.length === 0) {
+      return reply.status(400).send({ error: `Unknown pi provider '${query.provider}'` });
+    }
+    const q = (query.q ?? '').toLowerCase();
+    const filtered = q
+      ? models.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+      : models;
+    return reply.send({
+      data: filtered.map((m) => ({ id: m.id, name: m.name, api: m.api })),
+    });
+  });
 }

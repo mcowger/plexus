@@ -217,6 +217,7 @@ export interface Provider {
   oauthAccount?: string;
   enabled: boolean;
   disableCooldown?: boolean;
+  stallCooldown?: boolean;
   estimateTokens?: boolean;
   useClaudeMasking?: boolean;
   geminiThinkingEnabled?: boolean;
@@ -230,12 +231,26 @@ export interface Provider {
     intervalMinutes: number;
     options?: Record<string, unknown>;
   };
+  modelAutosync?: {
+    enabled: boolean;
+    intervalMinutes: number;
+  };
   // GPU Profile settings for inference energy calculation
   gpu_profile?: string;
   gpu_ram_gb?: number;
   gpu_bandwidth_tb_s?: number;
   gpu_flops_tflop?: number;
   gpu_power_draw_watts?: number;
+  adapter?: any[];
+  timeoutMs?: number;
+  maxConcurrency?: number | null;
+  // Per-provider stall detection overrides
+  stallTtfbMs?: number | null;
+  stallTtfbBytes?: number | null;
+  stallMinBps?: number | null;
+  stallWindowMs?: number | null;
+  stallGracePeriodMs?: number | null;
+  pi_ai_provider?: string;
 }
 
 export interface McpServer {
@@ -346,6 +361,28 @@ export interface NormalizedModelMetadata {
   };
 }
 
+export interface ModelMetadataRefreshSourceSummary {
+  source: Exclude<MetadataSource, 'custom'>;
+  initialized: boolean;
+  count: number;
+  error?: string;
+}
+
+export interface ModelMetadataRefreshResult {
+  success: boolean;
+  message: string;
+  trigger: 'startup' | 'scheduled' | 'manual';
+  refreshedAt: string;
+  durationMs: number;
+  intervalMinutes: number;
+  hadErrors: boolean;
+  sources: {
+    openrouter: ModelMetadataRefreshSourceSummary;
+    modelsDev: ModelMetadataRefreshSourceSummary;
+    catwalk: ModelMetadataRefreshSourceSummary;
+  };
+}
+
 // Discriminated union mirrors backend validation: catalog-backed sources
 // must carry a non-empty source_path; 'custom' may omit it but MUST carry
 // an overrides blob with a non-empty `name` (there is no catalog fallback).
@@ -366,6 +403,8 @@ export interface AliasTargetGroup {
   selector: string;
   targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
 }
+
+export type PreferredApiValue = 'chat_completions' | 'messages' | 'gemini' | 'responses';
 
 export interface Alias {
   id: string;
@@ -388,6 +427,10 @@ export interface Alias {
     dtype?: 'fp16' | 'bf16' | 'fp8' | 'fp8_e4m3' | 'fp8_e5m2' | 'nvfp4' | 'int4' | 'int8';
   };
   enforce_limits?: boolean;
+  sticky_session?: boolean;
+  preferred_api?: Array<PreferredApiValue>;
+  pi_model?: { provider: string; model_id: string };
+  extraBody?: Record<string, any>;
 }
 
 export interface InferenceError {
@@ -447,7 +490,7 @@ export interface UsageRecord {
   costSource?: string;
   costMetadata?: string;
   startTime: number;
-  durationMs: number;
+  durationMs: number | null;
   isStreamed: boolean;
   responseStatus: string;
   ttftMs?: number;
@@ -537,78 +580,30 @@ const summaryRequestCache = new Map<
 const CONFIG_CACHE_TTL_MS = 20000;
 const configRequestCache = new Map<string, { expiresAt: number; promise: Promise<any> }>();
 
-// Cache for quota checker types fetched from backend
-let quotaCheckerTypesCache: Set<string> | null = null;
-let quotaCheckerTypesCacheTime: number = 0;
-const QUOTA_TYPES_CACHE_TTL_MS = 60000; // 1 minute cache
-
-// Fallback types - will be used until fetched from server
-const FALLBACK_QUOTA_CHECKER_TYPES = new Set([
-  'synthetic',
-  'naga',
-  'nanogpt',
-  'openai-codex',
-  'claude-code',
-  'zai',
-  'moonshot',
-  'novita',
-  'minimax',
-  'minimax-coding',
-  'kimi-code',
-  'openrouter',
-  'kilo',
-  'wisdomgate',
-  'apertis',
-  'copilot',
-  'poe',
-  'gemini-cli',
-  'antigravity',
-  'ollama',
-  'neuralwatt',
-  'zenmux',
-  'devpass',
-  'wafer',
-]);
-
-/**
- * Fetch valid quota checker types from the backend
- */
-async function fetchQuotaCheckerTypes(): Promise<Set<string>> {
-  const now = Date.now();
-  if (quotaCheckerTypesCache && now - quotaCheckerTypesCacheTime < QUOTA_TYPES_CACHE_TTL_MS) {
-    return quotaCheckerTypesCache;
-  }
-
-  try {
-    const response = await fetchWithAuth(`${API_BASE}/v0/management/quota-checker-types`);
-    if (response.ok) {
-      const data = await response.json();
-      if (Array.isArray(data.types)) {
-        quotaCheckerTypesCache = new Set(data.types);
-        quotaCheckerTypesCacheTime = now;
-        return quotaCheckerTypesCache;
-      }
-    }
-  } catch (error) {
-    // Silently fail and use fallback
-  }
-
-  return FALLBACK_QUOTA_CHECKER_TYPES;
+export interface QuotaCheckerType {
+  type: string;
+  displayName: string;
 }
 
-/**
- * Get valid quota checker types (sync version - returns fallback if not fetched)
- * Call fetchQuotaCheckerTypes() early to populate the cache
- */
-export function getQuotaCheckerTypes(): Set<string> {
-  return quotaCheckerTypesCache || FALLBACK_QUOTA_CHECKER_TYPES;
+export interface QuotaCheckersResponse {
+  knownTypes: QuotaCheckerType[];
+  configured: (QuotaCheckerInfo & { displayName: string; pending: boolean })[];
 }
 
-/**
- * Initialize quota checker types cache
- */
-export async function initQuotaCheckerTypes(): Promise<void> {
-  await fetchQuotaCheckerTypes();
+export async function fetchQuotaCheckers(): Promise<QuotaCheckersResponse> {
+  const response = await fetchWithAuth(`${API_BASE}/v0/management/quota-checkers`);
+  if (!response.ok) throw new Error('Failed to fetch quota checkers');
+  const data = await response.json();
+  return {
+    knownTypes: data.knownTypes ?? [],
+    configured: (data.configured ?? []).map(
+      (c: QuotaCheckerInfo & { displayName: string; pending: boolean }) => ({
+        ...normalizeQuotaCheckerInfo(c),
+        displayName: c.displayName,
+        pending: c.pending,
+      })
+    ),
+  };
 }
 
 // Re-export GpuProfileOption from shared package for use by other components
@@ -625,10 +620,9 @@ const normalizeProviderQuotaChecker = (checker?: {
   const type = checker.type?.trim();
   if (!type) return undefined;
 
-  const isValidType = getQuotaCheckerTypes().has(type);
   return {
     type,
-    enabled: isValidType ? checker.enabled !== false : false,
+    enabled: checker.enabled !== false,
     intervalMinutes: Math.max(1, Number(checker.intervalMinutes || 30)),
     options: checker.options,
   };
@@ -919,6 +913,8 @@ export interface KeyConfig {
   allowedProviders?: string[];
   excludedModels?: string[];
   excludedProviders?: string[];
+  allowedIps?: string[];
+  beta?: boolean;
 }
 
 export type UsageSortField =
@@ -1039,33 +1035,15 @@ export const api = {
 
   getStats: async (): Promise<Stat[]> => {
     try {
-      const now = normalizeNow();
-      const startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 7);
-      const usageResponse = await fetchUsageRecords({
-        limit: 1000,
-        startDate: startDate.toISOString(),
-        fields: ['tokensInput', 'tokensOutput', 'tokensCached', 'tokensCacheWrite', 'durationMs'],
-        cache: true,
-      });
-
-      const config = await fetchConfigCached();
+      const [summary, config] = await Promise.all([
+        fetchUsageSummary('week', true),
+        fetchConfigCached(),
+      ]);
       const activeProviders = config ? Object.keys(config.providers || {}).length : '-';
 
-      const records = usageResponse.data || [];
-      const totalRequests = usageResponse.total;
-      const totalTokens = records.reduce(
-        (acc, r) =>
-          acc +
-          (r.tokensInput || 0) +
-          (r.tokensOutput || 0) +
-          (r.tokensCached || 0) +
-          (r.tokensCacheWrite || 0),
-        0
-      );
-      const avgLatency = records.length
-        ? Math.round(records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / records.length)
-        : 0;
+      const totalRequests = summary.stats.totalRequests || 0;
+      const totalTokens = summary.stats.totalTokens || 0;
+      const avgLatency = Math.round(summary.stats.avgDurationMs || 0);
 
       return [
         { label: STAT_LABELS.REQUESTS, value: formatNumber(totalRequests, 0) },
@@ -1363,6 +1341,7 @@ export const api = {
 
       records.forEach((r) => {
         const name = r.incomingModelAlias || 'Unknown';
+        if (name.startsWith('direct/')) return;
         if (!aggregated[name]) {
           aggregated[name] = { name, requests: 0, tokens: 0 };
         }
@@ -1474,7 +1453,13 @@ export const api = {
       const aggregated: Record<string, PieChartDataPoint> = {};
 
       records.forEach((r) => {
-        const name = r.apiKey ? `${r.apiKey.slice(0, 8)}...` : 'Unknown';
+        if (r.apiKey === 'probe') return;
+
+        const name = r.apiKey
+          ? r.apiKey.length > 8
+            ? `${r.apiKey.slice(0, 8)}...`
+            : r.apiKey
+          : 'Unknown';
         if (!aggregated[name]) {
           aggregated[name] = { name, requests: 0, tokens: 0 };
         }
@@ -1608,6 +1593,8 @@ export const api = {
           allowedProviders?: string[];
           excludedModels?: string[];
           excludedProviders?: string[];
+          allowedIps?: string[];
+          beta?: boolean;
         }
       >;
 
@@ -1620,6 +1607,8 @@ export const api = {
         allowedProviders: val.allowedProviders,
         excludedModels: val.excludedModels,
         excludedProviders: val.excludedProviders,
+        allowedIps: val.allowedIps,
+        beta: val.beta,
       }));
     } catch (e) {
       console.error('API Error getKeys', e);
@@ -1641,12 +1630,16 @@ export const api = {
           allowedProviders: keyConfig.allowedProviders ?? [],
           excludedModels: keyConfig.excludedModels ?? [],
           excludedProviders: keyConfig.excludedProviders ?? [],
+          allowedIps: keyConfig.allowedIps ?? [],
+          beta: !!keyConfig.beta,
         }),
       }
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to save key');
+      const detail =
+        Array.isArray(err.details) && err.details[0]?.message ? `: ${err.details[0].message}` : '';
+      throw new Error(`${err.error || 'Failed to save key'}${detail}`);
     }
 
     // Delete old key only after new one is saved successfully
@@ -1701,6 +1694,7 @@ export const api = {
           useClaudeMasking: val.useClaudeMasking === true,
           geminiThinkingEnabled: val.gemini_thinking_enabled === true,
           disableCooldown: val.disable_cooldown === true,
+          stallCooldown: val.stall_cooldown === true,
           discount: val.discount,
           headers: val.headers,
           extraBody:
@@ -1709,6 +1703,21 @@ export const api = {
               : {},
           models: normalizedModels,
           quotaChecker: normalizeProviderQuotaChecker(val.quota_checker),
+          modelAutosync: val.model_autosync
+            ? {
+                enabled: val.model_autosync.enabled === true,
+                intervalMinutes: Math.max(1, val.model_autosync.intervalMinutes || 60),
+              }
+            : { enabled: false, intervalMinutes: 60 },
+          adapter: val.adapter ? (Array.isArray(val.adapter) ? val.adapter : [val.adapter]) : [],
+          timeoutMs: val.timeoutMs ?? undefined,
+          maxConcurrency: val.maxConcurrency ?? undefined,
+          stallTtfbMs: val.stallTtfbMs ?? undefined,
+          stallTtfbBytes: val.stallTtfbBytes ?? undefined,
+          stallMinBps: val.stallMinBps ?? undefined,
+          stallWindowMs: val.stallWindowMs ?? undefined,
+          stallGracePeriodMs: val.stallGracePeriodMs ?? undefined,
+          pi_ai_provider: val.pi_ai_provider ?? undefined,
         };
       });
     } catch (e) {
@@ -1729,6 +1738,7 @@ export const api = {
       useClaudeMasking: provider.useClaudeMasking,
       geminiThinkingEnabled: provider.geminiThinkingEnabled,
       disable_cooldown: provider.disableCooldown === true ? true : undefined,
+      stall_cooldown: provider.stallCooldown === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,
@@ -1741,6 +1751,10 @@ export const api = {
             options: provider.quotaChecker.options,
           }
         : undefined,
+      model_autosync: {
+        enabled: provider.modelAutosync?.enabled === true,
+        intervalMinutes: Math.max(1, provider.modelAutosync?.intervalMinutes || 60),
+      },
       // GPU Profile settings — always send resolved numeric fields so backend
       // never needs to resolve profile names. gpu_profile is a display hint only.
       ...(provider.gpu_profile ? { gpu_profile: provider.gpu_profile } : {}),
@@ -1752,6 +1766,17 @@ export const api = {
       ...(provider.gpu_power_draw_watts != null
         ? { gpu_power_draw_watts: provider.gpu_power_draw_watts }
         : {}),
+      ...(provider.adapter && provider.adapter.length > 0 ? { adapter: provider.adapter } : {}),
+      ...(provider.timeoutMs != null ? { timeoutMs: provider.timeoutMs } : {}),
+      ...(provider.maxConcurrency != null ? { maxConcurrency: provider.maxConcurrency } : {}),
+      ...(provider.stallTtfbMs != null ? { stallTtfbMs: provider.stallTtfbMs } : {}),
+      ...(provider.stallTtfbBytes != null ? { stallTtfbBytes: provider.stallTtfbBytes } : {}),
+      ...(provider.stallMinBps != null ? { stallMinBps: provider.stallMinBps } : {}),
+      ...(provider.stallWindowMs != null ? { stallWindowMs: provider.stallWindowMs } : {}),
+      ...(provider.stallGracePeriodMs != null
+        ? { stallGracePeriodMs: provider.stallGracePeriodMs }
+        : {}),
+      ...(provider.pi_ai_provider ? { pi_ai_provider: provider.pi_ai_provider } : {}),
     };
 
     const res = await fetchWithAuth(
@@ -1854,11 +1879,19 @@ export const api = {
       additional_aliases: alias.aliases,
       use_image_fallthrough: alias.use_image_fallthrough || false,
       enforce_limits: alias.enforce_limits || false,
+      sticky_session: alias.sticky_session || false,
+      ...(alias.preferred_api &&
+        alias.preferred_api.length > 0 && {
+          preferred_api: alias.preferred_api,
+        }),
       ...(alias.type && { type: alias.type }),
       ...(alias.advanced && alias.advanced.length > 0 && { advanced: alias.advanced }),
       ...(alias.metadata && { metadata: alias.metadata }),
+      ...(alias.pi_model && { pi_model: alias.pi_model }),
       // Model architecture override for inference energy calculation
       ...(alias.model_architecture && { model_architecture: alias.model_architecture }),
+      ...(alias.extraBody &&
+        Object.keys(alias.extraBody).length > 0 && { extraBody: alias.extraBody }),
       target_groups: alias.target_groups.map((g) => ({
         name: g.name,
         selector: g.selector,
@@ -1974,9 +2007,16 @@ export const api = {
           target_groups: targetGroups,
           use_image_fallthrough: val.use_image_fallthrough || false,
           enforce_limits: val.enforce_limits || false,
+          sticky_session: val.sticky_session || false,
           advanced: val.advanced || [],
           metadata: val.metadata,
           model_architecture: val.model_architecture,
+          preferred_api: val.preferred_api || [],
+          pi_model: val.pi_model,
+          extraBody:
+            val.extraBody && typeof val.extraBody === 'object' && !Array.isArray(val.extraBody)
+              ? val.extraBody
+              : {},
         });
       });
       return aliases;
@@ -1989,7 +2029,7 @@ export const api = {
   getDebugLogs: async (
     limit: number = 50,
     offset: number = 0
-  ): Promise<{ requestId: string; createdAt: number }[]> => {
+  ): Promise<{ requestId: string; createdAt: number; responseStatus: number | null }[]> => {
     try {
       const res = await fetchWithAuth(
         `${API_BASE}/v0/management/debug/logs?limit=${limit}&offset=${offset}`
@@ -2249,7 +2289,7 @@ export const api = {
   ): Promise<{
     success: boolean;
     error?: string;
-    durationMs: number;
+    durationMs: number | null;
     response?: string;
     apiType?: string;
   }> => {
@@ -2560,6 +2600,36 @@ export const api = {
       throw new Error(`Failed to look up model metadata: ${res.statusText}`);
     }
     const json = (await res.json()) as { data: NormalizedModelMetadata };
+    return json.data;
+  },
+
+  refreshModelMetadata: async (): Promise<ModelMetadataRefreshResult> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/models/metadata/refresh`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to refresh model metadata');
+    }
+    return (await res.json()) as ModelMetadataRefreshResult;
+  },
+
+  getPiProviders: async (): Promise<string[]> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/pi/providers`);
+    if (!res.ok) throw new Error('Failed to fetch pi providers');
+    const json = (await res.json()) as { data: string[] };
+    return json.data;
+  },
+
+  getPiModels: async (
+    provider: string,
+    q?: string
+  ): Promise<Array<{ id: string; name: string; api: string }>> => {
+    const params = new URLSearchParams({ provider });
+    if (q) params.set('q', q);
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/pi/models?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch pi models');
+    const json = (await res.json()) as { data: Array<{ id: string; name: string; api: string }> };
     return json.data;
   },
 
@@ -2886,6 +2956,7 @@ export const api = {
     allowedModels?: string[];
     quotaName?: string | null;
     comment?: string | null;
+    beta?: boolean;
     traceEnabled?: boolean;
     traceEnabledGlobal?: boolean;
   }> => {
@@ -3042,6 +3113,18 @@ export const api = {
     return res.json();
   },
 
+  /** Reset all request logs, error logs, and debug trace logs. */
+  resetLogs: async (): Promise<{ success: boolean; message: string }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/logs/reset`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Reset logs failed' }));
+      throw new Error(err.error || 'Reset logs failed');
+    }
+    return res.json();
+  },
+
   // ─── Failover Settings ────────────────────────────────────────────
 
   /** Fetch current failover policy. */
@@ -3103,6 +3186,31 @@ export const api = {
     return res.json();
   },
 
+  // ─── Trusted Proxies ───────────────────────────────────────────────
+
+  /** Fetch the trusted-proxy allowlist (IPs/CIDRs whose forwarding headers are honored). */
+  getTrustedProxies: async (): Promise<{ trustedProxies: string[] }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/trusted-proxies`);
+    if (!res.ok) throw new Error('Failed to fetch trusted proxies');
+    return res.json();
+  },
+
+  /** Replace the trusted-proxy allowlist. */
+  patchTrustedProxies: async (trustedProxies: string[]): Promise<{ trustedProxies: string[] }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/trusted-proxies`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trustedProxies }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail =
+        Array.isArray(err.details) && err.details[0]?.message ? `: ${err.details[0].message}` : '';
+      throw new Error(`${err.error || 'Failed to update trusted proxies'}${detail}`);
+    }
+    return res.json();
+  },
+
   // ─── Exploration Rate Settings ─────────────────────────────────────
 
   /** Fetch current exploration rate settings. */
@@ -3132,6 +3240,121 @@ export const api = {
       body: JSON.stringify(updates),
     });
     if (!res.ok) throw new Error('Failed to update exploration rate settings');
+    return res.json();
+  },
+
+  // ─── Background Exploration Settings ──────────────────────────
+
+  /** Fetch current background exploration settings. */
+  getBackgroundExploration: async (): Promise<{
+    enabled: boolean;
+    stalenessThresholdSeconds: number;
+    workerConcurrency: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/background-exploration`);
+    if (!res.ok) throw new Error('Failed to fetch background exploration settings');
+    return res.json();
+  },
+
+  /** Patch background exploration settings. */
+  patchBackgroundExploration: async (updates: {
+    enabled?: boolean;
+    stalenessThresholdSeconds?: number;
+    workerConcurrency?: number;
+  }): Promise<{
+    enabled: boolean;
+    stalenessThresholdSeconds: number;
+    workerConcurrency: number;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/background-exploration`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update background exploration settings');
+    return res.json();
+  },
+
+  // ─── Timeout Settings ───────────────────────────────────────────
+
+  /** Fetch current timeout settings. */
+  getTimeoutConfig: async (): Promise<{ defaultSeconds: number }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/timeout`);
+    if (!res.ok) throw new Error('Failed to fetch timeout settings');
+    return res.json();
+  },
+
+  /** Patch timeout settings. */
+  patchTimeoutConfig: async (updates: {
+    defaultSeconds?: number;
+  }): Promise<{ defaultSeconds: number }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/timeout`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update timeout settings');
+    return res.json();
+  },
+
+  // ─── MCP Server Enabled ───────────────────────────────────────────
+
+  /** Fetch current MCP server enabled state. */
+  getMcpEnabled: async (): Promise<{ enabled: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/mcp-enabled`);
+    if (!res.ok) throw new Error('Failed to fetch MCP enabled state');
+    return res.json();
+  },
+
+  /** Enable or disable the MCP server. */
+  patchMcpEnabled: async (enabled: boolean): Promise<{ enabled: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/mcp-enabled`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) throw new Error('Failed to update MCP enabled state');
+    return res.json();
+  },
+
+  // ─── Stall Detection Settings ────────────────────────────────────
+
+  /** Fetch current stall detection settings. */
+  getStallConfig: async (): Promise<{
+    ttfbSeconds: number | null;
+    ttfbBytes: number;
+    minBytesPerSecond: number | null;
+    windowSeconds: number;
+    gracePeriodSeconds: number;
+    stallCooldown: boolean;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/stall`);
+    if (!res.ok) throw new Error('Failed to fetch stall detection settings');
+    return res.json();
+  },
+
+  /** Patch stall detection settings. */
+  patchStallConfig: async (updates: {
+    ttfbSeconds?: number | null;
+    ttfbBytes?: number;
+    minBytesPerSecond?: number | null;
+    windowSeconds?: number;
+    gracePeriodSeconds?: number;
+    stallCooldown?: boolean;
+  }): Promise<{
+    ttfbSeconds: number | null;
+    ttfbBytes: number;
+    minBytesPerSecond: number | null;
+    windowSeconds: number;
+    gracePeriodSeconds: number;
+    stallCooldown: boolean;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/stall`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update stall detection settings');
     return res.json();
   },
 };

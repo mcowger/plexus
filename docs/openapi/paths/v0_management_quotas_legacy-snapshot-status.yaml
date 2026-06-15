@@ -1,0 +1,49 @@
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Get legacy quota snapshot migration status (admin only)
+  description: |
+    Returns the current status of legacy quota snapshot data, including
+    counts and migration state.
+
+    ## Response fields
+
+    - `legacyCount` — Number of legacy snapshot records remaining
+    - `migratedCount` — Number of records migrated to new schema
+    - `migrationComplete` — Whether migration has finished
+    - `lastMigrationAt` — Timestamp of last migration run (ISO 8601)
+
+    ## Use case
+
+    Use this endpoint to:
+    1. Check if legacy data still exists
+    2. Monitor migration progress
+    3. Verify migration completion before cleanup
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Legacy snapshot migration status.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              legacyCount:
+                type: integer
+                description: Number of legacy snapshot records remaining
+              migratedCount:
+                type: integer
+                description: Number of records migrated to new schema
+              migrationComplete:
+                type: boolean
+                description: Whether migration has finished
+              lastMigrationAt:
+                type: string
+                format: date-time
+                description: Timestamp of last migration run
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotasLegacySnapshotStatus

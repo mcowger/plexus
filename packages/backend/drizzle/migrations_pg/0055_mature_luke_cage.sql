@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "stall_cooldown" boolean DEFAULT false NOT NULL;

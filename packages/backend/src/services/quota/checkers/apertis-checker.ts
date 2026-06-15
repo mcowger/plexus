@@ -24,6 +24,7 @@ interface ApertisBillingCreditsResponse {
 
 export default defineChecker({
   type: 'apertis',
+  displayName: 'Apertis',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Apertis API key is required'),
     endpoint: z.string().url().optional(),

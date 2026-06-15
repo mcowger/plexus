@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `timeout_ms` integer;

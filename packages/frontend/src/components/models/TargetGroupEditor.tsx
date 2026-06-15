@@ -11,15 +11,7 @@ interface TargetGroupEditorProps {
   onChange: (groups: AliasTargetGroup[]) => void;
 }
 
-const SELECTOR_LABELS: Record<string, string> = {
-  random: 'Random',
-  in_order: 'In Order',
-  cost: 'Lowest Cost',
-  latency: 'Lowest Latency',
-  usage: 'Usage Balanced',
-  performance: 'Best Performance (post-TTFT)',
-  e2e_performance: 'Best E2E Performance',
-};
+import { SELECTOR_LABELS } from '../../lib/selectors';
 
 export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   groups,

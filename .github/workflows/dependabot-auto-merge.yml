@@ -1,0 +1,64 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request_target:
+  workflow_run:
+    workflows: ["PR Tests"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ── Approve Dependabot PRs immediately so they don't block on review ──
+  approve:
+    if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve PR
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Enable auto-merge only after PR Tests pass ──────────────────────────
+  merge:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR number from workflow run
+        id: pr
+        run: |
+          PR_NUMBER=$(echo '${{ toJson(github.event.workflow_run.pull_requests) }}' | jq -r '.[0].number // empty')
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "::notice::No PR associated with this workflow run, skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge for Dependabot PRs
+        if: steps.pr.outputs.skip == 'false'
+        run: |
+          PR_DATA=$(gh pr view "$PR_NUMBER" --json author,headRefOid)
+          AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          HEAD_SHA=$(echo "$PR_DATA" | jq -r '.headRefOid')
+
+          if [ "$HEAD_SHA" != "$WORKFLOW_HEAD_SHA" ]; then
+            echo "::notice::PR head changed since test run ($WORKFLOW_HEAD_SHA -> $HEAD_SHA), skipping"
+            exit 0
+          fi
+
+          if [ "$AUTHOR" = "dependabot[bot]" ]; then
+            echo "Enabling auto-merge for Dependabot PR #$PR_NUMBER"
+            gh pr merge --auto --squash "$PR_NUMBER"
+          else
+            echo "Not a Dependabot PR (author: $AUTHOR), skipping"
+          fi
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          WORKFLOW_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

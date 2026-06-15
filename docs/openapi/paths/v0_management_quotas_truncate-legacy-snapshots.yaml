@@ -1,0 +1,42 @@
+post:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Truncate legacy quota snapshots (admin only)
+  description: |
+    Deletes all legacy quota snapshot data after migration is complete.
+
+    ## Use case
+
+    Run this endpoint after confirming migration is complete to clean
+    up the legacy quota snapshot tables. This frees database space and
+    removes obsolete data.
+
+    ## Warnings
+
+    - **Irreversible**: This operation cannot be undone
+    - **Verify first**: Ensure migration is complete before truncating
+    - **Backup recommended**: Export legacy data before truncation
+
+    ## Response
+
+    Returns `{ ok: true }` on success.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Legacy snapshots truncated successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                const: true
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Truncation failed.
+  operationId: postV0ManagementQuotasTruncateLegacySnapshots

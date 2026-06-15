@@ -31,6 +31,7 @@ interface NeuralwattQuotaResponse {
 
 export default defineChecker({
   type: 'neuralwatt',
+  displayName: 'Neuralwatt',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Neuralwatt API key is required'),
     endpoint: z.string().url().optional(),

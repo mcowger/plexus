@@ -449,15 +449,44 @@ export async function registerUsageRoutes(
     // Also listen for 'created' for backward compatibility
     usageStorage.on('created', completedListener);
 
-    request.raw.on('close', () => {
+    // Periodic progress updates for in-flight requests (every 1s, fire-and-forget)
+    const progressInterval = setInterval(() => {
+      if (reply.raw.destroyed) return;
+      const updates = usageStorage.getProgressUpdates();
+      for (const update of updates) {
+        if (scopeKey && update.apiKey !== scopeKey) continue;
+        try {
+          reply.raw.write(
+            encode({
+              data: JSON.stringify(update),
+              event: 'progress',
+              id: String(Date.now()),
+            })
+          );
+        } catch {
+          // Fire-and-forget: ignore write errors
+        }
+      }
+    }, 1000);
+    progressInterval.unref?.();
+
+    // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
+    // and as a fallback for other disconnect scenarios.
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      clearInterval(progressInterval);
       usageStorage.off('started', startedListener);
       usageStorage.off('updated', updatedListener);
       usageStorage.off('completed', completedListener);
       usageStorage.off('created', completedListener);
-    });
+    };
+
+    reply.raw.on('close', cleanup);
 
     // Keep connection alive with periodic pings
-    while (!request.raw.destroyed) {
+    while (!reply.raw.destroyed) {
       await new Promise((resolve) => setTimeout(resolve, 10000));
       if (!reply.raw.destroyed) {
         reply.raw.write(
@@ -469,153 +498,8 @@ export async function registerUsageRoutes(
         );
       }
     }
-  });
 
-  /**
-   * GET /v0/management/concurrency
-   *
-   * Dual-mode concurrency endpoint:
-   *   - mode=live (default): Returns currently in-flight requests (durationMs IS NULL)
-   *     for the Live Metrics dashboard card.
-   *   - mode=timeline: Returns bucketed historical counts for Usage Analytics charts.
-   *
-   * Query parameters:
-   *   - mode: 'live' | 'timeline' (default: 'live')
-   *   - timeRange: 'hour' | 'day' | 'week' | 'month' (default: 'hour', timeline mode only)
-   *   - groupBy: 'provider' | 'model' (default: 'provider', timeline mode only)
-   */
-  fastify.get('/v0/management/concurrency', async (request, reply) => {
-    const query = request.query as any;
-    const mode = query.mode || 'live';
-
-    try {
-      const db = usageStorage.getDb();
-      const schema = getSchema();
-      const dialect = getCurrentDialect();
-
-      if (mode === 'timeline') {
-        // Timeline mode: bucketed request counts over time for Usage Analytics charts
-        const timeRange = query.timeRange || 'hour';
-        const groupBy = query.groupBy || 'provider'; // 'provider' or 'model'
-        const startDateStr = query.startDate;
-        const endDateStr = query.endDate;
-        const now = Date.now();
-
-        let startTime: number;
-        let endTime: number = now;
-
-        if (timeRange === 'custom' && startDateStr && endDateStr) {
-          const startDate = new Date(startDateStr);
-          const endDate = new Date(endDateStr);
-          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-            startTime = startDate.getTime();
-            endTime = endDate.getTime();
-          } else {
-            return reply.code(400).send({ error: 'Invalid date format' });
-          }
-        } else {
-          const ranges: Record<string, number> = {
-            hour: 60 * 60 * 1000,
-            day: 24 * 60 * 60 * 1000,
-            week: 7 * 24 * 60 * 60 * 1000,
-            month: 30 * 24 * 60 * 60 * 1000,
-          };
-          const windowMs = ranges[timeRange] ?? ranges.hour ?? 60 * 60 * 1000;
-          startTime = now - windowMs;
-        }
-
-        // Adaptive bucketing based on duration (prevent millions of rows for long ranges)
-        const durationMs = endTime - startTime;
-        const durationMinutes = durationMs / (1000 * 60);
-
-        // Use same adaptive thresholds as summary endpoint
-        const useMinuteBuckets = durationMinutes <= 30;
-        const use5MinuteBuckets = durationMinutes <= 24 * 60;
-        const useHourlyBuckets = durationMinutes <= 7 * 24 * 60;
-
-        let bucketSizeMs: number;
-        if (useMinuteBuckets) {
-          bucketSizeMs = 60000; // 1 minute
-        } else if (use5MinuteBuckets) {
-          bucketSizeMs = 300000; // 5 minutes
-        } else if (useHourlyBuckets) {
-          bucketSizeMs = 3600000; // 1 hour
-        } else {
-          bucketSizeMs = 21600000; // 6 hours
-        }
-
-        // Ensure maximum 100 buckets
-        const maxBuckets = 100;
-        const calculatedBuckets = Math.ceil(durationMs / bucketSizeMs);
-        if (calculatedBuckets > maxBuckets) {
-          bucketSizeMs = Math.ceil(durationMs / maxBuckets);
-        }
-
-        const bucketSizeMsLiteral = sql.raw(String(bucketSizeMs));
-        const bucketSql =
-          dialect === 'sqlite'
-            ? sql<number>`(CAST(${schema.requestUsage.startTime} AS INTEGER) / ${bucketSizeMsLiteral}) * ${bucketSizeMsLiteral}`
-            : sql<number>`(FLOOR(${schema.requestUsage.startTime}::double precision / ${bucketSizeMsLiteral}) * ${bucketSizeMsLiteral})`;
-
-        // Group by either provider or model (not both) to prevent Cartesian explosion
-        const groupField =
-          groupBy === 'model'
-            ? schema.requestUsage.canonicalModelName
-            : schema.requestUsage.provider;
-
-        const timelineScopeKey = scopedKeyName(request);
-        const results = await db
-          .select({
-            timestamp: bucketSql,
-            key: groupField,
-            count: sql<number>`count(*)`,
-          })
-          .from(schema.requestUsage)
-          .where(
-            and(
-              isNotNull(groupField),
-              gte(schema.requestUsage.startTime, startTime),
-              lte(schema.requestUsage.startTime, endTime),
-              ...(timelineScopeKey ? [eq(schema.requestUsage.apiKey, timelineScopeKey)] : [])
-            )
-          )
-          .groupBy(groupField, bucketSql)
-          .orderBy(bucketSql);
-
-        // Map 'key' back to 'provider' or 'model' for frontend compatibility
-        const mappedResults = results.map((row: any) => ({
-          timestamp: row.timestamp,
-          [groupBy]: row.key,
-          count: row.count,
-        }));
-
-        return reply.send({ data: mappedResults });
-      }
-
-      // Live mode (default): currently in-flight requests for Live Metrics card
-      const liveNow = Date.now();
-      const liveScopeKey = scopedKeyName(request);
-      const results = await db
-        .select({
-          provider: schema.requestUsage.provider,
-          model: schema.requestUsage.canonicalModelName,
-          count: sql<number>`COALESCE(count(*), 0)`,
-          timestamp: sql<number>`${liveNow}`,
-        })
-        .from(schema.requestUsage)
-        .where(
-          and(
-            isNull(schema.requestUsage.durationMs),
-            isNotNull(schema.requestUsage.provider),
-            gte(schema.requestUsage.startTime, liveNow - 60 * 60 * 1000),
-            ...(liveScopeKey ? [eq(schema.requestUsage.apiKey, liveScopeKey)] : [])
-          )
-        )
-        .groupBy(schema.requestUsage.provider, schema.requestUsage.canonicalModelName);
-
-      return reply.send({ data: results });
-    } catch (e: any) {
-      return reply.code(500).send({ error: e.message });
-    }
+    // Cleanup: socket destroyed (client disconnect or server shutdown)
+    cleanup();
   });
 }

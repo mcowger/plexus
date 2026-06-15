@@ -29,7 +29,7 @@ export default defineConfig({
     isolate: true,
     server: {
       deps: {
-        inline: ['zod', 'yaml', '@plexus/shared', '@mariozechner/pi-ai'],
+        inline: ['zod', 'yaml', '@plexus/shared', '@earendil-works/pi-ai'],
       },
     },
     onConsoleLog(log, type) {

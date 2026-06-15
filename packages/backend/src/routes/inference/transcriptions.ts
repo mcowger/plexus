@@ -9,6 +9,7 @@ import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { UnifiedTranscriptionRequest } from '../../types/unified';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
 
 export async function registerTranscriptionsRoute(
   fastify: FastifyInstance,
@@ -133,16 +134,20 @@ export async function registerTranscriptionsRoute(
         attribution: (request as any).attribution || null,
       });
 
-      DebugManager.getInstance().startLog(requestId, {
-        model,
-        filename: fileData.filename,
-        fileSize,
-        mimeType: fileData.mimetype,
-        language,
-        prompt: prompt ? '(provided)' : undefined,
-        response_format,
-        temperature,
-      });
+      DebugManager.getInstance().startLog(
+        requestId,
+        {
+          model,
+          filename: fileData.filename,
+          fileSize,
+          mimeType: fileData.mimetype,
+          language,
+          prompt: prompt ? '(provided)' : undefined,
+          response_format,
+          temperature,
+        },
+        sanitizeHeaders(request.headers as any)
+      );
 
       // Dispatch
       const unifiedResponse = await dispatcher.dispatchTranscription(unifiedRequest);

@@ -10,6 +10,10 @@ import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware } from '../../services/quota/quota-middleware';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
+import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { handleBetaChatCompletions } from '../../inference-v2';
 
 export async function registerChatRoute(
   fastify: FastifyInstance,
@@ -24,6 +28,10 @@ export async function registerChatRoute(
    * and translates the response back to OpenAI format.
    */
   fastify.post('/v1/chat/completions', async (request, reply) => {
+    if ((request as any).keyConfig?.beta === true) {
+      return handleBetaChatCompletions(request, reply, { usageStorage, quotaEnforcer });
+    }
+
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();
@@ -40,6 +48,7 @@ export async function registerChatRoute(
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
     usageStorage.emitStartedAsync(usageRecord);
 
+    let earlyDisconnect: ReturnType<typeof wireEarlyDisconnectDetection> | undefined;
     try {
       const body = request.body as any;
       usageRecord.incomingModelAlias = body.model;
@@ -78,7 +87,7 @@ export async function registerChatRoute(
         };
       }
 
-      DebugManager.getInstance().startLog(requestId, body);
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       // Check quota before processing
       if (quotaEnforcer) {
@@ -86,7 +95,16 @@ export async function registerChatRoute(
         if (!allowed) return;
       }
 
-      const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+      const abortController = new AbortController();
+      const { signal: dispatchSignal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
+      earlyDisconnect = wireEarlyDisconnectDetection(request, abortController);
+      const stallDetectionResult = wireStallDetection(abortController, getGlobalStallConfig());
+      const unifiedResponse = await dispatcher.dispatch(
+        unifiedRequest,
+        dispatchSignal,
+        resolveTimeoutMs,
+        stallDetectionResult?.addStallConfig
+      );
 
       // Emit 'updated' event with routing decision details
       usageStorage.emitUpdatedAsync({
@@ -116,12 +134,29 @@ export async function registerChatRoute(
         shouldEstimateTokens,
         body,
         quotaEnforcer,
-        (request as any).keyName
+        (request as any).keyName,
+        abortController,
+        stallDetectionResult
       );
 
+      earlyDisconnect?.cleanup();
       return result;
     } catch (e: any) {
-      usageRecord.responseStatus = 'error';
+      earlyDisconnect?.cleanup();
+      if (e?.routingContext?.code === 'client_disconnected') {
+        usageRecord.responseStatus = 'cancelled';
+        usageRecord.durationMs = Date.now() - startTime;
+        usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
+        usageRecord.retryHistory =
+          e.routingContext?.retryHistory || usageRecord.retryHistory || null;
+        usageStorage.saveRequest(usageRecord as UsageRecord);
+        logger.info(
+          `Request ${requestId}: ${e.message}, usage recorded as ${e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'cancelled'}`
+        );
+        return;
+      }
+      usageRecord.responseStatus =
+        e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'error';
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
       usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;

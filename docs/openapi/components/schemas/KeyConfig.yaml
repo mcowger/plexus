@@ -23,6 +23,18 @@ properties:
     description: >
       Restrict this key to specific providers only. If empty, the key
       can be used with any provider.
+  excludedProviders:
+    type: array
+    items:
+      type: string
+    description: >
+      Optional denylist. If set, routing will not use these provider IDs.
+  excludedModels:
+    type: array
+    items:
+      type: string
+    description: >
+      Optional denylist. If set, this key cannot use these model aliases.
   allowedModels:
     type: array
     items:

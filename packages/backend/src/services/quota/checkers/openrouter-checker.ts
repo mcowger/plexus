@@ -11,6 +11,7 @@ interface OpenRouterCreditsResponse {
 
 export default defineChecker({
   type: 'openrouter',
+  displayName: 'OpenRouter',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'OpenRouter management key is required'),
     endpoint: z.string().url().optional(),

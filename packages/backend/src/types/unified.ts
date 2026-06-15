@@ -94,6 +94,12 @@ export interface PlexusMetadata {
 
 export interface UnifiedChatRequest {
   requestId?: string;
+  /**
+   * Set by the Responses API route when the client supplied
+   * `previous_response_id`. Used by sticky-session routing to chain turns
+   * without hashing message content.
+   */
+  previousResponseId?: string;
   messages: UnifiedMessage[];
   model: string;
   max_tokens?: number;

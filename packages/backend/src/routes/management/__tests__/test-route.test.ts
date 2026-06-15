@@ -4,6 +4,7 @@ import { setConfigForTesting } from '../../../config';
 import { registerManagementRoutes } from '../../management';
 import { Dispatcher } from '../../../services/dispatcher';
 import { UsageStorageService } from '../../../services/usage-storage';
+import { ProbeService } from '../../../services/probe-service';
 
 const TEST_CONFIG = {
   providers: {},
@@ -93,6 +94,7 @@ describe('POST /v0/management/test', () => {
   let fastify: FastifyInstance;
   let mockUsageStorage: UsageStorageService;
   let mockDispatcher: Dispatcher;
+  let probeService: ProbeService;
 
   beforeEach(async () => {
     process.env.ADMIN_KEY = 'test-admin-key';
@@ -101,7 +103,8 @@ describe('POST /v0/management/test', () => {
     const deps = makeMockDeps();
     mockUsageStorage = deps.mockUsageStorage;
     mockDispatcher = deps.mockDispatcher;
-    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher);
+    probeService = new ProbeService(mockDispatcher, mockUsageStorage);
+    await registerManagementRoutes(fastify, mockUsageStorage, mockDispatcher, probeService);
     await fastify.ready();
   });
 
@@ -172,7 +175,7 @@ describe('POST /v0/management/test', () => {
     expect(body.error).toContain('Invalid API type');
   });
 
-  it('returns error for transcriptions apiType (not supported in test endpoint)', async () => {
+  it('returns 400 for transcriptions apiType (not supported in test endpoint)', async () => {
     const res = await fastify.inject({
       method: 'POST',
       url: '/v0/management/test',
@@ -180,11 +183,10 @@ describe('POST /v0/management/test', () => {
       payload: { provider: 'openai', model: 'whisper-1', apiType: 'transcriptions' },
     });
 
-    // transcriptions is not in TEST_TEMPLATES, so the request fails
+    expect(res.statusCode).toBe(400);
     const body = res.json();
     expect(body.success).toBe(false);
-    // The route returns 200 even on error
-    expect(res.statusCode).toBe(200);
+    expect(body.error).toMatch(/transcriptions/i);
   });
 
   it('emits started event when a test request begins', async () => {

@@ -3,7 +3,8 @@ get:
     - Events
   summary: Live backend log stream (admin only)
   description: |
-    Server-Sent Events stream of all backend log lines atDEBUG and above.
+    Server-Sent Events stream of backend log entries emitted at or above the
+    current runtime log level.
 
     ## Event format
 
@@ -15,7 +16,7 @@ get:
     ## Event payload
 
     Each `syslog` event contains:
-    - **level** — Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal`
+    - **level** — Log level: `error`, `warn`, `info`, `debug`, `verbose`, or `silly`
     - **message** — Log message text
     - **timestamp** — ISO 8601 timestamp
     - **context** — Additional fields (provider, model, requestId, etc.)

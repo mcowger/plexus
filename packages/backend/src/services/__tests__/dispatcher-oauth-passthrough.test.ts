@@ -25,7 +25,7 @@ import type { UnifiedChatRequest } from '../../types/unified';
 // test in oauth-transformer.test.ts.  This file covers the dispatcher-level
 // regression: the request must succeed, not throw.
 
-// @mariozechner/pi-ai is mocked globally in vitest.setup.ts.
+// @earendil-works/pi-ai is mocked globally in vitest.setup.ts.
 const { Dispatcher } = await import('../dispatcher');
 
 function oauthConfigWithChatAccessVia() {

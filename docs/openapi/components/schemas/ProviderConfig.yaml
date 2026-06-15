@@ -63,6 +63,12 @@ properties:
     description: >
       When true, disables automatic cooldown for this provider. Failed
       requests won't trigger exponential backoff. Use with caution.
+  stall_cooldown:
+    type: boolean
+    default: false
+    description: >
+      When enabled, stall detection cancellations will trigger cooldown for
+      this provider.
   discount:
     type: number
     minimum: 0
@@ -104,6 +110,30 @@ properties:
               type: object
               additionalProperties: true
               description: Extra fields merged into the request body for this model.
+            adapter:
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    oneOf:
+                      - type: string
+                      - type: object
+                        required:
+                          - name
+                        properties:
+                          name:
+                            type: string
+                            description: Adapter name.
+                          options:
+                            type: object
+                            additionalProperties: true
+                            description: Adapter-specific options.
+              description: >
+                Adapter name(s) applied to this specific model. Appended after
+                any provider-level adapters. Accepts bare strings or
+                `{ name, options }` objects for parameterized adapters
+                (e.g. `model_override` with rules). See the provider-level
+                `adapter` field for available values.
         description: >
           Map of model ID → per-model configuration. Allows per-model pricing
           overrides and access aliases.
@@ -117,6 +147,13 @@ properties:
     description: >
       Static headers forwarded on every request to this provider. Useful for
       custom authentication schemes or provider-specific requirements.
+  maxConcurrency:
+    type: [integer, "null"]
+    minimum: 1
+    description: >
+      Max concurrency across all models. Optional per-provider limit on
+      how many requests can be in-flight simultaneously. Empty/null means
+      no limit.
   extraBody:
     type: object
     additionalProperties: true
@@ -128,6 +165,11 @@ properties:
     description: >
       When true, token counts are estimated locally rather than relying on
       the provider's response. Useful for providers that omit usage fields.
+  geminiThinkingEnabled:
+    type: boolean
+    description: >
+      When true, enables Gemini-native thinking (extended reasoning) for this
+      provider. Only applicable to Gemini-compatible providers.
   useClaudeMasking:
     type: boolean
     default: false
@@ -141,6 +183,21 @@ properties:
       Optional provider-level quota checker configuration. References a
       quota checker type from `GET /v0/management/quota-checker-types`.
     additionalProperties: true
+  model_autosync:
+    type: object
+    description: >
+      Optional provider-level model discovery sync. When enabled, Plexus
+      periodically fetches the provider's known model list and adds any missing
+      models to this provider's `models` configuration without removing or
+      overwriting existing model entries.
+    properties:
+      enabled:
+        type: boolean
+        default: false
+      intervalMinutes:
+        type: integer
+        minimum: 1
+        default: 60
   gpu_profile:
     type: string
     description: >
@@ -161,3 +218,113 @@ properties:
   gpu_power_draw_watts:
     type: number
     description: GPU TDP in watts. Used for energy estimation.
+  adapter:
+    oneOf:
+      - type: string
+      - type: array
+        items:
+          oneOf:
+            - type: string
+            - type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Adapter name.
+                options:
+                  type: object
+                  additionalProperties: true
+                  description: Adapter-specific options.
+    description: >
+      Adapter name(s) applied to every model under this provider.
+      Adapters rewrite outbound request payloads (preDispatch) and inbound
+      provider responses (postDispatch) to fix provider-specific field-name
+      incompatibilities. Applied before model-level adapters.
+
+      Adapters can be specified as bare strings (backward compatible) or as
+      objects with `{ name, options }` for adapters that require configuration.
+
+      Available adapters:
+
+      - `reasoning_content` — Renames `reasoning`/`thinking.content` →
+        `reasoning_content` on outbound assistant messages. Fixes Fireworks/
+        DeepSeek providers that reject the `reasoning` field name.
+
+      - `suppress_developer_role` — Rewrites the `developer` role to `system`
+        for providers that do not support the OpenAI `developer` role.
+
+      - `model_override` — Conditionally rewrites the provider model name
+        based on request payload fields. Accepts a `rules` array in options
+        where each rule specifies a `model` to match, a `rewriteTo` model name,
+        and an array of `conditions` (OR semantics) using dotted field paths.
+        Used for providers that expose reasoning variants as separate model
+        names rather than respecting reasoning-related request fields.
+
+      - `reasoning_rewrite` — Declaratively rewrites reasoning/thinking fields
+        in outbound request payloads. Different providers accept reasoning
+        effort via different field names (e.g. `enable_thinking`, `thinking.type`,
+        `chat_template_kwargs.enable_thinking`, `budget_tokens`, `thinking_budget`).
+        This adapter maps from unified fields (e.g. `reasoning.enabled`,
+        `reasoning.effort`) to provider-specific formats. Accepts a `rules`
+        array in options where each rule specifies a `source` dotted path,
+        an optional `when` condition (with `op` and `value`), an array of
+        `rewrites` (each with `target` and `value`), and optional `strip`
+        paths to remove after rewriting.
+
+      Pass-through optimisation is automatically disabled when any adapter
+      is active.
+  timeoutMs:
+    type: integer
+    minimum: 1
+    description: >
+      Optional per-provider upstream request timeout in milliseconds.
+      When omitted, Plexus uses the global timeout from
+      `/v0/management/config/timeout`.
+  stallTtfbMs:
+    type:
+      - integer
+      - 'null'
+    minimum: 5000
+    maximum: 120000
+    description: >
+      Optional per-provider TTFB stall timeout override in milliseconds.
+      Omit to inherit the global value. `null` disables TTFB stall detection
+      for this provider.
+  stallTtfbBytes:
+    type:
+      - integer
+      - 'null'
+    minimum: 50
+    maximum: 10000
+    description: >
+      Optional per-provider byte threshold used to confirm meaningful first
+      output for stall detection. Omit to inherit the global value.
+  stallMinBps:
+    type:
+      - integer
+      - 'null'
+    minimum: 50
+    maximum: 5000
+    description: >
+      Optional per-provider minimum throughput override in bytes per second.
+      Omit to inherit the global value. `null` disables throughput stall
+      detection for this provider.
+  stallWindowMs:
+    type:
+      - integer
+      - 'null'
+    minimum: 3000
+    maximum: 30000
+    description: >
+      Optional per-provider sliding-window width for throughput stall
+      detection, in milliseconds. Omit to inherit the global value.
+  stallGracePeriodMs:
+    type:
+      - integer
+      - 'null'
+    minimum: 0
+    maximum: 120000
+    description: >
+      Optional per-provider grace period before throughput stall detection
+      starts, in milliseconds. Omit to inherit the global value.

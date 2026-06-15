@@ -16,6 +16,7 @@ import {
 } from '../lib/api';
 import {
   KWH_PER_SLICE,
+  formatBytes,
   formatCost,
   formatEnergy,
   formatMs,
@@ -60,9 +61,18 @@ import {
   PlayCircle,
   Circle,
   X,
+  Ban,
+  Timer,
+  CheckCircle,
+  XCircle,
+  Gauge,
+  Wifi,
+  WifiOff,
+  Loader,
+  Pi,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import messagesLogo from '../assets/messages.svg';
@@ -106,14 +116,74 @@ const parseRetryHistory = (value?: string | null): RetryAttemptDetail[] => {
   }
 };
 
+const getOffsetFromSearchParams = (searchParams: URLSearchParams) => {
+  const offsetParam = searchParams.get('offset');
+  if (!offsetParam) return 0;
+
+  const parsedOffset = Number(offsetParam);
+  if (!Number.isFinite(parsedOffset) || parsedOffset < 0) return 0;
+
+  return Math.floor(parsedOffset);
+};
+
+interface PaginationControlsProps {
+  position: 'top' | 'bottom';
+  currentPage: number;
+  totalPages: number;
+  offset: number;
+  limit: number;
+  total: number;
+  onOffsetChange: (offset: number) => void;
+}
+
+const PaginationControls = ({
+  position,
+  currentPage,
+  totalPages,
+  offset,
+  limit,
+  total,
+  onOffsetChange,
+}: PaginationControlsProps) => (
+  <div
+    className={clsx(
+      'flex items-center justify-between gap-3 px-3 py-3 sm:justify-end',
+      position === 'top' ? 'border-b border-border' : 'border-t border-border'
+    )}
+  >
+    <span className="text-xs text-text-secondary font-mono">
+      Page {currentPage} of {Math.max(1, totalPages)}
+    </span>
+    <div className="flex gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={offset === 0}
+        onClick={() => onOffsetChange(Math.max(0, offset - limit))}
+      >
+        <ChevronLeft size={16} />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={offset + limit >= total}
+        onClick={() => onOffsetChange(offset + limit)}
+      >
+        <ChevronRight size={16} />
+      </Button>
+    </div>
+  </div>
+);
+
 export const Logs = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { adminKey, isAdmin, isLimited, principal } = useAuth();
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [limit] = useState(20);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(() => getOffsetFromSearchParams(searchParams));
   const [newestLogId, setNewestLogId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<UsageSortField>('date');
   const [sortDir, setSortDir] = useState<UsageSortDirection>('desc');
@@ -130,7 +200,19 @@ export const Logs = () => {
     antigravity: antigravityLogo,
     chat: chatLogo,
     gemini: geminiLogo,
+    // inference-v2 (pi-ai) outgoing API types
+    'google-generative-ai': geminiLogo,
+    'openai-completions': chatLogo,
+    'anthropic-messages': messagesLogo,
   };
+
+  // Outgoing API types produced exclusively by the inference-v2 (pi-ai native) path
+  const INFERENCE_V2_OUTGOING_TYPES = new Set([
+    'google-generative-ai',
+    'openai-completions',
+    'anthropic-messages',
+    'openai-responses',
+  ]);
 
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -145,10 +227,59 @@ export const Logs = () => {
   const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
 
   const filtersRef = useRef(filters);
+  // sseConnected tracks whether the live-update SSE stream is currently active.
+  // Used to stop the liveTick timer when the stream drops so duration counters freeze.
+  const sseConnected = useRef(false);
+  // sseStatus drives the visible connection indicator in the UI.
+  const [sseStatus, setSseStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>(
+    'disconnected'
+  );
 
   useEffect(() => {
     filtersRef.current = filters;
   }, [filters]);
+
+  interface ProgressUpdate {
+    requestId: string;
+    bytesReceived: number;
+    bytesPerSec: number | null;
+    state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
+    elapsedMs: number;
+  }
+
+  const progressMapRef = useRef<Map<string, ProgressUpdate>>(new Map());
+  // progressTick is incremented to trigger re-renders when progress data changes.
+  // The value itself is intentionally unused; only the setter is called.
+  const [, setProgressTick] = useState(0);
+  // liveTick triggers re-renders every 100ms so pending-request durations update live.
+  const [, setLiveTick] = useState(0);
+
+  useEffect(() => {
+    // Only tick while the SSE stream is active so duration counters freeze when it drops.
+    const interval = setInterval(() => {
+      if (sseConnected.current) setLiveTick((t) => t + 1);
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const nextOffset = getOffsetFromSearchParams(searchParams);
+    setOffset((currentOffset) => (currentOffset === nextOffset ? currentOffset : nextOffset));
+  }, [searchParams]);
+
+  const updateOffset = (nextOffset: number) => {
+    const normalizedOffset = Math.max(0, Math.floor(nextOffset));
+    setOffset(normalizedOffset);
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (normalizedOffset === 0) {
+        nextParams.delete('offset');
+      } else {
+        nextParams.set('offset', String(normalizedOffset));
+      }
+      return nextParams;
+    });
+  };
 
   const loadLogs = async () => {
     setLoading(true);
@@ -183,7 +314,7 @@ export const Logs = () => {
         await api.deleteAllUsageLogs(olderThanDays);
       }
       // Reset to first page
-      setOffset(0);
+      updateOffset(0);
       await loadLogs();
       setIsDeleteModalOpen(false);
     } finally {
@@ -226,28 +357,55 @@ export const Logs = () => {
 
     const controller = new AbortController();
 
-    const connect = async () => {
+    // Freeze pending logs and update connection status when the stream drops.
+    const handleDisconnect = () => {
+      sseConnected.current = false;
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.responseStatus === 'pending' && log.durationMs == null
+            ? { ...log, durationMs: Date.now() - log.startTime }
+            : log
+        )
+      );
+    };
+
+    // Attempt a single SSE connection.
+    // Returns:
+    //   true  — connected and stream ended (transient; safe to retry)
+    //   false — connection-level error (transient; safe to retry)
+    //   null  — permanent server error (4xx); stop retrying
+    const connectOnce = async (): Promise<boolean | null> => {
       try {
         const response = await fetch('/v0/management/events', {
-          headers: {
-            'x-admin-key': adminKey,
-          },
+          headers: { 'x-admin-key': adminKey },
           signal: controller.signal,
         });
 
         if (!response.ok) {
+          // Non-transient HTTP errors (401, 403, 404, etc.) — no point retrying.
+          if (response.status >= 400 && response.status < 500) {
+            handleDisconnect();
+            console.error(`SSE: permanent error ${response.status} — stopping reconnect`);
+            return null;
+          }
           throw new Error(`Failed to connect: ${response.statusText}`);
         }
 
         const reader = response.body?.getReader();
-        if (!reader) return;
+        if (!reader) return false;
+
+        sseConnected.current = true;
+        setSseStatus('connected');
 
         const decoder = new TextDecoder();
         let buffer = '';
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            handleDisconnect();
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n\n'); // SSE messages are separated by double newline
@@ -263,6 +421,17 @@ export const Logs = () => {
                 eventType = line.slice(7);
               } else if (line.startsWith('data: ')) {
                 eventData = line.slice(6);
+              }
+            }
+
+            // Handle progress updates for in-flight requests
+            if (eventType === 'progress' && eventData) {
+              try {
+                const update: ProgressUpdate = JSON.parse(eventData);
+                progressMapRef.current.set(update.requestId, update);
+                setProgressTick((t) => t + 1);
+              } catch {
+                // ignore malformed progress events
               }
             }
 
@@ -308,6 +477,10 @@ export const Logs = () => {
                 }
 
                 if (matches) {
+                  // If a completed event arrives, clear any stale progress entry
+                  if (eventType === 'completed') {
+                    progressMapRef.current.delete(newLog.requestId);
+                  }
                   setLogs((prev) => {
                     const existingIndex = prev.findIndex((l) => l.requestId === newLog.requestId);
                     if (existingIndex >= 0) {
@@ -330,28 +503,94 @@ export const Logs = () => {
             }
           }
         }
+
+        return true;
       } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          console.error('Log stream error:', err);
+        handleDisconnect();
+        if (err.name === 'AbortError') {
+          // Intentional teardown — do not retry.
+          throw err;
         }
+        console.error('Log stream error:', err);
+        return false;
       }
     };
 
-    connect();
+    // Reconnect loop with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (cap).
+    // Delay resets to 1s after any successful connection so a brief outage
+    // following a long stable session doesn't start with an accumulated delay.
+    const run = async () => {
+      const MAX_DELAY_MS = 30_000;
+      let delay = 1_000;
+
+      while (!controller.signal.aborted) {
+        const result = await connectOnce();
+
+        if (controller.signal.aborted) break;
+
+        // Permanent server error (4xx) — stop retrying entirely.
+        if (result === null) break;
+
+        // Reset backoff after a successful connection so the next drop after a
+        // long stable session starts back at 1 s instead of the accumulated delay.
+        if (result === true) delay = 1_000;
+
+        // Stream ended unexpectedly — start reconnecting.
+        setSseStatus('reconnecting');
+
+        // Wait before retrying, but bail early if aborted.
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, delay);
+          controller.signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true }
+          );
+        });
+
+        if (!controller.signal.aborted) {
+          delay = Math.min(delay * 2, MAX_DELAY_MS);
+        }
+      }
+
+      setSseStatus('disconnected');
+    };
+
+    run().catch(() => {
+      // AbortError from intentional teardown — suppress.
+      setSseStatus('disconnected');
+    });
 
     return () => {
+      sseConnected.current = false;
+      setSseStatus('disconnected');
       controller.abort();
+      // Freeze any in-flight logs that are still 'pending' so their duration
+      // counter stops at the moment the stream dropped rather than continuing forever.
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.responseStatus === 'pending' && log.durationMs == null
+            ? { ...log, durationMs: Date.now() - log.startTime }
+            : log
+        )
+      );
     };
   }, [offset, limit, adminKey, sortBy, sortDir]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setOffset(0); // Reset to first page
-    loadLogs();
+    if (offset === 0) {
+      loadLogs();
+      return;
+    }
+    updateOffset(0);
   };
 
   const handleSort = (field: UsageSortField) => {
-    setOffset(0);
+    updateOffset(0);
     if (sortBy === field) {
       setSortDir((current) => (current === 'desc' ? 'asc' : 'desc'));
       return;
@@ -413,18 +652,51 @@ export const Logs = () => {
             : 'All API requests routed through the gateway'
         }
         actions={
-          isAdmin ? (
-            <Button
-              onClick={handleDeleteAll}
-              variant="danger"
-              size="sm"
-              leftIcon={<Trash2 size={14} />}
-              disabled={logs.length === 0}
-              type="button"
-            >
-              Delete All
-            </Button>
-          ) : undefined
+          <>
+            {/* SSE live-update connection status — only visible when on page 1, sorted by date desc */}
+            {!!adminKey && offset === 0 && sortBy === 'date' && sortDir === 'desc' && (
+              <span
+                className={clsx(
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border select-none',
+                  sseStatus === 'connected' && 'bg-green-500/10 text-green-400 border-green-500/20',
+                  sseStatus === 'reconnecting' &&
+                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                  sseStatus === 'disconnected' &&
+                    'bg-red-500/10 text-text-muted border-border-glass'
+                )}
+                title={
+                  sseStatus === 'connected'
+                    ? 'Live updates active'
+                    : sseStatus === 'reconnecting'
+                      ? 'Reconnecting to live updates…'
+                      : 'Live updates disconnected'
+                }
+              >
+                {sseStatus === 'connected' && <Wifi size={12} />}
+                {sseStatus === 'reconnecting' && <Loader size={12} className="animate-spin" />}
+                {sseStatus === 'disconnected' && <WifiOff size={12} />}
+                <span className="hidden sm:inline">
+                  {sseStatus === 'connected'
+                    ? 'Live'
+                    : sseStatus === 'reconnecting'
+                      ? 'Reconnecting…'
+                      : 'Disconnected'}
+                </span>
+              </span>
+            )}
+            {isAdmin && (
+              <Button
+                onClick={handleDeleteAll}
+                variant="danger"
+                size="sm"
+                leftIcon={<Trash2 size={14} />}
+                disabled={logs.length === 0}
+                type="button"
+              >
+                Delete All
+              </Button>
+            )}
+          </>
         }
       >
         <form
@@ -490,6 +762,16 @@ export const Logs = () => {
 
       <PageContainer>
         <Card flush>
+          <PaginationControls
+            position="top"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            offset={offset}
+            limit={limit}
+            total={total}
+            onOffsetChange={updateOffset}
+          />
+
           <div className="space-y-3 p-3 lg:hidden">
             {loading ? (
               <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
@@ -514,7 +796,11 @@ export const Logs = () => {
                     ? 'border-success/30 bg-emerald-500/15 text-success'
                     : status === 'pending'
                       ? 'border-warning/30 bg-yellow-500/15 text-warning'
-                      : 'border-danger/30 bg-red-500/15 text-danger';
+                      : status === 'cancelled'
+                        ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
+                        : status === 'timeout'
+                          ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
+                          : 'border-danger/30 bg-red-500/15 text-danger';
 
                 return (
                   <article
@@ -536,10 +822,21 @@ export const Logs = () => {
                       </div>
                       <span
                         className={clsx(
-                          'inline-flex shrink-0 items-center rounded-md border px-2 py-1 text-[11px] font-semibold capitalize',
+                          'inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold capitalize',
                           statusClass
                         )}
                       >
+                        {status === 'success' ? (
+                          <CheckCircle size={10} />
+                        ) : status === 'pending' ? (
+                          <Plane size={10} className="animate-pulse" />
+                        ) : status === 'cancelled' ? (
+                          <Ban size={10} />
+                        ) : status === 'timeout' ? (
+                          <Timer size={10} />
+                        ) : (
+                          <XCircle size={10} />
+                        )}
                         {status}
                       </span>
                     </div>
@@ -591,14 +888,66 @@ export const Logs = () => {
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
                             Latency
                           </div>
-                          <div className="text-text">{formatMs(log.durationMs)}</div>
+                          <div className="text-text">
+                            {(() => {
+                              const progress =
+                                log.responseStatus === 'pending'
+                                  ? progressMapRef.current.get(log.requestId)
+                                  : undefined;
+                              const rawDurationMs =
+                                log.durationMs != null && log.durationMs > 0
+                                  ? log.durationMs
+                                  : log.responseStatus === 'pending'
+                                    ? Date.now() - log.startTime
+                                    : null;
+                              const liveDuration =
+                                rawDurationMs != null ? formatMs(rawDurationMs) : '-';
+                              if (progress) {
+                                return (
+                                  <div
+                                    style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+                                  >
+                                    <span>Duration: {liveDuration}</span>
+                                    <span
+                                      style={{
+                                        color: 'var(--color-text-secondary)',
+                                        fontSize: '0.85em',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      <CloudDownload size={11} className="text-yellow-400" />
+                                      <span>{formatBytes(progress.bytesReceived)}</span>
+                                    </span>
+                                    {progress.bytesPerSec != null && (
+                                      <span
+                                        style={{
+                                          color: 'var(--color-text-secondary)',
+                                          fontSize: '0.85em',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                        }}
+                                      >
+                                        <Gauge size={11} className="text-text-secondary" />
+                                        {formatBytes(progress.bytesPerSec)}/s
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return liveDuration;
+                            })()}
+                          </div>
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
                             Meta
                           </div>
                           <div className="text-text">
-                            {log.messageCount || 0} msg / {log.toolCallsCount || 0} tools
+                            {(log.messageCount || 0) === 0 ? '-' : log.messageCount} msg /{' '}
+                            {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount} tools
                           </div>
                         </div>
                       </div>
@@ -674,11 +1023,11 @@ export const Logs = () => {
                   </th>
                   <th
                     className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                    style={{ minWidth: '70px' }}
+                    style={{ minWidth: '130px' }}
                   >
                     {renderSortableHeader('Cost', 'costTotal')}
                   </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-w-[140px]">
                     {renderSortableHeader('Perf', 'durationMs')}
                   </th>
                   <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
@@ -760,7 +1109,7 @@ export const Logs = () => {
                       </td>
                       <td
                         className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
-                        title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
+                        title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.outgoingApiType && INFERENCE_V2_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
                         style={{ cursor: 'help' }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -803,7 +1152,8 @@ export const Logs = () => {
                                 <Volume2 size={16} className="text-orange-500" />
                               ) : log.outgoingApiType === 'images' ? (
                                 <ImageIcon size={16} className="text-fuchsia-500" />
-                              ) : log.outgoingApiType === 'responses' ? (
+                              ) : log.outgoingApiType === 'responses' ||
+                                log.outgoingApiType === 'openai-responses' ? (
                                 <MessagesSquare size={16} className="text-cyan-500" />
                               ) : log.outgoingApiType === 'oauth' ? (
                                 <ShieldCheck size={16} className="text-emerald-500" />
@@ -840,7 +1190,10 @@ export const Logs = () => {
                             <div
                               style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
                             >
-                              {log.isPassthrough ? (
+                              {log.outgoingApiType &&
+                              INFERENCE_V2_OUTGOING_TYPES.has(log.outgoingApiType) ? (
+                                <Pi size={12} className="text-emerald-400" />
+                              ) : log.isPassthrough ? (
                                 <MoveHorizontal size={12} className="text-yellow-500" />
                               ) : (
                                 <Languages size={12} className="text-purple-400" />
@@ -1055,108 +1408,156 @@ export const Logs = () => {
                       </td>
                       <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle">
                         {log.costTotal !== undefined && log.costTotal !== null ? (
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            {/* Left side: Total cost */}
-                            <div style={{ minWidth: '50px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {/* Row 1: Total cost */}
+                            <div>
                               {log.costSource ? (
                                 <CostToolTip
                                   source={log.costSource}
                                   costMetadata={log.costMetadata}
                                 >
                                   <span style={{ fontWeight: '500', cursor: 'help' }}>
-                                    {log.costTotal === 0 ? '∅' : formatCost(log.costTotal)}
+                                    {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
                                   </span>
                                 </CostToolTip>
                               ) : (
                                 <span style={{ fontWeight: '500' }}>
-                                  {log.costTotal === 0 ? '∅' : formatCost(log.costTotal)}
+                                  {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
                                 </span>
                               )}
                             </div>
-                            {/* Right side: Breakdown */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <CloudUpload size={10} className="text-blue-400" />
-                                <span
-                                  style={{
-                                    color: 'var(--color-text-secondary)',
-                                    fontSize: '0.85em',
-                                    minWidth: '35px',
-                                  }}
-                                >
-                                  {log.costInput === 0 ? '∅' : formatCost(log.costInput || 0)}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <CloudDownload size={10} className="text-green-400" />
-                                <span
-                                  style={{
-                                    color: 'var(--color-text-secondary)',
-                                    fontSize: '0.85em',
-                                    minWidth: '35px',
-                                  }}
-                                >
-                                  {log.costOutput === 0 ? '∅' : formatCost(log.costOutput || 0)}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <PackageOpen size={10} className="text-orange-400" />
-                                <span
-                                  style={{
-                                    color: 'var(--color-text-secondary)',
-                                    fontSize: '0.85em',
-                                    minWidth: '35px',
-                                  }}
-                                >
-                                  {log.costCached === 0 ? '∅' : formatCost(log.costCached || 0)}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <PencilLine size={10} className="text-fuchsia-400" />
-                                <span
-                                  style={{
-                                    color: 'var(--color-text-secondary)',
-                                    fontSize: '0.85em',
-                                    minWidth: '35px',
-                                  }}
-                                >
-                                  {log.costCacheWrite === 0
-                                    ? '∅'
-                                    : formatCost(log.costCacheWrite || 0)}
-                                </span>
-                              </div>
+                            {/* Separator */}
+                            <div
+                              style={{
+                                borderTop: '1px solid var(--color-border-glass)',
+                                margin: '1px 2px',
+                              }}
+                            />
+                            {/* Breakdown grid: 2 rows x 4 columns (icon, value, icon, value) */}
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'auto 1fr auto 1fr',
+                                gap: '2px 4px',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <CloudUpload size={10} className="text-blue-400" />
+                              <span
+                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
+                              >
+                                {log.costInput === 0 ? '$-.----' : formatCost(log.costInput || 0)}
+                              </span>
+                              <CloudDownload size={10} className="text-green-400" />
+                              <span
+                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
+                              >
+                                {log.costOutput === 0 ? '$-.----' : formatCost(log.costOutput || 0)}
+                              </span>
+                              <PackageOpen size={10} className="text-orange-400" />
+                              <span
+                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
+                              >
+                                {log.costCached === 0 ? '$-.----' : formatCost(log.costCached || 0)}
+                              </span>
+                              <PencilLine size={10} className="text-fuchsia-400" />
+                              <span
+                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
+                              >
+                                {log.costCacheWrite === 0
+                                  ? '$-.----'
+                                  : formatCost(log.costCacheWrite || 0)}
+                              </span>
                             </div>
                           </div>
                         ) : (
-                          <span style={{ color: 'var(--color-text-secondary)', fontSize: '1.2em' }}>
-                            ∅
+                          <span
+                            style={{
+                              color: 'var(--color-text-secondary)',
+                              fontSize: '1.2em',
+                              display: 'block',
+                              textAlign: 'center',
+                            }}
+                          >
+                            -
                           </span>
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span>Duration: {formatMs(log.durationMs)}</span>
-                          <span
-                            style={{
-                              color: 'var(--color-text-secondary)',
-                              fontSize: '0.85em',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : ''}
-                          </span>
-                          <span
-                            style={{
-                              color: 'var(--color-text-secondary)',
-                              fontSize: '0.85em',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {log.tokensPerSec && log.tokensPerSec > 0
-                              ? `TPS: ${formatTPS(log.tokensPerSec)}`
-                              : ''}
-                          </span>
-                        </div>
+                        {(() => {
+                          const progress =
+                            log.responseStatus === 'pending'
+                              ? progressMapRef.current.get(log.requestId)
+                              : undefined;
+                          const rawDurationMs =
+                            log.durationMs != null && log.durationMs > 0
+                              ? log.durationMs
+                              : log.responseStatus === 'pending'
+                                ? Date.now() - log.startTime
+                                : null;
+                          const liveDuration =
+                            rawDurationMs != null ? formatMs(rawDurationMs) : '-';
+                          if (progress) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span>Duration: {liveDuration}</span>
+                                <span
+                                  style={{
+                                    color: 'var(--color-text-secondary)',
+                                    fontSize: '0.85em',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  <CloudDownload size={12} className="text-yellow-400" />
+                                  <span>{formatBytes(progress.bytesReceived)}</span>
+                                </span>
+                                {progress.bytesPerSec != null && (
+                                  <span
+                                    style={{
+                                      color: 'var(--color-text-secondary)',
+                                      fontSize: '0.85em',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                  >
+                                    <Gauge size={12} className="text-text-secondary" />
+                                    {formatBytes(progress.bytesPerSec)}/s
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span>Duration: {liveDuration}</span>
+                              <span
+                                style={{
+                                  color: 'var(--color-text-secondary)',
+                                  fontSize: '0.85em',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {log.ttftMs && log.ttftMs > 0
+                                  ? `TTFT: ${formatMs(log.ttftMs)}`
+                                  : ''}
+                              </span>
+                              <span
+                                style={{
+                                  color: 'var(--color-text-secondary)',
+                                  fontSize: '0.85em',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {log.tokensPerSec && log.tokensPerSec > 0
+                                  ? `TPS: ${formatTPS(log.tokensPerSec)}`
+                                  : ''}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td
                         className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
@@ -1180,7 +1581,7 @@ export const Logs = () => {
                               <span
                                 style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}
                               >
-                                {log.messageCount || 0}
+                                {(log.messageCount || 0) === 0 ? '-' : log.messageCount}
                               </span>
                             </div>
                             <div
@@ -1195,7 +1596,7 @@ export const Logs = () => {
                                   minWidth: '20px',
                                 }}
                               >
-                                {log.toolCallsCount || 0}
+                                {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount}
                               </span>
                             </div>
                           </div>
@@ -1209,7 +1610,7 @@ export const Logs = () => {
                               <span
                                 style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}
                               >
-                                {log.toolsDefined || 0}
+                                {(log.toolsDefined || 0) === 0 ? '-' : log.toolsDefined}
                               </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1299,16 +1700,24 @@ export const Logs = () => {
                                   ? 'text-success border-success/30 bg-emerald-500/15'
                                   : log.responseStatus === 'pending'
                                     ? 'text-warning border-warning/30 bg-yellow-500/15'
-                                    : 'text-danger border-danger/30 bg-red-500/15'
+                                    : log.responseStatus === 'cancelled'
+                                      ? 'text-blue-400 border-blue-400/30 bg-blue-500/15'
+                                      : log.responseStatus === 'timeout'
+                                        ? 'text-orange-400 border-orange-400/30 bg-orange-500/15'
+                                        : 'text-danger border-danger/30 bg-red-500/15'
                               )}
                               style={{ width: '52px' }}
                             >
                               {log.responseStatus === 'success' ? (
-                                <span style={{ fontWeight: 600 }}>✓</span>
+                                <CheckCircle size={12} />
                               ) : log.responseStatus === 'pending' ? (
                                 <Plane size={12} className="animate-pulse" />
+                              ) : log.responseStatus === 'cancelled' ? (
+                                <Ban size={12} />
+                              ) : log.responseStatus === 'timeout' ? (
+                                <Timer size={12} />
                               ) : (
-                                <span style={{ fontWeight: 600 }}>✗</span>
+                                <XCircle size={12} />
                               )}
                             </div>
                           )}
@@ -1330,29 +1739,15 @@ export const Logs = () => {
             </table>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-3 sm:justify-end">
-            <span className="text-xs text-text-secondary font-mono">
-              Page {currentPage} of {Math.max(1, totalPages)}
-            </span>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-              >
-                <ChevronLeft size={16} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={offset + limit >= total}
-                onClick={() => setOffset(offset + limit)}
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
+          <PaginationControls
+            position="bottom"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            offset={offset}
+            limit={limit}
+            total={total}
+            onOffsetChange={updateOffset}
+          />
         </Card>
       </PageContainer>
 

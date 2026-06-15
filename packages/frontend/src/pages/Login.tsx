@@ -24,6 +24,25 @@ export const Login: React.FC = () => {
     }
   }, [isAuthenticated, navigate, from]);
 
+  useEffect(() => {
+    if (isAuthenticated) return;
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    if (!token) return;
+
+    // Strip token from URL immediately so it doesn't linger in the address bar.
+    navigate('/login', { replace: true });
+    // Pre-fill the input so the user sees what's happening.
+    setKey(token);
+
+    // Attempt login — AuthContext.login sets localStorage on success.
+    login(token).then((valid) => {
+      if (!valid) {
+        setError('Invalid key. Verify the prefix and try again.');
+      }
+    });
+  }, [isAuthenticated, location.search, navigate, login]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!key.trim()) {

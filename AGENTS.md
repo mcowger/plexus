@@ -1,188 +1,114 @@
-## Project Overview
+# Plexus agent rules
 
-**Plexus** is a unified API gateway for LLMs. Built on **Bun** + **Fastify**, it exposes OpenAI- and Anthropic-compatible endpoints and routes requests to any backend provider, handling request/response transformation automatically.
+This file is a **guardrail**, not general documentation.
+
+**Use order:**
+1. Read **Critical rules**.
+2. Match the task in **Task triggers**.
+3. Use the listed command/workflow exactly.
+4. If unsure, **ask** instead of guessing.
+
+## Critical rules
+
+- **NEVER** commit, push, or create a PR unless the user explicitly asks.
+- **NEVER** treat earlier permission as ongoing permission. Each individual commit/push needs fresh approval in local/interactive sessions.
+- **NEVER** use `--no-verify` or `LEFTHOOK=0` without user permission.
+- **NEVER** edit existing migration files.
+- **NEVER** manually create SQL migrations.
+- **NEVER** run `drizzle-kit generate` directly.
+- **NEVER** produce implementation or summary documents unless specifically requested.
+- **AVOID** searching library type definitions for documentation. Use context/search skills first when available.
+- **ASK** when requirements are ambiguous.
+
+## Task triggers
+
+### If the task changes database schema
+
+Before editing schema files:
+
+1. Read the **`db-schema-migrations`** skill.
+2. Update the Drizzle schema.
+3. Generate migrations with:
+
+```bash
+bun run generate-migrations
+bun run generate-migrations --name add_foo
+```
+
+4. Lint migrations with:
+
+```bash
+bun run lint:migrations
+```
+
+Rules:
+- On `main`, `--name` is required.
+- Random migration names like `rare_skullbuster` are rejected by CI.
+
+### If the task writes or updates tests
+
+Before editing tests:
+
+1. Read the **`vitest`** skill.
+2. Follow these project rules:
+   - Unit tests go in `__tests__/` alongside the source file.
+   - Integration tests go in `test/integration/`.
+   - Run tests with `bun run test`.
+   - Do **not** use `bun test`.
+   - Use `registerSpy` from `test/test-utils.ts` instead of raw `vi.spyOn`.
+   - `utils/logger` and `@earendil-works/pi-ai` are globally mocked; do not re-mock them in test files.
+   - Reset singletons via `resetForTesting()` methods in `beforeEach`.
+
+### If the task changes the Pi assistant workflow
+
+Files:
+- Workflow: `.github/workflows/pi-assistant.yml`
+- Prompt: `.github/prompts/pi-assistant.md`
+
+Rules:
+- To change agent instructions, edit `.github/prompts/pi-assistant.md`.
+- Do **not** put prompt text directly in the workflow YAML.
+- Available placeholders:
+  - `{{context.*}}` for `@actions/github` context
+  - `{{env.*}}` for environment variables passed to the step
+- Current explicit env passthrough: `INITIAL_COMMENT_ID`
+- If a needed value is not in `context.*`, add it to the `env:` block on the **Run Pi agent** step and reference it as `{{env.YOUR_VAR_NAME}}`.
+
+### If the task touches frontend CSS/assets/Tailwind
+
+Rules:
+- **NEVER** import CSS files with Tailwind directives into `.ts` or `.tsx` files.
+- Build CSS with `@tailwindcss/cli` from `packages/frontend`.
+- Input: `./src/globals.css`
+- Output: `./dist/main.css`
+- Keep this directive in `globals.css`:
+
+```css
+@source "../src/**/*.{tsx,ts,jsx,js}";
+```
+
+- Put assets in `packages/frontend/src/assets/`.
+- Import assets with ES6 imports only.
+- Do not use dynamic asset paths.
+
+## Canonical project commands
+
+Use these commands exactly:
+
+- Dev server: `bun run dev`
+- Dev port: `PORT=$(bun run dev:get:port)`
+- Dev DB path: `DB_PATH=$(bun run dev:get:db_path)`
+- Tests: `bun run test`
+- Type check: `bun run typecheck`
+- Format: `bun run format`
+- Format check: `bun run format:check`
+
+Notes:
+- `bun run dev` derives the backend port from the worktree name and runs the frontend watcher.
+- `bun test` is intentionally blocked. Use `bun run test`.
+
+## Project overview
+
+**Plexus** is a unified API gateway for LLMs built on **Bun** + **Fastify**. It exposes OpenAI- and Anthropic-compatible endpoints and routes requests to backend providers while handling request/response transformation.
 
 **Stack:** Bun, Fastify, Drizzle ORM (SQLite/Postgres), Zod, React frontend (Tailwind v4).
-
----
-
-## Critical Requirements
-
-- **NEVER** commit or push without explicit request, unless running in CI (`CI=true`). In local/interactive sessions, every individual commit and push requires explicit user permission — even if permission was granted earlier in the same session. Do not assume continued consent. In GitHub Actions (CI), commits and pushes are expected as part of the workflow and do not require per-instance approval.
-- **NEVER** use --no-verify or LEFTHOOK=0 without user permission.
-- **AVOID** search library type definitions for documentation. Use search and context skills where available first.
-- **NEVER** produce implementation or summary documents unless specifically requested.
-- **NEVER** edit existing migration files or manually create SQL migrations. See [Migrations](#migrations) below.
-- **Only errors matter.** When reading linter, type-checker, or build output, ignore warnings — only fix actual errors. Warnings should not block progress or require changes.
-
----
-
-## Efficiency & Batching
-
-Think ahead and **perform multiple reads, edits, and commands in the same response** whenever they don't depend on each other's results. Minimize round-trips by:
-
-- **Reading multiple files at once.** If you need to understand several files to diagnose a problem, issue all reads in one call rather than sequentially.
-- **Making multiple edits at once.** When changing several locations in a file, or multiple independent files, issue all edits in parallel.
-- **Batching independent tool calls.** Any tool calls (reads, edits, bash commands) that don't depend on each other's results should be issued in the same turn.
-- **Planning before acting.** Before calling a tool, consider what else you'll need and whether you can combine it with the current call. A little upfront planning avoids many round-trips.
-
----
-
-
-## Database & Migrations
-
-Drizzle ORM with SQLite (default) or Postgres.
-
-### Migrations
-
-**Migrations are auto-generated by CI after schema changes merge to `main`.** PRs should only contain schema `.ts` file changes — never migration artifacts.
-**Workflow:** Edit schema in `drizzle/schema/sqlite/` (and/or `postgres/`) → optionally validate locally with `bunx drizzle-kit generate` (don't commit output) → CI generates migrations on merge.
-**Adding a new table:** You MUST update `drizzle/schema/index.ts` to export the new schema, or `drizzle-kit generate` will report "No schema changes."
-**Enforcement:** Pre-commit hook blocks migration files. PR check workflow fails on migration changes. Post-merge CI generates them.
-**Bypasses (maintainers only):** `ALLOW_MIGRATIONS=1 git commit`, or add `migrations-ok` label to PR.
-
----
-
-## Development & Testing
-
-- **Dev server:** `bun run dev` (backend port 4000 + frontend watcher)
-- **Tests:** `bun run test` from the repo root or from `packages/backend/` (`bun test` is intentionally blocked both at repo root and in `packages/backend` with a guidance message)
-- **Format:** `bun run format` / `bun run format:check`
-
-
-### Test File Organization
-
-```
-packages/backend/
-├── src/
-│   └── <module>/
-│       ├── foo.ts                   # source file
-│       └── __tests__/
-│           └── foo.test.ts          # unit test — lives next to the source it tests
-└── test/
-    ├── vitest.setup.ts              # per-file setup (mocks, doubles)
-    ├── vitest.global-setup.ts       # once-per-run setup (DB creation, migrations)
-    ├── test-utils.ts                # shared spy/mock helpers
-    ├── bun-test-guard/              # meta guard — excluded from Vitest
-    └── integration/
-        └── vision-*.test.ts         # multi-component / cross-service tests
-```
-
-**Rules:**
-- **Unit tests** go in a `__tests__/` subdirectory alongside the source file they test. All imports use relative paths within `src/`.
-- **Integration tests** (tests that exercise multiple services/components together) go in `test/integration/`.
-- **Infrastructure** (setup files, shared utilities) stays in `test/` directly.
-- **Never** put unit tests in the top-level `test/` folder, and never put integration tests inside `src/`.
-- The Vitest `include` globs (`src/**/*.test.ts` and `test/**/*.test.ts`) cover both locations automatically.
-
-### Test Architecture
-
-Backend tests run on **Vitest** with two parallel projects (sqlite + postgres) defined in `vitest.config.ts`. Key settings that shape every testing decision:
-
-| Setting | Value | Effect |
-|---------|-------|--------|
-| `pool` | `forks` | Each test file runs in a child process fork |
-| `isolate` | `true` | Each test file gets its own module registry — modules are re-imported fresh per file |
-| `mockReset` | `true` | `vi.resetAllMocks()` before every test — clears `vi.fn()` call history and resets implementations to original |
-| `clearMocks` | `true` | Clears call history (redundant with mockReset but explicit) |
-| `restoreMocks` | `true` | Restores `vi.spyOn` mocks to originals after every test |
-
-**Global setup:** `packages/backend/test/vitest.global-setup.ts` — creates a temporary DB, runs migrations once, cleans up after the run. Runs once total.
-
-**Per-file setup:** `packages/backend/test/vitest.setup.ts` — **runs once per test file**. Installs the logger mock and the `@mariozechner/pi-ai` mock.
-
-**Rule 4 — Test shared mutable state through the system under test, not through direct mutation.**
-The `utils/logger` mock in `vitest.setup.ts` closes over a `currentLogLevel` variable that both the mock functions and route handlers share. Adding a competing `vi.mock` for the same path in a test file can bind different closures to different variables, causing silent mismatches. Tests for stateful behaviour (e.g., logging routes) must interact exclusively through the API/HTTP layer — never by calling `setCurrentLogLevel` or `getCurrentLogLevel` directly from test code.
-
-### Mocking Rules
-
-**Globally mocked modules** (registered in `vitest.setup.ts` — do NOT re-mock in test files):
-- `../src/utils/logger` — logger, logEmitter, level helpers
-- `@mariozechner/pi-ai` — getModels, getModel, complete (vi.fn), stream (vi.fn)
-
-**`@mariozechner/pi-ai` specifics:**
-- `getModels` covers all providers tests need including `openai-codex` (gpt-5.4) and `anthropic` (claude-test etc.)
-- `getModel` always returns the `api` field — `OAuthTransformer.executeRequest` dispatches on `model.api` and throws "No API provider registered" without it
-- `complete` and `stream` are `vi.fn()`. Because `mockReset: true` wipes them between tests, any test that needs a specific return value must call `vi.mocked(piAi.complete).mockResolvedValue(...)` in `beforeEach`
-- Because `vitest.setup.ts` re-runs per file, the `vi.fn()` spy in File A's namespace is a **different object** than in File B's namespace. Never assert `piAi.complete` call counts from a file that didn't fully own the dispatch call chain. Prefer asserting on observable outcomes (response values, HTTP status codes, absence of throws) over spy call counts for cross-file scenarios
-
-**For spy-count assertions on pi-ai calls:** put them in unit tests of the transformer layer (e.g., `oauth-transformer.test.ts`) where the test owns the full call chain within a single file.
-
-**For new module mocks:** if a test needs to mock a module NOT already in `vitest.setup.ts`, it may add its own `vi.mock` factory. That mock will be active only for that file's execution. Do not duplicate a mock already registered globally.
-
-### Using `registerSpy`
-
-Always use `registerSpy` from `test/test-utils.ts` instead of raw `vi.spyOn`. It registers the spy in a global tracker that the `test-utils` global `afterEach` automatically restores after every test, preventing leaks across files:
-
-```ts
-import { registerSpy } from '../../../test/test-utils';
-
-// Instead of:
-const spy = vi.spyOn(authManager, 'getApiKey');
-
-// Use:
-const spy = registerSpy(authManager, 'getApiKey').mockResolvedValue('token');
-```
-
-### `mockReset: true` and `vi.fn()` implementations
-
-`mockReset: true` resets all `vi.fn()` instances before every test:
-- `vi.fn()` (no impl) → implementation becomes `undefined` (returns undefined)
-- `vi.fn(impl)` → implementation resets to the original `impl`
-
-This means the global mock's `complete: vi.fn(async () => ({...}))` is safe — after reset it still works. But any `mockResolvedValue`/`mockImplementation` applied during a test is wiped before the next. Always re-apply overrides in `beforeEach`.
-
-### Singletons and test isolation
-
-Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `DebugManager`). Always reset them in `beforeEach`/`afterEach` using their provided `resetForTesting()` or equivalent methods. With `pool: forks` and `isolate: true`, singletons are re-initialized per file, but can still leak state between tests within the same file.
-
-### Other rules
-- `packages/backend/bunfig.toml` blocks raw `bun test` — use `bun run test` / `bun run test:watch`
-- Root `bunfig.toml` blocks raw `bun test` at repo root — use `cd packages/backend && bun run test`
-- **Prefer `bun run test` (affected only) over `bun run test:force-all`.** The default test command uses `--changed HEAD` and runs only tests affected by uncommitted changes — use it unless you have a specific reason to run the full suite (e.g., verifying a cross-cutting refactor or diagnosing flakiness unrelated to your changes). Never reach for `test:force-all` out of habit.
-- If you must mock a module, implement its **full public interface**
-- Do not use `__mocks__` directories for node_modules mocks — they are not reliably loaded by Vitest with `pool: forks`
-
----
-
-## Pi Assistant (AI Agent Workflow)
-
-The `/pi` trigger in issue and PR comments is handled by `.github/workflows/pi-assistant.yml`,
-which invokes `mcowger/pi-action`.
-
-### Prompt file
-
-The agent's system prompt lives at **`.github/prompts/pi-assistant.md`** — edit that file
-to change what the agent is instructed to do. Do not put prompt text inside the workflow YAML.
-
-The prompt file supports `{{dot.notation.path}}` placeholders resolved at runtime against
-two namespaces:
-
-| Namespace | Contents | Example |
-|-----------|----------|---------|
-| `context.*` | The full `@actions/github` context — event payload, actor, SHA, ref, repo, etc. | `{{context.payload.comment.body}}` |
-| `env.*` | All environment variables, including `GITHUB_*` / `RUNNER_*` runner vars and any values passed via the step's `env:` block | `{{env.INITIAL_COMMENT_ID}}` |
-
-Most GitHub context data is available automatically via `context.*`. The only value
-currently passed explicitly via `env:` is `INITIAL_COMMENT_ID`, because it is derived
-from a previous workflow step output and is not part of the event payload.
-
-### Workflow env: block
-
-If a new placeholder is needed that cannot be sourced from `context.*`, add it to the
-`env:` block on the **Run Pi agent** step in `pi-assistant.yml` and reference it as
-`{{env.YOUR_VAR_NAME}}` in the prompt file. Do not add it to any other step.
-
----
-
-## Frontend
-
-### Tailwind CSS v4
-- **NEVER** import CSS files with Tailwind directives into `.ts`/`.tsx` files — Bun's CSS loader breaks Tailwind v4 `@theme`/`@source`.
-- Build: `@tailwindcss/cli` from `packages/frontend`, input `./src/globals.css`, output `./dist/main.css`.
-- Source directive: `@source "../src/**/*.{tsx,ts,jsx,js}";` in `globals.css`.
-
-### Assets
-- Place in `packages/frontend/src/assets/`, import with ES6 imports. No dynamic paths.
-
-

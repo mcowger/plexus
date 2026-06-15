@@ -22,7 +22,8 @@ export class PerformanceSelector extends Selector {
 
     // Get exploration rate from config (default 5%)
     const config = getConfig();
-    const explorationRate = config.performanceExplorationRate ?? 0.05;
+    const bgEnabled = config.backgroundExploration?.enabled === true;
+    const explorationRate = bgEnabled ? 0 : (config.performanceExplorationRate ?? 0.05);
 
     // If no performance data exists, we might want to fall back to random or first.
     // For now, let's assume we want to pick the one with highest known performance.

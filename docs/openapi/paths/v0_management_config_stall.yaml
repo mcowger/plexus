@@ -1,0 +1,193 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get stall detection config (admin only)
+  description: |
+    Returns the global stream stall detection configuration.
+
+    Stall detection has two independent dimensions:
+
+    - **TTFB stall detection** — aborts providers that do not produce enough
+      initial bytes quickly enough
+    - **Throughput stall detection** — aborts streams that fall below a
+      minimum bytes-per-second threshold after a grace period
+
+    If both `ttfbSeconds` and `minBytesPerSecond` are `null`, stall
+    detection is effectively disabled globally.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Stall detection config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ttfbSeconds:
+                type:
+                  - integer
+                  - 'null'
+                minimum: 5
+                maximum: 120
+                description: Max seconds to wait for the first meaningful bytes. Null disables TTFB detection.
+              ttfbBytes:
+                type: integer
+                minimum: 50
+                maximum: 10000
+                description: Minimum bytes that must arrive within the TTFB window.
+              minBytesPerSecond:
+                type:
+                  - integer
+                  - 'null'
+                minimum: 50
+                maximum: 5000
+                description: Minimum acceptable throughput. Null disables throughput detection.
+              windowSeconds:
+                type: integer
+                minimum: 3
+                maximum: 30
+                description: Sliding window width for throughput measurement.
+              gracePeriodSeconds:
+                type: integer
+                minimum: 0
+                maximum: 120
+                description: Delay after TTFB success before throughput enforcement begins.
+            required:
+              - ttfbSeconds
+              - ttfbBytes
+              - minBytesPerSecond
+              - windowSeconds
+              - gracePeriodSeconds
+          examples:
+            disabled:
+              summary: Stall detection disabled globally
+              value:
+                ttfbSeconds: null
+                ttfbBytes: 100
+                minBytesPerSecond: null
+                windowSeconds: 10
+                gracePeriodSeconds: 30
+            enabled:
+              summary: TTFB and throughput stall detection enabled
+              value:
+                ttfbSeconds: 15
+                ttfbBytes: 100
+                minBytesPerSecond: 500
+                windowSeconds: 10
+                gracePeriodSeconds: 30
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigStall
+patch:
+  tags:
+    - Management — Config
+  summary: Update stall detection config (admin only)
+  description: |
+    Partially updates the global stall detection configuration.
+
+    Only provided fields are updated; omitted fields retain their current
+    values.
+
+    ## Validation rules
+
+    - `ttfbSeconds` — `null` or a number between 5 and 120
+    - `ttfbBytes` — Integer between 50 and 10000
+    - `minBytesPerSecond` — `null` or an integer between 50 and 5000
+    - `windowSeconds` — Integer between 3 and 30
+    - `gracePeriodSeconds` — Integer between 0 and 120
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ttfbSeconds:
+              type:
+                - integer
+                - 'null'
+              minimum: 5
+              maximum: 120
+              description: Null disables TTFB stall detection.
+            ttfbBytes:
+              type: integer
+              minimum: 50
+              maximum: 10000
+              description: Minimum bytes that must arrive within the TTFB window.
+            minBytesPerSecond:
+              type:
+                - integer
+                - 'null'
+              minimum: 50
+              maximum: 5000
+              description: Null disables throughput stall detection.
+            windowSeconds:
+              type: integer
+              minimum: 3
+              maximum: 30
+              description: Sliding window width for throughput measurement.
+            gracePeriodSeconds:
+              type: integer
+              minimum: 0
+              maximum: 120
+              description: Delay before throughput checks begin after TTFB success.
+        examples:
+          enable_ttfb_only:
+            summary: Enable only TTFB stall detection
+            value:
+              ttfbSeconds: 15
+              ttfbBytes: 100
+              minBytesPerSecond: null
+          enable_both:
+            summary: Enable TTFB and throughput detection
+            value:
+              ttfbSeconds: 15
+              ttfbBytes: 100
+              minBytesPerSecond: 500
+              windowSeconds: 10
+              gracePeriodSeconds: 30
+          disable_ttfb:
+            summary: Disable TTFB detection while keeping throughput checks
+            value:
+              ttfbSeconds: null
+              minBytesPerSecond: 400
+  responses:
+    '200':
+      description: Updated stall detection config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ttfbSeconds:
+                type:
+                  - integer
+                  - 'null'
+              ttfbBytes:
+                type: integer
+              minBytesPerSecond:
+                type:
+                  - integer
+                  - 'null'
+              windowSeconds:
+                type: integer
+              gracePeriodSeconds:
+                type: integer
+            required:
+              - ttfbSeconds
+              - ttfbBytes
+              - minBytesPerSecond
+              - windowSeconds
+              - gracePeriodSeconds
+    '400':
+      description: Invalid request body or validation failed.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigStall

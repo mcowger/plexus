@@ -1,8 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import { BackupService } from '../../services/backup-service';
+import type { UsageStorageService } from '../../services/usage-storage';
+import type { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 
-export async function registerBackupRoutes(fastify: FastifyInstance) {
+export async function registerBackupRoutes(
+  fastify: FastifyInstance,
+  usageStorage?: UsageStorageService,
+  mcpUsageStorage?: McpUsageStorageService
+) {
   const backupService = new BackupService();
 
   // ─── GET /v0/management/backup ──────────────────────────────────
@@ -93,4 +99,45 @@ export async function registerBackupRoutes(fastify: FastifyInstance) {
       done(null, body);
     }
   );
+
+  // ─── DELETE /v0/management/logs/reset ────────────────────────────
+
+  /**
+   * Reset all request logs, error logs, and debug trace logs.
+   * Cooldowns, configs etc. remain untouched.
+   */
+  fastify.delete('/v0/management/logs/reset', async (request, reply) => {
+    if (!usageStorage) {
+      return reply.code(500).send({ error: 'Usage storage service is not available' });
+    }
+    logger.info('[Backup] Starting logs reset (request logs, error logs, debug trace logs)');
+    try {
+      const [successUsage, successErrors, successDebug] = await Promise.all([
+        usageStorage.deleteAllUsageLogs(),
+        usageStorage.deleteAllErrors(),
+        usageStorage.deleteAllDebugLogs(),
+      ]);
+
+      let successMcp = true;
+      if (mcpUsageStorage) {
+        successMcp = await mcpUsageStorage.deleteAllLogs();
+      }
+
+      if (!successUsage || !successErrors || !successDebug || !successMcp) {
+        logger.error('[Backup] Reset logs partial failure:', {
+          successUsage,
+          successErrors,
+          successDebug,
+          successMcp,
+        });
+        return reply.code(500).send({ error: 'Failed to reset some logs' });
+      }
+
+      logger.info('[Backup] All logs reset successfully');
+      return reply.send({ success: true, message: 'All logs have been reset successfully' });
+    } catch (e: any) {
+      logger.error('[Backup] Reset logs failed:', e);
+      return reply.code(500).send({ error: e.message || 'Reset logs failed' });
+    }
+  });
 }

@@ -251,12 +251,18 @@ properties:
       - success
       - error
       - pending
+      - cancelled
+      - timeout
+      - stall
     description: >
       Outcome of the request.
 
       - **success** — Upstream returned a successful response.
       - **error** — Upstream returned an error or the request failed.
       - **pending** — Request is in-flight (used for async tracking).
+      - **cancelled** — The downstream client disconnected and Plexus cancelled the upstream request.
+      - **timeout** — Plexus aborted the upstream request because it exceeded the configured timeout.
+      - **stall** — Plexus aborted the request because stream stall detection fired.
   toolsDefined:
     type:
       - integer

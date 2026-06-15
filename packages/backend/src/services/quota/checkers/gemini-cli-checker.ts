@@ -1,7 +1,7 @@
 import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
-import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
+import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import { logger } from '../../../utils/logger';
 
 interface GeminiBucket {
@@ -72,6 +72,7 @@ function extractBuckets(data: GeminiQuotaResponse): GeminiBucket[] {
 
 export default defineChecker({
   type: 'gemini-cli',
+  displayName: 'Gemini CLI',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

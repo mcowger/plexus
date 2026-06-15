@@ -1,0 +1,38 @@
+get:
+  tags:
+    - Management — PI (Plexus Internal)
+  summary: List pi-ai provider IDs (admin only)
+  description: |
+    Returns the list of provider IDs known to the `pi-ai` library.
+    These are the providers available for model discovery via the
+    `/v0/management/pi/models` endpoint.
+
+    ## Use case
+
+    Use this endpoint to discover which providers are supported by
+    the pi-ai library, then query `/v0/management/pi/models` with a
+    specific provider to get available models.
+
+    ## Response format
+
+    Returns an array of provider ID strings (e.g., `["openai", "anthropic", "google"]`).
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: List of provider IDs.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: string
+                description: Provider ID strings
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementPiProviders

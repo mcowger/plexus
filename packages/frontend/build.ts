@@ -8,7 +8,16 @@ const buildCSS = async () => {
   console.log('Building CSS...');
   const proc = spawn(
     process.execPath,
-    ['x', '@tailwindcss/cli', '-i', './src/globals.css', '-o', './dist/main.css'],
+    [
+      'x',
+      '-p',
+      '@tailwindcss/cli',
+      'tailwindcss',
+      '-i',
+      './src/globals.css',
+      '-o',
+      './dist/main.css',
+    ],
     {
       stdio: 'inherit',
       cwd: '.',

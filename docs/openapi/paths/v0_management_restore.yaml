@@ -31,8 +31,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: '#/components/schemas/ConfigBackupEnvelope'
-        description: Config-only backup envelope.
+          $ref: ../components/schemas/ConfigBackupEnvelope.yaml
       application/octet-stream:
         schema:
           type: string

@@ -21,6 +21,7 @@ interface SelfInfo {
   allowedModels?: string[];
   quotaName?: string | null;
   comment?: string | null;
+  beta?: boolean;
   traceEnabled?: boolean;
   traceEnabledGlobal?: boolean;
 }
@@ -151,6 +152,8 @@ export const MyKey: React.FC = () => {
               <dd className="font-mono text-text break-all">{info.keyName}</dd>
               <dt className="text-text-muted">Quota</dt>
               <dd className="text-text">{info.quotaName || '—'}</dd>
+              <dt className="text-text-muted">Inference path</dt>
+              <dd className="text-text">{info.beta ? 'Beta' : 'Stable'}</dd>
               <dt className="text-text-muted">Allowed providers</dt>
               <dd className="text-text break-words">
                 {allowedProviders.length > 0 ? allowedProviders.join(', ') : 'Any (unrestricted)'}

@@ -84,6 +84,18 @@ properties:
       - **selector** — Apply each group's selector across its targets regardless of API type.
       - **api_match** — Filter targets to those whose provider supports the
         requested API type first, then apply the selector.
+  preferred_api:
+    type: array
+    description: >
+      Advertised in /v1/models to inform clients of the recommended API
+      surface for this alias.
+    items:
+      type: string
+      enum:
+        - chat_completions
+        - messages
+        - gemini
+        - responses
   additional_aliases:
     type: array
     items:
@@ -103,6 +115,20 @@ properties:
     description: >
       When true, enforces the model's `max_tokens` / `max_output_tokens`
       constraint from metadata, rejecting requests that exceed it.
+  extraBody:
+    type: object
+    additionalProperties: true
+    description: >
+      Extra JSON body fields merged into every request dispatched through
+      this alias. Merged after provider-level and model-level extraBody,
+      so alias values win.
+  sticky_session:
+    type: boolean
+    default: false
+    description: >
+      When enabled, multi-turn conversations prefer the same provider/model
+      from the previous turn (when still healthy) for better prompt-cache
+      hit rates.
   metadata:
     description: >
       Optional reference to an external model catalog entry. When configured,
@@ -225,6 +251,21 @@ properties:
     description: >
       Shorthand simple pricing: output price per million tokens. See
       `input_price_per_million`.
+  pi_model:
+    type: object
+    description: >
+      Link to a pi-ai model to include its compatibility options as
+      `pi_options` in `GET /v1/models`.
+    properties:
+      provider:
+        type: string
+        description: pi-ai provider identifier (e.g. openai, anthropic).
+      model_id:
+        type: string
+        description: pi-ai model ID (e.g. gpt-4o, claude-sonnet-4-20250514).
+    required:
+      - provider
+      - model_id
   pricing:
     description: >
       Advanced pricing configuration. Takes precedence over

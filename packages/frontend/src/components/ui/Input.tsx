@@ -39,7 +39,7 @@ export const Input: React.FC<InputProps> = ({
           id={inputId}
           aria-invalid={!!error}
           className={clsx(
-            'w-full py-2 font-body text-sm text-text bg-slate-900/60 border rounded-md outline-none transition-all duration-fast placeholder:text-text-muted',
+            'w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-fast placeholder:text-text-muted',
             'hover:border-border-2',
             'focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.18)]',
             'disabled:opacity-50 disabled:cursor-not-allowed',

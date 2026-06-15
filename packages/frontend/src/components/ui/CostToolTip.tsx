@@ -113,12 +113,14 @@ export const CostToolTip: React.FC<CostToolTipProps> = ({ source, costMetadata, 
         </div>
       );
     } else if (s === 'provider_reported') {
+      // Support both SSE `: cost` format (request_cost_usd) and usage.cost_details format
+      const reportedCost = data.request_cost_usd ?? data.cost_details?.total_cost;
       content = (
         <div style={containerStyle}>
           <div style={headerStyle}>Source: Provider Reported</div>
           <div style={gridStyle}>
             <span style={labelStyle}>Cost:</span>
-            <span style={valueStyle}>${formatRate(data.request_cost_usd)}</span>
+            <span style={valueStyle}>${formatRate(reportedCost)}</span>
 
             {data.cache_savings_usd !== undefined && (
               <>

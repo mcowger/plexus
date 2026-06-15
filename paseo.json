@@ -1,0 +1,19 @@
+{
+  "worktree": {
+    "setup": ["bun run scripts/init_worktree.ts"]
+  },
+  "metadataGeneration": {
+    "agentTitle": {
+      "instructions": "Choose a concise 2-5 word title. Use plain ASCII only. No emojis, smart quotes, dashes, or other Unicode characters. Prefer short, descriptive noun phrases or imperative phrases"
+    },
+    "branchName": {
+      "instructions": "Use the format <type>/<scope>-<short-desc>. Keep it lowercase ASCII with hyphens only in the short description. Use a concise scope and description. Examples: feat/auth-session-refresh, fix/websocket-host-check, chore/ci-node-upgrade."
+    },
+    "commitMessage": {
+      "instructions": "Follow Conventional Commits. Describe only the final state of the codebase, not the steps taken to get there. Do not mention implementation process, exploration, refactors that were discarded, or debugging work unless they are part of the shipped result."
+    },
+    "pullRequest": {
+      "instructions": "Describe the final state of the change for another engineer. Do not describe the implementation journey, debugging process, or discarded approaches. Do not include a Testing section, checklist, marketing language, hype, or sales framing. Keep it factual, technical, and concise."
+    }
+  }
+}

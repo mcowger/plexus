@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { getCurrentLogLevel, logger } from '../utils/logger';
+import { logger } from '../utils/logger';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -18,16 +18,6 @@ let sqlClient: postgres.Sql | null = null;
 let pgliteClient: any = null;
 let currentDialect: SupportedDialect | null = null;
 let currentSchema: any = null;
-
-function createDrizzleLogger() {
-  return {
-    logQuery(query: string, params: unknown[]) {
-      if (getCurrentLogLevel() === 'silly') {
-        logger.silly(`Query: ${query}`);
-      }
-    },
-  };
-}
 
 function parseConnectionString(uri: string): {
   dialect: SupportedDialect;
@@ -140,7 +130,6 @@ export function initializeDatabase(connectionString?: string) {
         systemSettings,
         oauthCredentials,
       },
-      logger: createDrizzleLogger(),
     });
   } else {
     const postgresDriver = getPostgresDriver();
@@ -190,7 +179,6 @@ export function initializeDatabase(connectionString?: string) {
       pgliteClient = dataDir ? new PGlite(dataDir) : new PGlite();
       dbInstance = drizzlePglite(pgliteClient, {
         schema,
-        logger: createDrizzleLogger(),
       });
     } else {
       sqlClient = postgres(connStr, {
@@ -208,7 +196,6 @@ export function initializeDatabase(connectionString?: string) {
 
       dbInstance = drizzlePg(sqlClient, {
         schema,
-        logger: createDrizzleLogger(),
       });
     }
   }

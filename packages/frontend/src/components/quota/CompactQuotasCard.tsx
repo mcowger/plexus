@@ -8,13 +8,17 @@ import { AllowanceMeterRow } from './AllowanceMeterRow';
 
 interface CompactQuotasCardProps {
   allowanceQuotas: QuotaCheckerInfo[];
+  displayNameMap?: Map<string, string>;
 }
 
 function getAllowanceMeters(meters: Meter[]): Meter[] {
   return meters.filter((m) => m.kind === 'allowance');
 }
 
-export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQuotas }) => {
+export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
+  allowanceQuotas,
+  displayNameMap,
+}) => {
   const navigate = useNavigate();
 
   if (allowanceQuotas.length === 0) return null;
@@ -33,7 +37,11 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({ allowanceQ
       }}
     >
       {allowanceQuotas.map((quota, idx) => {
-        const displayName = getCheckerDisplayName(quota.checkerType, quota.checkerId);
+        const displayName = getCheckerDisplayName(
+          quota.checkerType,
+          quota.checkerId,
+          displayNameMap
+        );
         const allowanceMeters = getAllowanceMeters(quota.meters);
         const isLast = idx === allowanceQuotas.length - 1;
 

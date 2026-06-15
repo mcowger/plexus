@@ -1,0 +1,79 @@
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: List quota checker types and configured checkers (admin only)
+  description: |
+    Returns both the available quota checker types and the status of
+    currently configured quota checkers.
+
+    ## Response structure
+
+    - `knownTypes` — Array of available quota checker types:
+      - `type` — Checker type identifier
+      - `displayName` — Human-readable name
+    - `configured` — Array of configured checker instances:
+      - `checkerId` — Unique checker ID (`{provider}:{account}`)
+      - `checkerType` — Type of checker
+      - `displayName` — Human-readable name
+      - `pending` — Whether initial check is pending
+      - `meters` — Current quota meter readings
+      - `success` — Whether last check succeeded
+      - `error` — Error message if last check failed (optional)
+      - `oauthAccountId` — OAuth account ID if using OAuth (optional)
+      - `oauthProvider` — OAuth provider if using OAuth (optional)
+
+    ## Use case
+
+    Use this endpoint to:
+    1. Discover available quota checker types
+    2. See which providers have quota tracking configured
+    3. Check the health status of each quota checker
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: List of quota checker types and configured instances.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              knownTypes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    displayName:
+                      type: string
+              configured:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    checkerId:
+                      type: string
+                    checkerType:
+                      type: string
+                    displayName:
+                      type: string
+                    pending:
+                      type: boolean
+                    meters:
+                      type: array
+                      items:
+                        type: object
+                    success:
+                      type: boolean
+                    error:
+                      type: string
+                    oauthAccountId:
+                      type: string
+                    oauthProvider:
+                      type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotaCheckers

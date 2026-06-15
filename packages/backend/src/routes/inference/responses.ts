@@ -11,6 +11,10 @@ import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware } from '../../services/quota/quota-middleware';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
+import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { handleBetaResponses } from '../../inference-v2';
 
 export async function registerResponsesRoute(
   fastify: FastifyInstance,
@@ -33,6 +37,14 @@ export async function registerResponsesRoute(
    */
   // Handler for Responses API requests (shared between /v1/responses and /v1/codex/responses)
   const responsesHandler = async (request: FastifyRequest, reply: FastifyReply) => {
+    if ((request as any).keyConfig?.beta === true) {
+      return handleBetaResponses(request, reply, {
+        usageStorage,
+        quotaEnforcer,
+        responsesStorage,
+      });
+    }
+
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();
@@ -49,6 +61,7 @@ export async function registerResponsesRoute(
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
     usageStorage.emitStartedAsync(usageRecord);
 
+    let earlyDisconnect: ReturnType<typeof wireEarlyDisconnectDetection> | undefined;
     try {
       const body = request.body as any;
       usageRecord.incomingModelAlias = body.model;
@@ -129,6 +142,9 @@ export async function registerResponsesRoute(
       unifiedRequest.incomingApiType = 'responses';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      if (body.previous_response_id) {
+        unifiedRequest.previousResponseId = body.previous_response_id;
+      }
 
       // Forward cache routing headers for prompt caching support.
       // These headers enable server-side cache routing at the upstream provider.
@@ -156,7 +172,7 @@ export async function registerResponsesRoute(
         };
       }
 
-      DebugManager.getInstance().startLog(requestId, body);
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       // Check quota before processing
       if (quotaEnforcer) {
@@ -164,7 +180,16 @@ export async function registerResponsesRoute(
         if (!allowed) return;
       }
 
-      const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+      const abortController = new AbortController();
+      const { signal: dispatchSignal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
+      earlyDisconnect = wireEarlyDisconnectDetection(request, abortController);
+      const stallDetectionResult = wireStallDetection(abortController, getGlobalStallConfig());
+      const unifiedResponse = await dispatcher.dispatch(
+        unifiedRequest,
+        dispatchSignal,
+        resolveTimeoutMs,
+        stallDetectionResult.addStallConfig
+      );
 
       // Emit 'updated' event with routing decision details
       usageStorage.emitUpdatedAsync({
@@ -196,7 +221,9 @@ export async function registerResponsesRoute(
         shouldEstimateTokens,
         body,
         quotaEnforcer,
-        (request as any).keyName
+        (request as any).keyName,
+        abortController,
+        stallDetectionResult
       );
 
       // Store response if requested and not streaming
@@ -217,9 +244,24 @@ export async function registerResponsesRoute(
         }
       }
 
+      earlyDisconnect?.cleanup();
       return result;
     } catch (e: any) {
-      usageRecord.responseStatus = 'error';
+      earlyDisconnect?.cleanup();
+      if (e?.routingContext?.code === 'client_disconnected') {
+        usageRecord.responseStatus = 'cancelled';
+        usageRecord.durationMs = Date.now() - startTime;
+        usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
+        usageRecord.retryHistory =
+          e.routingContext?.retryHistory || usageRecord.retryHistory || null;
+        usageStorage.saveRequest(usageRecord as UsageRecord);
+        logger.info(
+          `Request ${requestId}: ${e.message}, usage recorded as ${e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'cancelled'}`
+        );
+        return;
+      }
+      usageRecord.responseStatus =
+        e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'error';
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
       usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;

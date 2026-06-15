@@ -18,6 +18,9 @@ import type {
   McpServerConfig,
   FailoverPolicy,
   CooldownPolicy,
+  BackgroundExplorationConfig,
+  TimeoutConfig,
+  StallConfigType,
   MetadataOverrides,
 } from '../config';
 import { resolveGpuParams } from '@plexus/shared';
@@ -45,6 +48,43 @@ function toJson(value: unknown): string | unknown {
     return JSON.stringify(value);
   }
   return value; // PG jsonb handles objects natively
+}
+
+/**
+ * Normalize adapter entries from DB storage to the canonical { name, options } form.
+ *
+ * Legacy rows stored adapter entries as bare strings (e.g. ["reasoning_content"]).
+ * This function converts them to the uniform object form:
+ * [{ name: "reasoning_content", options: {} }]
+ *
+ * Rows are self-healing: on next save through the API, the normalized form
+ * is persisted back to the DB.
+ */
+function normalizeAdapterEntries(
+  raw: unknown
+): Array<{ name: string; options: Record<string, any> }> | null {
+  if (raw === null || raw === undefined) return null;
+  const arr = Array.isArray(raw) ? raw : [raw];
+  if (arr.length === 0) return null;
+
+  return arr
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        // Legacy bare-string form
+        return { name: entry, options: {} };
+      }
+      if (entry && typeof entry === 'object' && 'name' in entry) {
+        // Already in object form
+        return {
+          name: (entry as any).name,
+          options: (entry as any).options ?? {},
+        };
+      }
+      // Malformed entry — skip with a warning (don't crash)
+      logger.warn(`Skipping malformed adapter entry: ${JSON.stringify(entry)}`);
+      return null;
+    })
+    .filter((e): e is { name: string; options: Record<string, any> } => e !== null);
 }
 
 /**
@@ -287,6 +327,7 @@ export class ConfigRepository {
       oauthCredentialId,
       enabled: fromBool(config.enabled !== false),
       disableCooldown: fromBool(config.disable_cooldown === true),
+      stallCooldown: fromBool(config.stall_cooldown === true),
       discount: config.discount ?? null,
       estimateTokens: fromBool(config.estimateTokens === true),
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
@@ -300,12 +341,27 @@ export class ConfigRepository {
       quotaCheckerOptions: config.quota_checker?.options
         ? encryptJsonField(config.quota_checker.options)
         : null,
+      modelAutosyncEnabled: fromBool(config.model_autosync?.enabled === true),
+      modelAutosyncInterval: Math.max(1, config.model_autosync?.intervalMinutes ?? 60),
       // GPU Profile settings for inference energy calculation
       gpuProfile: config.gpu_profile ?? null,
       gpuRamGb: config.gpu_ram_gb ?? null,
       gpuBandwidthTbS: config.gpu_bandwidth_tb_s ?? null,
       gpuFlopsTflop: config.gpu_flops_tflop ?? null,
       gpuPowerDrawWatts: config.gpu_power_draw_watts ?? null,
+      adapter:
+        config.adapter && Array.isArray(config.adapter) && config.adapter.length > 0
+          ? toJson(config.adapter)
+          : null,
+      timeoutMs: config.timeoutMs ?? null,
+      maxConcurrency: config.maxConcurrency ?? null,
+      piAiProvider: config.pi_ai_provider ?? null,
+      // Per-provider stall detection overrides
+      stallTtfbMs: config.stallTtfbMs ?? null,
+      stallTtfbBytes: config.stallTtfbBytes ?? null,
+      stallMinBps: config.stallMinBps ?? null,
+      stallWindowMs: config.stallWindowMs ?? null,
+      stallGracePeriodMs: config.stallGracePeriodMs ?? null,
       updatedAt: timestamp,
     };
 
@@ -358,6 +414,12 @@ export class ConfigRepository {
           modelType: cfg.type ?? null,
           accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
           extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
+          adapter:
+            cfg.adapter && Array.isArray(cfg.adapter) && cfg.adapter.length > 0
+              ? toJson(cfg.adapter)
+              : null,
+          maxConcurrency: cfg.maxConcurrency ?? null,
+          piAiModelId: cfg.pi_ai_model_id ?? null,
           sortOrder: idx,
         }));
         if (modelRows.length > 0) {
@@ -414,6 +476,52 @@ export class ConfigRepository {
     }));
   }
 
+  async addMissingProviderModels(providerSlug: string, modelNames: string[]): Promise<number> {
+    const schema = this.schema();
+    const normalizedNames = Array.from(
+      new Set(modelNames.map((name) => name.trim()).filter((name) => name.length > 0))
+    );
+    if (normalizedNames.length === 0) return 0;
+
+    const provider = await this.db()
+      .select()
+      .from(schema.providers)
+      .where(eq(schema.providers.slug, providerSlug))
+      .limit(1);
+
+    if (provider.length === 0) return 0;
+
+    const providerId = provider[0]!.id;
+    const existing = await this.db()
+      .select()
+      .from(schema.providerModels)
+      .where(eq(schema.providerModels.providerId, providerId))
+      .orderBy(schema.providerModels.sortOrder);
+
+    const existingNames = new Set(existing.map((row: any) => row.modelName));
+    const missingNames = normalizedNames.filter((name) => !existingNames.has(name));
+    if (missingNames.length === 0) return 0;
+
+    const maxSortOrder = existing.reduce(
+      (max: number, row: any) => Math.max(max, row.sortOrder ?? -1),
+      -1
+    );
+
+    await this.db()
+      .insert(schema.providerModels)
+      .values(
+        missingNames.map((modelName, idx) => ({
+          providerId,
+          modelName,
+          pricingConfig: toJson({ source: 'simple', input: 0, output: 0 }),
+          accessVia: toJson([]),
+          sortOrder: maxSortOrder + idx + 1,
+        }))
+      );
+
+    return missingNames.length;
+  }
+
   private rowToProviderConfig(row: any, modelRows: any[], oauthAccountId?: string): ProviderConfig {
     const apiBaseUrl = parseJson<string | Record<string, string>>(row.apiBaseUrl);
 
@@ -429,6 +537,9 @@ export class ConfigRepository {
             ...(m.modelType ? { type: m.modelType } : {}),
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
+            ...(m.adapter ? { adapter: normalizeAdapterEntries(parseJson(m.adapter)) } : {}),
+            ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
+            ...(m.piAiModelId != null ? { pi_ai_model_id: m.piAiModelId } : {}),
           };
         }
       } else {
@@ -459,6 +570,7 @@ export class ConfigRepository {
       ...(oauthAccountId ? { oauth_account: oauthAccountId } : {}),
       enabled: toBool(row.enabled),
       disable_cooldown: toBool(row.disableCooldown),
+      stall_cooldown: toBool(row.stallCooldown),
       ...(row.discount !== null ? { discount: row.discount } : {}),
       estimateTokens: toBool(row.estimateTokens),
       useClaudeMasking: toBool(row.useClaudeMasking),
@@ -470,6 +582,15 @@ export class ConfigRepository {
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
       ...(quota_checker ? { quota_checker } : {}),
+      model_autosync: {
+        enabled: toBool(row.modelAutosyncEnabled),
+        intervalMinutes: Math.max(1, row.modelAutosyncInterval ?? 60),
+      },
+      ...(() => {
+        const adapterVal = parseJson(row.adapter);
+        const normalized = normalizeAdapterEntries(adapterVal);
+        return normalized && normalized.length > 0 ? { adapter: normalized } : {};
+      })(),
       // GPU Profile settings — resolve named profiles to concrete values for
       // backward compatibility with existing DB rows that may only have gpuProfile
       // set without the numeric fields.
@@ -516,6 +637,14 @@ export class ConfigRepository {
           gpu_power_draw_watts: row.gpuPowerDrawWatts!,
         };
       })(),
+      ...(row.timeoutMs != null ? { timeoutMs: row.timeoutMs } : {}),
+      ...(row.stallTtfbMs != null ? { stallTtfbMs: row.stallTtfbMs } : {}),
+      ...(row.stallTtfbBytes != null ? { stallTtfbBytes: row.stallTtfbBytes } : {}),
+      ...(row.stallMinBps != null ? { stallMinBps: row.stallMinBps } : {}),
+      ...(row.stallWindowMs != null ? { stallWindowMs: row.stallWindowMs } : {}),
+      ...(row.stallGracePeriodMs != null ? { stallGracePeriodMs: row.stallGracePeriodMs } : {}),
+      ...(row.maxConcurrency != null ? { maxConcurrency: row.maxConcurrency } : {}),
+      ...(row.piAiProvider != null ? { pi_ai_provider: row.piAiProvider } : {}),
     };
 
     return result as ProviderConfig;
@@ -662,6 +791,10 @@ export class ConfigRepository {
       // Model architecture override for inference energy calculation
       modelArchitecture: config.model_architecture ? toJson(config.model_architecture) : null,
       enforceLimits: fromBool(config.enforce_limits === true),
+      stickySession: fromBool(config.sticky_session === true),
+      preferredApi: config.preferred_api ? toJson(config.preferred_api) : null,
+      piModel: config.pi_model ? toJson(config.pi_model) : null,
+      extraBody: config.extraBody ? toJson(config.extraBody) : null,
       targetGroups:
         config.target_groups && config.target_groups.length > 0
           ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
@@ -794,12 +927,16 @@ export class ConfigRepository {
       priority: row.priority ?? 'selector',
       use_image_fallthrough: toBool(row.useImageFallthrough),
       enforce_limits: toBool(row.enforceLimits),
+      sticky_session: toBool(row.stickySession),
       ...(row.selector ? { selector: row.selector } : {}),
       ...(row.modelType ? { type: row.modelType } : {}),
       ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),
       ...(row.advanced ? { advanced: parseJson(row.advanced) } : {}),
       // Model architecture override for inference energy calculation
       ...(row.modelArchitecture ? { model_architecture: parseJson(row.modelArchitecture) } : {}),
+      ...(row.preferredApi ? { preferred_api: parseJson(row.preferredApi) } : {}),
+      ...(row.piModel ? { pi_model: parseJson(row.piModel) } : {}),
+      ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
     };
 
     if (row.metadataSource) {
@@ -835,6 +972,7 @@ export class ConfigRepository {
       const allowedProviders = parseStringArray(row.allowedProviders);
       const excludedModels = parseStringArray(row.excludedModels);
       const excludedProviders = parseStringArray(row.excludedProviders);
+      const allowedIps = parseStringArray(row.allowedIps);
 
       result[row.name] = {
         secret: decrypt(row.secret),
@@ -844,6 +982,8 @@ export class ConfigRepository {
         ...(allowedProviders ? { allowedProviders } : {}),
         ...(excludedModels ? { excludedModels } : {}),
         ...(excludedProviders ? { excludedProviders } : {}),
+        ...(allowedIps ? { allowedIps } : {}),
+        ...(row.beta ? { beta: true } : {}),
       };
     }
 
@@ -884,6 +1024,7 @@ export class ConfigRepository {
     const allowedProviders = parseStringArray(row.allowedProviders);
     const excludedModels = parseStringArray(row.excludedModels);
     const excludedProviders = parseStringArray(row.excludedProviders);
+    const allowedIps = parseStringArray(row.allowedIps);
 
     return {
       name: row.name,
@@ -895,6 +1036,8 @@ export class ConfigRepository {
         ...(allowedProviders ? { allowedProviders } : {}),
         ...(excludedModels ? { excludedModels } : {}),
         ...(excludedProviders ? { excludedProviders } : {}),
+        ...(allowedIps ? { allowedIps } : {}),
+        ...(row.beta ? { beta: true } : {}),
       },
     };
   }
@@ -923,6 +1066,8 @@ export class ConfigRepository {
           allowedProviders: stringifyStringArray(config.allowedProviders),
           excludedModels: stringifyStringArray(config.excludedModels),
           excludedProviders: stringifyStringArray(config.excludedProviders),
+          allowedIps: stringifyStringArray(config.allowedIps),
+          beta: config.beta ?? false,
           updatedAt: timestamp,
         })
         .where(eq(schema.apiKeys.name, name));
@@ -939,6 +1084,8 @@ export class ConfigRepository {
           allowedProviders: stringifyStringArray(config.allowedProviders),
           excludedModels: stringifyStringArray(config.excludedModels),
           excludedProviders: stringifyStringArray(config.excludedProviders),
+          allowedIps: stringifyStringArray(config.allowedIps),
+          beta: config.beta ?? false,
           createdAt: timestamp,
           updatedAt: timestamp,
         });
@@ -1191,6 +1338,45 @@ export class ConfigRepository {
     const initialMinutes = await this.getSetting<number>('cooldown.initialMinutes', 2);
     const maxMinutes = await this.getSetting<number>('cooldown.maxMinutes', 300);
     return { initialMinutes, maxMinutes };
+  }
+
+  async getTrustedProxies(): Promise<string[]> {
+    return this.getSetting<string[]>('trustedProxies', ['0.0.0.0/0', '::/0']);
+  }
+
+  async getBackgroundExplorationConfig(): Promise<BackgroundExplorationConfig> {
+    const enabled = await this.getSetting<boolean>('backgroundExploration.enabled', false);
+    const stalenessThresholdSeconds = await this.getSetting<number>(
+      'backgroundExploration.stalenessThresholdSeconds',
+      600
+    );
+    const workerConcurrency = await this.getSetting<number>(
+      'backgroundExploration.workerConcurrency',
+      2
+    );
+    return { enabled, stalenessThresholdSeconds, workerConcurrency };
+  }
+
+  async getTimeoutConfig(): Promise<TimeoutConfig> {
+    const defaultSeconds = await this.getSetting<number>('timeout.defaultSeconds', 300);
+    return { defaultSeconds };
+  }
+
+  async getStallConfig(): Promise<import('../config').StallConfigType> {
+    const ttfbSeconds = await this.getSetting<number | null>('stall.ttfbSeconds', null);
+    const ttfbBytes = await this.getSetting<number>('stall.ttfbBytes', 100);
+    const minBytesPerSecond = await this.getSetting<number | null>('stall.minBytesPerSecond', null);
+    const windowSeconds = await this.getSetting<number>('stall.windowSeconds', 10);
+    const gracePeriodSeconds = await this.getSetting<number>('stall.gracePeriodSeconds', 30);
+    const stallCooldown = await this.getSetting<boolean>('stall.stallCooldown', false);
+    return {
+      ttfbSeconds,
+      ttfbBytes,
+      minBytesPerSecond,
+      windowSeconds,
+      gracePeriodSeconds,
+      stallCooldown,
+    };
   }
 
   // ─── OAuth Credentials ──────────────────────────────────────────

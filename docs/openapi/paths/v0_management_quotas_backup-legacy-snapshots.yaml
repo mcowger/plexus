@@ -1,0 +1,51 @@
+parameters:
+  - in: query
+    name: format
+    required: false
+    schema:
+      type: string
+      enum: [csv, sql]
+      default: csv
+    description: >
+      Export format. Use `csv` for spreadsheet import or `sql` for
+      database restore.
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Export legacy quota snapshots (admin only)
+  description: |
+    Exports legacy quota snapshot data before migration to the new
+    quota system. Returns either CSV or SQL format.
+
+    ## Use case
+
+    Use this endpoint to backup legacy quota data before running the
+    migration. The exported file can be used for:
+    - Historical analysis
+    - Audit trails
+    - Manual restore if migration fails
+
+    ## Response
+
+    Returns a file download with appropriate `Content-Type` and
+    `Content-Disposition` headers. Filename format:
+    `quota_snapshots_backup_{timestamp}.{format}`
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Exported quota snapshot data.
+      content:
+        text/csv:
+          schema:
+            type: string
+            description: CSV export of legacy quota snapshots
+        text/plain:
+          schema:
+            type: string
+            description: SQL export of legacy quota snapshots
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementQuotasBackupLegacySnapshots

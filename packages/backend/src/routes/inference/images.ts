@@ -9,6 +9,7 @@ import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { UnifiedImageGenerationRequest, UnifiedImageEditRequest } from '../../types/unified';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
 
 export async function registerImagesRoute(
   fastify: FastifyInstance,
@@ -72,13 +73,17 @@ export async function registerImagesRoute(
       };
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
-      DebugManager.getInstance().startLog(requestId, {
-        model: body.model,
-        prompt: body.prompt?.substring(0, 100),
-        n: body.n,
-        size: body.size,
-        response_format: body.response_format,
-      });
+      DebugManager.getInstance().startLog(
+        requestId,
+        {
+          model: body.model,
+          prompt: body.prompt?.substring(0, 100),
+          n: body.n,
+          size: body.size,
+          response_format: body.response_format,
+        },
+        sanitizeHeaders(request.headers as any)
+      );
 
       const unifiedResponse = await dispatcher.dispatchImageGenerations(unifiedRequest);
 
@@ -241,14 +246,18 @@ export async function registerImagesRoute(
       };
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
-      DebugManager.getInstance().startLog(requestId, {
-        model: formFields.model,
-        prompt: formFields.prompt?.substring(0, 100),
-        filename: imageFilename,
-        hasMask: !!maskBuffer,
-        n: formFields.n,
-        size: formFields.size,
-      });
+      DebugManager.getInstance().startLog(
+        requestId,
+        {
+          model: formFields.model,
+          prompt: formFields.prompt?.substring(0, 100),
+          filename: imageFilename,
+          hasMask: !!maskBuffer,
+          n: formFields.n,
+          size: formFields.size,
+        },
+        sanitizeHeaders(request.headers as any)
+      );
 
       const unifiedResponse = await dispatcher.dispatchImageEdits(unifiedRequest);
 

@@ -1,7 +1,7 @@
 import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
-import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
+import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import { logger } from '../../../utils/logger';
 
 interface CopilotUsageResponse {
@@ -55,6 +55,7 @@ async function resolveApiKey(
 
 export default defineChecker({
   type: 'copilot',
+  displayName: 'GitHub Copilot',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

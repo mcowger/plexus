@@ -8,6 +8,7 @@ import { getClientIp } from '../../utils/ip';
 import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../../services/debug-manager';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
 
 export async function registerEmbeddingsRoute(
   fastify: FastifyInstance,
@@ -60,7 +61,7 @@ export async function registerEmbeddingsRoute(
       unifiedRequest.requestId = requestId;
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
-      DebugManager.getInstance().startLog(requestId, body);
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       const unifiedResponse = await dispatcher.dispatchEmbeddings(unifiedRequest);
 
@@ -78,7 +79,7 @@ export async function registerEmbeddingsRoute(
       usageRecord.canonicalModelName = unifiedResponse.plexus?.canonicalModel;
       usageRecord.outgoingApiType = unifiedResponse.plexus?.apiType;
       usageRecord.isPassthrough = true; // Embeddings are always pass-through (OpenAI format)
-      usageRecord.tokensInput = unifiedResponse.usage.prompt_tokens;
+      usageRecord.tokensInput = unifiedResponse.usage?.prompt_tokens ?? 0;
       usageRecord.tokensOutput = 0; // Embeddings don't have output tokens
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.responseStatus = 'success';

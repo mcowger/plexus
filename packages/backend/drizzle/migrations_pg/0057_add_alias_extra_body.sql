@@ -1,0 +1,1 @@
+ALTER TABLE "model_aliases" ADD COLUMN "extra_body" jsonb;

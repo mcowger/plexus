@@ -1,0 +1,78 @@
+parameters:
+  - in: query
+    name: provider
+    required: true
+    schema:
+      type: string
+    description: >
+      Provider ID from pi-ai library (e.g. `openai`, `anthropic`, `google`).
+      Use `GET /v0/management/pi/providers` to list available providers.
+  - in: query
+    name: q
+    required: false
+    schema:
+      type: string
+    description: >
+      Optional substring filter to search model IDs and names.
+get:
+  tags:
+    - Management — PI (Plexus Internal)
+  summary: List models for a pi-ai provider (admin only)
+  description: |
+    Returns the list of models available from a specific provider in the
+    `pi-ai` library, optionally filtered by a search query.
+
+    ## Use case
+
+    Discover available models from a provider to configure model aliases
+    or understand what's available for routing.
+
+    ## Query parameters
+
+    - `provider` (required) — Provider ID from pi-ai library
+    - `q` (optional) — Substring filter on model ID or name
+
+    ## Response format
+
+    Returns an array of model objects with:
+    - `id` — Model identifier
+    - `name` — Human-readable model name
+    - `api` — API type (e.g., `chat`, `embeddings`)
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: List of models.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Model identifier
+                    name:
+                      type: string
+                      description: Human-readable model name
+                    api:
+                      type: string
+                      description: API type (e.g., chat, embeddings)
+    '400':
+      description: Missing or invalid provider parameter.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementPiModels

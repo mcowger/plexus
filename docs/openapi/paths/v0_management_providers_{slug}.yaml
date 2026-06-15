@@ -94,6 +94,23 @@ put:
               gpu_bandwidth_tb_s: 3.35
               gpu_flops_tflop: 989.4
               gpu_power_draw_watts: 700
+          fireworks_with_adapters:
+            summary: Fireworks provider with reasoning_content adapter
+            value:
+              api_base_url:
+                chat: https://api.fireworks.ai/inference/v1
+                responses: https://api.fireworks.ai/inference/v1
+              api_key: fw_your_key
+              adapter: reasoning_content
+              models:
+                accounts/fireworks/models/deepseek-r1:
+                  pricing:
+                    source: simple
+                    input: 0
+                    output: 0
+                  adapter:
+                    - reasoning_content
+                    - suppress_developer_role
   responses:
     '200':
       description: Saved.

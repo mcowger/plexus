@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../minimax-checker';
 
-const makeCtx = (groupid = '1234567890', hertzSession = 'test_hertz_session_cookie_value') =>
-  createMeterContext('minimax-test', 'minimax', { groupid, hertzSession });
+const makeCtx = (groupid = '1234567890', token = 'test_jwt_token_value') =>
+  createMeterContext('minimax-test', 'minimax', { groupid, token });
 
 describe('minimax checker', () => {
   const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
@@ -18,14 +18,16 @@ describe('minimax checker', () => {
     expect(isCheckerRegistered('minimax')).toBe(true);
   });
 
-  it('queries balance with GroupId and HERTZ-SESSION cookie', async () => {
+  it('queries balance with _token cookie and x-group-id header', async () => {
     let capturedUrl: string | undefined;
     let capturedCookie: string | undefined;
+    let capturedGroupHeader: string | undefined;
 
     setFetchMock(async (input: unknown, init: unknown) => {
       capturedUrl = String(input as string);
-      capturedCookie =
-        new Headers((init as RequestInit | undefined)?.headers).get('Cookie') ?? undefined;
+      const headers = new Headers((init as RequestInit | undefined)?.headers);
+      capturedCookie = headers.get('Cookie') ?? undefined;
+      capturedGroupHeader = headers.get('x-group-id') ?? undefined;
       return new Response(
         JSON.stringify({
           available_amount: '22.91',
@@ -35,10 +37,11 @@ describe('minimax checker', () => {
       );
     });
 
-    const meters = await checkerDef.check(makeCtx('group-abc', 'cookie-secret-value'));
+    const meters = await checkerDef.check(makeCtx('group-abc', 'jwt-token-value'));
 
-    expect(capturedUrl).toBe('https://platform.minimax.io/account/query_balance?GroupId=group-abc');
-    expect(capturedCookie).toBe('HERTZ-SESSION=cookie-secret-value');
+    expect(capturedUrl).toBe('https://platform.minimax.io/account/query_balance');
+    expect(capturedCookie).toBe('_token=jwt-token-value');
+    expect(capturedGroupHeader).toBe('group-abc');
     expect(meters).toHaveLength(1);
     expect(meters[0]?.kind).toBe('balance');
     expect(meters[0]?.unit).toBe('usd');

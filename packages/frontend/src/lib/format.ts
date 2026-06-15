@@ -62,19 +62,21 @@ export function formatTokens(tokens: number): string {
 }
 
 /**
- * Format cost in dollars (e.g., "$0.001234", "$1.23")
+ * Format cost in dollars, always showing 4 decimal places.
+ * Costs below $0.0001 are shown as "$<0.0001" to avoid implying zero.
+ * Costs of exactly $0 show "$0.0000".
  */
-export function formatCost(cost: number, maxDecimals: number = 6): string {
-  if (cost === 0) return '$0';
+export function formatCost(cost: number, decimals: number = 4): string {
+  if (cost === 0) return `$${cost.toFixed(decimals)}`;
+  const threshold = Math.pow(10, -decimals);
+  if (cost > 0 && cost < threshold) return `$<${threshold.toFixed(decimals)}`;
   if (cost >= 0.01) {
-    // For costs >= 1 cent, use 2-4 decimals
     return `$${cost.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     })}`;
   }
-  // For small costs, show up to maxDecimals
-  return `$${cost.toFixed(maxDecimals)}`;
+  return `$${cost.toFixed(decimals)}`;
 }
 
 /**
@@ -107,6 +109,15 @@ export function formatMs(ms: number): string {
   if (ms < 10) return `${Math.round(ms)}ms`;
   if (ms < 1000) return `${Math.round(ms)}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * Format byte counts with B/KB/MB suffixes (e.g., 1536 -> "1.5 KB")
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /**
@@ -155,19 +166,38 @@ export function formatPercent(value: number, decimals: number = 1): string {
  * Handles ISO strings and epoch-millisecond numeric strings.
  */
 export function formatTimeLabel(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (!isNaN(date.getTime())) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const date = parseTimestamp(timestamp);
+  if (date) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return timestamp;
+}
+
+/**
+ * Format a timestamp string into a detailed date-time label for chart tooltips.
+ * Includes date and time (e.g., "2025/05/15 14:00").
+ */
+export function formatDateTimeLabel(timestamp: string): string {
+  const date = parseTimestamp(timestamp);
+  if (date) {
+    const dateStr = date.toLocaleDateString([], {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr} ${timeStr}`;
   }
-  // Try parsing as a numeric string (epoch ms)
+  return timestamp;
+}
+
+function parseTimestamp(timestamp: string): Date | null {
+  const date = new Date(timestamp);
+  if (!isNaN(date.getTime())) return date;
   const num = Number(timestamp);
   if (!isNaN(num)) {
     const dateFromNum = new Date(num);
-    if (!isNaN(dateFromNum.getTime())) {
-      return dateFromNum.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+    if (!isNaN(dateFromNum.getTime())) return dateFromNum;
   }
-  return timestamp;
+  return null;
 }
 
 /**

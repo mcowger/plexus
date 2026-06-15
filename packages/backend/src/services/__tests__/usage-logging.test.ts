@@ -397,4 +397,140 @@ describe('UsageInspector', () => {
       expect(capturedRecord!.tokensEstimated).toBe(1);
     });
   });
+
+  describe('_destroy() — client disconnect handling', () => {
+    function makeInspector(requestId: string, startTime: number) {
+      return new UsageInspector(
+        requestId,
+        mockStorage,
+        { requestId } as Partial<UsageRecord>,
+        mockPricing,
+        undefined,
+        startTime,
+        false,
+        'chat',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
+      );
+    }
+
+    it('records responseStatus=cancelled when stream is destroyed before completion', async () => {
+      const requestId = 'test-destroy-cancelled';
+      const startTime = Date.now() - 200;
+      const inspector = makeInspector(requestId, startTime);
+      // Must attach error listener — destroying with an Error would otherwise throw uncaught
+      inspector.on('error', () => {});
+
+      let capturedRecord: UsageRecord | null = null;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+        capturedRecord = record;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+      src.write('data: partial chunk\n\n');
+      // Destroy before end — simulates client disconnect
+      inspector.destroy(new Error('client_disconnected'));
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(capturedRecord).not.toBeNull();
+      expect(capturedRecord!.responseStatus).toBe('cancelled');
+      expect(capturedRecord!.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('records responseStatus=timeout when destroyed with a TimeoutError', async () => {
+      const requestId = 'test-destroy-timeout';
+      const startTime = Date.now() - 500;
+      const inspector = makeInspector(requestId, startTime);
+      inspector.on('error', () => {});
+
+      let capturedRecord: UsageRecord | null = null;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+        capturedRecord = record;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+
+      const timeoutErr = new Error('Upstream timeout');
+      timeoutErr.name = 'TimeoutError';
+      inspector.destroy(timeoutErr);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(capturedRecord).not.toBeNull();
+      expect(capturedRecord!.responseStatus).toBe('timeout');
+    });
+
+    it('does not double-save when _flush runs normally then destroy is called', async () => {
+      const requestId = 'test-no-double-save';
+      const startTime = Date.now() - 100;
+
+      const debugManager = DebugManager.getInstance();
+      debugManager.setEnabled(true);
+      debugManager.startLog(requestId, { messages: [] });
+      debugManager.addReconstructedRawResponse(requestId, {
+        choices: [{ finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const inspector = makeInspector(requestId, startTime);
+      inspector.on('error', () => {});
+
+      let saveCount = 0;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async () => {
+        saveCount++;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+
+      // Normal end — _flush fires, sets _flushed = true
+      src.end();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Simulate a post-completion write error triggering destroy
+      inspector.destroy(new Error('EPIPE'));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // saveRequest must be called exactly once (from _flush, not again from _destroy)
+      expect(saveCount).toBe(1);
+    });
+
+    it('saves with partial tokens from DebugManager when cancelled mid-stream', async () => {
+      const requestId = 'test-destroy-partial-tokens';
+      const startTime = Date.now() - 1000;
+
+      const debugManager = DebugManager.getInstance();
+      debugManager.setEnabled(true);
+      debugManager.startLog(requestId, { messages: [] });
+      // Simulate partial token data accumulated before disconnect
+      debugManager.addReconstructedRawResponse(requestId, {
+        choices: [{ finish_reason: null }],
+        usage: { prompt_tokens: 50, completion_tokens: 0, total_tokens: 50 },
+      });
+
+      const inspector = makeInspector(requestId, startTime);
+      inspector.on('error', () => {});
+
+      let capturedRecord: UsageRecord | null = null;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+        capturedRecord = record;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+      src.write('data: partial\n\n');
+      inspector.destroy(new Error('client_disconnected'));
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(capturedRecord).not.toBeNull();
+      expect(capturedRecord!.responseStatus).toBe('cancelled');
+      expect(capturedRecord!.tokensInput).toBe(50);
+    });
+  });
 });

@@ -84,6 +84,11 @@ import {
   List,
   AlertTriangle,
   ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Ban,
+  Timer,
+  Plane,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -1326,10 +1331,29 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                     </div>
                   </div>
                   <span
-                    className={`shrink-0 text-xs font-semibold ${
-                      r.responseStatus === 'success' ? 'text-green-500' : 'text-red-500'
+                    className={`inline-flex shrink-0 items-center gap-1 text-xs font-semibold ${
+                      r.responseStatus === 'success'
+                        ? 'text-green-500'
+                        : r.responseStatus === 'pending'
+                          ? 'text-warning'
+                          : r.responseStatus === 'cancelled'
+                            ? 'text-blue-400'
+                            : r.responseStatus === 'timeout'
+                              ? 'text-orange-400'
+                              : 'text-red-500'
                     }`}
                   >
+                    {r.responseStatus === 'success' ? (
+                      <CheckCircle size={11} />
+                    ) : r.responseStatus === 'pending' ? (
+                      <Plane size={11} className="animate-pulse" />
+                    ) : r.responseStatus === 'cancelled' ? (
+                      <Ban size={11} />
+                    ) : r.responseStatus === 'timeout' ? (
+                      <Timer size={11} />
+                    ) : (
+                      <XCircle size={11} />
+                    )}
                     {r.responseStatus}
                   </span>
                 </div>
@@ -1394,8 +1418,29 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                     </td>
                     <td className="py-2 pr-3">
                       <span
-                        className={`text-xs ${r.responseStatus === 'success' ? 'text-green-500' : 'text-red-500'}`}
+                        className={`inline-flex items-center gap-1 text-xs ${
+                          r.responseStatus === 'success'
+                            ? 'text-green-500'
+                            : r.responseStatus === 'pending'
+                              ? 'text-warning'
+                              : r.responseStatus === 'cancelled'
+                                ? 'text-blue-400'
+                                : r.responseStatus === 'timeout'
+                                  ? 'text-orange-400'
+                                  : 'text-red-500'
+                        }`}
                       >
+                        {r.responseStatus === 'success' ? (
+                          <CheckCircle size={11} />
+                        ) : r.responseStatus === 'pending' ? (
+                          <Plane size={11} className="animate-pulse" />
+                        ) : r.responseStatus === 'cancelled' ? (
+                          <Ban size={11} />
+                        ) : r.responseStatus === 'timeout' ? (
+                          <Timer size={11} />
+                        ) : (
+                          <XCircle size={11} />
+                        )}
                         {r.responseStatus}
                       </span>
                     </td>

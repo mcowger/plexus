@@ -12,44 +12,449 @@ on:
         type: string
         description: "The release tag to publish (will be created on main if it doesn't exist)"
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  pull-requests: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
 jobs:
+  # ── Setup: resolve/create the tag ──────────────────────────────────────
   setup:
     name: Setup
-    uses: ./.github/workflows/release-setup.yml
-    with:
-      tag: ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release_tag.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
+      - name: Get tag from ref and create if missing
+        id: release_tag
+        run: |
+          TAG="${{ env.TAG }}"
+
+          # If the tag doesn't exist, create it on HEAD of main
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG does not exist, creating it on main"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  # ── Quality Gates ──────────────────────────────────────────────────────
   quality-gates:
     name: Quality Gates
     needs: setup
-    uses: ./.github/workflows/release-quality-gates.yml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend
+        run: bun run build:frontend
+
+      - name: Typecheck all workspaces
+        run: bun run typecheck
+        continue-on-error: true
+
+      - name: Run backend tests
+        run: cd packages/backend && bun run test
+
+      - name: Check for pending migrations
+        run: |
+          bun run generate-migrations --name release_check 2>&1 | tee /tmp/migrate.log
+
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard packages/backend/drizzle/migrations packages/backend/drizzle/migrations_pg)" ]; then
+            echo "✅ No pending migrations"
+          else
+            echo "::error::Pending migrations detected! Wait for generate-migrations workflow."
+            exit 1
+          fi
+
+  # ── Generate Release Notes ──────────────────────────────────────────────
   generate-release-notes:
     name: Generate Release Notes
     needs: setup
-    uses: ./.github/workflows/release-notes.yml
-    with:
-      tag: ${{ needs.setup.outputs.tag }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
+    outputs:
+      notes: ${{ steps.read_notes.outputs.notes }}
+    steps:
+      - name: Mask API key
+        run: echo "::add-mask::$LLM_API_KEY"
 
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Gather release data
+        id: gather
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const currentTag = '${{ needs.setup.outputs.tag }}';
+            const calVerRegex = /^\d{4}\.\d{2}\.\d{2}\.\d+$/;
+            const fs = require('fs');
+
+            async function getTagDate(tag) {
+              const ref = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`,
+              });
+
+              if (ref.data.object.type === 'tag') {
+                const tagObj = await github.rest.git.getTag({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_sha: ref.data.object.sha,
+                });
+                return new Date(tagObj.data.tagger.date);
+              }
+
+              const commit = await github.rest.git.getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: ref.data.object.sha,
+              });
+              return new Date(commit.data.committer.date);
+            }
+
+            const currentDate = await getTagDate(currentTag);
+            core.info(`Current tag ${currentTag} date: ${currentDate.toISOString()}`);
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const prevRelease = releases
+              .filter(r => !r.prerelease && calVerRegex.test(r.tag_name) && r.tag_name !== currentTag)
+              .sort((a, b) => {
+                const pa = a.tag_name.split('.').map(Number);
+                const pb = b.tag_name.split('.').map(Number);
+                for (let i = 0; i < 4; i++) {
+                  if (pa[i] !== pb[i]) return pb[i] - pa[i];
+                }
+                return 0;
+              })[0];
+
+            let prevDate = null;
+            let prevTag = null;
+
+            if (prevRelease) {
+              prevTag = prevRelease.tag_name;
+              prevDate = new Date(prevRelease.published_at);
+              core.info(`Previous release ${prevTag} published_at: ${prevDate.toISOString()}`);
+            } else {
+              core.info('No previous CalVer release found — this appears to be the first release');
+            }
+
+            const allPRs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              per_page: 100,
+            });
+
+            const relevantPRs = allPRs
+              .filter(pr => {
+                if (!pr.merged_at) return false;
+                const mergedAt = new Date(pr.merged_at);
+                if (prevDate && mergedAt <= prevDate) return false;
+                return mergedAt <= currentDate;
+              })
+              .map(pr => ({
+                number: pr.number,
+                title: pr.title,
+                author: pr.user?.login ?? 'unknown',
+                labels: pr.labels.map(l => l.name),
+                merged_at: pr.merged_at,
+                body: (pr.body ?? '').substring(0, 1000),
+              }));
+
+            core.info(`Found ${relevantPRs.length} PRs in this release window`);
+
+            const allCommits = await github.paginate(github.rest.repos.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: 'main',
+              since: prevDate ? prevDate.toISOString() : undefined,
+              until: currentDate.toISOString(),
+              per_page: 100,
+            });
+
+            const relevantCommits = allCommits.map(c => ({
+              sha: c.sha.substring(0, 7),
+              message: c.commit.message.split('\n')[0],
+              author: c.commit.author?.name ?? c.author?.login ?? 'unknown',
+              date: c.commit.committer?.date ?? null,
+            }));
+
+            core.info(`Found ${relevantCommits.length} commits in this release window`);
+
+            const releaseData = {
+              currentTag,
+              previousTag: prevTag,
+              currentDate: currentDate.toISOString(),
+              previousDate: prevDate ? prevDate.toISOString() : null,
+              pullRequests: relevantPRs,
+              commits: relevantCommits,
+            };
+
+            fs.writeFileSync('release-data.json', JSON.stringify(releaseData, null, 2));
+            core.info('Wrote release-data.json');
+
+      - name: Run release notes agent
+        id: release_notes_agent
+        uses: mcowger/pi-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          provider: openrouter
+          model: ${{ vars.LLM_MODEL_ID }}
+          token: ${{ env.LLM_API_KEY }}
+          base_url: ${{ secrets.LLM_API_HOST }}
+          trigger: generate-release-notes
+          load_builtin_extensions: true
+          suppress_final_comment: true
+          export_session_html: true
+          prompt_file: .github/prompts/release-notes.md
+        env:
+          RELEASE_TAG: ${{ needs.setup.outputs.tag }}
+
+      - name: Read agent-generated notes
+        id: read_notes
+        if: always()
+        run: |
+          if [ -f release-notes.md ]; then
+            {
+              echo 'notes<<RELEASE_NOTES_EOF'
+              cat release-notes.md
+              echo 'RELEASE_NOTES_EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo '::warning::Agent did not write release-notes.md — release will have no body'
+            echo 'notes=' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload agent session
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-notes-session
+          path: ${{ steps.release_notes_agent.outputs.session_html_path }}
+          retention-days: 7
+          if-no-files-found: ignore
+          archive: false
+
+  # ── Build Binaries ──────────────────────────────────────────────────────
   build-binaries:
     name: Build Binaries
     needs: [setup, quality-gates]
-    uses: ./.github/workflows/release-build-binaries.yml
-    with:
-      tag: ${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ needs.setup.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-  build-docker:
-    name: Build Docker Image
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend
+        run: bun run build:frontend
+
+      - name: Compile all binaries
+        run: |
+          bun run compile:linux-amd64
+          bun run compile:linux-arm64
+          bun run compile:macos
+          bun run compile:windows
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: binaries
+          path: |
+            plexus-linux-amd64
+            plexus-linux-arm64
+            plexus-macos
+            plexus.exe
+          retention-days: 1
+
+  # ── Build Docker Image (per-arch, cache-isolated) ─────────────────────
+  # Each platform gets its own job so the GHA cache is scoped per arch,
+  # preventing a cached amd64 builder layer from being served to arm64.
+  build-docker-image:
+    name: Build Docker Image (${{ matrix.platform }})
     needs: [setup, quality-gates]
-    uses: ./.github/workflows/release-build-docker.yml
-    with:
-      tag: ${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive cache scope and arch suffix
+        id: vars
+        run: |
+          # Convert "linux/arm64" → "linux-arm64" for use in cache keys and tags
+          SAFE_PLATFORM="${{ matrix.platform }}"
+          SAFE_PLATFORM="${SAFE_PLATFORM//\//-}"
+          echo "safe_platform=${SAFE_PLATFORM}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push platform image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: ${{ matrix.platform }}
+          # Push as a per-arch tag; the manifest-merge job will assemble the
+          # final multi-arch index from these two digests.
+          tags: ghcr.io/${{ github.repository }}:${{ needs.setup.outputs.tag }}-${{ steps.vars.outputs.safe_platform }}
+          labels: org.opencontainers.image.version=${{ needs.setup.outputs.tag }}
+          build-args: |
+            APP_VERSION=${{ needs.setup.outputs.tag }}
+          # Cache scope is isolated per platform — prevents amd64 cache entries
+          # from being served to the arm64 build (the root cause of issue #550).
+          cache-from: type=gha,scope=plexus-${{ steps.vars.outputs.safe_platform }}
+          cache-to: type=gha,mode=min,scope=plexus-${{ steps.vars.outputs.safe_platform }}
+
+  # ── Merge multi-arch manifest + smoke test ────────────────────────────
+  build-docker-manifest:
+    name: Build Docker Manifest
+    needs: [setup, build-docker-image]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}"
+          TAG="${{ needs.setup.outputs.tag }}"
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${TAG}" \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}:${TAG}-linux-amd64" \
+            "${IMAGE}:${TAG}-linux-arm64"
+
+      - name: Smoke test Docker image (amd64)
+        timeout-minutes: 2
+        run: |
+          echo "Starting smoke test for Docker image..."
+          TEST_ADMIN_KEY="test-admin-key-$(openssl rand -hex 8)"
+
+          docker run -d \
+            --name plexus-smoke-test \
+            -p 4000:4000 \
+            -e DATABASE_URL="sqlite://:memory:" \
+            -e ADMIN_KEY="$TEST_ADMIN_KEY" \
+            ghcr.io/${{ github.repository }}:${{ needs.setup.outputs.tag }}
+
+          echo "Waiting for container to be healthy (30s timeout)..."
+          SECONDS=0
+          MAX_WAIT=30
+
+          while [ $SECONDS -lt $MAX_WAIT ]; do
+            if curl -sf http://localhost:4000/health 2>/dev/null || \
+               curl -sf http://localhost:4000/v1/models 2>/dev/null; then
+              echo "Container started successfully and responded on port 4000"
+              docker stop plexus-smoke-test
+              docker rm plexus-smoke-test
+              exit 0
+            fi
+
+            if ! docker ps -q -f name=plexus-smoke-test | grep -q .; then
+              echo "Container crashed or exited unexpectedly"
+              docker logs plexus-smoke-test 2>/dev/null || true
+              docker rm plexus-smoke-test 2>/dev/null || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          echo "Container failed to start within 30 seconds"
+          docker logs plexus-smoke-test 2>/dev/null || true
+          docker stop plexus-smoke-test 2>/dev/null || true
+          docker rm plexus-smoke-test 2>/dev/null || true
+          exit 1
+
+  # ── Verify binary arch inside each platform image ─────────────────────
+  # Catches the exact failure mode from issue #550: an arm64-labelled image
+  # that actually contains an x86-64 binary.
+  # ── Create Release ─────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [setup, build-binaries, build-docker, generate-release-notes]
-    uses: ./.github/workflows/release-publish.yml
-    with:
-      tag: ${{ needs.setup.outputs.tag }}
-      release_notes: ${{ needs.generate-release-notes.outputs.notes }}
+    needs: [setup, build-binaries, build-docker-manifest, generate-release-notes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          name: binaries
+          path: release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.setup.outputs.tag }}
+          body: ${{ needs.generate-release-notes.outputs.notes }}
+          files: |
+            release/plexus-linux-amd64
+            release/plexus-linux-arm64
+            release/plexus-macos
+            release/plexus.exe
+          draft: false
+          prerelease: false

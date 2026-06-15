@@ -8,6 +8,31 @@ parameters:
     description: >
       Server name (lowercase alphanumeric, max 64 chars). Must match pattern
       `^[a-z0-9][a-z0-9-_]{1,62}$`.
+get:
+  tags:
+    - Management — Config
+  summary: Get an MCP server entry by name (admin only)
+  description: |
+    Returns a single configured MCP gateway server entry.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: MCP server configuration.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - type: object
+                properties:
+                  name:
+                    type: string
+              - $ref: ../components/schemas/McpServerConfig.yaml
+    '404':
+      description: MCP server not found.
+  operationId: getV0ManagementMcpserversByserverName
 put:
   tags:
     - Management — Config
@@ -21,14 +46,8 @@ put:
     - Max 64 characters
     - Can contain lowercase letters, numbers, and hyphens/underscores
 
-    ## Proxy auth fields
-
-    These fields affect how the MCP proxy authenticates to the upstream:
-    - `auth_type` — Authentication type (none, bearer, basic, header)
-    - `auth_header_value` — Static value for custom auth headers
-
-    The proxy strips incoming `Authorization` / `x-api-key` headers and
-    uses the configured static auth instead.
+    The request body contains the upstream URL, enabled flag, and optional
+    static headers forwarded to the upstream MCP server.
 
     **Admin only** — limited principals receive 403.
   security:
@@ -55,6 +74,44 @@ put:
     '400':
       description: Invalid server name or body.
   operationId: putV0ManagementMcpserversByserverName
+patch:
+  tags:
+    - Management — Config
+  summary: Merge updates into an MCP server entry (admin only)
+  description: |
+    Merges the request body into the existing MCP server configuration, then
+    validates the result against `McpServerConfig`.
+
+    PATCH performs a shallow merge; omitted fields keep their current values.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties: true
+  responses:
+    '200':
+      description: Saved.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+    '400':
+      description: Invalid server name or body.
+    '404':
+      description: MCP server not found.
+  operationId: patchV0ManagementMcpserversByserverName
 delete:
   tags:
     - Management — Config

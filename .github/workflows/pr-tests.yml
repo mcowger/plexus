@@ -75,7 +75,7 @@ jobs:
         continue-on-error: true
 
       - name: Run backend tests
-        run: cd packages/backend && bun run test
+        run: cd packages/backend && bun run test:force-all
 
       - name: Update PR check to complete
         if: github.event_name == 'workflow_dispatch' && always()

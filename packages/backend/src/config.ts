@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
+import { isValidIpRule } from './utils/ip-match';
 import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
 import type { ModelArchitecture } from '@plexus/shared';
+import { getModel } from '@earendil-works/pi-ai';
 
 // --- Zod Schemas ---
 
@@ -61,6 +63,115 @@ const PricingSchema = z.discriminatedUnion('source', [
   }),
 ]);
 
+// ─── Adapter Config ─────────────────────────────────────────────────
+// Adapters are configured as an array of { name, options } entries.
+// Legacy bare-string forms are normalized at read time in config-repository.
+
+const ModelOverrideConditionSchema = z.object({
+  /** JSON dotted path into the payload (e.g. "reasoning.enabled", "reasoning.effort"). */
+  field: z.string().min(1),
+  /** If omitted, matches when the field is present (any value). If set, matches when value equals this. */
+  value: z.any().optional(),
+});
+
+const ModelOverrideRuleSchema = z.object({
+  /** The model name in the payload to match against (e.g. "deepseek-r1"). */
+  model: z.string().min(1),
+  /** The model name to rewrite to when conditions match (e.g. "deepseek-r1-fast"). */
+  rewriteTo: z.string().min(1),
+  /** Conditions — ANY match triggers the rewrite (OR semantics). */
+  conditions: z.array(ModelOverrideConditionSchema).min(1),
+});
+
+const ModelOverrideOptionsSchema = z.object({
+  rules: z.array(ModelOverrideRuleSchema).min(1),
+});
+
+const AdapterEntrySchema = z.object({
+  name: z.string().min(1),
+  options: z.record(z.string(), z.any()).default({}),
+});
+
+/**
+ * Accepts both the legacy format (string | string[]) and the new
+ * uniform format ({ name, options }[]) and normalizes everything
+ * to AdapterEntry[]. This ensures backward compatibility with
+ * existing YAML configs while enforcing the canonical shape at
+ * validation time.
+ */
+const AdapterConfigSchema = z.preprocess((val) => {
+  if (val === undefined || val === null) return undefined;
+  // Already an array (or single entry) — normalize each element
+  const arr = Array.isArray(val) ? val : [val];
+  return arr.map((entry: any) => {
+    if (typeof entry === 'string') {
+      return { name: entry, options: {} };
+    }
+    if (entry && typeof entry === 'object' && 'name' in entry) {
+      return { name: entry.name, options: entry.options ?? {} };
+    }
+    return entry; // Let Zod produce a clear validation error
+  });
+}, z.array(AdapterEntrySchema).optional());
+
+export type ModelOverrideCondition = z.infer<typeof ModelOverrideConditionSchema>;
+export type ModelOverrideRule = z.infer<typeof ModelOverrideRuleSchema>;
+export type ModelOverrideOptions = z.infer<typeof ModelOverrideOptionsSchema>;
+export type AdapterEntry = z.infer<typeof AdapterEntrySchema>;
+
+// ─── Reasoning Rewrite Adapter Config ────────────────────────────────
+
+const ValueTransformSchema = z.union([
+  z.object({ from: z.literal('source') }),
+  z.object({ from: z.literal('map'), values: z.record(z.string(), z.any()) }),
+  z.object({ from: z.literal('boolean'), truthy: z.any(), falsy: z.any() }),
+]);
+
+const FieldRewriteSchema = z.object({
+  /** Dotted path to write (e.g. "enable_thinking", "thinking.type"). */
+  target: z.string().min(1),
+  /**
+   * Value to write at the target path.
+   * Literal primitives are written as-is.
+   * Objects with { from: "source" | "map" | "boolean" } trigger transforms.
+   */
+  value: z.any(),
+});
+
+const MatchConditionSchema = z.object({
+  /** Comparison operator. */
+  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'present', 'absent']),
+  /** Value to compare against (for eq/neq/gt/gte/lt/lte). */
+  value: z.any().optional(),
+  /** Values array for "in" operator. */
+  values: z.array(z.any()).optional(),
+});
+
+const ReasoningRewriteRuleSchema = z.object({
+  /** Dotted path to read from the payload (e.g. "reasoning.enabled", "reasoning.effort"). */
+  source: z.string().min(1),
+  /** Optional condition on the source value. Omit = match any (presence check). */
+  when: MatchConditionSchema.optional(),
+  /** Rewrites to apply when the source matches. All matching rewrites apply. */
+  rewrites: z.array(FieldRewriteSchema).min(1),
+  /**
+   * Dotted paths to REMOVE from the payload after rewrites are applied.
+   * Use to strip unified fields the provider doesn't understand
+   * (e.g. "reasoning" when mapping to "enable_thinking" instead).
+   */
+  strip: z.array(z.string().min(1)).optional(),
+});
+
+const ReasoningRewriteOptionsSchema = z.object({
+  rules: z.array(ReasoningRewriteRuleSchema).min(1),
+});
+
+export type ValueTransform = z.infer<typeof ValueTransformSchema>;
+export type FieldRewrite = z.infer<typeof FieldRewriteSchema>;
+export type MatchCondition = z.infer<typeof MatchConditionSchema>;
+export type ReasoningRewriteRule = z.infer<typeof ReasoningRewriteRuleSchema>;
+export type ReasoningRewriteOptions = z.infer<typeof ReasoningRewriteOptionsSchema>;
+
 const ModelProviderConfigSchema = z.object({
   pricing: PricingSchema.default({
     source: 'simple',
@@ -70,6 +181,9 @@ const ModelProviderConfigSchema = z.object({
   access_via: z.array(z.string()).optional(),
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   extraBody: z.record(z.string(), z.any()).optional(),
+  adapter: AdapterConfigSchema,
+  maxConcurrency: z.number().int().positive().nullable().optional(),
+  pi_ai_model_id: z.string().optional(),
 });
 
 const OAuthProviderSchema = z.enum([
@@ -118,7 +232,7 @@ const NovitaQuotaCheckerOptionsSchema = z.object({
 
 const MiniMaxQuotaCheckerOptionsSchema = z.object({
   groupid: z.string().trim().min(1, 'MiniMax groupid is required'),
-  hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),
+  token: z.string().trim().min(1, 'MiniMax _token cookie value is required'),
 });
 
 const MiniMaxCodingQuotaCheckerOptionsSchema = z.object({
@@ -193,15 +307,38 @@ const ZenmuxQuotaCheckerOptionsSchema = z.object({
 
 const WaferQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
+  includeAllowance: z.boolean().optional(),
 });
 
 const PoeQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const RoutingRunQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const DevPassQuotaCheckerOptionsSchema = z.object({
   session: z.string().trim().min(1, 'DevPass session cookie is required'),
   endpoint: z.string().url().optional(),
+});
+
+const OpenCodeGoQuotaCheckerOptionsSchema = z.object({
+  workspaceId: z.string().min(1, 'OpenCode Go workspace ID is required'),
+  authCookie: z.string().min(1, 'OpenCode Go auth cookie is required'),
+  endpoint: z.string().url().optional(),
+});
+
+const CrofQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
+const ExeDevQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
+const HyperQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.url().optional(),
 });
 
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
@@ -325,6 +462,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     options: PoeQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
+    type: z.literal('routing-run'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: RoutingRunQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
     type: z.literal('gemini-cli'),
     enabled: z.boolean().default(true),
     intervalMinutes: z.number().min(1).default(30),
@@ -373,7 +517,40 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     id: z.string().trim().min(1).optional(),
     options: WaferQuotaCheckerOptionsSchema.optional().default({}),
   }),
+  z.object({
+    type: z.literal('opencode-go'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: OpenCodeGoQuotaCheckerOptionsSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('crof'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: CrofQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('exedev'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ExeDevQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('hyper'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: HyperQuotaCheckerOptionsSchema.optional().default({}),
+  }),
 ]);
+
+const ModelAutosyncSchema = z.object({
+  enabled: z.boolean().default(false),
+  intervalMinutes: z.number().int().min(1).default(60),
+});
 
 export const ProviderConfigSchema = z
   .object({
@@ -389,6 +566,7 @@ export const ProviderConfigSchema = z
     oauth_account: z.string().min(1).optional(),
     enabled: z.boolean().default(true).optional(),
     disable_cooldown: z.boolean().optional().default(false),
+    stall_cooldown: z.boolean().optional().default(false),
     discount: z.number().min(0).max(1).optional(),
     models: z
       .union([z.array(z.string()), z.record(z.string(), ModelProviderConfigSchema)])
@@ -398,6 +576,7 @@ export const ProviderConfigSchema = z
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
+    model_autosync: ModelAutosyncSchema.optional(),
     // GPU Profile settings — gpu_profile is a display hint (e.g. 'H100', 'custom').
     // The 4 numeric fields are the source of truth; the frontend resolves named
     // profiles to concrete values before saving. The backend never resolves.
@@ -407,6 +586,16 @@ export const ProviderConfigSchema = z
     gpu_flops_tflop: z.number().positive().optional(),
     gpu_power_draw_watts: z.number().positive().optional(),
     geminiThinkingEnabled: z.boolean().optional(),
+    adapter: AdapterConfigSchema,
+    timeoutMs: z.number().int().positive().optional(),
+    maxConcurrency: z.number().int().positive().nullable().optional(),
+    // Per-provider stall detection overrides (null = use global setting)
+    stallTtfbMs: z.number().int().min(5000).max(120000).nullable().optional(),
+    stallTtfbBytes: z.number().int().min(50).max(10000).nullable().optional(),
+    stallMinBps: z.number().int().min(50).max(5000).nullable().optional(),
+    stallWindowMs: z.number().int().min(3000).max(30000).nullable().optional(),
+    stallGracePeriodMs: z.number().int().min(0).max(120000).nullable().optional(),
+    pi_ai_provider: z.string().optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",
@@ -562,11 +751,31 @@ export const ModelConfigSchema = z
     additional_aliases: z.array(z.string()).optional(),
     use_image_fallthrough: z.boolean().default(false).optional(),
     enforce_limits: z.boolean().default(false).optional(),
+    // When true, multi-turn requests prefer the provider:model used on the
+    // previous turn of the same conversation (when still healthy and present
+    // in the alias targets). Tracked in-memory only; see
+    // services/sticky-session-manager.ts.
+    sticky_session: z.boolean().default(false).optional(),
+    // Advertised in GET /v1/models to inform clients of the preferred API surface(s)
+    // for this alias, even if plexus can translate between them.
+    preferred_api: z
+      .array(z.enum(['chat_completions', 'messages', 'gemini', 'responses']))
+      .optional(),
     type: z
       .enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image'])
       .optional(),
     advanced: z.array(ModelBehaviorSchema).optional(),
     metadata: ModelMetadataSchema.optional(),
+    // pi-ai model reference: when set, pi_options (compat) will be included in GET /v1/models
+    pi_model: z
+      .object({
+        provider: z.string().min(1),
+        model_id: z.string().min(1),
+      })
+      .optional(),
+    // Extra body fields merged into every request dispatched through this alias.
+    // Merged after provider-level and model-level extraBody, so alias values win.
+    extraBody: z.record(z.string(), z.any()).optional(),
     // Model architecture override for inference energy calculation
     model_architecture: z
       .object({
@@ -614,6 +823,15 @@ export const KeyConfigSchema = z.object({
   allowedProviders: z.array(z.string().min(1)).optional(),
   excludedModels: z.array(z.string().min(1)).optional(),
   excludedProviders: z.array(z.string().min(1)).optional(),
+  beta: z.boolean().optional(),
+  allowedIps: z
+    .array(
+      z.string().min(1).refine(isValidIpRule, {
+        message:
+          'Invalid IP rule. Use IPv4/IPv6, CIDR (a.b.c.d/n, ::/n), or a range (a.b.c.d-N or addr-addr).',
+      })
+    )
+    .optional(),
 });
 
 const QuotaConfigSchema = z.object({
@@ -641,6 +859,21 @@ const VisionFallthroughConfigSchema = z.object({
   default_prompt: z.string().default(DEFAULT_VISION_DESCRIPTION_PROMPT),
 });
 
+const BackgroundExplorationConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  stalenessThresholdSeconds: z.number().int().min(1).default(600),
+  workerConcurrency: z.number().int().min(1).max(16).default(2),
+});
+
+const StallConfigSchema = z.object({
+  ttfbSeconds: z.number().min(5).max(120).nullable().optional(),
+  ttfbBytes: z.number().int().min(50).max(10000).default(100).optional(),
+  minBytesPerSecond: z.number().int().min(50).max(5000).nullable().optional(),
+  windowSeconds: z.number().int().min(3).max(30).default(10).optional(),
+  gracePeriodSeconds: z.number().int().min(0).max(120).default(30).optional(),
+  stallCooldown: z.boolean().default(false).optional(),
+});
+
 const RawPlexusConfigSchema = z
   .object({
     providers: z.record(z.string(), ProviderConfigSchema),
@@ -652,6 +885,9 @@ const RawPlexusConfigSchema = z
     performanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     latencyExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
     e2ePerformanceExplorationRate: z.number().min(0).max(1).default(0.05).optional(),
+    timeout: z.object({ defaultSeconds: z.number().min(1).max(3600).default(300) }).optional(),
+    stall: StallConfigSchema.optional(),
+    backgroundExploration: BackgroundExplorationConfigSchema.optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
     user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
   })
@@ -659,11 +895,31 @@ const RawPlexusConfigSchema = z
 
 export type FailoverPolicy = z.infer<typeof FailoverPolicySchema>;
 export type CooldownPolicy = z.infer<typeof CooldownPolicySchema>;
+export type BackgroundExplorationConfig = z.infer<typeof BackgroundExplorationConfigSchema>;
+export type TimeoutConfig = { defaultSeconds: number };
+export type StallConfigType = {
+  ttfbSeconds?: number | null;
+  ttfbBytes?: number;
+  minBytesPerSecond?: number | null;
+  windowSeconds?: number;
+  gracePeriodSeconds?: number;
+  stallCooldown?: boolean;
+};
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
   cooldown?: CooldownPolicy;
+  timeout?: TimeoutConfig;
+  stall?: StallConfigType;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
+  // Immediate-peer IPs/CIDRs whose forwarding headers are trusted when
+  // resolving the client IP. Semantics:
+  //  - undefined: legacy trust-all before DB-backed config is loaded
+  //  - ['0.0.0.0/0', '::/0']: explicit trust-all database default
+  //  - []: trust no proxies, use peer IP only
+  //  - specific CIDRs: trust only matching peers
+  // See getTrustedClientIp for enforcement.
+  trustedProxies?: string[];
 };
 export type DatabaseConfig = {
   connectionString: string;
@@ -777,6 +1033,32 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
       };
     } else {
       resolvedProviders[providerId] = pc;
+    }
+  }
+
+  // Startup registry validation: warn (non-fatally) for any configured
+  // (pi_ai_provider, pi_ai_model_id) pair that is not in the pi-ai registry.
+  // getModel() throws on unknown pairs — downgrade to a warning so that new or
+  // unreleased model IDs don't prevent Plexus from starting.
+  for (const [providerId, providerConfig] of Object.entries(resolvedProviders)) {
+    const pc = providerConfig as ProviderConfig;
+    if (!pc.pi_ai_provider) continue;
+    if (!pc.models || Array.isArray(pc.models)) continue;
+    for (const [modelName, modelCfg] of Object.entries(
+      pc.models as Record<string, { pi_ai_model_id?: string }>
+    )) {
+      const piAiModelId = modelCfg.pi_ai_model_id;
+      if (!piAiModelId) continue;
+      try {
+        getModel(pc.pi_ai_provider as any, piAiModelId as any);
+      } catch {
+        logger.warn(
+          `pi-ai registry: provider "${providerId}" model "${modelName}" references ` +
+            `pi_ai_provider="${pc.pi_ai_provider}" pi_ai_model_id="${piAiModelId}" ` +
+            `which is not in the pi-ai model registry. The beta inference path will ` +
+            `skip this provider/model combination.`
+        );
+      }
     }
   }
 
@@ -973,33 +1255,3 @@ export function getDatabaseConfig(): DatabaseConfig | null {
   }
   return { connectionString: databaseUrl };
 }
-
-// Valid quota checker types - single source of truth
-export const VALID_QUOTA_CHECKER_TYPES = [
-  'naga',
-  'synthetic',
-  'nanogpt',
-  'zai',
-  'moonshot',
-  'minimax',
-  'minimax-coding',
-  'openrouter',
-  'kilo',
-  'openai-codex',
-  'claude-code',
-  'kimi-code',
-  'copilot',
-  'wisdomgate',
-  'apertis',
-  'poe',
-  'gemini-cli',
-  'antigravity',
-  'novita',
-  'ollama',
-  'neuralwatt',
-  'zenmux',
-  'devpass',
-  'wafer',
-] as const;
-
-export type QuotaCheckerType = (typeof VALID_QUOTA_CHECKER_TYPES)[number];

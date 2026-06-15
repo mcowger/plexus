@@ -23,6 +23,7 @@ import { and, gte, lte, isNull, isNotNull, sql } from 'drizzle-orm';
 import { getSchema } from '../../db/client';
 import { UsageStorageService } from '../../services/usage-storage';
 import { CooldownManager } from '../../services/cooldown-manager';
+import { ConcurrencyTracker } from '../../services/concurrency-tracker';
 
 // ---------------------------------------------------------------------------
 // Prometheus text-format helpers
@@ -927,6 +928,36 @@ export async function registerMetricsRoutes(
             },
             value: c.consecutiveFailures,
           }))
+        )
+      );
+
+      // --- Concurrency tracker gauges (in-memory, not DB) ---------------
+
+      const concurrencySnapshot = ConcurrencyTracker.getInstance().getSnapshot();
+      blocks.push(
+        metricBlock(
+          'plexus_concurrency_active',
+          'gauge',
+          'Number of requests currently tracked by the in-memory ConcurrencyTracker per provider.',
+          Object.entries(concurrencySnapshot.providers).map(([provider, count]) => ({
+            labels: { provider },
+            value: count,
+          }))
+        )
+      );
+
+      blocks.push(
+        metricBlock(
+          'plexus_concurrency_active_by_target',
+          'gauge',
+          'Number of requests currently tracked by the in-memory ConcurrencyTracker per provider/model target.',
+          Object.entries(concurrencySnapshot.targets).map(([target, count]) => {
+            const [provider = '', model = ''] = target.split('/');
+            return {
+              labels: { provider, model },
+              value: count,
+            };
+          })
         )
       );
 

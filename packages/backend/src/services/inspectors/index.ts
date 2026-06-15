@@ -11,3 +11,5 @@
 
 export { DebugLoggingInspector } from './debug-logging';
 export { UsageInspector } from './usage-logging';
+export { StallInspector } from './stall-inspector';
+export type { StallConfig } from './stall-inspector';

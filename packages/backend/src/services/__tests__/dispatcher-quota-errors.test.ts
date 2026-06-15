@@ -7,7 +7,7 @@ import { QUOTA_ERROR_PATTERNS } from '../../utils/constants';
 import { Router } from '../router';
 import { TransformerFactory } from '../transformer-factory';
 
-// @mariozechner/pi-ai is mocked globally in vitest.setup.ts — do not add a
+// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 

@@ -1,0 +1,113 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get background exploration config (admin only)
+  description: |
+    Returns the background exploration configuration used by the
+    `BackgroundExplorer` service for automatic performance probing.
+
+    ## What's included
+
+    - `enabled` — Whether background exploration is active
+    - `stalenessThresholdSeconds` — How old data can be before re-probing
+    - `workerConcurrency` — Number of parallel probe workers (1-16)
+
+    ## Use case
+
+    Background exploration automatically refreshes performance data for
+    model aliases by sending probe requests. This endpoint returns the
+    current configuration for that system.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Background exploration config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+                description: Whether background exploration is enabled
+              stalenessThresholdSeconds:
+                type: integer
+                description: Seconds before data is considered stale
+              workerConcurrency:
+                type: integer
+                minimum: 1
+                maximum: 16
+                description: Number of parallel probe workers
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigBackgroundExploration
+patch:
+  tags:
+    - Management — Config
+  summary: Update background exploration config (admin only)
+  description: |
+    Partially updates the background exploration configuration. Only
+    provided fields are updated; others retain their current values.
+
+    ## Validation rules
+
+    - `enabled` — Must be a boolean
+    - `stalenessThresholdSeconds` — Integer >= 1
+    - `workerConcurrency` — Integer between 1 and 16
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              description: Enable or disable background exploration
+            stalenessThresholdSeconds:
+              type: integer
+              minimum: 1
+              description: Seconds before data is considered stale
+            workerConcurrency:
+              type: integer
+              minimum: 1
+              maximum: 16
+              description: Number of parallel probe workers
+        examples:
+          enable_exploration:
+            summary: Enable with default thresholds
+            value:
+              enabled: true
+          adjust_workers:
+            summary: Increase worker concurrency
+            value:
+              workerConcurrency: 8
+          custom_threshold:
+            summary: Custom staleness threshold
+            value:
+              stalenessThresholdSeconds: 3600
+  responses:
+    '200':
+      description: Updated config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+              stalenessThresholdSeconds:
+                type: integer
+              workerConcurrency:
+                type: integer
+    '400':
+      description: Invalid request body or validation failed.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigBackgroundExploration

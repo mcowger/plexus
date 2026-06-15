@@ -8,6 +8,7 @@ interface PoeBalanceResponse {
 
 export default defineChecker({
   type: 'poe',
+  displayName: 'POE',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'POE API key is required'),
     endpoint: z.string().url().optional(),

@@ -171,7 +171,7 @@ The Docker image for this release has been updated and can be found at `ghcr.io/
 
 ## Dependencies
 
-- Updated @mariozechner/pi-ai from 0.56.3 to 0.61.0 ([4273680](https://github.com/mcowger/plexus/commit/4273680))
+- Updated @earendil-works/pi-ai from 0.56.3 to 0.61.0 ([4273680](https://github.com/mcowger/plexus/commit/4273680))
 
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 

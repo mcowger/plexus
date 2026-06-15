@@ -201,12 +201,19 @@ export class QuotaScheduler {
     const checkedAt = toDbTimestampMs(new Date(result.checkedAt), dialect);
     const createdAt = toDbTimestampMs(Date.now(), dialect);
 
-    if (!result.success) {
-      try {
-        await db.insert(schema.meterSnapshots).values({
-          checkerId: result.checkerId,
-          checkerType: result.checkerType,
-          provider: result.provider,
+    const sentinelValues = result.success
+      ? {
+          meterKey: '_empty',
+          kind: 'allowance',
+          unit: '',
+          label: 'No meters',
+          utilizationState: 'not_applicable',
+          utilizationPercent: null,
+          status: 'ok',
+          success: true,
+          errorMessage: null,
+        }
+      : {
           meterKey: '_error',
           kind: 'allowance',
           unit: '',
@@ -216,11 +223,20 @@ export class QuotaScheduler {
           status: 'ok',
           success: false,
           errorMessage: result.error ?? 'Unknown quota check error',
+        };
+
+    if (!result.success || result.meters.length === 0) {
+      try {
+        await db.insert(schema.meterSnapshots).values({
+          checkerId: result.checkerId,
+          checkerType: result.checkerType,
+          provider: result.provider,
           checkedAt,
           createdAt,
+          ...sentinelValues,
         });
       } catch (error) {
-        logger.error(`Failed to persist quota error for '${result.checkerId}': ${error}`);
+        logger.error(`Failed to persist quota result for '${result.checkerId}': ${error}`);
       }
       return;
     }
@@ -272,6 +288,10 @@ export class QuotaScheduler {
     return Array.from(this.configs.keys());
   }
 
+  isInitialized(): boolean {
+    return this.checkersLoaded;
+  }
+
   async getLatestQuota(checkerId: string): Promise<MeterCheckResult | null> {
     try {
       const { db, schema } = this.ensureDb();
@@ -307,31 +327,33 @@ export class QuotaScheduler {
         };
       }
 
-      const meters: Meter[] = latestRows.map((row: any) => {
-        const util: Meter['utilizationPercent'] =
-          row.utilizationState === 'unknown'
-            ? 'unknown'
-            : row.utilizationState === 'not_applicable'
-              ? 'not_applicable'
-              : (row.utilizationPercent ?? 0);
-        return {
-          key: row.meterKey,
-          label: row.label,
-          kind: row.kind,
-          unit: row.unit,
-          group: row.group ?? undefined,
-          scope: row.scope ?? undefined,
-          limit: row.limit ?? undefined,
-          used: row.used ?? undefined,
-          remaining: row.remaining ?? undefined,
-          utilizationPercent: util,
-          status: row.status,
-          periodValue: row.periodValue ?? undefined,
-          periodUnit: row.periodUnit ?? undefined,
-          periodCycle: row.periodCycle ?? undefined,
-          resetsAt: row.resetsAt ? toIso(row.resetsAt) : undefined,
-        };
-      });
+      const meters: Meter[] = latestRows
+        .filter((r: any) => r.meterKey !== '_empty' && r.meterKey !== '_error')
+        .map((row: any) => {
+          const util: Meter['utilizationPercent'] =
+            row.utilizationState === 'unknown'
+              ? 'unknown'
+              : row.utilizationState === 'not_applicable'
+                ? 'not_applicable'
+                : (row.utilizationPercent ?? 0);
+          return {
+            key: row.meterKey,
+            label: row.label,
+            kind: row.kind,
+            unit: row.unit,
+            group: row.group ?? undefined,
+            scope: row.scope ?? undefined,
+            limit: row.limit ?? undefined,
+            used: row.used ?? undefined,
+            remaining: row.remaining ?? undefined,
+            utilizationPercent: util,
+            status: row.status,
+            periodValue: row.periodValue ?? undefined,
+            periodUnit: row.periodUnit ?? undefined,
+            periodCycle: row.periodCycle ?? undefined,
+            resetsAt: row.resetsAt ? toIso(row.resetsAt) : undefined,
+          };
+        });
 
       const firstRow = latestRows[0];
       return {
@@ -397,32 +419,11 @@ export class QuotaScheduler {
     }
 
     const existingIds = new Set(this.configs.keys());
-    const newConfigs = quotaConfigs.filter((c) => !existingIds.has(c.id) && c.enabled);
+    const activeConfigs = quotaConfigs.filter((c) => c.enabled);
+    const activeIds = new Set(activeConfigs.map((c) => c.id));
 
-    for (const config of newConfigs) {
-      if (!getCheckerDefinition(config.type)) {
-        logger.error(`Unknown quota checker type '${config.type}' for checker '${config.id}'`);
-        continue;
-      }
-      this.configs.set(config.id, config);
-      logger.info(
-        `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
-      );
-
-      const intervalMs = config.intervalMinutes * 60 * 1000;
-      const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
-      this.intervals.set(config.id, intervalId);
-      logger.info(
-        `Scheduled quota checker '${config.id}' to run every ${config.intervalMinutes} minutes`
-      );
-      this.runCheckNow(config.id).catch((error) => {
-        logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
-      });
-    }
-
-    const loadedIds = new Set(quotaConfigs.filter((c) => c.enabled).map((c) => c.id));
     for (const id of existingIds) {
-      if (!loadedIds.has(id)) {
+      if (!activeIds.has(id)) {
         const intervalId = this.intervals.get(id);
         if (intervalId) {
           clearInterval(intervalId);
@@ -430,6 +431,52 @@ export class QuotaScheduler {
         }
         this.configs.delete(id);
         logger.info(`Removed quota checker '${id}' on reload`);
+      }
+    }
+
+    for (const config of activeConfigs) {
+      if (!getCheckerDefinition(config.type)) {
+        logger.error(`Unknown quota checker type '${config.type}' for checker '${config.id}'`);
+        continue;
+      }
+
+      const existingConfig = this.configs.get(config.id);
+      const intervalChanged = existingConfig?.intervalMinutes !== config.intervalMinutes;
+
+      this.configs.set(config.id, config);
+
+      if (existingConfig && !intervalChanged) {
+        logger.debug(`Updated quota checker '${config.id}' on reload`);
+        continue;
+      }
+
+      if (existingConfig && intervalChanged) {
+        const intervalId = this.intervals.get(config.id);
+        if (intervalId) clearInterval(intervalId);
+        this.intervals.delete(config.id);
+        logger.info(
+          `Rescheduled quota checker '${config.id}' from ${existingConfig.intervalMinutes} to ${config.intervalMinutes} minutes`
+        );
+      } else {
+        logger.info(
+          `Registered quota checker '${config.id}' (${config.type}) for provider '${config.provider}'`
+        );
+      }
+
+      if (this.intervals.has(config.id)) continue;
+
+      logger.info(
+        `Scheduled quota checker '${config.id}' to run every ${config.intervalMinutes} minutes`
+      );
+
+      const intervalMs = config.intervalMinutes * 60 * 1000;
+      const intervalId = setInterval(() => this.runCheckNow(config.id), intervalMs);
+      this.intervals.set(config.id, intervalId);
+
+      if (!existingConfig) {
+        this.runCheckNow(config.id).catch((error) => {
+          logger.error(`Initial quota check failed for '${config.id}' on reload: ${error}`);
+        });
       }
     }
   }

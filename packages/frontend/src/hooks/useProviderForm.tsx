@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  api,
-  Provider,
-  OAuthSession,
-  initQuotaCheckerTypes,
-  getQuotaCheckerTypes,
-} from '../lib/api';
+import { api, Provider, OAuthSession, fetchQuotaCheckers } from '../lib/api';
 import type { QuotaCheckerInfo } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
@@ -31,32 +25,6 @@ export const OAUTH_PROVIDERS = [
   { value: 'google-antigravity', label: 'Antigravity (Gemini 3, Claude, GPT-OSS)' },
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' },
 ];
-
-const QUOTA_CHECKER_TYPES_FALLBACK = [
-  'synthetic',
-  'naga',
-  'nanogpt',
-  'openai-codex',
-  'claude-code',
-  'kimi-code',
-  'zai',
-  'moonshot',
-  'novita',
-  'minimax',
-  'minimax-coding',
-  'openrouter',
-  'kilo',
-  'wisdomgate',
-  'apertis',
-  'poe',
-  'copilot',
-  'gemini-cli',
-  'antigravity',
-  'ollama',
-  'neuralwatt',
-  'zenmux',
-  'devpass',
-] as const;
 
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
@@ -95,12 +63,17 @@ export const EMPTY_PROVIDER: Provider = {
   oauthAccount: '',
   enabled: true,
   disableCooldown: false,
+  stallCooldown: false,
   estimateTokens: false,
   useClaudeMasking: false,
   apiBaseUrl: {},
   headers: {},
   extraBody: {},
   models: {},
+  modelAutosync: { enabled: false, intervalMinutes: 60 },
+  adapter: [],
+  timeoutMs: undefined,
+  maxConcurrency: undefined,
 };
 
 export interface FetchedModel {
@@ -123,9 +96,7 @@ export function useProviderForm() {
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([
-    ...QUOTA_CHECKER_TYPES_FALLBACK,
-  ]);
+  const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([]);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [quotasLoading, setQuotasLoading] = useState(true);
 
@@ -164,7 +135,13 @@ export function useProviderForm() {
   const [testStates, setTestStates] = useState<
     Record<
       string,
-      { loading: boolean; result?: 'success' | 'error'; message?: string; showResult: boolean; showMessage?: boolean }
+      {
+        loading: boolean;
+        result?: 'success' | 'error';
+        message?: string;
+        showResult: boolean;
+        showMessage?: boolean;
+      }
     >
   >({});
 
@@ -207,9 +184,8 @@ export function useProviderForm() {
 
   // Effects
   useEffect(() => {
-    initQuotaCheckerTypes().then(() => {
-      const types = Array.from(getQuotaCheckerTypes());
-      setQuotaCheckerTypes(types.length > 0 ? types : [...QUOTA_CHECKER_TYPES_FALLBACK]);
+    fetchQuotaCheckers().then((res) => {
+      setQuotaCheckerTypes(res.knownTypes.map((t) => t.type));
     });
   }, []);
 
@@ -394,7 +370,10 @@ export function useProviderForm() {
 
   const handleTestModel = async (providerId: string, modelId: string, modelType?: string) => {
     const testKey = `${providerId}-${modelId}`;
-    setTestStates((prev) => ({ ...prev, [testKey]: { loading: true, showResult: true, showMessage: false } }));
+    setTestStates((prev) => ({
+      ...prev,
+      [testKey]: { loading: true, showResult: true, showMessage: false },
+    }));
     let testApiTypes: string[] = ['chat'];
     if (modelType === 'embeddings') testApiTypes = ['embeddings'];
     else if (modelType === 'image') testApiTypes = ['images'];
@@ -407,7 +386,7 @@ export function useProviderForm() {
       );
       const allSuccess = results.every((r) => r.success);
       const firstError = results.find((r) => !r.success);
-      const totalDuration = results.reduce((sum, r) => sum + r.durationMs, 0);
+      const totalDuration = results.reduce((sum, r) => sum + (r.durationMs || 0), 0);
       const avgDuration = Math.round(totalDuration / results.length);
       setTestStates((prev) => ({
         ...prev,
@@ -421,12 +400,15 @@ export function useProviderForm() {
           showMessage: true,
         },
       }));
-      setTimeout(() => {
-        setTestStates((prev) => ({
-          ...prev,
-          [testKey]: { ...prev[testKey], showResult: false },
-        }));
-      }, allSuccess ? 3000 : 1500);
+      setTimeout(
+        () => {
+          setTestStates((prev) => ({
+            ...prev,
+            [testKey]: { ...prev[testKey], showResult: false },
+          }));
+        },
+        allSuccess ? 3000 : 1500
+      );
       if (allSuccess) {
         setTimeout(() => {
           setTestStates((prev) => ({
@@ -438,7 +420,13 @@ export function useProviderForm() {
     } catch (e) {
       setTestStates((prev) => ({
         ...prev,
-        [testKey]: { loading: false, result: 'error', message: String(e), showResult: true, showMessage: true },
+        [testKey]: {
+          loading: false,
+          result: 'error',
+          message: String(e),
+          showResult: true,
+          showMessage: true,
+        },
       }));
       setTimeout(() => {
         setTestStates((prev) => ({
@@ -743,10 +731,20 @@ export function useProviderForm() {
   };
 
   const toggleModelSelection = (modelId: string) => {
-    const next = new Set(selectedModelIds);
-    if (next.has(modelId)) next.delete(modelId);
-    else next.add(modelId);
-    setSelectedModelIds(next);
+    setSelectedModelIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(modelId)) next.delete(modelId);
+      else next.add(modelId);
+      return next;
+    });
+  };
+
+  const selectAllFetchedModels = () => {
+    setSelectedModelIds(new Set(fetchedModels.map((model) => model.id)));
+  };
+
+  const clearSelectedModels = () => {
+    setSelectedModelIds(new Set());
   };
 
   const handleAddSelectedModels = () => {
@@ -773,13 +771,19 @@ export function useProviderForm() {
     if (quotaType === 'minimax') {
       if (!options.groupid || !(options.groupid as string).trim())
         return 'Group ID is required for MiniMax quota checker';
-      if (!options.hertzSession || !(options.hertzSession as string).trim())
-        return 'HERTZ-SESSION cookie value is required for MiniMax quota checker';
+      if (!options.token || !(options.token as string).trim())
+        return '_token cookie value is required for MiniMax quota checker';
     }
     if (quotaType === 'wisdomgate' && (!options.session || !(options.session as string).trim()))
       return 'Session cookie is required for Wisdom Gate quota checker';
     if (quotaType === 'devpass' && (!options.session || !(options.session as string).trim()))
       return 'Session cookie is required for DevPass quota checker';
+    if (quotaType === 'opencode-go') {
+      if (!options.workspaceId || !(options.workspaceId as string).trim())
+        return 'Workspace ID is required for OpenCode Go quota checker';
+      if (!options.authCookie || !(options.authCookie as string).trim())
+        return 'Auth cookie is required for OpenCode Go quota checker';
+    }
     return null;
   };
 
@@ -792,12 +796,17 @@ export function useProviderForm() {
       e.stopPropagation();
       navigate('/quotas');
     };
+
+    const badges: React.ReactNode[] = [];
+
+    // Balance pill
     const balanceMeter = quota.meters.find(
       (m) => m.kind === 'balance' && m.remaining !== undefined
     );
     if (balanceMeter && balanceMeter.remaining !== undefined) {
-      return (
+      badges.push(
         <Badge
+          key="balance"
           status="neutral"
           className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2 bg-bg-subtle border border-border text-text-secondary"
           onClick={handleQuotaClick}
@@ -806,6 +815,8 @@ export function useProviderForm() {
         </Badge>
       );
     }
+
+    // Allowance pill
     const allowances = quota.meters.filter((m) => m.kind === 'allowance');
     const primary = allowances.reduce<(typeof allowances)[0] | undefined>((worst, m) => {
       if (!worst) return m;
@@ -813,18 +824,24 @@ export function useProviderForm() {
       const mu = typeof m.utilizationPercent === 'number' ? m.utilizationPercent : 0;
       return mu > wu ? m : worst;
     }, undefined);
-    if (!primary || typeof primary.utilizationPercent !== 'number') return null;
-    const pct = Math.round(primary.utilizationPercent);
-    const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
-    return (
-      <Badge
-        status={status}
-        className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
-        onClick={handleQuotaClick}
-      >
-        {pct}%
-      </Badge>
-    );
+    if (primary && typeof primary.utilizationPercent === 'number') {
+      const pct = Math.round(primary.utilizationPercent);
+      const status = pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'connected';
+      badges.push(
+        <Badge
+          key="allowance"
+          status={status}
+          className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
+          onClick={handleQuotaClick}
+        >
+          {pct}%
+        </Badge>
+      );
+    }
+
+    if (!badges.length) return null;
+    if (badges.length === 1) return badges[0];
+    return <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>{badges}</div>;
   };
 
   const sortedProviders = [...providers].sort((a, b) => a.id.localeCompare(b.id));
@@ -930,6 +947,8 @@ export function useProviderForm() {
     handleOpenFetchModels,
     handleFetchModels,
     toggleModelSelection,
+    selectAllFetchedModels,
+    clearSelectedModels,
     handleAddSelectedModels,
     // Quota
     getQuotaDisplay,

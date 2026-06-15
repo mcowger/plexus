@@ -9,6 +9,16 @@ import { getCurrentKeyName } from './request-context';
 import { estimateKwhUsed } from './inference-energy';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { ModelArchitecture, GpuParams } from '@plexus/shared';
+import type { StallInspector } from './inspectors/stall-inspector';
+
+export interface ProgressUpdate {
+  requestId: string;
+  apiKey: string | null;
+  bytesReceived: number;
+  bytesPerSec: number | null;
+  state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
+  elapsedMs: number;
+}
 
 // ModelArchitecture is now imported from @plexus/shared
 
@@ -54,6 +64,31 @@ export class UsageStorageService extends EventEmitter {
   private schema: any = null;
   private readonly defaultPerformanceRetentionLimit = 100;
   private telemetryQueue: Promise<void> = Promise.resolve();
+  private inFlightRegistry = new Map<
+    string,
+    { inspector: StallInspector; apiKey: string | null }
+  >();
+
+  registerInFlight(requestId: string, inspector: StallInspector, apiKey: string | null): void {
+    this.inFlightRegistry.set(requestId, { inspector, apiKey });
+  }
+
+  deregisterInFlight(requestId: string): void {
+    this.inFlightRegistry.delete(requestId);
+  }
+
+  getProgressUpdates(): ProgressUpdate[] {
+    const updates: ProgressUpdate[] = [];
+    for (const [requestId, { inspector, apiKey }] of this.inFlightRegistry) {
+      try {
+        const stats = inspector.getStats();
+        updates.push({ requestId, apiKey, ...stats });
+      } catch {
+        // Inspector may have been destroyed; skip it
+      }
+    }
+    return updates;
+  }
 
   constructor(connectionString?: string) {
     super();
@@ -226,37 +261,26 @@ export class UsageStorageService extends EventEmitter {
 
   async saveDebugLog(record: DebugLogRecord) {
     try {
+      const serialize = (data: any): string | null => {
+        if (!data) return null;
+        if (typeof data === 'string') return data;
+        return JSON.stringify(data);
+      };
+
       await this.ensureDb()
         .insert(this.schema.debugLogs)
         .values({
           requestId: record.requestId,
           apiKey: record.apiKey ?? null,
-          rawRequest: record.rawRequest
-            ? typeof record.rawRequest === 'string'
-              ? record.rawRequest
-              : JSON.stringify(record.rawRequest)
-            : null,
-          transformedRequest: record.transformedRequest
-            ? typeof record.transformedRequest === 'string'
-              ? record.transformedRequest
-              : JSON.stringify(record.transformedRequest)
-            : null,
-          rawResponse: record.rawResponse
-            ? typeof record.rawResponse === 'string'
-              ? record.rawResponse
-              : JSON.stringify(record.rawResponse)
-            : null,
-          transformedResponse: record.transformedResponse
-            ? typeof record.transformedResponse === 'string'
-              ? record.transformedResponse
-              : JSON.stringify(record.transformedResponse)
-            : null,
-          rawResponseSnapshot: record.rawResponseSnapshot
-            ? JSON.stringify(record.rawResponseSnapshot)
-            : null,
-          transformedResponseSnapshot: record.transformedResponseSnapshot
-            ? JSON.stringify(record.transformedResponseSnapshot)
-            : null,
+          rawRequest: serialize(record.rawRequest),
+          transformedRequest: serialize(record.transformedRequest),
+          rawResponse: serialize(record.rawResponse),
+          transformedResponse: serialize(record.transformedResponse),
+          rawResponseSnapshot: serialize(record.rawResponseSnapshot),
+          transformedResponseSnapshot: serialize(record.transformedResponseSnapshot),
+          requestHeaders: serialize(record.requestHeaders),
+          responseHeaders: serialize(record.responseHeaders),
+          responseStatus: record.responseStatus ?? null,
           createdAt: record.createdAt || Date.now(),
         });
 
@@ -390,7 +414,7 @@ export class UsageStorageService extends EventEmitter {
     limit: number = 50,
     offset: number = 0,
     apiKey?: string
-  ): Promise<{ requestId: string; createdAt: number }[]> {
+  ): Promise<{ requestId: string; createdAt: number; responseStatus: number | null }[]> {
     try {
       const db = this.ensureDb();
       const where = apiKey ? eq(this.schema.debugLogs.apiKey, apiKey) : undefined;
@@ -398,6 +422,7 @@ export class UsageStorageService extends EventEmitter {
         .select({
           requestId: this.schema.debugLogs.requestId,
           createdAt: this.schema.debugLogs.createdAt,
+          responseStatus: this.schema.debugLogs.responseStatus,
         })
         .from(this.schema.debugLogs)
         .orderBy(desc(this.schema.debugLogs.createdAt))
@@ -408,6 +433,7 @@ export class UsageStorageService extends EventEmitter {
       return results.map((row: any) => ({
         requestId: row.requestId,
         createdAt: row.createdAt,
+        responseStatus: row.responseStatus,
       }));
     } catch (error) {
       logger.error('Failed to get debug logs', error);
@@ -436,6 +462,9 @@ export class UsageStorageService extends EventEmitter {
         transformedResponse: row.transformedResponse,
         rawResponseSnapshot: row.rawResponseSnapshot,
         transformedResponseSnapshot: row.transformedResponseSnapshot,
+        requestHeaders: row.requestHeaders,
+        responseHeaders: row.responseHeaders,
+        responseStatus: row.responseStatus,
       };
     } catch (error) {
       logger.error(`Failed to get debug log for ${requestId}`, error);
@@ -619,7 +648,7 @@ export class UsageStorageService extends EventEmitter {
         costSource: row.costSource,
         costMetadata: row.costMetadata,
         startTime: row.startTime,
-        durationMs: row.durationMs ?? 0,
+        durationMs: row.durationMs,
         isStreamed: !!row.isStreamed,
         responseStatus: row.responseStatus ?? '',
         ttftMs: row.ttftMs,

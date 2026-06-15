@@ -16,13 +16,18 @@ import { TransformerFactory } from './transformer-factory';
 import { logger } from '../utils/logger';
 import { QUOTA_ERROR_PATTERNS } from '../utils/constants';
 import { CooldownManager } from './cooldown-manager';
+import { StickySessionManager } from './sticky-session-manager';
 import { RouteResult } from './router';
 import { DebugManager } from './debug-manager';
 import { UsageStorageService } from './usage-storage';
 import { CooldownParserRegistry } from './cooldown-parsers';
 import { getConfig, getProviderTypes } from '../config';
 import { applyModelBehaviors } from './model-behaviors';
-import { getModels } from '@mariozechner/pi-ai';
+import { resolveAdapters } from './adapter-resolver';
+import type { ResolvedAdapter } from '../types/provider-adapter';
+import { getModels } from '@earendil-works/pi-ai';
+import type { StallConfig } from './inspectors/stall-inspector';
+import { getGlobalStallConfig, resolveStallConfig } from '../utils/stall';
 import { VisionDescriptorService } from './vision-descriptor-service';
 import { ModelMetadataManager } from './model-metadata-manager';
 import { enforceContextLimit } from './enforce-limits';
@@ -31,6 +36,8 @@ import { UsageRecord } from '../types/usage';
 import { calculateCosts } from '../utils/calculate-costs';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { GpuParams, ModelParams } from '@plexus/shared';
+import { ConcurrencyTracker } from './concurrency-tracker';
+import { sanitizeHeaders } from '../utils/sanitize-headers';
 
 interface RetryAttemptRecord {
   index: number;
@@ -52,6 +59,8 @@ interface ParseFailureContext {
 interface RetryHistoryLikeEntry {
   reason?: unknown;
 }
+
+type ResolveTimeoutMs = (timeoutMs?: number | null) => number;
 
 /**
  * Strips trailing /v1beta* path segments from Gemini base URLs.
@@ -214,13 +223,52 @@ export class Dispatcher {
     });
   }
 
-  async dispatch(request: UnifiedChatRequest): Promise<UnifiedChatResponse> {
+  /**
+   * Persist the (alias, sessionKey) → (provider, model) mapping after a
+   * successful dispatch so the next turn of this conversation can prefer the
+   * same target. No-op when stickiness doesn't apply (no session key, no
+   * canonical alias, or vision-descriptor sub-request).
+   */
+  private recordStickySession(
+    sessionKey: string | null,
+    route: RouteResult,
+    request: UnifiedChatRequest
+  ): void {
+    if (!sessionKey || !route.canonicalModel) return;
+    if ((request as any)._isVisionDescriptorRequest) return;
+    const aliasConfig = getConfig().models?.[route.canonicalModel];
+    if (!aliasConfig?.sticky_session) return;
+    StickySessionManager.getInstance().set(
+      route.canonicalModel,
+      sessionKey,
+      route.provider,
+      route.model
+    );
+  }
+
+  async dispatch(
+    request: UnifiedChatRequest,
+    signal?: AbortSignal,
+    resolveTimeoutMs?: ResolveTimeoutMs,
+    addStallConfig?: (providerOverrides: {
+      stallTtfbMs?: number | null;
+      stallTtfbBytes?: number | null;
+      stallMinBps?: number | null;
+      stallWindowMs?: number | null;
+      stallGracePeriodMs?: number | null;
+    }) => void
+  ): Promise<UnifiedChatResponse> {
     const config = getConfig();
     const failover = config.failover;
     const failoverEnabled = failover?.enabled !== false;
 
     // 1. Route (ordered candidates)
-    let candidates = await Router.resolveCandidates(request.model, request.incomingApiType);
+    const sessionKey = StickySessionManager.computeSessionKey(request);
+    let candidates = await Router.resolveCandidates(
+      request.model,
+      request.incomingApiType,
+      sessionKey
+    );
 
     // Fallback for direct/provider/model syntax and legacy single-route behavior
     if (candidates.length === 0) {
@@ -243,8 +291,14 @@ export class Dispatcher {
     const isVisionDescriptorRequest = (request as any)._isVisionDescriptorRequest === true;
 
     for (let i = 0; i < targets.length; i++) {
+      if (signal?.aborted) throw this.buildCancelledError(signal);
       let currentRequest = { ...request };
       const route = targets[i]!;
+      const attemptTimeout = this.createAttemptTimeout(
+        signal,
+        route.config.timeoutMs,
+        resolveTimeoutMs
+      );
 
       // Vision Fallthrough (Image-to-Text Preprocessing)
       // Check if:
@@ -302,6 +356,7 @@ export class Dispatcher {
         route.model
       );
       if (!isHealthy) {
+        attemptTimeout.cleanup();
         logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
         lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
         this.appendSkippedAttempt(
@@ -316,14 +371,39 @@ export class Dispatcher {
       // the finalized per-target request — after any vision fallthrough has
       // expanded the prompt and after cooldown has selected a live target —
       // so we reject oversized prompts locally with a 400 instead of
-      // burning an upstream round trip on a guaranteed failure. A thrown
-      // ContextLengthExceededError escapes the loop (it's a client-side
-      // problem; failing over to another target won't help).
+      // burning an upstream round trip on a guaranteed failure. Checked
+      // BEFORE acquiring a concurrency slot so that a thrown
+      // ContextLengthExceededError (a client-side problem; failing over to
+      // another target won't help) never leaks an acquired slot.
       if (aliasConfig?.enforce_limits && route.canonicalModel) {
         enforceContextLimit(currentRequest, aliasConfig, route.canonicalModel);
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        attemptTimeout.cleanup();
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(currentRequest.requestId, route);
 
@@ -345,12 +425,16 @@ export class Dispatcher {
         // 3. Transform Request
         const requestWithTargetModel = { ...currentRequest, model: route.model };
 
+        // Resolve adapters for this specific provider+model combination
+        const adapters = resolveAdapters(route);
+
         const { payload: providerPayload, bypassTransformation } =
           await this.transformRequestPayload(
             requestWithTargetModel,
             route,
             transformer,
-            targetApiType
+            targetApiType,
+            adapters
           );
 
         // Capture transformed request
@@ -361,6 +445,47 @@ export class Dispatcher {
           );
         }
 
+        // Wire per-provider stall detection overrides. Always call addStallConfig
+        // so the StallInspector is reset on each failover iteration — even when
+        // the current provider has no overrides, this clears a previous provider's
+        // overrides from the inspector.
+        if (addStallConfig) {
+          const providerStallOverrides: Parameters<typeof addStallConfig>[0] = {};
+          if (route.config.stallTtfbMs !== undefined)
+            providerStallOverrides.stallTtfbMs = route.config.stallTtfbMs;
+          if (route.config.stallTtfbBytes !== undefined)
+            providerStallOverrides.stallTtfbBytes = route.config.stallTtfbBytes;
+          if (route.config.stallMinBps !== undefined)
+            providerStallOverrides.stallMinBps = route.config.stallMinBps;
+          if (route.config.stallWindowMs !== undefined)
+            providerStallOverrides.stallWindowMs = route.config.stallWindowMs;
+          if (route.config.stallGracePeriodMs !== undefined)
+            providerStallOverrides.stallGracePeriodMs = route.config.stallGracePeriodMs;
+          logger.debug(
+            `Dispatcher: provider stall overrides for ${route.provider}: ${JSON.stringify(providerStallOverrides)}, ` +
+              `route.config stall fields: stallTtfbMs=${route.config.stallTtfbMs}, stallMinBps=${route.config.stallMinBps}`
+          );
+          addStallConfig(providerStallOverrides);
+        }
+
+        // Resolve stall config BEFORE the dispatch so we can wrap fetch+probe
+        // in a TTFB timeout. This is critical because fetch() itself may block
+        // for a long time waiting for HTTP response headers — the TTFB timeout
+        // must cover this "headers phase" too, not just the body reading.
+        // This applies to BOTH OAuth and non-OAuth routes.
+        let effectiveStallConfig = resolveStallConfig(getGlobalStallConfig(), {
+          stallTtfbMs: route.config.stallTtfbMs,
+          stallTtfbBytes: route.config.stallTtfbBytes,
+          stallMinBps: route.config.stallMinBps,
+          stallWindowMs: route.config.stallWindowMs,
+          stallGracePeriodMs: route.config.stallGracePeriodMs,
+        });
+
+        logger.debug(
+          `Dispatcher: effectiveStallConfig for ${route.provider}: ${JSON.stringify(effectiveStallConfig)}, ` +
+            `route.config.stallTtfbMs=${route.config.stallTtfbMs}, route.config.stallMinBps=${route.config.stallMinBps}`
+        );
+
         if (this.isPiAiRoute(route, targetApiType)) {
           try {
             const oauthResponse = await this.dispatchOAuthRequest(
@@ -368,8 +493,11 @@ export class Dispatcher {
               currentRequest,
               route,
               targetApiType,
-              transformer
+              transformer,
+              attemptTimeout.signal,
+              effectiveStallConfig
             );
+            attemptTimeout.cleanup();
             await this.recordAttemptMetric(route, currentRequest.requestId, true, {
               isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
               isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -383,42 +511,106 @@ export class Dispatcher {
               route,
               targetApiType
             );
+            doRelease();
             return oauthResponse;
           } catch (oauthError: any) {
-            lastError = oauthError;
-            const canRetry =
-              failoverEnabled && i < targets.length - 1 && this.isRetryableOAuthError(oauthError);
+            const effectiveOAuthError = attemptTimeout.isTimedOut()
+              ? this.buildTimeoutError()
+              : oauthError;
+            if (signal?.aborted) throw this.buildCancelledError(signal);
+            lastError = effectiveOAuthError;
 
-            this.appendFailureAttempt(retryHistory, route, oauthError, targetApiType, canRetry);
+            // Handle TTFB stall errors with failover support
+            const isStallError = (effectiveOAuthError as any).isStallError === true;
+            if (isStallError) {
+              const canRetryStall = failoverEnabled && i < targets.length - 1;
+              this.appendFailureAttempt(
+                retryHistory,
+                route,
+                effectiveOAuthError,
+                targetApiType,
+                canRetryStall
+              );
+
+              if (canRetryStall) {
+                attemptTimeout.cleanup();
+                await this.recordAttemptMetric(route, currentRequest.requestId, false, {
+                  isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
+                  isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+                  visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
+                });
+                CooldownManager.getInstance().markProviderStallFailure(
+                  route.provider,
+                  route.model,
+                  this.formatFailureReason(effectiveOAuthError)
+                );
+                this.saveIntermediateError(
+                  currentRequest.requestId,
+                  targetApiType || 'chat',
+                  effectiveOAuthError
+                );
+                logger.info(
+                  `TTFB stall: OAuth request timed out for ${route.provider}/${route.model}, retrying`
+                );
+                doRelease();
+                continue;
+              }
+
+              doRelease();
+
+              // Mark stall failure for cooldown tracking even on the last target
+              CooldownManager.getInstance().markProviderStallFailure(
+                route.provider,
+                route.model,
+                this.formatFailureReason(effectiveOAuthError)
+              );
+              throw effectiveOAuthError;
+            }
+
+            const canRetry =
+              failoverEnabled &&
+              i < targets.length - 1 &&
+              (attemptTimeout.isTimedOut() || this.isRetryableOAuthError(effectiveOAuthError));
+
+            this.appendFailureAttempt(
+              retryHistory,
+              route,
+              effectiveOAuthError,
+              targetApiType,
+              canRetry
+            );
 
             if (canRetry) {
+              attemptTimeout.cleanup();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
                 visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
-              await this.markOAuthProviderFailure(route, oauthError);
+              await this.markOAuthProviderFailure(route, effectiveOAuthError);
               this.saveIntermediateError(
                 currentRequest.requestId,
                 targetApiType || 'chat',
-                oauthError
+                effectiveOAuthError
               );
               logger.warn(
-                `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
+                `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${effectiveOAuthError.message}`
               );
+              doRelease();
               continue;
             }
 
-            await this.markOAuthProviderFailure(route, oauthError);
-            throw oauthError;
+            attemptTimeout.cleanup();
+            await this.markOAuthProviderFailure(route, effectiveOAuthError);
+            doRelease();
+            throw effectiveOAuthError;
           }
         }
 
-        // 4. Execute Request
+        // 4. Execute Request (non-OAuth)
+        const incomingApi = currentRequest.incomingApiType || 'unknown';
         const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
         const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
-
-        const incomingApi = currentRequest.incomingApiType || 'unknown';
 
         logger.info(
           `Dispatching ${currentRequest.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
@@ -426,7 +618,122 @@ export class Dispatcher {
 
         logger.silly('Upstream Request Payload', providerPayload);
 
-        const response = await this.executeProviderRequest(url, headers, providerPayload);
+        // When TTFB stall detection is configured for streaming requests, wrap
+        // the fetch + probe in a single timeout that covers the entire TTFB
+        // window (from request dispatch to receiving ttfbBytes of body data).
+        // This handles the case where fetch() itself blocks for a long time
+        // waiting for HTTP response headers from a slow provider.
+        let response: Response;
+        let stallAbortController: AbortController | undefined;
+        let ttfbTimerId: ReturnType<typeof setTimeout> | undefined;
+        const dispatchStartTime = Date.now();
+
+        if (currentRequest.stream && effectiveStallConfig?.ttfbMs != null) {
+          // Create a separate AbortController for the TTFB stall timeout.
+          // We don't use the route's abortController because an abort there
+          // means the client disconnected — we need a distinct signal for
+          // "provider is too slow to start responding".
+          stallAbortController = new AbortController();
+          const combinedSignal = AbortSignal.any([
+            attemptTimeout.signal,
+            stallAbortController.signal,
+          ]);
+
+          const ttfbMs = effectiveStallConfig.ttfbMs!;
+          ttfbTimerId = setTimeout(() => {
+            stallAbortController!.abort(
+              new DOMException(
+                `Stream stalled: TTFB timeout — no response within ${ttfbMs}ms`,
+                'TimeoutError'
+              )
+            );
+          }, ttfbMs);
+          ttfbTimerId.unref?.();
+
+          try {
+            response = await this.executeProviderRequest(
+              url,
+              headers,
+              providerPayload,
+              combinedSignal
+            );
+          } catch (fetchError: any) {
+            // Client disconnected takes priority over stall detection —
+            // if the client is gone, no point retrying.
+            if (signal?.aborted) {
+              clearTimeout(ttfbTimerId);
+              throw this.buildCancelledError(signal);
+            }
+
+            // If the error was caused by our TTFB stall timeout, synthesize
+            // a stall result instead of treating it as a generic network error.
+            if (stallAbortController.signal.aborted) {
+              clearTimeout(ttfbTimerId);
+              const stallError = new Error(
+                `Stream stalled: TTFB timeout — no response within ${ttfbMs}ms`
+              );
+              lastError = stallError;
+
+              const canRetryStall =
+                failoverEnabled &&
+                i < targets.length - 1 &&
+                (this.isRetryableNetworkError(stallError, failover?.retryableErrors || []) ||
+                  stallError.message?.includes('stalled'));
+
+              if (canRetryStall) {
+                attemptTimeout.cleanup();
+                await this.recordAttemptMetric(route, currentRequest.requestId, false, {
+                  isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
+                  isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
+                  visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
+                });
+                this.appendFailureAttempt(retryHistory, route, stallError, targetApiType, true);
+                CooldownManager.getInstance().markProviderStallFailure(
+                  route.provider,
+                  route.model,
+                  this.formatFailureReason(stallError)
+                );
+                this.saveIntermediateError(
+                  currentRequest.requestId,
+                  targetApiType || 'chat',
+                  stallError
+                );
+                logger.info(
+                  `TTFB stall: fetch timed out after ${ttfbMs}ms for ${route.provider}/${route.model}, retrying with next provider`
+                );
+                doRelease();
+                continue;
+              }
+              doRelease();
+              throw stallError;
+            }
+            throw fetchError;
+          }
+
+          // Fetch returned — clear the TTFB timer (we beat the timeout)
+          clearTimeout(ttfbTimerId);
+          ttfbTimerId = undefined;
+
+          // Adjust the stall config's ttfbMs for the probe — subtract the time
+          // already spent waiting for fetch() to return. The probe only needs
+          // to cover the remaining time until the byte threshold is met.
+          const fetchElapsed = Date.now() - dispatchStartTime;
+          const remainingTtfbMs = Math.max(0, ttfbMs - fetchElapsed);
+          if (remainingTtfbMs <= 0 && effectiveStallConfig) {
+            // Fetch returned just barely within the TTFB window — no time left
+            // for the probe. Skip the probe and let the pipeline handle it.
+            effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: null };
+          } else if (effectiveStallConfig) {
+            effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: remainingTtfbMs };
+          }
+        } else {
+          response = await this.executeProviderRequest(
+            url,
+            headers,
+            providerPayload,
+            attemptTimeout.signal
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -446,10 +753,13 @@ export class Dispatcher {
               currentRequest.requestId
             );
           } catch (e: any) {
+            if (signal?.aborted) throw this.buildCancelledError(signal);
             lastError = e;
             this.appendFailureAttempt(retryHistory, route, e, targetApiType, canRetry);
 
             if (canRetry) {
+              attemptTimeout.cleanup();
+              doRelease();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -472,13 +782,17 @@ export class Dispatcher {
               continue;
             }
 
+            doRelease();
             throw e;
           }
         }
 
         // 5. Handle Response
         if (currentRequest.stream) {
-          const streamProbe = await this.probeStreamingStart(response);
+          // effectiveStallConfig was already computed before the fetch above.
+          // If TTFB stall is still active (fetch returned within TTFB but body
+          // hasn't met the byte threshold yet), the probe will continue checking.
+          const streamProbe = await this.probeStreamingStart(response, effectiveStallConfig);
 
           if (!streamProbe.ok) {
             const error = streamProbe.error;
@@ -488,29 +802,40 @@ export class Dispatcher {
               failoverEnabled &&
               i < targets.length - 1 &&
               !streamProbe.streamStarted &&
-              this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+              (this.isRetryableNetworkError(error, failover?.retryableErrors || []) ||
+                error.message?.includes('stalled'));
 
             if (canRetry) {
+              attemptTimeout.cleanup();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
                 visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
               });
               this.appendFailureAttempt(retryHistory, route, error, targetApiType, true);
-              // Always mark as failed when retrying — provider couldn't serve this request
-              CooldownManager.getInstance().markProviderFailure(
-                route.provider,
-                route.model,
-                undefined,
-                this.formatFailureReason(error)
-              );
+              if (error.message?.includes('stalled')) {
+                CooldownManager.getInstance().markProviderStallFailure(
+                  route.provider,
+                  route.model,
+                  this.formatFailureReason(error)
+                );
+              } else {
+                CooldownManager.getInstance().markProviderFailure(
+                  route.provider,
+                  route.model,
+                  undefined,
+                  this.formatFailureReason(error)
+                );
+              }
               this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', error);
               logger.warn(
                 `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
               );
+              doRelease();
               continue;
             }
 
+            doRelease();
             throw error;
           }
 
@@ -519,14 +844,53 @@ export class Dispatcher {
             currentRequest,
             route,
             targetApiType,
-            bypassTransformation
+            bypassTransformation,
+            adapters
           );
+
+          // Wrap the stream to release the concurrency slot when the stream
+          // is fully consumed, cancelled, or errors out. Without this, the
+          // slot would never be released for streaming responses.
+          if (streamResponse.stream) {
+            const originalStream = streamResponse.stream;
+            const reader = originalStream.getReader();
+            let released = false;
+            const release = () => {
+              if (!released) {
+                released = true;
+                reader.releaseLock();
+                doRelease();
+              }
+            };
+            streamResponse.stream = new ReadableStream({
+              async pull(controller) {
+                try {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    controller.close();
+                    release();
+                  } else {
+                    controller.enqueue(value);
+                  }
+                } catch (e) {
+                  controller.error(e);
+                  release();
+                }
+              },
+              cancel(reason) {
+                release();
+                return originalStream.cancel(reason);
+              },
+            });
+          }
+
           await this.recordAttemptMetric(route, currentRequest.requestId, true, {
             isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
             isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
             visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
           });
           CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
+          this.recordStickySession(sessionKey, route, currentRequest);
           this.appendSuccessAttempt(retryHistory, route, targetApiType);
           this.attachAttemptMetadata(
             streamResponse,
@@ -535,6 +899,7 @@ export class Dispatcher {
             route,
             targetApiType
           );
+          attemptTimeout.cleanup();
           return streamResponse;
         }
 
@@ -544,7 +909,8 @@ export class Dispatcher {
           route,
           targetApiType,
           transformer,
-          bypassTransformation
+          bypassTransformation,
+          adapters
         );
         await this.recordAttemptMetric(route, currentRequest.requestId, true, {
           isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
@@ -557,6 +923,7 @@ export class Dispatcher {
         }
 
         CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
+        this.recordStickySession(sessionKey, route, currentRequest);
         this.appendSuccessAttempt(retryHistory, route, targetApiType);
         this.attachAttemptMetadata(
           nonStreamingResponse,
@@ -565,22 +932,41 @@ export class Dispatcher {
           route,
           targetApiType
         );
+        doRelease();
+        attemptTimeout.cleanup();
         return nonStreamingResponse;
       } catch (error: any) {
-        lastError = error;
+        const effectiveError = attemptTimeout.isTimedOut() ? this.buildTimeoutError() : error;
+        lastError = effectiveError;
+        attemptTimeout.cleanup();
+        doRelease();
+
+        // If the client disconnected (abort signal), don't treat this as a
+        // retryable error — throw a proper client_disconnected error so the
+        // route handler records it as cancelled, not as an inference error.
+        if (signal?.aborted) throw this.buildCancelledError(signal);
 
         // If the error came from handleProviderError, it already called markProviderFailure.
         // Only call it here for network/transport errors that have no HTTP status code.
-        const isHttpError = error?.routingContext?.statusCode !== undefined;
+        const isHttpError = effectiveError?.routingContext?.statusCode !== undefined;
+        const isUpstreamTimeout = effectiveError?.routingContext?.code === 'upstream_timeout';
 
-        if (!isHttpError) {
+        if (!isHttpError || isUpstreamTimeout) {
           // Pure network/transport error — mark the provider as failed
-          CooldownManager.getInstance().markProviderFailure(
-            route.provider,
-            route.model,
-            undefined,
-            this.formatFailureReason(error)
-          );
+          if (effectiveError.message?.includes('stalled')) {
+            CooldownManager.getInstance().markProviderStallFailure(
+              route.provider,
+              route.model,
+              this.formatFailureReason(effectiveError)
+            );
+          } else {
+            CooldownManager.getInstance().markProviderFailure(
+              route.provider,
+              route.model,
+              undefined,
+              this.formatFailureReason(effectiveError)
+            );
+          }
         }
         await this.recordAttemptMetric(route, currentRequest.requestId, false, {
           isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
@@ -591,18 +977,20 @@ export class Dispatcher {
         const canRetryNetwork =
           failoverEnabled &&
           i < targets.length - 1 &&
-          this.isRetryableNetworkError(error, failover?.retryableErrors || []);
+          (isUpstreamTimeout ||
+            this.isRetryableNetworkError(effectiveError, failover?.retryableErrors || []) ||
+            effectiveError.message?.includes('stalled'));
 
-        this.appendFailureAttempt(retryHistory, route, error, undefined, canRetryNetwork);
+        this.appendFailureAttempt(retryHistory, route, effectiveError, undefined, canRetryNetwork);
 
         if (canRetryNetwork) {
           this.saveIntermediateError(
             currentRequest.requestId,
-            error?.routingContext?.targetApiType || 'chat',
-            error
+            effectiveError?.routingContext?.targetApiType || 'chat',
+            effectiveError
           );
           logger.warn(
-            `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+            `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${effectiveError.message}`
           );
           continue;
         }
@@ -677,7 +1065,8 @@ export class Dispatcher {
   }
 
   private async probeStreamingStart(
-    response: Response
+    response: Response,
+    stallConfig?: StallConfig | null
   ): Promise<
     { ok: true; response: Response } | { ok: false; error: Error; streamStarted: boolean }
   > {
@@ -685,6 +1074,19 @@ export class Dispatcher {
       return { ok: true, response };
     }
 
+    // When TTFB stall detection is configured, probe the stream until we've
+    // received ttfbBytes or the TTFB timeout fires. This allows the
+    // failover loop to retry with a different provider when a provider is
+    // slow to start responding.
+    if (stallConfig?.ttfbMs != null) {
+      logger.debug(
+        `probeStreamingStart: using stall-aware probe (ttfbMs=${stallConfig.ttfbMs}, ttfbBytes=${stallConfig.ttfbBytes})`
+      );
+      return this.probeStreamingStartWithStallCheck(response, stallConfig);
+    }
+
+    // Original 100ms probe — if the first byte doesn't arrive within 100ms,
+    // let the stream continue in the background.
     const reader = response.body.getReader();
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -777,6 +1179,118 @@ export class Dispatcher {
       };
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Stall-aware stream probe: reads from the stream until we've received
+   * `stallConfig.ttfbBytes` bytes or the TTFB timeout fires.
+   *
+   * - If TTFB threshold is met → returns ok:true, stream continues normally.
+   * - If TTFB timeout fires → returns ok:false with a stall error, which the
+   *   failover loop treats as retryable (same as a network error before first byte).
+   */
+  private async probeStreamingStartWithStallCheck(
+    response: Response,
+    stallConfig: StallConfig
+  ): Promise<
+    { ok: true; response: Response } | { ok: false; error: Error; streamStarted: boolean }
+  > {
+    const reader = response.body!.getReader();
+    const ttfbBytes = stallConfig.ttfbBytes;
+    const ttfbMs = stallConfig.ttfbMs!;
+
+    // Collected chunks to replay into the response stream
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    let streamStarted = false;
+
+    // TTFB stall timer
+    let ttfbTimerId: ReturnType<typeof setTimeout> | undefined;
+    const ttfbTimeoutPromise = new Promise<'ttfb_timeout'>((resolve) => {
+      ttfbTimerId = setTimeout(() => resolve('ttfb_timeout'), ttfbMs);
+    });
+
+    try {
+      // Read chunks until we hit the TTFB byte threshold or the timeout
+      while (totalBytes < ttfbBytes) {
+        const readPromise = reader.read();
+        const result = await Promise.race([readPromise, ttfbTimeoutPromise]);
+
+        if (result === 'ttfb_timeout') {
+          // TTFB stall detected — abort the reader
+          reader
+            .cancel(new DOMException('Stream stalled: TTFB timeout', 'TimeoutError'))
+            .catch(() => {});
+          logger.info(
+            `TTFB stall probe: received ${totalBytes} bytes within ${ttfbMs}ms ` +
+              `(threshold: ${ttfbBytes} bytes)`
+          );
+          return {
+            ok: false,
+            error: new Error(
+              `Stream stalled: TTFB timeout — received ${totalBytes} bytes in ${ttfbMs}ms ` +
+                `(threshold: ${ttfbBytes} bytes within ${ttfbMs}ms)`
+            ),
+            streamStarted,
+          };
+        }
+
+        const { done, value } = result as ReadableStreamReadResult<Uint8Array>;
+        if (done) {
+          // Stream ended before we got enough bytes — not a stall, just a short response
+          break;
+        }
+
+        chunks.push(value);
+        totalBytes += value.length;
+        streamStarted = true;
+      }
+
+      // TTFB threshold met (or stream ended naturally) — build replay stream
+      const replayChunks = [...chunks];
+      let chunkIndex = 0;
+      const replay = new ReadableStream<Uint8Array>({
+        start(controller) {
+          // Replay buffered chunks
+          while (chunkIndex < replayChunks.length) {
+            controller.enqueue(replayChunks[chunkIndex]!);
+            chunkIndex++;
+          }
+        },
+        async pull(controller) {
+          try {
+            const next = await reader.read();
+            if (next.done) {
+              controller.close();
+            } else {
+              controller.enqueue(next.value);
+            }
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+        cancel(reason) {
+          return reader.cancel(reason);
+        },
+      });
+
+      return {
+        ok: true,
+        response: new Response(replay, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        }),
+      };
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+        streamStarted,
+      };
+    } finally {
+      if (ttfbTimerId) clearTimeout(ttfbTimerId);
     }
   }
 
@@ -1304,8 +1818,42 @@ export class Dispatcher {
     return error;
   }
 
+  private buildOAuthRawStreamError(value: unknown): Error | null {
+    let text: string | null = null;
+
+    if (typeof value === 'string') {
+      text = value;
+    } else if (value instanceof Uint8Array) {
+      text = new TextDecoder().decode(value);
+    } else if (value instanceof ArrayBuffer) {
+      text = new TextDecoder().decode(value);
+    }
+
+    if (!text) return null;
+
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('{')) return null;
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!parsed?.error || typeof parsed.error !== 'object') return null;
+
+      const message =
+        parsed.error.message ||
+        parsed.error.errorMessage ||
+        parsed.message ||
+        'OAuth provider error';
+      const error = new Error(message) as Error & { piAiResponse?: unknown };
+      error.piAiResponse = parsed;
+      return error;
+    } catch {
+      return null;
+    }
+  }
+
   private async probeOAuthStreamStart(
-    stream: ReadableStream<any>
+    stream: ReadableStream<any>,
+    stallConfig?: StallConfig | null
   ): Promise<
     { ok: true; stream: ReadableStream<any> } | { ok: false; error: Error; streamStarted: boolean }
   > {
@@ -1330,36 +1878,157 @@ export class Dispatcher {
 
     const reader = stream.getReader();
     const buffered: any[] = [];
+    const ttfbMs = stallConfig?.ttfbMs;
 
     try {
-      while (true) {
-        const { value, done } = await reader.read();
+      if (ttfbMs != null) {
+        // TTFB deadline mode: race each read against remaining time from
+        // a single absolute deadline. The deadline never resets after each
+        // bookkeeping event — a slow trickle of bookkeeping events cannot
+        // avoid timeout. TTFB for OAuth is "time to first non-bookkeeping event".
+        const deadline = Date.now() + ttfbMs;
+        const stallReason = new DOMException(
+          `Stream stalled: TTFB timeout — no response within ${ttfbMs}ms`,
+          'TimeoutError'
+        );
 
-        if (done) {
-          // Stream closed — quota exhausted (no events) or provider gave up.
-          reader.releaseLock();
-          return {
-            ok: false,
-            error: new Error('OAuth provider returned empty stream (quota exhausted)'),
-            streamStarted: false,
-          };
+        while (true) {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) {
+            try {
+              await reader.cancel(stallReason);
+            } catch {}
+            try {
+              reader.releaseLock();
+            } catch {}
+            return {
+              ok: false,
+              error: new Error(stallReason.message),
+              streamStarted: false,
+            };
+          }
+
+          let readTimerId: ReturnType<typeof setTimeout> | undefined;
+          try {
+            const readPromise = reader.read();
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              readTimerId = setTimeout(() => reject(stallReason), remaining);
+              readTimerId.unref?.();
+            });
+
+            const { value, done } = await Promise.race([readPromise, timeoutPromise]);
+
+            if (done) {
+              try {
+                await reader.cancel();
+              } catch {}
+              try {
+                reader.releaseLock();
+              } catch {}
+              return {
+                ok: false,
+                error: new Error('OAuth provider returned empty stream (quota exhausted)'),
+                streamStarted: false,
+              };
+            }
+
+            if (value?.type === 'error' || value?.reason === 'error') {
+              try {
+                await reader.cancel();
+              } catch {}
+              try {
+                reader.releaseLock();
+              } catch {}
+              return {
+                ok: false,
+                error: this.buildOAuthStreamEventError(value),
+                streamStarted: false,
+              };
+            }
+
+            const rawError = this.buildOAuthRawStreamError(value);
+            if (rawError) {
+              try {
+                await reader.cancel();
+              } catch {}
+              try {
+                reader.releaseLock();
+              } catch {}
+              return {
+                ok: false,
+                error: rawError,
+                streamStarted: false,
+              };
+            }
+
+            buffered.push(value);
+
+            // If this event is not pure bookkeeping, the stream is healthy.
+            if (!BOOKKEEPING_TYPES.has(value?.type)) {
+              break;
+            }
+          } catch (err: any) {
+            if (err?.name === 'TimeoutError' || err?.message?.includes('stalled')) {
+              try {
+                await reader.cancel(err);
+              } catch {}
+              try {
+                reader.releaseLock();
+              } catch {}
+              return {
+                ok: false,
+                error: err instanceof Error ? err : new Error(String(err)),
+                streamStarted: false,
+              };
+            }
+            throw err;
+          } finally {
+            if (readTimerId !== undefined) {
+              clearTimeout(readTimerId);
+            }
+          }
         }
+      } else {
+        // No TTFB deadline — use existing indefinite read loop
+        while (true) {
+          const { value, done } = await reader.read();
 
-        if (value?.type === 'error' || value?.reason === 'error') {
-          reader.releaseLock();
-          return {
-            ok: false,
-            error: this.buildOAuthStreamEventError(value),
-            streamStarted: false,
-          };
-        }
+          if (done) {
+            // Stream closed — quota exhausted (no events) or provider gave up.
+            reader.releaseLock();
+            return {
+              ok: false,
+              error: new Error('OAuth provider returned empty stream (quota exhausted)'),
+              streamStarted: false,
+            };
+          }
 
-        buffered.push(value);
+          if (value?.type === 'error' || value?.reason === 'error') {
+            reader.releaseLock();
+            return {
+              ok: false,
+              error: this.buildOAuthStreamEventError(value),
+              streamStarted: false,
+            };
+          }
 
-        // If this event is not pure bookkeeping, the stream is healthy.
-        // Replay all buffered events then continue from the reader.
-        if (!BOOKKEEPING_TYPES.has(value?.type)) {
-          break;
+          const rawError = this.buildOAuthRawStreamError(value);
+          if (rawError) {
+            reader.releaseLock();
+            return {
+              ok: false,
+              error: rawError,
+              streamStarted: false,
+            };
+          }
+
+          buffered.push(value);
+
+          // If this event is not pure bookkeeping, the stream is healthy.
+          // Replay all buffered events then continue from the reader.
+          if (!BOOKKEEPING_TYPES.has(value?.type)) {
+            break;
+          }
         }
       }
 
@@ -1453,7 +2122,7 @@ export class Dispatcher {
    *
    * This is needed because pi-ai retries HTTP 429s internally with exponential
    * backoff (delays of 1 s, 2 s, 4 s …), so the final error event may arrive
-   * many seconds after the 100 ms probe timeout has already declared the stream
+   * many seconds after the probe has already declared the stream
    * healthy.  Without this wrapper the cooldown is never triggered and the
    * exhausted provider keeps receiving traffic.
    */
@@ -1570,7 +2239,9 @@ export class Dispatcher {
     request: UnifiedChatRequest,
     route: RouteResult,
     targetApiType: string,
-    transformer: any
+    transformer: any,
+    signal?: AbortSignal,
+    effectiveStallConfig?: StallConfig | null
   ): Promise<UnifiedChatResponse> {
     if (!transformer.executeRequest) {
       throw new Error('OAuth transformer missing executeRequest()');
@@ -1622,54 +2293,237 @@ export class Dispatcher {
         hasOptions: !!oauthOptions,
       });
 
+      logger.debug('OAuth: Stall detection config', {
+        ttfbMs: effectiveStallConfig?.ttfbMs,
+        ttfbBytes: effectiveStallConfig?.ttfbBytes,
+        minBytesPerSecond: effectiveStallConfig?.minBytesPerSecond,
+        provider: route.provider,
+      });
+
       if (!oauthContext.systemPrompt) {
         oauthContext.systemPrompt =
           this.resolveOAuthInstructions(request, oauthProvider) || oauthContext.systemPrompt;
       }
-      const result = await transformer.executeRequest(
-        oauthContext,
-        oauthProvider,
-        route.model,
-        !!request.stream,
-        oauthOptions,
-        authConfig
-      );
 
-      if (request.stream) {
-        const rawStream = this.normalizeOAuthStream(result);
-        const streamProbe = await this.probeOAuthStreamStart(rawStream);
+      // TTFB stall detection for streaming OAuth requests.
+      // The stallAbortController is separate from the client signal — aborting
+      // it means the provider is too slow to start responding, not that the
+      // client disconnected. We intercept stall aborts BEFORE wrapOAuthError
+      // can swallow them — the OAuth transformer converts AbortError
+      // to generic 'Upstream timeout', losing the stall message).
+      const originalSignal = signal;
+      let requestSignal = signal;
+      let stallAbortController: AbortController | undefined;
+      let ttfbTimerId: ReturnType<typeof setTimeout> | undefined;
+      let raceTimerId: ReturnType<typeof setTimeout> | undefined;
+      const dispatchStartTime = Date.now();
 
-        if (!streamProbe.ok) {
-          throw streamProbe.error;
-        }
+      if (request.stream && effectiveStallConfig?.ttfbMs != null) {
+        stallAbortController = new AbortController();
+        requestSignal = originalSignal
+          ? AbortSignal.any([originalSignal, stallAbortController.signal])
+          : stallAbortController.signal;
 
-        logger.debug('OAuth: Normalized stream result', this.describeStreamResult(result));
-
-        // Wrap the probed stream with an error monitor so that quota/error events
-        // arriving AFTER the 100ms probe timeout still trigger a cooldown.  This
-        // is necessary because pi-ai retries HTTP 429s with exponential backoff
-        // (1 s, 2 s, 4 s) before emitting the final error event, which takes far
-        // longer than the probe's 100 ms window.
-        const monitoredStream = this.monitorOAuthStreamForErrors(streamProbe.stream, route);
-
-        const streamResponse: UnifiedChatResponse = {
-          id: 'stream-' + Date.now(),
-          model: request.model,
-          content: null,
-          stream: monitoredStream,
-          bypassTransformation: false,
-        };
-
-        this.enrichResponseWithMetadata(streamResponse, route, 'oauth');
-        return streamResponse;
+        const ttfbMs = effectiveStallConfig.ttfbMs!;
+        ttfbTimerId = setTimeout(() => {
+          stallAbortController!.abort(
+            new DOMException(
+              `Stream stalled: TTFB timeout — no response within ${ttfbMs}ms`,
+              'TimeoutError'
+            )
+          );
+        }, ttfbMs);
+        ttfbTimerId.unref?.();
       }
 
-      const unified = await transformer.transformResponse(result);
-      this.enrichResponseWithMetadata(unified, route, 'oauth');
-      return unified;
+      try {
+        // Race executeRequest against the TTFB deadline. The abort signal
+        // is passed for cooperative cancellation, but if the upstream
+        // doesn't observe it, the Promise.race ensures we don't hang.
+        let executePromise: Promise<any>;
+        if (request.stream && stallAbortController && effectiveStallConfig?.ttfbMs != null) {
+          const deadlineMs = effectiveStallConfig.ttfbMs!;
+          executePromise = Promise.race([
+            transformer.executeRequest(
+              oauthContext,
+              oauthProvider,
+              route.model,
+              !!request.stream,
+              oauthOptions,
+              authConfig,
+              requestSignal
+            ),
+            new Promise<never>((_, reject) => {
+              // Redundant with the timer above, but guarantees we reject
+              // even if the upstream ignores the abort signal.
+              raceTimerId = setTimeout(
+                () => {
+                  reject(
+                    new DOMException(
+                      `Stream stalled: TTFB timeout — no response within ${deadlineMs}ms`,
+                      'TimeoutError'
+                    )
+                  );
+                },
+                deadlineMs - (Date.now() - dispatchStartTime)
+              );
+            }),
+          ]);
+        } else {
+          executePromise = transformer.executeRequest(
+            oauthContext,
+            oauthProvider,
+            route.model,
+            !!request.stream,
+            oauthOptions,
+            authConfig,
+            requestSignal
+          );
+        }
+
+        const result = await executePromise;
+
+        // executeRequest succeeded — clear stall timer
+        if (ttfbTimerId !== undefined) {
+          clearTimeout(ttfbTimerId);
+          ttfbTimerId = undefined;
+        }
+        if (raceTimerId !== undefined) {
+          clearTimeout(raceTimerId);
+          raceTimerId = undefined;
+        }
+
+        // Client disconnect check after executeRequest
+        if (originalSignal?.aborted) throw this.buildCancelledError(originalSignal);
+
+        if (request.stream) {
+          // Compute remaining TTFB for the probe using absolute deadline
+          let probeStallConfig: StallConfig | null = effectiveStallConfig ?? null;
+          if (effectiveStallConfig?.ttfbMs != null) {
+            const deadline = dispatchStartTime + effectiveStallConfig.ttfbMs;
+            const remainingMs = deadline - Date.now();
+            if (remainingMs <= 0) {
+              // Deadline already exceeded after executeRequest — cancel the
+              // returned stream before failing, otherwise the upstream
+              // connection leaks while failover proceeds.
+              try {
+                const rawStream = this.normalizeOAuthStream(result);
+                if (rawStream && typeof rawStream.cancel === 'function') {
+                  await rawStream.cancel();
+                }
+              } catch {}
+              const err = new Error(
+                `Stream stalled: TTFB timeout — no response within ${effectiveStallConfig.ttfbMs}ms`
+              ) as any;
+              err.isStallError = true;
+              throw err;
+            }
+            probeStallConfig = { ...effectiveStallConfig, ttfbMs: remainingMs };
+          }
+
+          const rawStream = this.normalizeOAuthStream(result);
+          const streamProbe = await this.probeOAuthStreamStart(rawStream, probeStallConfig);
+
+          if (!streamProbe.ok) {
+            throw streamProbe.error;
+          }
+
+          logger.debug('OAuth: Normalized stream result', this.describeStreamResult(result));
+
+          // Wrap the probed stream with an error monitor so that quota/error events
+          // arriving AFTER the 100ms probe timeout still trigger a cooldown.  This
+          // is necessary because pi-ai retries HTTP 429s with exponential backoff
+          // (1 s, 2 s, 4 s) before emitting the final error event, which takes far
+          // longer than the probe's window.
+          const monitoredStream = this.monitorOAuthStreamForErrors(streamProbe.stream, route);
+
+          const streamResponse: UnifiedChatResponse = {
+            id: 'stream-' + Date.now(),
+            model: request.model,
+            content: null,
+            stream: monitoredStream,
+            bypassTransformation: false,
+          };
+
+          this.enrichResponseWithMetadata(streamResponse, route, 'oauth');
+          return streamResponse;
+        }
+
+        const unified = await transformer.transformResponse(result);
+        this.enrichResponseWithMetadata(unified, route, 'oauth');
+        return unified;
+      } catch (error: any) {
+        // ALWAYS clear timer on any error
+        if (ttfbTimerId !== undefined) {
+          clearTimeout(ttfbTimerId);
+          ttfbTimerId = undefined;
+        }
+        if (raceTimerId !== undefined) {
+          clearTimeout(raceTimerId);
+          raceTimerId = undefined;
+        }
+
+        // Client disconnect takes priority over stall detection
+        if (originalSignal?.aborted) throw this.buildCancelledError(originalSignal);
+
+        // TTFB stall abort — re-throw with correct stall message BEFORE
+        // wrapOAuthError can swallow it
+        if (stallAbortController?.signal.aborted) {
+          const stallError = new Error(
+            `Stream stalled: TTFB timeout — no response within ${effectiveStallConfig?.ttfbMs}ms`
+          );
+          (stallError as any).isStallError = true;
+          throw stallError;
+        }
+
+        // Non-stall error — let wrapOAuthError handle it
+        throw error;
+      }
     } catch (error: any) {
       throw this.wrapOAuthError(error, route, targetApiType);
     }
+  }
+
+  private createAttemptTimeout(
+    signal: AbortSignal | undefined,
+    providerTimeoutMs: number | null | undefined,
+    resolveTimeoutMs?: ResolveTimeoutMs
+  ): { signal: AbortSignal; isTimedOut: () => boolean; cleanup: () => void } {
+    const timeoutMs = resolveTimeoutMs
+      ? resolveTimeoutMs(providerTimeoutMs ?? null)
+      : (providerTimeoutMs ?? (getConfig().timeout?.defaultSeconds ?? 300) * 1000);
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      timeoutController.abort(new DOMException('Upstream request timed out', 'TimeoutError'));
+    }, timeoutMs);
+    timeoutId.unref?.();
+
+    return {
+      signal: signal
+        ? AbortSignal.any([signal, timeoutController.signal])
+        : timeoutController.signal,
+      isTimedOut: () => timeoutController.signal.aborted,
+      cleanup: () => clearTimeout(timeoutId),
+    };
+  }
+
+  private buildTimeoutError(): Error {
+    const err = new Error('Upstream timeout') as any;
+    err.routingContext = {
+      statusCode: 504,
+      code: 'upstream_timeout',
+    };
+    return err;
+  }
+
+  private buildCancelledError(signal: AbortSignal): Error {
+    const isTimeout = signal.reason?.name === 'TimeoutError';
+    const err = new Error(isTimeout ? 'Upstream timeout' : 'Client disconnected') as any;
+    err.routingContext = {
+      statusCode: isTimeout ? 504 : 499,
+      code: isTimeout ? 'upstream_timeout' : 'client_disconnected',
+    };
+    return err;
   }
 
   private assertOAuthModelSupported(oauthProvider: string, modelId: string) {
@@ -1872,12 +2726,16 @@ export class Dispatcher {
     request: UnifiedChatRequest,
     route: RouteResult,
     transformer: any,
-    targetApiType: string
+    targetApiType: string,
+    adapters: ResolvedAdapter[] = []
   ): Promise<{ payload: any; bypassTransformation: boolean }> {
     let providerPayload: any;
     let bypassTransformation = false;
 
-    if (this.shouldUsePassThrough(request, targetApiType, route)) {
+    // Adapters require full transformation — suppress pass-through when any are active
+    const hasAdapters = adapters.length > 0;
+
+    if (!hasAdapters && this.shouldUsePassThrough(request, targetApiType, route)) {
       logger.debug(
         `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
       );
@@ -1928,14 +2786,30 @@ export class Dispatcher {
     }
 
     // Apply alias-level advanced behaviors (e.g. strip_adaptive_thinking)
+    // Also merge alias-level extraBody (overrides both provider and model level)
     if (route.canonicalModel) {
       const aliasConfig = getConfig().models?.[route.canonicalModel];
+      if (aliasConfig?.extraBody) {
+        providerPayload = { ...providerPayload, ...aliasConfig.extraBody };
+      }
       if (aliasConfig?.advanced) {
         providerPayload = applyModelBehaviors(providerPayload, aliasConfig.advanced, {
           incomingApiType: request.incomingApiType ?? '',
           canonicalModel: route.canonicalModel,
         });
       }
+    }
+
+    // Apply provider/model adapters (preDispatch) in configured order
+    for (const { adapter, options } of adapters) {
+      providerPayload = adapter.preDispatch(providerPayload, options);
+    }
+
+    if (adapters.length > 0) {
+      logger.debug(
+        `Adapters applied (preDispatch): [${adapters.map((a) => a.adapter.name).join(', ')}] ` +
+          `for ${route.provider}/${route.model}`
+      );
     }
 
     return { payload: providerPayload, bypassTransformation };
@@ -1963,12 +2837,14 @@ export class Dispatcher {
   private async executeProviderRequest(
     url: string,
     headers: Record<string, string>,
-    payload: any
+    payload: any,
+    signal?: AbortSignal
   ): Promise<Response> {
     return await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal,
     });
   }
 
@@ -2070,7 +2946,7 @@ export class Dispatcher {
       targetModel: route.model,
       targetApiType: targetApiType,
       url: url,
-      headers: this.sanitizeHeaders(headers || {}),
+      headers: sanitizeHeaders(headers || {}),
       statusCode: response.status,
       providerResponse: errorText,
       providerResponseHeaders: this.extractResponseHeaders(response),
@@ -2079,6 +2955,11 @@ export class Dispatcher {
 
     // Capture the raw error response for debug logs
     if (requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
       DebugManager.getInstance().addRawResponse(requestId, errorText);
     }
 
@@ -2094,42 +2975,6 @@ export class Dispatcher {
       headers[key] = value;
     });
     return headers;
-  }
-
-  /**
-   * Sanitize headers to remove sensitive information before logging
-   */
-  private sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
-    const sanitized = { ...headers };
-
-    // Mask sensitive headers
-    if (sanitized['x-api-key']) {
-      sanitized['x-api-key'] = this.maskSecret(sanitized['x-api-key']);
-    }
-    if (sanitized['Authorization']) {
-      sanitized['Authorization'] = this.maskSecret(sanitized['Authorization']);
-    }
-    if (sanitized['x-goog-api-key']) {
-      sanitized['x-goog-api-key'] = this.maskSecret(sanitized['x-goog-api-key']);
-    }
-
-    return sanitized;
-  }
-
-  /**
-   * Mask secret values, showing only first and last few characters
-   */
-  private maskSecret(value: string): string {
-    if (value.length <= 8) return '***';
-
-    // For Bearer tokens, preserve the "Bearer " prefix
-    if (value.startsWith('Bearer ')) {
-      const token = value.substring(7);
-      if (token.length <= 8) return 'Bearer ***';
-      return `Bearer ${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
-    }
-
-    return `${value.substring(0, 4)}...${value.substring(value.length - 4)}`;
   }
 
   /**
@@ -2159,11 +3004,32 @@ export class Dispatcher {
     request: UnifiedChatRequest,
     route: RouteResult,
     targetApiType: string,
-    bypassTransformation: boolean
+    bypassTransformation: boolean,
+    adapters: ResolvedAdapter[] = []
   ): UnifiedChatResponse {
     logger.debug('Streaming response detected');
 
-    const rawStream = response.body!;
+    // Capture response metadata for debug logging
+    if (request.requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        request.requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
+    }
+
+    let rawStream: ReadableStream = response.body!;
+
+    // If any adapter defines preDispatchStreamChunk, pipe the raw SSE stream
+    // through a rewrite transform before it reaches transformStream().
+    const streamAdapters = adapters.filter((a) => a.adapter.preDispatchStreamChunk);
+    if (streamAdapters.length > 0) {
+      rawStream = rawStream.pipeThrough(this.buildSseRewriteTransform(streamAdapters));
+      logger.debug(
+        `Stream adapters applied (preDispatchStreamChunk): [${streamAdapters.map((a) => a.adapter.name).join(', ')}] ` +
+          `for ${route.provider}/${route.model}`
+      );
+    }
 
     const streamResponse: UnifiedChatResponse = {
       id: 'stream-' + Date.now(),
@@ -2179,6 +3045,44 @@ export class Dispatcher {
   }
 
   /**
+   * Builds a TransformStream that rewrites raw SSE lines through the
+   * preDispatchStreamChunk hooks of the given adapters.
+   * Handles chunked delivery — lines may arrive split across multiple chunks.
+   */
+  private buildSseRewriteTransform(
+    adapters: ResolvedAdapter[]
+  ): TransformStream<Uint8Array, Uint8Array> {
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    return new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep the last (possibly incomplete) segment in the buffer
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          let rewritten = line;
+          for (const { adapter, options } of adapters) {
+            rewritten = adapter.preDispatchStreamChunk!(rewritten, options);
+          }
+          controller.enqueue(encoder.encode(rewritten + '\n'));
+        }
+      },
+      flush(controller) {
+        if (buffer.length > 0) {
+          let rewritten = buffer;
+          for (const { adapter, options } of adapters) {
+            rewritten = adapter.preDispatchStreamChunk!(rewritten, options);
+          }
+          controller.enqueue(encoder.encode(rewritten));
+        }
+      },
+    });
+  }
+
+  /**
    * Handles non-streaming responses
    */
   private async handleNonStreamingResponse(
@@ -2187,9 +3091,19 @@ export class Dispatcher {
     route: RouteResult,
     targetApiType: string,
     transformer: any,
-    bypassTransformation: boolean
+    bypassTransformation: boolean,
+    adapters: ResolvedAdapter[] = []
   ): Promise<UnifiedChatResponse> {
-    const responseBody = await this.parseJsonResponseBody(
+    // Capture response metadata for debug logging
+    if (request.requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        request.requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
+    }
+
+    let responseBody = await this.parseJsonResponseBody(
       response,
       request.requestId,
       route,
@@ -2197,7 +3111,25 @@ export class Dispatcher {
     );
     logger.silly('Upstream Response Payload', responseBody);
 
+    // Apply provider/model adapters (postDispatch) in reverse order
+    if (adapters.length > 0) {
+      for (let i = adapters.length - 1; i >= 0; i--) {
+        responseBody = adapters[i]!.adapter.postDispatch(responseBody, adapters[i]!.options);
+      }
+      logger.debug(
+        `Adapters applied (postDispatch): [${[...adapters]
+          .reverse()
+          .map((a) => a.adapter.name)
+          .join(', ')}] ` + `for ${route.provider}/${route.model}`
+      );
+    }
+
     if (request.requestId) {
+      DebugManager.getInstance().addResponseMeta(
+        request.requestId,
+        response.status,
+        this.extractResponseHeaders(response)
+      );
       DebugManager.getInstance().addRawResponse(request.requestId, responseBody);
     }
 
@@ -2266,7 +3198,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'embeddings'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -2296,6 +3252,14 @@ export class Dispatcher {
           Object.assign(payload, route.config.extraBody);
         }
 
+        // Merge alias-level extraBody (overrides provider level)
+        if (route.canonicalModel) {
+          const aliasConfig = getConfig().models?.[route.canonicalModel];
+          if (aliasConfig?.extraBody) {
+            Object.assign(payload, aliasConfig.extraBody);
+          }
+        }
+
         logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
         logger.silly('Embeddings Request Payload', payload);
 
@@ -2304,6 +3268,15 @@ export class Dispatcher {
         }
 
         const response = await this.executeProviderRequest(url, headers, payload);
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -2379,6 +3352,7 @@ export class Dispatcher {
           route,
           'embeddings'
         );
+        doRelease();
         return enrichedResponse;
       } catch (error: any) {
         lastError = error;
@@ -2406,9 +3380,11 @@ export class Dispatcher {
           logger.warn(
             `Failover: retrying embeddings after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
+          doRelease();
           continue;
         }
 
+        doRelease();
         throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
       }
     }
@@ -2463,7 +3439,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'transcriptions'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -2508,6 +3508,15 @@ export class Dispatcher {
           headers,
           body: formData,
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -2586,9 +3595,11 @@ export class Dispatcher {
           route,
           'transcriptions'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {
@@ -2669,7 +3680,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'speech'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -2698,6 +3733,14 @@ export class Dispatcher {
           Object.assign(payload, route.config.extraBody);
         }
 
+        // Merge alias-level extraBody (overrides provider level)
+        if (route.canonicalModel) {
+          const aliasConfig = getConfig().models?.[route.canonicalModel];
+          if (aliasConfig?.extraBody) {
+            Object.assign(payload, aliasConfig.extraBody);
+          }
+        }
+
         logger.info(`Dispatching speech ${request.model} to ${route.provider}:${route.model}`);
         logger.silly('Speech Request Payload', payload);
 
@@ -2714,6 +3757,15 @@ export class Dispatcher {
           headers,
           body: JSON.stringify(payload),
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -2758,7 +3810,7 @@ export class Dispatcher {
 
         let responseForProcessing = response;
         if (isStreamed) {
-          const streamProbe = await this.probeStreamingStart(response);
+          const streamProbe = await this.probeStreamingStart(response, null);
 
           if (!streamProbe.ok) {
             const error = streamProbe.error;
@@ -2827,9 +3879,11 @@ export class Dispatcher {
           route,
           'speech'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {
@@ -2911,7 +3965,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'images'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -2941,6 +4019,14 @@ export class Dispatcher {
           Object.assign(payload, route.config.extraBody);
         }
 
+        // Merge alias-level extraBody (overrides provider level)
+        if (route.canonicalModel) {
+          const aliasConfig = getConfig().models?.[route.canonicalModel];
+          if (aliasConfig?.extraBody) {
+            Object.assign(payload, aliasConfig.extraBody);
+          }
+        }
+
         logger.info(
           `Dispatching image generation ${request.model} to ${route.provider}:${route.model}`
         );
@@ -2955,6 +4041,15 @@ export class Dispatcher {
           headers,
           body: JSON.stringify(payload),
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3025,9 +4120,11 @@ export class Dispatcher {
           route,
           'images'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {
@@ -3108,7 +4205,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'images'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -3151,6 +4272,15 @@ export class Dispatcher {
           headers,
           body: formData,
         });
+
+        // Capture response metadata for debug logging
+        if (request.requestId) {
+          DebugManager.getInstance().addResponseMeta(
+            request.requestId,
+            response.status,
+            this.extractResponseHeaders(response)
+          );
+        }
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3221,9 +4351,11 @@ export class Dispatcher {
           route,
           'images'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {

@@ -55,8 +55,10 @@ export class LatencySelector extends Selector {
       validCandidates.sort((a, b) => a.avgTtft - b.avgTtft);
 
       const config = getConfig();
-      const explorationRate =
-        config.latencyExplorationRate ?? config.performanceExplorationRate ?? 0;
+      const bgEnabled = config.backgroundExploration?.enabled === true;
+      const explorationRate = bgEnabled
+        ? 0
+        : (config.latencyExplorationRate ?? config.performanceExplorationRate ?? 0);
 
       // If exploration rate is set and we have multiple candidates, occasionally explore
       if (explorationRate > 0 && validCandidates.length > 1 && Math.random() < explorationRate) {

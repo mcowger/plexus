@@ -84,15 +84,25 @@ export class OpenAITransformer implements Transformer {
           })
         : undefined;
 
-    const out: any = {
-      model: request.model,
-      messages,
-      max_tokens: request.max_tokens,
-      temperature: request.temperature,
-      stream: request.stream,
-      tools: normalizedTools && normalizedTools.length > 0 ? normalizedTools : undefined,
-      tool_choice: request.tool_choice,
-    };
+    // When the incoming API type matches our outgoing type (chat -> chat),
+    // start from the original body to preserve unknown fields (e.g.
+    // enable_thinking, chat_template_kwargs, budget_tokens) that the
+    // explicit mapping below would otherwise drop. The explicitly-mapped
+    // fields are then overlaid on top to apply any necessary transformations.
+    // Cross-API transformations (chat -> messages, chat -> gemini) remain
+    // fully explicit since they're fundamentally different protocols.
+    const isSameApiType = request.originalBody && request.incomingApiType?.toLowerCase() === 'chat';
+
+    const out: any = isSameApiType ? { ...request.originalBody } : {};
+
+    // Override with explicitly-transformed fields
+    out.model = request.model;
+    out.messages = messages;
+    out.max_tokens = request.max_tokens;
+    out.temperature = request.temperature;
+    out.stream = request.stream;
+    out.tools = normalizedTools && normalizedTools.length > 0 ? normalizedTools : undefined;
+    out.tool_choice = request.tool_choice;
 
     if (request.response_format) {
       if (request.response_format.type === 'json_schema' && request.response_format.json_schema) {

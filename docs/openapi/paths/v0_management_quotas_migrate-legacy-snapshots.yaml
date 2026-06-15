@@ -1,0 +1,58 @@
+post:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Migrate legacy quota snapshots (admin only)
+  description: |
+    Migrates legacy quota snapshot data to the new quota schema.
+    This is a one-time migration operation.
+
+    ## Use case
+
+    Run this endpoint when upgrading from the legacy quota system to
+    the new quota system. The migration:
+    1. Reads all legacy snapshot records
+    2. Transforms them to the new schema format
+    3. Inserts them into the new quota tables
+    4. Tracks migration progress for resumption if interrupted
+
+    ## Response
+
+    Returns migration statistics:
+    - `migrated` — Number of records migrated in this run
+    - `total` — Total legacy records
+    - `complete` — Whether migration is finished
+    - `error` — Error message if migration failed (optional)
+
+    ## Idempotency
+
+    This endpoint is idempotent. Running it multiple times will only
+    migrate records that haven't been migrated yet.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Migration result.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              migrated:
+                type: integer
+                description: Number of records migrated in this run
+              total:
+                type: integer
+                description: Total legacy records
+              complete:
+                type: boolean
+                description: Whether migration is finished
+              error:
+                type: string
+                description: Error message if migration failed
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Migration failed.
+  operationId: postV0ManagementQuotasMigrateLegacySnapshots

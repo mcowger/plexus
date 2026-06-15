@@ -1,0 +1,1 @@
+ALTER TABLE "model_aliases" ADD COLUMN "preferred_api" jsonb;

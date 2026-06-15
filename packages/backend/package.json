@@ -6,19 +6,22 @@
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
     "typecheck": "bun x tsc --noEmit",
-    "test": "bunx --bun vitest run --config vitest.config.ts --changed HEAD",
-    "test:force-all": "bunx --bun vitest run --config vitest.config.ts",
+    "test": "bun run --cwd ../.. build:frontend:if-needed && bunx --bun vitest run --config vitest.config.ts --changed HEAD",
+    "test:force-all": "bun run --cwd ../.. build:frontend:if-needed && bunx --bun vitest run --config vitest.config.ts",
     "test:watch": "bunx --bun vitest --config vitest.config.ts",
     "rekey": "bun run src/cli/rekey.ts",
-    "backup": "bun run src/cli/backup.ts"
+    "backup": "bun run src/cli/backup.ts",
+    "generate-migrations": "cd ../.. && bun run scripts/generate-migrations.ts",
+    "lint:migrations": "cd ../.. && bun run scripts/lint-migrations.ts"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.79.1",
     "@fastify/bearer-auth": "^10.1.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.1.3",
-    "@google/genai": "^1.52.0",
-    "@mariozechner/pi-ai": "0.73.0",
+    "@google/genai": "^2.8.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@plexus/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
     "csv-parse": "^6.2.1",
@@ -26,7 +29,7 @@
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "eventsource-encoder": "^1.0.2",
-    "eventsource-parser": "^3.0.8",
+    "eventsource-parser": "^3.1.0",
     "fastify": "^5.8.5",
     "js-tiktoken": "^1.0.21",
     "parse-duration": "^2.1.6",
@@ -38,9 +41,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.5",
+    "@electric-sql/pglite": "^0.4.6",
     "@types/bun": "latest",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.8.0",
     "@types/winston": "^2.4.4",
     "drizzle-kit": "^0.31.10",
     "form-data": "^4.0.5"

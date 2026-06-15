@@ -1,0 +1,34 @@
+delete:
+  tags:
+    - Management — Backup
+  summary: Reset all request logs, error logs, and debug trace logs (admin only)
+  description: |
+    Deletes all request logs (usage), error logs, and debug trace logs.
+    Configuration settings, provider configurations, model aliases, keys, MCP servers,
+    and provider cooldowns remain untouched.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Logs successfully reset.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+                example: "All logs have been reset successfully"
+            required:
+              - success
+              - message
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals cannot access this endpoint.
+  operationId: deleteV0ManagementLogsReset

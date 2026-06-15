@@ -49,6 +49,8 @@ import { getConfig } from './config';
 import { ConfigService } from './services/config-service';
 import { Dispatcher } from './services/dispatcher';
 import { UsageStorageService } from './services/usage-storage';
+import { ProbeService } from './services/probe-service';
+import { BackgroundExplorer } from './services/background-explorer';
 import { CooldownManager } from './services/cooldown-manager';
 import { DebugManager } from './services/debug-manager';
 import { PricingManager } from './services/pricing-manager';
@@ -97,6 +99,7 @@ logger.debug(`PORT: ${process.env.PORT || '4000'}`);
 const fastify = Fastify({
   logger: false, // We use a custom winston-based logger
   bodyLimit: 30 * 1024 * 1024, // 30MB to accommodate 25MB audio files + metadata
+  forceCloseConnections: true, // Destroy all open sockets on shutdown (fixes SSE hang)
 });
 
 // --- Plugin Registration ---
@@ -128,6 +131,13 @@ const quotaScheduler = QuotaScheduler.getInstance();
 dispatcher.setUsageStorage(usageStorage);
 DebugManager.getInstance().setStorage(usageStorage);
 SelectorFactory.setUsageStorage(usageStorage);
+
+// ProbeService is shared between the management test endpoint and the
+// background explorer. BackgroundExplorer is created here so router
+// triggers can pick it up via getInstance() once routes start handling
+// traffic.
+const probeService = new ProbeService(dispatcher, usageStorage);
+BackgroundExplorer.initialize(probeService);
 
 // Enable debug mode if DEBUG=true environment variable is set
 if (process.env.DEBUG === 'true') {
@@ -168,11 +178,11 @@ try {
   await OAuthAuthManager.getInstance().initialize();
   await PricingManager.getInstance().loadPricing();
   // Load model metadata from all configured sources (non-fatal on failure)
-  ModelMetadataManager.getInstance()
-    .loadAll()
-    .catch((e) => {
-      logger.error('Failed to load model metadata', e);
-    });
+  const modelMetadataManager = ModelMetadataManager.getInstance();
+  modelMetadataManager.startAutoRefresh(60);
+  modelMetadataManager.refreshAll(undefined, 'startup').catch((e) => {
+    logger.error('Failed to load model metadata', e);
+  });
   CodexVersionService.getInstance()
     .fetchVersion()
     .catch((e) => {
@@ -193,9 +203,7 @@ try {
 // Initialize quota checkers (requires DB to be ready)
 try {
   const config = getConfig();
-  if (config.quotas && config.quotas.length > 0) {
-    await quotaScheduler.initialize(config.quotas);
-  }
+  await quotaScheduler.initialize(config.quotas ?? []);
 } catch (e) {
   logger.error('Failed to initialize quota checkers', e);
 }
@@ -272,6 +280,7 @@ await registerManagementRoutes(
   fastify,
   usageStorage,
   dispatcher,
+  probeService,
   quotaScheduler,
   mcpUsageStorage,
   quotaEnforcer

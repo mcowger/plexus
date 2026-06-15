@@ -31,11 +31,11 @@ Use the PR titles, bodies, and labels to determine the nature of each change. Us
 
 ### ✨ New Features
 
-- **Short feature name**: What it does and why it matters. ([#NNN](https://github.com/mcowger/plexus/pull/NNN))
+- **Short feature name**: What it does and why it matters. ([#NNN](https://github.com/mcowger/plexus/pull/NNN)) @username_of_contributor
 
 ### 🐛 Bug Fixes
 
-- What was broken and how it was fixed. ([#NNN](https://github.com/mcowger/plexus/pull/NNN))
+- What was broken and how it was fixed. ([#NNN](https://github.com/mcowger/plexus/pull/NNN)) @username_of_contributor
 
 ### 🔧 Improvements
 
@@ -54,7 +54,7 @@ Use the PR titles, bodies, and labels to determine the nature of each change. Us
 - If all changes in the release are internal/infrastructure, write a brief maintenance-only note instead of the full format
 - Group closely related PRs into a single bullet when they address the same feature or fix
 - Use friendly, non-technical language — avoid internal code names or abbreviations
-- Link each item to its PR: `([#NNN](https://github.com/mcowger/plexus/pull/NNN))`
+- Link each item to its PR: `([#NNN](https://github.com/mcowger/plexus/pull/NNN))`. if the contributor was not @mcowger or a bot, mention their username.  
 - Do not add a title line like `# 2026.05.06.1` — the tag name is already the release title on GitHub
 
 ## STEP 3: Write the output file

@@ -195,7 +195,7 @@ async function followReleaseWorkflow(owner: string, repo: string, version: strin
 
     try {
       const result = execSync(
-        `gh run list --repo ${owner}/${repo} --branch refs/tags/${version} --limit 1 --json databaseId,status,conclusion`,
+        `gh run list --repo ${owner}/${repo} --branch ${version} --event push --limit 1 --json databaseId,status,conclusion`,
         { encoding: 'utf-8' }
       );
       const runs = JSON.parse(result);

@@ -9,20 +9,25 @@ interface MiniMaxBalanceResponse {
 
 export default defineChecker({
   type: 'minimax',
+  displayName: 'MiniMax',
   optionsSchema: z.object({
     groupid: z.string().trim().min(1, 'MiniMax groupid is required'),
-    hertzSession: z.string().trim().min(1, 'MiniMax HERTZ-SESSION cookie value is required'),
+    token: z.string().trim().min(1, 'MiniMax _token cookie value is required'),
   }),
   async check(ctx) {
     const groupid = ctx.requireOption<string>('groupid').trim();
-    const hertzSession = ctx.requireOption<string>('hertzSession').trim();
+    const token = ctx.requireOption<string>('token').trim();
 
-    const endpoint = `https://platform.minimax.io/account/query_balance?GroupId=${encodeURIComponent(groupid)}`;
+    const endpoint = `https://platform.minimax.io/account/query_balance`;
     logger.silly(`Calling ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: { Cookie: `HERTZ-SESSION=${hertzSession}`, Accept: 'application/json' },
+      headers: {
+        Cookie: `_token=${token}`,
+        'x-group-id': groupid,
+        Accept: 'application/json',
+      },
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);

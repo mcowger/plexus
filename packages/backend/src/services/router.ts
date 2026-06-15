@@ -8,9 +8,12 @@ import {
   type ModelConfig,
   type ModelTargetGroup,
 } from '../config';
+import { BackgroundExplorer } from './background-explorer';
 import { CooldownManager } from './cooldown-manager';
+import { ConcurrencyTracker } from './concurrency-tracker';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
+import { StickySessionManager } from './sticky-session-manager';
 import type { ModelArchitecture } from '@plexus/shared';
 
 export interface RouteResult {
@@ -93,6 +96,69 @@ async function filterGroupTargets(
   }
 
   let healthyTargets = [...healthyEligible, ...cooldownExempt];
+
+  if (healthyTargets.length === 0) return [];
+
+  // 2.5 Concurrency filter
+  const concurrencyExempt = healthyTargets.filter((t) => {
+    const providerConfig = config.providers[t.provider];
+    const modelConfig =
+      providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models
+        ? providerConfig.models[t.model]
+        : undefined;
+    return providerConfig?.maxConcurrency == null && modelConfig?.maxConcurrency == null;
+  });
+  const concurrencyEligible = healthyTargets.filter((t) => {
+    const providerConfig = config.providers[t.provider];
+    const modelConfig =
+      providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models
+        ? providerConfig.models[t.model]
+        : undefined;
+    return providerConfig?.maxConcurrency != null || modelConfig?.maxConcurrency != null;
+  });
+
+  const concurrencyHealthy = concurrencyEligible.filter((t) => {
+    const providerConfig = config.providers[t.provider];
+    if (providerConfig?.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getProviderCount(t.provider);
+      logger.debug(
+        `Router: concurrency check for ${t.provider}/${t.model}: providerCount=${count}, maxConcurrency=${providerConfig.maxConcurrency}`
+      );
+      if (count >= providerConfig.maxConcurrency) return false;
+    }
+    const modelConfig =
+      providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models
+        ? providerConfig.models[t.model]
+        : undefined;
+    if (modelConfig?.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getTargetCount(t.provider, t.model);
+      logger.debug(
+        `Router: concurrency check for ${t.provider}/${t.model}: targetCount=${count}, maxConcurrency=${modelConfig.maxConcurrency}`
+      );
+      if (count >= modelConfig.maxConcurrency) return false;
+    }
+    return true;
+  });
+
+  if (logModelName) {
+    logger.debug(
+      `Router: concurrency filter for '${logModelName}': exempt=[${concurrencyExempt.map((t) => t.provider + '/' + t.model).join(', ')}], eligible=[${concurrencyEligible.map((t) => t.provider + '/' + t.model).join(', ')}], healthy=[${concurrencyHealthy.map((t) => t.provider + '/' + t.model).join(', ')}]`
+    );
+    if (concurrencyHealthy.length < concurrencyEligible.length) {
+      logger.warn(
+        `Router: ${concurrencyEligible.length - concurrencyHealthy.length} target(s) for '${logModelName}' were filtered out due to concurrency limits.`
+      );
+    }
+  }
+
+  // Merge back preserving original order — concurrencyExempt and concurrencyHealthy
+  // are subsets of the original healthyTargets list, so we iterate the original
+  // order and include each target if it appears in either set.
+  const concurrencyExemptSet = new Set(concurrencyExempt);
+  const concurrencyHealthySet = new Set(concurrencyHealthy);
+  healthyTargets = healthyTargets.filter(
+    (t) => concurrencyExemptSet.has(t) || concurrencyHealthySet.has(t)
+  );
 
   if (healthyTargets.length === 0) return [];
 
@@ -200,7 +266,8 @@ async function selectOrderedTargets(
 export class Router {
   static async resolveCandidates(
     modelName: string,
-    incomingApiType?: string
+    incomingApiType?: string,
+    sessionKey?: string | null
   ): Promise<RouteResult[]> {
     const config = getConfig();
 
@@ -224,6 +291,8 @@ export class Router {
           if (enriched.length === 0) return [];
 
           const ordered = await selectOrderedTargets(group.selector, enriched);
+
+          BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
           const results: RouteResult[] = [];
           for (const target of ordered) {
@@ -261,6 +330,15 @@ export class Router {
 
     const orderedCandidates: RouteResult[] = [];
 
+    // Sticky session: if enabled and we have a session key, look up the
+    // provider:model used last turn. We don't return early — we still build
+    // the full candidate list so failover works — but we hoist the sticky
+    // pick to position 0 if it's still a healthy candidate.
+    let stickyPick: { provider: string; model: string } | null = null;
+    if (alias.sticky_session && sessionKey) {
+      stickyPick = StickySessionManager.getInstance().get(canonicalModel, sessionKey);
+    }
+
     for (const group of alias.target_groups) {
       const enriched = await filterGroupTargets(
         group.targets,
@@ -273,6 +351,8 @@ export class Router {
       if (enriched.length === 0) continue;
 
       const ordered = await selectOrderedTargets(group.selector, enriched);
+
+      BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
       for (const target of ordered) {
         const providerConfig = config.providers[target.provider];
@@ -292,6 +372,23 @@ export class Router {
           incomingModelAlias: modelName,
           canonicalModel,
         });
+      }
+    }
+
+    if (stickyPick) {
+      const idx = orderedCandidates.findIndex(
+        (c) => c.provider === stickyPick!.provider && c.model === stickyPick!.model
+      );
+      if (idx > 0) {
+        const [picked] = orderedCandidates.splice(idx, 1);
+        orderedCandidates.unshift(picked!);
+        logger.info(
+          `Router: sticky_session hoisted '${stickyPick.provider}/${stickyPick.model}' to front for alias '${modelName}'.`
+        );
+      } else if (idx === -1) {
+        logger.debug(
+          `Router: sticky_session pick '${stickyPick.provider}/${stickyPick.model}' for alias '${modelName}' is no longer a healthy candidate; using normal selection.`
+        );
       }
     }
 
@@ -333,6 +430,8 @@ export class Router {
                 `No target selected in group '${groupName}' for alias '${aliasName}'`
               );
             }
+
+            BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
             const providerConfig = config.providers[target.provider];
             if (!providerConfig) {
@@ -384,6 +483,8 @@ export class Router {
         const target = await selector.select(enriched);
 
         if (!target) continue;
+
+        BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
         const providerConfig = config.providers[target.provider];
         if (!providerConfig) {
@@ -453,9 +554,31 @@ export class Router {
       throw error;
     }
 
+    if (providerConfig.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getProviderCount(providerId);
+      if (count >= providerConfig.maxConcurrency) {
+        const error = new Error(
+          `Direct routing failed: Concurrency limit exceeded for provider '${providerId}'`
+        ) as any;
+        error.routingContext = { statusCode: 429 };
+        throw error;
+      }
+    }
+
     let modelConfig = undefined;
     if (!Array.isArray(providerConfig.models) && providerConfig.models) {
       modelConfig = providerConfig.models[providerModel];
+    }
+
+    if (modelConfig?.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getTargetCount(providerId, providerModel);
+      if (count >= modelConfig.maxConcurrency) {
+        const error = new Error(
+          `Direct routing failed: Concurrency limit exceeded for model '${providerId}/${providerModel}'`
+        ) as any;
+        error.routingContext = { statusCode: 429 };
+        throw error;
+      }
     }
 
     logger.info(`Router: Direct routing to '${providerId}/${providerModel}' (bypassing selector)`);

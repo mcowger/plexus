@@ -21,8 +21,10 @@ export class E2EPerformanceSelector extends Selector {
     }
 
     const config = getConfig();
-    const explorationRate =
-      config.e2ePerformanceExplorationRate ?? config.performanceExplorationRate ?? 0.05;
+    const bgEnabled = config.backgroundExploration?.enabled === true;
+    const explorationRate = bgEnabled
+      ? 0
+      : (config.e2ePerformanceExplorationRate ?? config.performanceExplorationRate ?? 0.05);
 
     const candidates: { target: ModelTarget; e2eTps: number }[] = [];
     const explorationStats: CandidateStats[] = [];

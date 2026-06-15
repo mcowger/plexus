@@ -21,7 +21,9 @@ import { registerSelfRoutes } from './management/self';
 import { authenticate, requireAdmin, ManagementAuthError } from './management/_principal';
 import { registerModelRoutes } from './management/models';
 import { registerBackupRoutes } from './management/backup';
+import { registerConcurrencyRoutes } from './management/concurrency';
 import { Dispatcher } from '../services/dispatcher';
+import { ProbeService } from '../services/probe-service';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage';
@@ -30,6 +32,7 @@ export async function registerManagementRoutes(
   fastify: FastifyInstance,
   usageStorage: UsageStorageService,
   dispatcher: Dispatcher,
+  probeService: ProbeService,
   quotaScheduler?: QuotaScheduler,
   mcpUsageStorage?: McpUsageStorageService,
   quotaEnforcer?: QuotaEnforcer
@@ -94,7 +97,7 @@ export async function registerManagementRoutes(
 
       await registerConfigRoutes(adminOnly, usageStorage);
       await registerSystemLogRoutes(adminOnly);
-      await registerTestRoutes(adminOnly, dispatcher, usageStorage);
+      await registerTestRoutes(adminOnly, probeService);
       await registerOAuthRoutes(adminOnly);
       await registerLoggingRoutes(adminOnly);
       await registerRestartRoutes(adminOnly);
@@ -114,7 +117,9 @@ export async function registerManagementRoutes(
       // Model routes for AI energy calculations
       await registerModelRoutes(adminOnly);
       // Backup and restore routes
-      await registerBackupRoutes(adminOnly);
+      await registerBackupRoutes(adminOnly, usageStorage, mcpUsageStorage);
+      // Concurrency (live snapshot + historical timeline)
+      await registerConcurrencyRoutes(adminOnly, usageStorage);
     });
   });
 }

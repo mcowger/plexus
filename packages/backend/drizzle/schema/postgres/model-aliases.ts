@@ -32,7 +32,11 @@ export const modelAliases = pgTable('model_aliases', {
   // Model architecture override for inference energy calculation
   modelArchitecture: jsonb('model_architecture'), // override for total_params, active_params, layers, heads, kv_lora_rank, qk_rope_head_dim, context_length, dtype
   enforceLimits: boolean('enforce_limits').notNull().default(false),
+  stickySession: boolean('sticky_session').notNull().default(false),
+  preferredApi: jsonb('preferred_api'), // ('chat_completions' | 'messages' | 'gemini' | 'responses')[]
+  piModel: jsonb('pi_model'), // { provider: string, model_id: string }
   targetGroups: jsonb('target_groups'), // {name, selector}[]
+  extraBody: jsonb('extra_body'), // Record<string, any>
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

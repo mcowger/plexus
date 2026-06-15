@@ -8,6 +8,7 @@ interface KiloBalanceResponse {
 
 export default defineChecker({
   type: 'kilo',
+  displayName: 'Kilo',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Kilo API key is required'),
     endpoint: z.string().url().optional(),

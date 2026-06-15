@@ -8,6 +8,13 @@ interface Props {
   orphanGroups: OrphanGroup[];
   selectedImports: Map<string, Set<string>>;
   setSelectedImports: React.Dispatch<React.SetStateAction<Map<string, Set<string>>>>;
+  selectedModels: Set<string>;
+  setSelectedModels: React.Dispatch<React.SetStateAction<Set<string>>>;
+  selectedAliases: Map<string, string>;
+  setSelectedAliases: React.Dispatch<React.SetStateAction<Map<string, string>>>;
+  onSuppress: (modelId: string) => void;
+  onUnsuppressAll: () => void;
+  hasSuppressedModels: boolean;
   onImport: () => Promise<boolean>;
   isImporting: boolean;
 }
@@ -18,9 +25,21 @@ export function ImportModelsModal({
   orphanGroups,
   selectedImports,
   setSelectedImports,
+  selectedModels,
+  setSelectedModels,
+  selectedAliases,
+  setSelectedAliases,
+  onSuppress,
+  onUnsuppressAll,
+  hasSuppressedModels,
   onImport,
   isImporting,
 }: Props) {
+  const hasSelectedImport = orphanGroups.some(
+    (group) =>
+      selectedModels.has(group.modelId) && (selectedImports.get(group.modelId)?.size ?? 0) > 0
+  );
+
   return (
     <Modal
       isOpen={isOpen}
@@ -35,10 +54,7 @@ export function ImportModelsModal({
           <Button
             onClick={onImport}
             isLoading={isImporting}
-            disabled={
-              Array.from(selectedImports.values()).every((providerIds) => providerIds.size === 0) ||
-              orphanGroups.length === 0
-            }
+            disabled={!hasSelectedImport || orphanGroups.length === 0}
           >
             Import Selected
           </Button>
@@ -46,9 +62,20 @@ export function ImportModelsModal({
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onUnsuppressAll}
+            disabled={!hasSuppressedModels}
+          >
+            Unsuppress all
+          </Button>
+        </div>
         {orphanGroups.length === 0 ? (
           <div className="text-text-muted italic text-center text-sm py-8">
-            No orphaned models found — all provider models are covered by aliases.
+            No orphaned models found. All provider models are covered by aliases or suppressed
+            locally.
           </div>
         ) : (
           <div
@@ -82,46 +109,69 @@ export function ImportModelsModal({
                   <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                     Providers
                   </th>
+                  <th
+                    className="px-4 py-3 text-right font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    style={{ width: '110px' }}
+                  >
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {orphanGroups.map((group) => {
                   const selected = selectedImports.get(group.modelId) || new Set<string>();
-                  const allChecked =
-                    group.candidates.length > 0 &&
-                    group.candidates.every((c) => selected.has(c.provider.id));
+                  const isModelSelected = selectedModels.has(group.modelId);
+                  const selectedAliasId = selectedAliases.get(group.modelId) ?? '';
 
                   return (
                     <tr key={group.modelId} className="hover:bg-bg-hover">
                       <td className="px-4 py-3 text-left text-text">
                         <input
                           type="checkbox"
-                          checked={allChecked}
+                          checked={isModelSelected}
                           onChange={(e) => {
-                            const next = new Map(selectedImports);
+                            const next = new Set(selectedModels);
                             if (e.target.checked) {
-                              next.set(
-                                group.modelId,
-                                new Set(group.candidates.map((c) => c.provider.id))
-                              );
+                              next.add(group.modelId);
                             } else {
-                              next.set(group.modelId, new Set<string>());
+                              next.delete(group.modelId);
                             }
-                            setSelectedImports(next);
+                            setSelectedModels(next);
                           }}
                         />
                       </td>
                       <td className="px-4 py-3 text-left text-text">
                         <div className="font-medium">{group.modelId}</div>
-                        {group.existingAlias ? (
+                        {group.aliasMatches.length > 0 ? (
                           <>
                             <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
-                              Existing Alias
+                              Existing Alias Match
                             </span>
-                            {group.matchReason && (
+                            {group.aliasMatches.length === 1 ? (
                               <div className="text-[11px] text-text-muted mt-0.5">
-                                {group.matchReason}
+                                {group.aliasMatches[0].alias.id} · {group.aliasMatches[0].reason}
                               </div>
+                            ) : (
+                              <select
+                                className="mt-1 w-full max-w-xs py-1 px-2 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                                value={selectedAliasId}
+                                onChange={(e) => {
+                                  const next = new Map(selectedAliases);
+                                  if (e.target.value) {
+                                    next.set(group.modelId, e.target.value);
+                                  } else {
+                                    next.delete(group.modelId);
+                                  }
+                                  setSelectedAliases(next);
+                                }}
+                              >
+                                <option value="">Create new alias</option>
+                                {group.aliasMatches.map((match) => (
+                                  <option key={match.alias.id} value={match.alias.id}>
+                                    {match.alias.id} ({match.reason})
+                                  </option>
+                                ))}
+                              </select>
                             )}
                           </>
                         ) : (
@@ -166,6 +216,11 @@ export function ImportModelsModal({
                             );
                           })}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => onSuppress(group.modelId)}>
+                          Suppress
+                        </Button>
                       </td>
                     </tr>
                   );

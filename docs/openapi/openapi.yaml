@@ -404,6 +404,18 @@ paths:
     $ref: paths/v0_management_config_export.yaml
   /v0/management/config/vision-fallthrough:
     $ref: paths/v0_management_config_vision-fallthrough.yaml
+  /v0/management/config/background-exploration:
+    $ref: paths/v0_management_config_background-exploration.yaml
+  /v0/management/config/timeout:
+    $ref: paths/v0_management_config_timeout.yaml
+  /v0/management/config/stall:
+    $ref: paths/v0_management_config_stall.yaml
+  /v0/management/config/cooldown:
+    $ref: paths/v0_management_config_cooldown.yaml
+  /v0/management/config/exploration-rate:
+    $ref: paths/v0_management_config_exploration-rate.yaml
+  /v0/management/config/failover:
+    $ref: paths/v0_management_config_failover.yaml
   /v0/management/system-settings:
     $ref: paths/v0_management_system-settings.yaml
   /v0/management/providers:
@@ -412,6 +424,10 @@ paths:
     $ref: paths/v0_management_providers_{slug}.yaml
   /v0/management/providers/fetch-models:
     $ref: paths/v0_management_providers_fetch-models.yaml
+  /v0/management/pi/providers:
+    $ref: paths/v0_management_pi_providers.yaml
+  /v0/management/pi/models:
+    $ref: paths/v0_management_pi_models.yaml
   /v0/management/aliases:
     $ref: paths/v0_management_aliases.yaml
   /v0/management/aliases/{slug}:
@@ -422,6 +438,8 @@ paths:
     $ref: paths/v0_management_models_{aliasId}.yaml
   /v0/management/models/huggingface/{modelId}:
     $ref: paths/v0_management_models_huggingface_{modelId}.yaml
+  /v0/management/models/metadata/refresh:
+    $ref: paths/v0_management_models_metadata_refresh.yaml
   /v0/management/keys:
     $ref: paths/v0_management_keys.yaml
   /v0/management/keys/{name}:
@@ -432,6 +450,16 @@ paths:
     $ref: paths/v0_management_mcp-servers_{serverName}.yaml
   /v0/management/quota-checker-types:
     $ref: paths/v0_management_quota-checker-types.yaml
+  /v0/management/quota-checkers:
+    $ref: paths/v0_management_quota-checkers.yaml
+  /v0/management/quotas/backup-legacy-snapshots:
+    $ref: paths/v0_management_quotas_backup-legacy-snapshots.yaml
+  /v0/management/quotas/legacy-snapshot-status:
+    $ref: paths/v0_management_quotas_legacy-snapshot-status.yaml
+  /v0/management/quotas/migrate-legacy-snapshots:
+    $ref: paths/v0_management_quotas_migrate-legacy-snapshots.yaml
+  /v0/management/quotas/truncate-legacy-snapshots:
+    $ref: paths/v0_management_quotas_truncate-legacy-snapshots.yaml
   /v0/management/usage:
     $ref: paths/v0_management_usage.yaml
   /v0/management/usage/summary:
@@ -506,12 +534,16 @@ paths:
     $ref: paths/v0_management_restart.yaml
   /v0/management/backup:
     $ref: paths/v0_management_backup.yaml
+  /v0/management/logs/reset:
+    $ref: paths/v0_management_logs_reset.yaml
   /v0/management/restore:
     $ref: paths/v0_management_restore.yaml
   /v0/management/events:
     $ref: paths/v0_management_events.yaml
   /v0/system/logs/stream:
     $ref: paths/v0_system_logs_stream.yaml
+  /v0/system/logs/recent:
+    $ref: paths/v0_system_logs_recent.yaml
   /mcp/{name}:
     $ref: paths/mcp_{name}.yaml
   /.well-known/oauth-authorization-server:
@@ -539,84 +571,3 @@ components:
       description: |
         Either the server's `ADMIN_KEY` (full admin access) or the plaintext
         secret of a configured API key (limited access, scoped to that key).
-    schemas:
-      ConfigBackupEnvelope:
-        type: object
-        required:
-          - plexus_backup
-          - version
-          - created_at
-          - data
-        properties:
-          plexus_backup:
-            type: boolean
-            const: true
-          version:
-            type: integer
-            description: Schema version for forward-compatible migration.
-            const: 1
-          created_at:
-            type: string
-            format: date-time
-            description: ISO 8601 timestamp of when the backup was created.
-          dialect:
-            type: string
-            enum: [sqlite, postgres]
-            description: Source database dialect (informational; not used on import).
-          data:
-            type: object
-            description: All configuration tables.
-            required:
-              - providers
-              - models
-              - keys
-              - user_quotas
-              - mcp_servers
-              - settings
-              - oauth_credentials
-            properties:
-              providers:
-                type: object
-                additionalProperties: true
-                description: Map of provider slug to provider configuration.
-              models:
-                type: object
-                additionalProperties: true
-                description: Map of model alias slug to model configuration.
-              keys:
-                type: object
-                additionalProperties: true
-                description: Map of key name to API key configuration.
-              user_quotas:
-                type: object
-                additionalProperties: true
-                description: Map of quota name to quota definition.
-              mcp_servers:
-                type: object
-                additionalProperties: true
-                description: Map of MCP server name to server configuration.
-              settings:
-                type: object
-                additionalProperties: true
-                description: Map of setting key to value.
-              oauth_credentials:
-                type: array
-                items:
-                  type: object
-                  required:
-                    - provider_type
-                    - account_id
-                    - access_token
-                    - refresh_token
-                    - expires_at
-                  properties:
-                    provider_type:
-                      type: string
-                    account_id:
-                      type: string
-                    access_token:
-                      type: string
-                    refresh_token:
-                      type: string
-                    expires_at:
-                      type: number

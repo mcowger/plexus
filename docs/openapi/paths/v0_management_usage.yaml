@@ -101,6 +101,10 @@ get:
         enum:
           - success
           - error
+          - pending
+          - cancelled
+          - timeout
+          - stall
     - in: query
       name: minDurationMs
       schema:

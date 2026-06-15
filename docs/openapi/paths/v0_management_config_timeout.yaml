@@ -1,0 +1,92 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get upstream timeout config (admin only)
+  description: |
+    Returns the global upstream request timeout configuration.
+
+    This timeout is used as the default maximum duration for upstream
+    provider requests unless the selected provider defines its own
+    `timeoutMs` override.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Timeout config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              defaultSeconds:
+                type: integer
+                minimum: 1
+                maximum: 3600
+                description: Default upstream timeout in seconds.
+            required:
+              - defaultSeconds
+          examples:
+            default:
+              summary: Default timeout config
+              value:
+                defaultSeconds: 300
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigTimeout
+patch:
+  tags:
+    - Management — Config
+  summary: Update upstream timeout config (admin only)
+  description: |
+    Partially updates the global upstream timeout configuration.
+
+    Only provided fields are updated; omitted fields retain their current
+    values.
+
+    ## Validation rules
+
+    - `defaultSeconds` — Integer between 1 and 3600
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            defaultSeconds:
+              type: integer
+              minimum: 1
+              maximum: 3600
+              description: Default upstream timeout in seconds.
+        examples:
+          shorter_default:
+            summary: Lower the global timeout
+            value:
+              defaultSeconds: 120
+          longer_default:
+            summary: Increase the global timeout
+            value:
+              defaultSeconds: 600
+  responses:
+    '200':
+      description: Updated timeout config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              defaultSeconds:
+                type: integer
+            required:
+              - defaultSeconds
+    '400':
+      description: Invalid request body or validation failed.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigTimeout

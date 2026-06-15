@@ -19,6 +19,7 @@ function readOptionValue(args: string[], index: number, option: string) {
 
 let fullMode = false;
 let profileMode = false;
+let noOpen = false;
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -29,6 +30,8 @@ for (let i = 2; i < process.argv.length; i++) {
     process.env.PLEXUS_POSTGRES_DRIVER = 'pglite';
   } else if (arg === '--full') {
     fullMode = true;
+  } else if (arg === '--no-open') {
+    noOpen = true;
   } else if (arg.startsWith('DATABASE_URL=')) {
     process.env.DATABASE_URL = arg.slice('DATABASE_URL='.length);
   } else if (arg.startsWith('PORT=')) {
@@ -54,7 +57,7 @@ for (let i = 2; i < process.argv.length; i++) {
     console.error(`Unknown option: ${arg}`);
     console.error('Usage: bun run dev [DATABASE_URL=...] [PORT=...] [ADMIN_KEY=...]');
     console.error(
-      '   or: bun run dev [--database-url ...] [--port ...] [--admin-key ...] [--pglite] [--full] [--profile]'
+      '   or: bun run dev [--database-url ...] [--port ...] [--admin-key ...] [--pglite] [--full] [--no-open] [--profile]'
     );
     process.exit(1);
   }
@@ -236,6 +239,39 @@ const frontend = spawnManaged(['run', 'dev'], FRONTEND_DIR);
 console.log(`Backend: http://localhost:${process.env.PORT}`);
 console.log('Watching for changes...');
 
+// --- Auto-open browser (unless --no-open) ---
+
+function openBrowser(url: string) {
+  try {
+    if (process.platform === 'win32') {
+      nodeSpawn('cmd', ['/c', 'start', '""', url], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      const child = nodeSpawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.on('error', () => {});
+      child.unref();
+    }
+  } catch {
+    // Silently ignore if browser opener is not available
+  }
+}
+
+if (!noOpen) {
+  (async () => {
+    console.log(`\n[dev] Waiting for server at http://localhost:${process.env.PORT}...`);
+    try {
+      await waitForServer();
+      const url = `http://localhost:${process.env.PORT}/ui/login?token=${encodeURIComponent(process.env.ADMIN_KEY!)}`;
+      console.log(`[dev] Server ready. Opening browser: ${url}`);
+      openBrowser(url);
+    } catch (err) {
+      console.error(`[dev] ${err instanceof Error ? err.message : err}. Not opening browser.`);
+    }
+  })();
+}
+
 // --- Full mode: wait for server ready, then run prep-dev ---
 
 async function waitForServer(timeout = 30000): Promise<void> {
@@ -287,6 +323,11 @@ if (fullMode) {
     try {
       await waitForServer();
       console.log('[full] Server restarted and ready.\n');
+      if (!noOpen) {
+        const url = `http://localhost:${process.env.PORT}/ui/login?token=${encodeURIComponent(process.env.ADMIN_KEY!)}`;
+        console.log(`[full] Opening browser: ${url}`);
+        openBrowser(url);
+      }
     } catch (err) {
       console.error(`[full] ${err instanceof Error ? err.message : err}.`);
     }

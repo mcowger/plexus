@@ -6,7 +6,7 @@ import type {
   AssistantMessageEvent,
   Tool as PiAiTool,
   Usage,
-} from '@mariozechner/pi-ai';
+} from '@earendil-works/pi-ai';
 import { Type } from '@sinclair/typebox';
 import type {
   UnifiedChatRequest,
@@ -231,7 +231,7 @@ function unifiedMessageToToolResult(msg: UnifiedMessage): ToolResultMessage {
  * arrays). This recursive converter ensures tool parameter schemas match the format
  * that pi-coding-agent uses successfully.
  */
-function jsonSchemaToTypeBox(schema: any): any {
+export function jsonSchemaToTypeBox(schema: any): any {
   if (!schema || typeof schema !== 'object') return Type.Any();
 
   const opts: Record<string, any> = {};

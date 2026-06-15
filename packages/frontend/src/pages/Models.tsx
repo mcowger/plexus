@@ -4,7 +4,6 @@ import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
 import { AliasMobileCard } from '../components/models/AliasMobileCard';
 import { TargetGroupEditor } from '../components/models/TargetGroupEditor';
-import { ModelArchitectureEditor } from '../components/models/ModelArchitectureEditor';
 import { ModelBehaviorsEditor } from '../components/models/ModelBehaviorsEditor';
 import { ModelMetadataEditor } from '../components/models/ModelMetadataEditor';
 import { AutoAddModal } from '../components/models/AutoAddModal';
@@ -18,7 +17,7 @@ import { SearchInput } from '../components/ui/SearchInput';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
-import { Plus, Trash2, Zap, Download } from 'lucide-react';
+import { Plus, Trash2, Zap, Download, ChevronDown, ChevronRight } from 'lucide-react';
 
 export const Models = () => {
   const toast = useToast();
@@ -49,8 +48,15 @@ export const Models = () => {
     orphanGroups,
     selectedImports,
     setSelectedImports,
+    selectedImportModels,
+    setSelectedImportModels,
+    selectedImportAliases,
+    setSelectedImportAliases,
+    hasSuppressedImportModels,
     isImporting,
     handleOpenImport,
+    handleSuppressImportModel,
+    handleUnsuppressAllImportModels,
     handleSaveImports,
   } = useModels();
 
@@ -63,6 +69,7 @@ export const Models = () => {
 
   // Auto Add Modal State
   const [isAutoAddModalOpen, setIsAutoAddModalOpen] = useState(false);
+  const [isAliasesOpen, setIsAliasesOpen] = useState(false);
 
   // Edit modal accordion toggles — architecture & metadata manage their own
   // in child components, but behaviors has no parent-provided toggle.
@@ -109,19 +116,18 @@ export const Models = () => {
   const handleAutoAddTargets = useCallback(
     (targets: Array<{ provider: string; model: string }>) => {
       setEditingAlias((prev: Alias) => {
-        const groups = [...prev.target_groups];
-        const g0 = groups[0];
+        const updatedTargets = [...(prev.target_groups[0]?.targets ?? [])];
         for (const t of targets) {
-          const alreadyExists = g0?.targets.some(
-            (x: any) => x.provider === t.provider && x.model === t.model
+          const alreadyExists = updatedTargets.some(
+            (x: { provider: string; model: string }) =>
+              x.provider === t.provider && x.model === t.model
           );
           if (!alreadyExists) {
-            groups[0] = {
-              ...g0,
-              targets: [...(g0?.targets ?? []), { ...t, enabled: true }],
-            };
+            updatedTargets.push({ ...t, enabled: true });
           }
         }
+        const groups = [...prev.target_groups];
+        groups[0] = { ...groups[0], targets: updatedTargets };
         return { ...prev, target_groups: groups };
       });
       setIsAutoAddModalOpen(false);
@@ -208,18 +214,6 @@ export const Models = () => {
                   >
                     Alias
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Aliases
-                  </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Selector
-                  </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Metadata
-                  </th>
                   <th
                     className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                     style={{ paddingRight: '24px' }}
@@ -245,7 +239,7 @@ export const Models = () => {
                 ))}
                 {sortedAliases.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center text-text-muted p-12">
+                    <td colSpan={2} className="text-center text-text-muted p-12">
                       No aliases found
                     </td>
                   </tr>
@@ -339,13 +333,75 @@ export const Models = () => {
 
             <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
 
-            {/* Model Architecture accordion */}
-            <ModelArchitectureEditor
-              editingAlias={editingAlias}
-              setEditingAlias={setEditingAlias}
-            />
+            {/* Additional Aliases disclosure */}
+            <div className="border border-border-glass rounded-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsAliasesOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+              >
+                <span className="font-body text-[13px] font-medium text-text-secondary">
+                  Additional Aliases
+                </span>
+                {isAliasesOpen ? (
+                  <ChevronDown size={14} className="text-text-muted" />
+                ) : (
+                  <ChevronRight size={14} className="text-text-muted" />
+                )}
+              </button>
+              {isAliasesOpen && (
+                <div className="px-3 py-3 border-t border-border-glass flex flex-col gap-1">
+                  {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
+                    <div className="text-text-muted italic text-center text-sm py-1">
+                      No additional aliases
+                    </div>
+                  )}
+                  {editingAlias.aliases?.map((alias, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <div className="min-w-0 flex-1">
+                        <input
+                          className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                          value={alias}
+                          onChange={(e) => {
+                            const next = [...(editingAlias.aliases || [])];
+                            next[idx] = e.target.value;
+                            setEditingAlias({ ...editingAlias, aliases: next });
+                          }}
+                          placeholder="e.g. gpt4"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = [...(editingAlias.aliases || [])];
+                          next.splice(idx, 1);
+                          setEditingAlias({ ...editingAlias, aliases: next });
+                        }}
+                        className="text-danger opacity-60 hover:opacity-100 px-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-1 w-fit"
+                    onClick={() =>
+                      setEditingAlias({
+                        ...editingAlias,
+                        aliases: [...(editingAlias.aliases || []), ''],
+                      })
+                    }
+                    leftIcon={<Plus size={14} />}
+                  >
+                    Add Alias
+                  </Button>
+                </div>
+              )}
+            </div>
 
-            {/* Advanced accordion (behaviors + additional aliases) */}
+            {/* Advanced accordion (behaviors + architecture) */}
             <ModelBehaviorsEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
 
             <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
@@ -404,6 +460,13 @@ export const Models = () => {
           orphanGroups={orphanGroups}
           selectedImports={selectedImports}
           setSelectedImports={setSelectedImports}
+          selectedModels={selectedImportModels}
+          setSelectedModels={setSelectedImportModels}
+          selectedAliases={selectedImportAliases}
+          setSelectedAliases={setSelectedImportAliases}
+          onSuppress={handleSuppressImportModel}
+          onUnsuppressAll={handleUnsuppressAllImportModels}
+          hasSuppressedModels={hasSuppressedImportModels}
           onImport={handleSaveImports}
           isImporting={isImporting}
         />

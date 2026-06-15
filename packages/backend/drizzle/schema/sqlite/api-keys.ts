@@ -11,6 +11,8 @@ export const apiKeys = sqliteTable('api_keys', {
   allowedProviders: text('allowed_providers'),
   excludedModels: text('excluded_models'),
   excludedProviders: text('excluded_providers'),
+  allowedIps: text('allowed_ips'),
+  beta: integer('beta', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

@@ -46,10 +46,20 @@ import { registerBackupRoutes } from '../backup';
 
 describe('Backup management routes', () => {
   let fastify: ReturnType<typeof Fastify>;
+  let mockUsageStorage: any;
+  let mockMcpUsageStorage: any;
 
   beforeEach(async () => {
     fastify = Fastify();
-    await registerBackupRoutes(fastify);
+    mockUsageStorage = {
+      deleteAllUsageLogs: vi.fn(async () => true),
+      deleteAllErrors: vi.fn(async () => true),
+      deleteAllDebugLogs: vi.fn(async () => true),
+    };
+    mockMcpUsageStorage = {
+      deleteAllLogs: vi.fn(async () => true),
+    };
+    await registerBackupRoutes(fastify, mockUsageStorage, mockMcpUsageStorage);
   });
 
   afterEach(async () => {
@@ -106,6 +116,37 @@ describe('Backup management routes', () => {
       });
 
       expect(res.statusCode).toBe(400);
+    });
+  });
+
+  describe('DELETE /v0/management/logs/reset', () => {
+    it('calls delete functions on storage services and returns 200', async () => {
+      const res = await fastify.inject({
+        method: 'DELETE',
+        url: '/v0/management/logs/reset',
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({
+        success: true,
+        message: 'All logs have been reset successfully',
+      });
+      expect(mockUsageStorage.deleteAllUsageLogs).toHaveBeenCalled();
+      expect(mockUsageStorage.deleteAllErrors).toHaveBeenCalled();
+      expect(mockUsageStorage.deleteAllDebugLogs).toHaveBeenCalled();
+      expect(mockMcpUsageStorage.deleteAllLogs).toHaveBeenCalled();
+    });
+
+    it('returns 500 if a storage delete operation fails', async () => {
+      mockUsageStorage.deleteAllErrors.mockResolvedValueOnce(false);
+
+      const res = await fastify.inject({
+        method: 'DELETE',
+        url: '/v0/management/logs/reset',
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json().error).toBeDefined();
     });
   });
 });

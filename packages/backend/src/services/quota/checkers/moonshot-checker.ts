@@ -15,6 +15,7 @@ interface MoonshotBalanceResponse {
 
 export default defineChecker({
   type: 'moonshot',
+  displayName: 'Moonshot',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Moonshot API key is required'),
     endpoint: z.string().url().optional(),

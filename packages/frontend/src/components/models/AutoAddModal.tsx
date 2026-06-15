@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -14,6 +14,25 @@ interface Props {
   preFillQuery?: string;
 }
 
+const getMatchingModels = (query: string, availableModels: Model[], providers: Provider[]) => {
+  const searchTerm = query.trim();
+  if (!searchTerm) return [];
+
+  const searchLower = searchTerm.toLowerCase();
+  const matches: Array<{ model: Model; provider: Provider }> = [];
+  availableModels.forEach((model) => {
+    const provider = providers.find((p) => p.id === model.providerId);
+    if (
+      provider &&
+      (model.name.toLowerCase().includes(searchLower) ||
+        provider.name.toLowerCase().includes(searchLower))
+    ) {
+      matches.push({ model, provider: { ...provider } });
+    }
+  });
+  return matches;
+};
+
 export function AutoAddModal({
   isOpen,
   onClose,
@@ -28,37 +47,41 @@ export function AutoAddModal({
     []
   );
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const wasOpenRef = useRef(false);
+  const availableModelsRef = useRef(availableModels);
+  const providersRef = useRef(providers);
+
+  availableModelsRef.current = availableModels;
+  providersRef.current = providers;
+
+  useEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+    if (!isOpen || wasOpen) return;
+
+    setSubstring(preFillQuery);
+    setSelectedModels(new Set());
+    setFilteredModels(
+      getMatchingModels(preFillQuery, availableModelsRef.current, providersRef.current)
+    );
+  }, [isOpen, preFillQuery]);
 
   const handleSearchModels = (query?: string) => {
     const searchTerm = query !== undefined ? query : substring;
-    if (!searchTerm.trim()) {
-      setFilteredModels([]);
-      return;
-    }
-    const searchLower = searchTerm.toLowerCase();
-    const matches: Array<{ model: Model; provider: Provider }> = [];
-    availableModels.forEach((model) => {
-      const provider = providers.find((p) => p.id === model.providerId);
-      if (
-        provider &&
-        (model.name.toLowerCase().includes(searchLower) ||
-          provider.name.toLowerCase().includes(searchLower))
-      ) {
-        matches.push({ model, provider: { ...provider } });
-      }
-    });
-    setFilteredModels(matches);
+    setFilteredModels(getMatchingModels(searchTerm, availableModels, providers));
   };
 
   const handleToggleModelSelection = (modelId: string, providerId: string) => {
     const key = `${providerId}|${modelId}`;
-    const newSelection = new Set(selectedModels);
-    if (newSelection.has(key)) {
-      newSelection.delete(key);
-    } else {
-      newSelection.add(key);
-    }
-    setSelectedModels(newSelection);
+    setSelectedModels((prev) => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(key)) {
+        newSelection.delete(key);
+      } else {
+        newSelection.add(key);
+      }
+      return newSelection;
+    });
   };
 
   const handleAddSelectedModels = () => {
@@ -147,24 +170,28 @@ export function AutoAddModal({
                       }
                       onChange={(e) => {
                         if (e.target.checked) {
-                          const newSelection = new Set(selectedModels);
-                          filteredModels.forEach((m) => {
-                            const key = `${m.provider.id}|${m.model.id}`;
-                            if (
-                              !group0Targets.some(
-                                (t: any) => t.provider === m.provider.id && t.model === m.model.id
-                              )
-                            ) {
-                              newSelection.add(key);
-                            }
+                          setSelectedModels((prev) => {
+                            const newSelection = new Set(prev);
+                            filteredModels.forEach((m) => {
+                              const key = `${m.provider.id}|${m.model.id}`;
+                              if (
+                                !group0Targets.some(
+                                  (t: any) => t.provider === m.provider.id && t.model === m.model.id
+                                )
+                              ) {
+                                newSelection.add(key);
+                              }
+                            });
+                            return newSelection;
                           });
-                          setSelectedModels(newSelection);
                         } else {
-                          const newSelection = new Set(selectedModels);
-                          filteredModels.forEach((m) => {
-                            newSelection.delete(`${m.provider.id}|${m.model.id}`);
+                          setSelectedModels((prev) => {
+                            const newSelection = new Set(prev);
+                            filteredModels.forEach((m) => {
+                              newSelection.delete(`${m.provider.id}|${m.model.id}`);
+                            });
+                            return newSelection;
                           });
-                          setSelectedModels(newSelection);
                         }
                       }}
                     />

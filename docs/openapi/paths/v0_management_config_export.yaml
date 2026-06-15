@@ -1,32 +1,29 @@
 get:
   tags:
     - Management — Config
-  summary: Export the configuration as YAML (admin only)
+  summary: Export the configuration as JSON (admin only)
   description: |
-    Exports the full configuration as YAML — the same format used in
-    the database.
+    Exports the persisted configuration graph as JSON.
 
-    ## JSON vs YAML
+    ## JSON endpoints
 
     - **`GET /v0/management/config`** — Returns configuration as JSON
-    - **This endpoint** — Returns configuration as YAML (same as on disk)
+    - **This endpoint** — Returns an export-friendly JSON object
 
-    Both contain the same data; the YAML form is suitable for saving
-    back to the config file.
+    This endpoint is useful for programmatic export/backup flows. It does not
+    return YAML and Plexus no longer relies on an on-disk YAML source of truth.
 
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
     '200':
-      description: YAML export.
+      description: JSON export.
       content:
-        application/x-yaml:
+        application/json:
           schema:
-            type: string
-        text/yaml:
-          schema:
-            type: string
+            type: object
+            additionalProperties: true
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0ManagementConfigExport

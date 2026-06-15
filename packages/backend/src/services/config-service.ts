@@ -10,9 +10,12 @@ import type {
   FailoverPolicy,
   CooldownPolicy,
   QuotaConfig,
+  TimeoutConfig,
+  StallConfigType,
 } from '../config';
-import { VALID_QUOTA_CHECKER_TYPES } from '../config';
+
 import { QuotaScheduler } from './quota/quota-scheduler';
+import { ModelAutosyncScheduler } from './model-autosync-scheduler';
 
 /**
  * ConfigService — In-memory cache + DB sync.
@@ -28,6 +31,15 @@ export class ConfigService {
 
   private cache: PlexusConfig | null = null;
   private repo: ConfigRepository;
+
+  /** Number of writes issued since the last rebuild; used for coalescing. */
+  private pendingWrites = 0;
+  /** Active timer for a deferred rebuild. */
+  private coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Promise for an in-flight rebuild so parallel callers can wait on it. */
+  private rebuildPromise: Promise<void> | null = null;
+  /** Delay (ms) before a coalesced rebuild fires. */
+  private readonly COALESCE_MS = 100;
 
   constructor(repo?: ConfigRepository) {
     this.repo = repo ?? new ConfigRepository();
@@ -63,7 +75,7 @@ export class ConfigService {
    * Must be called once during startup, after DB is initialized.
    */
   async initialize(): Promise<void> {
-    await this.rebuildCache();
+    await this.executeRebuild();
     logger.debug('ConfigService initialized from database');
   }
 
@@ -80,7 +92,7 @@ export class ConfigService {
       logger.info(
         `Migrated ${migrated.length} legacy aliases to target groups: ${migrated.join(', ')}`
       );
-      await this.rebuildCache();
+      await this.executeRebuild();
     }
     return migrated;
   }
@@ -107,29 +119,34 @@ export class ConfigService {
 
   async saveProvider(slug: string, config: ProviderConfig): Promise<void> {
     await this.repo.saveProvider(slug, config);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async deleteProvider(slug: string, cascade: boolean = true): Promise<void> {
     await this.repo.deleteProvider(slug, cascade);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   // ─── Alias CRUD ──────────────────────────────────────────────────
 
   async saveAlias(slug: string, config: ModelConfig): Promise<void> {
     await this.repo.saveAlias(slug, config);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async deleteAlias(slug: string): Promise<void> {
     await this.repo.deleteAlias(slug);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async deleteAllAliases(): Promise<number> {
     const count = await this.repo.deleteAllAliases();
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
     return count;
   }
 
@@ -137,48 +154,56 @@ export class ConfigService {
 
   async saveKey(name: string, config: KeyConfig): Promise<void> {
     await this.repo.saveKey(name, config);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async deleteKey(name: string): Promise<void> {
     await this.repo.deleteKey(name);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   // ─── User Quota CRUD ─────────────────────────────────────────────
 
   async saveUserQuota(name: string, quota: QuotaDefinition): Promise<void> {
     await this.repo.saveUserQuota(name, quota);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async deleteUserQuota(name: string): Promise<void> {
     await this.repo.deleteUserQuota(name);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   // ─── MCP Server CRUD ─────────────────────────────────────────────
 
   async saveMcpServer(name: string, config: McpServerConfig): Promise<void> {
     await this.repo.saveMcpServer(name, config);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async deleteMcpServer(name: string): Promise<void> {
     await this.repo.deleteMcpServer(name);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   // ─── Settings ─────────────────────────────────────────────────────
 
   async setSetting(key: string, value: unknown): Promise<void> {
     await this.repo.setSetting(key, value);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async setSettingsBulk(entries: Record<string, unknown>): Promise<void> {
     await this.repo.setSettingsBulk(entries);
-    await this.rebuildCache();
+    this.pendingWrites++;
+    this.rebuildCache();
   }
 
   async getSetting<T>(key: string, defaultValue: T): Promise<T> {
@@ -268,12 +293,83 @@ export class ConfigService {
     };
   }
 
+  // ─── Write Coalescing & Cache Flush ─────────────────────────────
+
+  /**
+   * Force an immediate, synchronous cache rebuild.
+   * Cancels any pending coalesced rebuild and waits for an in-flight one.
+   * Useful in tests or operations that need immediate consistency.
+   */
+  async flush(): Promise<void> {
+    if (this.coalesceTimer) {
+      clearTimeout(this.coalesceTimer);
+      this.coalesceTimer = null;
+    }
+    if (this.rebuildPromise) {
+      await this.rebuildPromise;
+    }
+    this.pendingWrites = 0;
+    await this.executeRebuild();
+  }
+
   // ─── Internal ────────────────────────────────────────────────────
 
   /**
-   * Rebuild the in-memory cache from the database.
+   * Schedule a cache rebuild, coalescing rapid successive calls.
+   * If pending writes are present the rebuild is deferred; only the
+   * final call in a burst actually hits the database.
    */
-  private async rebuildCache(): Promise<void> {
+  private rebuildCache(): void {
+    if (this.coalesceTimer) {
+      clearTimeout(this.coalesceTimer);
+      this.coalesceTimer = null;
+    }
+
+    if (this.pendingWrites > 0) {
+      this.coalesceTimer = setTimeout(() => {
+        this.pendingWrites = 0;
+        this.rebuildCache();
+      }, this.COALESCE_MS);
+      return;
+    }
+
+    if (this.rebuildPromise) {
+      this.coalesceTimer = setTimeout(() => this.rebuildCache(), this.COALESCE_MS);
+      return;
+    }
+
+    const promise = this.executeRebuild();
+    this.rebuildPromise = promise;
+    promise.finally(() => {
+      if (this.rebuildPromise === promise) {
+        this.rebuildPromise = null;
+      }
+    });
+  }
+
+  /**
+   * Execute the actual cache rebuild. Guarantees that only one rebuild
+   * runs concurrently; duplicate callers receive the in-flight promise.
+   */
+  private async executeRebuild(): Promise<void> {
+    if (this.rebuildPromise) {
+      return this.rebuildPromise;
+    }
+    const promise = this.doRebuild();
+    this.rebuildPromise = promise;
+    try {
+      await promise;
+    } finally {
+      if (this.rebuildPromise === promise) {
+        this.rebuildPromise = null;
+      }
+    }
+  }
+
+  /**
+   * Core rebuild logic — loads the full config graph from the database.
+   */
+  private async doRebuild(): Promise<void> {
     const providers = await this.repo.getAllProviders();
     const models = await this.repo.getAllAliases();
     const keys = await this.repo.getAllKeys();
@@ -281,6 +377,9 @@ export class ConfigService {
     const mcpServers = await this.repo.getAllMcpServers();
     const failover = await this.repo.getFailoverPolicy();
     const cooldown = await this.repo.getCooldownPolicy();
+    const backgroundExploration = await this.repo.getBackgroundExplorationConfig();
+    const timeout = await this.repo.getTimeoutConfig();
+    const stall = await this.repo.getStallConfig();
     const allSettings = await this.repo.getAllSettings();
 
     // Spread all flat settings (non-dotted keys) onto the cache so new settings
@@ -299,6 +398,9 @@ export class ConfigService {
       keys,
       failover,
       cooldown,
+      timeout,
+      stall: Object.values(stall).some((v) => v !== null && v !== undefined) ? stall : undefined,
+      backgroundExploration,
       quotas,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       mcp_servers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
@@ -307,13 +409,24 @@ export class ConfigService {
 
     // Reload the quota scheduler with the updated quota configs so that
     // changes saved via the UI take effect without a restart.
-    // Only reload if the scheduler has already been initialized (has checkers registered);
+    // Only reload if the scheduler has already been initialized;
     // on startup, index.ts calls quotaScheduler.initialize() explicitly after this.
     const scheduler = QuotaScheduler.getInstance();
-    if (scheduler.getCheckerIds().length > 0) {
+    if (scheduler.isInitialized()) {
       scheduler.reload(quotas).catch((err) => {
         logger.warn(`Failed to reload QuotaScheduler after config change: ${err}`);
       });
+    }
+
+    const modelAutosyncScheduler = ModelAutosyncScheduler.getInstance();
+    const onModelsChanged = () => {
+      this.pendingWrites++;
+      this.rebuildCache();
+    };
+    if (modelAutosyncScheduler.isInitialized()) {
+      modelAutosyncScheduler.reload(providers, onModelsChanged);
+    } else {
+      modelAutosyncScheduler.initialize(providers, onModelsChanged);
     }
   }
 

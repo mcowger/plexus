@@ -7,12 +7,14 @@ import { calculateCosts } from '../../utils/calculate-costs';
 import { DebugManager } from '../debug-manager';
 import { estimateTokensFromReconstructed, estimateInputTokens } from '../../utils/estimate-tokens';
 import {
+  normalizeAnthropicUsage,
   normalizeGeminiUsage,
   normalizeOpenAIChatUsage,
   normalizeOpenAIResponsesUsage,
+  extractUsageCostDetails,
 } from '../../utils/usage-normalizer';
 import { estimateKwhUsed } from '../inference-energy';
-import { applyProviderReportedCost } from '../../utils/provider-cost';
+import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
 import { DEFAULT_MODEL, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import { recordQuotaUsage } from '../quota/quota-middleware';
 
@@ -29,6 +31,7 @@ export class UsageInspector extends PassThrough {
   private firstChunk = true;
   private quotaEnforcer?: any;
   private keyName?: string;
+  private _flushed = false;
 
   private modelParams: ModelParams;
   private gpuParams: GpuParams;
@@ -75,6 +78,7 @@ export class UsageInspector extends PassThrough {
   }
 
   override _flush(callback: Function) {
+    this._flushed = true;
     const stats = {
       inputTokens: 0,
       outputTokens: 0,
@@ -145,6 +149,24 @@ export class UsageInspector extends PassThrough {
       // Some providers emit `: cost {"request_cost_usd": ...}` as SSE comments
       if (reconstructed?.providerReportedCost) {
         applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
+        if (reconstructed?.usage) {
+          const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+          if (usageCostDetails) {
+            logger.debug(
+              `[ProviderCost] Both SSE :cost and usage.cost_details present for ${this.usageRecord.requestId}; ` +
+                `SSE value ($${this.usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
+            );
+          }
+        }
+      }
+
+      // Override with provider-reported cost from usage.cost_details if available
+      // Some providers include detailed cost breakdowns in the usage block
+      if (!this.usageRecord.providerReportedCost && reconstructed?.usage) {
+        const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+        if (usageCostDetails) {
+          applyUsageCostDetails(this.usageRecord, usageCostDetails);
+        }
       }
 
       // Use provider-reported energy if available, otherwise estimate
@@ -220,6 +242,63 @@ export class UsageInspector extends PassThrough {
     }
   }
 
+  override _destroy(err: Error | null, callback: (error?: Error | null) => void) {
+    if (this._flushed) {
+      callback(err);
+      return;
+    }
+
+    const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('timeout');
+    const isStall = err?.message?.includes('stalled');
+    // If onDisconnect() already set the status to 'stall' or 'timeout' (e.g. when
+    // the abort signal carried a stall/timeout error), don't overwrite it with 'cancelled'.
+    const status =
+      this.usageRecord.responseStatus === 'stall' || this.usageRecord.responseStatus === 'timeout'
+        ? this.usageRecord.responseStatus
+        : isStall
+          ? 'stall'
+          : isTimeout
+            ? 'timeout'
+            : 'cancelled';
+
+    logger.info(
+      `UsageInspector: stream destroyed for ${this.usageRecord.requestId} ` +
+        `(responseStatus=${status}, err=${err?.message ?? 'none'})`
+    );
+
+    try {
+      this.usageRecord.responseStatus = status;
+      this.usageRecord.durationMs = Date.now() - this.startTime;
+
+      const debugManager = DebugManager.getInstance();
+      const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
+      if (reconstructed) {
+        const usage = this.extractUsageFromReconstructed(reconstructed, this.apiType);
+        if (usage) {
+          this.usageRecord.tokensInput = usage.inputTokens || null;
+          this.usageRecord.tokensOutput = usage.outputTokens || null;
+          this.usageRecord.tokensCached = usage.cachedTokens || null;
+          this.usageRecord.tokensCacheWrite = usage.cacheWriteTokens || null;
+          this.usageRecord.tokensReasoning = usage.reasoningTokens || null;
+        }
+        calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
+      }
+
+      this.usageStorage.saveRequest(this.usageRecord as UsageRecord).catch((saveErr) => {
+        logger.error(`Failed to save ${status} usage for ${this.usageRecord.requestId}:`, saveErr);
+      });
+
+      debugManager.flush(this.usageRecord.requestId!);
+    } catch (destroyErr) {
+      logger.error(
+        `Error in UsageInspector._destroy for ${this.usageRecord.requestId}:`,
+        destroyErr
+      );
+    }
+
+    callback(err);
+  }
+
   private extractUsageFromReconstructed(reconstructed: any, apiType: string): any {
     if (!reconstructed) return null;
 
@@ -249,15 +328,17 @@ export class UsageInspector extends PassThrough {
           };
         }
       case 'messages':
-        return reconstructed.usage
-          ? {
-              inputTokens: reconstructed.usage.input_tokens || 0,
-              outputTokens: reconstructed.usage.output_tokens || 0,
-              cachedTokens: reconstructed.usage.cache_read_input_tokens || 0,
-              cacheWriteTokens: reconstructed.usage.cache_creation_input_tokens || 0,
-              reasoningTokens: 0,
-            }
-          : null;
+        if (!reconstructed.usage) return null;
+        {
+          const usage = normalizeAnthropicUsage(reconstructed.usage);
+          return {
+            inputTokens: usage.input_tokens,
+            outputTokens: usage.output_tokens,
+            cachedTokens: usage.cached_tokens,
+            cacheWriteTokens: usage.cache_creation_tokens,
+            reasoningTokens: usage.reasoning_tokens,
+          };
+        }
       case 'gemini':
         if (!reconstructed.usageMetadata) return null;
         {

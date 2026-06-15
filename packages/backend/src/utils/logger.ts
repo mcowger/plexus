@@ -7,14 +7,35 @@ const { combine, timestamp, printf, colorize, splat, json } = winston.format;
 
 export const SUPPORTED_LOG_LEVELS = ['error', 'warn', 'info', 'debug', 'verbose', 'silly'] as const;
 export type LogLevel = (typeof SUPPORTED_LOG_LEVELS)[number];
+const RECENT_LOG_BUFFER_SIZE = 1000;
 
 // Event emitter for streaming logs
 export const logEmitter = new EventEmitter();
+const recentLogs: any[] = [];
+
+function appendRecentLog(info: any): void {
+  recentLogs.push(info);
+  if (recentLogs.length > RECENT_LOG_BUFFER_SIZE) {
+    recentLogs.shift();
+  }
+}
+
+export const getRecentLogs = (limit: number = 100): any[] => {
+  const safeLimit = Math.max(1, Math.min(limit, RECENT_LOG_BUFFER_SIZE));
+  return recentLogs.slice(-safeLimit).reverse();
+};
+
+export const getRecentLogCount = (): number => recentLogs.length;
+
+export const clearRecentLogsForTesting = (): void => {
+  recentLogs.length = 0;
+};
 
 // Custom transport to emit logs
 export class StreamTransport extends Transport {
   override log(info: any, callback: () => void) {
     setImmediate(() => {
+      appendRecentLog(info);
       logEmitter.emit('log', info);
     });
     callback();

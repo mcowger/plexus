@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { BookOpen, ChevronDown, ChevronRight, CheckCircle, X, Loader2 } from 'lucide-react';
 import { Input } from '../ui/Input';
@@ -6,7 +6,14 @@ import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
 import { MetadataOverrideForm } from './MetadataOverrideForm';
 import { useMetadataEditor } from '../../hooks/useMetadataEditor';
-import type { Alias, AliasMetadata, MetadataSource, MetadataOverrides } from '../../lib/api';
+import { api } from '../../lib/api';
+import type {
+  Alias,
+  AliasMetadata,
+  MetadataSource,
+  MetadataOverrides,
+  PreferredApiValue,
+} from '../../lib/api';
 
 interface Props {
   editingAlias: Alias;
@@ -38,6 +45,33 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
     populateOverridesFromCatalog,
     buildCustomDefaults,
   } = useMetadataEditor(editingAlias, setEditingAlias, isModalOpen);
+
+  // ── Pi model selector state ──────────────────────────────────────────
+  const [piProviders, setPiProviders] = useState<string[]>([]);
+  const [piModels, setPiModels] = useState<Array<{ id: string; name: string; api: string }>>([]);
+  const [piModelsLoading, setPiModelsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api
+      .getPiProviders()
+      .then(setPiProviders)
+      .catch(() => {});
+  }, [isOpen]);
+
+  useEffect(() => {
+    const provider = editingAlias.pi_model?.provider;
+    if (!provider) {
+      setPiModels([]);
+      return;
+    }
+    setPiModelsLoading(true);
+    api
+      .getPiModels(provider)
+      .then(setPiModels)
+      .catch(() => setPiModels([]))
+      .finally(() => setPiModelsLoading(false));
+  }, [editingAlias.pi_model?.provider]);
 
   return (
     <>
@@ -265,6 +299,166 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   </div>
                 </div>
               )}
+
+            {/* Pi model */}
+            <div>
+              <label
+                className="font-body text-[12px] font-medium text-text-secondary"
+                style={{ display: 'block', marginBottom: '4px' }}
+              >
+                Pi model
+              </label>
+              <p className="font-body text-[11px] text-text-muted" style={{ marginBottom: '6px' }}>
+                Link to a pi-ai model to include its compatibility options as{' '}
+                <code className="text-primary">pi_options</code> in{' '}
+                <code className="text-primary">GET /v1/models</code>.
+              </p>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {/* Provider dropdown */}
+                <select
+                  className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                  style={{
+                    padding: '5px 8px',
+                    height: '30px',
+                    flex: '0 0 auto',
+                    maxWidth: '160px',
+                  }}
+                  value={editingAlias.pi_model?.provider ?? ''}
+                  onChange={(e) => {
+                    const provider = e.target.value;
+                    if (!provider) {
+                      const { pi_model: _removed, ...rest } = editingAlias;
+                      setEditingAlias(rest as Alias);
+                    } else {
+                      setEditingAlias({ ...editingAlias, pi_model: { provider, model_id: '' } });
+                    }
+                  }}
+                >
+                  <option value="">None</option>
+                  {piProviders.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Model dropdown */}
+                {editingAlias.pi_model?.provider && (
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <select
+                      className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                      style={{
+                        padding: '5px 8px',
+                        height: '30px',
+                        paddingRight: piModelsLoading ? '28px' : undefined,
+                      }}
+                      value={editingAlias.pi_model?.model_id ?? ''}
+                      onChange={(e) => {
+                        const model_id = e.target.value;
+                        setEditingAlias({
+                          ...editingAlias,
+                          pi_model: { provider: editingAlias.pi_model!.provider, model_id },
+                        });
+                      }}
+                    >
+                      <option value="">Select model...</option>
+                      {piModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.id})
+                        </option>
+                      ))}
+                    </select>
+                    {piModelsLoading && (
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-text-muted"
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Clear pi model */}
+                {editingAlias.pi_model?.model_id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const { pi_model: _removed, ...rest } = editingAlias;
+                      setEditingAlias(rest as Alias);
+                    }}
+                    style={{
+                      color: 'var(--color-danger)',
+                      padding: '4px',
+                      minHeight: 'auto',
+                      flex: '0 0 auto',
+                    }}
+                    title="Remove pi model"
+                  >
+                    <X size={14} />
+                  </Button>
+                )}
+              </div>
+
+              {/* Confirmation badge */}
+              {editingAlias.pi_model?.model_id && (
+                <div
+                  className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--color-text-secondary)',
+                    marginTop: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle size={12} className="text-success" />
+                    <span>
+                      Pi model: <strong>{editingAlias.pi_model.provider}</strong>
+                      {' / '}
+                      <code className="text-primary">{editingAlias.pi_model.model_id}</code>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Preferred API */}
+            <div>
+              <label
+                className="font-body text-[12px] font-medium text-text-secondary"
+                style={{ display: 'block', marginBottom: '4px' }}
+              >
+                Preferred API
+              </label>
+              <p className="font-body text-[11px] text-text-muted" style={{ marginBottom: '6px' }}>
+                Advertised in <code className="text-primary">/v1/models</code> to inform clients of
+                the recommended API surface for this alias.
+              </p>
+              <select
+                className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                style={{ padding: '5px 8px', height: '30px' }}
+                value={(editingAlias.preferred_api ?? [])[0] ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value as PreferredApiValue | '';
+                  setEditingAlias({
+                    ...editingAlias,
+                    preferred_api: val ? [val] : undefined,
+                  });
+                }}
+              >
+                <option value="">None</option>
+                <option value="chat_completions">Chat Completions (/v1/chat/completions)</option>
+                <option value="messages">Messages (/v1/messages)</option>
+                <option value="gemini">Gemini (Google Gemini API)</option>
+                <option value="responses">Responses (/v1/responses)</option>
+              </select>
+            </div>
 
             {/* Override toggle + editable form */}
             {editingAlias.metadata && (

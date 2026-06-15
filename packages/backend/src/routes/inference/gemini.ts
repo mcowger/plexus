@@ -10,6 +10,10 @@ import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware } from '../../services/quota/quota-middleware';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
+import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { handleBetaGeminiRequest } from '../../inference-v2';
 
 export async function registerGeminiRoute(
   fastify: FastifyInstance,
@@ -23,6 +27,16 @@ export async function registerGeminiRoute(
    * Supports both unary and streamGenerateContent actions.
    */
   fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
+    if ((request as any).keyConfig?.beta === true) {
+      const modelWithAction = (request.params as any).modelWithAction as string;
+      return handleBetaGeminiRequest(
+        request,
+        reply,
+        modelWithAction.includes('streamGenerateContent'),
+        { usageStorage, quotaEnforcer }
+      );
+    }
+
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();
@@ -39,6 +53,7 @@ export async function registerGeminiRoute(
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
     usageStorage.emitStartedAsync(usageRecord);
 
+    let earlyDisconnect: ReturnType<typeof wireEarlyDisconnectDetection> | undefined;
     try {
       const body = request.body as any;
       const params = request.params as any;
@@ -82,7 +97,7 @@ export async function registerGeminiRoute(
         };
       }
 
-      DebugManager.getInstance().startLog(requestId, body);
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       // Check quota before processing
       if (quotaEnforcer) {
@@ -94,7 +109,16 @@ export async function registerGeminiRoute(
         unifiedRequest.stream = true;
       }
 
-      const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+      const abortController = new AbortController();
+      const { signal: dispatchSignal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
+      earlyDisconnect = wireEarlyDisconnectDetection(request, abortController);
+      const stallDetectionResult = wireStallDetection(abortController, getGlobalStallConfig());
+      const unifiedResponse = await dispatcher.dispatch(
+        unifiedRequest,
+        dispatchSignal,
+        resolveTimeoutMs,
+        stallDetectionResult?.addStallConfig
+      );
 
       // Emit 'updated' event with routing decision details
       usageStorage.emitUpdatedAsync({
@@ -125,12 +149,29 @@ export async function registerGeminiRoute(
         shouldEstimateTokens,
         body,
         quotaEnforcer,
-        (request as any).keyName
+        (request as any).keyName,
+        abortController,
+        stallDetectionResult
       );
 
+      earlyDisconnect?.cleanup();
       return result;
     } catch (e: any) {
-      usageRecord.responseStatus = 'error';
+      earlyDisconnect?.cleanup();
+      if (e?.routingContext?.code === 'client_disconnected') {
+        usageRecord.responseStatus = 'cancelled';
+        usageRecord.durationMs = Date.now() - startTime;
+        usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
+        usageRecord.retryHistory =
+          e.routingContext?.retryHistory || usageRecord.retryHistory || null;
+        usageStorage.saveRequest(usageRecord as UsageRecord);
+        logger.info(
+          `Request ${requestId}: ${e.message}, usage recorded as ${e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'cancelled'}`
+        );
+        return;
+      }
+      usageRecord.responseStatus =
+        e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'error';
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
       usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;

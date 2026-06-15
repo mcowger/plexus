@@ -10,11 +10,14 @@ import { DebugLoggingInspector, UsageInspector } from './inspectors';
 import { Readable } from 'stream';
 import { DebugManager } from './debug-manager';
 import { estimateKwhUsed } from './inference-energy';
-import { applyProviderReportedCost } from '../utils/provider-cost';
+import { applyProviderReportedCost, applyUsageCostDetails } from '../utils/provider-cost';
+import { extractUsageCostDetails } from '../utils/usage-normalizer';
+import { StallInspector, type StallConfig } from './inspectors/stall-inspector';
 import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { recordQuotaUsage } from '../services/quota/quota-middleware';
+import { CooldownManager } from './cooldown-manager';
 /**
  * handleResponse
  *
@@ -36,7 +39,18 @@ export async function handleResponse(
   shouldEstimateTokens: boolean = false,
   originalRequest?: any,
   quotaEnforcer?: QuotaEnforcer,
-  keyName?: string
+  keyName?: string,
+  abortController?: AbortController,
+  stallDetectionResult?: {
+    stallInspector: StallInspector;
+    addStallConfig: (providerOverrides: {
+      stallTtfbMs?: number | null;
+      stallTtfbBytes?: number | null;
+      stallMinBps?: number | null;
+      stallWindowMs?: number | null;
+      stallGracePeriodMs?: number | null;
+    }) => void;
+  } | null
 ) {
   // Populate usage record with metadata from the dispatcher's selection
   usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
@@ -181,19 +195,232 @@ export async function handleResponse(
     // Convert Web Stream to Node Stream for piping
     const nodeStream = Readable.fromWeb(finalClientStream as any);
 
-    // Pipeline: Source -> Usage -> Client
-    // rawLogInspector is already tapped via the TransformStream above
-    const pipeline = nodeStream.pipe(usageInspector);
+    // Insert StallInspector into the pipeline if stall detection is active
+    const stallInspector = stallDetectionResult?.stallInspector ?? null;
+    if (stallInspector) {
+      stallInspector.setRequestId(usageRecord.requestId!);
+      usageStorage.registerInFlight(
+        usageRecord.requestId!,
+        stallInspector,
+        (usageRecord.apiKey as string | null) ?? null
+      );
+    }
 
-    // Restore debug mode state when the stream ends (not before!)
+    // Pipeline: Source -> StallInspector (if active) -> Usage -> Client
+    const pipeline = stallInspector
+      ? nodeStream.pipe(stallInspector).pipe(usageInspector)
+      : nodeStream.pipe(usageInspector);
+
+    // =============================================================================
+    // CLIENT DISCONNECT DETECTION & UPSTREAM CANCELLATION
+    // =============================================================================
+    //
+    // BACKGROUND — WHY THIS IS HARD ON BUN
+    // -------------------------------------
+    // Detecting client disconnects in Bun's node:http compatibility layer (which
+    // Fastify uses) is deeply broken for streaming POST responses as of Bun 1.3.14.
+    // We investigated every standard Node.js mechanism exhaustively:
+    //
+    //   ✗  request.raw.once('close', ...)  — fires immediately when the POST body
+    //        is consumed (a few ms after the request arrives), NOT on client disconnect.
+    //        Fastify's own onRequestAbort hook uses this + req.aborted, which is why
+    //        Fastify's abort detection also doesn't work here.
+    //
+    //   ✗  socket.once('close', ...)  — never fires at all for POST requests when
+    //        the client disconnects. (Bun open issue #14697: ServerResponse doesn't
+    //        emit close event.)
+    //
+    //   ✗  socket.destroyed  — stays false indefinitely even after the client is gone.
+    //
+    //   ✗  res.write() EPIPE  — Bun silently swallows write failures; writes appear
+    //        to succeed even when the client TCP connection is long dead. No EPIPE,
+    //        no ECONNRESET, nothing. (Confirmed in Bun issue #25919, still reproducible
+    //        on Bun 1.3.14 for the streaming proxy case.)
+    //
+    //   ✗  reply.raw.destroyed  — undefined (property doesn't exist on Bun's
+    //        ServerResponse implementation).
+    //
+    // For reference, Bun.serve() (the native HTTP server) DOES correctly fire
+    // request.signal abort on disconnect. But Fastify runs on node:http, not
+    // Bun.serve(), so we can't use that here without a much larger refactor.
+    //
+    // THE SOLUTION — bunHandle.closed
+    // --------------------------------
+    // Bun's Node.js Socket wraps an internal Bun TCP socket handle. It is stored
+    // under Symbol(handle) on the Socket object. This handle has a .closed boolean
+    // property that transitions false → true when the underlying TCP connection
+    // closes, even when all the Node.js-layer signals above are broken.
+    //
+    // Discovery: we enumerated Object.getOwnPropertySymbols() on the Socket at
+    // runtime, found Symbol(handle), and verified with polling tests that its
+    // .closed property updates correctly within ~250ms of a client disconnect.
+    //
+    // If Bun ever fixes the node:http disconnect signals, we can simplify this.
+    // Track: https://github.com/oven-sh/bun/issues/25919
+    //        https://github.com/oven-sh/bun/issues/14697
+    //
+    // CANCELLATION CHAIN — WHY nodeStream.destroy() IS REQUIRED
+    // -----------------------------------------------------------
+    // The stream pipeline is:
+    //
+    //   fetch response body  (Web ReadableStream)
+    //       ↓  Readable.fromWeb()
+    //   nodeStream           (Node.js Readable)
+    //       ↓  .pipe()
+    //   pipeline / usageInspector  (Node.js Transform/Writable)
+    //       ↓  reply.send()
+    //   HTTP response to client
+    //
+    // When a client disconnects, we need to cancel the upstream fetch so we stop
+    // consuming tokens and burning API quota. Simply calling pipeline.destroy()
+    // (the downstream end) does NOT propagate cancel() back through Readable.fromWeb()
+    // to the underlying Web ReadableStream — the upstream fetch keeps running.
+    //
+    // Calling nodeStream.destroy() (the source Node Readable) DOES cause
+    // Readable.fromWeb() to call cancel() on the Web ReadableStream, which aborts
+    // the underlying fetch. We verified this with isolated test scripts.
+    //
+    // We also call abortController.abort() as belt-and-suspenders, since the fetch
+    // was initiated with that signal.
+    //
+    // TIMEOUT ABORTS HAVE THE SAME BUG
+    // ---------------------------------
+    // abortController.abort() alone (whether triggered by a timeout or anything else)
+    // also does NOT stop an already-in-progress Readable.fromWeb() read loop. The
+    // abort signal is consumed by fetch() at call time; aborting it afterwards has
+    // no effect on the streaming body read. nodeStream.destroy() is required in all
+    // cases. We wire abortController.signal's 'abort' event to onDisconnect() so
+    // that route-level timeout wiring automatically flows through the correct
+    // cancellation path with no further changes needed here. See test-timeout-*.ts.
+    // =============================================================================
+    let disconnected = false;
+    let disconnectPoll: ReturnType<typeof setInterval> | null = null;
+
+    const rawSocket = (request.raw as any)?.socket;
+    const symHandle = rawSocket
+      ? Object.getOwnPropertySymbols(rawSocket).find((s) => s.toString() === 'Symbol(handle)')
+      : undefined;
+    const bunHandle = symHandle ? (rawSocket as any)[symHandle] : null;
+
+    const onDisconnect = (source: string) => {
+      if (disconnected) return;
+      disconnected = true;
+      // Determine if this is a timeout by checking the source string OR the abort
+      // reason. When wireUpstreamTimeout fires, it calls abortController.abort(TimeoutError),
+      // so the signal listener fires with source='signal.abort' but the reason tells us
+      // it was a timeout.
+      const isTimeout =
+        source.includes('timeout') || abortController?.signal?.reason?.name === 'TimeoutError';
+      // Stall detection uses DOMException('TimeoutError') as the abort reason,
+      // but we check the reason message for 'stalled' to distinguish from absolute timeout.
+      const isStall =
+        source === 'stall' ||
+        (abortController?.signal?.reason?.name === 'TimeoutError' &&
+          abortController?.signal?.reason?.message?.includes('stalled'));
+      logger.debug(
+        `${isStall ? 'Stream stalled' : isTimeout ? 'Upstream timeout' : 'Client disconnected'} for request ${usageRecord.requestId} (detected via ${source}), aborting upstream`
+      );
+      const timeoutErr = isStall
+        ? new DOMException(
+            abortController?.signal?.reason?.message || 'Stream stalled',
+            'TimeoutError'
+          )
+        : isTimeout
+          ? new DOMException('The operation timed out.', 'TimeoutError')
+          : undefined;
+      abortController?.abort(timeoutErr);
+      // Set responseStatus before destroy so UsageInspector._destroy() sees it.
+      if (isStall) {
+        usageRecord.responseStatus = 'stall';
+        if (usageRecord.provider && usageRecord.selectedModelName) {
+          CooldownManager.getInstance().markProviderStallFailure(
+            usageRecord.provider,
+            usageRecord.selectedModelName,
+            abortController?.signal?.reason?.message || 'Stream stalled'
+          );
+        }
+      } else if (isTimeout) {
+        usageRecord.responseStatus = 'timeout';
+      }
+      // Destroy without passing the error — calling .destroy(err) causes Node.js to
+      // emit 'error' on the stream, which becomes an uncaught exception since
+      // these streams don't have error listeners. The cancellation still works:
+      // nodeStream.destroy() triggers Readable.fromWeb → cancel() on the upstream
+      // fetch body, and _destroy reads the status we already set on usageRecord.
+      nodeStream.destroy(); // cancels the upstream fetch via Readable.fromWeb → cancel()
+      pipeline.destroy();
+    };
+
+    if (abortController) {
+      // Wire the abort signal so that timeout aborts also trigger
+      // nodeStream.destroy(). abortController.abort() alone does NOT stop an
+      // already-in-progress Readable.fromWeb() read loop — the same root cause as
+      // the client-disconnect bug. This listener ensures any abort reason goes through
+      // the correct cancellation path. The timeout is wired via wireUpstreamTimeout()
+      // in the route handler, which calls abortController.abort() when the timeout
+      // fires so this listener detects it. The pipeline.on('error') handler also
+      // catches TimeoutErrors that propagate through the stream as a belt-and-suspenders.
+      // See test-timeout-signal-listener.ts and utils/timeout.ts.
+      abortController.signal.addEventListener('abort', () => onDisconnect('signal.abort'), {
+        once: true,
+      });
+
+      // Poll bunHandle.closed every 250ms — the only reliable client-disconnect
+      // signal available in Bun's node:http layer for POST requests (see above).
+      disconnectPoll = setInterval(() => {
+        if (bunHandle?.closed) onDisconnect('bunHandle.closed');
+        if (pipeline.destroyed || pipeline.readableEnded) {
+          if (disconnectPoll) {
+            clearInterval(disconnectPoll);
+            disconnectPoll = null;
+          }
+        }
+      }, 250);
+    }
+
+    const cleanupDisconnectWiring = () => {
+      if (disconnectPoll) {
+        clearInterval(disconnectPoll);
+        disconnectPoll = null;
+      }
+      if (stallInspector) {
+        usageStorage.deregisterInFlight(usageRecord.requestId!);
+      }
+    };
+
+    pipeline.once('end', cleanupDisconnectWiring);
+
+    pipeline.on('error', (err: any) => {
+      // Belt-and-suspenders: catch any write errors that do surface (e.g. if Bun
+      // ever fixes EPIPE propagation, or on non-Bun runtimes).
+      const code = err?.code;
+      const isTimeout =
+        err?.name === 'TimeoutError' ||
+        err?.name === 'AbortError' ||
+        err?.message?.includes('timeout') ||
+        err?.message?.includes('aborted');
+      if (
+        code === 'EPIPE' ||
+        code === 'ECONNRESET' ||
+        code === 'ERR_STREAM_DESTROYED' ||
+        isTimeout
+      ) {
+        onDisconnect(isTimeout ? 'pipeline.error.timeout' : 'pipeline.error.' + code);
+      }
+      cleanupDisconnectWiring(); // also deregisters stallInspector
+      // Restore debug mode on error
+      if (shouldEstimateTokens && !wasDebugEnabled) {
+        debugManager.setEnabled(false);
+      }
+    });
+
+    // Restore debug mode on normal end
     if (shouldEstimateTokens && !wasDebugEnabled) {
       pipeline.on('end', () => {
         debugManager.setEnabled(false);
       });
-      pipeline.on('error', () => {
-        debugManager.setEnabled(false);
-      });
     }
+    // --- end disconnect wiring ---
 
     usageRecord.responseStatus = 'success';
 
@@ -274,6 +501,23 @@ async function finalizeUsage(
   const reconstructed = debugManager.getReconstructedRawResponse(usageRecord.requestId!);
   if (reconstructed?.providerReportedCost) {
     applyProviderReportedCost(usageRecord, reconstructed.providerReportedCost);
+    if (reconstructed?.usage) {
+      const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+      if (usageCostDetails) {
+        logger.debug(
+          `[ProviderCost] Both SSE :cost and usage.cost_details present for ${usageRecord.requestId}; ` +
+            `SSE value ($${usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
+        );
+      }
+    }
+  }
+
+  // Also check for cost_details in the usage block (some providers embed costs there)
+  if (!usageRecord.providerReportedCost && reconstructed?.usage) {
+    const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+    if (usageCostDetails) {
+      applyUsageCostDetails(usageRecord, usageCostDetails);
+    }
   }
   usageRecord.responseStatus = 'success';
   usageRecord.durationMs = Date.now() - startTime;

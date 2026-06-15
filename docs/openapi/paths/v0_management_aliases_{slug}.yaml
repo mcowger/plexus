@@ -5,6 +5,31 @@ parameters:
     schema:
       type: string
     description: Alias slug (e.g. "gpt-4", "claude-3-opus").
+get:
+  tags:
+    - Management — Config
+  summary: Get a model alias by slug (admin only)
+  description: |
+    Returns a single model alias configuration by slug.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Alias configuration.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - type: object
+                properties:
+                  slug:
+                    type: string
+              - $ref: ../components/schemas/AliasConfig.yaml
+    '404':
+      description: Alias not found.
+  operationId: getV0ManagementAliasesByslug
 put:
   tags:
     - Management — Config

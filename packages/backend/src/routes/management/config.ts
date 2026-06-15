@@ -1,14 +1,16 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 import {
-  VALID_QUOTA_CHECKER_TYPES,
   ProviderConfigSchema,
   ModelConfigSchema,
   KeyConfigSchema,
   McpServerConfigSchema,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
+import { isValidIpRule } from '../../utils/ip-match';
+import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
+import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
 
@@ -198,6 +200,20 @@ export async function registerConfigRoutes(
     }
   });
 
+  // Using wildcard to support slugs containing '/' (e.g. "provider/model")
+  fastify.get('/v0/management/aliases/*', async (request, reply) => {
+    const slug = (request.params as { '*': string })['*'];
+    try {
+      const alias = await configService.getRepository().getAlias(slug);
+      if (!alias) {
+        return reply.code(404).send({ error: `Alias '${slug}' not found` });
+      }
+      return reply.send({ slug, ...alias });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // PUT — full create-or-replace with Zod validation
   // Using wildcard to support slugs containing '/' (e.g. "provider/model")
   fastify.put('/v0/management/aliases/*', async (request, reply) => {
@@ -295,6 +311,20 @@ export async function registerConfigRoutes(
     }
   });
 
+  fastify.get('/v0/management/keys/:name', async (request, reply) => {
+    const { name } = request.params as { name: string };
+    try {
+      const keys = await configService.getRepository().getAllKeys();
+      const key = keys[name];
+      if (!key) {
+        return reply.code(404).send({ error: `API key '${name}' not found` });
+      }
+      return reply.send({ name, ...key });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // PUT — full create-or-replace with Zod validation
   fastify.put('/v0/management/keys/:name', async (request, reply) => {
     const { name } = request.params as { name: string };
@@ -308,6 +338,33 @@ export async function registerConfigRoutes(
       return reply.send({ success: true, name });
     } catch (e: any) {
       logger.error(`Failed to save API key '${name}'`, e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/keys/:name', async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      const keys = await configService.getRepository().getAllKeys();
+      const existing = keys[name];
+      if (!existing) {
+        return reply.code(404).send({ error: `API key '${name}' not found` });
+      }
+      const merged = { ...existing, ...body };
+      const result = KeyConfigSchema.safeParse(merged);
+      if (!result.success) {
+        return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
+      }
+      await configService.saveKey(name, result.data);
+      logger.debug(`API key '${name}' updated via API (PATCH)`);
+      return reply.send({ success: true, name });
+    } catch (e: any) {
+      logger.error(`Failed to patch API key '${name}'`, e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
@@ -393,6 +450,46 @@ export async function registerConfigRoutes(
       return reply.send(updated);
     } catch (e: any) {
       logger.error('Failed to patch failover config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Trusted Proxies ──────────────────────────────────────────────
+  fastify.get('/v0/management/config/trusted-proxies', async (_request, reply) => {
+    try {
+      const trustedProxies = await configService.getRepository().getTrustedProxies();
+      return reply.send({ trustedProxies });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/trusted-proxies', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    const value = (body as { trustedProxies?: unknown }).trustedProxies;
+    if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+      return reply.code(400).send({ error: 'trustedProxies must be an array of strings' });
+    }
+
+    const normalized = (value as string[]).map((v) => v.trim()).filter(Boolean);
+    const invalid = normalized.find((entry) => !isValidIpRule(entry));
+    if (invalid) {
+      return reply.code(400).send({
+        error: `Invalid IP rule: ${invalid}. Use IPv4/IPv6, CIDR (a.b.c.d/n, ::/n), or a range (a.b.c.d-N or addr-addr).`,
+      });
+    }
+
+    try {
+      await configService.setSetting('trustedProxies', normalized);
+      const trustedProxies = await configService.getRepository().getTrustedProxies();
+      logger.debug('Trusted proxies updated via API');
+      return reply.send({ trustedProxies });
+    } catch (e: any) {
+      logger.error('Failed to patch trusted-proxies config', e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
@@ -530,6 +627,184 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── Background Exploration ──────────────────────────────────────
+
+  fastify.get('/v0/management/config/background-exploration', async (_request, reply) => {
+    try {
+      const cfg = await configService.getRepository().getBackgroundExplorationConfig();
+      return reply.send(cfg);
+    } catch (e: any) {
+      logger.error('Failed to read background-exploration config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/background-exploration', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      if (body.enabled !== undefined) {
+        if (typeof body.enabled !== 'boolean') {
+          return reply.code(400).send({ error: 'enabled must be a boolean' });
+        }
+        await configService.setSetting('backgroundExploration.enabled', body.enabled);
+      }
+      if (body.stalenessThresholdSeconds !== undefined) {
+        const val = Number(body.stalenessThresholdSeconds);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1) {
+          return reply
+            .code(400)
+            .send({ error: 'stalenessThresholdSeconds must be an integer >= 1' });
+        }
+        await configService.setSetting('backgroundExploration.stalenessThresholdSeconds', val);
+      }
+      if (body.workerConcurrency !== undefined) {
+        const val = Number(body.workerConcurrency);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1 || val > 16) {
+          return reply
+            .code(400)
+            .send({ error: 'workerConcurrency must be an integer between 1 and 16' });
+        }
+        await configService.setSetting('backgroundExploration.workerConcurrency', val);
+      }
+
+      const updated = await configService.getRepository().getBackgroundExplorationConfig();
+      logger.debug('Background exploration config updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch background-exploration config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Timeout Config ───────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/timeout', async (_request, reply) => {
+    try {
+      const timeout = await configService.getRepository().getTimeoutConfig();
+      return reply.send(timeout);
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/timeout', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      if (body.defaultSeconds !== undefined) {
+        const val = Number(body.defaultSeconds);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1 || val > 3600) {
+          return reply
+            .code(400)
+            .send({ error: 'defaultSeconds must be an integer between 1 and 3600' });
+        }
+        await configService.setSetting('timeout.defaultSeconds', val);
+      }
+
+      const updated = await configService.getRepository().getTimeoutConfig();
+      logger.debug('Timeout config updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch timeout config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Stall Config ──────────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/stall', async (_request, reply) => {
+    try {
+      const stall = await configService.getRepository().getStallConfig();
+      return reply.send(stall);
+    } catch (e: any) {
+      logger.error('Failed to read stall config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/stall', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    try {
+      if (body.ttfbSeconds !== undefined) {
+        if (body.ttfbSeconds === null) {
+          await configService.setSetting('stall.ttfbSeconds', null);
+        } else {
+          const val = Number(body.ttfbSeconds);
+          if (!Number.isFinite(val) || val < 5 || val > 120) {
+            return reply
+              .code(400)
+              .send({ error: 'ttfbSeconds must be null or a number between 5 and 120' });
+          }
+          await configService.setSetting('stall.ttfbSeconds', val);
+        }
+      }
+      if (body.ttfbBytes !== undefined) {
+        const val = Number(body.ttfbBytes);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 50 || val > 10000) {
+          return reply
+            .code(400)
+            .send({ error: 'ttfbBytes must be an integer between 50 and 10000' });
+        }
+        await configService.setSetting('stall.ttfbBytes', val);
+      }
+      if (body.minBytesPerSecond !== undefined) {
+        if (body.minBytesPerSecond === null) {
+          await configService.setSetting('stall.minBytesPerSecond', null);
+        } else {
+          const val = Number(body.minBytesPerSecond);
+          if (!Number.isFinite(val) || !Number.isInteger(val) || val < 50 || val > 5000) {
+            return reply
+              .code(400)
+              .send({ error: 'minBytesPerSecond must be null or an integer between 50 and 5000' });
+          }
+          await configService.setSetting('stall.minBytesPerSecond', val);
+        }
+      }
+      if (body.windowSeconds !== undefined) {
+        const val = Number(body.windowSeconds);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 3 || val > 30) {
+          return reply
+            .code(400)
+            .send({ error: 'windowSeconds must be an integer between 3 and 30' });
+        }
+        await configService.setSetting('stall.windowSeconds', val);
+      }
+      if (body.gracePeriodSeconds !== undefined) {
+        const val = Number(body.gracePeriodSeconds);
+        if (!Number.isFinite(val) || !Number.isInteger(val) || val < 0 || val > 120) {
+          return reply
+            .code(400)
+            .send({ error: 'gracePeriodSeconds must be an integer between 0 and 120' });
+        }
+        await configService.setSetting('stall.gracePeriodSeconds', val);
+      }
+      if (body.stallCooldown !== undefined) {
+        if (typeof body.stallCooldown !== 'boolean') {
+          return reply.code(400).send({ error: 'stallCooldown must be a boolean' });
+        }
+        await configService.setSetting('stall.stallCooldown', body.stallCooldown);
+      }
+
+      const updated = await configService.getRepository().getStallConfig();
+      logger.debug('Stall config updated via API');
+      return reply.send(updated);
+    } catch (e: any) {
+      logger.error('Failed to patch stall config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Vision Fallthrough ───────────────────────────────────────────
 
   fastify.get('/v0/management/config/vision-fallthrough', async (_request, reply) => {
@@ -568,13 +843,28 @@ export async function registerConfigRoutes(
     }
   });
 
+  fastify.get('/v0/management/mcp-servers/:serverName', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+
+    try {
+      const servers = await configService.getRepository().getAllMcpServers();
+      const server = servers[serverName];
+      if (!server) {
+        return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+      }
+      return reply.send({ name: serverName, ...server });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   fastify.put('/v0/management/mcp-servers/:serverName', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
 
-    if (!/^[a-z0-9][a-z0-9-_]{1,62}$/.test(serverName)) {
+    if (!validateServerName(serverName)) {
       return reply.code(400).send({
         error:
-          'Invalid server name. Must be a slug (lowercase letters, numbers, hyphens, underscores, 2-63 characters)',
+          'Invalid server name. Must be a non-reserved slug (lowercase letters, numbers, hyphens, underscores, 2-63 characters)',
       });
     }
 
@@ -593,6 +883,40 @@ export async function registerConfigRoutes(
     }
   });
 
+  fastify.patch('/v0/management/mcp-servers/:serverName', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+
+    if (!validateServerName(serverName)) {
+      return reply.code(400).send({
+        error:
+          'Invalid server name. Must be a non-reserved slug (lowercase letters, numbers, hyphens, underscores, 2-63 characters)',
+      });
+    }
+
+    try {
+      const servers = await configService.getRepository().getAllMcpServers();
+      const existing = servers[serverName];
+      if (!existing) {
+        return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+      }
+      const merged = { ...existing, ...body };
+      const result = McpServerConfigSchema.safeParse(merged);
+      if (!result.success) {
+        return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
+      }
+      await configService.saveMcpServer(serverName, result.data);
+      logger.debug(`MCP server '${serverName}' updated via API (PATCH)`);
+      return reply.send({ success: true, name: serverName });
+    } catch (e: any) {
+      logger.error(`Failed to patch MCP server '${serverName}'`, e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   fastify.delete('/v0/management/mcp-servers/:serverName', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
 
@@ -606,12 +930,44 @@ export async function registerConfigRoutes(
     }
   });
 
+  // ─── MCP Server Enabled ──────────────────────────────────────────
+
+  fastify.get('/v0/management/config/mcp-enabled', async (_request, reply) => {
+    try {
+      const enabled = await configService.getSetting<boolean>('mcpEnabled', true);
+      return reply.send({ enabled });
+    } catch (e: any) {
+      logger.error('Failed to read mcp-enabled setting', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/mcp-enabled', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+    if (typeof body.enabled !== 'boolean') {
+      return reply.code(400).send({ error: 'enabled must be a boolean' });
+    }
+
+    try {
+      await configService.setSetting('mcpEnabled', body.enabled);
+      logger.debug(`MCP server ${body.enabled ? 'enabled' : 'disabled'} via API`);
+      return reply.send({ enabled: body.enabled });
+    } catch (e: any) {
+      logger.error('Failed to update mcp-enabled setting', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
   // ─── Quota Checker Types ──────────────────────────────────────────
 
   fastify.get('/v0/management/quota-checker-types', async (_request, reply) => {
+    const defs = getCheckerDefinitions();
     return reply.send({
-      types: VALID_QUOTA_CHECKER_TYPES,
-      count: VALID_QUOTA_CHECKER_TYPES.length,
+      types: defs.map((d) => ({ type: d.type, displayName: d.displayName })),
+      count: defs.length,
     });
   });
 }

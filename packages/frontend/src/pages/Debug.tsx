@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import Editor from '@monaco-editor/react';
 import {
@@ -13,6 +13,8 @@ import {
   Download,
   Filter,
   X,
+  Minimize2,
+  Maximize2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
@@ -26,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 interface DebugLogMeta {
   requestId: string;
   createdAt: number;
+  responseStatus?: number | null;
 }
 
 interface DebugLogDetail extends DebugLogMeta {
@@ -35,6 +38,8 @@ interface DebugLogDetail extends DebugLogMeta {
   transformedResponse: string | object;
   rawResponseSnapshot?: string | object;
   transformedResponseSnapshot?: string | object;
+  requestHeaders?: string | object;
+  responseHeaders?: string | object;
 }
 
 export const Debug: React.FC = () => {
@@ -228,6 +233,25 @@ export const Debug: React.FC = () => {
     return content;
   };
 
+  const getHttpStatusBadgeClasses = (status?: number | null) => {
+    if (status == null) {
+      return 'border-border-glass bg-bg-glass text-text-muted';
+    }
+    if (status >= 100 && status < 200) {
+      return 'border-border-glass bg-bg-glass text-text-muted';
+    }
+    if (status >= 200 && status < 300) {
+      return 'border-success/30 bg-emerald-500/15 text-success';
+    }
+    if (status >= 300 && status < 400) {
+      return 'border-blue-400/30 bg-blue-500/15 text-blue-400';
+    }
+    if (status >= 400 && status < 500) {
+      return 'border-warning/30 bg-yellow-500/15 text-warning';
+    }
+    return 'border-danger/30 bg-red-500/15 text-danger';
+  };
+
   const exportContent = useMemo(() => {
     if (!detail) return '';
     const payload = {
@@ -239,6 +263,9 @@ export const Debug: React.FC = () => {
       rawResponseSnapshot: normalizeExportContent(detail.rawResponseSnapshot),
       transformedResponse: normalizeExportContent(detail.transformedResponse),
       transformedResponseSnapshot: normalizeExportContent(detail.transformedResponseSnapshot),
+      requestHeaders: normalizeExportContent(detail.requestHeaders),
+      responseHeaders: normalizeExportContent(detail.responseHeaders),
+      httpStatusCode: detail.responseStatus ?? null,
     };
     return JSON.stringify(payload, null, 2);
   }, [detail]);
@@ -438,6 +465,16 @@ export const Debug: React.FC = () => {
                   <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1">
                     {log.requestId?.substring(0, 8) ?? '-'}...
                   </div>
+                  <div className="mt-2">
+                    <span
+                      className={clsx(
+                        'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold',
+                        getHttpStatusBadgeClasses(log.responseStatus)
+                      )}
+                    >
+                      HTTP {log.responseStatus ?? '?'}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -462,6 +499,25 @@ export const Debug: React.FC = () => {
                     {detail.requestId}
                   </span>
                 </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-text-secondary">
+                  <div className="min-w-0">
+                    <span className="text-text-muted">Captured:</span>
+                    <span className="ml-2 font-mono">
+                      {new Date(detail.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="text-text-muted">HTTP Status:</span>
+                    <span
+                      className={clsx(
+                        'inline-flex items-center rounded-md border px-2 py-0.5 font-mono font-semibold',
+                        getHttpStatusBadgeClasses(detail.responseStatus)
+                      )}
+                    >
+                      {detail.responseStatus ?? 'Not captured'}
+                    </span>
+                  </div>
+                </div>
               </div>
               <AccordionPanel
                 title="Raw Request"
@@ -469,6 +525,13 @@ export const Debug: React.FC = () => {
                 color="text-blue-400"
                 defaultOpen={true}
               />
+              {detail.requestHeaders && (
+                <AccordionPanel
+                  title="Request Headers"
+                  content={formatContent(detail.requestHeaders)}
+                  color="text-blue-400"
+                />
+              )}
               <AccordionPanel
                 title="Transformed Request"
                 content={formatContent(detail.transformedRequest)}
@@ -484,6 +547,13 @@ export const Debug: React.FC = () => {
                   title="Raw Response (Reconstructed)"
                   content={formatContent(detail.rawResponseSnapshot)}
                   color="text-orange-400"
+                />
+              )}
+              {detail.responseHeaders && (
+                <AccordionPanel
+                  title="Response Headers"
+                  content={formatContent(detail.responseHeaders)}
+                  color="text-yellow-400"
                 />
               )}
               <AccordionPanel
@@ -562,6 +632,8 @@ const AccordionPanel: React.FC<{
 }> = ({ title, content, color, defaultOpen = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
+  const [folded, setFolded] = useState(false);
+  const editorRef = useRef<any>(null);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -571,6 +643,25 @@ const AccordionPanel: React.FC<{
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleToggleFold = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (folded) {
+      editor.trigger('unfoldAll', 'editor.unfoldAll', null);
+    } else {
+      // Fold everything first
+      editor.trigger('foldAll', 'editor.foldAll', null);
+      // Then unfold the outermost object (line 1) to keep it visible
+      setTimeout(() => {
+        editor.setSelection({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 });
+        editor.trigger('unfold', 'editor.unfold', null);
+        editor.setSelection({ startLineNumber: 0, startColumn: 0, endLineNumber: 0, endColumn: 0 });
+      }, 50);
+    }
+    setFolded(!folded);
   };
 
   return (
@@ -584,6 +675,13 @@ const AccordionPanel: React.FC<{
           <span className={clsx('truncate text-[11px] font-bold uppercase tracking-wider', color)}>
             {title}
           </span>
+          <button
+            className="bg-transparent border-0 text-text-muted p-0.5 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
+            onClick={handleToggleFold}
+            title={folded ? 'Unfold all' : 'Fold all'}
+          >
+            {folded ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
+          </button>
         </div>
         <button
           className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
@@ -605,6 +703,9 @@ const AccordionPanel: React.FC<{
             defaultLanguage="json"
             theme="vs-dark"
             value={content}
+            onMount={(editor) => {
+              editorRef.current = editor;
+            }}
             options={{
               readOnly: true,
               minimap: { enabled: false },

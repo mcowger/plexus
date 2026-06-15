@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, afterEach } from 'vitest';
+import { describe, expect, test, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import path from 'path';
 import { ModelMetadataManager, mergeOverrides } from '../model-metadata-manager';
 import type { NormalizedModelMetadata } from '../model-metadata-manager';
@@ -11,8 +11,13 @@ const modelsDevFixture = path.join(FIXTURES, 'models-dev-sample.json');
 const catwalkFixture = path.join(FIXTURES, 'catwalk-sample.json');
 
 // Reset the singleton between test suites so each describe block gets a fresh instance
-afterEach(() => {
+afterAll(() => {
   ModelMetadataManager.resetForTesting();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 // ─── OpenRouter ──────────────────────────────────────────────────
@@ -58,9 +63,18 @@ describe('ModelMetadataManager – OpenRouter source', () => {
 
   test('getMetadata returns architecture with modalities', () => {
     const meta = mgr.getMetadata('openrouter', 'openai/gpt-4.1-nano');
+    expect(meta!.architecture?.modality).toBe('text+image->text');
     expect(meta!.architecture?.input_modalities).toContain('text');
     expect(meta!.architecture?.input_modalities).toContain('image');
     expect(meta!.architecture?.output_modalities).toContain('text');
+  });
+
+  test('getMetadata preserves non-text OpenRouter modalities', () => {
+    const meta = mgr.getMetadata('openrouter', 'openai/gpt-audio');
+    expect(meta).toBeDefined();
+    expect(meta!.architecture?.modality).toBe('text+audio->text+audio');
+    expect(meta!.architecture?.input_modalities).toContain('audio');
+    expect(meta!.architecture?.output_modalities).toContain('audio');
   });
 
   test('getMetadata returns supported_parameters', () => {
@@ -96,6 +110,16 @@ describe('ModelMetadataManager – OpenRouter source', () => {
     ).toBe(true);
   });
 
+  test('search matches OpenRouter architecture modalities', () => {
+    const results = mgr.search('openrouter', 'audio');
+    expect(results.map((r) => r.id)).toContain('openai/gpt-audio');
+  });
+
+  test('search matches OpenRouter descriptions', () => {
+    const results = mgr.search('openrouter', 'transcribe');
+    expect(results.map((r) => r.id)).toContain('mistralai/voxtral-small-24b-2507');
+  });
+
   test('search is case-insensitive', () => {
     const lower = mgr.search('openrouter', 'claude');
     const upper = mgr.search('openrouter', 'CLAUDE');
@@ -122,6 +146,81 @@ describe('ModelMetadataManager – OpenRouter source', () => {
     expect(ids).toContain('anthropic/claude-3.5-sonnet');
     expect(ids).toContain('openai/gpt-4.1-nano');
     expect(ids).toContain('google/gemini-pro');
+  });
+
+  test('loadAll merges OpenRouter embeddings and videos catalog endpoints', async () => {
+    ModelMetadataManager.resetForTesting();
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/api/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'openai/gpt-4o', name: 'GPT-4o' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/api/v1/embeddings/models')) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: 'google/gemini-embedding-2',
+                name: 'Google: Gemini Embedding 2',
+                description: 'Multimodal embedding model',
+                context_length: 8192,
+                architecture: {
+                  modality: 'text+image+file+audio+video->embeddings',
+                  input_modalities: ['text', 'image', 'file', 'audio', 'video'],
+                  output_modalities: ['embeddings'],
+                  tokenizer: 'Gemini',
+                  instruct_type: null,
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (url.endsWith('/api/v1/videos/models')) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: 'google/veo-3.1-fast',
+                name: 'Google: Veo 3.1 Fast',
+                description: 'Video generation model',
+                supported_frame_images: ['first_frame'],
+                generate_audio: true,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response('{}', { status: 404, statusText: 'Not Found' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const manager = ModelMetadataManager.getInstance();
+    await manager.loadAll({
+      openrouter: 'https://openrouter.ai/api/v1/models',
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    expect(manager.getAllIds('openrouter')).toEqual([
+      'openai/gpt-4o',
+      'google/gemini-embedding-2',
+      'google/veo-3.1-fast',
+    ]);
+    expect(manager.search('openrouter', 'embed').map((r) => r.id)).toContain(
+      'google/gemini-embedding-2'
+    );
+    expect(manager.search('openrouter', 'video').map((r) => r.id)).toContain('google/veo-3.1-fast');
+    expect(manager.getMetadata('openrouter', 'google/veo-3.1-fast')?.architecture).toEqual({
+      modality: 'text+image->video+audio',
+      input_modalities: ['text', 'image'],
+      output_modalities: ['video', 'audio'],
+    });
   });
 });
 
@@ -326,6 +425,133 @@ describe('ModelMetadataManager – error handling', () => {
     const meta = mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet');
     expect(meta).toBeUndefined();
   });
+
+  test('failed refresh preserves the previously loaded metadata', async () => {
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    await mgr.refreshAll({
+      openrouter: openrouterFixture,
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    const before = mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet');
+    expect(before?.name).toBe('Anthropic: Claude 3.5 Sonnet');
+
+    const result = await mgr.refreshAll({
+      openrouter: '/nonexistent/path/openrouter.json',
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    expect(result.hadErrors).toBe(true);
+    expect(result.sources.openrouter.initialized).toBe(true);
+    expect(result.sources.openrouter.count).toBeGreaterThan(0);
+    expect(result.sources.openrouter.count).toBe(mgr.getAllIds('openrouter').length);
+    expect(mgr.getMetadata('openrouter', 'anthropic/claude-3.5-sonnet')).toEqual(before);
+  });
+
+  test('empty models.dev refresh preserves the previously loaded metadata', async () => {
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    await mgr.refreshAll({
+      openrouter: '/dev/null-nonexistent',
+      modelsDev: modelsDevFixture,
+      catwalk: '/dev/null-nonexistent',
+    });
+
+    const before = mgr.getMetadata('models.dev', 'anthropic.claude-3-5-haiku-20241022');
+    expect(before?.name).toBe('Claude Haiku 3.5');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ anthropic: { models: {} } }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
+
+    const result = await mgr.refreshAll({
+      modelsDev: 'https://example.com/models-dev-empty.json',
+    });
+
+    expect(result.hadErrors).toBe(true);
+    expect(result.sources.modelsDev.initialized).toBe(true);
+    expect(result.sources.modelsDev.count).toBe(mgr.getAllIds('models.dev').length);
+    expect(mgr.getMetadata('models.dev', 'anthropic.claude-3-5-haiku-20241022')).toEqual(before);
+  });
+
+  test('empty catwalk refresh preserves the previously loaded metadata', async () => {
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    await mgr.refreshAll({
+      openrouter: '/dev/null-nonexistent',
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: catwalkFixture,
+    });
+
+    const before = mgr.getMetadata('catwalk', 'anthropic.claude-3-5-haiku-20241022');
+    expect(before?.name).toBe('Claude 3.5 Haiku');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+      )
+    );
+
+    const result = await mgr.refreshAll({
+      catwalk: 'https://example.com/catwalk-empty.json',
+    });
+
+    expect(result.hadErrors).toBe(true);
+    expect(result.sources.catwalk.initialized).toBe(true);
+    expect(result.sources.catwalk.count).toBe(mgr.getAllIds('catwalk').length);
+    expect(mgr.getMetadata('catwalk', 'anthropic.claude-3-5-haiku-20241022')).toEqual(before);
+  });
+
+  test('startAutoRefresh schedules refresh every 60 minutes', async () => {
+    vi.useFakeTimers();
+    ModelMetadataManager.resetForTesting();
+    const mgr = ModelMetadataManager.getInstance();
+
+    const fetchMock = vi.fn(async (_input: string | URL | Request) => {
+      return new Response(
+        JSON.stringify({
+          data: [{ id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await mgr.refreshAll({
+      openrouter: 'https://example.com/openrouter.json',
+      modelsDev: 'https://example.com/models-dev.json',
+      catwalk: 'https://example.com/catwalk.json',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    mgr.startAutoRefresh(60);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    mgr.stopAutoRefresh();
+  });
 });
 
 // ─── Singleton ───────────────────────────────────────────────────
@@ -341,7 +567,11 @@ describe('ModelMetadataManager – singleton', () => {
   test('resetForTesting creates a fresh instance', async () => {
     ModelMetadataManager.resetForTesting();
     const mgr = ModelMetadataManager.getInstance();
-    await mgr.loadAll({ openrouter: openrouterFixture });
+    await mgr.loadAll({
+      openrouter: openrouterFixture,
+      modelsDev: '/dev/null-nonexistent',
+      catwalk: '/dev/null-nonexistent',
+    });
     expect(mgr.isInitialized('openrouter')).toBe(true);
 
     ModelMetadataManager.resetForTesting();

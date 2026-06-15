@@ -10,6 +10,10 @@ import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware } from '../../services/quota/quota-middleware';
 import { attachKeyAccessPolicy } from '../../utils/auth';
+import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
+import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { handleBetaMessages } from '../../inference-v2';
 
 export async function registerMessagesRoute(
   fastify: FastifyInstance,
@@ -22,6 +26,10 @@ export async function registerMessagesRoute(
    * Anthropic Compatible Endpoint.
    */
   fastify.post('/v1/messages', async (request, reply) => {
+    if ((request as any).keyConfig?.beta === true) {
+      return handleBetaMessages(request, reply, { usageStorage, quotaEnforcer });
+    }
+
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();
@@ -38,6 +46,7 @@ export async function registerMessagesRoute(
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
     usageStorage.emitStartedAsync(usageRecord);
 
+    let earlyDisconnect: ReturnType<typeof wireEarlyDisconnectDetection> | undefined;
     try {
       const body = request.body as any;
       usageRecord.incomingModelAlias = body.model;
@@ -76,7 +85,7 @@ export async function registerMessagesRoute(
         };
       }
 
-      DebugManager.getInstance().startLog(requestId, body);
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       // Check quota before processing
       if (quotaEnforcer) {
@@ -84,7 +93,16 @@ export async function registerMessagesRoute(
         if (!allowed) return;
       }
 
-      const unifiedResponse = await dispatcher.dispatch(unifiedRequest);
+      const abortController = new AbortController();
+      const { signal: dispatchSignal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
+      earlyDisconnect = wireEarlyDisconnectDetection(request, abortController);
+      const stallDetectionResult = wireStallDetection(abortController, getGlobalStallConfig());
+      const unifiedResponse = await dispatcher.dispatch(
+        unifiedRequest,
+        dispatchSignal,
+        resolveTimeoutMs,
+        stallDetectionResult?.addStallConfig
+      );
 
       // Emit 'updated' event with routing decision details
       usageStorage.emitUpdatedAsync({
@@ -115,12 +133,29 @@ export async function registerMessagesRoute(
         shouldEstimateTokens,
         body,
         quotaEnforcer,
-        (request as any).keyName
+        (request as any).keyName,
+        abortController,
+        stallDetectionResult
       );
 
+      earlyDisconnect?.cleanup();
       return result;
     } catch (e: any) {
-      usageRecord.responseStatus = 'error';
+      earlyDisconnect?.cleanup();
+      if (e?.routingContext?.code === 'client_disconnected') {
+        usageRecord.responseStatus = 'cancelled';
+        usageRecord.durationMs = Date.now() - startTime;
+        usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
+        usageRecord.retryHistory =
+          e.routingContext?.retryHistory || usageRecord.retryHistory || null;
+        usageStorage.saveRequest(usageRecord as UsageRecord);
+        logger.info(
+          `Request ${requestId}: ${e.message}, usage recorded as ${e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'cancelled'}`
+        );
+        return;
+      }
+      usageRecord.responseStatus =
+        e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'error';
       usageRecord.durationMs = Date.now() - startTime;
       usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
       usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;

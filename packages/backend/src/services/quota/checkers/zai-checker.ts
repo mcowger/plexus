@@ -18,6 +18,7 @@ interface ZAIQuotaResponse {
 
 export default defineChecker({
   type: 'zai',
+  displayName: 'ZAI',
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'ZAI API key is required'),
     endpoint: z.string().url().optional(),

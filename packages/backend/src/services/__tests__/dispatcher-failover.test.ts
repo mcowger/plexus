@@ -119,6 +119,33 @@ describe('Dispatcher Failover', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  test('OAuth stream probe rejects raw JSON upstream error body before committing stream', async () => {
+    const upstreamError = {
+      error: {
+        message:
+          'One of "input" or "previous_response_id" or \'prompt\' or \'conversation_id\' must be provided.',
+        type: 'invalid_request_error',
+        param: null,
+        code: 'missing_required_parameter',
+      },
+    };
+    const encoded = new TextEncoder().encode(JSON.stringify(upstreamError));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoded);
+        controller.close();
+      },
+    });
+
+    const dispatcher = new Dispatcher() as any;
+    const result = await dispatcher.probeOAuthStreamStart(stream, null);
+
+    expect(result.ok).toBe(false);
+    expect(result.streamStarted).toBe(false);
+    expect(result.error.message).toBe(upstreamError.error.message);
+    expect(result.error.piAiResponse).toEqual(upstreamError);
+  });
+
   test('multiple targets, success on first try', async () => {
     setConfigForTesting(makeConfig({ targetCount: 3 }));
     fetchMock.mockImplementation(async () => successChatResponse('model-1'));

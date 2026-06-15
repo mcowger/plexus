@@ -212,5 +212,48 @@ describe('E2EPerformanceSelector', () => {
         Math.random = originalRandom;
       }
     });
+
+    it('suppresses inline exploration when backgroundExploration.enabled is true', async () => {
+      setConfigForTesting({
+        ...makeConfig(1, 1),
+        backgroundExploration: {
+          enabled: true,
+          stalenessThresholdSeconds: 600,
+          workerConcurrency: 2,
+        },
+      } as PlexusConfig);
+
+      mockGetProviderPerformance.mockImplementation((provider) => {
+        if (provider === 'p1')
+          return Promise.resolve([
+            {
+              target_model: 'm1',
+              avg_e2e_tokens_per_sec: 100,
+              sample_count: 10,
+              last_updated: 1000,
+            },
+          ]);
+        if (provider === 'p2')
+          return Promise.resolve([
+            {
+              target_model: 'm2',
+              avg_e2e_tokens_per_sec: 50,
+              sample_count: 10,
+              last_updated: 2000,
+            },
+          ]);
+        return Promise.resolve([]);
+      });
+
+      const targets: ModelTarget[] = [
+        { provider: 'p1', model: 'm1' },
+        { provider: 'p2', model: 'm2' },
+      ];
+
+      for (let i = 0; i < 10; i++) {
+        const selected = await selector.select(targets);
+        expect(selected).toEqual(targets[0]!);
+      }
+    });
   });
 });

@@ -27,10 +27,11 @@ COPY . .
 # Build the frontend and compile everything into a single self-contained binary.
 # Frontend assets (HTML, JS, CSS, images) and migration SQL files are all embedded
 # inside the binary via `bun build --compile` — no runtime file copies needed.
-# Use BuildKit's TARGETPLATFORM to select the correct build target (e.g., linux/amd64, linux/arm64)
+# Use TARGETPLATFORM to select the correct build target (e.g., linux/amd64, linux/arm64).
+# BuildKit sets this automatically; deploy-staging.ts also passes it explicitly as --build-arg.
 RUN case "${TARGETPLATFORM}" in \
-         linux/arm64) bun run compile:linux-arm64 ;; \
-         linux/amd64) bun run compile:linux-amd64 ;; \
+         linux/arm64) bun run compile:linux-arm64 && mv plexus-linux-arm64 plexus ;; \
+         linux/amd64) bun run compile:linux-amd64 && mv plexus-linux-amd64 plexus ;; \
          *) echo "Unsupported platform: ${TARGETPLATFORM}" && exit 1 ;; \
     esac
 
@@ -38,12 +39,10 @@ RUN case "${TARGETPLATFORM}" in \
 FROM debian:bookworm-slim
 
 ARG APP_VERSION=dev
-ARG TARGETPLATFORM
-
 WORKDIR /app
 
-# Copy the compiled binary from the builder stage (uses BuildKit's TARGETPLATFORM)
-COPY --from=builder /app/plexus-linux-${TARGETPLATFORM#linux/} ./plexus
+# Copy the compiled binary from the builder stage.
+COPY --from=builder /app/plexus ./plexus
 
 EXPOSE 4000
 

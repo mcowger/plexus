@@ -43,7 +43,21 @@ import { SortableContext } from '@dnd-kit/sortable';
 //
 // IMPORTS -- Icons (lucide-react)
 //
-import { AlertTriangle, Clock, Cpu, Info, RefreshCw, Server, Signal, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ban,
+  CheckCircle,
+  Clock,
+  Cpu,
+  Info,
+  Plane,
+  RefreshCw,
+  Server,
+  Signal,
+  Timer,
+  X,
+  XCircle,
+} from 'lucide-react';
 
 //
 // IMPORTS -- UI components (internal)
@@ -105,6 +119,7 @@ import {
   formatTPS,
 } from '../../../lib/format';
 import { formatMsToMinSec } from '@plexus/shared';
+import { clsx } from 'clsx';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../../contexts/ToastContext';
 
@@ -207,6 +222,12 @@ const MODEL_TIMELINE_COLORS = ['#3b82f6', '#14b8a6', '#8b5cf6', '#f59e0b', '#ef4
  * report placeholder strings instead of null, so we normalise these away.
  */
 const PLACEHOLDER_LABELS = new Set(['unknown', 'n/a', 'na', 'none', 'null', 'undefined']);
+
+/**
+ * Synthetic provider labels returned by {@link getProviderLabel}.
+ * These are not real providers and should be excluded from provider-scoped aggregations.
+ */
+const EXCLUDED_PROVIDER_LABELS = ['Failed Request', 'Unresolved Provider'];
 
 //
 // LABEL NORMALISATION HELPERS
@@ -1068,6 +1089,12 @@ export const LiveTab: React.FC<LiveTabProps> = ({
     );
   }, [liveRequests, streamFilter]);
 
+  /** Requests that resolved to a real provider (excludes synthetic labels) */
+  const providerRequests = useMemo(
+    () => liveRequests.filter((r) => !EXCLUDED_PROVIDER_LABELS.includes(getProviderLabel(r))),
+    [liveRequests]
+  );
+
   /** Aggregate summary of all liveRequests: counts, token totals, cost, latency sums */
   const summary = useMemo(() => {
     return liveRequests.reduce(
@@ -1394,7 +1421,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       { requests: number; success: number; totalLatency: number; totalCost: number }
     >();
 
-    for (const request of liveRequests) {
+    for (const request of providerRequests) {
       const provider = getProviderLabel(request);
       const row = providers.get(provider) || {
         requests: 0,
@@ -1422,7 +1449,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       }))
       .sort((a, b) => b.requests - a.requests)
       .slice(0, 6);
-  }, [liveRequests]);
+  }, [providerRequests]);
 
   /**
    * Computes minute-over-minute request rate deltas for the velocity chart.
@@ -1446,7 +1473,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   /** Top 8 providers by request count with success rate -- for the provider pulse bar chart */
   const providerPulseRows = useMemo(() => {
     const rows = new Map<string, { requests: number; success: number }>();
-    for (const request of liveRequests) {
+    for (const request of providerRequests) {
       const provider = getProviderLabel(request);
       const row = rows.get(provider) || { requests: 0, success: 0 };
       row.requests += 1;
@@ -1464,7 +1491,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       }))
       .sort((a, b) => b.requests - a.requests)
       .slice(0, 8);
-  }, [liveRequests]);
+  }, [providerRequests]);
 
   /** Top 8 models by request count with success rate -- for the model pulse bar chart */
   const modelPulseRows = useMemo(() => {
@@ -1506,7 +1533,10 @@ export const LiveTab: React.FC<LiveTabProps> = ({
   }, [cooldowns]);
 
   /** Aggregated stats for the top 5 providers -- used by the "stats" card */
-  const providerStats = useMemo(() => aggregateByEntity(liveRequests, 'provider'), [liveRequests]);
+  const providerStats = useMemo(
+    () => aggregateByEntity(providerRequests, 'provider'),
+    [providerRequests]
+  );
 
   /** Aggregated stats for the top 5 models -- used by the "stats" card */
   const modelStats = useMemo(() => aggregateByEntity(liveRequests, 'model'), [liveRequests]);
@@ -1916,7 +1946,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                   Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
                 );
                 const status = (request.responseStatus || 'errored').toLowerCase();
-                const isSuccess = status.toLowerCase() === 'success';
                 const providerLabel = getProviderLabel(request);
                 const modelLabel = getModelLabel(request);
                 return (
@@ -1929,12 +1958,30 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         <span className="text-base text-text font-medium">{providerLabel}</span>
                         <span className="text-sm text-text-secondary">{modelLabel}</span>
                         <span
-                          className={
-                            isSuccess
-                              ? 'text-xs px-2 py-0.5 rounded-md text-success bg-emerald-500/15 border border-success/25'
-                              : 'text-xs px-2 py-0.5 rounded-md text-danger bg-red-500/15 border border-danger/30'
-                          }
+                          className={clsx(
+                            'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border',
+                            status === 'success'
+                              ? 'text-success bg-emerald-500/15 border-success/25'
+                              : status === 'pending'
+                                ? 'text-warning bg-yellow-500/15 border-warning/25'
+                                : status === 'cancelled'
+                                  ? 'text-blue-400 bg-blue-500/15 border-blue-400/25'
+                                  : status === 'timeout'
+                                    ? 'text-orange-400 bg-orange-500/15 border-orange-400/25'
+                                    : 'text-danger bg-red-500/15 border-danger/30'
+                          )}
                         >
+                          {status === 'success' ? (
+                            <CheckCircle size={11} />
+                          ) : status === 'pending' ? (
+                            <Plane size={11} className="animate-pulse" />
+                          ) : status === 'cancelled' ? (
+                            <Ban size={11} />
+                          ) : status === 'timeout' ? (
+                            <Timer size={11} />
+                          ) : (
+                            <XCircle size={11} />
+                          )}
                           {status}
                         </span>
                       </div>
@@ -2772,7 +2819,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         Math.floor((Date.now() - new Date(request.date).getTime()) / 1000)
                       );
                       const status = (request.responseStatus || 'errored').toLowerCase();
-                      const isSuccess = status.toLowerCase() === 'success';
                       const providerLabel = getProviderLabel(request);
                       const modelLabel = getModelLabel(request);
 
@@ -2786,12 +2832,30 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                               <span className="text-sm text-text font-medium">{providerLabel}</span>
                               <span className="text-xs text-text-secondary">{modelLabel}</span>
                               <span
-                                className={
-                                  isSuccess
-                                    ? 'text-[11px] px-2 py-0.5 rounded-md text-success bg-emerald-500/15 border border-success/25'
-                                    : 'text-[11px] px-2 py-0.5 rounded-md text-danger bg-red-500/15 border border-danger/30'
-                                }
+                                className={clsx(
+                                  'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border',
+                                  status === 'success'
+                                    ? 'text-success bg-emerald-500/15 border-success/25'
+                                    : status === 'pending'
+                                      ? 'text-warning bg-yellow-500/15 border-warning/25'
+                                      : status === 'cancelled'
+                                        ? 'text-blue-400 bg-blue-500/15 border-blue-400/25'
+                                        : status === 'timeout'
+                                          ? 'text-orange-400 bg-orange-500/15 border-orange-400/25'
+                                          : 'text-danger bg-red-500/15 border-danger/30'
+                                )}
                               >
+                                {status === 'success' ? (
+                                  <CheckCircle size={10} />
+                                ) : status === 'pending' ? (
+                                  <Plane size={10} className="animate-pulse" />
+                                ) : status === 'cancelled' ? (
+                                  <Ban size={10} />
+                                ) : status === 'timeout' ? (
+                                  <Timer size={10} />
+                                ) : (
+                                  <XCircle size={10} />
+                                )}
                                 {status}
                               </span>
                             </div>

@@ -21,10 +21,15 @@ import {
   CheckCircle,
   Zap,
   ZapOff,
+  Download,
 } from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
 import { formatMs } from '../lib/format';
+import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
+import plexusAdminSkill from '../../../../.agents/skills/plexus-management/SKILL.md' with {
+  type: 'text',
+};
 
 const EMPTY_SERVER: McpServer = {
   upstream_url: '',
@@ -36,6 +41,7 @@ export const McpPage: React.FC = () => {
   const toast = useToast();
   const [servers, setServers] = useState<Record<string, McpServer>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [mcpEnabled, setMcpEnabled] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingServerName, setEditingServerName] = useState<string | null>(null);
   const [serverNameInput, setServerNameInput] = useState('');
@@ -78,8 +84,9 @@ export const McpPage: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await api.getMcpServers();
+      const [data, enabled] = await Promise.all([api.getMcpServers(), api.getMcpEnabled()]);
       setServers(data);
+      setMcpEnabled(enabled.enabled);
     } catch (e) {
       console.error('Failed to load MCP servers', e);
     } finally {
@@ -244,6 +251,17 @@ export const McpPage: React.FC = () => {
     }
   };
 
+  const handleToggleMcpEnabled = async (enabled: boolean) => {
+    setMcpEnabled(enabled);
+    try {
+      await api.patchMcpEnabled(enabled);
+      toast.success(`MCP server ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (e) {
+      setMcpEnabled(!enabled); // revert on failure
+      toast.error((e as Error).message, 'Failed to update MCP server state');
+    }
+  };
+
   const isValidServerName = (name: string): boolean => {
     return /^[a-z0-9][a-z0-9-_]{1,62}$/.test(name);
   };
@@ -291,21 +309,112 @@ export const McpPage: React.FC = () => {
     );
   }
 
+  const triggerDownload = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopySkill = async () => {
+    const canCopy = isClipboardAvailable();
+    if (!canCopy) {
+      toast.error('Copy requires HTTPS connection');
+      return;
+    }
+    const success = await copyToClipboard(plexusAdminSkill);
+    if (success) {
+      toast.success('Skill copied to clipboard');
+    } else {
+      toast.error('Failed to copy to clipboard');
+    }
+  };
+
+  const handleDownloadSkill = () => {
+    triggerDownload(plexusAdminSkill, 'SKILL.md', 'text/markdown');
+  };
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
-        title="MCP servers"
-        subtitle="Model Context Protocol connections — exposes tools and resources to clients"
+        title="MCP & Skills"
+        subtitle="Model Context Protocol connections and the Plexus admin skill"
         actions={
-          <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
-            Add server
-          </Button>
+          <>
+            <div className="inline-flex rounded-md overflow-hidden border border-border-glass">
+              <button
+                type="button"
+                onClick={handleCopySkill}
+                className={clsx(
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all duration-fast',
+                  'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                  'hover:brightness-105',
+                  'border-r border-[#1A1006]/20'
+                )}
+              >
+                Plexus Admin Skill
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadSkill}
+                title="Download as file"
+                className={clsx(
+                  'inline-flex items-center justify-center px-2 py-1.5 text-xs',
+                  'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                  'hover:brightness-105'
+                )}
+              >
+                <Download size={14} />
+              </button>
+            </div>
+            <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
+              Add server
+            </Button>
+          </>
         }
       />
       <PageContainer>
         <div className="flex flex-col gap-5">
           {/* Servers Config Card */}
           <Card title="MCP Servers">
+            {/* Plexus Management MCP — global enable/disable, always visible */}
+            <article className="rounded-md border border-primary/30 bg-primary/5 p-3 mb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate font-heading text-sm font-semibold text-text">
+                      Plexus Management MCP
+                    </span>
+                    <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      ADMIN
+                    </span>
+                  </div>
+                  <div className="mt-1 break-all text-xs text-text-muted">
+                    /mcp/plexus — admin-only management endpoint
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Switch
+                    checked={mcpEnabled}
+                    onChange={(val) => handleToggleMcpEnabled(val)}
+                    size="sm"
+                  />
+                </div>
+              </div>
+              <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-1.5 text-xs">
+                <span className="text-text-muted">
+                  Toggle for the Plexus Management MCP only. When disabled, /mcp/plexus responds
+                  with HTTP 418, while configured gateway MCP routes under /mcp/:name continue to
+                  work.
+                </span>
+              </div>
+            </article>
+
             {serverNames.length === 0 ? (
               <div className="p-4 text-text-secondary text-center">
                 No MCP servers configured. Click "Add MCP Server" to create one.
@@ -394,6 +503,40 @@ export const McpPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
+                      {/* Plexus Management MCP — fixed row */}
+                      <tr className="bg-primary/5 border-b border-primary/30">
+                        <td
+                          className="px-4 py-3 text-left border-b border-border-glass text-text"
+                          style={{ paddingLeft: '24px' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontWeight: 600 }}>Plexus Management MCP</div>
+                            <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              ADMIN
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
+                          /mcp/plexus — admin-only management endpoint
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                          <Switch
+                            checked={mcpEnabled}
+                            onChange={(val) => handleToggleMcpEnabled(val)}
+                            size="sm"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
+                          Disables /mcp/plexus only — gateway /mcp/:name routes still work
+                        </td>
+                        <td
+                          className="px-4 py-3 text-left border-b border-border-glass text-text"
+                          style={{ paddingRight: '24px', textAlign: 'right' }}
+                        >
+                          —
+                        </td>
+                      </tr>
+
                       {serverNames.map((name) => {
                         const server = servers[name];
                         const headerCount = server.headers ? Object.keys(server.headers).length : 0;

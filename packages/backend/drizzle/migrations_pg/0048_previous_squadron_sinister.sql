@@ -1,0 +1,1 @@
+ALTER TABLE "model_aliases" ADD COLUMN "sticky_session" boolean DEFAULT false NOT NULL;

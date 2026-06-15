@@ -1,0 +1,135 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get exploration rate config (admin only)
+  description: |
+    Returns the exploration rate configuration used for performance-based
+    selector exploration.
+
+    ## What's included
+
+    - `performanceExplorationRate` — Rate for cost/performance exploration (0-1)
+    - `latencyExplorationRate` — Rate for latency exploration (0-1)
+    - `e2ePerformanceExplorationRate` — Rate for end-to-end performance exploration (0-1)
+
+    ## How exploration works
+
+    Exploration rate determines what percentage of requests are sent to
+    non-optimal providers to gather performance data:
+    - `0.0` — No exploration; always use best-known provider
+    - `0.05` — 5% of requests explore alternatives (default)
+    - `1.0` — All requests explore (not recommended)
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Exploration rate config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              performanceExplorationRate:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 1
+                description: Exploration rate for cost/performance
+              latencyExplorationRate:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 1
+                description: Exploration rate for latency
+              e2ePerformanceExplorationRate:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 1
+                description: Exploration rate for end-to-end performance
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigExplorationRate
+patch:
+  tags:
+    - Management — Config
+  summary: Update exploration rate config (admin only)
+  description: |
+    Partially updates the exploration rate configuration. Only provided
+    fields are updated; others retain their current values.
+
+    ## Validation rules
+
+    All exploration rates must be between 0 and 1 (inclusive).
+
+    ## Recommendations
+
+    - **Production**: 0.01-0.05 (1-5% exploration)
+    - **Testing**: 0.1-0.2 (10-20% exploration)
+    - **Debug**: 0.5+ (50%+ exploration)
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            performanceExplorationRate:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Exploration rate for cost/performance (0-1)
+            latencyExplorationRate:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Exploration rate for latency (0-1)
+            e2ePerformanceExplorationRate:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Exploration rate for end-to-end performance (0-1)
+        examples:
+          production:
+            summary: Production settings (low exploration)
+            value:
+              performanceExplorationRate: 0.02
+              latencyExplorationRate: 0.02
+              e2ePerformanceExplorationRate: 0.02
+          testing:
+            summary: Testing settings (moderate exploration)
+            value:
+              performanceExplorationRate: 0.1
+              latencyExplorationRate: 0.1
+              e2ePerformanceExplorationRate: 0.1
+  responses:
+    '200':
+      description: Updated exploration rates.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              performanceExplorationRate:
+                type: number
+                format: float
+              latencyExplorationRate:
+                type: number
+                format: float
+              e2ePerformanceExplorationRate:
+                type: number
+                format: float
+    '400':
+      description: Invalid request body or validation failed.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigExplorationRate

@@ -1,7 +1,7 @@
 import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth-auth-manager';
-import type { OAuthProvider } from '@mariozechner/pi-ai/oauth';
+import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import { logger } from '../../../utils/logger';
 
 const ANTIGRAVITY_ENDPOINTS = [
@@ -151,6 +151,7 @@ async function fetchModels(
 
 export default defineChecker({
   type: 'antigravity',
+  displayName: 'Antigravity',
   optionsSchema: z.object({
     apiKey: z.string().optional(),
     oauthAccountId: z.string().optional(),

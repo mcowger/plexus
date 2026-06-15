@@ -17,6 +17,8 @@ interface Props {
   isOAuthMode: boolean;
   onFetch: () => Promise<void>;
   onToggleSelection: (modelId: string) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
   onAddSelected: () => void;
 }
 
@@ -32,6 +34,8 @@ export function FetchModelsModal({
   isOAuthMode,
   onFetch,
   onToggleSelection,
+  onSelectAll,
+  onClearSelection,
   onAddSelected,
 }: Props) {
   return (
@@ -96,18 +100,10 @@ export function FetchModelsModal({
                 Available Models ({fetchedModels.length})
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => fetchedModels.forEach((m) => onToggleSelection(m.id))}
-                >
+                <Button size="sm" variant="ghost" onClick={onSelectAll}>
                   Select All
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => selectedModelIds.forEach((id) => onToggleSelection(id))}
-                >
+                <Button size="sm" variant="ghost" onClick={onClearSelection}>
                   Clear
                 </Button>
               </div>

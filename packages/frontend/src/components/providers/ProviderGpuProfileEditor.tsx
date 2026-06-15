@@ -12,7 +12,7 @@ export function ProviderGpuProfileEditor({ editingProvider, setEditingProvider }
       <label className="font-body text-[13px] font-medium text-text-secondary">GPU Profile</label>
       <div className="flex gap-3 items-end">
         <select
-          className="flex-1 py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+          className="flex-1 h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
           value={editingProvider.gpu_profile || ''}
           onChange={(e) => {
             const value = e.target.value;
@@ -70,7 +70,7 @@ export function ProviderGpuProfileEditor({ editingProvider, setEditingProvider }
                 RAM (GB)
               </label>
               <input
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 type="number"
                 step="1"
                 min="1"
@@ -89,7 +89,7 @@ export function ProviderGpuProfileEditor({ editingProvider, setEditingProvider }
                 Bandwidth (TB/s)
               </label>
               <input
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 type="number"
                 step="0.1"
                 min="0.1"
@@ -108,7 +108,7 @@ export function ProviderGpuProfileEditor({ editingProvider, setEditingProvider }
                 FLOPS (TFLOPs)
               </label>
               <input
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 type="number"
                 step="100"
                 min="1"
@@ -127,7 +127,7 @@ export function ProviderGpuProfileEditor({ editingProvider, setEditingProvider }
                 Power Draw (Watts)
               </label>
               <input
-                className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                 type="number"
                 step="10"
                 min="1"

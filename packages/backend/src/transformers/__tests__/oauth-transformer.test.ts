@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, vi, test } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 
-// @mariozechner/pi-ai is mocked globally in vitest.setup.ts — do not add a
+// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 const { OAuthTransformer } = await import('../oauth/oauth-transformer');

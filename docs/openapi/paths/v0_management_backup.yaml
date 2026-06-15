@@ -37,7 +37,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ConfigBackupEnvelope'
+            $ref: ../components/schemas/ConfigBackupEnvelope.yaml
         application/gzip:
           schema:
             type: string

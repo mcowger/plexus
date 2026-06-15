@@ -6,12 +6,13 @@ get:
     Returns the full Plexus configuration object as JSON. This is the
     same structure used by the database.
 
-    ## JSON vs YAML
+    ## JSON endpoints
 
     - **This endpoint** — Returns the in-memory configuration as JSON
-    - **`GET /v0/management/config/export`** — Returns the raw YAML as stored on disk
+    - **`GET /v0/management/config/export`** — Returns an export-friendly JSON object
 
-    Both contain the same data; the JSON form is easier for programmatic access.
+    Both contain nearly the same data; the export form omits derived runtime-only
+    fields and is suitable for backups or round-tripping through restore/import flows.
 
     ## What's included
 

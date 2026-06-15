@@ -1,0 +1,107 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get cooldown policy config (admin only)
+  description: |
+    Returns the cooldown policy configuration used when providers
+    experience errors or rate limiting.
+
+    ## What's included
+
+    - `initialMinutes` — Initial cooldown duration after first error
+    - `maxMinutes` — Maximum cooldown duration after repeated errors
+
+    ## How cooldowns work
+
+    When a provider fails, Plexus applies an exponential backoff cooldown:
+    1. First error: `initialMinutes` cooldown
+    2. Repeated errors: Cooldown doubles each time
+    3. Cap: Never exceeds `maxMinutes`
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Cooldown policy config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              initialMinutes:
+                type: number
+                format: float
+                minimum: 0.1
+                description: Initial cooldown duration in minutes
+              maxMinutes:
+                type: number
+                format: float
+                minimum: 0.1
+                description: Maximum cooldown duration in minutes
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigCooldown
+patch:
+  tags:
+    - Management — Config
+  summary: Update cooldown policy config (admin only)
+  description: |
+    Partially updates the cooldown policy configuration. Only provided
+    fields are updated; others retain their current values.
+
+    ## Validation rules
+
+    - `initialMinutes` — Must be >= 0.1 (6 seconds minimum)
+    - `maxMinutes` — Must be >= 0.1 and >= `initialMinutes`
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            initialMinutes:
+              type: number
+              format: float
+              minimum: 0.1
+              description: 'Initial cooldown duration in minutes (min: 0.1 = 6 seconds)'
+            maxMinutes:
+              type: number
+              format: float
+              minimum: 0.1
+              description: Maximum cooldown duration in minutes
+        examples:
+          aggressive:
+            summary: Aggressive retry (short cooldowns)
+            value:
+              initialMinutes: 0.5
+              maxMinutes: 5
+          conservative:
+            summary: Conservative retry (long cooldowns)
+            value:
+              initialMinutes: 2
+              maxMinutes: 30
+  responses:
+    '200':
+      description: Updated cooldown policy.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              initialMinutes:
+                type: number
+                format: float
+              maxMinutes:
+                type: number
+                format: float
+    '400':
+      description: Invalid request body or validation failed.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigCooldown

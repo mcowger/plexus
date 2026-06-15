@@ -6,6 +6,20 @@ pre-commit:
     - CI: "true"
 
   commands:
+    # --- Sync CLAUDE.md from AGENTS.md whenever AGENTS.md is staged ----------
+    sync-claude-md:
+      glob: "**/AGENTS.md"
+      run: |
+        changed=$(git diff --cached --name-only | grep -E '(^|/)AGENTS\.md$' || true)
+        if [ -z "$changed" ]; then exit 0; fi
+        for agents_file in $changed; do
+          dir=$(dirname "$agents_file")
+          claude_file="$dir/CLAUDE.md"
+          cp "$agents_file" "$claude_file"
+          git add "$claude_file"
+          echo "[pre-commit] synced $claude_file from $agents_file"
+        done
+
     # --- Block manually committed migration files ----------------------------
     no-migrations:
       skip:
@@ -55,7 +69,12 @@ pre-commit:
       glob: "packages/frontend/src/**"
       run: bun run build:frontend
 
+    # --- OpenAPI spec lint (only when OpenAPI docs change) -----------------
+    openapi-lint:
+      glob: "docs/openapi/**"
+      run: bun run lint:openapi
+
     # --- Backend tests (only when backend source changes) --------------------
     backend-tests:
       glob: "packages/backend/src/**"
-      run: cd packages/backend && bun run test
+      run: bun run test

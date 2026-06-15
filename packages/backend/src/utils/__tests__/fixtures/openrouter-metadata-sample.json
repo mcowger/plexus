@@ -78,6 +78,52 @@
         "max_completion_tokens": 8192,
         "is_moderated": false
       }
+    },
+    {
+      "id": "openai/gpt-audio",
+      "name": "OpenAI: GPT Audio",
+      "description": "GPT Audio supports audio input and output.",
+      "context_length": 128000,
+      "architecture": {
+        "modality": "text+audio->text+audio",
+        "input_modalities": ["text", "audio"],
+        "output_modalities": ["text", "audio"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001"
+      },
+      "supported_parameters": ["temperature", "max_tokens"],
+      "top_provider": {
+        "context_length": 128000,
+        "max_completion_tokens": 16384,
+        "is_moderated": false
+      }
+    },
+    {
+      "id": "mistralai/voxtral-small-24b-2507",
+      "name": "Mistral: Voxtral Small 24B 2507",
+      "description": "Audio understanding model that can transcribe speech from uploaded audio files.",
+      "context_length": 32768,
+      "architecture": {
+        "modality": "text+file+audio->text",
+        "input_modalities": ["text", "audio", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Mistral",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000003"
+      },
+      "supported_parameters": ["temperature", "max_tokens"],
+      "top_provider": {
+        "context_length": 32768,
+        "max_completion_tokens": 4096,
+        "is_moderated": false
+      }
     }
   ]
 }

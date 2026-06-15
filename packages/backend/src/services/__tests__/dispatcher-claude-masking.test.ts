@@ -2,11 +2,11 @@ import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// @mariozechner/pi-ai is mocked globally in vitest.setup.ts — do not add a
+// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 const { Dispatcher } = await import('../dispatcher');
-import * as piAi from '@mariozechner/pi-ai';
+import * as piAi from '@earendil-works/pi-ai';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch should not be called in pi-ai masking path');

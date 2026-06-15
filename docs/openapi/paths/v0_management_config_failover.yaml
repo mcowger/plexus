@@ -1,0 +1,125 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get failover policy config (admin only)
+  description: |
+    Returns the failover policy configuration used when providers fail.
+
+    ## What's included
+
+    - `enabled` — Whether automatic failover is enabled
+    - `retryableStatusCodes` — HTTP status codes that trigger failover
+    - `retryableErrors` — Error patterns that trigger failover
+
+    ## How failover works
+
+    When a provider fails with a retryable status code or error pattern,
+    Plexus automatically retries the request with the next provider in
+    the fallback chain.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Failover policy config.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+                description: Whether automatic failover is enabled
+              retryableStatusCodes:
+                type: array
+                items:
+                  type: integer
+                description: HTTP status codes that trigger failover
+              retryableErrors:
+                type: array
+                items:
+                  type: string
+                description: Error patterns (regex) that trigger failover
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementConfigFailover
+patch:
+  tags:
+    - Management — Config
+  summary: Update failover policy config (admin only)
+  description: |
+    Partially updates the failover policy configuration. Only provided
+    fields are updated; others retain their current values.
+
+    ## Common retryable status codes
+
+    - `429` — Rate limited
+    - `500` — Internal server error
+    - `502` — Bad gateway
+    - `503` — Service unavailable
+    - `504` — Gateway timeout
+
+    ## Common retryable error patterns
+
+    - `rate.limit` — Rate limiting errors
+    - `timeout` — Request timeouts
+    - `connection` — Connection failures
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              description: Enable or disable automatic failover
+            retryableStatusCodes:
+              type: array
+              items:
+                type: integer
+              description: HTTP status codes that trigger failover
+            retryableErrors:
+              type: array
+              items:
+                type: string
+              description: Error patterns (regex) that trigger failover
+        examples:
+          enable_failover:
+            summary: Enable failover with standard settings
+            value:
+              enabled: true
+              retryableStatusCodes: [429, 500, 502, 503, 504]
+              retryableErrors: ['rate.limit', 'timeout']
+          disable_failover:
+            summary: Disable failover
+            value:
+              enabled: false
+  responses:
+    '200':
+      description: Updated failover policy.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+              retryableStatusCodes:
+                type: array
+                items:
+                  type: integer
+              retryableErrors:
+                type: array
+                items:
+                  type: string
+    '400':
+      description: Invalid request body or validation failed.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: patchV0ManagementConfigFailover

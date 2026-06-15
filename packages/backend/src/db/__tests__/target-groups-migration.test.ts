@@ -1,5 +1,11 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
+import {
+  closeDatabase,
+  getDatabase,
+  getSchema,
+  initializeDatabase,
+  getCurrentDialect,
+} from '../client';
 import { runMigrations } from '../migrate';
 import { eq } from 'drizzle-orm';
 import { ConfigRepository } from '../config-repository';
@@ -17,6 +23,18 @@ describe('migrateLegacyTargetGroups', () => {
     await runMigrations();
     db = getDatabase();
     schema = getSchema();
+    // Ensure extra_body column exists — it's in the Drizzle schema but may not
+    // have a committed migration yet (CI auto-generates migrations after merge).
+    const dialect = getCurrentDialect();
+    try {
+      const alterSql =
+        dialect === 'postgres'
+          ? 'ALTER TABLE model_aliases ADD COLUMN extra_body jsonb'
+          : 'ALTER TABLE model_aliases ADD COLUMN extra_body text';
+      await db.run(alterSql as any);
+    } catch {
+      // Column already exists — that's fine
+    }
     repo = new ConfigRepository();
     // Clean slate for each test
     await db.delete(schema.modelAliasTargets);
@@ -239,5 +257,32 @@ describe('migrateLegacyTargetGroups', () => {
     }
     expect(byGroup.get('primary')).toHaveLength(1);
     expect(byGroup.get('fallback')).toHaveLength(1);
+  });
+
+  it('round-trips sticky_session through saveAlias and getAlias', async () => {
+    await repo.saveAlias('sticky-on', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p1', model: 'm1' }] },
+      ],
+      sticky_session: true,
+    } as any);
+
+    await repo.saveAlias('sticky-off', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p2', model: 'm2' }] },
+      ],
+      sticky_session: false,
+    } as any);
+
+    await repo.saveAlias('sticky-unset', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p3', model: 'm3' }] },
+      ],
+    } as any);
+
+    expect((await repo.getAlias('sticky-on'))!.sticky_session).toBe(true);
+    expect((await repo.getAlias('sticky-off'))!.sticky_session).toBe(false);
+    // Unset on input defaults to false in the DB column.
+    expect((await repo.getAlias('sticky-unset'))!.sticky_session).toBe(false);
   });
 });

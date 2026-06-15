@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { getConfig } from '../../config';
 import { PricingManager } from '../../services/pricing-manager';
 import { ModelMetadataManager, mergeOverrides } from '../../services/model-metadata-manager';
+import { getModel } from '@earendil-works/pi-ai';
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
   /**
@@ -21,18 +22,48 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
     const metadataManager = ModelMetadataManager.getInstance();
 
     const created = Math.floor(Date.now() / 1000);
+    const hasVisionFallthrough = !!config.vision_fallthrough;
 
     const models = Object.entries(config.models).map(([aliasId, modelConfig]) => {
       const metaConfig = modelConfig?.metadata;
+      const piModelConfig = modelConfig?.pi_model;
+
+      // Look up pi compat options if a pi model reference is configured.
+      let piOptions: Record<string, unknown> | undefined;
+      if (piModelConfig) {
+        try {
+          const piModel = getModel(piModelConfig.provider as any, piModelConfig.model_id as any);
+          if (piModel?.compat && Object.keys(piModel.compat).length > 0) {
+            piOptions = piModel.compat as Record<string, unknown>;
+          }
+        } catch {
+          // Unknown provider or model — skip silently.
+        }
+      }
 
       const base = {
         id: aliasId,
         object: 'model' as const,
         created,
         owned_by: 'plexus',
+        ...(modelConfig?.preferred_api !== undefined && {
+          preferred_api: modelConfig.preferred_api,
+        }),
+        ...(piModelConfig && { pi_provider: piModelConfig.provider }),
+        ...(piModelConfig && { pi_model: piModelConfig.model_id }),
+        ...(piOptions !== undefined && { pi_options: piOptions }),
       };
 
       if (!metaConfig) {
+        if (hasVisionFallthrough && modelConfig.use_image_fallthrough) {
+          return {
+            ...base,
+            architecture: {
+              input_modalities: ['text', 'image'],
+              output_modalities: ['text'],
+            },
+          };
+        }
         return base;
       }
 
@@ -51,10 +82,19 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         }
       }
       if (!enriched) {
+        if (hasVisionFallthrough && modelConfig.use_image_fallthrough) {
+          return {
+            ...base,
+            architecture: {
+              input_modalities: ['text', 'image'],
+              output_modalities: ['text'],
+            },
+          };
+        }
         return base;
       }
 
-      return {
+      const result: Record<string, unknown> = {
         ...base,
         name: enriched.name,
         ...(enriched.description !== undefined && { description: enriched.description }),
@@ -66,6 +106,25 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         }),
         ...(enriched.top_provider !== undefined && { top_provider: enriched.top_provider }),
       };
+
+      if (hasVisionFallthrough && modelConfig.use_image_fallthrough) {
+        const arch = (result.architecture ?? {}) as Record<string, unknown>;
+        const inputModalities = (arch.input_modalities as string[] | undefined) ?? [];
+        if (!inputModalities.includes('image')) {
+          result.architecture = {
+            ...arch,
+            input_modalities: [...inputModalities, 'image'],
+          };
+        }
+        if (!arch.output_modalities) {
+          result.architecture = {
+            ...(result.architecture as Record<string, unknown>),
+            output_modalities: ['text'],
+          };
+        }
+      }
+
+      return result;
     });
 
     return reply.send({

@@ -36,8 +36,8 @@ async function consumeStream(stream: ReadableStream<any>): Promise<any[]> {
 /**
  * Helper to access the private probeOAuthStreamStart method for testing
  */
-function probeStreamStart(dispatcher: any, stream: ReadableStream<any>) {
-  return dispatcher.probeOAuthStreamStart(stream);
+function probeStreamStart(dispatcher: any, stream: ReadableStream<any>, stallConfig?: any) {
+  return dispatcher.probeOAuthStreamStart(stream, stallConfig);
 }
 
 function makeConfig() {
@@ -219,5 +219,132 @@ describe('OAuth probe: bookkeeping event buffering', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toBeDefined();
     expect(result.error!.message).toContain('429');
+  });
+
+  test('TTFB deadline exceeded returns stall error', async () => {
+    const dispatcher = new Dispatcher();
+    // Stream that keeps producing bookkeeping events slowly — never reaches content.
+    // The first event arrives after the TTFB deadline, so the deadline fires first.
+    const slowStream = new ReadableStream({
+      start(controller) {
+        setTimeout(() => {
+          controller.enqueue({ type: 'start', role: 'assistant' });
+          // More bookkeeping events would follow, but the deadline fires first
+          setTimeout(() => {
+            controller.enqueue({ type: 'text_start', contentIndex: 0 });
+          }, 500);
+        }, 500);
+      },
+    });
+
+    const result = await probeStreamStart(dispatcher, slowStream, {
+      ttfbMs: 50, // Very short deadline
+      ttfbBytes: 100,
+      minBytesPerSecond: null,
+      windowMs: 10000,
+      gracePeriodMs: 30000,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.streamStarted).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error!.message).toContain('stalled');
+  });
+
+  test('TTFB timeout fires during slow read', async () => {
+    const dispatcher = new Dispatcher();
+    // Stream that delivers a bookkeeping event slowly, then content after
+    const delayedStream = new ReadableStream({
+      start(controller) {
+        // Delay the first event past the TTFB timeout
+        setTimeout(() => {
+          controller.enqueue({ type: 'start', role: 'assistant' });
+          // The content arrives way after the deadline
+          setTimeout(() => {
+            controller.enqueue({ type: 'text_delta', delta: 'Hello', contentIndex: 0 });
+            controller.close();
+          }, 200);
+        }, 200);
+      },
+    });
+
+    const result = await probeStreamStart(dispatcher, delayedStream, {
+      ttfbMs: 50,
+      ttfbBytes: 100,
+      minBytesPerSecond: null,
+      windowMs: 10000,
+      gracePeriodMs: 30000,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.streamStarted).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error!.message).toContain('stalled');
+  });
+
+  test('Content event before deadline returns ok:true', async () => {
+    const dispatcher = new Dispatcher();
+    // Stream with bookkeeping then content — arrives well within deadline
+    const fastStream = createEventStream([
+      { type: 'start', role: 'assistant' },
+      { type: 'text_delta', delta: 'Hello', contentIndex: 0 },
+    ]);
+
+    const result = await probeStreamStart(dispatcher, fastStream, {
+      ttfbMs: 5000, // Generous deadline
+      ttfbBytes: 100,
+      minBytesPerSecond: null,
+      windowMs: 10000,
+      gracePeriodMs: 30000,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.stream).toBeDefined();
+
+    const events = await consumeStream(result.stream!);
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe('start');
+    expect(events[1].type).toBe('text_delta');
+  });
+
+  test('Error event before deadline returns ok:false (not stall)', async () => {
+    const dispatcher = new Dispatcher();
+    const errorStream = createEventStream([
+      { type: 'start', role: 'assistant' },
+      {
+        type: 'error',
+        error: { type: 'rate_limit_error', message: 'Rate limit exceeded' },
+      },
+    ]);
+
+    const result = await probeStreamStart(dispatcher, errorStream, {
+      ttfbMs: 5000,
+      ttfbBytes: 100,
+      minBytesPerSecond: null,
+      windowMs: 10000,
+      gracePeriodMs: 30000,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error!.message).toContain('Rate limit');
+    // Should NOT be a stall error
+    expect(result.error!.message).not.toContain('stalled');
+  });
+
+  test('No stallConfig preserves existing behavior', async () => {
+    const dispatcher = new Dispatcher();
+    const streamWithBookkeeping = createEventStream([
+      { type: 'start', role: 'assistant' },
+      { type: 'text_delta', delta: 'Hello', contentIndex: 0 },
+    ]);
+
+    const result = await probeStreamStart(dispatcher, streamWithBookkeeping);
+
+    expect(result.ok).toBe(true);
+    expect(result.stream).toBeDefined();
+
+    const events = await consumeStream(result.stream!);
+    expect(events).toHaveLength(2);
   });
 });

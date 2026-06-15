@@ -1,0 +1,1 @@
+ALTER TABLE `model_aliases` ADD `extra_body` text;
