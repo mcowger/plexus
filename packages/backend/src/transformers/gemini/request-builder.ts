@@ -16,6 +16,7 @@ export interface GenerateContentRequest {
     thinkingConfig?: {
       includeThoughts?: boolean;
       thinkingBudget?: number;
+      thinkingLevel?: string;
     };
     [key: string]: any;
   };
@@ -203,6 +204,8 @@ export async function buildGeminiRequest(
     generationConfig.thinkingConfig = {
       includeThoughts: request.reasoning.enabled,
       thinkingBudget: request.reasoning.max_tokens,
+      // Map unified effort back to Gemini's ThinkingLevel enum values (MINIMAL/LOW/MEDIUM/HIGH)
+      thinkingLevel: request.reasoning.effort ? request.reasoning.effort.toUpperCase() : undefined,
     };
   }
 

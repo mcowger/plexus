@@ -226,6 +226,77 @@ describe('Gemini Request Parser', () => {
     });
   });
 
+  describe('thinkingConfig parsing', () => {
+    it('should parse snake_case include_thoughts and thinking_level', async () => {
+      const input = {
+        contents: [{ role: 'user', parts: [{ text: 'Think' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          thinkingConfig: {
+            include_thoughts: true,
+            thinking_level: 'MEDIUM',
+          },
+        },
+      };
+
+      const result = await parseGeminiRequest(input);
+
+      expect(result.reasoning).toBeDefined();
+      expect(result.reasoning?.enabled).toBe(true);
+      expect(result.reasoning?.effort).toBe('medium');
+    });
+
+    it('should parse snake_case thinking_budget', async () => {
+      const input = {
+        contents: [{ role: 'user', parts: [{ text: 'Think' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          thinkingConfig: {
+            include_thoughts: true,
+            thinking_budget: 8192,
+          },
+        },
+      };
+
+      const result = await parseGeminiRequest(input);
+
+      expect(result.reasoning).toBeDefined();
+      expect(result.reasoning?.enabled).toBe(true);
+      expect(result.reasoning?.max_tokens).toBe(8192);
+    });
+
+    it('should parse camelCase includeThoughts and thinkingBudget for backwards compatibility', async () => {
+      const input = {
+        contents: [{ role: 'user', parts: [{ text: 'Think' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: 4096,
+          },
+        },
+      };
+
+      const result = await parseGeminiRequest(input);
+
+      expect(result.reasoning).toBeDefined();
+      expect(result.reasoning?.enabled).toBe(true);
+      expect(result.reasoning?.max_tokens).toBe(4096);
+    });
+
+    it('should produce no reasoning when thinkingConfig is absent', async () => {
+      const input = {
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {},
+      };
+
+      const result = await parseGeminiRequest(input);
+
+      expect(result.reasoning).toBeUndefined();
+    });
+  });
+
   describe('Gap 5: Google built-in tools', () => {
     it('should parse googleSearch tool', async () => {
       const input = {

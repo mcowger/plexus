@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildGeminiRequest } from '../request-builder';
+import { parseGeminiRequest } from '../request-parser';
 import type { UnifiedChatRequest, UnifiedToolConfig } from '../../../types/unified';
 
 // Helper to get first element with type narrowing
@@ -217,6 +218,87 @@ describe('Gemini Request Builder', () => {
       expect(decl.parametersJsonSchema).toBeDefined();
       // parameters is not output when parametersJsonSchema is present
       expect(decl.parameters).toBeUndefined();
+    });
+  });
+
+  describe('thinkingConfig building', () => {
+    it('should emit camelCase thinkingLevel from effort', async () => {
+      // SDK ThinkingConfig uses camelCase: includeThoughts, thinkingBudget, thinkingLevel
+      const request: UnifiedChatRequest = {
+        messages: [{ role: 'user', content: 'Think' }],
+        model: 'gemini-2.5-flash',
+        reasoning: { enabled: true, effort: 'medium' },
+      };
+
+      const result = await buildGeminiRequest(request);
+
+      expect(result.generationConfig?.thinkingConfig).toBeDefined();
+      expect(result.generationConfig?.thinkingConfig?.thinkingLevel).toBe('MEDIUM');
+      expect(result.generationConfig?.thinkingConfig?.includeThoughts).toBe(true);
+    });
+
+    it('should emit camelCase thinkingBudget from max_tokens', async () => {
+      const request: UnifiedChatRequest = {
+        messages: [{ role: 'user', content: 'Think' }],
+        model: 'gemini-2.5-flash',
+        reasoning: { enabled: true, max_tokens: 8192 },
+      };
+
+      const result = await buildGeminiRequest(request);
+
+      expect(result.generationConfig?.thinkingConfig?.thinkingBudget).toBe(8192);
+    });
+
+    it('should NOT emit snake_case thinking_budget or include_thoughts', async () => {
+      // Guards against re-introducing the snake_case bug on the outbound path
+      const request: UnifiedChatRequest = {
+        messages: [{ role: 'user', content: 'Think' }],
+        model: 'gemini-2.5-flash',
+        reasoning: { enabled: true, effort: 'high', max_tokens: 4096 },
+      };
+
+      const result = await buildGeminiRequest(request);
+      const tc = result.generationConfig?.thinkingConfig as any;
+
+      expect(tc).toBeDefined();
+      expect(tc.thinking_budget).toBeUndefined();
+      expect(tc.include_thoughts).toBeUndefined();
+      expect(tc.thinking_level).toBeUndefined();
+    });
+
+    it('should round-trip thinking config through parser then builder', async () => {
+      // Reproduces the bug from the trace: Python SDK sends snake_case thinkingConfig,
+      // parser must normalise to unified, builder must emit camelCase to the SDK.
+      const rawRequest = {
+        contents: [{ role: 'user', parts: [{ text: 'Think about this' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          thinkingConfig: {
+            include_thoughts: true,
+            thinking_level: 'MEDIUM',
+          },
+        },
+      };
+
+      const unified = await parseGeminiRequest(rawRequest);
+      const rebuilt = await buildGeminiRequest(unified);
+
+      const tc = rebuilt.generationConfig?.thinkingConfig;
+      expect(tc).toBeDefined();
+      // Builder must emit camelCase (SDK ThinkingConfig field names)
+      expect(tc?.includeThoughts).toBe(true);
+      expect(tc?.thinkingLevel).toBe('MEDIUM');
+    });
+
+    it('should not emit thinkingConfig when reasoning is absent', async () => {
+      const request: UnifiedChatRequest = {
+        messages: [{ role: 'user', content: 'Hello' }],
+        model: 'gemini-2.5-flash',
+      };
+
+      const result = await buildGeminiRequest(request);
+
+      expect(result.generationConfig?.thinkingConfig).toBeUndefined();
     });
   });
 
