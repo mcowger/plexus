@@ -159,6 +159,9 @@ export class OpenAITransformer implements Transformer {
       content: response.content,
       reasoning_content: response.reasoning_content,
       tool_calls: response.tool_calls,
+      ...(response.annotations && response.annotations.length > 0
+        ? { annotations: response.annotations }
+        : {}),
     };
 
     return {

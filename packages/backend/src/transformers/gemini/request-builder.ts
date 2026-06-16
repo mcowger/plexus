@@ -144,8 +144,16 @@ export async function buildGeminiRequest(
         }
 
         functionDeclarations.push(funcDecl);
-      } else if (t.type === 'googleSearch') {
-        // Gap 5: Google built-in tools
+      } else if (
+        t.type === 'googleSearch' ||
+        // Coerce known cross-provider web search types to googleSearch so that
+        // clients using Anthropic/OpenAI/OpenRouter web search tool formats are
+        // transparently mapped to the Gemini built-in when routing to a Gemini provider.
+        (t as any).type === 'web_search_20250305' ||
+        (t as any).type === 'web_search' ||
+        (t as any).type === 'openrouter:web_search'
+      ) {
+        // Gap 5: Google built-in tools (including cross-provider web search coercion)
         googleSearches.push({});
       } else if (t.type === 'codeExecution') {
         codeExecutions.push({});

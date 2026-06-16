@@ -141,6 +141,7 @@ Adapters can be set at **provider level** (applied to every model under the prov
 | `reasoning_content` | Renames `reasoning` / `thinking.content` → `reasoning_content` on outbound assistant messages for providers that use Fireworks/DeepSeek field naming (e.g. Fireworks DeepSeek-R1). Fixes *"Extra inputs are not permitted, field: messages[N].reasoning"* errors. |
 | `suppress_developer_role` | Rewrites the `developer` role to `system` on outbound messages for providers that do not support the newer OpenAI `developer` role. |
 | `model_override` | Conditionally rewrites the provider model name based on request payload fields. Used for providers that expose reasoning variants as separate model names rather than respecting reasoning-related fields in the request body. See [Model Override Adapter](#model-override-adapter) below. |
+| `web_search_coercion` | Translates server-side web search tool entries to the format expected by the target provider. Clients can use any web search format; Plexus rewrites it transparently. See [Web Search Coercion Adapter](#web-search-coercion-adapter) below. |
 
 **Example — provider-level:**
 ```json
@@ -224,6 +225,73 @@ The `model_override` adapter is configured at **model level** only (not provider
 - The adapter operates on the **transformed provider payload**, so fields must survive API transformation to be matchable. For chat-to-chat requests, all fields from the original request body are preserved (including non-standard fields like `enable_thinking`, `thinking_budget`, etc.).
 - Multiple rules are evaluated in order; only the first matching rule applies.
 - The rewrite is transparent to the client — billing and usage tracking still reference the original canonical model name.
+
+### Web Search Coercion Adapter
+
+Different providers expose server-side web search under completely different tool type strings, making it impossible for a client to use a single request format across all providers. The `web_search_coercion` adapter solves this: configure the target format once on the provider, and Plexus rewrites every web search tool entry in the outgoing request automatically — regardless of which format the client sent.
+
+**Supported incoming formats** (any of these will be recognised and coerced):
+
+| Provider | Tool entry |
+|----------|-----------|
+| Anthropic | `{ "type": "web_search_20250305", "name": "web_search", "max_uses": N }` |
+| OpenAI | `{ "type": "web_search" }` |
+| OpenRouter | `{ "type": "openrouter:web_search" }` |
+| Google | `{ "googleSearch": {} }` / `{ "type": "googleSearch" }` |
+
+**Supported targets** (the format Plexus rewrites to):
+
+| `target` | Output tool entry | Provider |
+|----------|------------------|---------|
+| `anthropic` | `{ "type": "web_search_20250305", "name": "web_search" }` | Anthropic API |
+| `openai` | `{ "type": "web_search" }` | OpenAI Responses API |
+| `openrouter` | `{ "type": "openrouter:web_search" }` | OpenRouter |
+| `google` | `{ "googleSearch": {} }` | Google Gemini native API |
+
+The adapter operates transparently across **all four incoming API surfaces** (Chat Completions, Anthropic Messages, OpenAI Responses, and Gemini native) — a client using any of these APIs and any web search format will have its request correctly rewritten for the target provider.
+
+**Configuration:**
+
+Set the adapter on the provider that needs coercion. The only required option is `target`:
+
+```json
+PATCH /v0/management/providers/my-openrouter-provider
+{
+  "adapter": [
+    {
+      "name": "web_search_coercion",
+      "options": {
+        "target": "openrouter"
+      }
+    }
+  ]
+}
+```
+
+For the Anthropic target, an optional `max_uses` limits how many web searches are allowed per request:
+
+```json
+{
+  "name": "web_search_coercion",
+  "options": {
+    "target": "anthropic",
+    "max_uses": 5
+  }
+}
+```
+
+**Options:**
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `target` | `"anthropic"` \| `"openai"` \| `"openrouter"` \| `"google"` | Yes | The provider's expected web search tool format |
+| `max_uses` | integer | No | Maximum web searches per request. Anthropic target only; ignored for other targets. |
+
+**Notes:**
+- Non-web-search tools (regular function tools) in the same request are left untouched.
+- The adapter only fires when a web search tool is present; requests without web search tools have zero overhead.
+- For Google providers, web search coercion requires the **native Gemini API** endpoint (`/v1beta/models/...`). The OpenAI-compatible endpoint Google exposes does not support any web search tool format.
+- Pass-through optimisation is automatically disabled when any adapter is active.
 
 ### Provider Quota Checkers
 

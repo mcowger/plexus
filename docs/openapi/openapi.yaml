@@ -555,6 +555,9 @@ paths:
   /register:
     $ref: paths/register.yaml
 components:
+  schemas:
+    WebSearchCoercionAdapterOptions:
+      $ref: ./components/schemas/WebSearchCoercionAdapterOptions.yaml
   securitySchemes:
     PlexusApiKey:
       type: http

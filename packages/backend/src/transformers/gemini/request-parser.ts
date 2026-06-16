@@ -120,6 +120,17 @@ export async function parseGeminiRequest(input: any): Promise<UnifiedChatRequest
       if (tool.urlContext) {
         unifiedTools.push({ type: 'urlContext' as const, urlContext: {} });
       }
+
+      // Coerce cross-provider web search types to googleSearch so clients
+      // using Anthropic/OpenAI/OpenRouter web search tool formats work transparently
+      // when routing to a Gemini provider via the native Gemini API.
+      if (
+        tool.type === 'web_search_20250305' ||
+        tool.type === 'web_search' ||
+        tool.type === 'openrouter:web_search'
+      ) {
+        unifiedTools.push({ type: 'googleSearch' as const, googleSearch: {} });
+      }
     }
 
     if (unifiedTools.length > 0) {

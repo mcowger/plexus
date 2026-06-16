@@ -1,0 +1,51 @@
+type: object
+description: >
+  Options for the `web_search_coercion` provider adapter.
+
+  This adapter translates server-side web search tool entries to the format
+  expected by the target provider, allowing clients to use any known web
+  search tool format regardless of which provider Plexus routes to.
+
+  **Recognised incoming formats:**
+
+  - Anthropic: `{ "type": "web_search_20250305", "name": "web_search" }`
+  - OpenAI: `{ "type": "web_search" }`
+  - OpenRouter: `{ "type": "openrouter:web_search" }`
+  - Google: `{ "googleSearch": {} }`
+
+  The adapter works across all four Plexus incoming API surfaces: Chat
+  Completions (`/v1/chat/completions`), Anthropic Messages (`/v1/messages`),
+  OpenAI Responses (`/v1/responses`), and Gemini native
+  (`/v1beta/models/{model}:generateContent`).
+required:
+  - target
+properties:
+  target:
+    type: string
+    enum:
+      - anthropic
+      - openai
+      - openrouter
+      - google
+    description: >
+      The provider's expected web search tool format.
+
+      | Value | Output tool entry | Provider |
+      |-------|------------------|---------|
+      | `anthropic` | `{ "type": "web_search_20250305", "name": "web_search" }` | Anthropic API |
+      | `openai` | `{ "type": "web_search" }` | OpenAI Responses API |
+      | `openrouter` | `{ "type": "openrouter:web_search" }` | OpenRouter |
+      | `google` | `{ "googleSearch": {} }` | Google Gemini native API |
+
+      **Note for `google`:** web search coercion requires the native Gemini
+      API endpoint. Google's OpenAI-compatible endpoint does not support any
+      web search tool format.
+  max_uses:
+    type: integer
+    minimum: 1
+    description: >
+      Maximum number of web searches allowed per request. Only honoured when
+      `target` is `"anthropic"` (maps to `max_uses` on the
+      `web_search_20250305` tool entry). Ignored for all other targets.
+example:
+  target: openrouter

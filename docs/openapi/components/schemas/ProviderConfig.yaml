@@ -245,7 +245,7 @@ properties:
       Adapters can be specified as bare strings (backward compatible) or as
       objects with `{ name, options }` for adapters that require configuration.
 
-      Available adapters:
+       Available adapters:
 
       - `reasoning_content` — Renames `reasoning`/`thinking.content` →
         `reasoning_content` on outbound assistant messages. Fixes Fireworks/
@@ -271,6 +271,17 @@ properties:
         an optional `when` condition (with `op` and `value`), an array of
         `rewrites` (each with `target` and `value`), and optional `strip`
         paths to remove after rewriting.
+
+      - `web_search_coercion` — Translates server-side web search tool entries
+        to the format expected by this provider. Clients may send any known web
+        search tool format (`web_search_20250305`, `web_search`,
+        `openrouter:web_search`, or `googleSearch`); the adapter rewrites it
+        to the target provider's canonical shape. Accepts a `target` option
+        (`"anthropic"`, `"openai"`, `"openrouter"`, or `"google"`) and an
+        optional `max_uses` integer (Anthropic target only). Works transparently
+        across all four incoming API surfaces (Chat Completions, Anthropic
+        Messages, OpenAI Responses, and Gemini native).
+        See [`WebSearchCoercionAdapterOptions`](#/components/schemas/WebSearchCoercionAdapterOptions).
 
       Pass-through optimisation is automatically disabled when any adapter
       is active.

@@ -119,6 +119,20 @@ export type ModelOverrideRule = z.infer<typeof ModelOverrideRuleSchema>;
 export type ModelOverrideOptions = z.infer<typeof ModelOverrideOptionsSchema>;
 export type AdapterEntry = z.infer<typeof AdapterEntrySchema>;
 
+// ─── Web Search Coercion Adapter Config ──────────────────────────────
+
+const WebSearchCoercionOptionsSchema = z.object({
+  /** The target provider web-search format to coerce incoming tools to. */
+  target: z.enum(['anthropic', 'openai', 'openrouter', 'google']),
+  /**
+   * Max number of web searches allowed (Anthropic only).
+   * Ignored when target is not 'anthropic'.
+   */
+  max_uses: z.number().int().positive().optional(),
+});
+
+export type WebSearchCoercionOptions = z.infer<typeof WebSearchCoercionOptionsSchema>;
+
 // ─── Reasoning Rewrite Adapter Config ────────────────────────────────
 
 const ValueTransformSchema = z.union([

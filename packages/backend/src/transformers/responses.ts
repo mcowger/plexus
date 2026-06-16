@@ -53,8 +53,9 @@ export class ResponsesTransformer implements Transformer {
       });
     }
 
-    // Convert tools (filter out built-in tools that Chat Completions doesn't support)
-    const tools = this.convertToolsForChatCompletions(input.tools || []);
+    // Convert tools — built-in server-side tools (web search etc.) are passed through
+    // so provider adapters can coerce them; only function tools are reformatted.
+    const tools = this.convertToolsForUnified(input.tools || []);
 
     return {
       requestId: input.requestId,
@@ -154,13 +155,20 @@ export class ResponsesTransformer implements Transformer {
         : JSON.stringify(systemMessage.content)
       : undefined;
 
-    // Convert tools to Responses API format
-    const tools = request.tools?.map((tool) => ({
-      type: 'function',
-      name: tool.function?.name ?? '',
-      description: tool.function?.description ?? '',
-      parameters: tool.function?.parameters ?? {},
-    }));
+    // Convert tools to Responses API format.
+    // Non-function tools (e.g. server-side web search types like "web_search",
+    // "web_search_20250305", "openrouter:web_search") are passed through as-is
+    // so that provider adapters can coerce them to the correct format before
+    // the HTTP call is made.
+    const tools = request.tools?.map((tool: any) => {
+      if (tool.type !== 'function' || !tool.function) return tool;
+      return {
+        type: 'function',
+        name: tool.function?.name ?? '',
+        description: tool.function?.description ?? '',
+        parameters: tool.function?.parameters ?? {},
+      };
+    });
 
     const payload: any = {
       model: request.model,
@@ -228,6 +236,27 @@ export class ResponsesTransformer implements Transformer {
       const messageItem = response.output?.find((item: any) => item.type === 'message');
       const content = messageItem?.content?.map((part: any) => part.text).join('\n') || null;
 
+      // Collect url_citation annotations from all output_text content parts
+      const annotations: any[] = [];
+      for (const part of messageItem?.content ?? []) {
+        if (Array.isArray(part.annotations)) {
+          for (const ann of part.annotations) {
+            if (ann.type === 'url_citation') {
+              annotations.push({
+                type: 'url_citation',
+                url_citation: {
+                  url: ann.url,
+                  title: ann.title,
+                  content: ann.text ?? ann.content,
+                  start_index: ann.start_index,
+                  end_index: ann.end_index,
+                },
+              });
+            }
+          }
+        }
+      }
+
       // Find reasoning output item
       const reasoningItem = response.output?.find((item: any) => item.type === 'reasoning');
       const reasoningParts = reasoningItem?.content?.length
@@ -241,6 +270,7 @@ export class ResponsesTransformer implements Transformer {
         created: response.created_at || Math.floor(Date.now() / 1000),
         content,
         reasoning_content,
+        annotations: annotations.length > 0 ? annotations : undefined,
         tool_calls: undefined, // TODO: Extract from function_call output items if needed
         usage,
       };
@@ -450,7 +480,8 @@ export class ResponsesTransformer implements Transformer {
   }
 
   /**
-   * Filters out built-in tools and converts function tools
+   * Filters out built-in tools and converts function tools.
+   * Used when routing Responses API → Chat Completions (outbound transform).
    */
   private convertToolsForChatCompletions(tools: any[]): any[] {
     return tools
@@ -464,6 +495,27 @@ export class ResponsesTransformer implements Transformer {
           strict: tool.strict,
         },
       }));
+  }
+
+  /**
+   * Converts incoming Responses API tools to unified format.
+   * Function tools are reformatted; non-function tools (built-in server-side
+   * tools like web_search, web_search_20250305, openrouter:web_search) are
+   * passed through as-is so provider adapters can coerce them.
+   */
+  private convertToolsForUnified(tools: any[]): any[] {
+    return tools.map((tool) => {
+      if (tool.type !== 'function') return tool;
+      return {
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+          strict: tool.strict,
+        },
+      };
+    });
   }
 
   /**
