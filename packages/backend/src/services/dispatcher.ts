@@ -511,6 +511,8 @@ export class Dispatcher {
               route,
               targetApiType
             );
+            CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
+            this.recordStickySession(sessionKey, route, currentRequest);
             doRelease();
             return oauthResponse;
           } catch (oauthError: any) {
