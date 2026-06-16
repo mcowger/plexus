@@ -158,6 +158,7 @@ describe('Dispatcher: visionFallthroughModel propagation', () => {
 describe('VisionDescriptorService: child request usage logging', () => {
   beforeEach(() => {
     (VisionDescriptorService.process as any).mockRestore?.();
+    VisionDescriptorService.clearCache();
   });
 
   afterEach(() => {

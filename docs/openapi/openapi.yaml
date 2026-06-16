@@ -404,6 +404,8 @@ paths:
     $ref: paths/v0_management_config_export.yaml
   /v0/management/config/vision-fallthrough:
     $ref: paths/v0_management_config_vision-fallthrough.yaml
+  /v0/management/cache/vision-descriptor/clear:
+    $ref: paths/v0_management_cache_vision-descriptor_clear.yaml
   /v0/management/config/background-exploration:
     $ref: paths/v0_management_config_background-exploration.yaml
   /v0/management/config/timeout:
