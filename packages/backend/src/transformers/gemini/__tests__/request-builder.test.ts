@@ -300,6 +300,18 @@ describe('Gemini Request Builder', () => {
 
       expect(result.generationConfig?.thinkingConfig).toBeUndefined();
     });
+
+    it('should not emit thinkingConfig when reasoning.enabled is false', async () => {
+      const request: UnifiedChatRequest = {
+        messages: [{ role: 'user', content: 'Hello' }],
+        model: 'gemini-2.5-flash',
+        reasoning: { enabled: false },
+      };
+
+      const result = await buildGeminiRequest(request);
+
+      expect(result.generationConfig?.thinkingConfig).toBeUndefined();
+    });
   });
 
   describe('Gap 5: Google built-in tools', () => {

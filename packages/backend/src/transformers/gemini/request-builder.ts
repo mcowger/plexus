@@ -200,7 +200,7 @@ export async function buildGeminiRequest(
   }
 
   // Pass through thinking config
-  if (request.reasoning) {
+  if (request.reasoning && request.reasoning.enabled !== false) {
     generationConfig.thinkingConfig = {
       includeThoughts: request.reasoning.enabled,
       thinkingBudget: request.reasoning.max_tokens,
