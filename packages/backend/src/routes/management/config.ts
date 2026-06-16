@@ -11,6 +11,7 @@ import { isValidIpRule } from '../../utils/ip-match';
 import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
 import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
+import { VisionDescriptorService } from '../../services/vision-descriptor-service';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
 
@@ -830,6 +831,13 @@ export async function registerConfigRoutes(
       logger.error('Failed to patch vision-fallthrough config', e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
+  });
+
+  // ─── Vision Descriptor Cache ──────────────────────────────────────
+
+  fastify.post('/v0/management/cache/vision-descriptor/clear', async (_request, reply) => {
+    VisionDescriptorService.clearCache();
+    return reply.send({ success: true, message: 'Vision descriptor cache cleared.' });
   });
 
   // ─── MCP Servers ──────────────────────────────────────────────────

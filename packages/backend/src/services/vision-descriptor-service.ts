@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   UnifiedChatRequest,
   UnifiedMessage,
@@ -13,7 +14,41 @@ import { calculateCosts } from '../utils/calculate-costs';
 import { estimateKwhUsed } from './inference-energy';
 import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 
+const DESCRIPTION_CACHE_MAX = 500;
+
 export class VisionDescriptorService {
+  // LRU cache: key = "<model>:<sha256(imageUrl)>", value = description string
+  private static readonly _cache = new Map<string, string>();
+
+  private static _cacheKey(imageUrl: string, model: string): string {
+    const hash = crypto.createHash('sha256').update(imageUrl).digest('hex');
+    return `${model}:${hash}`;
+  }
+
+  private static _cacheGet(key: string): string | undefined {
+    if (!VisionDescriptorService._cache.has(key)) return undefined;
+    // Move to end (most recently used)
+    const val = VisionDescriptorService._cache.get(key)!;
+    VisionDescriptorService._cache.delete(key);
+    VisionDescriptorService._cache.set(key, val);
+    return val;
+  }
+
+  private static _cacheSet(key: string, value: string): void {
+    if (VisionDescriptorService._cache.has(key)) {
+      VisionDescriptorService._cache.delete(key);
+    } else if (VisionDescriptorService._cache.size >= DESCRIPTION_CACHE_MAX) {
+      // Evict least recently used (first entry in Map)
+      VisionDescriptorService._cache.delete(VisionDescriptorService._cache.keys().next().value!);
+    }
+    VisionDescriptorService._cache.set(key, value);
+  }
+
+  /** Clears the in-memory description cache. Primarily useful in tests. */
+  public static clearCache(): void {
+    VisionDescriptorService._cache.clear();
+  }
+
   /**
    * Processes a request by converting images to text descriptions if needed.
    * Modifies a clone of the original request.
@@ -99,6 +134,13 @@ export class VisionDescriptorService {
     usageStorage?: UsageStorageService,
     parentRequest?: UnifiedChatRequest
   ): Promise<string> {
+    const cacheKey = VisionDescriptorService._cacheKey(url, model);
+    const cached = VisionDescriptorService._cacheGet(cacheKey);
+    if (cached !== undefined) {
+      logger.debug(`Vision descriptor cache hit for model '${model}'`);
+      return cached;
+    }
+
     const dispatcher = new Dispatcher();
     if (usageStorage) {
       dispatcher.setUsageStorage(usageStorage);
@@ -202,6 +244,7 @@ export class VisionDescriptorService {
       }
 
       logger.debug(`Received description (${description.length} chars)`);
+      VisionDescriptorService._cacheSet(cacheKey, description);
       return description;
     } catch (error) {
       logger.error(`Error describing image with ${model}:`, error);
