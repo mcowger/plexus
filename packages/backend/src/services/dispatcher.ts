@@ -511,8 +511,13 @@ export class Dispatcher {
               route,
               targetApiType
             );
-            doRelease();
-            return oauthResponse;
+            try {
+              CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
+              this.recordStickySession(sessionKey, route, currentRequest);
+              return oauthResponse;
+            } finally {
+              doRelease();
+            }
           } catch (oauthError: any) {
             const effectiveOAuthError = attemptTimeout.isTimedOut()
               ? this.buildTimeoutError()

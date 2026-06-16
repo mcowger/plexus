@@ -4,6 +4,8 @@ import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { CooldownManager } from '../cooldown-manager';
 import { StickySessionManager } from '../sticky-session-manager';
+import { OAuthAuthManager } from '../oauth-auth-manager';
+import { registerSpy } from '../../../test/test-utils';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
@@ -73,6 +75,39 @@ function configFor(opts: { sticky: boolean }) {
   } as any;
 }
 
+function oauthConfigForSticky() {
+  return {
+    providers: {
+      oauthClaude: {
+        type: 'oauth',
+        api_base_url: 'oauth://anthropic',
+        oauth_provider: 'anthropic',
+        oauth_account: 'test-account',
+        models: {
+          'claude-test': {
+            pricing: { source: 'simple', input: 0, output: 0 },
+            access_via: ['chat', 'messages'],
+          },
+        },
+      },
+    },
+    models: {
+      'test-alias': {
+        selector: 'in_order',
+        sticky_session: true,
+        targets: [{ provider: 'oauthClaude', model: 'claude-test' }],
+      },
+    },
+    keys: {},
+    failover: {
+      enabled: true,
+      retryableStatusCodes: [500, 502, 503, 504, 429],
+      retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'],
+    },
+    quotas: [],
+  } as any;
+}
+
 function multiTurnRequest(): UnifiedChatRequest {
   return {
     model: 'test-alias',
@@ -91,11 +126,13 @@ describe('Dispatcher sticky_session write-back', () => {
   beforeEach(async () => {
     fetchMock.mockClear();
     StickySessionManager.getInstance().clear();
+    OAuthAuthManager.resetForTesting();
     await CooldownManager.getInstance().clearCooldown();
   });
 
   afterEach(async () => {
     await CooldownManager.getInstance().clearCooldown();
+    OAuthAuthManager.resetForTesting();
   });
 
   test('records the successful (provider, model) after dispatch when sticky_session is enabled', async () => {
@@ -199,6 +236,23 @@ describe('Dispatcher sticky_session write-back', () => {
     expect(StickySessionManager.getInstance().get('test-alias', sessionKey)).toEqual({
       provider: 'p2',
       model: 'model-2',
+    });
+  });
+
+  test('records successful OAuth/pi-ai dispatches for sticky_session aliases', async () => {
+    setConfigForTesting(oauthConfigForSticky());
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
+      'sk-ant-oat-fake-token-for-test'
+    );
+
+    const req = multiTurnRequest();
+    const sessionKey = StickySessionManager.computeSessionKey(req)!;
+
+    await new Dispatcher().dispatch(req);
+
+    expect(StickySessionManager.getInstance().get('test-alias', sessionKey)).toEqual({
+      provider: 'oauthClaude',
+      model: 'claude-test',
     });
   });
 });
