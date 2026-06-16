@@ -37,8 +37,17 @@ export const webSearchCoercionAdapter: ProviderAdapter = {
     if (!options?.target) return payload;
     if (!Array.isArray(payload.tools) || payload.tools.length === 0) return payload;
 
-    const target = options.target as WebSearchCoercionOptions['target'];
-    const maxUses = options.max_uses as number | undefined;
+    const target = options.target;
+    if (
+      target !== 'anthropic' &&
+      target !== 'openai' &&
+      target !== 'openrouter' &&
+      target !== 'google'
+    ) {
+      return payload;
+    }
+
+    const maxUses = typeof options.max_uses === 'number' ? options.max_uses : undefined;
 
     let didRewrite = false;
     const tools = payload.tools.map((tool: any) => {
