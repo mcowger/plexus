@@ -15,5 +15,10 @@
     "pullRequest": {
       "instructions": "Describe the final state of the change for another engineer. Do not describe the implementation journey, debugging process, or discarded approaches. Do not include a Testing section, checklist, marketing language, hype, or sales framing. Keep it factual, technical, and concise."
     }
+  },
+  "scripts": {
+    "ship": {
+      "command": "bash scripts/ship.sh"
+    }
   }
 }
