@@ -55,6 +55,7 @@ async function createApp(): Promise<{
     models: {
       'test-model': {
         priority: 'selector',
+        sticky_session: false,
         targets: [{ provider: 'test-provider', model: 'test-model' }],
       },
     },

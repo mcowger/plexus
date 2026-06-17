@@ -58,6 +58,7 @@ const TRANSCRIPTIONS_TEST_CONFIG = {
     'transcription-model': {
       type: 'transcriptions' as const,
       priority: 'selector' as const,
+      sticky_session: false,
       targets: [{ provider: 'openai', model: 'whisper-1' }],
     },
   },

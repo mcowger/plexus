@@ -88,6 +88,7 @@ describe('Plexus management MCP routes', () => {
       models: {
         'gpt-5': {
           priority: 'selector',
+          sticky_session: false,
           selector: 'random',
           target_groups: [
             {

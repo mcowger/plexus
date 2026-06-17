@@ -42,6 +42,7 @@ describe('Auth Middleware', () => {
       models: {
         'gpt-4': {
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'gpt-4' }],
         },
       },
@@ -220,6 +221,7 @@ describe('Key Attribution', () => {
       models: {
         'gpt-4': {
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'gpt-4' }],
         },
       },
@@ -452,6 +454,7 @@ describe('Key Access Policy Propagation', () => {
       models: {
         'gpt-4': {
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'gpt-4' }],
         },
       },
@@ -561,6 +564,7 @@ describe('Key Access Policy Exclusion Propagation', () => {
       models: {
         'gpt-4': {
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'gpt-4' }],
         },
       },
@@ -638,6 +642,7 @@ describe('Key IP Allowlist', () => {
       models: {
         'gpt-4': {
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'gpt-4' }],
         },
       },
@@ -710,6 +715,7 @@ describe('Trusted Proxy Header Handling', () => {
       models: {
         'gpt-4': {
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'gpt-4' }],
         },
       },

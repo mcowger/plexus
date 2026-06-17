@@ -114,6 +114,7 @@ describe('Transcriptions Debug Logging', () => {
         'transcription-model': {
           type: 'transcriptions',
           priority: 'selector',
+          sticky_session: false,
           targets: [{ provider: 'openai', model: 'whisper-1' }],
         },
       },

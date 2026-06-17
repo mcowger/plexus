@@ -26,6 +26,7 @@ const EMBEDDINGS_TEST_CONFIG = {
   models: {
     'embeddings-small': {
       priority: 'selector' as const,
+      sticky_session: false,
       targets: [{ provider: 'openai', model: 'text-embedding-3-small' }],
     },
   },

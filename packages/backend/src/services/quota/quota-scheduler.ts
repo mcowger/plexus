@@ -108,7 +108,6 @@ export class QuotaScheduler {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Quota checker '${checkerId}' threw an exception: ${message}`);
       result = {
         checkerId,
         checkerType: config.type,
