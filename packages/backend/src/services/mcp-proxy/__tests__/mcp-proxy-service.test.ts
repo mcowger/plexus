@@ -7,6 +7,7 @@ import {
   mergeUpstreamHeaders,
   redactSensitiveHeaders,
   extractJsonRpcMethod,
+  getEffectiveUpstreamUrl,
   proxyMcpRequest,
 } from '../mcp-proxy-service';
 import { setConfigForTesting } from '../../../config';
@@ -251,6 +252,15 @@ describe('MCP Proxy Service', () => {
             upstream_url: 'http://localhost:3001/mcp',
             enabled: false,
           },
+          'local-server': {
+            mode: 'local_http',
+            enabled: true,
+            launcher: 'bunx',
+            package: '@example/mcp-server',
+            args: ['--port', '{{PORT}}'],
+            port: 7345,
+            path: '/mcp',
+          },
         },
       });
     });
@@ -259,9 +269,22 @@ describe('MCP Proxy Service', () => {
       const config = getMcpServerConfig('test-server');
 
       expect(config).not.toBeNull();
+      expect(config?.mode).not.toBe('local_http');
+      if (config?.mode === 'local_http') throw new Error('Expected remote HTTP config');
       expect(config?.upstream_url).toBe('http://localhost:3000/mcp');
       expect(config?.enabled).toBe(true);
       expect(config?.headers).toEqual({ 'x-upstream-header': 'value' });
+    });
+
+    test('should return config and effective URL for local HTTP server', () => {
+      const config = getMcpServerConfig('local-server');
+
+      expect(config).not.toBeNull();
+      expect(config?.mode).toBe('local_http');
+      if (config?.mode !== 'local_http') throw new Error('Expected local HTTP config');
+      expect(config.launcher).toBe('bunx');
+      expect(config.package).toBe('@example/mcp-server');
+      expect(getEffectiveUpstreamUrl(config)).toBe('http://127.0.0.1:7345/mcp');
     });
 
     test('should return null for disabled server', () => {

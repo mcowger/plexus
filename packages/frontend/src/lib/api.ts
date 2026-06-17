@@ -253,10 +253,35 @@ export interface Provider {
   pi_ai_provider?: string;
 }
 
-export interface McpServer {
+export type McpServer = RemoteMcpServer | LocalMcpServer;
+
+export interface RemoteMcpServer {
+  mode?: 'remote_http';
   upstream_url: string;
   enabled: boolean;
   headers?: Record<string, string>;
+}
+
+export interface LocalMcpServer {
+  mode: 'local_http';
+  enabled: boolean;
+  launcher: 'bunx' | 'uvx';
+  package: string;
+  args?: string[];
+  port: number;
+  path?: string;
+  startup_timeout_ms?: number;
+  headers?: Record<string, string>;
+}
+
+export interface LocalMcpRuntimeStatus {
+  serverName: string;
+  status: 'stopped' | 'starting' | 'running' | 'failed';
+  pid: number | null;
+  url: string | null;
+  lastError: string | null;
+  startedAt: string | null;
+  exitedAt: string | null;
 }
 
 export interface McpLogRecord {
@@ -2660,9 +2685,7 @@ export const api = {
     return json.data || [];
   },
 
-  getMcpServers: async (): Promise<
-    Record<string, { upstream_url: string; enabled: boolean; headers?: Record<string, string> }>
-  > => {
+  getMcpServers: async (): Promise<Record<string, McpServer>> => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/v0/management/mcp-servers`);
       if (!res.ok) throw new Error('Failed to fetch MCP servers');
@@ -2673,10 +2696,7 @@ export const api = {
     }
   },
 
-  saveMcpServer: async (
-    serverName: string,
-    server: { upstream_url: string; enabled?: boolean; headers?: Record<string, string> }
-  ): Promise<void> => {
+  saveMcpServer: async (serverName: string, server: McpServer): Promise<void> => {
     try {
       const res = await fetchWithAuth(
         `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}`,
@@ -2712,6 +2732,41 @@ export const api = {
       console.error('API Error deleteMcpServer', e);
       throw e;
     }
+  },
+
+  getMcpServerStatus: async (serverName: string): Promise<LocalMcpRuntimeStatus> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/status`
+    );
+    if (!res.ok) throw new Error('Failed to fetch MCP server status');
+    return await res.json();
+  },
+
+  startMcpServer: async (serverName: string): Promise<LocalMcpRuntimeStatus> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/start`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error('Failed to start MCP server');
+    return await res.json();
+  },
+
+  stopMcpServer: async (serverName: string): Promise<LocalMcpRuntimeStatus> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/stop`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error('Failed to stop MCP server');
+    return await res.json();
+  },
+
+  restartMcpServer: async (serverName: string): Promise<LocalMcpRuntimeStatus> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/restart`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error('Failed to restart MCP server');
+    return await res.json();
   },
 
   getMcpLogs: async (

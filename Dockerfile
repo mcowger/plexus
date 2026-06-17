@@ -35,11 +35,19 @@ RUN case "${TARGETPLATFORM}" in \
          *) echo "Unsupported platform: ${TARGETPLATFORM}" && exit 1 ;; \
     esac
 
-# Stage 2: Minimal production image — just the binary
-FROM debian:bookworm-slim
+# Stage 2: Production image with local MCP runtime tooling.
+# Includes Bun/bunx and uv/uvx so Plexus can manage local HTTP MCP servers.
+FROM oven/bun:1
 
 ARG APP_VERSION=dev
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git python3 build-essential \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && ln -sf /root/.local/bin/uv /usr/local/bin/uv \
+    && ln -sf /root/.local/bin/uvx /usr/local/bin/uvx \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binary from the builder stage.
 COPY --from=builder /app/plexus ./plexus

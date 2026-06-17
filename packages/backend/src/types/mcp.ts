@@ -1,6 +1,24 @@
-export interface McpServerConfig {
+export type McpServerMode = 'remote_http' | 'local_http';
+export type McpLauncher = 'bunx' | 'uvx';
+
+export type McpServerConfig = RemoteHttpMcpServerConfig | LocalHttpMcpServerConfig;
+
+export interface RemoteHttpMcpServerConfig {
+  mode?: 'remote_http';
   upstream_url: string;
   enabled: boolean;
+  headers?: Record<string, string>;
+}
+
+export interface LocalHttpMcpServerConfig {
+  mode: 'local_http';
+  enabled: boolean;
+  launcher: McpLauncher;
+  package: string;
+  args?: string[];
+  port: number;
+  path?: string;
+  startup_timeout_ms?: number;
   headers?: Record<string, string>;
 }
 

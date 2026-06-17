@@ -196,7 +196,11 @@ export async function registerMcpRoutes(
           start_time: startTime,
           duration_ms: durationMs,
           server_name: serverName,
-          upstream_url: mcpProxyService.getMcpServerConfig(serverName)?.upstream_url || '',
+          upstream_url: mcpProxyService.getMcpServerConfig(serverName)
+            ? mcpProxyService.getEffectiveUpstreamUrl(
+                mcpProxyService.getMcpServerConfig(serverName)!
+              )
+            : '',
           method,
           jsonrpc_method: jsonrpcMethod,
           tool_name: toolName,
@@ -281,7 +285,11 @@ export async function registerMcpRoutes(
           start_time: startTime,
           duration_ms: durationMs,
           server_name: serverName,
-          upstream_url: mcpProxyService.getMcpServerConfig(serverName)?.upstream_url || '',
+          upstream_url: mcpProxyService.getMcpServerConfig(serverName)
+            ? mcpProxyService.getEffectiveUpstreamUrl(
+                mcpProxyService.getMcpServerConfig(serverName)!
+              )
+            : '',
           method,
           jsonrpc_method: null,
           tool_name: null,
@@ -359,7 +367,11 @@ export async function registerMcpRoutes(
           start_time: startTime,
           duration_ms: durationMs,
           server_name: serverName,
-          upstream_url: mcpProxyService.getMcpServerConfig(serverName)?.upstream_url || '',
+          upstream_url: mcpProxyService.getMcpServerConfig(serverName)
+            ? mcpProxyService.getEffectiveUpstreamUrl(
+                mcpProxyService.getMcpServerConfig(serverName)!
+              )
+            : '',
           method,
           jsonrpc_method: null,
           tool_name: null,

@@ -70,6 +70,7 @@ import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
 import { isEncryptionEnabled } from './utils/encryption';
+import { mcpProcessManager } from './services/mcp-local/mcp-process-manager';
 
 /**
  * Plexus Backend Server
@@ -403,6 +404,7 @@ const start = async () => {
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
       quotaScheduler.stop();
+      await mcpProcessManager.stopAll();
       await fastify.close();
       const { closeDatabase } = await import('./db/client');
       await closeDatabase();

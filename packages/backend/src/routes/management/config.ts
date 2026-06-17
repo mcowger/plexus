@@ -11,6 +11,7 @@ import { isValidIpRule } from '../../utils/ip-match';
 import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
 import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
+import { mcpProcessManager } from '../../services/mcp-local/mcp-process-manager';
 import { VisionDescriptorService } from '../../services/vision-descriptor-service';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
@@ -936,6 +937,44 @@ export async function registerConfigRoutes(
       logger.error(`Failed to delete MCP server '${serverName}'`, e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
+  });
+
+  fastify.get('/v0/management/mcp-servers/:serverName/status', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    const servers = await configService.getRepository().getAllMcpServers();
+    const server = servers[serverName];
+    if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+    return reply.send(mcpProcessManager.getStatus(serverName, server));
+  });
+
+  fastify.post('/v0/management/mcp-servers/:serverName/start', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    const servers = await configService.getRepository().getAllMcpServers();
+    const server = servers[serverName];
+    if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+    if (server.mode !== 'local_http')
+      return reply.code(400).send({ error: 'MCP server is not local_http' });
+    return reply.send(await mcpProcessManager.start(serverName, server));
+  });
+
+  fastify.post('/v0/management/mcp-servers/:serverName/stop', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    return reply.send(await mcpProcessManager.stop(serverName));
+  });
+
+  fastify.post('/v0/management/mcp-servers/:serverName/restart', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    const servers = await configService.getRepository().getAllMcpServers();
+    const server = servers[serverName];
+    if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+    if (server.mode !== 'local_http')
+      return reply.code(400).send({ error: 'MCP server is not local_http' });
+    return reply.send(await mcpProcessManager.restart(serverName, server));
+  });
+
+  fastify.get('/v0/management/mcp-servers/:serverName/process-logs', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    return reply.send({ data: mcpProcessManager.getLogs(serverName) });
   });
 
   // ─── MCP Server Enabled ──────────────────────────────────────────

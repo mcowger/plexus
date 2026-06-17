@@ -32,8 +32,21 @@ import plexusAdminSkill from '../../../../.agents/skills/plexus-management/SKILL
 };
 
 const EMPTY_SERVER: McpServer = {
+  mode: 'remote_http',
   upstream_url: '',
   enabled: true,
+  headers: {},
+};
+
+const EMPTY_LOCAL_SERVER: McpServer = {
+  mode: 'local_http',
+  enabled: true,
+  launcher: 'bunx',
+  package: '',
+  args: ['--port', '{{PORT}}'],
+  port: 7345,
+  path: '/mcp',
+  startup_timeout_ms: 30000,
   headers: {},
 };
 
@@ -189,8 +202,15 @@ export const McpPage: React.FC = () => {
       );
       return;
     }
-    if (!editingServer.upstream_url || !editingServer.upstream_url.trim()) {
+    if (
+      editingServer.mode !== 'local_http' &&
+      (!editingServer.upstream_url || !editingServer.upstream_url.trim())
+    ) {
       toast.error('Upstream URL is required');
+      return;
+    }
+    if (editingServer.mode === 'local_http' && !editingServer.package.trim()) {
+      toast.error('Package name is required');
       return;
     }
 
@@ -202,11 +222,7 @@ export const McpPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await api.saveMcpServer(nameToSave, {
-        upstream_url: editingServer.upstream_url,
-        enabled: editingServer.enabled,
-        headers: finalHeaders,
-      });
+      await api.saveMcpServer(nameToSave, { ...editingServer, headers: finalHeaders });
       await loadData();
       setIsModalOpen(false);
     } catch (e) {
@@ -444,7 +460,9 @@ export const McpPage: React.FC = () => {
                               </span>
                             </div>
                             <div className="mt-1 break-all text-xs text-text-muted">
-                              {server.upstream_url}
+                              {server.mode === 'local_http'
+                                ? `${server.launcher} ${server.package} → 127.0.0.1:${server.port}${server.path || '/mcp'}`
+                                : server.upstream_url}
                             </div>
                           </button>
                           <div className="flex shrink-0 items-center gap-2">
@@ -565,7 +583,9 @@ export const McpPage: React.FC = () => {
                                   whiteSpace: 'nowrap',
                                 }}
                               >
-                                {server.upstream_url}
+                                {server.mode === 'local_http'
+                                  ? `${server.launcher} ${server.package} → 127.0.0.1:${server.port}${server.path || '/mcp'}`
+                                  : server.upstream_url}
                               </div>
                             </td>
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
@@ -1024,14 +1044,113 @@ export const McpPage: React.FC = () => {
                 />
               )}
 
-              <Input
-                label="Upstream URL"
-                value={editingServer.upstream_url}
-                onChange={(e) =>
-                  setEditingServer({ ...editingServer, upstream_url: e.target.value })
-                }
-                placeholder="https://mcp.example.com/mcp"
-              />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-secondary">
+                  Server Type
+                </label>
+                <select
+                  className="w-full rounded-md border border-border-glass bg-bg-surface px-3 py-2 text-sm text-text"
+                  value={editingServer.mode === 'local_http' ? 'local_http' : 'remote_http'}
+                  onChange={(e) =>
+                    setEditingServer(
+                      e.target.value === 'local_http'
+                        ? {
+                            ...EMPTY_LOCAL_SERVER,
+                            enabled: editingServer.enabled,
+                            headers: editingServer.headers,
+                          }
+                        : {
+                            ...EMPTY_SERVER,
+                            enabled: editingServer.enabled,
+                            headers: editingServer.headers,
+                          }
+                    )
+                  }
+                >
+                  <option value="remote_http">Remote HTTP</option>
+                  <option value="local_http">Local HTTP</option>
+                </select>
+              </div>
+
+              {editingServer.mode === 'local_http' ? (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-text-secondary">
+                      Launcher
+                    </label>
+                    <select
+                      className="w-full rounded-md border border-border-glass bg-bg-surface px-3 py-2 text-sm text-text"
+                      value={editingServer.launcher}
+                      onChange={(e) =>
+                        setEditingServer({
+                          ...editingServer,
+                          launcher: e.target.value as 'bunx' | 'uvx',
+                        })
+                      }
+                    >
+                      <option value="bunx">bunx</option>
+                      <option value="uvx">uvx</option>
+                    </select>
+                  </div>
+                  <Input
+                    label="Package"
+                    value={editingServer.package}
+                    onChange={(e) =>
+                      setEditingServer({ ...editingServer, package: e.target.value })
+                    }
+                    placeholder="@example/mcp-server"
+                  />
+                  <Input
+                    label="Arguments"
+                    value={(editingServer.args || []).join(' ')}
+                    onChange={(e) =>
+                      setEditingServer({
+                        ...editingServer,
+                        args: e.target.value.split(' ').filter(Boolean),
+                      })
+                    }
+                    placeholder="--port {{PORT}}"
+                  />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Input
+                      label="Port"
+                      type="number"
+                      value={editingServer.port}
+                      onChange={(e) =>
+                        setEditingServer({
+                          ...editingServer,
+                          port: parseInt(e.target.value) || 7345,
+                        })
+                      }
+                    />
+                    <Input
+                      label="Path"
+                      value={editingServer.path || '/mcp'}
+                      onChange={(e) => setEditingServer({ ...editingServer, path: e.target.value })}
+                    />
+                    <Input
+                      label="Startup Timeout (ms)"
+                      type="number"
+                      value={editingServer.startup_timeout_ms || 30000}
+                      onChange={(e) =>
+                        setEditingServer({
+                          ...editingServer,
+                          startup_timeout_ms: parseInt(e.target.value) || 30000,
+                        })
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <Input
+                  label="Upstream URL"
+                  value={editingServer.upstream_url}
+                  onChange={(e) =>
+                    setEditingServer({ ...editingServer, upstream_url: e.target.value })
+                  }
+                  placeholder="https://mcp.example.com/mcp"
+                />
+              )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">

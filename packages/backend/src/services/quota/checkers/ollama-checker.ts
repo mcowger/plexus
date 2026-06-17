@@ -10,7 +10,10 @@ function extractUsage(html: string, label: string): { percent: number; resetsAt?
     const percent = parseFloat(ariaMatch[1]!);
     // data-time is on a sibling element after the usage meter, search the broader area
     const labelIndex = html.indexOf(label);
-    const resetMatch = labelIndex !== -1 ? html.slice(labelIndex, labelIndex + 3000).match(/data-time="([^"]+)"/) : null;
+    const resetMatch =
+      labelIndex !== -1
+        ? html.slice(labelIndex, labelIndex + 3000).match(/data-time="([^"]+)"/)
+        : null;
     const resetsAt = resetMatch ? new Date(resetMatch[1]!).toISOString() : undefined;
 
     logger.silly(`${label}: ${percent}% (aria-label), resets at ${resetsAt}`);

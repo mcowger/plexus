@@ -1167,6 +1167,26 @@ export class ConfigRepository {
     const result: Record<string, McpServerConfig> = {};
 
     for (const row of rows) {
+      const mode = row.mode || 'remote_http';
+
+      if (mode === 'local_http') {
+        const localConfig: McpServerConfig = {
+          mode: 'local_http',
+          enabled: toBool(row.enabled),
+          launcher: row.launcher as 'bunx' | 'uvx',
+          package: row.packageName || '',
+          args: row.args ? decryptJsonField<string[]>(row.args) || [] : [],
+          port: Number(row.port || 0),
+          path: row.path || '/mcp',
+          startup_timeout_ms: Number(row.startupTimeoutMs || 30000),
+          headers: row.headers
+            ? decryptJsonField<Record<string, string>>(row.headers) || undefined
+            : undefined,
+        };
+        result[row.name] = localConfig;
+        continue;
+      }
+
       result[row.name] = {
         upstream_url: row.upstreamUrl,
         enabled: toBool(row.enabled),
@@ -1189,13 +1209,38 @@ export class ConfigRepository {
       .where(eq(schema.mcpServers.name, name))
       .limit(1);
 
+    const isLocal = config.mode === 'local_http';
+    const upstreamUrl = isLocal
+      ? 'http://127.0.0.1:' + config.port + (config.path || '/mcp')
+      : config.upstream_url;
+    const localFields = isLocal
+      ? {
+          mode: 'local_http',
+          launcher: config.launcher,
+          packageName: config.package,
+          args: config.args ? encryptJsonField(config.args) : null,
+          port: config.port,
+          path: config.path || '/mcp',
+          startupTimeoutMs: config.startup_timeout_ms || 30000,
+        }
+      : {
+          mode: 'remote_http',
+          launcher: null,
+          packageName: null,
+          args: null,
+          port: null,
+          path: null,
+          startupTimeoutMs: null,
+        };
+
     if (existing.length > 0) {
       await this.db()
         .update(schema.mcpServers)
         .set({
-          upstreamUrl: config.upstream_url,
+          upstreamUrl,
           enabled: fromBool(config.enabled !== false),
           headers: config.headers ? encryptJsonField(config.headers) : null,
+          ...localFields,
           updatedAt: timestamp,
         })
         .where(eq(schema.mcpServers.name, name));
@@ -1204,9 +1249,10 @@ export class ConfigRepository {
         .insert(schema.mcpServers)
         .values({
           name,
-          upstreamUrl: config.upstream_url,
+          upstreamUrl,
           enabled: fromBool(config.enabled !== false),
           headers: config.headers ? encryptJsonField(config.headers) : null,
+          ...localFields,
           createdAt: timestamp,
           updatedAt: timestamp,
         });

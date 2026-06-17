@@ -39,6 +39,12 @@ Upstream MCP servers are configured on the MCP page. Each server requires:
 - **Headers** — optional headers forwarded to the upstream server
 - **Timeout** — request timeout in milliseconds
 
+Plexus also supports **Local HTTP** MCP servers. For these, Plexus starts a
+local process with either `bunx` or `uvx`, waits for it to listen on a local
+HTTP port, then proxies `/mcp/:name` to `http://127.0.0.1:<port><path>`.
+Admins select the launcher (`bunx` or `uvx`), provide a package name, package
+arguments, port, and path. Arbitrary commands are not supported.
+
 Server names must match `[a-z0-9][a-z0-9-_]{1,62}`. The name `plexus` is reserved for the management MCP server and cannot be used as a gateway server name.
 
 ## Plexus Management MCP Tools

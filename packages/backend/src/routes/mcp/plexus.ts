@@ -992,6 +992,32 @@ async function handleMcpGatewayTool(
           `/v0/management/mcp-servers/${encodeURIComponent(requireId(input, 'mcp_gateway'))}`
         )
       );
+    case 'status':
+    case 'logs': {
+      const id = requireId(input, 'mcp_gateway');
+      const suffix = input.operation === 'logs' ? 'process-logs' : 'status';
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'GET',
+          `/v0/management/mcp-servers/${encodeURIComponent(id)}/${suffix}`
+        )
+      );
+    }
+    case 'start':
+    case 'stop':
+    case 'restart': {
+      const id = requireId(input, 'mcp_gateway');
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'POST',
+          `/v0/management/mcp-servers/${encodeURIComponent(id)}/${input.operation}`
+        )
+      );
+    }
     default:
       throw unsupportedOperation(input.operation, [
         'servers_list',
@@ -1001,6 +1027,11 @@ async function handleMcpGatewayTool(
         'create',
         'update',
         'delete',
+        'status',
+        'start',
+        'stop',
+        'restart',
+        'logs',
       ]);
   }
 }
@@ -1344,7 +1375,7 @@ function getToolDescription(toolName: string) {
     case 'plexus_debug':
       return 'Review and manage debug tracing. Operations: state, update, logs, get_log, delete_log, delete_all_logs.';
     case 'plexus_mcp_gateway':
-      return 'Inspect and manage Plexus upstream MCP gateway configuration. Operations: servers_list, list, get, put, create, update, delete.';
+      return 'Inspect and manage Plexus upstream MCP gateway configuration. Operations: servers_list, list, get, put, create, update, delete, status, start, stop, restart, logs.';
     case 'plexus_settings':
       return 'Inspect Plexus settings by category. Initial operations: get.';
     case 'plexus_system_logs':
