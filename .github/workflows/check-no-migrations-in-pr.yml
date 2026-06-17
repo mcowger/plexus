@@ -10,10 +10,10 @@ jobs:
   check-migrations:
     name: Block migration files in PR
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'migrations-ok') }}
     steps:
       - name: Check author association
         id: author-check
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'migrations-ok') }}
         run: |
           ASSOC="${{ github.event.pull_request.author_association }}"
           SENDER="${{ github.event.pull_request.user.login }}"

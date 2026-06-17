@@ -13,10 +13,11 @@ permissions:
 jobs:
   # ── Approve Dependabot PRs immediately so they don't block on review ──
   approve:
-    if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     steps:
       - name: Approve PR
+        if: github.actor == 'dependabot[bot]'
         run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -24,11 +25,12 @@ jobs:
 
   # ── Enable auto-merge only after PR Tests pass ──────────────────────────
   merge:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     steps:
       - name: Get PR number from workflow run
         id: pr
+        if: github.event.workflow_run.conclusion == 'success'
         run: |
           PR_NUMBER=$(echo '${{ toJson(github.event.workflow_run.pull_requests) }}' | jq -r '.[0].number // empty')
           if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
@@ -40,7 +42,7 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Enable auto-merge for Dependabot PRs
-        if: steps.pr.outputs.skip == 'false'
+        if: steps.pr.conclusion == 'success' && steps.pr.outputs.skip == 'false'
         run: |
           PR_DATA=$(gh pr view "$PR_NUMBER" --json author,headRefOid)
           AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')

@@ -9,7 +9,6 @@ on:
 
 jobs:
   pr-agent:
-    if: github.event.sender.type != 'Bot' || github.event.sender.login == 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
       PR_AGENT_LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
