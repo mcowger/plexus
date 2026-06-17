@@ -27,6 +27,7 @@ const EMPTY_ALIAS: Alias = {
   aliases: [],
   priority: 'selector',
   target_groups: [{ name: 'default', selector: 'random', targets: [] }],
+  sticky_session: true,
 };
 
 const IMPORT_SUPPRESSIONS_STORAGE_KEY = 'plexus_suppressed_import_models';

@@ -125,7 +125,7 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                 </p>
               </div>
               <Switch
-                checked={editingAlias.sticky_session || false}
+                checked={editingAlias.sticky_session ?? true}
                 onChange={(val) => setEditingAlias({ ...editingAlias, sticky_session: val })}
                 size="sm"
               />

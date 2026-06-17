@@ -1879,7 +1879,7 @@ export const api = {
       additional_aliases: alias.aliases,
       use_image_fallthrough: alias.use_image_fallthrough || false,
       enforce_limits: alias.enforce_limits || false,
-      sticky_session: alias.sticky_session || false,
+      sticky_session: alias.sticky_session ?? true,
       ...(alias.preferred_api &&
         alias.preferred_api.length > 0 && {
           preferred_api: alias.preferred_api,
@@ -2007,7 +2007,7 @@ export const api = {
           target_groups: targetGroups,
           use_image_fallthrough: val.use_image_fallthrough || false,
           enforce_limits: val.enforce_limits || false,
-          sticky_session: val.sticky_session || false,
+          sticky_session: val.sticky_session ?? true,
           advanced: val.advanced || [],
           metadata: val.metadata,
           model_architecture: val.model_architecture,

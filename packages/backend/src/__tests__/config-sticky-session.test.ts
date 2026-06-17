@@ -37,11 +37,11 @@ describe('ModelConfigSchema sticky_session parsing', () => {
     expect(cfg.models?.['test-alias']?.sticky_session).toBe(false);
   });
 
-  it('defaults sticky_session to false when not provided', () => {
+  it('defaults sticky_session to true when not provided', () => {
     const cfg = validateConfig(configWithAlias({}));
-    // Schema is `.default(false).optional()` — same pattern as the sibling
-    // booleans on this schema, so missing input parses to false.
-    expect(cfg.models?.['test-alias']?.sticky_session).toBe(false);
+    // Schema is `.default(true).optional()` — missing input parses to true so
+    // sticky sessions are enabled by default for new models.
+    expect(cfg.models?.['test-alias']?.sticky_session).toBe(true);
   });
 
   it('rejects non-boolean sticky_session', () => {
