@@ -31,6 +31,8 @@ import plexusAdminSkill from '../../../../.agents/skills/plexus-management/SKILL
   type: 'text',
 };
 
+const LOCAL_MCP_DEFAULT_PORT = 7345;
+
 const EMPTY_SERVER: McpServer = {
   mode: 'remote_http',
   upstream_url: '',
@@ -45,7 +47,7 @@ const EMPTY_LOCAL_SERVER: McpServer = {
   package: '',
   args: ['--port', '{{PORT}}'],
   env: {},
-  port: 7345,
+  port: LOCAL_MCP_DEFAULT_PORT,
   path: '/mcp',
   startup_timeout_ms: 30000,
   headers: {},
@@ -171,6 +173,21 @@ export const McpPage: React.FC = () => {
     } finally {
       setIsDeletingLogs(false);
     }
+  };
+
+  const getNextLocalMcpPort = (): number => {
+    const usedPorts = new Set(
+      Object.entries(servers)
+        .filter(([name]) => name !== editingServerName)
+        .map(([, server]) => (server.mode === 'local_http' ? server.port : null))
+        .filter((port): port is number => typeof port === 'number')
+    );
+
+    let port = LOCAL_MCP_DEFAULT_PORT;
+    while (usedPorts.has(port) && port < 65535) {
+      port += 1;
+    }
+    return port;
   };
 
   const handleAddNew = () => {
@@ -1097,6 +1114,7 @@ export const McpPage: React.FC = () => {
                             ...EMPTY_LOCAL_SERVER,
                             enabled: editingServer.enabled,
                             headers: editingServer.headers,
+                            port: getNextLocalMcpPort(),
                           }
                         : {
                             ...EMPTY_SERVER,
@@ -1145,11 +1163,15 @@ export const McpPage: React.FC = () => {
                     onChange={(e) =>
                       setEditingServer({
                         ...editingServer,
-                        args: e.target.value.split(' ').filter(Boolean),
+                        args: [e.target.value],
                       })
                     }
                     placeholder="--port {{PORT}}"
                   />
+                  <p className="-mt-2 text-xs text-text-muted">
+                    Available interpolations: {'{{PORT}}'} for the configured port and {'{{HOST}}'}
+                    for 127.0.0.1.
+                  </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Input
                       label="Port"
@@ -1164,7 +1186,7 @@ export const McpPage: React.FC = () => {
                     />
                     <Input
                       label="Path"
-                      value={editingServer.path || '/mcp'}
+                      value={editingServer.path ?? '/mcp'}
                       onChange={(e) => setEditingServer({ ...editingServer, path: e.target.value })}
                     />
                     <Input
