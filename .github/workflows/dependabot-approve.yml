@@ -1,0 +1,20 @@
+name: Dependabot Approve
+
+on:
+  pull_request_target:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ── Approve Dependabot PRs immediately so they don't block on review ──
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve PR
+        if: github.actor == 'dependabot[bot]'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

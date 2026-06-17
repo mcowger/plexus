@@ -1,7 +1,6 @@
 name: Dependabot Auto-Merge
 
 on:
-  pull_request_target:
   workflow_run:
     workflows: ["PR Tests"]
     types: [completed]
@@ -11,21 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  # ── Approve Dependabot PRs immediately so they don't block on review ──
-  approve:
-    if: github.event_name == 'pull_request_target'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Approve PR
-        if: github.actor == 'dependabot[bot]'
-        run: gh pr review --approve "$PR_URL"
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   # ── Enable auto-merge only after PR Tests pass ──────────────────────────
   merge:
-    if: github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     steps:
       - name: Get PR number from workflow run
