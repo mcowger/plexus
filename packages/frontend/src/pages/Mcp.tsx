@@ -22,6 +22,7 @@ import {
   Zap,
   ZapOff,
   Download,
+  Copy,
 } from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
@@ -411,6 +412,21 @@ export const McpPage: React.FC = () => {
     triggerDownload(plexusAdminSkill, 'SKILL.md', 'text/markdown');
   };
 
+  const mcpPathForServer = (name: string) => `/mcp/${name}`;
+
+  const handleCopyMcpPath = async (path: string) => {
+    if (!isClipboardAvailable()) {
+      toast.error('Copy requires HTTPS connection');
+      return;
+    }
+    const success = await copyToClipboard(path);
+    if (success) {
+      toast.success(`Copied ${path}`);
+    } else {
+      toast.error('Failed to copy path');
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
@@ -454,39 +470,6 @@ export const McpPage: React.FC = () => {
         <div className="flex flex-col gap-5">
           {/* Servers Config Card */}
           <Card title="MCP Servers">
-            {/* Plexus Management MCP — global enable/disable, always visible */}
-            <article className="rounded-md border border-primary/30 bg-primary/5 p-3 mb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate font-heading text-sm font-semibold text-text">
-                      Plexus Management MCP
-                    </span>
-                    <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      ADMIN
-                    </span>
-                  </div>
-                  <div className="mt-1 break-all text-xs text-text-muted">
-                    /mcp/plexus — admin-only management endpoint
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Switch
-                    checked={mcpEnabled}
-                    onChange={(val) => handleToggleMcpEnabled(val)}
-                    size="sm"
-                  />
-                </div>
-              </div>
-              <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-1.5 text-xs">
-                <span className="text-text-muted">
-                  Toggle for the Plexus Management MCP only. When disabled, /mcp/plexus responds
-                  with HTTP 418, while configured gateway MCP routes under /mcp/:name continue to
-                  work.
-                </span>
-              </div>
-            </article>
-
             {serverNames.length === 0 ? (
               <div className="p-4 text-text-secondary text-center">
                 No MCP servers configured. Click "Add MCP Server" to create one.
@@ -560,13 +543,13 @@ export const McpPage: React.FC = () => {
                           Name
                         </th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Upstream URL
+                          Upstream
+                        </th>
+                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                          Path
                         </th>
                         <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                           Status
-                        </th>
-                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Headers
                         </th>
                         <th
                           className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
@@ -584,14 +567,28 @@ export const McpPage: React.FC = () => {
                           style={{ paddingLeft: '24px' }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ fontWeight: 600 }}>Plexus Management MCP</div>
-                            <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-medium text-primary">
-                              ADMIN
-                            </span>
+                            <div style={{ fontWeight: 600 }}>Plexus Management</div>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
-                          /mcp/plexus — admin-only management endpoint
+                          —
+                        </td>
+                        <td className="px-4 py-3 text-left border-b border-border-glass text-text whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs">/mcp/plexus</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyMcpPath('/mcp/plexus');
+                              }}
+                              className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text"
+                              title="Copy path"
+                              aria-label="Copy /mcp/plexus"
+                            >
+                              <Copy size={13} />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                           <Switch
@@ -600,20 +597,14 @@ export const McpPage: React.FC = () => {
                             size="sm"
                           />
                         </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
-                          Disables /mcp/plexus only — gateway /mcp/:name routes still work
-                        </td>
                         <td
                           className="px-4 py-3 text-left border-b border-border-glass text-text"
                           style={{ paddingRight: '24px', textAlign: 'right' }}
-                        >
-                          —
-                        </td>
+                        />
                       </tr>
 
                       {serverNames.map((name) => {
                         const server = servers[name];
-                        const headerCount = server.headers ? Object.keys(server.headers).length : 0;
                         return (
                           <tr
                             key={name}
@@ -644,6 +635,23 @@ export const McpPage: React.FC = () => {
                                   : server.upstream_url}
                               </div>
                             </td>
+                            <td className="px-4 py-3 text-left border-b border-border-glass text-text whitespace-nowrap">
+                              <div
+                                className="flex items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="font-mono text-xs">{mcpPathForServer(name)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMcpPath(mcpPathForServer(name))}
+                                  className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text"
+                                  title="Copy path"
+                                  aria-label={`Copy ${mcpPathForServer(name)}`}
+                                >
+                                  <Copy size={13} />
+                                </button>
+                              </div>
+                            </td>
                             <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                               <div onClick={(e) => e.stopPropagation()}>
                                 <Switch
@@ -652,9 +660,6 @@ export const McpPage: React.FC = () => {
                                   size="sm"
                                 />
                               </div>
-                            </td>
-                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                              {headerCount > 0 ? `${headerCount} header(s)` : '-'}
                             </td>
                             <td
                               className="px-4 py-3 text-left border-b border-border-glass text-text"
