@@ -2,6 +2,11 @@
   "worktree": {
     "setup": ["bun run scripts/init_worktree.ts"]
   },
+  "scripts": {
+    "ship": {
+      "command": "bash scripts/ship.sh"
+    }
+  },
   "metadataGeneration": {
     "agentTitle": {
       "instructions": "Choose a concise 2-5 word title. Use plain ASCII only. No emojis, smart quotes, dashes, or other Unicode characters. Prefer short, descriptive noun phrases or imperative phrases"
