@@ -1497,6 +1497,15 @@ export const Logs = () => {
                                 : null;
                           const liveDuration =
                             rawDurationMs != null ? formatMs(rawDurationMs) : '-';
+                          // End-to-end throughput: total output tokens / full request duration.
+                          // Unlike TPS (which excludes the TTFT delay), E2E includes it.
+                          const e2e =
+                            log.durationMs != null &&
+                            log.durationMs > 0 &&
+                            log.tokensOutput &&
+                            log.tokensOutput > 0
+                              ? log.tokensOutput / (log.durationMs / 1000)
+                              : null;
                           if (progress) {
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1554,6 +1563,15 @@ export const Logs = () => {
                                 {log.tokensPerSec && log.tokensPerSec > 0
                                   ? `TPS: ${formatTPS(log.tokensPerSec)}`
                                   : ''}
+                              </span>
+                              <span
+                                style={{
+                                  color: 'var(--color-text-secondary)',
+                                  fontSize: '0.85em',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {e2e != null ? `E2E: ${formatTPS(e2e)}` : ''}
                               </span>
                             </div>
                           );
