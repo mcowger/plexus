@@ -17,6 +17,7 @@ interface LocalProcessState {
   status: LocalMcpStatus;
   process: Bun.Subprocess<'pipe', 'pipe', 'pipe'> | null;
   startPromise: Promise<void> | null;
+  configFingerprint: string | null;
   logs: string[];
   lastError: string | null;
   startedAt: string | null;
@@ -24,6 +25,18 @@ interface LocalProcessState {
 }
 
 const MAX_LOG_LINES = 500;
+const SAFE_INHERITED_ENV_KEYS = [
+  'PATH',
+  'HOME',
+  'TMPDIR',
+  'TMP',
+  'TEMP',
+  'XDG_CACHE_HOME',
+  'BUN_INSTALL',
+  'UV_CACHE_DIR',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+];
 
 class McpProcessManager {
   private states = new Map<string, LocalProcessState>();
@@ -36,12 +49,21 @@ class McpProcessManager {
   async ensureRunning(serverName: string, config: McpServerConfig): Promise<void> {
     if (config.mode !== 'local_http') return;
     const state = this.getState(serverName);
+    const configFingerprint = this.getConfigFingerprint(config);
     if (state.status === 'running' && state.process) {
-      logger.debug(`[mcp-local:${serverName}] process already running`, {
-        pid: state.process.pid,
-        url: this.getLocalUrl(config),
-      });
-      return;
+      if (state.configFingerprint !== configFingerprint) {
+        logger.info(`[mcp-local:${serverName}] local MCP config changed; restarting process`, {
+          pid: state.process.pid,
+          url: this.getLocalUrl(config),
+        });
+        await this.stop(serverName);
+      } else {
+        logger.debug(`[mcp-local:${serverName}] process already running`, {
+          pid: state.process.pid,
+          url: this.getLocalUrl(config),
+        });
+        return;
+      }
     }
     if (state.startPromise) {
       logger.info(`[mcp-local:${serverName}] startup already in progress`);
@@ -54,7 +76,7 @@ class McpProcessManager {
       port: config.port,
       path: config.path || '/mcp',
     });
-    state.startPromise = this.startInternal(serverName, config).finally(() => {
+    state.startPromise = this.startInternal(serverName, config, configFingerprint).finally(() => {
       state.startPromise = null;
     });
     return state.startPromise;
@@ -116,12 +138,17 @@ class McpProcessManager {
     await Promise.all([...this.states.keys()].map((serverName) => this.stop(serverName)));
   }
 
-  private async startInternal(serverName: string, config: McpServerConfig): Promise<void> {
+  private async startInternal(
+    serverName: string,
+    config: McpServerConfig,
+    configFingerprint: string
+  ): Promise<void> {
     if (config.mode !== 'local_http') return;
     const state = this.getState(serverName);
     state.status = 'starting';
     state.lastError = null;
     state.exitedAt = null;
+    state.configFingerprint = configFingerprint;
 
     const args = [config.package, ...(config.args || [])].map((arg) =>
       arg.replaceAll('{{PORT}}', String(config.port)).replaceAll('{{HOST}}', '127.0.0.1')
@@ -145,7 +172,7 @@ class McpProcessManager {
         stdout: 'pipe',
         stderr: 'pipe',
         stdin: 'pipe',
-        env: { ...process.env, ...configuredEnv, PORT: String(config.port), HOST: '127.0.0.1' },
+        env: this.buildChildEnv(config),
       });
     } catch (error) {
       state.status = 'failed';
@@ -228,6 +255,31 @@ class McpProcessManager {
     throw new Error('Local MCP server did not become ready: ' + lastError);
   }
 
+  private buildChildEnv(config: McpServerConfig): Record<string, string> {
+    const env: Record<string, string> = Object.create(null);
+    for (const key of SAFE_INHERITED_ENV_KEYS) {
+      const value = process.env[key];
+      if (value !== undefined) env[key] = value;
+    }
+    if (config.mode === 'local_http' && config.env) Object.assign(env, config.env);
+    if (config.mode === 'local_http') env.PORT = String(config.port);
+    env.HOST = '127.0.0.1';
+    return env;
+  }
+
+  private getConfigFingerprint(config: McpServerConfig): string {
+    if (config.mode !== 'local_http') return '';
+    return JSON.stringify({
+      launcher: config.launcher,
+      package: config.package,
+      args: config.args || [],
+      env: config.env || Object.create(null),
+      port: config.port,
+      path: config.path || '/mcp',
+      startup_timeout_ms: config.startup_timeout_ms || 30000,
+    });
+  }
+
   private consumeStream(
     state: LocalProcessState,
     stream: ReadableStream<Uint8Array>,
@@ -268,6 +320,7 @@ class McpProcessManager {
         status: 'stopped',
         process: null,
         startPromise: null,
+        configFingerprint: null,
         logs: [],
         lastError: null,
         startedAt: null,

@@ -68,6 +68,7 @@ export const McpPage: React.FC = () => {
   const [headerValue, setHeaderValue] = useState('');
   const [envKey, setEnvKey] = useState('');
   const [envValue, setEnvValue] = useState('');
+  const [argsInput, setArgsInput] = useState((EMPTY_LOCAL_SERVER.args || []).join(' '));
 
   // Logs state
   const [logs, setLogs] = useState<McpLogRecord[]>([]);
@@ -191,6 +192,44 @@ export const McpPage: React.FC = () => {
     return port;
   };
 
+  const parseArguments = (input: string): string[] => {
+    const args: string[] = [];
+    let current = '';
+    let quote: 'single' | 'double' | null = null;
+    let escaping = false;
+
+    for (const char of input) {
+      if (escaping) {
+        current += char;
+        escaping = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaping = true;
+        continue;
+      }
+      if (char === '"' && quote !== 'single') {
+        quote = quote === 'double' ? null : 'double';
+        continue;
+      }
+      if (char === "'" && quote !== 'double') {
+        quote = quote === 'single' ? null : 'single';
+        continue;
+      }
+      if (/\s/.test(char) && quote === null) {
+        if (current) {
+          args.push(current);
+          current = '';
+        }
+        continue;
+      }
+      current += char;
+    }
+    if (escaping) current += '\\';
+    if (current) args.push(current);
+    return args;
+  };
+
   const handleAddNew = () => {
     setEditingServerName(null);
     setServerNameInput('');
@@ -199,6 +238,7 @@ export const McpPage: React.FC = () => {
     setHeaderValue('');
     setEnvKey('');
     setEnvValue('');
+    setArgsInput((EMPTY_LOCAL_SERVER.args || []).join(' '));
     setIsModalOpen(true);
   };
 
@@ -212,6 +252,11 @@ export const McpPage: React.FC = () => {
     setHeaderValue('');
     setEnvKey('');
     setEnvValue('');
+    setArgsInput(
+      server.mode === 'local_http'
+        ? (server.args || []).join(' ')
+        : (EMPTY_LOCAL_SERVER.args || []).join(' ')
+    );
     setIsModalOpen(true);
   };
 
@@ -254,7 +299,12 @@ export const McpPage: React.FC = () => {
       await api.saveMcpServer(
         nameToSave,
         editingServer.mode === 'local_http'
-          ? { ...editingServer, headers: finalHeaders, env: finalEnv }
+          ? {
+              ...editingServer,
+              args: parseArguments(argsInput),
+              headers: finalHeaders,
+              env: finalEnv,
+            }
           : { ...editingServer, headers: finalHeaders }
       );
       await loadData();
@@ -1112,22 +1162,23 @@ export const McpPage: React.FC = () => {
                 <select
                   className="w-full rounded-md border border-border-glass bg-bg-surface px-3 py-2 text-sm text-text"
                   value={editingServer.mode === 'local_http' ? 'local_http' : 'remote_http'}
-                  onChange={(e) =>
-                    setEditingServer(
-                      e.target.value === 'local_http'
-                        ? {
-                            ...EMPTY_LOCAL_SERVER,
-                            enabled: editingServer.enabled,
-                            headers: editingServer.headers,
-                            port: getNextLocalMcpPort(),
-                          }
-                        : {
-                            ...EMPTY_SERVER,
-                            enabled: editingServer.enabled,
-                            headers: editingServer.headers,
-                          }
-                    )
-                  }
+                  onChange={(e) => {
+                    if (e.target.value === 'local_http') {
+                      setArgsInput((EMPTY_LOCAL_SERVER.args || []).join(' '));
+                      setEditingServer({
+                        ...EMPTY_LOCAL_SERVER,
+                        enabled: editingServer.enabled,
+                        headers: editingServer.headers,
+                        port: getNextLocalMcpPort(),
+                      });
+                    } else {
+                      setEditingServer({
+                        ...EMPTY_SERVER,
+                        enabled: editingServer.enabled,
+                        headers: editingServer.headers,
+                      });
+                    }
+                  }}
                 >
                   <option value="remote_http">Remote HTTP</option>
                   <option value="local_http">Local HTTP</option>
@@ -1164,13 +1215,8 @@ export const McpPage: React.FC = () => {
                   />
                   <Input
                     label="Arguments"
-                    value={(editingServer.args || []).join(' ')}
-                    onChange={(e) =>
-                      setEditingServer({
-                        ...editingServer,
-                        args: [e.target.value],
-                      })
-                    }
+                    value={argsInput}
+                    onChange={(e) => setArgsInput(e.target.value)}
                     placeholder="--port {{PORT}}"
                   />
                   <p className="-mt-2 text-xs text-text-muted">
