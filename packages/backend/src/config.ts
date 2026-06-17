@@ -769,7 +769,7 @@ export const ModelConfigSchema = z
     // previous turn of the same conversation (when still healthy and present
     // in the alias targets). Tracked in-memory only; see
     // services/sticky-session-manager.ts.
-    sticky_session: z.boolean().default(true).optional(),
+    sticky_session: z.boolean().default(true),
     // Advertised in GET /v1/models to inform clients of the preferred API surface(s)
     // for this alias, even if plexus can translate between them.
     preferred_api: z
