@@ -268,6 +268,7 @@ export interface LocalMcpServer {
   launcher: 'bunx' | 'uvx';
   package: string;
   args?: string[];
+  env?: Record<string, string>;
   port: number;
   path?: string;
   startup_timeout_ms?: number;

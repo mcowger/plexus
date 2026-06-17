@@ -941,6 +941,7 @@ export async function registerConfigRoutes(
 
   fastify.get('/v0/management/mcp-servers/:serverName/status', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
+    logger.info(`MCP local status requested for '${serverName}'`);
     const servers = await configService.getRepository().getAllMcpServers();
     const server = servers[serverName];
     if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
@@ -949,6 +950,7 @@ export async function registerConfigRoutes(
 
   fastify.post('/v0/management/mcp-servers/:serverName/start', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
+    logger.info(`MCP local start requested for '${serverName}'`);
     const servers = await configService.getRepository().getAllMcpServers();
     const server = servers[serverName];
     if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
@@ -959,11 +961,13 @@ export async function registerConfigRoutes(
 
   fastify.post('/v0/management/mcp-servers/:serverName/stop', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
+    logger.info(`MCP local stop requested for '${serverName}'`);
     return reply.send(await mcpProcessManager.stop(serverName));
   });
 
   fastify.post('/v0/management/mcp-servers/:serverName/restart', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
+    logger.info(`MCP local restart requested for '${serverName}'`);
     const servers = await configService.getRepository().getAllMcpServers();
     const server = servers[serverName];
     if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
@@ -974,6 +978,7 @@ export async function registerConfigRoutes(
 
   fastify.get('/v0/management/mcp-servers/:serverName/process-logs', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };
+    logger.info(`MCP local process logs requested for '${serverName}'`);
     return reply.send({ data: mcpProcessManager.getLogs(serverName) });
   });
 

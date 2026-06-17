@@ -44,6 +44,7 @@ const EMPTY_LOCAL_SERVER: McpServer = {
   launcher: 'bunx',
   package: '',
   args: ['--port', '{{PORT}}'],
+  env: {},
   port: 7345,
   path: '/mcp',
   startup_timeout_ms: 30000,
@@ -62,6 +63,8 @@ export const McpPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [headerKey, setHeaderKey] = useState('');
   const [headerValue, setHeaderValue] = useState('');
+  const [envKey, setEnvKey] = useState('');
+  const [envValue, setEnvValue] = useState('');
 
   // Logs state
   const [logs, setLogs] = useState<McpLogRecord[]>([]);
@@ -176,6 +179,8 @@ export const McpPage: React.FC = () => {
     setEditingServer({ ...EMPTY_SERVER });
     setHeaderKey('');
     setHeaderValue('');
+    setEnvKey('');
+    setEnvValue('');
     setIsModalOpen(true);
   };
 
@@ -187,6 +192,8 @@ export const McpPage: React.FC = () => {
     setEditingServer({ ...server });
     setHeaderKey('');
     setHeaderValue('');
+    setEnvKey('');
+    setEnvValue('');
     setIsModalOpen(true);
   };
 
@@ -219,10 +226,19 @@ export const McpPage: React.FC = () => {
     if (headerKey.trim() && headerValue.trim()) {
       finalHeaders[headerKey.trim()] = headerValue.trim();
     }
+    const finalEnv = editingServer.mode === 'local_http' ? { ...editingServer.env } : undefined;
+    if (finalEnv && envKey.trim()) {
+      finalEnv[envKey.trim()] = envValue;
+    }
 
     setIsSaving(true);
     try {
-      await api.saveMcpServer(nameToSave, { ...editingServer, headers: finalHeaders });
+      await api.saveMcpServer(
+        nameToSave,
+        editingServer.mode === 'local_http'
+          ? { ...editingServer, headers: finalHeaders, env: finalEnv }
+          : { ...editingServer, headers: finalHeaders }
+      );
       await loadData();
       setIsModalOpen(false);
     } catch (e) {
@@ -301,6 +317,29 @@ export const McpPage: React.FC = () => {
     setEditingServer({
       ...editingServer,
       headers: newHeaders,
+    });
+  };
+
+  const addEnv = () => {
+    if (editingServer.mode !== 'local_http' || !envKey.trim()) return;
+    setEditingServer({
+      ...editingServer,
+      env: {
+        ...editingServer.env,
+        [envKey.trim()]: envValue,
+      },
+    });
+    setEnvKey('');
+    setEnvValue('');
+  };
+
+  const removeEnv = (key: string) => {
+    if (editingServer.mode !== 'local_http') return;
+    const newEnv = { ...editingServer.env };
+    delete newEnv[key];
+    setEditingServer({
+      ...editingServer,
+      env: newEnv,
     });
   };
 
@@ -1139,6 +1178,61 @@ export const McpPage: React.FC = () => {
                         })
                       }
                     />
+                  </div>
+
+                  <div className="space-y-2 rounded-md border border-border-glass p-3">
+                    <label className="text-sm font-medium text-text-secondary">
+                      Environment Variables
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          label="Env Key"
+                          value={envKey}
+                          onChange={(e) => setEnvKey(e.target.value)}
+                          placeholder="API_KEY"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          label="Env Value"
+                          value={envValue}
+                          onChange={(e) => setEnvValue(e.target.value)}
+                          placeholder="secret value"
+                        />
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={addEnv}
+                        className="w-full sm:w-auto"
+                      >
+                        <PlusCircle size={16} />
+                      </Button>
+                    </div>
+                    {editingServer.env && Object.keys(editingServer.env).length > 0 && (
+                      <div className="space-y-2">
+                        {Object.entries(editingServer.env).map(([key, value]) => (
+                          <div
+                            key={key}
+                            className="flex flex-col gap-2 p-2 bg-bg-hover rounded-md sm:flex-row sm:items-center"
+                          >
+                            <span className="min-w-0 flex-1 break-all font-mono text-xs">
+                              {key}
+                            </span>
+                            <span className="flex-1 font-mono text-xs text-text-secondary truncate">
+                              {value}
+                            </span>
+                            <button
+                              onClick={() => removeEnv(key)}
+                              className="p-1 hover:bg-bg-surface rounded"
+                            >
+                              <MinusCircle size={14} className="text-danger" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (

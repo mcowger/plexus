@@ -10,6 +10,7 @@ export const mcpServers = pgTable('mcp_servers', {
   launcher: text('launcher'),
   packageName: text('package_name'),
   args: text('args'), // JSON or encrypted string — text for encryption compatibility
+  env: text('env'), // JSON or encrypted string — text for encryption compatibility
   port: bigint('port', { mode: 'number' }),
   path: text('path'),
   startupTimeoutMs: bigint('startup_timeout_ms', { mode: 'number' }),

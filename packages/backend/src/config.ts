@@ -870,6 +870,7 @@ const LocalHttpMcpServerConfigSchema = z.object({
   launcher: z.enum(['bunx', 'uvx']),
   package: z.string().trim().min(1),
   args: z.array(z.string()).default([]).optional(),
+  env: z.record(z.string(), z.string()).default({}).optional(),
   port: z.number().int().min(1).max(65535),
   path: z.string().trim().min(1).default('/mcp').optional(),
   startup_timeout_ms: z.number().int().min(1000).max(300000).default(30000).optional(),

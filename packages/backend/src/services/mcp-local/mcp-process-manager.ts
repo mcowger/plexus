@@ -36,8 +36,24 @@ class McpProcessManager {
   async ensureRunning(serverName: string, config: McpServerConfig): Promise<void> {
     if (config.mode !== 'local_http') return;
     const state = this.getState(serverName);
-    if (state.status === 'running' && state.process) return;
-    if (state.startPromise) return state.startPromise;
+    if (state.status === 'running' && state.process) {
+      logger.debug(`[mcp-local:${serverName}] process already running`, {
+        pid: state.process.pid,
+        url: this.getLocalUrl(config),
+      });
+      return;
+    }
+    if (state.startPromise) {
+      logger.info(`[mcp-local:${serverName}] startup already in progress`);
+      return state.startPromise;
+    }
+    logger.info(`[mcp-local:${serverName}] ensuring local MCP server is running`, {
+      status: state.status,
+      launcher: config.launcher,
+      package: config.package,
+      port: config.port,
+      path: config.path || '/mcp',
+    });
     state.startPromise = this.startInternal(serverName, config).finally(() => {
       state.startPromise = null;
     });
@@ -57,11 +73,17 @@ class McpProcessManager {
     state.startPromise = null;
     if (child) {
       try {
+        logger.info(`[mcp-local:${serverName}] stopping local MCP process`, { pid: child.pid });
         child.kill('SIGTERM');
         await Promise.race([child.exited, Bun.sleep(3000)]);
       } catch (error) {
+        logger.warn(`[mcp-local:${serverName}] failed to stop local MCP process`, error);
         this.appendLog(state, 'Failed to stop process: ' + (error as Error).message);
       }
+    } else {
+      logger.info(`[mcp-local:${serverName}] stop requested but no process is running`, {
+        status: state.status,
+      });
     }
     state.status = 'stopped';
     state.exitedAt = new Date().toISOString();
@@ -104,18 +126,38 @@ class McpProcessManager {
     const args = [config.package, ...(config.args || [])].map((arg) =>
       arg.replaceAll('{{PORT}}', String(config.port)).replaceAll('{{HOST}}', '127.0.0.1')
     );
+    const configuredEnv = config.env || Object.create(null);
+    const configuredEnvKeys = Object.keys(configuredEnv);
     const command = [config.launcher, ...args];
     this.appendLog(state, 'Starting: ' + command.join(' '));
-
-    const child = Bun.spawn(command, {
-      stdout: 'pipe',
-      stderr: 'pipe',
-      stdin: 'pipe',
-      env: { ...process.env, PORT: String(config.port), HOST: '127.0.0.1' },
+    logger.info(`[mcp-local:${serverName}] starting local MCP process`, {
+      command: config.launcher,
+      args,
+      port: config.port,
+      path: config.path || '/mcp',
+      startupTimeoutMs: config.startup_timeout_ms || 30000,
+      envKeys: configuredEnvKeys,
     });
+
+    let child: Bun.Subprocess<'pipe', 'pipe', 'pipe'>;
+    try {
+      child = Bun.spawn(command, {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        stdin: 'pipe',
+        env: { ...process.env, ...configuredEnv, PORT: String(config.port), HOST: '127.0.0.1' },
+      });
+    } catch (error) {
+      state.status = 'failed';
+      state.lastError = (error as Error).message;
+      logger.error(`[mcp-local:${serverName}] failed to spawn local MCP process`, error);
+      this.appendLog(state, 'Spawn failed: ' + state.lastError);
+      throw error;
+    }
 
     state.process = child;
     state.startedAt = new Date().toISOString();
+    logger.info(`[mcp-local:${serverName}] local MCP process spawned`, { pid: child.pid });
     this.consumeStream(state, child.stdout, 'stdout');
     this.consumeStream(state, child.stderr, 'stderr');
 
@@ -126,6 +168,11 @@ class McpProcessManager {
         state.lastError = code === 0 ? null : 'Process exited with code ' + code;
         state.exitedAt = new Date().toISOString();
       }
+      const level = code === 0 ? 'info' : 'warn';
+      logger[level](`[mcp-local:${serverName}] local MCP process exited`, {
+        code,
+        previousStatus: state.status,
+      });
       this.appendLog(state, 'Process exited with code ' + code);
     });
 
@@ -133,11 +180,16 @@ class McpProcessManager {
       await this.waitForReady(config);
       if (state.process === child) {
         state.status = 'running';
+        logger.info(`[mcp-local:${serverName}] local MCP server is ready`, {
+          pid: child.pid,
+          url: this.getLocalUrl(config),
+        });
         this.appendLog(state, 'Ready at ' + this.getLocalUrl(config));
       }
     } catch (error) {
       state.status = 'failed';
       state.lastError = (error as Error).message;
+      logger.error(`[mcp-local:${serverName}] local MCP server startup failed`, error);
       this.appendLog(state, 'Startup failed: ' + state.lastError);
       child.kill('SIGTERM');
       throw error;
@@ -149,16 +201,30 @@ class McpProcessManager {
     if (!url || config.mode !== 'local_http') return;
     const deadline = Date.now() + (config.startup_timeout_ms || 30000);
     let lastError = '';
+    let attempts = 0;
+    logger.info(`[mcp-local] waiting for local MCP server readiness`, {
+      url,
+      timeoutMs: config.startup_timeout_ms || 30000,
+    });
     while (Date.now() < deadline) {
+      attempts++;
       try {
         const response = await fetch(url, { method: 'GET' });
-        if (response.status < 500) return;
+        if (response.status < 500) {
+          logger.info(`[mcp-local] readiness check passed`, {
+            url,
+            status: response.status,
+            attempts,
+          });
+          return;
+        }
         lastError = 'HTTP ' + response.status;
       } catch (error) {
         lastError = (error as Error).message;
       }
       await Bun.sleep(500);
     }
+    logger.warn(`[mcp-local] readiness check timed out`, { url, attempts, lastError });
     throw new Error('Local MCP server did not become ready: ' + lastError);
   }
 
@@ -174,7 +240,15 @@ class McpProcessManager {
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
-          if (value) this.appendLog(state, '[' + label + '] ' + decoder.decode(value).trimEnd());
+          if (value) {
+            const text = decoder.decode(value).trimEnd();
+            this.appendLog(state, '[' + label + '] ' + text);
+            if (label === 'stderr') {
+              logger.warn(`[mcp-local:${label}] ${text}`);
+            } else {
+              logger.info(`[mcp-local:${label}] ${text}`);
+            }
+          }
         }
       } catch (error) {
         logger.silly('Local MCP log stream error: ' + (error as Error).message);

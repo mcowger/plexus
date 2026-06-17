@@ -258,6 +258,7 @@ describe('MCP Proxy Service', () => {
             launcher: 'bunx',
             package: '@example/mcp-server',
             args: ['--port', '{{PORT}}'],
+            env: { API_KEY: 'test-key' },
             port: 7345,
             path: '/mcp',
           },
@@ -284,6 +285,7 @@ describe('MCP Proxy Service', () => {
       if (config?.mode !== 'local_http') throw new Error('Expected local HTTP config');
       expect(config.launcher).toBe('bunx');
       expect(config.package).toBe('@example/mcp-server');
+      expect(config.env).toEqual({ API_KEY: 'test-key' });
       expect(getEffectiveUpstreamUrl(config)).toBe('http://127.0.0.1:7345/mcp');
     });
 

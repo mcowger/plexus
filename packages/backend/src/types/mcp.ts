@@ -16,6 +16,7 @@ export interface LocalHttpMcpServerConfig {
   launcher: McpLauncher;
   package: string;
   args?: string[];
+  env?: Record<string, string>;
   port: number;
   path?: string;
   startup_timeout_ms?: number;

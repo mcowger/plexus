@@ -10,6 +10,7 @@ export const mcpServers = sqliteTable('mcp_servers', {
   launcher: text('launcher'),
   packageName: text('package_name'),
   args: text('args'), // JSON: string[]
+  env: text('env'), // JSON: Record<string, string>
   port: integer('port'),
   path: text('path'),
   startupTimeoutMs: integer('startup_timeout_ms'),
