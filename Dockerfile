@@ -39,9 +39,15 @@ RUN case "${TARGETPLATFORM}" in \
 # Includes Bun/bunx and uv/uvx so Plexus can manage local HTTP MCP servers.
 FROM oven/bun:1
 
-ARG APP_VERSION=dev
 WORKDIR /app
 
+# Install local MCP runtime tooling (uv/uvx for Python MCP servers).
+# IMPORTANT: This RUN must stay ABOVE any ARG/ENV for APP_VERSION. BuildKit
+# invalidates the cache of a RUN instruction whenever an in-scope ARG changes
+# value — even if the ARG is not referenced in that RUN. Since APP_VERSION
+# changes on every release, declaring it before this layer would re-run the
+# full apt-get + uv install on every build. Keeping it after lets this layer
+# cache stably across all version tags.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git python3 build-essential \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
@@ -59,6 +65,7 @@ ENV PORT=4000
 ENV LOG_LEVEL=info
 ENV DATA_DIR=/app/data
 ENV DATABASE_URL=sqlite:///app/data/plexus.db
+ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
 # ADMIN_KEY must be provided at runtime (no default for security)
 
