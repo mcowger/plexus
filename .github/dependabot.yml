@@ -12,6 +12,13 @@ updates:
     # Check the npm registry for updates every day (weekdays)
     schedule:
       interval: "weekly"
+    # Group minor + patch updates into a single PR (lower breaking-change risk).
+    # Major updates are left ungrouped, so each gets its own PR for careful review.
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
@@ -20,3 +27,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Group minor + patch updates into a single PR (lower breaking-change risk).
+    # Major updates are left ungrouped, so each gets its own PR for careful review.
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
