@@ -24,7 +24,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@plexus/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.49",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
