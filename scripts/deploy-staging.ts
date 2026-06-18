@@ -89,10 +89,41 @@ function resolveContainerName(): string {
     { encoding: 'utf-8' }
   );
   const lines = (fallbackResult.stdout ?? '').trim().split('\n').filter(Boolean);
+  // Watchtower's --no-pull only swaps a container when a newer image exists at
+  // the SAME ref the container runs. If the running container is on a
+  // non-staging image (e.g. a published ghcr.io/mcowger/plexus:<ver>), the
+  // build phase's plexus:staging-<ts> tag won't match that ref and Watchtower
+  // becomes a no-op — silently recreating the container with the *same* old
+  // image. We warn loudly here so that situation is visible. The build phase
+  // later tags the new build as the container's current ref to fix it.
   for (const line of lines) {
     const [name, image] = line.split('\t');
-    if (name && image?.startsWith('plexus:')) return name;
+    if (name && image?.startsWith('plexus:')) {
+      if (!image.startsWith('plexus:staging-')) {
+        console.warn(
+          `  ⚠️  Running container \`${name}\` is on image \`${image}\`, not a plexus:staging-* image.`
+        );
+        console.warn(
+          `     Watchtower --no-pull only swaps a container when a newer image exists at the SAME ref`
+        );
+        console.warn(
+          `     the container runs. Phase 3.5 will tag the new build as \`${image}\` so the swap takes effect.`
+        );
+        console.warn(
+          `     (If you intentionally run staging off a published image, this is the expected path — no action needed.)`
+        );
+      }
+      return name;
+    }
   }
+
+  console.warn(
+    `  ⚠️  No container matching plexus:staging-latest or any plexus:* image found; defaulting to \`${'Plexus'}\`.`
+  );
+  console.warn(
+    `     Watchtower --no-pull only swaps a container when a newer image exists at the SAME ref`
+  );
+  console.warn(`     the container runs — Phase 4b verifies the swap actually changed the image.`);
 
   return 'Plexus';
 }
@@ -126,7 +157,7 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
-function step(n: number, label: string) {
+function step(n: number | string, label: string) {
   console.log(`\n── Phase ${n}: ${label} ${'─'.repeat(Math.max(0, 50 - label.length))}`);
 }
 
@@ -352,6 +383,60 @@ docker(
 console.log(`  ✓ Built ${NEW_TAG}`);
 
 // ---------------------------------------------------------------------------
+// Phase 3.5: Re-tag the new build as the running container's current image ref
+// ---------------------------------------------------------------------------
+// Watchtower's --run-once --no-pull only swaps a container when a newer image
+// exists at the SAME image ref the container currently runs. If the running
+// container uses, say, ghcr.io/mcowger/plexus:2026.06.18.2 while we just
+// built plexus:staging-<ts>, the refs don't match and Watchtower is a silent
+// no-op — it recreates the container with the *same* old image and the new
+// bundle never reaches staging. To make the swap actually take effect, we
+// re-tag the freshly built image as the running container's current ref
+// (captured in `previousImage` during Phase 2). Now the local image at that
+// ref is the new build, and Watchtower will see "the image at this ref has a
+// newer digest than the container's running image" and swap it.
+//
+// We also record the container's current image digest here so Phase 4b can
+// verify the swap actually changed it (catching a no-op Watchtower run).
+
+step('3.5', 'Re-tag new build as running container image ref');
+
+// Capture the container's current image digest (before the swap) for the
+// Phase 4b verification. `docker inspect ... .Image` returns the image ID
+// (a sha256:... digest) the container is currently running.
+let previousImageDigest: string | null = null;
+if (previousImage) {
+  const digestResult = docker(['inspect', '--format', '{{.Image}}', CONTAINER_NAME], {
+    fatal: false,
+    silent: true,
+  });
+  if (digestResult.success && digestResult.stdout) {
+    previousImageDigest = digestResult.stdout;
+    console.log(`  Current container image digest: ${previousImageDigest}`);
+  }
+}
+
+if (previousImage) {
+  console.log(`  Tagging ${NEW_TAG} as ${previousImage} (the ref the container runs)`);
+  const tagResult = docker(['tag', NEW_TAG, previousImage], { fatal: false });
+  if (tagResult.success) {
+    console.log(
+      `  ✓ ${NEW_TAG} now also tagged as ${previousImage}; Watchtower --no-pull will see a newer image at this ref`
+    );
+  } else {
+    console.warn(`  ⚠️  Failed to tag ${NEW_TAG} as ${previousImage} (continuing).`);
+    console.warn(
+      `     If the running container uses a different ref than plexus:staging-*, Watchtower will be a no-op`
+    );
+    console.warn(`     and the new build will NOT reach staging. See Phase 4b verification.`);
+  }
+} else {
+  console.log(
+    `  No previous image detected (clean deploy); skipping re-tag. Watchtower will swap to ${NEW_TAG}.`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Phase 4: Deploy via Watchtower --run-once --no-pull
 // ---------------------------------------------------------------------------
 
@@ -371,6 +456,77 @@ docker(
   { fatal: true }
 );
 console.log(`  ✓ Watchtower restarted ${CONTAINER_NAME} with new image`);
+
+// ---------------------------------------------------------------------------
+// Phase 4b: Verify the swap actually changed the running image
+// ---------------------------------------------------------------------------
+// Watchtower's --run-once --no-pull is a silent no-op when no newer image
+// exists at the SAME ref the container runs (e.g. the container is on
+// ghcr.io/mcowger/plexus:<ver> but we only built plexus:staging-<ts>). It
+// recreates the container with the *same* old image, health check passes
+// instantly, and the deploy reports success while nothing actually shipped.
+// Phase 3.5 closes that gap by re-tagging the new build as the container's
+// current ref; this phase verifies the swap took effect by comparing the
+// container's image digest before (Phase 3.5) and after the Watchtower run.
+// If the digest is unchanged, the deploy did NOT reach staging — fail loudly
+// with an actionable message instead of reporting a false success.
+
+step('4b', 'Verify swap changed the running image');
+
+if (previousImageDigest) {
+  const afterResult = docker(['inspect', '--format', '{{.Image}}', CONTAINER_NAME], {
+    fatal: false,
+    silent: true,
+  });
+  const afterDigest = afterResult.success ? afterResult.stdout : null;
+
+  if (afterDigest && afterDigest !== previousImageDigest) {
+    console.log(`  ✓ Container image digest changed by the swap:`);
+    console.log(`      before: ${previousImageDigest}`);
+    console.log(`      after:  ${afterDigest}`);
+  } else {
+    console.error(`\n❌ Deploy did NOT reach staging — Watchtower was a no-op.`);
+    console.error(`     Container ${CONTAINER_NAME} image digest is unchanged after the swap:`);
+    console.error(`       before: ${previousImageDigest}`);
+    console.error(`       after:   ${afterDigest ?? '(inspect failed)'}`);
+    console.error(``);
+    console.error(`     This means the running container's image ref does not match what the`);
+    console.error(`     build phase produced, so Watchtower recreated the container with the SAME`);
+    console.error(`     old image. The new bundle is NOT live.`);
+    console.error(``);
+    console.error(`     Most likely cause: the running container uses an image ref different from`);
+    console.error(
+      `     plexus:staging-<ts> (e.g. a published ghcr.io/mcowger/plexus:<ver>), and the`
+    );
+    console.error(`     Phase 3.5 re-tag to that ref failed or was skipped.`);
+    console.error(``);
+    console.error(
+      `     To fix: re-run after confirming PLEXUS_STAGING_CONTAINER_NAME and that the`
+    );
+    console.error(`     Phase 3.5 \`docker tag ${NEW_TAG} <previousImage>\` step succeeded.`);
+    console.error(`     Previous image ref was: ${previousImage ?? '(unknown)'}`);
+    if (rollbackCommand) {
+      console.error(
+        `\n  Rollback command (container was not changed, so rollback is to the same image):`
+      );
+      console.error(
+        `    docker --context ${CTX} stop ${CONTAINER_NAME} && docker --context ${CTX} rm ${CONTAINER_NAME}`
+      );
+      console.error(`    Then: ${rollbackCommand}`);
+    }
+    process.exit(1);
+  }
+} else {
+  console.log(
+    `  Skipping digest verification (no previous image captured — clean deploy or inspect failed).`
+  );
+  console.warn(
+    `  ⚠️  Without verification, a Watchtower no-op would report as a successful deploy.`
+  );
+  console.warn(
+    `     Confirm the new image is actually running via \`docker ps\` on the host if unsure.`
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Phase 5: Prune old images on host
