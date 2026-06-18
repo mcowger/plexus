@@ -14,10 +14,30 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
+import { Disclosure } from '../components/ui/Disclosure';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
 import { Plus, Trash2, Zap, Download, ChevronDown, ChevronRight } from 'lucide-react';
+
+// Model alias types grouped into accordions on the Models page. Order
+// follows rough frequency of use. `responses` is intentionally NOT a
+// group here: it's a chat *protocol* (alongside chat_completions,
+// messages, gemini — see `preferred_api`), not a distinct model type, so
+// aliases with `type: 'responses'` are folded into the Chat bucket.
+type ModelTypeGroup = {
+  type: NonNullable<Alias['type']>;
+  label: string;
+  defaultOpen: boolean;
+};
+
+const MODEL_TYPE_GROUPS: ModelTypeGroup[] = [
+  { type: 'chat', label: 'Chat', defaultOpen: true },
+  { type: 'embeddings', label: 'Embeddings', defaultOpen: false },
+  { type: 'transcriptions', label: 'Transcriptions', defaultOpen: false },
+  { type: 'speech', label: 'Speech', defaultOpen: false },
+  { type: 'image', label: 'Image', defaultOpen: false },
+];
 
 export const Models = () => {
   const toast = useToast();
@@ -137,6 +157,20 @@ export const Models = () => {
 
   const sortedAliases = [...aliases].sort((a, b) => a.id.localeCompare(b.id));
 
+  // Bucket the (already search-filtered) aliases into the ordered type
+  // groups so we can render each group inside its own accordion. `responses`
+  // is a chat protocol, not a model type, so aliases with `type: 'responses'`
+  // (or no type at all) fall into Chat — matching the edit modal's convention
+  // (`value={editingAlias.type || 'chat'}`).
+  const aliasesByType = MODEL_TYPE_GROUPS.map((group) => ({
+    group,
+    aliases: sortedAliases.filter((a) => {
+      const t = a.type ?? 'chat';
+      const effective = t === 'responses' ? 'chat' : t;
+      return effective === group.type;
+    }),
+  }));
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
@@ -180,74 +214,84 @@ export const Models = () => {
       </PageHeader>
 
       <PageContainer>
-        <Card className="mb-6">
-          {/* Mobile cards */}
-          <div className="space-y-3 md:hidden">
-            {sortedAliases.length === 0 ? (
-              <div className="py-10 text-center text-sm text-text-muted">No aliases found</div>
-            ) : (
-              sortedAliases.map((alias) => (
-                <AliasMobileCard
-                  key={alias.id}
-                  alias={alias}
-                  providers={providers}
-                  cooldowns={cooldowns}
-                  testStates={testStates}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  onToggleTarget={handleToggleTarget}
-                  onTestTarget={handleTestTarget}
-                  onDismissTestMessage={dismissTestMessage}
-                />
-              ))
-            )}
-          </div>
+        {sortedAliases.length === 0 ? (
+          <Card className="mb-6">
+            <div className="py-10 text-center text-sm text-text-muted">No aliases found</div>
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-3 mb-6">
+            {aliasesByType.map(({ group, aliases: groupAliases }) => (
+              <Disclosure
+                key={group.type}
+                title={
+                  <span className="flex items-center gap-2">
+                    <span>{group.label}</span>
+                    <span className="text-xs font-normal text-text-muted">
+                      {groupAliases.length}
+                    </span>
+                  </span>
+                }
+                defaultOpen={group.defaultOpen}
+              >
+                {/* Mobile cards */}
+                <div className="space-y-3 md:hidden">
+                  {groupAliases.map((alias) => (
+                    <AliasMobileCard
+                      key={alias.id}
+                      alias={alias}
+                      providers={providers}
+                      cooldowns={cooldowns}
+                      testStates={testStates}
+                      onEdit={handleEdit}
+                      onDelete={handleDeleteClick}
+                      onToggleTarget={handleToggleTarget}
+                      onTestTarget={handleTestTarget}
+                      onDismissTestMessage={dismissTestMessage}
+                    />
+                  ))}
+                </div>
 
-          {/* Desktop table */}
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full border-collapse font-body text-[13px]">
-              <thead>
-                <tr>
-                  <th
-                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                    style={{ paddingLeft: '24px' }}
-                  >
-                    Alias
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                    style={{ paddingRight: '24px' }}
-                  >
-                    Targets
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedAliases.map((alias) => (
-                  <AliasTableRow
-                    key={alias.id}
-                    alias={alias}
-                    providers={providers}
-                    cooldowns={cooldowns}
-                    testStates={testStates}
-                    onEdit={handleEdit}
-                    onDelete={handleDeleteClick}
-                    onToggleTarget={handleToggleTarget}
-                    onTestTarget={handleTestTarget}
-                    onDismissTestMessage={dismissTestMessage}
-                  />
-                ))}
-                {sortedAliases.length === 0 && (
-                  <tr>
-                    <td colSpan={2} className="text-center text-text-muted p-12">
-                      No aliases found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                {/* Desktop table */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full border-collapse font-body text-[13px]">
+                    <thead>
+                      <tr>
+                        <th
+                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                          style={{ paddingLeft: '24px' }}
+                        >
+                          Alias
+                        </th>
+                        <th
+                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                          style={{ paddingRight: '24px' }}
+                        >
+                          Targets
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupAliases.map((alias) => (
+                        <AliasTableRow
+                          key={alias.id}
+                          alias={alias}
+                          providers={providers}
+                          cooldowns={cooldowns}
+                          testStates={testStates}
+                          onEdit={handleEdit}
+                          onDelete={handleDeleteClick}
+                          onToggleTarget={handleToggleTarget}
+                          onTestTarget={handleTestTarget}
+                          onDismissTestMessage={dismissTestMessage}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Disclosure>
+            ))}
           </div>
-        </Card>
+        )}
 
         {/* Edit / Add Modal */}
         <Modal
@@ -286,7 +330,12 @@ export const Models = () => {
                 </label>
                 <select
                   className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                  value={editingAlias.type || 'chat'}
+                  value={(() => {
+                    const t = editingAlias.type ?? 'chat';
+                    // `responses` is a chat protocol, not a model type — render
+                    // existing aliases that carry it as Chat (mirrors grouping).
+                    return t === 'responses' ? 'chat' : t;
+                  })()}
                   onChange={(e) =>
                     setEditingAlias({
                       ...editingAlias,
@@ -295,8 +344,7 @@ export const Models = () => {
                         | 'embeddings'
                         | 'transcriptions'
                         | 'speech'
-                        | 'image'
-                        | 'responses',
+                        | 'image',
                     })
                   }
                 >
@@ -305,7 +353,6 @@ export const Models = () => {
                   <option value="transcriptions">Transcriptions</option>
                   <option value="speech">Speech</option>
                   <option value="image">Image</option>
-                  <option value="responses">Responses</option>
                 </select>
               </div>
 
