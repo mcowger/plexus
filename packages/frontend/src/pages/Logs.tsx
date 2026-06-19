@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
+import { Select } from '../components/ui/Select';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -184,7 +185,7 @@ export const Logs = () => {
   const [logs, setLogs] = useState<UsageRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(() => getOffsetFromSearchParams(searchParams));
   const [newestLogId, setNewestLogId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<UsageSortField>('date');
@@ -593,6 +594,14 @@ export const Logs = () => {
     updateOffset(0);
   };
 
+  const handleLimitChange = (value: string) => {
+    const nextLimit = Number(value);
+    if (!Number.isFinite(nextLimit) || nextLimit <= 0) return;
+    setLimit(nextLimit);
+    // Reset to the first page so we don't land on an out-of-range offset.
+    updateOffset(0);
+  };
+
   const handleSort = (field: UsageSortField) => {
     updateOffset(0);
     if (sortBy === field) {
@@ -761,6 +770,19 @@ export const Logs = () => {
           <Button type="submit" variant="primary" size="sm" className="w-full sm:w-auto">
             Search
           </Button>
+          <div className="w-full sm:w-40">
+            <Select
+              label="Per page"
+              value={String(limit)}
+              onChange={handleLimitChange}
+              options={[
+                { value: '20', label: '20' },
+                { value: '50', label: '50' },
+                { value: '100', label: '100' },
+                { value: '200', label: '200' },
+              ]}
+            />
+          </div>
         </form>
       </PageHeader>
 
