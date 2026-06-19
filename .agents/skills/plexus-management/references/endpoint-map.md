@@ -39,10 +39,10 @@ Useful usage query params include `limit`, `offset`, `sortBy`, `sortDir`, `start
 | Get debug state | `GET` | `/v0/management/debug` |
 | Update global debug state | `PATCH` | `/v0/management/debug` |
 | Toggle current key debug | `POST` | `/v0/management/self/debug/toggle` |
-| List debug logs | `GET` | `/v0/management/debug-logs` |
-| Get one debug log | `GET` | `/v0/management/debug-logs/{requestId}` |
-| Delete one debug log | `DELETE` | `/v0/management/debug-logs/{requestId}` |
-| Delete all debug logs | `DELETE` | `/v0/management/debug-logs` |
+| List debug logs | `GET` | `/v0/management/debug/logs` |
+| Get one debug log | `GET` | `/v0/management/debug/logs/{requestId}` |
+| Delete one debug log | `DELETE` | `/v0/management/debug/logs/{requestId}` |
+| Delete all debug logs | `DELETE` | `/v0/management/debug/logs` |
 
 Debug state body examples:
 
