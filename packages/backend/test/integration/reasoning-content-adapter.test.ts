@@ -217,10 +217,14 @@ describe('reasoning_content adapter — Fireworks multi-turn scenario', () => {
     expect(result.content).toBe('Hello once more!');
   });
 
-  // ── Pass-through suppression ────────────────────────────────────────────────
+  // ── Adapter on pass-through payload ────────────────────────────────────────
 
-  it('suppresses pass-through when adapter is configured (forces full transformation)', async () => {
-    // Send with incomingApiType = 'chat' so pass-through would normally activate
+  it('runs adapter on pass-through payload (same-format chat -> chat, adapter still rewrites)', async () => {
+    // Send with incomingApiType = 'chat' so pass-through activates for a
+    // chat -> chat route. The reasoning_content adapter must still rewrite
+    // `reasoning`/`reasoning_content` fields on the (verbatim originalBody)
+    // outbound payload — adapters now run on the pass-through path instead
+    // of forcing a full transform.
     const requestWithApiType = {
       ...SAMPLE_REQUEST,
       incomingApiType: 'chat',
@@ -229,13 +233,13 @@ describe('reasoning_content adapter — Fireworks multi-turn scenario', () => {
 
     await dispatcher.dispatch(requestWithApiType as any);
 
-    // If pass-through were active, capturedRequestBody would equal originalBody verbatim
-    // and the reasoning fields would NOT have been rewritten.
-    // Adapter suppresses pass-through, so transformation must have run.
+    // Pass-through is active, so the body is the original client body — but
+    // the adapter has still rewritten the reasoning fields on assistant msgs.
     const messages: any[] = capturedRequestBody.messages;
     const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
     for (const msg of assistantMessages) {
       expect(msg.reasoning).toBeUndefined();
+      expect(msg.reasoning_content).toBeDefined();
     }
   });
 });

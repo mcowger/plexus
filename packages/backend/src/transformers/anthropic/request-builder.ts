@@ -55,7 +55,11 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
         } else if (Array.isArray(msg.content)) {
           for (const part of msg.content) {
             if (part.type === 'text') {
-              content.push({ type: 'text', text: part.text });
+              content.push({
+                type: 'text',
+                text: part.text,
+                ...(part.cache_control !== undefined ? { cache_control: part.cache_control } : {}),
+              });
             } else if (part.type === 'image_url') {
               content.push({
                 type: 'image',
@@ -64,6 +68,7 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
                   media_type: part.media_type || 'image/jpeg',
                   data: '',
                 },
+                ...(part.cache_control !== undefined ? { cache_control: part.cache_control } : {}),
               });
             }
           }
@@ -119,6 +124,29 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
     stream: request.stream,
     tools: request.tools ? convertUnifiedToolsToAnthropic(request.tools) : undefined,
   };
+
+  // For same-format (messages -> messages) requests, carry through Anthropic-native
+  // top-level fields that the unified schema does not model. The unified schema
+  // intentionally abstracts away provider-specific options (thinking config, output
+  // config, metadata) so cross-format transforms don't drop them on the floor when
+  // the client is talking the same API type as the upstream provider.
+  if (request.incomingApiType?.toLowerCase() === 'messages' && request.originalBody) {
+    const passthroughFields = [
+      'thinking',
+      'output_config',
+      'metadata',
+      'tool_choice',
+      'top_p',
+      'top_k',
+      'stop_sequences',
+      'prompt_cache_key',
+    ];
+    for (const field of passthroughFields) {
+      if (request.originalBody[field] !== undefined && payload[field] === undefined) {
+        payload[field] = request.originalBody[field];
+      }
+    }
+  }
 
   return payload;
 }

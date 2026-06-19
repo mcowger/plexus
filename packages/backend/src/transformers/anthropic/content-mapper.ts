@@ -28,6 +28,7 @@ export function convertAnthropicContent(content: any[]): string | MessageContent
               : c.source.url,
         },
         media_type: c.source.media_type,
+        ...(c.cache_control !== undefined ? { cache_control: c.cache_control } : {}),
       });
     }
   }

@@ -2737,12 +2737,10 @@ export class Dispatcher {
     let providerPayload: any;
     let bypassTransformation = false;
 
-    // Adapters require full transformation — suppress pass-through when any are active
-    const hasAdapters = adapters.length > 0;
-
-    if (!hasAdapters && this.shouldUsePassThrough(request, targetApiType, route)) {
+    if (this.shouldUsePassThrough(request, targetApiType, route)) {
       logger.debug(
-        `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}`
+        `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}` +
+          (adapters.length > 0 ? ` (with ${adapters.length} adapter(s))` : '')
       );
       providerPayload = JSON.parse(JSON.stringify(request.originalBody));
       providerPayload.model = route.model;

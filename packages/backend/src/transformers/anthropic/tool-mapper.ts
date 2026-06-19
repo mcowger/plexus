@@ -15,14 +15,23 @@ export function convertAnthropicToolsToUnified(tools: any[]): UnifiedTool[] {
     if (t.type && ANTHROPIC_BUILTIN_TOOL_TYPES.has(t.type)) {
       return t as unknown as UnifiedTool;
     }
-    return {
+    // Pull out the fields we explicitly map; everything else (e.g.
+    // eager_input_streaming, cache_control, type) is carried through as
+    // extra fields so Anthropic-native tool options survive a same-format
+    // (messages -> messages) round-trip.
+    const { name, description, input_schema, ...rest } = t;
+    const tool: any = {
       type: 'function' as const,
       function: {
-        name: t.name,
-        description: t.description,
-        parameters: t.input_schema,
+        name,
+        description,
+        parameters: input_schema,
       },
     };
+    if (rest && Object.keys(rest).length > 0) {
+      tool._anthropicExtras = rest;
+    }
+    return tool;
   });
 }
 
@@ -48,10 +57,16 @@ export function convertUnifiedToolsToAnthropic(tools: UnifiedTool[]): any[] {
     if (t.type && ANTHROPIC_BUILTIN_TOOL_TYPES.has(t.type)) {
       return t;
     }
-    return {
+    const result: any = {
       name: t.function?.name ?? '',
       description: t.function?.description ?? '',
       input_schema: t.function?.parameters ?? {},
     };
+    // Re-attach Anthropic-native extras preserved on parse (e.g.
+    // eager_input_streaming, cache_control) so they survive the round-trip.
+    if (t._anthropicExtras && typeof t._anthropicExtras === 'object') {
+      Object.assign(result, t._anthropicExtras);
+    }
+    return result;
   });
 }

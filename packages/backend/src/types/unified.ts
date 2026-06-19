@@ -14,6 +14,9 @@ export interface ImageContent {
     url: string;
   };
   media_type?: string;
+  cache_control?: {
+    type?: string;
+  };
 }
 
 export type MessageContent = TextContent | ImageContent;
