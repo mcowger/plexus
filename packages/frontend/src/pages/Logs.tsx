@@ -772,7 +772,7 @@ export const Logs = () => {
             onOffsetChange={updateOffset}
           />
 
-          <div className="space-y-3 p-3 lg:hidden">
+          <div className="space-y-1.5 p-2 lg:hidden">
             {loading ? (
               <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
                 Loading...
@@ -806,23 +806,21 @@ export const Logs = () => {
                   <article
                     key={log.requestId}
                     className={clsx(
-                      'rounded-lg border border-border-glass bg-bg-card p-3 shadow-sm',
+                      'rounded-lg border border-border-glass bg-bg-card p-2 shadow-sm',
                       log.requestId === newestLogId && 'animate-slide-in',
                       log.responseStatus === 'pending' && 'bg-yellow-500/5'
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-mono text-xs font-medium text-text">
-                          {formatted.time}
-                        </div>
-                        <div className="font-mono text-[11px] text-text-muted">
-                          {formatted.date}
+                        <div className="font-mono text-[11px] font-medium text-text">
+                          {formatted.time}{' '}
+                          <span className="text-[10px] text-text-muted">{formatted.date}</span>
                         </div>
                       </div>
                       <span
                         className={clsx(
-                          'inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold capitalize',
+                          'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold capitalize',
                           statusClass
                         )}
                       >
@@ -841,54 +839,46 @@ export const Logs = () => {
                       </span>
                     </div>
 
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-1.5 space-y-1.5">
                       <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-                          Model
-                        </div>
-                        <div className="truncate text-sm font-medium text-text">
+                        <div className="truncate text-xs font-medium text-text">
                           {log.incomingModelAlias || '-'}
-                        </div>
-                        <div className="truncate text-xs text-text-secondary">
-                          {log.provider || '-'}:{log.selectedModelName || '-'}
+                          <span className="font-normal text-text-secondary">
+                            {' '}
+                            · {log.provider || '-'}:{log.selectedModelName || '-'}
+                          </span>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-md bg-bg-subtle p-2">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Key
-                          </div>
-                          <div className="truncate text-text">{log.apiKey || '-'}</div>
-                        </div>
-                        <div className="rounded-md bg-bg-subtle p-2">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            API
-                          </div>
+                      <div className="grid grid-cols-3 gap-1 text-[11px]">
+                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
                           <div className="truncate text-text">
+                            <span className="text-[9px] uppercase text-text-muted">Key </span>
+                            {log.apiKey || '-'}
+                          </div>
+                        </div>
+                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+                          <div className="truncate text-text">
+                            <span className="text-[9px] uppercase text-text-muted">API </span>
                             {log.incomingApiType || '?'} {'->'} {log.outgoingApiType || '?'}
                           </div>
                         </div>
-                        <div className="rounded-md bg-bg-subtle p-2">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Tokens
+                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+                          <div className="truncate text-text">
+                            <span className="text-[9px] uppercase text-text-muted">Tok </span>
+                            {formatLargeNumber(totalTokens)}
                           </div>
-                          <div className="text-text">{formatLargeNumber(totalTokens)}</div>
                         </div>
-                        <div className="rounded-md bg-bg-subtle p-2">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Cost
-                          </div>
-                          <div className="text-text">
+                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+                          <div className="truncate text-text">
+                            <span className="text-[9px] uppercase text-text-muted">Cost </span>
                             {log.costTotal == null || log.costTotal === 0
                               ? '-'
                               : formatCost(log.costTotal)}
                           </div>
                         </div>
-                        <div className="rounded-md bg-bg-subtle p-2">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Latency
-                          </div>
-                          <div className="text-text">
+                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+                          <div className="truncate text-text">
+                            <span className="text-[9px] uppercase text-text-muted">Lat </span>
                             {(() => {
                               const progress =
                                 log.responseStatus === 'pending'
@@ -941,11 +931,9 @@ export const Logs = () => {
                             })()}
                           </div>
                         </div>
-                        <div className="rounded-md bg-bg-subtle p-2">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Meta
-                          </div>
-                          <div className="text-text">
+                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+                          <div className="truncate text-text">
+                            <span className="text-[9px] uppercase text-text-muted">Meta </span>
                             {(log.messageCount || 0) === 0 ? '-' : log.messageCount} msg /{' '}
                             {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount} tools
                           </div>
@@ -953,7 +941,7 @@ export const Logs = () => {
                       </div>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-glass pt-3">
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
                       <span className="min-w-0 truncate font-mono text-[11px] text-text-muted">
                         {log.requestId}
                       </span>
