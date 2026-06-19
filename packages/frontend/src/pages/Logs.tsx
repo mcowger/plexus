@@ -150,7 +150,7 @@ const PaginationControls = ({
 }: PaginationControlsProps) => (
   <div
     className={clsx(
-      'flex items-center justify-between gap-3 px-3 py-3 sm:justify-end',
+      'flex items-center justify-between gap-2 px-2 py-2 sm:justify-end sm:gap-3 sm:px-3 sm:py-3',
       position === 'top' ? 'border-b border-border' : 'border-t border-border'
     )}
   >
@@ -654,6 +654,7 @@ export const Logs = () => {
   };
 
   const selectedRetryHistory = parseRetryHistory(selectedRetryLog?.retryHistory);
+  const showLiveStatus = !!adminKey && offset === 0 && sortBy === 'date' && sortDir === 'desc';
 
   return (
     <div className="flex flex-col min-h-full">
@@ -664,13 +665,14 @@ export const Logs = () => {
             ? `Scoped to key "${principal.keyName}"`
             : 'All API requests routed through the gateway'
         }
+        className="py-2.5 sm:py-4"
         actions={
           <>
             {/* SSE live-update connection status — only visible when on page 1, sorted by date desc */}
-            {!!adminKey && offset === 0 && sortBy === 'date' && sortDir === 'desc' && (
+            {showLiveStatus && (
               <span
                 className={clsx(
-                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border select-none',
+                  'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium select-none sm:px-2.5',
                   sseStatus === 'connected' && 'bg-green-500/10 text-green-400 border-green-500/20',
                   sseStatus === 'reconnecting' &&
                     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
@@ -714,67 +716,70 @@ export const Logs = () => {
       >
         <form
           onSubmit={handleSearch}
-          className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch sm:items-end"
+          className="grid grid-cols-3 items-end gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end"
         >
           {!isLimited && (
-            <div className="w-full sm:w-56">
+            <div className="col-span-1 sm:w-56">
               <SearchInput
-                placeholder="Filter by key…"
+                placeholder="Key…"
                 value={filters.apiKey}
                 onChange={(v) => setFilters({ ...filters, apiKey: v })}
               />
             </div>
           )}
-          <div className="w-full sm:w-56">
+          <div className="col-span-1 sm:w-56">
             <SearchInput
-              placeholder="Filter by model…"
+              placeholder="Model…"
               value={filters.incomingModelAlias}
               onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
             />
           </div>
-          <div className="w-full sm:w-44">
+          <div className="col-span-1 sm:w-44">
             <SearchInput
-              placeholder="Filter by provider…"
+              placeholder="Provider…"
               value={filters.provider}
               onChange={(v) => setFilters({ ...filters, provider: v })}
             />
           </div>
-          <div className="w-full sm:w-auto flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <PlayCircle size={24} color="#94a3b8" />
+          <div className="hidden sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none sm:gap-2">
+              <PlayCircle size={18} className="shrink-0 text-slate-400 sm:h-6 sm:w-6" />
               <DateTimePicker
                 value={filters.startDate}
                 onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
                 placeholder="Start date"
+                className="min-w-0 flex-1 sm:flex-none"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Circle size={24} color="#94a3b8" />
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none sm:gap-2">
+              <Circle size={18} className="shrink-0 text-slate-400 sm:h-6 sm:w-6" />
               <DateTimePicker
                 value={filters.endDate}
                 onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
                 placeholder="End date"
+                className="min-w-0 flex-1 sm:flex-none"
               />
             </div>
             {(filters.startDate || filters.endDate) && (
               <button
                 type="button"
                 onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
-                className="rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast bg-transparent border-0 cursor-pointer"
+                className="rounded-md border-0 bg-transparent text-text-muted transition-colors duration-fast hover:bg-bg-hover hover:text-text"
                 title="Clear date filters"
               >
                 <X size={14} />
               </button>
             )}
           </div>
-          <Button type="submit" variant="primary" size="sm" className="w-full sm:w-auto">
+          <Button type="submit" variant="primary" size="sm" className="col-span-2 w-full sm:w-auto">
             Search
           </Button>
-          <div className="w-full sm:w-40">
+          <div className="col-span-1 sm:w-40">
             <Select
               label="Per page"
               value={String(limit)}
               onChange={handleLimitChange}
+              className="py-1.5 sm:py-2"
               options={[
                 { value: '20', label: '20' },
                 { value: '50', label: '50' },
@@ -883,9 +888,50 @@ export const Logs = () => {
                           </div>
                         </div>
                         <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">API </span>
-                            {log.incomingApiType || '?'} {'->'} {log.outgoingApiType || '?'}
+                          <div className="flex items-center gap-1 text-text">
+                            <div className="flex w-4 shrink-0 justify-center">
+                              {log.incomingApiType === 'embeddings' ? (
+                                <Variable size={14} className="text-green-500" />
+                              ) : log.incomingApiType === 'transcriptions' ? (
+                                <AudioLines size={14} className="text-purple-500" />
+                              ) : log.incomingApiType === 'speech' ? (
+                                <Volume2 size={14} className="text-orange-500" />
+                              ) : log.incomingApiType === 'images' ? (
+                                <ImageIcon size={14} className="text-fuchsia-500" />
+                              ) : log.incomingApiType === 'oauth' ? (
+                                <ShieldCheck size={14} className="text-emerald-500" />
+                              ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
+                                <img
+                                  src={apiLogos[log.incomingApiType]}
+                                  alt={log.incomingApiType}
+                                  className="h-3.5 w-3.5"
+                                />
+                              ) : (
+                                <span className="text-[10px] text-text-muted">?</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-text-muted">→</span>
+                            <div className="flex w-4 shrink-0 justify-center">
+                              {log.outgoingApiType === 'embeddings' ? (
+                                <Variable size={14} className="text-green-500" />
+                              ) : log.outgoingApiType === 'transcriptions' ? (
+                                <AudioLines size={14} className="text-purple-500" />
+                              ) : log.outgoingApiType === 'speech' ? (
+                                <Volume2 size={14} className="text-orange-500" />
+                              ) : log.outgoingApiType === 'images' ? (
+                                <ImageIcon size={14} className="text-fuchsia-500" />
+                              ) : log.outgoingApiType === 'oauth' ? (
+                                <ShieldCheck size={14} className="text-emerald-500" />
+                              ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (
+                                <img
+                                  src={apiLogos[log.outgoingApiType]}
+                                  alt={log.outgoingApiType}
+                                  className="h-3.5 w-3.5"
+                                />
+                              ) : (
+                                <span className="text-[10px] text-text-muted">?</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
@@ -904,57 +950,13 @@ export const Logs = () => {
                         </div>
                         <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
                           <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">Lat </span>
-                            {(() => {
-                              const progress =
-                                log.responseStatus === 'pending'
-                                  ? progressMapRef.current.get(log.requestId)
-                                  : undefined;
-                              const rawDurationMs =
-                                log.durationMs != null && log.durationMs > 0
-                                  ? log.durationMs
-                                  : log.responseStatus === 'pending'
-                                    ? Date.now() - log.startTime
-                                    : null;
-                              const liveDuration =
-                                rawDurationMs != null ? formatMs(rawDurationMs) : '-';
-                              if (progress) {
-                                return (
-                                  <div
-                                    style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
-                                  >
-                                    <span>Duration: {liveDuration}</span>
-                                    <span
-                                      style={{
-                                        color: 'var(--color-text-secondary)',
-                                        fontSize: '0.85em',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                      }}
-                                    >
-                                      <CloudDownload size={11} className="text-yellow-400" />
-                                      <span>{formatBytes(progress.bytesReceived)}</span>
-                                    </span>
-                                    {progress.bytesPerSec != null && (
-                                      <span
-                                        style={{
-                                          color: 'var(--color-text-secondary)',
-                                          fontSize: '0.85em',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                        }}
-                                      >
-                                        <Gauge size={11} className="text-text-secondary" />
-                                        {formatBytes(progress.bytesPerSec)}/s
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-                              return liveDuration;
-                            })()}
+                            <span className="text-[9px] uppercase text-text-muted">E2E </span>
+                            {log.durationMs != null &&
+                            log.durationMs > 0 &&
+                            log.tokensOutput &&
+                            log.tokensOutput > 0
+                              ? formatTPS(log.tokensOutput / (log.durationMs / 1000))
+                              : '-'}
                           </div>
                         </div>
                         <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
@@ -967,11 +969,8 @@ export const Logs = () => {
                       </div>
                     </div>
 
-                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
-                      <span className="min-w-0 truncate font-mono text-[11px] text-text-muted">
-                        {log.requestId}
-                      </span>
-                      <div className="flex items-center gap-1.5">
+                    {(log.hasError || log.hasDebug) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {log.hasError && (
                           <Button
                             size="sm"
@@ -996,16 +995,8 @@ export const Logs = () => {
                             Debug
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDelete(log.requestId)}
-                          className="text-danger"
-                        >
-                          <Trash2 size={14} />
-                        </Button>
                       </div>
-                    </div>
+                    )}
                   </article>
                 );
               })
