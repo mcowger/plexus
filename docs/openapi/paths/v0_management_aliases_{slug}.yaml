@@ -59,9 +59,9 @@ put:
           $ref: ../components/schemas/AliasConfig.yaml
         examples:
           chat_alias:
-            summary: Chat model alias (with custom metadata)
+            summary: Text model alias (with custom metadata)
             value:
-              type: chat
+              type: text
               target_groups:
                 - name: default
                   selector: random
@@ -79,7 +79,7 @@ put:
           chat_alias_multi_group:
             summary: Alias with multiple target groups
             value:
-              type: chat
+              type: text
               target_groups:
                 - name: subscription
                   selector: e2e_performance
@@ -99,9 +99,9 @@ put:
                     - provider: wisgate
                       model: glm-5.1
           chat_alias_openrouter:
-            summary: Chat model alias (OpenRouter catalog metadata)
+            summary: Text model alias (OpenRouter catalog metadata)
             value:
-              type: chat
+              type: text
               target_groups:
                 - name: default
                   selector: random

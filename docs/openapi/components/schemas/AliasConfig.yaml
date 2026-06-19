@@ -55,23 +55,22 @@ properties:
   type:
     type: string
     enum:
-      - chat
-      - responses
+      - text
       - embeddings
       - transcriptions
       - speech
       - image
     description: >
-      Inference API type this alias targets. Anthropic Messages and Google
-      Gemini models are both routed as `chat` — Plexus handles the
-      per-provider request/response transformation transparently.
+      Model capability type — what the model produces. This is distinct from
+      the wire protocol (which is configured via `preferred_api` or
+      `access_via` on each provider model).
 
-      - **chat** — OpenAI Chat Completions (also used for Anthropic and Gemini backends).
-      - **responses** — OpenAI Responses API.
-      - **embeddings** — OpenAI Embeddings.
-      - **transcriptions** — OpenAI Audio Transcriptions.
-      - **speech** — OpenAI Audio Speech.
-      - **image** — OpenAI Images generation/edit.
+      - **text** — Text generation (LLM). Supports all text wire protocols:
+        chat completions, messages, gemini, responses, ollama.
+      - **embeddings** — Vector embeddings.
+      - **transcriptions** — Audio to text.
+      - **speech** — Text to audio.
+      - **image** — Image generation/editing.
   priority:
     type: string
     enum:
