@@ -15,7 +15,7 @@
     "lint:migrations": "cd ../.. && bun run scripts/lint-migrations.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.79.6",
+    "@earendil-works/pi-ai": "0.79.7",
     "@fastify/bearer-auth": "^10.1.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^10.0.0",
@@ -41,11 +41,11 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.4.6",
+    "@electric-sql/pglite": "^0.5.3",
     "@types/bun": "latest",
-    "@types/node": "^25.8.0",
+    "@types/node": "^25.9.3",
     "@types/winston": "^2.4.4",
     "drizzle-kit": "^0.31.10",
-    "form-data": "^4.0.5"
+    "form-data": "^4.0.6"
   }
 }

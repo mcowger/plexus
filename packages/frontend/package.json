@@ -9,7 +9,7 @@
     "dev": "bun run build.ts --watch"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.0",
+    "@tailwindcss/cli": "^4.3.1",
     "@types/bun": "latest",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -25,9 +25,9 @@
     "@plexus/shared": "workspace:*",
     "@types/human-format": "^1.0.3",
     "clsx": "^2.1.1",
-    "fuse.js": "^7.4.1",
+    "fuse.js": "^7.4.2",
     "human-format": "^1.2.1",
-    "lucide-react": "^1.16.0",
+    "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.0",
