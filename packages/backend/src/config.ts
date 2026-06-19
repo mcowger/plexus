@@ -193,7 +193,7 @@ const ModelProviderConfigSchema = z.object({
     output: 0,
   }),
   access_via: z.array(z.string()).optional(),
-  type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
+  type: z.enum(['text', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   extraBody: z.record(z.string(), z.any()).optional(),
   adapter: AdapterConfigSchema,
   maxConcurrency: z.number().int().positive().nullable().optional(),
@@ -775,9 +775,7 @@ export const ModelConfigSchema = z
     preferred_api: z
       .array(z.enum(['chat_completions', 'messages', 'gemini', 'responses']))
       .optional(),
-    type: z
-      .enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image'])
-      .optional(),
+    type: z.enum(['text', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
     advanced: z.array(ModelBehaviorSchema).optional(),
     metadata: ModelMetadataSchema.optional(),
     // pi-ai model reference: when set, pi_options (compat) will be included in GET /v1/models

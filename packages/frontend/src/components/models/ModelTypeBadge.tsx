@@ -8,7 +8,7 @@ interface ModelTypeBadgeProps {
 }
 
 export const ModelTypeBadge: React.FC<ModelTypeBadgeProps> = ({ type, className }) => {
-  const label = type || 'chat';
+  const label = type || 'text';
 
   let status: 'connected' | 'disconnected' | 'connecting' | 'error' | 'neutral' | 'warning' =
     'neutral';
@@ -26,9 +26,6 @@ export const ModelTypeBadge: React.FC<ModelTypeBadgeProps> = ({ type, className 
       break;
     case 'image':
       customClass = 'text-pink-400 border-pink-500/30 bg-pink-500/15'; // pink
-      break;
-    case 'responses':
-      customClass = 'text-cyan-400 border-cyan-500/30 bg-cyan-500/15'; // cyan
       break;
     default:
       customClass = 'text-gray-400 border-gray-500/30 bg-gray-500/15';

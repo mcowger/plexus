@@ -74,13 +74,12 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                     transcriptions: 'text-purple-400',
                     speech: 'text-orange-400',
                     image: 'text-pink-400',
-                    responses: 'text-cyan-400',
-                    chat: 'text-gray-400',
+                    text: 'text-gray-400',
                   } as Record<string, string>
-                )[alias.type ?? 'chat'] ?? 'text-gray-400'
+                )[alias.type ?? 'text'] ?? 'text-gray-400'
               }
             >
-              {alias.type ?? 'chat'}
+              {alias.type ?? 'text'}
             </span>
           </span>
           {alias.metadata && (
@@ -163,7 +162,6 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                               let testApiTypes: string[] = ['chat'];
                               if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
                               else if (alias.type === 'image') testApiTypes = ['images'];
-                              else if (alias.type === 'responses') testApiTypes = ['responses'];
 
                               onTestTarget(alias.id, testKey, t.provider, t.model, testApiTypes);
                             }

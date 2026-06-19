@@ -92,7 +92,7 @@
 
   "aliases": {
     "gpt-4o": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-openai", "model": "gpt-4o" }],
       "additional_aliases": ["gpt4o", "openai/gpt-4o"],
       "input_price_per_million": 2.5,
@@ -111,7 +111,7 @@
       }
     },
     "gpt-4o-mini": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-openai", "model": "gpt-4o-mini" }],
       "additional_aliases": ["gpt4o-mini", "fast"],
       "input_price_per_million": 0.15,
@@ -130,7 +130,7 @@
       }
     },
     "claude-3-5-sonnet": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-anthropic", "model": "claude-3-5-sonnet-20241022" }],
       "additional_aliases": ["claude-sonnet", "anthropic/claude-3-5-sonnet"],
       "input_price_per_million": 3.0,
@@ -149,7 +149,7 @@
       }
     },
     "claude-3-haiku": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-anthropic", "model": "claude-3-haiku-20240307" }],
       "additional_aliases": ["claude-haiku", "cheap"],
       "input_price_per_million": 0.25,
@@ -168,7 +168,7 @@
       }
     },
     "gemini-1-5-pro": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-gemini", "model": "gemini-1.5-pro-latest" }],
       "additional_aliases": ["gemini-pro", "google/gemini-1.5-pro"],
       "input_price_per_million": 3.5,
@@ -187,7 +187,7 @@
       }
     },
     "gemini-flash": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-gemini", "model": "gemini-1.5-flash-latest" }],
       "additional_aliases": ["gemini-1-5-flash", "google/gemini-flash"],
       "input_price_per_million": 0.075,
@@ -206,7 +206,7 @@
       }
     },
     "smart": {
-      "type": "chat",
+      "type": "text",
       "targets": [
         { "provider": "mock-openai", "model": "gpt-4o" },
         { "provider": "mock-anthropic", "model": "claude-3-5-sonnet-20241022" },
@@ -222,7 +222,7 @@
       }
     },
     "balanced": {
-      "type": "chat",
+      "type": "text",
       "targets": [
         { "provider": "mock-openai", "model": "gpt-4o-mini" },
         { "provider": "mock-anthropic", "model": "claude-3-haiku-20240307" },
@@ -238,7 +238,7 @@
       }
     },
     "local-llama": {
-      "type": "chat",
+      "type": "text",
       "targets": [
         { "provider": "local-ollama", "model": "llama3.2" },
         { "provider": "local-lmstudio", "model": "llama-3.2-3b-instruct" }
@@ -253,7 +253,7 @@
       }
     },
     "local-mistral": {
-      "type": "chat",
+      "type": "text",
       "targets": [
         { "provider": "local-ollama", "model": "mistral" },
         { "provider": "local-llamacpp", "model": "mistral-7b-instruct-v0.2" }
@@ -329,7 +329,7 @@
       }
     },
     "openrouter-auto": {
-      "type": "chat",
+      "type": "text",
       "targets": [{ "provider": "mock-openrouter", "model": "openrouter/auto" }],
       "additional_aliases": ["auto"],
       "metadata": {

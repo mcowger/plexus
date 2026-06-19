@@ -774,6 +774,28 @@ export class ConfigRepository {
     return migrated;
   }
 
+  /**
+   * One-time startup migration: rewrite legacy model_type values to the
+   * canonical 'text' capability type.
+   *
+   * - 'chat'      → 'text'  (was overloaded to mean both wire protocol and capability)
+   * - 'responses' → 'text'  (was incorrectly stored as a capability type)
+   * - null / other values are left untouched.
+   *
+   * Idempotent: rows already set to 'text' (or any other valid value) are unaffected.
+   */
+  async migrateModelTypes(): Promise<number> {
+    const schema = this.schema();
+    const result = await this.db()
+      .update(schema.modelAliases)
+      .set({ modelType: 'text', updatedAt: now() })
+      .where(sql`${schema.modelAliases.modelType} IN ('chat', 'responses')`);
+    // Both SQLite (bun) and postgres-js drivers expose rowCount/changes on the result
+    const affected =
+      (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0;
+    return Number(affected);
+  }
+
   async saveAlias(slug: string, config: ModelConfig): Promise<void> {
     const schema = this.schema();
     const timestamp = now();

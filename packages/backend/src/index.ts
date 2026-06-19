@@ -174,6 +174,9 @@ try {
   // TODO(#target-groups-cleanup): remove this after migration period.
   await configService.migrateLegacyTargetGroups();
 
+  // One-time migration: rewrite legacy model_type 'chat'/'responses' → 'text'.
+  await configService.migrateModelTypes();
+
   // Eagerly initialize OAuth auth manager so auth.json schema migration
   // runs during startup (instead of waiting for first OAuth request).
   await OAuthAuthManager.getInstance().initialize();

@@ -82,6 +82,8 @@ import antigravityLogo from '../assets/antigravity.svg';
 import chatLogo from '../assets/chat.svg';
 // @ts-ignore
 import geminiLogo from '../assets/gemini.svg';
+// @ts-ignore
+import responsesLogo from '../assets/responses.svg';
 
 interface RetryAttemptDetail {
   index: number;
@@ -200,6 +202,8 @@ export const Logs = () => {
     antigravity: antigravityLogo,
     chat: chatLogo,
     gemini: geminiLogo,
+    responses: responsesLogo,
+    'openai-responses': responsesLogo,
     // inference-v2 (pi-ai) outgoing API types
     'google-generative-ai': geminiLogo,
     'openai-completions': chatLogo,
@@ -1126,8 +1130,6 @@ export const Logs = () => {
                                 <Volume2 size={16} className="text-orange-500" />
                               ) : log.incomingApiType === 'images' ? (
                                 <ImageIcon size={16} className="text-fuchsia-500" />
-                              ) : log.incomingApiType === 'responses' ? (
-                                <MessagesSquare size={16} className="text-cyan-500" />
                               ) : log.incomingApiType === 'oauth' ? (
                                 <ShieldCheck size={16} className="text-emerald-500" />
                               ) : log.incomingApiType && apiLogos[log.incomingApiType] ? (
@@ -1152,9 +1154,6 @@ export const Logs = () => {
                                 <Volume2 size={16} className="text-orange-500" />
                               ) : log.outgoingApiType === 'images' ? (
                                 <ImageIcon size={16} className="text-fuchsia-500" />
-                              ) : log.outgoingApiType === 'responses' ||
-                                log.outgoingApiType === 'openai-responses' ? (
-                                <MessagesSquare size={16} className="text-cyan-500" />
                               ) : log.outgoingApiType === 'oauth' ? (
                                 <ShieldCheck size={16} className="text-emerald-500" />
                               ) : log.outgoingApiType && apiLogos[log.outgoingApiType] ? (

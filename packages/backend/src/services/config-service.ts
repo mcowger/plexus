@@ -98,6 +98,24 @@ export class ConfigService {
   }
 
   /**
+   * One-time startup migration: rewrite legacy model_type values 'chat' and
+   * 'responses' to the canonical capability type 'text'.
+   *
+   * 'chat' was overloaded (wire protocol + capability type); 'responses' was
+   * incorrectly stored as a capability type when it is only a wire protocol.
+   * Both now map to 'text' (text-generation capability).
+   */
+  async migrateModelTypes(): Promise<void> {
+    const affected = await this.repo.migrateModelTypes();
+    if (affected > 0) {
+      logger.info(
+        `Migrated ${affected} alias model_type value(s) from legacy 'chat'/'responses' to 'text'`
+      );
+      await this.executeRebuild();
+    }
+  }
+
+  /**
    * Returns the cached PlexusConfig (same shape as the old getConfig()).
    * Throws if initialize() hasn't been called yet.
    */

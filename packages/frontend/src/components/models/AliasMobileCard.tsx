@@ -164,7 +164,6 @@ export const AliasMobileCard: React.FC<Props> = ({
                           let testApiTypes: string[] = ['chat'];
                           if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
                           else if (alias.type === 'image') testApiTypes = ['images'];
-                          else if (alias.type === 'responses') testApiTypes = ['responses'];
 
                           onTestTarget(
                             alias.id,

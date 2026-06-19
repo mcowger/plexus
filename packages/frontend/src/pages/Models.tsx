@@ -21,10 +21,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Plus, Trash2, Zap, Download, ChevronDown, ChevronRight } from 'lucide-react';
 
 // Model alias types grouped into accordions on the Models page. Order
-// follows rough frequency of use. `responses` is intentionally NOT a
-// group here: it's a chat *protocol* (alongside chat_completions,
-// messages, gemini — see `preferred_api`), not a distinct model type, so
-// aliases with `type: 'responses'` are folded into the Chat bucket.
+// follows rough frequency of use.
 type ModelTypeGroup = {
   type: NonNullable<Alias['type']>;
   label: string;
@@ -32,7 +29,7 @@ type ModelTypeGroup = {
 };
 
 const MODEL_TYPE_GROUPS: ModelTypeGroup[] = [
-  { type: 'chat', label: 'Chat', defaultOpen: true },
+  { type: 'text', label: 'Text', defaultOpen: true },
   { type: 'embeddings', label: 'Embeddings', defaultOpen: false },
   { type: 'transcriptions', label: 'Transcriptions', defaultOpen: false },
   { type: 'speech', label: 'Speech', defaultOpen: false },
@@ -157,18 +154,10 @@ export const Models = () => {
 
   const sortedAliases = [...aliases].sort((a, b) => a.id.localeCompare(b.id));
 
-  // Bucket the (already search-filtered) aliases into the ordered type
-  // groups so we can render each group inside its own accordion. `responses`
-  // is a chat protocol, not a model type, so aliases with `type: 'responses'`
-  // (or no type at all) fall into Chat — matching the edit modal's convention
-  // (`value={editingAlias.type || 'chat'}`).
+  // Bucket the (already search-filtered) aliases into the ordered type groups.
   const aliasesByType = MODEL_TYPE_GROUPS.map((group) => ({
     group,
-    aliases: sortedAliases.filter((a) => {
-      const t = a.type ?? 'chat';
-      const effective = t === 'responses' ? 'chat' : t;
-      return effective === group.type;
-    }),
+    aliases: sortedAliases.filter((a) => (a.type ?? 'text') === group.type),
   }));
 
   return (
@@ -330,17 +319,12 @@ export const Models = () => {
                 </label>
                 <select
                   className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
-                  value={(() => {
-                    const t = editingAlias.type ?? 'chat';
-                    // `responses` is a chat protocol, not a model type — render
-                    // existing aliases that carry it as Chat (mirrors grouping).
-                    return t === 'responses' ? 'chat' : t;
-                  })()}
+                  value={editingAlias.type ?? 'text'}
                   onChange={(e) =>
                     setEditingAlias({
                       ...editingAlias,
                       type: e.target.value as
-                        | 'chat'
+                        | 'text'
                         | 'embeddings'
                         | 'transcriptions'
                         | 'speech'
@@ -348,7 +332,7 @@ export const Models = () => {
                     })
                   }
                 >
-                  <option value="chat">Chat</option>
+                  <option value="text">Text</option>
                   <option value="embeddings">Embeddings</option>
                   <option value="transcriptions">Transcriptions</option>
                   <option value="speech">Speech</option>

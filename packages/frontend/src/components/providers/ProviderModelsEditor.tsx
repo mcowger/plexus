@@ -320,10 +320,10 @@ export function ProviderModelsEditor({
                             </label>
                             <select
                               className={FIELD_CLS}
-                              value={mCfg.type || 'chat'}
+                              value={mCfg.type || 'text'}
                               onChange={(e) => {
                                 const newType = e.target.value as
-                                  | 'chat'
+                                  | 'text'
                                   | 'embeddings'
                                   | 'transcriptions'
                                   | 'speech'
@@ -345,7 +345,7 @@ export function ProviderModelsEditor({
                                 else updateModelConfig(mId, { type: newType });
                               }}
                             >
-                              <option value="chat">Chat</option>
+                              <option value="text">Text</option>
                               <option value="embeddings">Embeddings</option>
                               <option value="transcriptions">Transcriptions</option>
                               <option value="speech">Speech</option>
@@ -353,7 +353,7 @@ export function ProviderModelsEditor({
                             </select>
                           </div>
 
-                          {(!mCfg.type || mCfg.type === 'chat') && (
+                          {(!mCfg.type || mCfg.type === 'text') && (
                             <div className="flex flex-col gap-1">
                               <label className="font-body text-[11px] font-medium text-text-secondary">
                                 Access Via

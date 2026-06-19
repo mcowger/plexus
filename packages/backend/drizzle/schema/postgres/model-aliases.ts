@@ -23,7 +23,7 @@ export const modelAliases = pgTable('model_aliases', {
   slug: text('slug').notNull().unique(),
   selector: selectorStrategyEnum('selector'),
   priority: aliasPriorityEnum('priority').notNull().default('selector'),
-  modelType: text('model_type'), // reuse model_type values but as text to avoid enum conflict
+  modelType: text('model_type'), // 'text' | 'embeddings' | 'transcriptions' | 'speech' | 'image'
   additionalAliases: jsonb('additional_aliases'), // string[]
   advanced: jsonb('advanced'), // behavior objects array
   metadataSource: metadataSourceEnum('metadata_source'),
