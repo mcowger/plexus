@@ -5,6 +5,13 @@ custom_model_max_tokens = 256000
 
 [pr_description]
 enable_semantic_files_types = false  # suppress the File Walkthrough section
+enable_pr_type = false                 # suppress the "PR Type" section
+enable_pr_diagram = false               # suppress the "Diagram Walkthrough" section
+
+[pr_reviewer]
+# Suppress the "PR Reviewer Guide" comment when there are no findings to report,
+# so we don't post a noise comment saying "No major issues detected" etc.
+publish_output_no_suggestions = false
 
 [pr_code_suggestions]
 num_code_suggestions_per_chunk = 5
