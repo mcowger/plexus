@@ -214,6 +214,38 @@ export class ResponsesTransformer implements Transformer {
       };
     }
 
+    // For same-format (responses -> responses) requests that take the
+    // non-pass-through path (e.g. adapter active, vision fallthrough), carry
+    // through Responses-API-native top-level fields that the explicit mapping
+    // above does not set. The unified schema intentionally abstracts away
+    // provider-specific options so cross-format transforms don't drop them on
+    // the floor when the client is talking the same API type as the upstream
+    // provider. Only fields not already set are carried through, so the
+    // unified pipeline output is never overridden.
+    if (request.incomingApiType?.toLowerCase() === 'responses' && request.originalBody) {
+      const passthroughFields = [
+        'user',
+        'store',
+        'background',
+        'service_tier',
+        'truncation',
+        'metadata',
+        'top_p',
+        'top_logprobs',
+        'max_tool_calls',
+        'previous_response_id',
+        'conversation',
+        'prompt_cache_retention',
+        'safety_identifier',
+        'stream_options',
+      ];
+      for (const field of passthroughFields) {
+        if (request.originalBody[field] !== undefined && payload[field] === undefined) {
+          payload[field] = request.originalBody[field];
+        }
+      }
+    }
+
     return payload;
   }
 

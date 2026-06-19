@@ -225,5 +225,30 @@ export async function buildGeminiRequest(
     generationConfig,
   };
 
+  // For same-format (gemini -> gemini) requests that take the non-pass-through
+  // path (e.g. adapter active, vision fallthrough), carry through Gemini-native
+  // top-level fields that the unified schema does not model. The unified schema
+  // intentionally abstracts away provider-specific options (safetySettings,
+  // cachedContent, labels, etc.) so cross-format transforms don't drop them on
+  // the floor when the client is talking the same API type as the upstream
+  // provider. Only fields not already set by the explicit mapping above are
+  // carried through, so the unified pipeline output is never overridden.
+  if (request.incomingApiType?.toLowerCase() === 'gemini' && request.originalBody) {
+    const passthroughFields = ['safetySettings', 'cachedContent', 'labels'];
+    for (const field of passthroughFields) {
+      if (request.originalBody[field] !== undefined && (req as any)[field] === undefined) {
+        (req as any)[field] = request.originalBody[field];
+      }
+    }
+
+    // Merge unmapped generationConfig keys (e.g. topP, topK, stopSequences,
+    // responseLogprobs, logprobs) that the explicit mapping above didn't set.
+    const originalGenConfig = request.originalBody.generationConfig;
+    if (originalGenConfig && typeof originalGenConfig === 'object') {
+      const mergedGenConfig: any = { ...originalGenConfig, ...req.generationConfig };
+      req.generationConfig = mergedGenConfig;
+    }
+  }
+
   return req;
 }
