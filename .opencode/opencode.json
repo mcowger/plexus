@@ -1,0 +1,9 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "command": {
+    "sendit": {
+      "description": "Commit pending changes, push to an appropriately named branch, and open a pull request against mcowger/plexus main.",
+      "prompt": "Ship the pending changes in this worktree to a pull request. Follow these steps in order:\n\n1. Inspect the working tree (`git status`, `git diff`) to understand the full set of pending changes.\n2. If there is nothing to commit, stop and report that.\n3. Determine an appropriately named branch for the work. If the current branch is already a feature/fix branch (not the default branch), reuse it; otherwise create and switch to a new branch named with the format `<type>/<short-desc>` (lowercase ASCII, hyphens only in the short description).\n4. Stage the relevant changes. Do not stage unrelated files.\n5. Generate a single Conventional Commits message of the form `type(scope): summary`. Base it ONLY on the final end state of the codebase after the change. Do NOT describe the implementation process, exploration, debugging, refactors that were discarded, or steps taken to get there. No prose, no backticks, no quotes, no markdown — exactly one line.\n6. Commit with that message.\n7. Push the branch to origin (`git push -u origin HEAD`).\n8. Open a pull request against `mcowger/plexus` base branch `main` using `gh pr create`. The PR title should be imperative and concise. The PR body should be a technical and accurate description of the final state of the change for another engineer — factual, technical, and concise. Do NOT include any kind of test plan, testing section, checklist, marketing language, hype, or sales framing. Do NOT describe the implementation journey, debugging process, or discarded approaches.\n9. Report the resulting PR URL.\n\nDo not use --no-verify or bypass hooks. Do not amend or force-push."
+    }
+  }
+}
