@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, bigint, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const apiKeys = pgTable('api_keys', {
   id: serial('id').primaryKey(),
@@ -13,6 +13,7 @@ export const apiKeys = pgTable('api_keys', {
   excludedProviders: text('excluded_providers'),
   allowedIps: text('allowed_ips'),
   beta: boolean('beta').notNull().default(false),
+  generation: jsonb('generation'), // { reasoning?, maxTokens?, verbosity?, serviceTier? }
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

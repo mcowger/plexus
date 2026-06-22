@@ -173,10 +173,11 @@ describe('buildPiAiModel', () => {
       'chat'
     );
     // The mock getModel returns api: 'anthropic-messages' for non-openai-codex
-    expect(model.id).toBe('claude-opus-4-6');
-    expect(model.provider).toBe('anthropic');
+    expect(model).not.toBeNull();
+    expect(model!.id).toBe('claude-opus-4-6');
+    expect(model!.provider).toBe('anthropic');
     // resolveBaseUrl strips /v1 for anthropic-messages
-    expect(model.baseUrl).toBe('https://api.anthropic.com');
+    expect(model!.baseUrl).toBe('https://api.anthropic.com');
   });
 
   it('returns pi-ai model with baseUrl from record config', () => {
@@ -186,7 +187,7 @@ describe('buildPiAiModel', () => {
       'claude-sonnet-4',
       'messages'
     );
-    expect(model.baseUrl).toBe('https://api.anthropic.com');
+    expect(model!.baseUrl).toBe('https://api.anthropic.com');
   });
 });
 

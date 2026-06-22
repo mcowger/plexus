@@ -7,6 +7,7 @@ import { Providers } from './pages/Providers';
 import { Models } from './pages/Models';
 import { Keys } from './pages/Keys';
 import { Config } from './pages/Config';
+import { PiRegistry } from './pages/PiRegistry';
 import { SystemLogs } from './pages/SystemLogs';
 import { Debug } from './pages/Debug';
 import { Errors } from './pages/Errors';
@@ -90,6 +91,14 @@ const AppRoutes = () => {
                   element={
                     <ProtectedRoute requireAdmin>
                       <Config />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/pi-registry"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <PiRegistry />
                     </ProtectedRoute>
                   }
                 />

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/Switch';
 import { ModelArchitectureEditor } from './ModelArchitectureEditor';
 import { AliasExtraBodyEditor } from './AliasExtraBodyEditor';
+import { GenerationPolicyEditor } from './GenerationPolicyEditor';
 import type { Alias, AliasBehavior } from '../../lib/api';
 
 interface Props {
@@ -141,6 +142,15 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
           {/* ── Extra Body Fields ── */}
           <AliasExtraBodyEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
+
+          <div className="h-px bg-border-glass"></div>
+
+          {/* ── Generation Policy ── */}
+          <GenerationPolicyEditor
+            scope="alias"
+            value={editingAlias.generation}
+            onChange={(generation) => setEditingAlias({ ...editingAlias, generation })}
+          />
         </div>
       )}
     </div>

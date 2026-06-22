@@ -22,26 +22,23 @@ import type {
   TextContent,
   ImageContent,
   ToolCall,
-  ProviderStreamOptions,
   Tool,
 } from '@earendil-works/pi-ai';
 import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
+import type { ReasoningIntent } from '../shared/reasoning';
+import { normalizeEffort } from '../shared/reasoning';
+import type { GenerationIntent } from '../shared/generation';
+import { normalizeVerbosity } from '../shared/generation';
 
 // ─── public result type ───────────────────────────────────────────────────────
 
 export interface OpenAIToContextResult {
   /** The pi-ai conversation context */
   context: Context;
-  /**
-   * Options fragment from the request body (temperature, maxTokens, toolChoice,
-   * parallelToolCalls).  reasoning_effort is not included here — the executor
-   * resolves it via buildReasoningOptions at call time.
-   */
-  streamOptions: Omit<ProviderStreamOptions, 'apiKey' | 'signal' | 'onPayload' | 'headers'>;
+  /** Canonical generation intent (reasoning + maxTokens/temperature/verbosity/serviceTier). */
+  generationIntent: GenerationIntent;
   /** True when the request body has stream: true */
   streaming: boolean;
-  /** reasoning_effort value forwarded from the request body, if present */
-  reasoningEffort?: string;
   /** tool_choice forwarded verbatim */
   toolChoice?: string | { type: string; function?: { name: string } };
   /** parallel_tool_calls forwarded verbatim */
@@ -231,16 +228,31 @@ export function openaiRequestToContext(body: any): OpenAIToContextResult {
 
   const maxTokens: number | undefined = body.max_completion_tokens ?? body.max_tokens ?? undefined;
 
-  const streamOptions: OpenAIToContextResult['streamOptions'] = {
-    temperature: body.temperature ?? undefined,
+  // ── Reasoning intent ──────────────────────────────────────────────────────
+  // OpenAI chat-completions speaks in effort buckets via `reasoning_effort`.
+  const effortRaw = normalizeEffort(body.reasoning_effort);
+  const reasoningIntent: ReasoningIntent =
+    effortRaw === 'off'
+      ? { enabled: false, source: 'client' }
+      : effortRaw != null
+        ? { effort: effortRaw, enabled: true, source: 'client' }
+        : { source: 'client' };
+
+  // ── Generation intent ─────────────────────────────────────────────────────
+  const generationIntent: GenerationIntent = {
+    reasoning: reasoningIntent,
     ...(maxTokens != null ? { maxTokens } : {}),
+    ...(body.temperature != null ? { temperature: body.temperature } : {}),
+    ...(normalizeVerbosity(body.verbosity ?? body.text?.verbosity) != null
+      ? { verbosity: normalizeVerbosity(body.verbosity ?? body.text?.verbosity) }
+      : {}),
+    ...(typeof body.service_tier === 'string' ? { serviceTier: body.service_tier } : {}),
   };
 
   return {
     context,
-    streamOptions,
+    generationIntent,
     streaming: body.stream === true,
-    reasoningEffort: body.reasoning_effort ?? undefined,
     toolChoice: body.tool_choice ?? undefined,
     parallelToolCalls: body.parallel_tool_calls ?? undefined,
     toolsDefined: context.tools?.length ?? 0,

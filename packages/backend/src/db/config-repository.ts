@@ -22,6 +22,8 @@ import type {
   TimeoutConfig,
   StallConfigType,
   MetadataOverrides,
+  PiAiCustomProvider,
+  PiAiCustomModel,
 } from '../config';
 import { resolveGpuParams } from '@plexus/shared';
 
@@ -236,6 +238,8 @@ export class ConfigRepository {
     await this.db().delete(schema.mcpServers);
     await this.db().delete(schema.oauthCredentials);
     await this.db().delete(schema.systemSettings);
+    await this.db().delete(schema.piAiCustomProviders);
+    await this.db().delete(schema.piAiCustomModels);
   }
 
   // ─── Providers ───────────────────────────────────────────────────
@@ -817,6 +821,7 @@ export class ConfigRepository {
       preferredApi: config.preferred_api ? toJson(config.preferred_api) : null,
       piModel: config.pi_model ? toJson(config.pi_model) : null,
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
+      generation: config.generation ? toJson(config.generation) : null,
       targetGroups:
         config.target_groups && config.target_groups.length > 0
           ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
@@ -959,6 +964,9 @@ export class ConfigRepository {
       ...(row.preferredApi ? { preferred_api: parseJson(row.preferredApi) } : {}),
       ...(row.piModel ? { pi_model: parseJson(row.piModel) } : {}),
       ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
+      ...(row.generation
+        ? { generation: parseJson<ModelConfig['generation']>(row.generation) ?? undefined }
+        : {}),
     };
 
     if (row.metadataSource) {
@@ -1006,6 +1014,10 @@ export class ConfigRepository {
         ...(excludedProviders ? { excludedProviders } : {}),
         ...(allowedIps ? { allowedIps } : {}),
         ...(row.beta ? { beta: true } : {}),
+
+        ...(row.generation
+          ? { generation: parseJson<KeyConfig['generation']>(row.generation) ?? undefined }
+          : {}),
       };
     }
 
@@ -1060,6 +1072,10 @@ export class ConfigRepository {
         ...(excludedProviders ? { excludedProviders } : {}),
         ...(allowedIps ? { allowedIps } : {}),
         ...(row.beta ? { beta: true } : {}),
+
+        ...(row.generation
+          ? { generation: parseJson<KeyConfig['generation']>(row.generation) ?? undefined }
+          : {}),
       },
     };
   }
@@ -1090,6 +1106,7 @@ export class ConfigRepository {
           excludedProviders: stringifyStringArray(config.excludedProviders),
           allowedIps: stringifyStringArray(config.allowedIps),
           beta: config.beta ?? false,
+          generation: config.generation ? toJson(config.generation) : null,
           updatedAt: timestamp,
         })
         .where(eq(schema.apiKeys.name, name));
@@ -1108,6 +1125,7 @@ export class ConfigRepository {
           excludedProviders: stringifyStringArray(config.excludedProviders),
           allowedIps: stringifyStringArray(config.allowedIps),
           beta: config.beta ?? false,
+          generation: config.generation ? toJson(config.generation) : null,
           createdAt: timestamp,
           updatedAt: timestamp,
         });
@@ -1179,6 +1197,84 @@ export class ConfigRepository {
     await this.db()
       .delete(schema.userQuotaDefinitions)
       .where(eq(schema.userQuotaDefinitions.name, name));
+  }
+
+  // ─── pi-ai Custom Providers ──────────────────────────────────────
+
+  async getAllPiAiCustomProviders(): Promise<Record<string, PiAiCustomProvider>> {
+    const schema = this.schema();
+    const rows = await this.db().select().from(schema.piAiCustomProviders);
+    const result: Record<string, PiAiCustomProvider> = {};
+    for (const row of rows) {
+      const def = parseJson<PiAiCustomProvider>(row.definition);
+      if (def) result[row.name] = def;
+    }
+    return result;
+  }
+
+  async savePiAiCustomProvider(name: string, def: PiAiCustomProvider): Promise<void> {
+    const schema = this.schema();
+    const timestamp = now();
+    const existing = await this.db()
+      .select()
+      .from(schema.piAiCustomProviders)
+      .where(eq(schema.piAiCustomProviders.name, name))
+      .limit(1);
+    if (existing.length > 0) {
+      await this.db()
+        .update(schema.piAiCustomProviders)
+        .set({ definition: toJson(def), updatedAt: timestamp })
+        .where(eq(schema.piAiCustomProviders.name, name));
+    } else {
+      await this.db()
+        .insert(schema.piAiCustomProviders)
+        .values({ name, definition: toJson(def), createdAt: timestamp, updatedAt: timestamp });
+    }
+  }
+
+  async deletePiAiCustomProvider(name: string): Promise<void> {
+    const schema = this.schema();
+    await this.db()
+      .delete(schema.piAiCustomProviders)
+      .where(eq(schema.piAiCustomProviders.name, name));
+  }
+
+  // ─── pi-ai Custom Models ─────────────────────────────────────────
+
+  async getAllPiAiCustomModels(): Promise<Record<string, PiAiCustomModel>> {
+    const schema = this.schema();
+    const rows = await this.db().select().from(schema.piAiCustomModels);
+    const result: Record<string, PiAiCustomModel> = {};
+    for (const row of rows) {
+      const def = parseJson<PiAiCustomModel>(row.definition);
+      if (def) result[row.name] = def;
+    }
+    return result;
+  }
+
+  async savePiAiCustomModel(name: string, def: PiAiCustomModel): Promise<void> {
+    const schema = this.schema();
+    const timestamp = now();
+    const existing = await this.db()
+      .select()
+      .from(schema.piAiCustomModels)
+      .where(eq(schema.piAiCustomModels.name, name))
+      .limit(1);
+    if (existing.length > 0) {
+      await this.db()
+        .update(schema.piAiCustomModels)
+        .set({ definition: toJson(def), updatedAt: timestamp })
+        .where(eq(schema.piAiCustomModels.name, name));
+    } else {
+      await this.db()
+        .insert(schema.piAiCustomModels)
+        .values({ name, definition: toJson(def), createdAt: timestamp, updatedAt: timestamp });
+    }
+  }
+
+  async deletePiAiCustomModel(name: string): Promise<void> {
+    const schema = this.schema();
+    await this.db().delete(schema.piAiCustomModels).where(eq(schema.piAiCustomModels.name, name));
   }
 
   // ─── MCP Servers ─────────────────────────────────────────────────

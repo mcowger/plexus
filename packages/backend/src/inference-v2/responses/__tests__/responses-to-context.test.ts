@@ -175,22 +175,36 @@ describe('responsesToContext', () => {
   });
 
   describe('reasoning and streaming', () => {
-    it('forwards reasoning.effort', () => {
+    it('forwards reasoning.effort to the generation intent', () => {
       const result = responsesToContext({
         model: 'gpt-4',
         input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
         reasoning: { effort: 'high' },
       });
-      expect(result.reasoningEffort).toBe('high');
+      expect(result.generationIntent.reasoning.effort).toBe('high');
+      expect(result.generationIntent.reasoning.enabled).toBe(true);
     });
 
-    it('sets wantsSummary from reasoning.summary', () => {
+    it('sets wantsSummary and reasoning visibility from reasoning.summary', () => {
       const result = responsesToContext({
         model: 'gpt-4',
         input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
         reasoning: { summary: 'auto' },
       });
       expect(result.wantsSummary).toBe(true);
+      expect(result.generationIntent.reasoning.visibility).toBe('summary');
+      expect(result.generationIntent.reasoning.summaryDetail).toBe('auto');
+    });
+
+    it('maps text.verbosity and service_tier onto the generation intent', () => {
+      const result = responsesToContext({
+        model: 'gpt-4',
+        input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
+        text: { verbosity: 'low' },
+        service_tier: 'priority',
+      });
+      expect(result.generationIntent.verbosity).toBe('low');
+      expect(result.generationIntent.serviceTier).toBe('priority');
     });
 
     it('sets streaming true when stream is true', () => {

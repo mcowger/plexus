@@ -432,6 +432,58 @@ export interface AliasTargetGroup {
 
 export type PreferredApiValue = 'chat_completions' | 'messages' | 'gemini' | 'responses';
 
+export type ReasoningEffortLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type VerbosityLevel = 'low' | 'medium' | 'high';
+
+/** Reasoning/thinking effort sub-policy. */
+export interface ReasoningEffortPolicy {
+  default?: ReasoningEffortLevel;
+  floor?: ReasoningEffortLevel;
+  ceiling?: ReasoningEffortLevel;
+  allowClientOverride?: boolean;
+}
+
+/**
+ * Per-alias / per-key generation policy (inference-v2 Layer 4): reasoning
+ * effort plus capability-aware knobs (max tokens, verbosity, service tier).
+ */
+export interface GenerationPolicy {
+  reasoning?: ReasoningEffortPolicy;
+  maxTokens?: { default?: number; ceiling?: number };
+  verbosity?: { default?: VerbosityLevel; allowClientOverride?: boolean };
+  serviceTier?: { default?: string; allowClientOverride?: boolean };
+}
+
+export type PiAiApi =
+  | 'openai-completions'
+  | 'openai-responses'
+  | 'openai-codex-responses'
+  | 'azure-openai-responses'
+  | 'anthropic-messages'
+  | 'google-generative-ai'
+  | 'google-generative-ai-vertex';
+
+/** Custom pi-ai provider definition (inference-v2 registry). */
+export interface PiAiCustomProviderDef {
+  api: PiAiApi;
+  display_name?: string;
+  compat?: Record<string, any>;
+}
+
+/** Custom / inherited pi-ai model definition (inference-v2 registry). */
+export interface PiAiCustomModelDef {
+  inherits?: { provider: string; model_id: string };
+  api?: PiAiApi;
+  name?: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  thinkingLevelMap?: Record<string, string | null>;
+  input?: Array<'text' | 'image'>;
+  cost?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+  compat?: Record<string, any>;
+}
+
 export interface Alias {
   id: string;
   aliases?: string[];
@@ -457,6 +509,7 @@ export interface Alias {
   preferred_api?: Array<PreferredApiValue>;
   pi_model?: { provider: string; model_id: string };
   extraBody?: Record<string, any>;
+  generation?: GenerationPolicy;
 }
 
 export interface InferenceError {
@@ -941,6 +994,7 @@ export interface KeyConfig {
   excludedProviders?: string[];
   allowedIps?: string[];
   beta?: boolean;
+  generation?: GenerationPolicy;
 }
 
 export type UsageSortField =
@@ -1621,6 +1675,7 @@ export const api = {
           excludedProviders?: string[];
           allowedIps?: string[];
           beta?: boolean;
+          generation?: GenerationPolicy;
         }
       >;
 
@@ -1635,6 +1690,7 @@ export const api = {
         excludedProviders: val.excludedProviders,
         allowedIps: val.allowedIps,
         beta: val.beta,
+        ...(val.generation ? { generation: val.generation } : {}),
       }));
     } catch (e) {
       console.error('API Error getKeys', e);
@@ -1658,6 +1714,10 @@ export const api = {
           excludedProviders: keyConfig.excludedProviders ?? [],
           allowedIps: keyConfig.allowedIps ?? [],
           beta: !!keyConfig.beta,
+          ...(keyConfig.generation &&
+            Object.keys(keyConfig.generation).length > 0 && {
+              generation: keyConfig.generation,
+            }),
         }),
       }
     );
@@ -1918,6 +1978,8 @@ export const api = {
       ...(alias.model_architecture && { model_architecture: alias.model_architecture }),
       ...(alias.extraBody &&
         Object.keys(alias.extraBody).length > 0 && { extraBody: alias.extraBody }),
+      ...(alias.generation &&
+        Object.keys(alias.generation).length > 0 && { generation: alias.generation }),
       target_groups: alias.target_groups.map((g) => ({
         name: g.name,
         selector: g.selector,
@@ -2043,6 +2105,9 @@ export const api = {
             val.extraBody && typeof val.extraBody === 'object' && !Array.isArray(val.extraBody)
               ? val.extraBody
               : {},
+          ...(val.generation && typeof val.generation === 'object'
+            ? { generation: val.generation }
+            : {}),
         });
       });
       return aliases;
@@ -2657,6 +2722,58 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch pi models');
     const json = (await res.json()) as { data: Array<{ id: string; name: string; api: string }> };
     return json.data;
+  },
+
+  // ─── pi-ai custom provider / model registries (inference-v2) ───────────────
+
+  getPiCustomProviders: async (): Promise<Record<string, PiAiCustomProviderDef>> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/pi/custom-providers`);
+    if (!res.ok) throw new Error('Failed to fetch pi custom providers');
+    return (await res.json()) as Record<string, PiAiCustomProviderDef>;
+  },
+
+  savePiCustomProvider: async (name: string, def: PiAiCustomProviderDef): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/pi/custom-providers/${encodeURIComponent(name)}`,
+      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(def) }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || 'Failed to save custom provider');
+    }
+  },
+
+  deletePiCustomProvider: async (name: string): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/pi/custom-providers/${encodeURIComponent(name)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error('Failed to delete custom provider');
+  },
+
+  getPiCustomModels: async (): Promise<Record<string, PiAiCustomModelDef>> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/pi/custom-models`);
+    if (!res.ok) throw new Error('Failed to fetch pi custom models');
+    return (await res.json()) as Record<string, PiAiCustomModelDef>;
+  },
+
+  savePiCustomModel: async (name: string, def: PiAiCustomModelDef): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/pi/custom-models/${encodeURIComponent(name)}`,
+      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(def) }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || 'Failed to save custom model');
+    }
+  },
+
+  deletePiCustomModel: async (name: string): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/pi/custom-models/${encodeURIComponent(name)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error('Failed to delete custom model');
   },
 
   getOAuthProviderModels: async (

@@ -207,7 +207,7 @@ describe('geminiRequestToContext', () => {
         },
         false
       );
-      expect(result.reasoningEffort).toBe('high');
+      expect(result.generationIntent.reasoning.effort).toBe('high');
     });
 
     it('maps LOW thinkingLevel to low effort', () => {
@@ -219,10 +219,10 @@ describe('geminiRequestToContext', () => {
         },
         false
       );
-      expect(result.reasoningEffort).toBe('low');
+      expect(result.generationIntent.reasoning.effort).toBe('low');
     });
 
-    it('maps NONE thinkingLevel to undefined effort', () => {
+    it('maps NONE thinkingLevel to a disabled intent', () => {
       const result = geminiRequestToContext(
         {
           model: 'gemini-2.5-pro',
@@ -231,7 +231,8 @@ describe('geminiRequestToContext', () => {
         },
         false
       );
-      expect(result.reasoningEffort).toBeUndefined();
+      expect(result.generationIntent.reasoning.effort).toBeUndefined();
+      expect(result.generationIntent.reasoning.enabled).toBe(false);
     });
 
     it('maps thinkingBudget > 10000 to high', () => {
@@ -243,7 +244,29 @@ describe('geminiRequestToContext', () => {
         },
         false
       );
-      expect(result.reasoningEffort).toBe('high');
+      expect(result.generationIntent.reasoning.effort).toBe('high');
+    });
+
+    it('maps includeThoughts to reasoning visibility', () => {
+      const visible = geminiRequestToContext(
+        {
+          model: 'gemini-2.5-pro',
+          contents: [{ role: 'user', parts: [{ text: 'Hi' }] }],
+          generationConfig: { thinkingConfig: { thinkingLevel: 'HIGH', includeThoughts: true } },
+        },
+        false
+      );
+      expect(visible.generationIntent.reasoning.visibility).toBe('summary');
+
+      const hidden = geminiRequestToContext(
+        {
+          model: 'gemini-2.5-pro',
+          contents: [{ role: 'user', parts: [{ text: 'Hi' }] }],
+          generationConfig: { thinkingConfig: { thinkingLevel: 'HIGH', includeThoughts: false } },
+        },
+        false
+      );
+      expect(hidden.generationIntent.reasoning.visibility).toBe('hidden');
     });
   });
 
@@ -266,7 +289,7 @@ describe('geminiRequestToContext', () => {
   });
 
   describe('generationConfig options', () => {
-    it('maps maxOutputTokens to streamOptions.maxTokens', () => {
+    it('maps maxOutputTokens to the generation intent', () => {
       const result = geminiRequestToContext(
         {
           model: 'gemini-2.5-pro',
@@ -275,10 +298,10 @@ describe('geminiRequestToContext', () => {
         },
         false
       );
-      expect(result.streamOptions.maxTokens).toBe(512);
+      expect(result.generationIntent.maxTokens).toBe(512);
     });
 
-    it('maps temperature to streamOptions.temperature', () => {
+    it('maps temperature to the generation intent', () => {
       const result = geminiRequestToContext(
         {
           model: 'gemini-2.5-pro',
@@ -287,7 +310,7 @@ describe('geminiRequestToContext', () => {
         },
         false
       );
-      expect(result.streamOptions.temperature).toBe(0.7);
+      expect(result.generationIntent.temperature).toBe(0.7);
     });
   });
 });

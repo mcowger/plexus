@@ -193,22 +193,35 @@ describe('anthropicRequestToContext', () => {
   });
 
   describe('reasoning effort', () => {
-    it('maps thinking.budget_tokens to reasoningEffort', () => {
+    it('preserves the raw budget on the reasoning intent for round-trip fidelity', () => {
       const result = anthropicRequestToContext({
         model: 'claude-opus-4-6',
         messages: [{ role: 'user', content: 'Think' }],
         thinking: { type: 'enabled', budget_tokens: 16000 },
       });
-      expect(result.reasoningEffort).toBeDefined();
-      expect(typeof result.reasoningEffort).toBe('string');
+      expect(result.generationIntent.reasoning).toEqual({
+        effort: 'high',
+        budgetTokens: 16000,
+        enabled: true,
+        source: 'client',
+      });
     });
 
-    it('omits reasoningEffort when thinking is disabled', () => {
+    it('builds an explicit-disable intent when thinking.type is disabled', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-opus-4-6',
+        messages: [{ role: 'user', content: 'No think' }],
+        thinking: { type: 'disabled' },
+      });
+      expect(result.generationIntent.reasoning).toEqual({ enabled: false, source: 'client' });
+    });
+
+    it('leaves the reasoning intent empty when thinking is absent', () => {
       const result = anthropicRequestToContext({
         model: 'claude-opus-4-6',
         messages: [{ role: 'user', content: 'No think' }],
       });
-      expect(result.reasoningEffort).toBeUndefined();
+      expect(result.generationIntent.reasoning).toEqual({ source: 'client' });
     });
   });
 
@@ -242,13 +255,13 @@ describe('anthropicRequestToContext', () => {
       expect(result.streaming).toBe(true);
     });
 
-    it('includes max_tokens in streamOptions', () => {
+    it('includes max_tokens on the generation intent', () => {
       const result = anthropicRequestToContext({
         model: 'claude-opus-4-6',
         messages: [{ role: 'user', content: 'Hi' }],
         max_tokens: 1024,
       });
-      expect(result.streamOptions.maxTokens).toBe(1024);
+      expect(result.generationIntent.maxTokens).toBe(1024);
     });
 
     it('counts user and assistant messages only', () => {

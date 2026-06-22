@@ -13,6 +13,7 @@ export const apiKeys = sqliteTable('api_keys', {
   excludedProviders: text('excluded_providers'),
   allowedIps: text('allowed_ips'),
   beta: integer('beta', { mode: 'boolean' }).notNull().default(false),
+  generation: text('generation'), // JSON: { reasoning?, maxTokens?, verbosity?, serviceTier? }
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

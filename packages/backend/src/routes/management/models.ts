@@ -3,6 +3,7 @@ import { logger } from '../../utils/logger';
 import { HuggingFaceModelFetcher } from '../../services/huggingface-model-fetcher';
 import { ModelMetadataManager } from '../../services/model-metadata-manager';
 import { getModels, getProviders } from '@earendil-works/pi-ai';
+import { ConfigService } from '../../services/config-service';
 
 interface FetchModelRequest {
   Params: {
@@ -80,7 +81,18 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
    * Returns the list of provider IDs known to the pi-ai library.
    */
   fastify.get('/v0/management/pi/providers', async (_request, reply) => {
-    return reply.send({ data: getProviders() });
+    // Built-in pi-ai providers plus any workspace custom providers.
+    const builtin = getProviders();
+    let custom: string[] = [];
+    try {
+      custom = Object.keys(
+        await ConfigService.getInstance().getRepository().getAllPiAiCustomProviders()
+      );
+    } catch {
+      /* non-fatal */
+    }
+    const merged = Array.from(new Set([...builtin, ...custom])).sort();
+    return reply.send({ data: merged });
   });
 
   /**
@@ -96,21 +108,41 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
     if (!query.provider) {
       return reply.status(400).send({ error: `Missing 'provider' parameter` });
     }
-    let models: ReturnType<typeof getModels>;
+
+    // Built-in registry models for this provider (may be empty for a custom provider).
+    let builtin: ReturnType<typeof getModels> = [];
     try {
-      models = getModels(query.provider as any);
+      builtin = getModels(query.provider as any) ?? [];
     } catch {
-      return reply.status(400).send({ error: `Unknown pi provider '${query.provider}'` });
+      builtin = [];
     }
-    if (!models || models.length === 0) {
-      return reply.status(400).send({ error: `Unknown pi provider '${query.provider}'` });
+
+    // Custom models are keyed by model id and usable under any provider; surface
+    // them in the picker so operators can select inherited/new model defs.
+    let customEntries: Array<{ id: string; name: string; api: string }> = [];
+    try {
+      const customModels = await ConfigService.getInstance()
+        .getRepository()
+        .getAllPiAiCustomModels();
+      customEntries = Object.entries(customModels).map(([id, def]) => ({
+        id,
+        name: (def as any).name ?? id,
+        api: (def as any).api ?? 'custom',
+      }));
+    } catch {
+      /* non-fatal */
     }
+
+    const merged = [
+      ...builtin.map((m) => ({ id: m.id, name: m.name, api: m.api as string })),
+      // Avoid duplicating a custom model id that also exists in the registry.
+      ...customEntries.filter((c) => !builtin.some((m) => m.id === c.id)),
+    ];
+
     const q = (query.q ?? '').toLowerCase();
     const filtered = q
-      ? models.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
-      : models;
-    return reply.send({
-      data: filtered.map((m) => ({ id: m.id, name: m.name, api: m.api })),
-    });
+      ? merged.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+      : merged;
+    return reply.send({ data: filtered });
   });
 }

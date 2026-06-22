@@ -83,7 +83,7 @@ describe('runPiAiExecutor streaming errors', () => {
       incomingApiType: 'responses',
       modelAlias: 'gpt-5.4',
       context: { messages: [] } as any,
-      streamOptions: {},
+      generationIntent: { reasoning: { source: 'client' } } as any,
       streaming: true,
       request: {
         body: {},
@@ -139,7 +139,7 @@ describe('runPiAiExecutor streaming errors', () => {
       incomingApiType: 'gemini',
       modelAlias: 'gpt-5.4',
       context: { messages: [] } as any,
-      streamOptions: {},
+      generationIntent: { reasoning: { source: 'client' } } as any,
       streaming: true,
       request: {
         body: {},

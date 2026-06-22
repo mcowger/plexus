@@ -25,17 +25,20 @@ import type {
   ImageContent,
   ToolCall,
   Tool,
-  ProviderStreamOptions,
 } from '@earendil-works/pi-ai';
 import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
+import type { ReasoningIntent } from '../shared/reasoning';
+import { normalizeEffort, normalizeVisibility } from '../shared/reasoning';
+import type { GenerationIntent } from '../shared/generation';
+import { normalizeVerbosity } from '../shared/generation';
 
 // ─── Public result type ───────────────────────────────────────────────────────
 
 export interface ResponsesToContextResult {
   context: Context;
-  streamOptions: Omit<ProviderStreamOptions, 'apiKey' | 'signal' | 'onPayload' | 'headers'>;
+  /** Canonical generation intent (reasoning + maxTokens/temperature/verbosity/serviceTier). */
+  generationIntent: GenerationIntent;
   streaming: boolean;
-  reasoningEffort?: string;
   toolChoice?: unknown;
   toolsDefined: number;
   messageCount: number;
@@ -260,26 +263,44 @@ export function responsesToContext(body: any): ResponsesToContextResult {
     tools,
   };
 
-  // ── Options ───────────────────────────────────────────────────────────────
-  const maxTokens: number | undefined = body.max_output_tokens ?? undefined;
-  const streamOptions: ResponsesToContextResult['streamOptions'] = {
-    temperature: body.temperature ?? undefined,
-    ...(maxTokens != null ? { maxTokens } : {}),
-  };
-
   // ── Reasoning ─────────────────────────────────────────────────────────────
-  const reasoningEffort: string | undefined = body.reasoning?.effort ?? undefined;
   const wantsSummary: boolean =
     body.reasoning?.summary === 'detailed' || body.reasoning?.summary === 'auto';
+  const effortRaw = normalizeEffort(body.reasoning?.effort);
+  const summaryDetail: string | undefined =
+    typeof body.reasoning?.summary === 'string' ? body.reasoning.summary : undefined;
+  const visibility = normalizeVisibility(body.reasoning?.summary);
+  const baseReasoning = {
+    ...(visibility != null ? { visibility } : {}),
+    ...(summaryDetail != null ? { summaryDetail } : {}),
+    source: 'client' as const,
+  };
+  const reasoningIntent: ReasoningIntent =
+    effortRaw === 'off'
+      ? { ...baseReasoning, enabled: false }
+      : effortRaw != null
+        ? { ...baseReasoning, effort: effortRaw, enabled: true }
+        : baseReasoning;
+
+  // ── Generation intent ─────────────────────────────────────────────────────
+  const maxTokens: number | undefined = body.max_output_tokens ?? undefined;
+  const generationIntent: GenerationIntent = {
+    reasoning: reasoningIntent,
+    ...(maxTokens != null ? { maxTokens } : {}),
+    ...(body.temperature != null ? { temperature: body.temperature } : {}),
+    ...(normalizeVerbosity(body.text?.verbosity) != null
+      ? { verbosity: normalizeVerbosity(body.text?.verbosity) }
+      : {}),
+    ...(typeof body.service_tier === 'string' ? { serviceTier: body.service_tier } : {}),
+  };
 
   // Count user + assistant turns
   const messageCount = piMessages.filter((m) => m.role === 'user' || m.role === 'assistant').length;
 
   return {
     context,
-    streamOptions,
+    generationIntent,
     streaming: body.stream === true,
-    reasoningEffort,
     toolChoice: parseToolChoice(body.tool_choice),
     toolsDefined: tools?.length ?? 0,
     messageCount,

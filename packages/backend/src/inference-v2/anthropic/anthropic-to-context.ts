@@ -15,8 +15,9 @@
  *     (MUST be preserved for multi-turn extended-thinking conversations);
  *     tool_use → ToolCall.
  *
- * Reasoning: `thinking.budget_tokens` is mapped to an effort string via
- * `getThinkLevel` and forwarded as `reasoningEffort` for `buildReasoningOptions`.
+ * Reasoning: `thinking.budget_tokens` is mapped to an effort bucket via
+ * `budgetToEffort`, while the raw budget is preserved on `reasoningIntent` so
+ * an Anthropic→Anthropic route can round-trip it without re-quantizing.
  *
  * Tool definitions: Anthropic `{ name, description, input_schema }` mapped
  * through `jsonSchemaToTypeBox`.
@@ -32,19 +33,19 @@ import type {
   ThinkingContent,
   ToolCall,
   Tool,
-  ProviderStreamOptions,
 } from '@earendil-works/pi-ai';
 import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
-import { getThinkLevel } from '../../transformers/utils';
+import type { ReasoningIntent } from '../shared/reasoning';
+import { budgetToEffort } from '../shared/reasoning';
+import type { GenerationIntent } from '../shared/generation';
 
 // ─── Public result type ───────────────────────────────────────────────────────
 
 export interface AnthropicToContextResult {
   context: Context;
-  streamOptions: Omit<ProviderStreamOptions, 'apiKey' | 'signal' | 'onPayload' | 'headers'>;
+  /** Canonical generation intent (reasoning + maxTokens/temperature). */
+  generationIntent: GenerationIntent;
   streaming: boolean;
-  /** Effort string derived from thinking.budget_tokens, if present */
-  reasoningEffort?: string;
   /** tool_choice forwarded */
   toolChoice?: unknown;
   toolsDefined: number;
@@ -250,28 +251,37 @@ export function anthropicRequestToContext(body: any): AnthropicToContextResult {
     tools,
   };
 
-  // ── Options ───────────────────────────────────────────────────────────────
-  const maxTokens: number | undefined = body.max_tokens ?? undefined;
-  const streamOptions: AnthropicToContextResult['streamOptions'] = {
-    temperature: body.temperature ?? undefined,
-    ...(maxTokens != null ? { maxTokens } : {}),
-  };
-
-  // ── Reasoning effort (from thinking config) ───────────────────────────────
-  let reasoningEffort: string | undefined;
+  // ── Reasoning intent (from thinking config) ──────────────────────────────
+  // Anthropic speaks in token budgets. Preserve the raw budget so an
+  // Anthropic→Anthropic route can round-trip it without re-quantizing.
+  let reasoningIntent: ReasoningIntent = { source: 'client' };
   if (body.thinking?.type === 'enabled' && body.thinking?.budget_tokens != null) {
-    const level = getThinkLevel(body.thinking.budget_tokens);
-    if (level !== 'none') reasoningEffort = level;
+    const budget: number = body.thinking.budget_tokens;
+    const level = budgetToEffort(budget);
+    if (level !== 'off') {
+      reasoningIntent = { effort: level, budgetTokens: budget, enabled: true, source: 'client' };
+    } else {
+      reasoningIntent = { enabled: false, source: 'client' };
+    }
+  } else if (body.thinking?.type === 'disabled') {
+    reasoningIntent = { enabled: false, source: 'client' };
   }
+
+  // ── Generation intent ─────────────────────────────────────────────────────
+  const maxTokens: number | undefined = body.max_tokens ?? undefined;
+  const generationIntent: GenerationIntent = {
+    reasoning: reasoningIntent,
+    ...(maxTokens != null ? { maxTokens } : {}),
+    ...(body.temperature != null ? { temperature: body.temperature } : {}),
+  };
 
   // Count non-system messages (user + assistant turns)
   const messageCount = piMessages.filter((m) => m.role === 'user' || m.role === 'assistant').length;
 
   return {
     context,
-    streamOptions,
+    generationIntent,
     streaming: body.stream === true,
-    reasoningEffort,
     toolChoice: mapToolChoice(body.tool_choice),
     toolsDefined: tools?.length ?? 0,
     messageCount,

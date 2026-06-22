@@ -19,6 +19,7 @@ export const modelAliases = sqliteTable('model_aliases', {
   piModel: text('pi_model'), // JSON: { provider: string, model_id: string }
   targetGroups: text('target_groups'), // JSON: {name, selector}[]
   extraBody: text('extra_body'), // JSON: Record<string, any>
+  generation: text('generation'), // JSON: { reasoning?, maxTokens?, verbosity?, serviceTier? }
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

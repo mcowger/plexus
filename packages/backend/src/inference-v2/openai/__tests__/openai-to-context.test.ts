@@ -217,7 +217,7 @@ describe('openaiRequestToContext', () => {
         max_completion_tokens: 512,
         max_tokens: 1024,
       });
-      expect(result.streamOptions.maxTokens).toBe(512);
+      expect(result.generationIntent.maxTokens).toBe(512);
     });
 
     it('falls back to max_tokens', () => {
@@ -226,16 +226,48 @@ describe('openaiRequestToContext', () => {
         messages: [{ role: 'user', content: 'Hi' }],
         max_tokens: 256,
       });
-      expect(result.streamOptions.maxTokens).toBe(256);
+      expect(result.generationIntent.maxTokens).toBe(256);
     });
 
-    it('forwards reasoning_effort', () => {
+    it('builds reasoningIntent from reasoning_effort', () => {
       const result = openaiRequestToContext({
         model: 'gpt-4',
         messages: [{ role: 'user', content: 'Hi' }],
-        reasoning_effort: 'high',
+        reasoning_effort: 'low',
       });
-      expect(result.reasoningEffort).toBe('high');
+      expect(result.generationIntent.reasoning).toEqual({
+        effort: 'low',
+        enabled: true,
+        source: 'client',
+      });
+    });
+
+    it('maps reasoning_effort=none to an explicit-disable intent', () => {
+      const result = openaiRequestToContext({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+        reasoning_effort: 'none',
+      });
+      expect(result.generationIntent.reasoning).toEqual({ enabled: false, source: 'client' });
+    });
+
+    it('leaves reasoningIntent empty when no reasoning field is present', () => {
+      const result = openaiRequestToContext({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+      expect(result.generationIntent.reasoning).toEqual({ source: 'client' });
+    });
+
+    it('captures verbosity and service_tier on the generation intent', () => {
+      const result = openaiRequestToContext({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+        verbosity: 'high',
+        service_tier: 'flex',
+      });
+      expect(result.generationIntent.verbosity).toBe('high');
+      expect(result.generationIntent.serviceTier).toBe('flex');
     });
 
     it('forwards tool_choice', () => {

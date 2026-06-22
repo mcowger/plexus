@@ -38,19 +38,20 @@ import type {
   ThinkingContent,
   ToolCall,
   Tool,
-  ProviderStreamOptions,
 } from '@earendil-works/pi-ai';
 import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
+import type { ReasoningIntent, ReasoningEffort, ReasoningVisibility } from '../shared/reasoning';
+import { budgetToEffort } from '../shared/reasoning';
+import type { GenerationIntent } from '../shared/generation';
 
 // ─── Public result type ───────────────────────────────────────────────────────
 
 export interface GeminiToContextResult {
   context: Context;
-  streamOptions: Omit<ProviderStreamOptions, 'apiKey' | 'signal' | 'onPayload' | 'headers'>;
+  /** Canonical generation intent (reasoning + maxTokens/temperature). */
+  generationIntent: GenerationIntent;
   /** True when the route URL suffix is :streamGenerateContent */
   streaming: boolean;
-  /** Effort string from generationConfig.thinkingConfig, if present */
-  reasoningEffort?: string;
   toolsDefined: number;
   messageCount: number;
 }
@@ -126,30 +127,50 @@ export function geminiRequestToContext(body: any, streaming: boolean): GeminiToC
   const tools =
     Array.isArray(body.tools) && body.tools.length > 0 ? parseTools(body.tools) : undefined;
 
-  // ── Reasoning effort (from thinkingConfig) ───────────────────────────────
-  let reasoningEffort: string | undefined;
+  // ── Reasoning intent (from thinkingConfig) ───────────────────────────────
+  // Gemini can speak in either a thinkingLevel string or a thinkingBudget. We
+  // preserve the raw budget for round-trip fidelity on Gemini→Gemini routes.
+  // `includeThoughts` maps to the unified reasoning visibility.
+  let reasoningIntent: ReasoningIntent = { source: 'client' };
   if (generationConfig.thinkingConfig) {
     const tc = generationConfig.thinkingConfig;
+    // includeThoughts: true → visible (summary), false → hidden, unset → undefined.
+    const visibility: ReasoningVisibility | undefined =
+      tc.includeThoughts === true ? 'summary' : tc.includeThoughts === false ? 'hidden' : undefined;
+    const withVis = (intent: ReasoningIntent): ReasoningIntent =>
+      visibility != null ? { ...intent, visibility } : intent;
+
     if (tc.thinkingLevel) {
-      reasoningEffort = mapThinkingLevel(tc.thinkingLevel);
+      const mapped = mapThinkingLevel(tc.thinkingLevel);
+      reasoningIntent = withVis(
+        mapped != null
+          ? { effort: mapped as ReasoningEffort, enabled: true, source: 'client' }
+          : { enabled: false, source: 'client' }
+      );
     } else if (tc.thinkingBudget != null && tc.thinkingBudget > 0) {
-      // Budget-based: map token count to effort level (same thresholds as getThinkLevel)
+      // Budget-based: map token count to effort via the unified threshold table.
       const budget: number = tc.thinkingBudget;
-      if (budget <= 1024) reasoningEffort = 'minimal';
-      else if (budget <= 4096) reasoningEffort = 'low';
-      else if (budget <= 10000) reasoningEffort = 'medium';
-      else reasoningEffort = 'high';
+      const level = budgetToEffort(budget);
+      reasoningIntent = withVis(
+        level !== 'off'
+          ? { effort: level, budgetTokens: budget, enabled: true, source: 'client' }
+          : { enabled: false, source: 'client' }
+      );
+    } else if (tc.thinkingBudget === 0) {
+      // Explicit budget of 0 disables thinking.
+      reasoningIntent = withVis({ enabled: false, source: 'client' });
     } else if (tc.includeThoughts === true) {
       // includeThoughts with no level/budget → default medium
-      reasoningEffort = 'medium';
+      reasoningIntent = withVis({ effort: 'medium', enabled: true, source: 'client' });
     }
   }
 
-  // ── Stream options ────────────────────────────────────────────────────────
+  // ── Generation intent ─────────────────────────────────────────────────────
   const maxTokens: number | undefined = generationConfig.maxOutputTokens ?? undefined;
-  const streamOptions: GeminiToContextResult['streamOptions'] = {
-    temperature: generationConfig.temperature ?? undefined,
+  const generationIntent: GenerationIntent = {
+    reasoning: reasoningIntent,
     ...(maxTokens != null ? { maxTokens } : {}),
+    ...(generationConfig.temperature != null ? { temperature: generationConfig.temperature } : {}),
   };
 
   // ── Message conversion ────────────────────────────────────────────────────
@@ -270,9 +291,8 @@ export function geminiRequestToContext(body: any, streaming: boolean): GeminiToC
 
   return {
     context,
-    streamOptions,
+    generationIntent,
     streaming,
-    reasoningEffort,
     toolsDefined: tools?.length ?? 0,
     messageCount,
   };

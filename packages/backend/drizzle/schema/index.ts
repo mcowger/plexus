@@ -45,6 +45,8 @@ export * from './sqlite/user-quota-definitions';
 export * from './sqlite/mcp-servers';
 export * from './sqlite/system-settings';
 export * from './sqlite/oauth-credentials';
+export * from './sqlite/pi-ai-custom-providers';
+export * from './sqlite/pi-ai-custom-models';
 export {
   providersRelations,
   providerModelsRelations,
@@ -64,3 +66,5 @@ export { userQuotaDefinitions as pgUserQuotaDefinitions } from './postgres/user-
 export { mcpServers as pgMcpServers } from './postgres/mcp-servers';
 export { systemSettings as pgSystemSettings } from './postgres/system-settings';
 export { oauthCredentials as pgOauthCredentials } from './postgres/oauth-credentials';
+export { piAiCustomProviders as pgPiAiCustomProviders } from './postgres/pi-ai-custom-providers';
+export { piAiCustomModels as pgPiAiCustomModels } from './postgres/pi-ai-custom-models';

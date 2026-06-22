@@ -44,10 +44,13 @@ import { getConfig } from '../../config';
 import { applyKeyAccessPolicy, type PolicyRequest } from '../../services/key-access-policy';
 import {
   buildPiAiModel,
-  buildReasoningOptions,
+  resolvePiAiModel,
+  buildGenerationOptions,
   buildGpuParams,
   computeKwhUsed,
 } from './pi-ai-utils';
+import type { GenerationIntent } from './generation';
+import { resolveGenerationIntent, splitReasoningSuffix } from './generation-policy';
 import { consumeTtfb } from './fetch-tap';
 import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
 
@@ -65,10 +68,12 @@ export interface PiAiExecutorInput<TResponse, TChunk extends string = string> {
   modelAlias: string;
   /** Built by the inbound parser */
   context: Context;
-  /** Options from the inbound parser (sans apiKey / signal) */
-  streamOptions: Omit<ProviderStreamOptions, 'apiKey' | 'signal' | 'onPayload' | 'headers'>;
-  /** reasoning_effort string, if present in the request */
-  reasoningEffort?: string;
+  /**
+   * Canonical generation intent from the inbound parser: reasoning + maxTokens,
+   * temperature, verbosity, serviceTier. Re-expanded against model capabilities
+   * by buildGenerationOptions() at egress.
+   */
+  generationIntent: GenerationIntent;
   /** tool_choice forwarded verbatim */
   toolChoice?: unknown;
   /** parallel_tool_calls forwarded verbatim */
@@ -369,8 +374,7 @@ export async function runPiAiExecutor<TResponse>(
     incomingApiType,
     modelAlias,
     context,
-    streamOptions,
-    reasoningEffort,
+    generationIntent,
     toolChoice,
     parallelToolCalls,
     streaming,
@@ -408,11 +412,15 @@ export async function runPiAiExecutor<TResponse>(
     parallelToolCallsEnabled: parallelToolCalls ?? null,
   });
 
+  // ── Strip reasoning suffix from the alias (Layer 4) ───────────────────────
+  // e.g. "gpt-5:high" routes as "gpt-5" with a fallback intent of effort=high.
+  const { alias: routingAlias, intent: suffixIntent } = splitReasoningSuffix(modelAlias);
+
   // ── Resolve candidates ────────────────────────────────────────────────────
-  let candidates = await Router.resolveCandidates(modelAlias, incomingApiType);
+  let candidates = await Router.resolveCandidates(routingAlias, incomingApiType);
   if (candidates.length === 0) {
     try {
-      candidates = [await Router.resolve(modelAlias, incomingApiType)];
+      candidates = [await Router.resolve(routingAlias, incomingApiType)];
     } catch {
       throw buildNoBetaCandidatesError();
     }
@@ -420,22 +428,21 @@ export async function runPiAiExecutor<TResponse>(
 
   // ── Apply key-access policy ───────────────────────────────────────────────
   const policyReq: PolicyRequest = {
-    model: modelAlias,
+    model: routingAlias,
     metadata: (request.body as any)?.metadata,
   };
   candidates = applyKeyAccessPolicy(policyReq, candidates, incomingApiType);
 
   // ── Filter to beta-compatible candidates ─────────────────────────────────
+  // A candidate is beta-compatible when both pi-ai hints are present AND the
+  // (provider, modelId) pair resolves to a pi-ai Model — via the custom
+  // registries or the built-in registry. resolvePiAiModel returns null (never
+  // throws) for unknown pairs, so a null check is the correct gate.
   const betaCandidates = candidates.filter((c) => {
     const piAiProvider = (c.config as any).pi_ai_provider as string | undefined;
     const piAiModelId = (c.modelConfig as any)?.pi_ai_model_id as string | undefined;
     if (!piAiProvider || !piAiModelId) return false;
-    try {
-      getModel(piAiProvider as any, piAiModelId as any);
-      return true;
-    } catch {
-      return false;
-    }
+    return resolvePiAiModel(piAiProvider, piAiModelId) != null;
   });
 
   if (betaCandidates.length === 0) {
@@ -489,6 +496,16 @@ export async function runPiAiExecutor<TResponse>(
     }
 
     const piModel = buildPiAiModel(route.config, piAiProvider, piAiModelId, incomingApiType);
+    if (!piModel) {
+      // Should not happen (beta filter resolves the same way) but fail closed.
+      concurrency.release(route.provider, route.model);
+      attemptTimeout.cleanup();
+      const err = new Error(
+        `pi-ai model could not be resolved for ${piAiProvider}/${piAiModelId}`
+      ) as any;
+      err.routingContext = { statusCode: 400, code: 'unresolved_pi_ai_model' };
+      throw err;
+    }
 
     // ── Debug: set provider for this request ──────────────────────────────
     debug.setProviderForRequest(requestId, route.provider);
@@ -504,10 +521,18 @@ export async function runPiAiExecutor<TResponse>(
     attemptedProviders.push(`${route.provider}/${route.model}`);
 
     // ── Assemble ProviderStreamOptions ────────────────────────────────────
-    const reasoningOpts = buildReasoningOptions(piModel.api, piAiModelId, reasoningEffort);
+    // Layer 4: resolve the effective generation intent (reasoning + maxTokens/
+    // verbosity/serviceTier) through key/alias policy, header override, and the
+    // model-name reasoning suffix; then re-expand against model capabilities.
+    const effectiveGeneration = resolveGenerationIntent({
+      requestIntent: generationIntent,
+      suffixReasoning: suffixIntent,
+      request,
+      route,
+    });
+    const generationOpts = buildGenerationOptions(piModel as any, effectiveGeneration);
     const callOptions: ProviderStreamOptions = {
-      ...streamOptions,
-      ...reasoningOpts,
+      ...generationOpts,
       ...(toolChoice != null ? { toolChoice } : {}),
       ...(parallelToolCalls != null ? { parallelToolCalls } : {}),
       apiKey: route.config.api_key,
