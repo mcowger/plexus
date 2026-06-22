@@ -98,4 +98,33 @@ describe('management pi-ai custom routes — registry-model clone', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().definition.provider).toBe('niche-host');
   });
+
+  test('DELETE custom-provider with dependent models is rejected (409)', async () => {
+    mockRepo.getAllPiAiCustomProviders.mockResolvedValue({
+      'niche-host': { api: 'openai-completions' },
+    });
+    mockRepo.getAllPiAiCustomModels.mockResolvedValue({
+      m1: { provider: 'niche-host', api: 'openai-completions' },
+    });
+    const res = await fastify.inject({
+      method: 'DELETE',
+      url: '/v0/management/pi/custom-providers/niche-host',
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.message).toMatch(/Cannot delete provider 'niche-host'/);
+    expect(mockConfigService.deletePiAiCustomProvider).not.toHaveBeenCalled();
+  });
+
+  test('DELETE custom-provider with no dependents succeeds (200)', async () => {
+    mockRepo.getAllPiAiCustomProviders.mockResolvedValue({
+      'niche-host': { api: 'openai-completions' },
+    });
+    mockRepo.getAllPiAiCustomModels.mockResolvedValue({});
+    const res = await fastify.inject({
+      method: 'DELETE',
+      url: '/v0/management/pi/custom-providers/niche-host',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mockConfigService.deletePiAiCustomProvider).toHaveBeenCalledWith('niche-host');
+  });
 });

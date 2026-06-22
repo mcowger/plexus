@@ -64,6 +64,18 @@ export async function registerPiAiCustomRoutes(fastify: FastifyInstance) {
             error: { message: `Custom provider not found: ${name}`, type: 'not_found_error' },
           });
         }
+        // Reject if any custom model is still scoped to this provider — deleting
+        // would leave orphaned models that fail to resolve at runtime.
+        const models = await configService.getRepository().getAllPiAiCustomModels();
+        const dependents = Object.entries(models).filter(([, def]) => def.provider === name);
+        if (dependents.length > 0) {
+          return reply.code(409).send({
+            error: {
+              message: `Cannot delete provider '${name}': ${dependents.length} custom model(s) still reference it (${dependents.map(([id]) => id).join(', ')}). Delete or reassign them first.`,
+              type: 'conflict_error',
+            },
+          });
+        }
         await configService.deletePiAiCustomProvider(name);
         return reply.send({ success: true, name });
       } catch (e: any) {
