@@ -96,7 +96,15 @@ const DEV_DATA_PATH = process.env.PLEXUS_DEV_DATA_PATH ?? '.dev-data';
 const SAVED_BACKUP_FILE = join(DEV_DATA_PATH, 'backup.tar.gz');
 
 const LOCAL_BASE_URL = process.env.PLEXUS_URL ?? 'http://localhost';
-const LOCAL_PORT = process.env.PLEXUS_PORT ?? deriveDevPort();
+// When run under Paseo, the dev service binds to $PASEO_PORT and is exposed to
+// peers as $PASEO_SERVICE_DEV_PORT. Honor those before falling back to the
+// cwd-derived port so prep-dev targets the correct worktree instance whether
+// it is launched as a peer service or spawned internally by `dev:full`.
+const LOCAL_PORT =
+  process.env.PLEXUS_PORT ??
+  process.env.PASEO_SERVICE_DEV_PORT ??
+  process.env.PASEO_PORT ??
+  deriveDevPort();
 const LOCAL_URL = `${LOCAL_BASE_URL}:${LOCAL_PORT}`;
 const LOCAL_KEY = process.env.PLEXUS_ADMIN_KEY ?? 'password';
 const EXCLUDE_OAUTH = (process.env.PLEXUS_EXCLUDE_OAUTH ?? 'true').toLowerCase() !== 'false';

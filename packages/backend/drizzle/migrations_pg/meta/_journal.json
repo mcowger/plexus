@@ -463,6 +463,13 @@
       "when": 1781712192210,
       "tag": "0065_auto_mcp_local_server_support",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1782156631416,
+      "tag": "0066_add_pi_ai_custom_and_generation",
+      "breakpoints": true
     }
   ]
 }
