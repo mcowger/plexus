@@ -428,7 +428,7 @@ export const Errors: React.FC = () => {
 
 const AccordionPanel: React.FC<{
   title: string;
-  content: string;
+  content: unknown;
   color: string;
   defaultOpen?: boolean;
   language?: string;
@@ -436,10 +436,20 @@ const AccordionPanel: React.FC<{
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
 
+  const editorContent = (() => {
+    if (content == null) return '';
+    if (typeof content === 'string') return content;
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch {
+      return String(content);
+    }
+  })();
+
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isClipboardAvailable()) return;
-    const success = await copyToClipboard(content);
+    const success = await copyToClipboard(editorContent);
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -477,7 +487,7 @@ const AccordionPanel: React.FC<{
             height="100%"
             defaultLanguage={language}
             theme="vs-dark"
-            value={content}
+            value={editorContent}
             options={{
               readOnly: true,
               minimap: { enabled: false },

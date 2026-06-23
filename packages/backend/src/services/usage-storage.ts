@@ -290,6 +290,31 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
+  private normalizeErrorDetails(details: unknown): string | null {
+    if (!details) return null;
+    if (typeof details === 'string') return details;
+
+    const normalized =
+      details && typeof details === 'object'
+        ? {
+            ...(details as Record<string, unknown>),
+            ...('providerResponse' in (details as Record<string, unknown>) &&
+            (details as Record<string, unknown>).providerResponse != null &&
+            typeof (details as Record<string, unknown>).providerResponse !== 'string'
+              ? {
+                  providerResponse: JSON.stringify(
+                    (details as Record<string, unknown>).providerResponse,
+                    null,
+                    2
+                  ),
+                }
+              : {}),
+          }
+        : details;
+
+    return JSON.stringify(normalized);
+  }
+
   async saveError(requestId: string, error: any, details?: any, apiKey?: string | null) {
     try {
       // Resolve the owning key name in preference order:
@@ -327,11 +352,7 @@ export class UsageStorageService extends EventEmitter {
           apiKey: effectiveApiKey,
           errorMessage: error.message || String(error),
           errorStack: error.stack || null,
-          details: details
-            ? typeof details === 'string'
-              ? details
-              : JSON.stringify(details)
-            : null,
+          details: this.normalizeErrorDetails(details),
           createdAt: Date.now(),
         });
 
