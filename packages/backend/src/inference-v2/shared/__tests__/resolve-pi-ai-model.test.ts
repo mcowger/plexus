@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Local pi-ai mock so getModel returns realistic models for known ids and
 // undefined for unknown ones (matching pi-ai 0.79.x behaviour).
-vi.mock('@earendil-works/pi-ai', () => {
+vi.mock('@earendil-works/pi-ai', () => ({
+  clampThinkingLevel: (_m: any, l: string) => l,
+  getSupportedThinkingLevels: () => ['off', 'low', 'medium', 'high'],
+}));
+
+vi.mock('@earendil-works/pi-ai/providers/all', () => {
   const REGISTRY: Record<string, Record<string, any>> = {
     openai: {
       'gpt-5.5': {
@@ -22,11 +27,16 @@ vi.mock('@earendil-works/pi-ai', () => {
     },
   };
   return {
-    getModel: (provider: string, modelId: string) => REGISTRY[provider]?.[modelId],
-    getProviders: () => Object.keys(REGISTRY),
-    getModels: (provider: string) => Object.values(REGISTRY[provider] ?? {}),
-    clampThinkingLevel: (_m: any, l: string) => l,
-    getSupportedThinkingLevels: () => ['off', 'low', 'medium', 'high'],
+    builtinModels: () => ({
+      complete: vi.fn(),
+      stream: vi.fn(),
+      getModel: (provider: string, modelId: string) => REGISTRY[provider]?.[modelId],
+      getModels: (provider: string) => Object.values(REGISTRY[provider] ?? {}),
+      getProviders: () => Object.keys(REGISTRY),
+    }),
+    getBuiltinModel: (provider: string, modelId: string) => REGISTRY[provider]?.[modelId],
+    getBuiltinProviders: () => Object.keys(REGISTRY),
+    getBuiltinModels: (provider: string) => Object.values(REGISTRY[provider] ?? {}),
   };
 });
 

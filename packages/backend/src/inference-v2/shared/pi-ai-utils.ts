@@ -8,8 +8,11 @@
  *  - buildPiAiModel: construct a call-ready pi-ai Model with base URL override applied
  */
 
-import { getModel, clampThinkingLevel, getSupportedThinkingLevels } from '@earendil-works/pi-ai';
+import { clampThinkingLevel, getSupportedThinkingLevels } from '@earendil-works/pi-ai';
+import { getBuiltinModel, builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type { Model as PiAiModel, ModelThinkingLevel } from '@earendil-works/pi-ai';
+
+export const piAiModels = builtinModels();
 import {
   getConfig,
   type ProviderConfig,
@@ -495,7 +498,7 @@ function applyCustomModelFields(base: PiAiModel<any>, spec: PiAiCustomModel): Pi
  */
 function safeGetModel(provider: string, modelId: string): PiAiModel<any> | null {
   try {
-    return getModel(provider as any, modelId as any) ?? null;
+    return getBuiltinModel(provider as any, modelId as any) ?? null;
   } catch {
     return null;
   }

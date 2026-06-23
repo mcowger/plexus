@@ -4,7 +4,7 @@ import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
 import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
 import type { ModelArchitecture } from '@plexus/shared';
-import { getModel } from '@earendil-works/pi-ai';
+import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
 
 // --- Zod Schemas ---
 
@@ -1182,7 +1182,7 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
   // mocked) for unknown pairs — treat both as "not found".
   const registryHas = (provider: string, modelId: string): boolean => {
     try {
-      return getModel(provider as any, modelId as any) != null;
+      return getBuiltinModel(provider as any, modelId as any) != null;
     } catch {
       return false;
     }

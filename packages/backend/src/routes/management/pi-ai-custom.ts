@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { getModel } from '@earendil-works/pi-ai';
+import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
 import type { Model as PiAiModel } from '@earendil-works/pi-ai';
 import { logger } from '../../utils/logger';
 import { PiAiCustomProviderSchema, PiAiCustomModelSchema } from '../../config';
@@ -180,7 +180,7 @@ export async function registerPiAiCustomRoutes(fastify: FastifyInstance) {
       }
       let model: PiAiModel<any> | null = null;
       try {
-        model = getModel(provider as any, model_id as any) ?? null;
+        model = getBuiltinModel(provider as any, model_id as any) ?? null;
       } catch {
         model = null;
       }

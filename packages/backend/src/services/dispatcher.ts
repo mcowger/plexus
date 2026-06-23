@@ -26,7 +26,7 @@ import { applyModelBehaviors } from './model-behaviors';
 import { EmbeddingsTransformerFactory } from './embeddings-transformer-factory';
 import { resolveAdapters } from './adapter-resolver';
 import type { ResolvedAdapter } from '../types/provider-adapter';
-import { getModels } from '@earendil-works/pi-ai';
+import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
 import type { StallConfig } from './inspectors/stall-inspector';
 import { getGlobalStallConfig, resolveStallConfig } from '../utils/stall';
 import { VisionDescriptorService } from './vision-descriptor-service';
@@ -2553,7 +2553,7 @@ export class Dispatcher {
   }
 
   private assertOAuthModelSupported(oauthProvider: string, modelId: string) {
-    const supportedModels = getModels(oauthProvider as any);
+    const supportedModels = getBuiltinModels(oauthProvider as any);
     if (!supportedModels || supportedModels.length === 0) {
       throw new Error(`OAuth provider '${oauthProvider}' has no known models.`);
     }

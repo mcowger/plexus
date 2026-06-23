@@ -22,7 +22,9 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { stream, complete, calculateCost, getModel } from '@earendil-works/pi-ai';
+import { calculateCost } from '@earendil-works/pi-ai';
+import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
+import { piAiModels } from './pi-ai-utils';
 import type {
   Context,
   ProviderStreamOptions,
@@ -300,7 +302,7 @@ function nextWithTtfbTimeout<T>(
 
 function buildUsageFromMessage(
   msg: AssistantMessage,
-  piModel: ReturnType<typeof getModel>,
+  piModel: ReturnType<typeof getBuiltinModel>,
   startTime: number,
   ttftMs: number | null,
   route: RouteResult
@@ -561,7 +563,7 @@ export async function runPiAiExecutor<TResponse>(
       if (!streaming) {
         // ── Non-streaming ────────────────────────────────────────────────
         const message = await debugRequestIdStorage.run(requestId, () =>
-          complete(piModel as any, context, callOptions)
+          piAiModels.complete(piModel as any, context, callOptions)
         );
 
         cooldown.markProviderSuccess(route.provider, route.model);
@@ -622,7 +624,7 @@ export async function runPiAiExecutor<TResponse>(
       } else {
         // ── Streaming ────────────────────────────────────────────────────
         const eventStream = await debugRequestIdStorage.run(requestId, () =>
-          stream(piModel as any, context, callOptions)
+          piAiModels.stream(piModel as any, context, callOptions)
         );
 
         // Build and return the SSE generator — the generator owns

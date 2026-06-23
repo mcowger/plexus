@@ -93,10 +93,10 @@ describe('hydrateConfig: startup registry validation', () => {
     // Import the pi-ai module — in tests it's globally mocked as a factory.
     // We can spy on the mocked object's getModel using vi.spyOn on the module
     // to temporarily make it throw.
-    const piAiModule = await import('@earendil-works/pi-ai');
+    const piAiProvidersModule = await import('@earendil-works/pi-ai/providers/all');
 
     const getModelSpy = vi
-      .spyOn(piAiModule, 'getModel')
+      .spyOn(piAiProvidersModule, 'getBuiltinModel')
       .mockImplementationOnce((provider: string, modelId: string) => {
         if (provider === 'anthropic' && modelId === 'bogus-model-xyz') {
           throw new Error('Unknown model');

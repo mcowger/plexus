@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as piAi from '@earendil-works/pi-ai';
+import * as piAi from '@earendil-works/pi-ai/compat';
 import { setConfigForTesting } from '../../../config';
 import { DebugManager } from '../../../services/debug-manager';
 import { enterRequestContext } from '../../../services/request-context';

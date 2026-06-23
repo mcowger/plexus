@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { getConfig } from '../../config';
 import { PricingManager } from '../../services/pricing-manager';
 import { ModelMetadataManager, mergeOverrides } from '../../services/model-metadata-manager';
-import { getModel } from '@earendil-works/pi-ai';
+import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
   /**
@@ -32,7 +32,10 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       let piOptions: Record<string, unknown> | undefined;
       if (piModelConfig) {
         try {
-          const piModel = getModel(piModelConfig.provider as any, piModelConfig.model_id as any);
+          const piModel = getBuiltinModel(
+            piModelConfig.provider as any,
+            piModelConfig.model_id as any
+          );
           if (piModel?.compat && Object.keys(piModel.compat).length > 0) {
             piOptions = piModel.compat as Record<string, unknown>;
           }

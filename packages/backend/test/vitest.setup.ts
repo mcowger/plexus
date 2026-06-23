@@ -87,6 +87,72 @@ const mockLogger = {
 };
 
 // ---------------------------------------------------------------------------
+const mockComplete = vi.fn(async () => ({
+  content: [{ type: 'text', text: 'ok' }],
+  stopReason: 'stop',
+  usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+  provider: 'anthropic',
+  model: 'claude-test',
+  timestamp: Date.now(),
+}));
+
+const mockStream = vi.fn(async () => ({ ok: true }));
+
+const mockGetModels = (provider: string) => {
+  if (provider === 'unknown-provider') return [];
+  if (provider === 'openai-codex') {
+    return [
+      {
+        id: 'gpt-5.4',
+        name: 'GPT-5.4',
+        contextWindow: 128000,
+        provider: 'openai-codex',
+        api: 'openai-codex-responses',
+      },
+      {
+        id: 'gpt-5.5',
+        name: 'GPT-5.5',
+        contextWindow: 128000,
+        provider: 'openai-codex',
+        api: 'openai-codex-responses',
+      },
+    ];
+  }
+  return [
+    {
+      id: 'claude-opus-4',
+      name: 'Claude Opus 4',
+      contextWindow: 200000,
+      provider: 'anthropic',
+      api: 'anthropic-messages',
+    },
+    {
+      id: 'claude-sonnet-4',
+      name: 'Claude Sonnet 4',
+      contextWindow: 200000,
+      provider: 'anthropic',
+      api: 'anthropic-messages',
+    },
+    {
+      id: 'claude-test',
+      name: 'Claude Test',
+      contextWindow: 200000,
+      provider: 'anthropic',
+      api: 'anthropic-messages',
+    },
+  ];
+};
+
+const mockGetModel = (provider: string, modelId: string) => ({
+  id: modelId,
+  name: modelId,
+  contextWindow: 200000,
+  provider,
+  api: provider === 'openai-codex' ? 'openai-codex-responses' : 'anthropic-messages',
+});
+
+const mockGetProviders = () => ['anthropic', 'openai-codex', 'openai', 'google'];
+
 // @earendil-works/pi-ai — single authoritative mock for the whole worker.
 //
 // With isolate: false every test file shares one module registry.  Letting
@@ -102,72 +168,39 @@ const mockLogger = {
 //   • getModels returns all known test models so quota-error assertions that
 //     validate gpt-5.4/gpt-5.5 are valid for openai-codex always pass.
 //   • getModel always includes the `api` field — OAuthTransformer.executeRequest
-//     dispatches on model.api and crashes with "No API provider registered"
+//     dispatches on model.api and crashes with \"No API provider registered\"
 //     if it is missing.
 // ---------------------------------------------------------------------------
 vi.mock('@earendil-works/pi-ai', () => ({
-  getModels: (provider: string) => {
-    if (provider === 'unknown-provider') return [];
-    if (provider === 'openai-codex') {
-      return [
-        {
-          id: 'gpt-5.4',
-          name: 'GPT-5.4',
-          contextWindow: 128000,
-          provider: 'openai-codex',
-          api: 'openai-codex-responses',
-        },
-        {
-          id: 'gpt-5.5',
-          name: 'GPT-5.5',
-          contextWindow: 128000,
-          provider: 'openai-codex',
-          api: 'openai-codex-responses',
-        },
-      ];
-    }
-    return [
-      {
-        id: 'claude-opus-4',
-        name: 'Claude Opus 4',
-        contextWindow: 200000,
-        provider: 'anthropic',
-        api: 'anthropic-messages',
-      },
-      {
-        id: 'claude-sonnet-4',
-        name: 'Claude Sonnet 4',
-        contextWindow: 200000,
-        provider: 'anthropic',
-        api: 'anthropic-messages',
-      },
-      {
-        id: 'claude-test',
-        name: 'Claude Test',
-        contextWindow: 200000,
-        provider: 'anthropic',
-        api: 'anthropic-messages',
-      },
-    ];
-  },
-  getModel: (provider: string, modelId: string) => ({
-    id: modelId,
-    name: modelId,
-    contextWindow: 200000,
-    provider,
-    api: provider === 'openai-codex' ? 'openai-codex-responses' : 'anthropic-messages',
-  }),
-  complete: vi.fn(async () => ({
-    content: [{ type: 'text', text: 'ok' }],
-    stopReason: 'stop',
-    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
-    provider: 'anthropic',
-    model: 'claude-test',
-    timestamp: Date.now(),
-  })),
-  stream: vi.fn(async () => ({ ok: true })),
+  complete: mockModels.complete,
+  stream: mockModels.stream,
   calculateCost: vi.fn(() => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 })),
+  clampThinkingLevel: (_m: any, l: string) => l,
+  getSupportedThinkingLevels: () => ['off', 'low', 'medium', 'high'],
 }));
+
+vi.mock('@earendil-works/pi-ai/providers/all', () => ({
+  builtinModels: () => mockModels,
+  getBuiltinModel: mockGetModel,
+  getBuiltinModels: mockGetModels,
+  getBuiltinProviders: mockGetProviders,
+}));
+
+vi.mock('@earendil-works/pi-ai/compat', () => ({
+  complete: mockComplete,
+  stream: mockStream,
+  getModels: mockGetModels,
+  getModel: mockGetModel,
+  getProviders: mockGetProviders,
+}));
+
+const mockModels = {
+  complete: mockComplete,
+  stream: mockStream,
+  getModel: mockGetModel,
+  getModels: mockGetModels,
+  getProviders: mockGetProviders,
+};
 
 vi.mock('../src/utils/logger', () => ({
   logger: mockLogger,

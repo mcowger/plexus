@@ -4,7 +4,8 @@ import type {
   UnifiedChatResponse,
   UnifiedChatStreamChunk,
 } from '../../types/unified';
-import { getModel, stream, complete, type Model as PiAiModel } from '@earendil-works/pi-ai';
+import type { Model as PiAiModel } from '@earendil-works/pi-ai';
+import { piAiModels } from '../../inference-v2/shared/pi-ai-utils';
 import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import {
   applyClaudeCodeToolProxy,
@@ -105,7 +106,11 @@ export class OAuthTransformer implements Transformer {
   readonly defaultModel = 'gpt-5-mini';
 
   protected getPiAiModel(provider: OAuthProvider, modelId: string): PiAiModel<any> {
-    return getModel(provider as any, modelId);
+    const model = piAiModels.getModel(provider as any, modelId);
+    if (!model) {
+      throw new Error(`Model '${modelId}' not found for provider '${provider}'`);
+    }
+    return model;
   }
 
   private async resolveApiKey(
@@ -473,7 +478,7 @@ export class OAuthTransformer implements Transformer {
 
     if (streaming) {
       try {
-        const result = await stream(model, context, requestOptions);
+        const result = await piAiModels.stream(model, context, requestOptions);
         logger.debug(`${this.name}: OAuth stream result type`, describeStreamResult(result));
         return result;
       } catch (error: any) {
@@ -492,7 +497,7 @@ export class OAuthTransformer implements Transformer {
     }
 
     try {
-      return await complete(model, context, requestOptions);
+      return await piAiModels.complete(model, context, requestOptions);
     } catch (error: any) {
       if (error?.name === 'AbortError' || signal?.aborted) {
         const isTimeout = signal?.reason?.name === 'TimeoutError';

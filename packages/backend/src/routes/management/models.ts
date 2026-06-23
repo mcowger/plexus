@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { logger } from '../../utils/logger';
 import { HuggingFaceModelFetcher } from '../../services/huggingface-model-fetcher';
 import { ModelMetadataManager } from '../../services/model-metadata-manager';
-import { getModels, getProviders } from '@earendil-works/pi-ai';
+import { getBuiltinModels, getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
 import { ConfigService } from '../../services/config-service';
 
 interface FetchModelRequest {
@@ -82,7 +82,7 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
    */
   fastify.get('/v0/management/pi/providers', async (_request, reply) => {
     // Built-in pi-ai providers plus any workspace custom providers.
-    const builtin = getProviders();
+    const builtin = getBuiltinProviders();
     let custom: string[] = [];
     try {
       custom = Object.keys(
@@ -110,9 +110,9 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
     }
 
     // Built-in registry models for this provider (may be empty for a custom provider).
-    let builtin: ReturnType<typeof getModels> = [];
+    let builtin: ReturnType<typeof getBuiltinModels> = [];
     try {
-      builtin = getModels(query.provider as any) ?? [];
+      builtin = getBuiltinModels(query.provider as any) ?? [];
     } catch {
       builtin = [];
     }

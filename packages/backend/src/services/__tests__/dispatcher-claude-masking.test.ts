@@ -6,7 +6,7 @@ import type { UnifiedChatRequest } from '../../types/unified';
 // per-file vi.mock() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 const { Dispatcher } = await import('../dispatcher');
-import * as piAi from '@earendil-works/pi-ai';
+import * as piAi from '@earendil-works/pi-ai/compat';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch should not be called in pi-ai masking path');

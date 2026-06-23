@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import * as piAi from '@earendil-works/pi-ai';
+import * as piAi from '@earendil-works/pi-ai/compat';
+import * as piAiProvidersAll from '@earendil-works/pi-ai/providers/all';
 import { registerPiAiCustomRoutes } from '../pi-ai-custom';
 
 // ConfigService is only touched by the custom-provider/model CRUD routes, not
@@ -67,7 +68,7 @@ describe('management pi-ai custom routes — registry-model clone', () => {
 
   test('GET /v0/management/pi/registry-model returns 404 when the base is unknown', async () => {
     // The global mock always returns a model; override it to simulate a miss.
-    vi.spyOn(piAi, 'getModel').mockReturnValue(undefined as any);
+    vi.spyOn(piAiProvidersAll, 'getBuiltinModel').mockReturnValue(undefined as any);
     const res = await fastify.inject({
       method: 'GET',
       url: '/v0/management/pi/registry-model?provider=unknown&model_id=ghost',
