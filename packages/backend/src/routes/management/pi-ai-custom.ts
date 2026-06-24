@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 import { PiAiCustomProviderSchema, PiAiCustomModelSchema } from '../../config';
 import { ConfigService } from '../../services/config-service';
 
-const NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9.\-_]{0,126}$/;
+const NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9.:\-_]{0,126}$/;
 
 /**
  * Register API endpoints for pi-ai custom provider / model registries

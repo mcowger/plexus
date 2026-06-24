@@ -571,7 +571,10 @@ export function resolvePiAiModel(piAiProvider: string, piAiModelId: string): PiA
 
   // 1. Custom model definition. A model is provider-scoped: it only matches
   //    when its `provider` field equals the referencing pi-ai provider.
-  const modelSpec = customModels?.[piAiModelId];
+  //    First, look up via the compound key `${piAiProvider}:${piAiModelId}`,
+  //    then fall back to the plain key `piAiModelId` for backwards compatibility.
+  const compoundKey = piAiModelId.includes(':') ? piAiModelId : `${piAiProvider}:${piAiModelId}`;
+  const modelSpec = customModels?.[compoundKey] ?? customModels?.[piAiModelId];
   if (modelSpec && modelSpec.provider === piAiProvider) {
     const resolved = resolveCustomModel(modelSpec, piAiProvider, piAiModelId);
     if (resolved) {
