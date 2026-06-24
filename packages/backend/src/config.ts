@@ -1201,7 +1201,7 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
   };
   const piPairResolves = (provider: string, modelId: string): boolean => {
     // Custom model: resolves if standalone (has api) or its inheritance base exists.
-    const cm = customModels[modelId];
+    const cm = customModels[`${provider}:${modelId}`] ?? customModels[modelId];
     if (cm && cm.provider === provider) {
       if (cm.inherits) return registryHas(cm.inherits.provider, cm.inherits.model_id);
       return cm.api != null;

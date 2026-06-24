@@ -755,12 +755,17 @@ function ProviderRow({
                     variant="secondary"
                     size="sm"
                     leftIcon={<Plus size={14} />}
-                    disabled={!draftModel.trim() || !!models[draftModel.trim()]}
+                    disabled={
+                      !draftModel.trim() ||
+                      !!models[`${name}:${draftModel.trim()}`] ||
+                      (!!models[draftModel.trim()] && models[draftModel.trim()].provider === name)
+                    }
                     onClick={async () => {
                       const id = draftModel.trim();
+                      const key = `${name}:${id}`;
                       try {
                         // Seed under this provider; user edits the rest below.
-                        await api.savePiCustomModel(id, {
+                        await api.savePiCustomModel(key, {
                           provider: name,
                           api: 'openai-completions',
                         });
@@ -810,6 +815,7 @@ function ModelRow({
   providerId: string;
   onChanged: () => void;
 }) {
+  const cleanName = name.includes(':') ? name.split(':').slice(1).join(':') : name;
   const toast = useToast();
   const [mode, setMode] = useState<'inherit' | 'standalone'>(
     def.inherits ? 'inherit' : 'standalone'
@@ -902,14 +908,14 @@ function ModelRow({
   return (
     <div className="border border-border-glass rounded-md p-3">
       <div className="flex items-center justify-between mb-2 gap-2">
-        <span className="font-mono text-[13px] text-text">{name}</span>
+        <span className="font-mono text-[13px] text-text">{cleanName}</span>
         <Button
           variant="ghost"
           size="sm"
           onClick={async () => {
             try {
               await api.deletePiCustomModel(name);
-              toast.success(`Deleted '${name}'`);
+              toast.success(`Deleted '${cleanName}'`);
               onChanged();
             } catch (e: any) {
               toast.error(e?.message ?? 'Failed to delete');
@@ -1047,7 +1053,7 @@ function ModelRow({
             Display name {mode === 'inherit' ? '(override)' : '(optional)'}
           </label>
           <Input
-            placeholder={name}
+            placeholder={cleanName}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
           />
@@ -1182,7 +1188,7 @@ function ModelRow({
             }
             try {
               await api.savePiCustomModel(name, def);
-              toast.success(`Saved '${name}'`);
+              toast.success(`Saved '${cleanName}'`);
               onChanged();
             } catch (e: any) {
               toast.error(e?.message ?? 'Failed to save');

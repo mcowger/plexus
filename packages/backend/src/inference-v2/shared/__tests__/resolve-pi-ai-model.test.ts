@@ -230,4 +230,49 @@ describe('resolvePiAiModel', () => {
       expect(resolvePiAiModel('unknown-host', 'scoped')).toBeNull();
     });
   });
+
+  describe('compound key provider-scoped custom model', () => {
+    beforeEach(() =>
+      configWith({
+        providers: {
+          'provider-a': { api: 'openai-completions' },
+          'provider-b': { api: 'openai-responses' },
+        },
+        models: {
+          'provider-a:shared-id': {
+            provider: 'provider-a',
+            api: 'openai-completions',
+            contextWindow: 1000,
+            maxTokens: 500,
+          },
+          'provider-b:shared-id': {
+            provider: 'provider-b',
+            api: 'openai-responses',
+            contextWindow: 2000,
+            maxTokens: 600,
+          },
+        },
+      })
+    );
+
+    it('resolves the correct custom model for provider-a using the compound key', () => {
+      const m = resolvePiAiModel('provider-a', 'shared-id')!;
+      expect(m).not.toBeNull();
+      expect(m.api).toBe('openai-completions');
+      expect(m.contextWindow).toBe(1000);
+      expect(m.maxTokens).toBe(500);
+      expect(m.provider).toBe('provider-a');
+      expect(m.id).toBe('shared-id');
+    });
+
+    it('resolves the correct custom model for provider-b using the compound key', () => {
+      const m = resolvePiAiModel('provider-b', 'shared-id')!;
+      expect(m).not.toBeNull();
+      expect(m.api).toBe('openai-responses');
+      expect(m.contextWindow).toBe(2000);
+      expect(m.maxTokens).toBe(600);
+      expect(m.provider).toBe('provider-b');
+      expect(m.id).toBe('shared-id');
+    });
+  });
 });

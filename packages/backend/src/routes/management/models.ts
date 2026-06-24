@@ -127,12 +127,15 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
         .getAllPiAiCustomModels();
       customEntries = Object.entries(customModels)
         .filter(([, def]) => def.provider === query.provider)
-        .map(([id, def]) => ({
-          id,
-          name: (def as any).name ?? id,
-          api: (def as any).api ?? 'custom',
-          custom: true as const,
-        }));
+        .map(([id, def]) => {
+          const cleanId = id.includes(':') ? id.split(':').slice(1).join(':') : id;
+          return {
+            id: cleanId,
+            name: (def as any).name ?? cleanId,
+            api: (def as any).api ?? 'custom',
+            custom: true as const,
+          };
+        });
     } catch {
       /* non-fatal */
     }
