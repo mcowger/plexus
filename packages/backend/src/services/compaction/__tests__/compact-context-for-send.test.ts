@@ -46,8 +46,7 @@ import { compactContextForSend, CompactionService } from '../compaction-service'
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  // Access and clear the private static instance
-  (CompactionService as any).instance = undefined;
+  CompactionService.resetForTesting();
   mockGetConfig.mockReset();
 });
 

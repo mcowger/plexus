@@ -603,6 +603,16 @@ export async function runPiAiExecutor<TResponse>(
     const stallTtfbMs: number | null = (route.config as any).stallTtfbMs ?? globalStallTtfbMs;
     const stallCooldownEnabled: boolean = route.config.stall_cooldown !== false;
 
+    // Compaction metadata surfaced as x-plexus-compaction-* headers on BOTH the
+    // non-streaming and streaming paths.
+    const compactionMeta = compaction.compacted
+      ? {
+          strategy: compaction.strategy,
+          tokensBefore: compaction.tokensBefore,
+          tokensAfter: compaction.tokensAfter,
+        }
+      : undefined;
+
     try {
       if (!streaming) {
         // ── Non-streaming ────────────────────────────────────────────────
@@ -666,13 +676,7 @@ export async function runPiAiExecutor<TResponse>(
 
         return {
           response: serializeMessage(message),
-          compaction: compaction.compacted
-            ? {
-                strategy: compaction.strategy,
-                tokensBefore: compaction.tokensBefore,
-                tokensAfter: compaction.tokensAfter,
-              }
-            : undefined,
+          compaction: compactionMeta,
         };
       } else {
         // ── Streaming ────────────────────────────────────────────────────
@@ -711,7 +715,7 @@ export async function runPiAiExecutor<TResponse>(
           serializeChunks,
         });
 
-        return { stream: gen };
+        return { stream: gen, compaction: compactionMeta };
       }
     } catch (err: any) {
       const effectiveErr = attemptTimeout.isTimedOut() ? buildTimeoutError() : err;

@@ -77,6 +77,11 @@ export class CompactionService {
     return this.instance;
   }
 
+  /** Test-only: drop the cached singleton so each test builds a fresh instance. */
+  static resetForTesting(): void {
+    this.instance = undefined;
+  }
+
   async maybeCompact(
     context: Context,
     opts: MaybeCompactOpts,

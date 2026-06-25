@@ -128,9 +128,10 @@ export function toOpenAI(msg: Message): OAIMessage {
 
   if (msg.role === 'toolResult') {
     const m = msg as ToolResultMessage;
+    // OpenAI 'tool' messages only carry string content. Keep text blocks and
+    // mark any non-text blocks (e.g. images) so they aren't silently dropped.
     const content = (m.content as (TextContent | ImageContent)[])
-      .filter((b): b is TextContent => b.type === 'text')
-      .map((b) => b.text)
+      .map((b) => (b.type === 'text' ? b.text : `[${b.type} content omitted]`))
       .join('');
     return { role: 'tool', tool_call_id: m.toolCallId, content };
   }
@@ -142,15 +143,6 @@ export function toOpenAI(msg: Message): OAIMessage {
 // ---------------------------------------------------------------------------
 // fromOpenAI — OpenAI message → pi-ai Message
 // ---------------------------------------------------------------------------
-
-/** Try JSON.parse; return {} on failure. */
-function safeJsonParse(s: string): Record<string, unknown> {
-  try {
-    return JSON.parse(s) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
 
 /**
  * Map a single OpenAI-format message back to a pi-ai Message.
@@ -198,11 +190,13 @@ export function fromOpenAI(
     }
 
     for (const tc of m.tool_calls ?? []) {
+      // Malformed argument JSON throws → CompactionService fails open (the
+      // original context with intact arguments is used) instead of emitting {}.
       contentBlocks.push({
         type: 'toolCall',
         id: tc.id,
         name: tc.function.name,
-        arguments: safeJsonParse(tc.function.arguments),
+        arguments: JSON.parse(tc.function.arguments) as Record<string, unknown>,
       });
     }
 

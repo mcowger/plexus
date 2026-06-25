@@ -670,10 +670,16 @@ export function estimateContextTokens(context: Context, apiType?: string): numbe
         } else if (block.type === 'thinking') {
           total += estimateTokens(block.thinking);
         } else if (block.type === 'toolCall') {
+          // The tool name and call id are serialized on the wire too.
+          total += estimateTokens(block.name);
+          total += estimateTokens(block.id);
           total += tokensForStringOrJson(block.arguments);
         }
       }
     } else if (message.role === 'toolResult') {
+      // The tool_call_id and tool name are serialized on the wire too.
+      total += estimateTokens(message.toolCallId);
+      total += estimateTokens(message.toolName);
       for (const block of message.content) {
         if (block.type === 'text') {
           total += estimateTokens(block.text);

@@ -497,7 +497,9 @@ export const Config = () => {
   const loadCompactionConfig = useCallback(async () => {
     try {
       const cfg = await api.getCompactionConfig();
-      setCompactionConfig(cfg);
+      // Merge over defaults so the UI state always has a complete shape
+      // (e.g. strategy defined) even when the backend returns {}.
+      setCompactionConfig({ ...DEFAULT_COMPACTION_CONFIG, ...cfg });
       setCompactionLoaded(true);
     } catch (e) {
       console.error('Failed to load compaction config:', e);

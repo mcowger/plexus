@@ -597,24 +597,26 @@ export function ProviderAdvancedEditor({
 
           {/* Compaction Override */}
           <div className="border border-border-glass rounded-md overflow-hidden">
-            <div
-              className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+            <button
+              type="button"
+              className="w-full p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass border-0 text-left"
               onClick={() => setIsCompactionOpen(!isCompactionOpen)}
+              aria-expanded={isCompactionOpen}
             >
               {isCompactionOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <label
+              <span
                 className="font-body text-[12px] font-medium text-text-secondary"
                 style={{ marginBottom: 0, flex: 1 }}
               >
                 Compaction Override
-              </label>
+              </span>
               {editingProvider.compaction &&
                 Object.values(editingProvider.compaction).some((v) => v != null) && (
                   <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
                     Custom
                   </Badge>
                 )}
-            </div>
+            </button>
             {isCompactionOpen && (
               <div
                 style={{

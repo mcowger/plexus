@@ -6,9 +6,10 @@
  * helper was added to enforce-limits.ts (GREEN).
  */
 
-import { describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { Context } from '@earendil-works/pi-ai';
 import type { ModelConfig } from '../../config';
+import { ModelMetadataManager } from '../model-metadata-manager';
 import {
   ContextLengthExceededError,
   enforceContextLimitForRoute,
@@ -59,6 +60,16 @@ function overWindowContext(): Context {
 // ---------------------------------------------------------------------------
 
 describe('enforceContextLimitForRoute', () => {
+  // Reset the ModelMetadataManager singleton so alias metadata retained by an
+  // earlier test can't leak into the default gpt-4 fallback path (matches the
+  // sibling enforce-limits-context.test.ts).
+  beforeEach(() => {
+    ModelMetadataManager.resetForTesting();
+  });
+  afterEach(() => {
+    ModelMetadataManager.resetForTesting();
+  });
+
   // Case 1: aliasConfig undefined → no-op
   test('no-ops when aliasConfig is undefined', () => {
     const context = makeContext('hello world');

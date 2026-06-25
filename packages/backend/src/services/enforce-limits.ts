@@ -162,7 +162,7 @@ export function enforceContextLimitForRoute(
 ): void {
   if (!aliasConfig?.enforce_limits || !route.canonicalModel) return;
   enforceContextLimitForContext(context, aliasConfig, route.canonicalModel, {
-    contextLength: resolveContextLength(aliasConfig) ?? route.modelArchitecture?.context_length,
+    contextLength: route.modelArchitecture?.context_length ?? resolveContextLength(aliasConfig),
     maxTokens,
     apiType,
   });

@@ -203,7 +203,13 @@ export async function handleBetaChatCompletions(
     }
 
     if (result.stream != null) {
-      // Streaming — SSE
+      // Streaming — SSE. Compaction headers must be set before the stream starts.
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -360,6 +366,13 @@ export async function handleBetaMessages(
     }
 
     if (result.stream != null) {
+      // Compaction headers must be set before the stream starts.
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -539,6 +552,13 @@ export async function handleBetaResponses(
     }
 
     if (result.stream != null) {
+      // Compaction headers must be set before the stream starts.
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')

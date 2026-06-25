@@ -53,6 +53,29 @@ function makeToolResultMessage(content: ToolResultMessage['content']): ToolResul
 }
 
 describe('NativeCompactor', () => {
+  test('assistant thinking blocks are preserved verbatim (never truncated)', async () => {
+    const compactor = new NativeCompactor();
+
+    // Thinking text far exceeds maxStringChars (20). Native must NOT compact it:
+    // Anthropic extended-thinking signatures bind the exact thinking text, so
+    // truncating it would invalidate them (see docs/compaction.md — native is
+    // the default precisely because it preserves thinking).
+    const longThinking = 'reasoning step '.repeat(20);
+    const assistant = makeAssistantMessage([{ type: 'thinking', thinking: longThinking }]);
+    const protected_ = makeUserMessage('keep me');
+    const context: Context = { messages: [assistant, protected_] };
+
+    const result = await compactor.compact(context, settings, ctx);
+
+    // Nothing changed → the assistant message is passed through by reference.
+    expect(result[0]).toBe(assistant);
+    const block = (result[0] as AssistantMessage).content[0] as {
+      type: 'thinking';
+      thinking: string;
+    };
+    expect(block.thinking).toBe(longThinking);
+  });
+
   test('1. toolResult with verbose JSON array is truncated with sentinel', async () => {
     const compactor = new NativeCompactor();
 

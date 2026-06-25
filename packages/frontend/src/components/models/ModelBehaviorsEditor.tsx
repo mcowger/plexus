@@ -149,24 +149,26 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
           {/* ── Compaction Override ── */}
           <div>
-            <div
-              className="flex items-center gap-2 cursor-pointer mb-1"
+            <button
+              type="button"
+              className="flex items-center gap-2 cursor-pointer mb-1 w-full border-0 bg-transparent p-0 text-left"
               onClick={() => setIsCompactionOpen(!isCompactionOpen)}
+              aria-expanded={isCompactionOpen}
             >
               {isCompactionOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <label
-                className="font-body text-[13px] font-medium text-text-secondary cursor-pointer"
+              <span
+                className="font-body text-[13px] font-medium text-text-secondary"
                 style={{ marginBottom: 0 }}
               >
                 Compaction Override
-              </label>
+              </span>
               {editingAlias.compaction &&
                 Object.values(editingAlias.compaction).some((v) => v != null) && (
                   <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
                     Custom
                   </Badge>
                 )}
-            </div>
+            </button>
             {isCompactionOpen && (
               <div
                 className="border border-border-glass rounded-md"
