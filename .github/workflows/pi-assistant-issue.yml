@@ -51,7 +51,7 @@ jobs:
             core.setOutput('comment_id', comment.id);
             core.info(`Posted progress comment: ${comment.id}`);
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
