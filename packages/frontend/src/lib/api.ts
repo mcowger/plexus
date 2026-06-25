@@ -251,6 +251,7 @@ export interface Provider {
   stallWindowMs?: number | null;
   stallGracePeriodMs?: number | null;
   pi_ai_provider?: string;
+  compaction?: CompactionSettings;
 }
 
 export type McpServer = RemoteMcpServer | LocalMcpServer;
@@ -489,6 +490,7 @@ export interface Alias {
   preferred_api?: Array<PreferredApiValue>;
   pi_model?: { provider: string; model_id: string };
   extraBody?: Record<string, any>;
+  compaction?: CompactionSettings;
 }
 
 export interface InferenceError {
@@ -1063,6 +1065,17 @@ export const STAT_LABELS = {
   TOKENS: 'Total Tokens',
   DURATION: 'Avg. Duration',
 } as const;
+
+export interface CompactionSettings {
+  enabled?: boolean;
+  strategy?: 'native' | 'headroom';
+  triggerRatio?: number;
+  absoluteTriggerTokens?: number | null;
+  minTokens?: number;
+  protectRecent?: number;
+  native?: { maxArrayItems?: number; maxStringChars?: number };
+  headroom?: { baseUrl?: string; apiKey?: string; targetRatio?: number | null; timeoutMs?: number };
+}
 
 export const api = {
   getCooldowns: async (): Promise<Cooldown[]> => {
@@ -3454,6 +3467,26 @@ export const api = {
       body: JSON.stringify(updates),
     });
     if (!res.ok) throw new Error('Failed to update timeout settings');
+    return res.json();
+  },
+
+  // ─── Compaction Settings ─────────────────────────────────────────
+
+  /** Fetch current compaction settings. */
+  getCompactionConfig: async (): Promise<CompactionSettings> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/compaction`);
+    if (!res.ok) throw new Error('Failed to fetch compaction settings');
+    return res.json();
+  },
+
+  /** Patch compaction settings. */
+  patchCompactionConfig: async (updates: CompactionSettings): Promise<CompactionSettings> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/compaction`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update compaction settings');
     return res.json();
   },
 

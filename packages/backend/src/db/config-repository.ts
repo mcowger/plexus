@@ -338,6 +338,7 @@ export class ConfigRepository {
       geminiThinkingEnabled: fromBool(config.geminiThinkingEnabled === true),
       headers: config.headers ? encryptJsonField(config.headers) : null,
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
+      compaction: config.compaction ? toJson(config.compaction) : null,
       quotaCheckerType: config.quota_checker?.type ?? null,
       quotaCheckerId: config.quota_checker?.id ?? null,
       quotaCheckerEnabled: fromBool(config.quota_checker?.enabled !== false),
@@ -585,6 +586,7 @@ export class ConfigRepository {
         const eb = parseJson<Record<string, unknown>>(row.extraBody);
         return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
       })(),
+      ...(row.compaction ? { compaction: parseJson(row.compaction) } : {}),
       ...(quota_checker ? { quota_checker } : {}),
       model_autosync: {
         enabled: toBool(row.modelAutosyncEnabled),
@@ -822,6 +824,7 @@ export class ConfigRepository {
       piModel: config.pi_model ? toJson(config.pi_model) : null,
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
       generation: null,
+      compaction: config.compaction ? toJson(config.compaction) : null,
       targetGroups:
         config.target_groups && config.target_groups.length > 0
           ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
@@ -964,6 +967,7 @@ export class ConfigRepository {
       ...(row.preferredApi ? { preferred_api: parseJson(row.preferredApi) } : {}),
       ...(row.piModel ? { pi_model: parseJson(row.piModel) } : {}),
       ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
+      ...(row.compaction ? { compaction: parseJson(row.compaction) } : {}),
     };
 
     if (row.metadataSource) {
@@ -1516,6 +1520,10 @@ export class ConfigRepository {
   async getTimeoutConfig(): Promise<TimeoutConfig> {
     const defaultSeconds = await this.getSetting<number>('timeout.defaultSeconds', 300);
     return { defaultSeconds };
+  }
+
+  async getCompactionConfig(): Promise<import('../config').CompactionSettingsConfig> {
+    return this.getSetting('compaction', {});
   }
 
   async getStallConfig(): Promise<import('../config').StallConfigType> {

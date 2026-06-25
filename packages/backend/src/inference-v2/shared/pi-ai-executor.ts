@@ -56,6 +56,8 @@ import { splitReasoningSuffix } from './reasoning';
 import { consumeTtfb } from './fetch-tap';
 import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
 import { enforceContextLimitForRoute } from '../../services/enforce-limits';
+import { compactContextForSend } from '../../services/compaction/compaction-service';
+import type { CompactionResult, CompactionStrategyName } from '../../services/compaction/types';
 
 // ─── AsyncLocalStorage for debug raw-capture correlation ─────────────────────
 
@@ -103,6 +105,12 @@ export interface PiAiExecutorResult<TResponse> {
   response?: TResponse;
   /** Set for streaming — async generator of wire-format frame strings */
   stream?: AsyncGenerator<string>;
+  /** Set for non-streaming when compaction actually ran and reduced tokens */
+  compaction?: {
+    strategy: CompactionStrategyName | null;
+    tokensBefore: number;
+    tokensAfter: number;
+  };
 }
 
 // ─── Attempt-timeout helper (mirrors Dispatcher.createAttemptTimeout) ─────────
@@ -457,6 +465,7 @@ export async function runPiAiExecutor<TResponse>(
   const attemptedProviders: string[] = [];
   let lastError: any = null;
   const failoverEnabled = betaCandidates.length > 1;
+  const compactionMemo = new Map<string, CompactionResult>();
 
   for (let i = 0; i < betaCandidates.length; i++) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -478,6 +487,19 @@ export async function runPiAiExecutor<TResponse>(
       continue;
     }
 
+    // ── Context compaction (opt-in per alias/provider/global) ──────────────
+    // Runs before force-limit enforcement so a borderline-oversized request can
+    // be rescued by compaction before it would be rejected. Fail-open: on any
+    // error the original context is returned. Per-candidate, memoized.
+    const compaction = await compactContextForSend(
+      context,
+      route,
+      modelAlias,
+      compactionMemo,
+      attemptTimeout.signal
+    );
+    const sendContext = compaction.compacted ? compaction.context : context;
+
     // ── Force-limit enforcement (opt-in per alias) ─────────────────────────
     // Mirrors dispatcher.ts:384-394. Checked AFTER cooldown and BEFORE
     // acquiring a concurrency slot, so a thrown ContextLengthExceededError
@@ -487,10 +509,10 @@ export async function runPiAiExecutor<TResponse>(
       : undefined;
     try {
       enforceContextLimitForRoute(
-        context,
+        sendContext,
         route,
         aliasForLimit,
-        (streamOptions as any).maxTokens,
+        generationIntent.maxTokens,
         incomingApiType
       );
     } catch (limitErr) {
@@ -585,7 +607,7 @@ export async function runPiAiExecutor<TResponse>(
       if (!streaming) {
         // ── Non-streaming ────────────────────────────────────────────────
         const message = await debugRequestIdStorage.run(requestId, () =>
-          piAiModels.complete(piModel as any, context, callOptions)
+          piAiModels.complete(piModel as any, sendContext, callOptions)
         );
 
         cooldown.markProviderSuccess(route.provider, route.model);
@@ -642,11 +664,20 @@ export async function runPiAiExecutor<TResponse>(
 
         await onSuccess?.(message);
 
-        return { response: serializeMessage(message) };
+        return {
+          response: serializeMessage(message),
+          compaction: compaction.compacted
+            ? {
+                strategy: compaction.strategy,
+                tokensBefore: compaction.tokensBefore,
+                tokensAfter: compaction.tokensAfter,
+              }
+            : undefined,
+        };
       } else {
         // ── Streaming ────────────────────────────────────────────────────
         const eventStream = await debugRequestIdStorage.run(requestId, () =>
-          piAiModels.stream(piModel as any, context, callOptions)
+          piAiModels.stream(piModel as any, sendContext, callOptions)
         );
 
         // Build and return the SSE generator — the generator owns

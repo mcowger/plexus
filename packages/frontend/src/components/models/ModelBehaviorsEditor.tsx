@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/Switch';
+import { Badge } from '../ui/Badge';
+import { DebouncedInput } from '../ui/DebouncedInput';
 import { ModelArchitectureEditor } from './ModelArchitectureEditor';
 import { AliasExtraBodyEditor } from './AliasExtraBodyEditor';
-import type { Alias, AliasBehavior } from '../../lib/api';
+import type { Alias, AliasBehavior, CompactionSettings } from '../../lib/api';
 
 interface Props {
   editingAlias: Alias;
@@ -12,6 +14,7 @@ interface Props {
 
 export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCompactionOpen, setIsCompactionOpen] = useState(false);
 
   const getBehavior = (type: AliasBehavior['type']): boolean => {
     return (editingAlias.advanced ?? []).some((b) => b.type === type && b.enabled !== false);
@@ -141,6 +144,232 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
           {/* ── Extra Body Fields ── */}
           <AliasExtraBodyEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
+
+          <div className="h-px bg-border-glass"></div>
+
+          {/* ── Compaction Override ── */}
+          <div>
+            <div
+              className="flex items-center gap-2 cursor-pointer mb-1"
+              onClick={() => setIsCompactionOpen(!isCompactionOpen)}
+            >
+              {isCompactionOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <label
+                className="font-body text-[13px] font-medium text-text-secondary cursor-pointer"
+                style={{ marginBottom: 0 }}
+              >
+                Compaction Override
+              </label>
+              {editingAlias.compaction &&
+                Object.values(editingAlias.compaction).some((v) => v != null) && (
+                  <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                    Custom
+                  </Badge>
+                )}
+            </div>
+            {isCompactionOpen && (
+              <div
+                className="border border-border-glass rounded-md"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  padding: '8px',
+                  background: 'var(--color-bg-subtle)',
+                }}
+              >
+                <div
+                  className="font-body text-[11px] text-text-secondary"
+                  style={{ lineHeight: 1.35 }}
+                >
+                  Override global context-compaction for this alias. Empty = inherit (alias
+                  overrides provider overrides global). Nested native/headroom settings are
+                  configurable on the global Config page only (v1).
+                </div>
+                {/* enabled tri-state */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Enabled
+                    <span className="font-normal text-[10px] text-text-muted ml-1">
+                      Inherit / On / Off
+                    </span>
+                  </label>
+                  <select
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={
+                      editingAlias.compaction?.enabled == null
+                        ? ''
+                        : editingAlias.compaction.enabled
+                          ? 'true'
+                          : 'false'
+                    }
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const enabled: boolean | undefined = raw === '' ? undefined : raw === 'true';
+                      setEditingAlias({
+                        ...editingAlias,
+                        compaction: {
+                          ...editingAlias.compaction,
+                          enabled,
+                        } as CompactionSettings,
+                      });
+                    }}
+                  >
+                    <option value="">Inherit</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                  </select>
+                </div>
+                {/* strategy */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Strategy
+                    <span className="font-normal text-[10px] text-text-muted ml-1">
+                      native | headroom
+                    </span>
+                  </label>
+                  <select
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={editingAlias.compaction?.strategy ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const strategy = (raw || undefined) as CompactionSettings['strategy'];
+                      setEditingAlias({
+                        ...editingAlias,
+                        compaction: {
+                          ...editingAlias.compaction,
+                          strategy,
+                        } as CompactionSettings,
+                      });
+                    }}
+                  >
+                    <option value="">Inherit</option>
+                    <option value="native">native</option>
+                    <option value="headroom">headroom</option>
+                  </select>
+                </div>
+                {/* numeric fields — two-column grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {/* triggerRatio */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Trigger Ratio
+                      <span className="font-normal text-[10px] text-text-muted ml-1">0–1</span>
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={
+                        editingAlias.compaction?.triggerRatio != null
+                          ? String(editingAlias.compaction.triggerRatio)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const triggerRatio = val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingAlias({
+                          ...editingAlias,
+                          compaction: {
+                            ...editingAlias.compaction,
+                            triggerRatio,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* absoluteTriggerTokens */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Abs. Trigger Tokens
+                      <span className="font-normal text-[10px] text-text-muted ml-1">optional</span>
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      step={1}
+                      value={
+                        editingAlias.compaction?.absoluteTriggerTokens != null
+                          ? String(editingAlias.compaction.absoluteTriggerTokens)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const absoluteTriggerTokens =
+                          val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingAlias({
+                          ...editingAlias,
+                          compaction: {
+                            ...editingAlias.compaction,
+                            absoluteTriggerTokens,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* minTokens */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Min Tokens
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      step={1}
+                      value={
+                        editingAlias.compaction?.minTokens != null
+                          ? String(editingAlias.compaction.minTokens)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const minTokens = val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingAlias({
+                          ...editingAlias,
+                          compaction: {
+                            ...editingAlias.compaction,
+                            minTokens,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* protectRecent */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Protect Recent
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      step={1}
+                      value={
+                        editingAlias.compaction?.protectRecent != null
+                          ? String(editingAlias.compaction.protectRecent)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const protectRecent = val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingAlias({
+                          ...editingAlias,
+                          compaction: {
+                            ...editingAlias.compaction,
+                            protectRecent,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

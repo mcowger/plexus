@@ -193,6 +193,12 @@ export async function handleBetaChatCompletions(
 
     if (result.response != null) {
       // Non-streaming
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
@@ -344,6 +350,12 @@ export async function handleBetaMessages(
     earlyDisconnect.cleanup();
 
     if (result.response != null) {
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
@@ -517,6 +529,12 @@ export async function handleBetaResponses(
     earlyDisconnect.cleanup();
 
     if (result.response != null) {
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
@@ -645,6 +663,12 @@ export async function handleBetaGeminiRequest(
     earlyDisconnect.cleanup();
 
     if (result.response != null) {
+      if (result.compaction) {
+        reply
+          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
+          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
+          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
+      }
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 

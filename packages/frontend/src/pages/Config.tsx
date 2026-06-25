@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import type { CompactionSettings } from '../lib/api';
 import { formatMinutesToMinSec } from '@plexus/shared';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
@@ -114,6 +115,8 @@ const DEFAULT_BACKGROUND_EXPLORATION: BackgroundExplorationConfig = {
   workerConcurrency: 2,
 };
 
+const DEFAULT_COMPACTION_CONFIG: CompactionSettings = { enabled: false, strategy: 'native' };
+
 const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
   enabled: true,
   retryableStatusCodes: [],
@@ -189,6 +192,12 @@ export const Config = () => {
   const [stallMinBpsInput, setStallMinBpsInput] = useState('');
   const [stallWindowInput, setStallWindowInput] = useState('');
   const [stallGraceInput, setStallGraceInput] = useState('');
+
+  // Context Compaction settings state
+  const [compactionConfig, setCompactionConfig] =
+    useState<CompactionSettings>(DEFAULT_COMPACTION_CONFIG);
+  const [compactionLoaded, setCompactionLoaded] = useState(false);
+  const [compactionSaving, setCompactionSaving] = useState(false);
 
   // Validate timeout input
   const validateTimeoutInput = (
@@ -485,6 +494,17 @@ export const Config = () => {
     }
   }, [toast]);
 
+  const loadCompactionConfig = useCallback(async () => {
+    try {
+      const cfg = await api.getCompactionConfig();
+      setCompactionConfig(cfg);
+      setCompactionLoaded(true);
+    } catch (e) {
+      console.error('Failed to load compaction config:', e);
+      toast.error('Failed to load compaction settings');
+    }
+  }, [toast]);
+
   const handleSaveTimeout = async () => {
     if (!timeoutDefaultValidation.valid) return;
     setTimeoutSaving(true);
@@ -553,6 +573,19 @@ export const Config = () => {
       toast.error((e as Error).message, 'Failed to save stall detection settings');
     } finally {
       setStallSaving(false);
+    }
+  };
+
+  const handleSaveCompaction = async () => {
+    setCompactionSaving(true);
+    try {
+      const updated = await api.patchCompactionConfig(compactionConfig);
+      setCompactionConfig(updated);
+      toast.success('Compaction settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save compaction settings');
+    } finally {
+      setCompactionSaving(false);
     }
   };
 
@@ -633,6 +666,7 @@ export const Config = () => {
     loadTrustedProxies();
     loadTimeoutConfig();
     loadStallConfig();
+    loadCompactionConfig();
     loadExplorationRates();
     loadBackgroundExploration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1217,6 +1251,326 @@ export const Config = () => {
                   )}
                 </div>
               </div>
+            </div>
+          </Disclosure>
+
+          {/* ─── Context Compaction Settings ────────────────────────────── */}
+          <Disclosure
+            title="Context Compaction"
+            defaultOpen={false}
+            extra={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveCompaction}
+                isLoading={compactionSaving}
+                disabled={!compactionLoaded}
+                leftIcon={<Save size={14} />}
+              >
+                Save
+              </Button>
+            }
+          >
+            <div className="flex flex-col gap-3">
+              <p className="font-body text-[11px] text-text-muted">
+                Applies to <code>/beta/</code> (inference-v2) routes.
+              </p>
+
+              {/* enabled toggle */}
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-body text-[12px] font-medium text-text">Enabled</p>
+                  <p className="font-body text-[11px] text-text-muted">
+                    Automatically compact context when the trigger threshold is reached.
+                  </p>
+                </div>
+                <Switch
+                  checked={compactionConfig.enabled ?? false}
+                  onChange={(checked) =>
+                    setCompactionConfig({ ...compactionConfig, enabled: checked })
+                  }
+                  aria-label="Toggle context compaction on/off"
+                />
+              </div>
+
+              {/* strategy */}
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="compactionStrategy"
+                  className="font-body text-[12px] font-medium text-text"
+                >
+                  Strategy
+                </label>
+                <select
+                  id="compactionStrategy"
+                  value={compactionConfig.strategy ?? 'native'}
+                  onChange={(e) =>
+                    setCompactionConfig({
+                      ...compactionConfig,
+                      strategy: e.target.value as 'native' | 'headroom',
+                    })
+                  }
+                  className="w-48 h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary"
+                >
+                  <option value="native">native</option>
+                  <option value="headroom">headroom</option>
+                </select>
+              </div>
+
+              {/* trigger ratio + absoluteTriggerTokens */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="compactionTriggerRatio"
+                    className="font-body text-[12px] font-medium text-text"
+                  >
+                    Trigger Ratio{' '}
+                    <span className="text-text-muted font-normal">— fraction 0–1</span>
+                  </label>
+                  <input
+                    id="compactionTriggerRatio"
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    placeholder="e.g. 0.8"
+                    value={compactionConfig.triggerRatio ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? undefined : Number(e.target.value);
+                      setCompactionConfig({ ...compactionConfig, triggerRatio: v });
+                    }}
+                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="compactionAbsoluteTrigger"
+                    className="font-body text-[12px] font-medium text-text"
+                  >
+                    Absolute Trigger Tokens{' '}
+                    <span className="text-text-muted font-normal">— empty = off</span>
+                  </label>
+                  <input
+                    id="compactionAbsoluteTrigger"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="Disabled"
+                    value={compactionConfig.absoluteTriggerTokens ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? null : Number(e.target.value);
+                      setCompactionConfig({ ...compactionConfig, absoluteTriggerTokens: v });
+                    }}
+                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="compactionMinTokens"
+                    className="font-body text-[12px] font-medium text-text"
+                  >
+                    Min Tokens
+                  </label>
+                  <input
+                    id="compactionMinTokens"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="e.g. 1000"
+                    value={compactionConfig.minTokens ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? undefined : Number(e.target.value);
+                      setCompactionConfig({ ...compactionConfig, minTokens: v });
+                    }}
+                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="compactionProtectRecent"
+                    className="font-body text-[12px] font-medium text-text"
+                  >
+                    Protect Recent (tokens)
+                  </label>
+                  <input
+                    id="compactionProtectRecent"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="e.g. 500"
+                    value={compactionConfig.protectRecent ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? undefined : Number(e.target.value);
+                      setCompactionConfig({ ...compactionConfig, protectRecent: v });
+                    }}
+                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  />
+                </div>
+              </div>
+
+              {/* native sub-settings */}
+              {compactionConfig.strategy === 'native' && (
+                <div className="flex flex-col gap-2">
+                  <p className="font-body text-[12px] font-medium text-text">Native Settings</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="compactionNativeMaxArrayItems"
+                        className="font-body text-[12px] font-medium text-text"
+                      >
+                        Max Array Items
+                      </label>
+                      <input
+                        id="compactionNativeMaxArrayItems"
+                        type="number"
+                        min={1}
+                        step={1}
+                        placeholder="e.g. 20"
+                        value={compactionConfig.native?.maxArrayItems ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? undefined : Number(e.target.value);
+                          setCompactionConfig({
+                            ...compactionConfig,
+                            native: { ...compactionConfig.native, maxArrayItems: v },
+                          });
+                        }}
+                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="compactionNativeMaxStringChars"
+                        className="font-body text-[12px] font-medium text-text"
+                      >
+                        Max String Chars
+                      </label>
+                      <input
+                        id="compactionNativeMaxStringChars"
+                        type="number"
+                        min={1}
+                        step={1}
+                        placeholder="e.g. 500"
+                        value={compactionConfig.native?.maxStringChars ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? undefined : Number(e.target.value);
+                          setCompactionConfig({
+                            ...compactionConfig,
+                            native: { ...compactionConfig.native, maxStringChars: v },
+                          });
+                        }}
+                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* headroom sub-settings */}
+              {compactionConfig.strategy === 'headroom' && (
+                <div className="flex flex-col gap-2">
+                  <p className="font-body text-[12px] font-medium text-text">Headroom Settings</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1 col-span-2">
+                      <label
+                        htmlFor="compactionHeadroomBaseUrl"
+                        className="font-body text-[12px] font-medium text-text"
+                      >
+                        Base URL
+                      </label>
+                      <input
+                        id="compactionHeadroomBaseUrl"
+                        type="text"
+                        placeholder="http://localhost:8787"
+                        value={compactionConfig.headroom?.baseUrl ?? ''}
+                        onChange={(e) =>
+                          setCompactionConfig({
+                            ...compactionConfig,
+                            headroom: {
+                              ...compactionConfig.headroom,
+                              baseUrl: e.target.value || undefined,
+                            },
+                          })
+                        }
+                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 col-span-2">
+                      <label
+                        htmlFor="compactionHeadroomApiKey"
+                        className="font-body text-[12px] font-medium text-text"
+                      >
+                        API Key
+                      </label>
+                      <input
+                        id="compactionHeadroomApiKey"
+                        type="password"
+                        placeholder="••••••••"
+                        value={compactionConfig.headroom?.apiKey ?? ''}
+                        onChange={(e) =>
+                          setCompactionConfig({
+                            ...compactionConfig,
+                            headroom: {
+                              ...compactionConfig.headroom,
+                              apiKey: e.target.value || undefined,
+                            },
+                          })
+                        }
+                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="compactionHeadroomTargetRatio"
+                        className="font-body text-[12px] font-medium text-text"
+                      >
+                        Target Ratio{' '}
+                        <span className="text-text-muted font-normal">— 0–1, empty = off</span>
+                      </label>
+                      <input
+                        id="compactionHeadroomTargetRatio"
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        placeholder="Disabled"
+                        value={compactionConfig.headroom?.targetRatio ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? null : Number(e.target.value);
+                          setCompactionConfig({
+                            ...compactionConfig,
+                            headroom: { ...compactionConfig.headroom, targetRatio: v },
+                          });
+                        }}
+                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="compactionHeadroomTimeoutMs"
+                        className="font-body text-[12px] font-medium text-text"
+                      >
+                        Timeout (ms)
+                      </label>
+                      <input
+                        id="compactionHeadroomTimeoutMs"
+                        type="number"
+                        min={0}
+                        step={1}
+                        placeholder="e.g. 30000"
+                        value={compactionConfig.headroom?.timeoutMs ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? undefined : Number(e.target.value);
+                          setCompactionConfig({
+                            ...compactionConfig,
+                            headroom: { ...compactionConfig.headroom, timeoutMs: v },
+                          });
+                        }}
+                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </Disclosure>
 

@@ -679,6 +679,29 @@ const ModelAutosyncSchema = z.object({
   intervalMinutes: z.number().int().min(1).default(60),
 });
 
+const CompactionNativeSchema = z.object({
+  maxArrayItems: z.number().int().positive().optional(),
+  maxStringChars: z.number().int().positive().optional(),
+});
+const CompactionHeadroomSchema = z.object({
+  baseUrl: z.string().url().optional(),
+  apiKey: z.string().optional(),
+  targetRatio: z.number().min(0).max(1).nullable().optional(),
+  timeoutMs: z.number().int().min(100).max(60000).optional(),
+});
+export const CompactionOverrideSchema = z.object({
+  enabled: z.boolean().optional(),
+  strategy: z.enum(['native', 'headroom']).optional(),
+  triggerRatio: z.number().min(0).max(1).optional(),
+  absoluteTriggerTokens: z.number().int().positive().nullable().optional(),
+  minTokens: z.number().int().min(0).optional(),
+  protectRecent: z.number().int().min(0).optional(),
+  native: CompactionNativeSchema.optional(),
+  headroom: CompactionHeadroomSchema.optional(),
+});
+export const CompactionConfigSchema = CompactionOverrideSchema;
+export type CompactionSettingsConfig = z.infer<typeof CompactionOverrideSchema>;
+
 export const ProviderConfigSchema = z
   .object({
     display_name: z.string().optional(),
@@ -723,6 +746,7 @@ export const ProviderConfigSchema = z
     stallWindowMs: z.number().int().min(3000).max(30000).nullable().optional(),
     stallGracePeriodMs: z.number().int().min(0).max(120000).nullable().optional(),
     pi_ai_provider: z.string().optional(),
+    compaction: CompactionOverrideSchema.optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",
@@ -916,6 +940,7 @@ export const ModelConfigSchema = z
           .optional(),
       })
       .optional(),
+    compaction: CompactionOverrideSchema.optional(),
   })
   .transform((data) => {
     // Normalise legacy flat format to grouped format immediately.
@@ -1037,6 +1062,7 @@ const RawPlexusConfigSchema = z
     // Workspace-level pi-ai custom provider / model registries (inference-v2).
     pi_ai_custom_providers: z.record(z.string(), PiAiCustomProviderSchema).optional(),
     pi_ai_custom_models: z.record(z.string(), PiAiCustomModelSchema).optional(),
+    compaction: CompactionOverrideSchema.optional(),
   })
   .passthrough();
 

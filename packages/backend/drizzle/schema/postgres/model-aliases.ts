@@ -38,6 +38,7 @@ export const modelAliases = pgTable('model_aliases', {
   targetGroups: jsonb('target_groups'), // {name, selector}[]
   extraBody: jsonb('extra_body'), // Record<string, any>
   generation: jsonb('generation'), // { reasoning?, maxTokens?, verbosity?, serviceTier? }
+  compaction: jsonb('compaction'), // compaction config
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

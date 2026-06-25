@@ -20,6 +20,7 @@ export const modelAliases = sqliteTable('model_aliases', {
   targetGroups: text('target_groups'), // JSON: {name, selector}[]
   extraBody: text('extra_body'), // JSON: Record<string, any>
   generation: text('generation'), // JSON: { reasoning?, maxTokens?, verbosity?, serviceTier? }
+  compaction: text('compaction'), // JSON: compaction config
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

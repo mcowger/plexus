@@ -35,6 +35,7 @@ export const providers = pgTable(
     geminiThinkingEnabled: boolean('gemini_thinking_enabled').notNull().default(false),
     headers: text('headers'), // JSON or encrypted string — text for encryption compatibility
     extraBody: text('extra_body'), // JSON — not encrypted, text for consistency
+    compaction: jsonb('compaction'), // compaction config
     quotaCheckerType: quotaCheckerTypeEnum('quota_checker_type'),
     quotaCheckerId: text('quota_checker_id'),
     quotaCheckerEnabled: boolean('quota_checker_enabled').notNull().default(true),

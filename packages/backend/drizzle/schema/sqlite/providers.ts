@@ -22,6 +22,7 @@ export const providers = sqliteTable(
     geminiThinkingEnabled: integer('gemini_thinking_enabled').notNull().default(0),
     headers: text('headers'), // JSON: Record<string, string>
     extraBody: text('extra_body'), // JSON: Record<string, any>
+    compaction: text('compaction'), // JSON: compaction config
     quotaCheckerType: text('quota_checker_type'),
     quotaCheckerId: text('quota_checker_id'),
     quotaCheckerEnabled: integer('quota_checker_enabled').notNull().default(1),

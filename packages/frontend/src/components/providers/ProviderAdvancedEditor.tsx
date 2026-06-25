@@ -5,7 +5,7 @@ import { DebouncedInput } from '../ui/DebouncedInput';
 import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
-import type { Provider } from '../../lib/api';
+import type { Provider, CompactionSettings } from '../../lib/api';
 import { api } from '../../lib/api';
 
 export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
@@ -67,6 +67,7 @@ export function ProviderAdvancedEditor({
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
   const [isStallOpen, setIsStallOpen] = useState(false);
+  const [isCompactionOpen, setIsCompactionOpen] = useState(false);
 
   // pi-ai provider dropdown
   const [piProviders, setPiProviders] = useState<string[]>([]);
@@ -586,6 +587,229 @@ export function ProviderAdvancedEditor({
                             stallGracePeriodMs: num * 1000,
                           });
                         }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Compaction Override */}
+          <div className="border border-border-glass rounded-md overflow-hidden">
+            <div
+              className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+              onClick={() => setIsCompactionOpen(!isCompactionOpen)}
+            >
+              {isCompactionOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <label
+                className="font-body text-[12px] font-medium text-text-secondary"
+                style={{ marginBottom: 0, flex: 1 }}
+              >
+                Compaction Override
+              </label>
+              {editingProvider.compaction &&
+                Object.values(editingProvider.compaction).some((v) => v != null) && (
+                  <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                    Custom
+                  </Badge>
+                )}
+            </div>
+            {isCompactionOpen && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  padding: '8px',
+                  borderTop: '1px solid var(--color-border-glass)',
+                  background: 'var(--color-bg-subtle)',
+                }}
+              >
+                <div
+                  className="font-body text-[11px] text-text-secondary"
+                  style={{ lineHeight: 1.35 }}
+                >
+                  Override global context-compaction for this provider. Empty = inherit. Nested
+                  native/headroom settings are configurable on the global Config page only (v1).
+                </div>
+                {/* enabled tri-state: Inherit | On | Off */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Enabled
+                    <span className="font-normal text-[10px] text-text-muted ml-1">
+                      Inherit / On / Off
+                    </span>
+                  </label>
+                  <select
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={
+                      editingProvider.compaction?.enabled == null
+                        ? ''
+                        : editingProvider.compaction.enabled
+                          ? 'true'
+                          : 'false'
+                    }
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const enabled: boolean | undefined = raw === '' ? undefined : raw === 'true';
+                      setEditingProvider({
+                        ...editingProvider,
+                        compaction: {
+                          ...editingProvider.compaction,
+                          enabled,
+                        } as CompactionSettings,
+                      });
+                    }}
+                  >
+                    <option value="">Inherit</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                  </select>
+                </div>
+                {/* strategy */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Strategy
+                    <span className="font-normal text-[10px] text-text-muted ml-1">
+                      native | headroom
+                    </span>
+                  </label>
+                  <select
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={editingProvider.compaction?.strategy ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const strategy = (raw || undefined) as CompactionSettings['strategy'];
+                      setEditingProvider({
+                        ...editingProvider,
+                        compaction: {
+                          ...editingProvider.compaction,
+                          strategy,
+                        } as CompactionSettings,
+                      });
+                    }}
+                  >
+                    <option value="">Inherit</option>
+                    <option value="native">native</option>
+                    <option value="headroom">headroom</option>
+                  </select>
+                </div>
+                {/* numeric fields — two-column grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {/* triggerRatio */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Trigger Ratio
+                      <span className="font-normal text-[10px] text-text-muted ml-1">0–1</span>
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={
+                        editingProvider.compaction?.triggerRatio != null
+                          ? String(editingProvider.compaction.triggerRatio)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const triggerRatio = val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingProvider({
+                          ...editingProvider,
+                          compaction: {
+                            ...editingProvider.compaction,
+                            triggerRatio,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* absoluteTriggerTokens */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Abs. Trigger Tokens
+                      <span className="font-normal text-[10px] text-text-muted ml-1">optional</span>
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      step={1}
+                      value={
+                        editingProvider.compaction?.absoluteTriggerTokens != null
+                          ? String(editingProvider.compaction.absoluteTriggerTokens)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const absoluteTriggerTokens =
+                          val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingProvider({
+                          ...editingProvider,
+                          compaction: {
+                            ...editingProvider.compaction,
+                            absoluteTriggerTokens,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* minTokens */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Min Tokens
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      step={1}
+                      value={
+                        editingProvider.compaction?.minTokens != null
+                          ? String(editingProvider.compaction.minTokens)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const minTokens = val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingProvider({
+                          ...editingProvider,
+                          compaction: {
+                            ...editingProvider.compaction,
+                            minTokens,
+                          } as CompactionSettings,
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* protectRecent */}
+                  <div>
+                    <label className="font-body text-[11px] font-medium text-text-secondary block mb-1">
+                      Protect Recent
+                    </label>
+                    <DebouncedInput
+                      type="number"
+                      placeholder="Inherit"
+                      min={0}
+                      step={1}
+                      value={
+                        editingProvider.compaction?.protectRecent != null
+                          ? String(editingProvider.compaction.protectRecent)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        const protectRecent = val === '' || !Number.isFinite(num) ? undefined : num;
+                        setEditingProvider({
+                          ...editingProvider,
+                          compaction: {
+                            ...editingProvider.compaction,
+                            protectRecent,
+                          } as CompactionSettings,
+                        });
                       }}
                     />
                   </div>

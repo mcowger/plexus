@@ -5,6 +5,7 @@ import {
   ModelConfigSchema,
   KeyConfigSchema,
   McpServerConfigSchema,
+  CompactionConfigSchema,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
 import { isValidIpRule } from '../../utils/ip-match';
@@ -803,6 +804,40 @@ export async function registerConfigRoutes(
       return reply.send(updated);
     } catch (e: any) {
       logger.error('Failed to patch stall config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Compaction Config ────────────────────────────────────────────
+
+  fastify.get('/v0/management/config/compaction', async (_request, reply) => {
+    try {
+      const compaction = await configService.getRepository().getCompactionConfig();
+      return reply.send(compaction ?? {});
+    } catch (e: any) {
+      logger.error('Failed to get compaction config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/compaction', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+    try {
+      const current = (await configService.getRepository().getCompactionConfig()) ?? {};
+      const merged = { ...current, ...body };
+      const parsed = CompactionConfigSchema.safeParse(merged);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'Invalid compaction config', details: parsed.error.issues });
+      }
+      await configService.setSetting('compaction', parsed.data);
+      return reply.send(parsed.data);
+    } catch (e: any) {
+      logger.error('Failed to patch compaction config', e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

@@ -31,6 +31,7 @@
     "eventsource-encoder": "^1.0.2",
     "eventsource-parser": "^3.1.0",
     "fastify": "^5.8.5",
+    "headroom-ai": "^0.22.4",
     "js-tiktoken": "^1.0.21",
     "parse-duration": "^2.1.6",
     "pkce-challenge": "^6.0.0",
