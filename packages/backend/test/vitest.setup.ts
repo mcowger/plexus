@@ -194,12 +194,17 @@ vi.mock('@earendil-works/pi-ai/compat', () => ({
   getProviders: mockGetProviders,
 }));
 
+const MOCK_BUILTIN_PROVIDER_IDS = new Set(['anthropic', 'openai-codex', 'openai', 'google']);
+
 const mockModels = {
   complete: mockComplete,
   stream: mockStream,
   getModel: mockGetModel,
   getModels: mockGetModels,
   getProviders: mockGetProviders,
+  // Returns a truthy stub for known builtin provider ids, undefined otherwise.
+  // Mirrors the real piAiModels.getProvider() used by toDispatchModel().
+  getProvider: (id: string) => (MOCK_BUILTIN_PROVIDER_IDS.has(id) ? { id } : undefined),
 };
 
 vi.mock('../src/utils/logger', () => ({

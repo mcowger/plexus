@@ -170,6 +170,11 @@ try {
   await configService.initialize();
   logger.debug('Configuration loaded from database');
 
+  // Register pi_ai_custom_providers with the piAiModels instance so custom
+  // providers can be dispatched directly by api type without remapping hacks.
+  const { registerCustomProvidersWithPiAi } = await import('./inference-v2/shared/pi-ai-utils');
+  await registerCustomProvidersWithPiAi();
+
   // One-time migration of legacy flat-format aliases to target groups.
   // TODO(#target-groups-cleanup): remove this after migration period.
   await configService.migrateLegacyTargetGroups();

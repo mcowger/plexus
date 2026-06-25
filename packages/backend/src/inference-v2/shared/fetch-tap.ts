@@ -54,6 +54,7 @@ export function installFetchTap(): void {
     // Always record TTFB when there is an active inference-v2 request context,
     // regardless of whether debug logging is enabled.
     const requestId = debugRequestIdStorage.getStore();
+
     if (!requestId) return response;
 
     ttfbMap.set(requestId, ttfb);
