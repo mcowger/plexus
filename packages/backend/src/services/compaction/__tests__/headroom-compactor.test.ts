@@ -166,6 +166,21 @@ describe('HeadroomCompactor', () => {
       expect(capturedOptions).not.toHaveProperty('signal');
       expect(capturedOptions).not.toHaveProperty('targetRatio');
     });
+
+    test('options include the caller abort signal when provided', async () => {
+      const controller = new AbortController();
+      const capturedOptions: any = {};
+      const fakeFn = vi.fn(async (messages: any[], options: any) => {
+        Object.assign(capturedOptions, options);
+        return echoResult(messages);
+      });
+
+      const context: Context = { messages: [makeUserMsg('hi')] };
+      const compactor = new HeadroomCompactor(fakeFn);
+      await compactor.compact(context, baseSettings, { ...baseCtx, signal: controller.signal });
+
+      expect(capturedOptions.signal).toBe(controller.signal);
+    });
   });
 
   // 2. Reverse mapping
@@ -288,6 +303,35 @@ describe('HeadroomCompactor', () => {
       const compactor = new HeadroomCompactor(fakeFn);
       await expect(compactor.compact(context, baseSettings, baseCtx)).rejects.toThrow(
         'network fail'
+      );
+    });
+
+    test.each([
+      ['array', '[]'],
+      ['null', 'null'],
+      ['string', '"oops"'],
+    ])('non-object tool-call arguments from headroom output reject: %s', async (_name, args) => {
+      const compressedOpenAI = [
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            { id: 'call_1', type: 'function', function: { name: 'search', arguments: args } },
+          ],
+        },
+      ];
+      const fakeFn = vi.fn(async () => echoResult(compressedOpenAI));
+      const context: Context = {
+        messages: [
+          makeAssistantMsg({
+            content: [{ type: 'toolCall', id: 'call_1', name: 'search', arguments: {} }],
+          }),
+        ],
+      };
+      const compactor = new HeadroomCompactor(fakeFn);
+
+      await expect(compactor.compact(context, baseSettings, baseCtx)).rejects.toThrow(
+        'invalid tool arguments'
       );
     });
   });

@@ -3484,7 +3484,7 @@ export const api = {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/config/compaction`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
+      body: JSON.stringify(updates, (_key, value) => (value === undefined ? null : value)),
     });
     if (!res.ok) throw new Error('Failed to update compaction settings');
     return res.json();

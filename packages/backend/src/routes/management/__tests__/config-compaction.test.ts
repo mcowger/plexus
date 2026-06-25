@@ -108,6 +108,60 @@ describe('compaction config routes', () => {
     expect(body.strategy).toBe('headroom');
   });
 
+  it('PATCH merge: preserves nested subfields when patching one nested value', async () => {
+    await fastify.inject({
+      method: 'PATCH',
+      url: '/v0/management/config/compaction',
+      payload: {
+        strategy: 'headroom',
+        headroom: {
+          baseUrl: 'http://localhost:8787',
+          apiKey: 'secret',
+          targetRatio: 0.5,
+          timeoutMs: 5000,
+        },
+      },
+    });
+
+    const mergeRes = await fastify.inject({
+      method: 'PATCH',
+      url: '/v0/management/config/compaction',
+      payload: { headroom: { timeoutMs: 1000 } },
+    });
+
+    expect(mergeRes.statusCode).toBe(200);
+    expect(mergeRes.json().headroom).toEqual({
+      baseUrl: 'http://localhost:8787',
+      apiKey: 'secret',
+      targetRatio: 0.5,
+      timeoutMs: 1000,
+    });
+  });
+
+  it('PATCH merge: null clears persisted scalar fields', async () => {
+    await fastify.inject({
+      method: 'PATCH',
+      url: '/v0/management/config/compaction',
+      payload: {
+        triggerRatio: 0.7,
+        minTokens: 2000,
+        headroom: { baseUrl: 'http://localhost:8787', timeoutMs: 5000 },
+      },
+    });
+
+    const clearRes = await fastify.inject({
+      method: 'PATCH',
+      url: '/v0/management/config/compaction',
+      payload: { triggerRatio: null, headroom: { timeoutMs: null } },
+    });
+
+    expect(clearRes.statusCode).toBe(200);
+    expect(clearRes.json()).toEqual({
+      minTokens: 2000,
+      headroom: { baseUrl: 'http://localhost:8787' },
+    });
+  });
+
   it('PATCH non-object body returns 400', async () => {
     const res = await fastify.inject({
       method: 'PATCH',

@@ -1392,14 +1392,14 @@ export const Config = () => {
                     htmlFor="compactionProtectRecent"
                     className="font-body text-[12px] font-medium text-text"
                   >
-                    Protect Recent (tokens)
+                    Protect Recent (messages)
                   </label>
                   <input
                     id="compactionProtectRecent"
                     type="number"
                     min={0}
                     step={1}
-                    placeholder="e.g. 500"
+                    placeholder="e.g. 4"
                     value={compactionConfig.protectRecent ?? ''}
                     onChange={(e) => {
                       const v = e.target.value === '' ? undefined : Number(e.target.value);

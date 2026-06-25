@@ -73,6 +73,20 @@ export interface BetaInferenceDeps {
   responsesStorage?: ResponsesStorageService;
 }
 
+interface CompactionHeaderMetadata {
+  strategy: string | null;
+  tokensBefore: number;
+  tokensAfter: number;
+}
+
+function applyCompactionHeaders(reply: FastifyReply, compaction?: CompactionHeaderMetadata): void {
+  if (!compaction) return;
+  reply
+    .header('x-plexus-compaction-strategy', String(compaction.strategy ?? ''))
+    .header('x-plexus-compaction-tokens-before', String(compaction.tokensBefore))
+    .header('x-plexus-compaction-tokens-after', String(compaction.tokensAfter));
+}
+
 function saveBetaErrorUsage(
   usageStorage: UsageStorageService,
   request: FastifyRequest,
@@ -193,23 +207,13 @@ export async function handleBetaChatCompletions(
 
     if (result.response != null) {
       // Non-streaming
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Streaming — SSE. Compaction headers must be set before the stream starts.
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -356,23 +360,13 @@ export async function handleBetaMessages(
     earlyDisconnect.cleanup();
 
     if (result.response != null) {
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Compaction headers must be set before the stream starts.
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -542,23 +536,13 @@ export async function handleBetaResponses(
     earlyDisconnect.cleanup();
 
     if (result.response != null) {
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Compaction headers must be set before the stream starts.
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -683,17 +667,13 @@ export async function handleBetaGeminiRequest(
     earlyDisconnect.cleanup();
 
     if (result.response != null) {
-      if (result.compaction) {
-        reply
-          .header('x-plexus-compaction-strategy', String(result.compaction.strategy ?? ''))
-          .header('x-plexus-compaction-tokens-before', String(result.compaction.tokensBefore))
-          .header('x-plexus-compaction-tokens-after', String(result.compaction.tokensAfter));
-      }
+      applyCompactionHeaders(reply, result.compaction);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Gemini streamGenerateContent uses data-prefixed JSON frames.
+      applyCompactionHeaders(reply, result.compaction);
       reply
         .code(200)
         .header('content-type', 'text/event-stream')

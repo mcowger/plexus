@@ -37,10 +37,13 @@ type GetGlobalFn = () => CompactionSettings | undefined;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function runWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function runWithTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<T>((_, rej) => {
-    timer = setTimeout(() => rej(new Error('compaction timeout')), ms);
+    timer = setTimeout(() => {
+      onTimeout?.();
+      rej(new Error('compaction timeout'));
+    }, ms);
     // Allow Node/Bun process to exit even if this timeout is still pending
     if (typeof timer === 'object' && timer !== null && typeof (timer as any).unref === 'function') {
       (timer as any).unref();
@@ -51,6 +54,27 @@ function runWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+function createScopedAbortSignal(parent?: AbortSignal): {
+  signal: AbortSignal;
+  abort: (reason?: unknown) => void;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const abortFromParent = () => controller.abort(parent?.reason);
+
+  if (parent?.aborted) {
+    abortFromParent();
+  } else {
+    parent?.addEventListener('abort', abortFromParent, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    abort: (reason?: unknown) => controller.abort(reason),
+    cleanup: () => parent?.removeEventListener('abort', abortFromParent),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,14 +174,16 @@ export class CompactionService {
     // 7. Run strategy with timeout (fail-open)
     const strategy = this.strategies[settings.strategy];
     let newMessages: Context['messages'];
+    const strategyAbort = createScopedAbortSignal(opts.signal);
     try {
       newMessages = await runWithTimeout(
         strategy.compact(context, settings, {
           model: opts.model,
           contextLength,
-          signal: opts.signal,
+          signal: strategyAbort.signal,
         }),
-        settings.headroom.timeoutMs
+        settings.headroom.timeoutMs,
+        () => strategyAbort.abort(new Error('compaction timeout'))
       );
     } catch (err) {
       logger.warn(
@@ -172,6 +198,8 @@ export class CompactionService {
         strategy: settings.strategy,
         reason: 'error',
       };
+    } finally {
+      strategyAbort.cleanup();
     }
 
     // 8. Build new context and re-estimate
@@ -222,8 +250,8 @@ export async function compactContextForSend(
 ): Promise<CompactionResult> {
   const aliasConfig = getConfig().models?.[route.canonicalModel ?? modelAlias];
   const contextLength =
-    (aliasConfig ? resolveContextLength(aliasConfig) : undefined) ??
-    route.modelArchitecture?.context_length;
+    route.modelArchitecture?.context_length ??
+    (aliasConfig ? resolveContextLength(aliasConfig) : undefined);
   return CompactionService.getInstance().maybeCompact(
     context,
     {

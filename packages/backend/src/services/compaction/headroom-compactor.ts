@@ -74,6 +74,14 @@ const ZERO_USAGE: Usage = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
+function parseToolArguments(raw: string): Record<string, unknown> {
+  const parsed = JSON.parse(raw);
+  if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+  throw new Error('HeadroomCompactor: invalid tool arguments in headroom output');
+}
+
 // ---------------------------------------------------------------------------
 // toOpenAI — pi-ai message → OpenAI message
 // ---------------------------------------------------------------------------
@@ -190,13 +198,13 @@ export function fromOpenAI(
     }
 
     for (const tc of m.tool_calls ?? []) {
-      // Malformed argument JSON throws → CompactionService fails open (the
-      // original context with intact arguments is used) instead of emitting {}.
+      // Malformed or non-object argument JSON throws → CompactionService fails
+      // open instead of rebuilding a structurally invalid tool call.
       contentBlocks.push({
         type: 'toolCall',
         id: tc.id,
         name: tc.function.name,
-        arguments: JSON.parse(tc.function.arguments) as Record<string, unknown>,
+        arguments: parseToolArguments(tc.function.arguments),
       });
     }
 
@@ -296,13 +304,15 @@ export class HeadroomCompactor implements CompactionStrategy {
     }
 
     // 5. Call compressFn. Errors propagate.
-    const result = await this.compressFn(openaiMessages, {
+    const compressOptions: CompressOptions & { signal?: AbortSignal } = {
       model: ctx.model,
       baseUrl: settings.headroom.baseUrl,
       apiKey: settings.headroom.apiKey,
       tokenBudget,
       timeout: settings.headroom.timeoutMs,
-    });
+      ...(ctx.signal ? { signal: ctx.signal } : {}),
+    };
+    const result = await this.compressFn(openaiMessages, compressOptions);
 
     // 6. Map result.messages back to pi-ai.
     return result.messages.map((m: OAIMessage) => fromOpenAI(m, toolNameById, assistantTemplate));

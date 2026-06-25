@@ -97,7 +97,7 @@ Content-Type: application/json
 
 Per-alias or per-provider overrides use the same field names in the alias/provider config objects.
 
-> The global `PATCH` shallow-merges over the stored config, so nested objects (`native`, `headroom`) are **replaced wholesale** â€” send the complete sub-object when changing one of its fields. (The Config UI always sends the full object.)
+> The global `PATCH` field-merges nested objects (`native`, `headroom`). Send `null` for a field to clear its stored value and fall back to the default.
 
 ---
 
@@ -119,9 +119,9 @@ If the headroom proxy is unreachable, all requests still succeed via fail-open â
 
 ## Observability
 
-### Response headers (non-streaming)
+### Response headers
 
-When compaction fires on a non-streaming `/beta/` request, three response headers are set:
+When compaction fires on a `/beta/` request, three response headers are set before the response body or stream starts:
 
 | Header | Value |
 |---|---|
@@ -131,12 +131,12 @@ When compaction fires on a non-streaming `/beta/` request, three response header
 
 These headers are absent when compaction did not fire (not enabled, below threshold, or failed-open).
 
-### Streaming
+### Logs
 
-SSE headers are pre-flushed before the stream starts, so compaction headers cannot be appended. Compaction activity for streaming requests is observable via the backend log line:
+Compaction activity is also observable via the backend log line:
 
 ```
-[compaction] strategy=native tokensBefore=45000 tokensAfter=28000
+[compaction] native 45000->28000 tokens (gpt-4o)
 ```
 
 ### Usage records

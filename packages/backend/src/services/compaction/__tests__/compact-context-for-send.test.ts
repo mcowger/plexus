@@ -25,6 +25,7 @@ import type { RouteResult } from '../../router';
 // ---------------------------------------------------------------------------
 
 const mockGetConfig = vi.fn();
+const mockResolveContextLength = vi.fn();
 
 vi.mock('../../../config', () => ({
   getConfig: () => mockGetConfig(),
@@ -34,7 +35,7 @@ vi.mock('../../../config', () => ({
 // requires a database / file on disk; we short-circuit by returning undefined, which
 // causes compactContextForSend to fall back to route.modelArchitecture?.context_length).
 vi.mock('../../enforce-limits', () => ({
-  resolveContextLength: (_aliasConfig: unknown) => undefined,
+  resolveContextLength: (aliasConfig: unknown) => mockResolveContextLength(aliasConfig),
   enforceContextLimitForRoute: () => {},
 }));
 
@@ -48,6 +49,8 @@ import { compactContextForSend, CompactionService } from '../compaction-service'
 beforeEach(() => {
   CompactionService.resetForTesting();
   mockGetConfig.mockReset();
+  mockResolveContextLength.mockReset();
+  mockResolveContextLength.mockReturnValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -174,5 +177,37 @@ describe('compactContextForSend', () => {
     expect(result.strategy).toBe('native');
     expect(result.tokensAfter).toBeLessThan(result.tokensBefore);
     expect(result.context).not.toBe(context); // a NEW context is returned
+  });
+
+  test('4. selected route context_length takes precedence over alias metadata', async () => {
+    const canonicalModel = 'gpt-4o';
+    mockResolveContextLength.mockReturnValue(1_000_000);
+    mockGetConfig.mockReturnValue({
+      models: {
+        [canonicalModel]: {
+          compaction: {
+            enabled: true,
+            minTokens: 0,
+            triggerRatio: 0.8,
+            protectRecent: 0,
+            strategy: 'native',
+            native: { maxArrayItems: 1, maxStringChars: 10 },
+          },
+        },
+      },
+    });
+
+    const bigArray = Array.from({ length: 50 }, (_, i) => i);
+    const context: Context = {
+      messages: Array.from({ length: 5 }, () => makeToolResultMessage(JSON.stringify(bigArray))),
+    };
+    const route = makeRoute(canonicalModel, 10);
+    const memo = new Map();
+
+    const result = await compactContextForSend(context, route, 'my-alias', memo);
+
+    expect(result.reason).toBe('ok');
+    expect(result.compacted).toBe(true);
+    expect(mockResolveContextLength).not.toHaveBeenCalled();
   });
 });

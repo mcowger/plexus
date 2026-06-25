@@ -1,11 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import {
-  closeDatabase,
-  getDatabase,
-  getSchema,
-  initializeDatabase,
-  getCurrentDialect,
-} from '../client';
+import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
 import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
 
@@ -21,26 +15,6 @@ describe('config-repository compaction round-trips', () => {
     await runMigrations();
     db = getDatabase();
     schema = getSchema();
-    // Ensure compaction column exists in case migration isn't committed yet
-    const dialect = getCurrentDialect();
-    try {
-      const alterProviders =
-        dialect === 'postgres'
-          ? 'ALTER TABLE providers ADD COLUMN compaction jsonb'
-          : 'ALTER TABLE providers ADD COLUMN compaction text';
-      await db.run(alterProviders as any);
-    } catch {
-      // Column already exists — fine
-    }
-    try {
-      const alterAliases =
-        dialect === 'postgres'
-          ? 'ALTER TABLE model_aliases ADD COLUMN compaction jsonb'
-          : 'ALTER TABLE model_aliases ADD COLUMN compaction text';
-      await db.run(alterAliases as any);
-    } catch {
-      // Column already exists — fine
-    }
     repo = new ConfigRepository();
     // Clean slate
     await db.delete(schema.modelAliasTargets);

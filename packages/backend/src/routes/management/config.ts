@@ -17,6 +17,39 @@ import { VisionDescriptorService } from '../../services/vision-descriptor-servic
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeCompactionPatch(
+  current: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...current };
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      delete merged[key];
+      continue;
+    }
+
+    if ((key === 'native' || key === 'headroom') && isRecord(value)) {
+      const currentNested = isRecord(merged[key]) ? (merged[key] as Record<string, unknown>) : {};
+      const nested = mergeCompactionPatch(currentNested, value);
+      if (Object.keys(nested).length === 0) {
+        delete merged[key];
+      } else {
+        merged[key] = nested;
+      }
+      continue;
+    }
+
+    merged[key] = value;
+  }
+
+  return merged;
+}
+
 /**
  * Build a map of provider slug -> resolved GpuParams from current config.
  * Used by recalculateEnergyIfChanged to pass concrete GPU params
@@ -827,7 +860,7 @@ export async function registerConfigRoutes(
     }
     try {
       const current = (await configService.getRepository().getCompactionConfig()) ?? {};
-      const merged = { ...current, ...body };
+      const merged = mergeCompactionPatch(current as Record<string, unknown>, body);
       const parsed = CompactionConfigSchema.safeParse(merged);
       if (!parsed.success) {
         return reply

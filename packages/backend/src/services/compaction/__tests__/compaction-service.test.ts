@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Context, UserMessage, AssistantMessage } from '@earendil-works/pi-ai';
 import { CompactionService } from '../compaction-service';
 import type {
@@ -87,6 +87,10 @@ function makeEstimateQueue(...values: number[]): (ctx: Context) => number {
 // ---------------------------------------------------------------------------
 
 describe('CompactionService.maybeCompact', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test('1. disabled: returns reason=disabled, strategy NOT called', async () => {
     const fakeStrategy = makeFakeStrategy(compactedMessages);
     const service = new CompactionService(
@@ -333,6 +337,48 @@ describe('CompactionService.maybeCompact', () => {
     );
 
     expect(fakeStrategy.callCount).toBe(2);
+  });
+
+  test('8. timeout aborts the strategy signal before failing open', async () => {
+    vi.useFakeTimers();
+
+    const seenSignals: AbortSignal[] = [];
+    const neverFinishes: CompactionStrategy = {
+      name: 'headroom',
+      compact: async (_ctx, _settings, stratCtx) => {
+        if (stratCtx.signal) {
+          seenSignals.push(stratCtx.signal);
+        }
+        return new Promise<Context['messages']>(() => {});
+      },
+    };
+    const service = new CompactionService(
+      { native: neverFinishes, headroom: neverFinishes },
+      makeEstimateQueue(9000),
+      () => ({
+        ...enabledSettings,
+        strategy: 'headroom',
+        minTokens: 0,
+        headroom: { timeoutMs: 100 },
+      })
+    );
+    const memo = new Map<string, CompactionResult>();
+
+    const resultPromise = service.maybeCompact(
+      baseContext,
+      { model: 'gpt-4', contextLength: 10000 },
+      memo
+    );
+
+    expect(seenSignals).toHaveLength(1);
+    expect(seenSignals[0]!.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await resultPromise;
+
+    expect(result.reason).toBe('error');
+    expect(result.context).toBe(baseContext);
+    expect(seenSignals[0]!.aborted).toBe(true);
   });
 
   test('singleton: getInstance() returns the same instance', () => {
