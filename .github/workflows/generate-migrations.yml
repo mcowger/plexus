@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - 'packages/backend/drizzle/schema/**/*.ts'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/backend/drizzle/schema/**/*.ts'
   workflow_dispatch:
 
 concurrency:
@@ -21,6 +25,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Bun
@@ -46,13 +52,16 @@ jobs:
           fi
 
       - name: Commit and push migrations
-        if: steps.check.outputs.has_changes == 'true'
+        if: steps.check.outputs.has_changes == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
         id: push
+        env:
+          PR_REF: ${{ github.event.pull_request.head.ref }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/
           git commit --no-verify -m "chore: auto-generate migrations for schema changes"
-          git push
+          git push origin HEAD:${PR_REF:-$REF_NAME}
 
 
