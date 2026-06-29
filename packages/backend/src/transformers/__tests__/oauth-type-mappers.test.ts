@@ -12,7 +12,7 @@ import { describe, expect, test } from 'vitest';
  * tool calls that failed Zod validation.
  */
 
-import { unifiedToContext } from '../oauth/type-mappers';
+import { jsonSchemaToTypeBox, unifiedToContext } from '../oauth/type-mappers';
 import type { UnifiedChatRequest } from '../../types/unified';
 
 // The full input_schema for OpenCode's `question` tool — the real-world trigger
@@ -434,5 +434,96 @@ describe('unifiedToContext — non-JSON tool call arguments (regression)', () =>
 
     expect(goodBlock.arguments).toEqual({ x: 1 });
     expect(badBlock.arguments).toEqual({ _raw: 'not json at all' });
+  });
+});
+
+/**
+ * Regression tests for `$defs` / `$ref` preservation in `jsonSchemaToTypeBox`.
+ *
+ * Bug: The `object` case rebuilt schemas via `Type.Object` and only carried
+ * `properties`, `required`, `additionalProperties`, and `description`. It
+ * dropped `$defs` (and `$schema`/`title`) while `$ref` pointers survived via
+ * the `Type.Unsafe` fallback. The result was a schema sent to upstream
+ * providers containing `$ref: "#/$defs/TagsInput"` with no `$defs` block —
+ * a dangling reference. Strict providers (e.g. wafer.ai / glm-5.2) reject
+ * this as `json_schema_refs_unresolved` (`400 tools[N].function.parameters
+ * .properties.tags.anyOf[0] references an unknown JSON Schema definition`).
+ *
+ * Mirrors the real-world stackydo `create_task` tool schema from trace
+ * a4b64c3c-4a46-42c6-9e65-90dbbaa4da76.
+ */
+const TAGS_TOOL_SCHEMA = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  title: 'CreateTask',
+  type: 'object' as const,
+  properties: {
+    title: { description: 'Task title (required)', type: 'string' },
+    tags: {
+      anyOf: [{ $ref: '#/$defs/TagsInput' }, { type: 'null' }],
+      description: 'Tags: comma-separated string or JSON array',
+    },
+  },
+  required: ['title'],
+  additionalProperties: false,
+  $defs: {
+    TagsInput: {
+      anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+      description: 'Accepts tags as either a comma-separated string or a JSON array of strings.',
+    },
+  },
+};
+
+describe('jsonSchemaToTypeBox — $defs/$ref preservation (regression: json_schema_refs_unresolved)', () => {
+  test('preserves $defs on object schema so $ref pointers stay resolvable', () => {
+    const converted = jsonSchemaToTypeBox(TAGS_TOOL_SCHEMA) as any;
+
+    expect(converted.$defs).toBeDefined();
+    expect(converted.$defs.TagsInput).toBeDefined();
+    // The referenced definition is converted but structurally intact
+    expect(converted.$defs.TagsInput.anyOf).toHaveLength(2);
+    expect(converted.$defs.TagsInput.anyOf[0]).toMatchObject({ type: 'string' });
+    expect(converted.$defs.TagsInput.anyOf[1]).toMatchObject({
+      type: 'array',
+      items: { type: 'string' },
+    });
+    // description on the definition is preserved too
+    expect(converted.$defs.TagsInput.description).toBe(
+      'Accepts tags as either a comma-separated string or a JSON array of strings.'
+    );
+  });
+
+  test('preserves $schema and title on object schema', () => {
+    const converted = jsonSchemaToTypeBox(TAGS_TOOL_SCHEMA) as any;
+
+    expect(converted.$schema).toBe('https://json-schema.org/draft/2020-12/schema');
+    expect(converted.title).toBe('CreateTask');
+  });
+
+  test('$ref inside anyOf survives conversion (the dangling-ref trigger)', () => {
+    const converted = jsonSchemaToTypeBox(TAGS_TOOL_SCHEMA) as any;
+    const tags = converted.properties.tags;
+
+    expect(tags.anyOf).toHaveLength(2);
+    // The $ref must survive verbatim so it resolves against the preserved $defs.
+    // (Type.Unsafe attaches a Symbol(TypeBox.Kind) marker, so check the $ref
+    // value directly rather than deep-equal the whole object.)
+    expect(tags.anyOf[0].$ref).toBe('#/$defs/TagsInput');
+    expect(tags.anyOf[1]).toMatchObject({ type: 'null' });
+    expect(tags.description).toBe('Tags: comma-separated string or JSON array');
+  });
+
+  test('omits $defs/$schema/title keys when absent (no behavioral change for plain schemas)', () => {
+    const converted = jsonSchemaToTypeBox({
+      type: 'object',
+      properties: { q: { type: 'string' } },
+      required: ['q'],
+      additionalProperties: false,
+    }) as any;
+
+    expect(converted.$defs).toBeUndefined();
+    expect(converted.$schema).toBeUndefined();
+    expect(converted.title).toBeUndefined();
+    expect(converted.type).toBe('object');
+    expect(converted.required).toEqual(['q']);
   });
 });
