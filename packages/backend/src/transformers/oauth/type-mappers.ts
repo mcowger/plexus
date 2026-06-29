@@ -269,6 +269,26 @@ export function jsonSchemaToTypeBox(schema: any): any {
       if (schema.additionalProperties !== undefined) {
         obj.additionalProperties = schema.additionalProperties;
       }
+      // Preserve JSON Schema keywords that Type.Object drops. `$defs` holds the
+      // definitions that `$ref` pointers resolve against; dropping it while
+      // leaving `$ref` intact produces unresolved references, which strict
+      // providers (e.g. wafer.ai) reject as `json_schema_refs_unresolved`.
+      // Convert each definition recursively so nested schemas stay consistent
+      // with how `properties` is handled (and `$ref` targets pass through via
+      // the `Type.Unsafe` fallback without looping).
+      if (schema.$defs !== undefined && schema.$defs !== null) {
+        const convertedDefs: Record<string, any> = {};
+        for (const [key, val] of Object.entries(schema.$defs)) {
+          convertedDefs[key] = jsonSchemaToTypeBox(val);
+        }
+        obj.$defs = convertedDefs;
+      }
+      if (schema.$schema !== undefined) {
+        obj.$schema = schema.$schema;
+      }
+      if (schema.title !== undefined) {
+        obj.title = schema.title;
+      }
       return obj;
     }
     case 'array': {
