@@ -77,6 +77,7 @@ export default defineChecker({
 
     logger.silly(`Fetching Cline user id`);
     const me = await clineRequest<{ id: string }>(`${baseEndpoint}/api/v1/users/me`, apiKey);
+    if (!me.id) throw new Error('Cline API response missing user id');
 
     logger.silly(`Fetching Cline balance for user ${me.id}`);
     const balance = await clineRequest<ClineBalanceResponse>(
