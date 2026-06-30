@@ -484,6 +484,13 @@
       "when": 1782437361106,
       "tag": "0068_add_context_compaction",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1782852976170,
+      "tag": "0069_add_cline_quota_checker",
+      "breakpoints": true
     }
   ]
 }
