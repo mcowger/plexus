@@ -461,6 +461,11 @@ const SakanaQuotaCheckerOptionsSchema = z.object({
   endpoint: z.string().url().optional(),
 });
 
+const ClineQuotaCheckerOptionsSchema = z.object({
+  apiKey: z.string().min(1, 'Cline API key is required'),
+  endpoint: z.string().url().optional(),
+});
+
 const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('naga'),
@@ -671,6 +676,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: SakanaQuotaCheckerOptionsSchema,
+  }),
+  z.object({
+    type: z.literal('cline'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: ClineQuotaCheckerOptionsSchema.optional(),
   }),
 ]);
 
