@@ -20,7 +20,7 @@
       "name": "plexus-backend",
       "version": "1.0.0",
       "dependencies": {
-        "@earendil-works/pi-ai": "0.80.1",
+        "@earendil-works/pi-ai": "0.80.3",
         "@fastify/bearer-auth": "^10.1.2",
         "@fastify/cors": "^11.2.0",
         "@fastify/multipart": "^10.0.0",
@@ -179,7 +179,7 @@
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
-    "@earendil-works/pi-ai": ["@earendil-works/pi-ai@0.80.1", "", { "dependencies": { "@anthropic-ai/sdk": "0.91.1", "@aws-sdk/client-bedrock-runtime": "3.1048.0", "@google/genai": "1.52.0", "@mistralai/mistralai": "2.2.6", "@opentelemetry/api": "1.9.0", "@smithy/node-http-handler": "4.7.3", "http-proxy-agent": "7.0.2", "https-proxy-agent": "7.0.6", "openai": "6.26.0", "partial-json": "0.1.7", "typebox": "1.1.38" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-qsHmuoBRu7a6rkOis/Elwl8jEhA9T884H/mXMP3tbz1slEBI+dHaY3zJ0nlEqUl+jcTz1FJNdgOVLG4sQHOPXQ=="],
+    "@earendil-works/pi-ai": ["@earendil-works/pi-ai@0.80.3", "", { "dependencies": { "@anthropic-ai/sdk": "0.91.1", "@aws-sdk/client-bedrock-runtime": "3.1048.0", "@google/genai": "1.52.0", "@mistralai/mistralai": "2.2.6", "@opentelemetry/api": "1.9.0", "@smithy/node-http-handler": "4.7.3", "http-proxy-agent": "7.0.2", "https-proxy-agent": "7.0.6", "openai": "6.26.0", "partial-json": "0.1.7", "typebox": "1.1.38" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-jPZLMeGL5kkMSEAwAklfXTMHqZvfhsJtCCpKGIr5Duk7mc0n4skjB1dugk7y0z3z8ZHIUCmPAWHdyDqgUz5vdA=="],
 
     "@electric-sql/pglite": ["@electric-sql/pglite@0.5.3", "", {}, "sha512-iTTYbA5Uesrl+N7zss0J5LopT7KE4j9aymYo+EZZh+rZbARQCUQOs+n2pay64JRUpc3fCkpfrniTNJnvYzOE+g=="],
 

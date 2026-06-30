@@ -158,7 +158,8 @@ export function buildThinkingOptions(
       modelId?.includes('opus-4-6') ||
       modelId?.includes('opus-4.6') ||
       modelId?.includes('sonnet-4-6') ||
-      modelId?.includes('sonnet-4.6');
+      modelId?.includes('sonnet-4.6') ||
+      modelId?.includes('sonnet-5');
 
     base.thinkingEnabled = true;
     if (isAdaptive) {

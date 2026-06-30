@@ -290,6 +290,19 @@ export function estimateActiveParams(options: EstimateActiveParamsOptions): numb
 // specifies a different dtype.
 
 export const PROPRIETARY_MODEL_HEURISTICS: Record<string, ModelParamsWithDtype> = {
+  // Claude Sonnet 5 (Released 2026): 1M Context + Adaptive Thinking
+  'claude-sonnet-5': {
+    total_params: 1500,
+    active_params: 120, // 15B base * ~8x output price premium
+    layers: 100,
+    heads: 80,
+    kv_lora_rank: 128,
+    qk_rope_head_dim: 96,
+    context_length: 1000000,
+    dtype_size: resolveDtypeSize('fp8'),
+    dtype: 'fp8',
+  },
+
   // Anthropic Claude 4 Series (Frontier Reasoning)
   // Claude 4.6 (Released Feb 2026): 1M Context + Adaptive Thinking
   'claude-4-6-opus': {
