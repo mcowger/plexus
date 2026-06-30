@@ -6,9 +6,10 @@ export interface ClineQuotaConfigProps {
   onChange: (options: Record<string, unknown>) => void;
 }
 
-const handleChange = (key: string, value: string) => {
-  onChange({ ...options, [key]: value || undefined });
-};
+export const ClineQuotaConfig: React.FC<ClineQuotaConfigProps> = ({ options, onChange }) => {
+  const handleChange = (key: string, value: string) => {
+    onChange({ ...options, [key]: value || undefined });
+  };
 
   return (
     <div className="space-y-3">
