@@ -58,6 +58,8 @@ import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
 import { enforceContextLimitForRoute } from '../../services/enforce-limits';
 import { compactContextForSend } from '../../services/compaction/compaction-service';
 import type { CompactionResult, CompactionStrategyName } from '../../services/compaction/types';
+import { applyVisionFallthrough, contextHasImages } from './vision-fallthrough';
+import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../../utils/constants';
 
 // ─── AsyncLocalStorage for debug raw-capture correlation ─────────────────────
 
@@ -487,26 +489,58 @@ export async function runPiAiExecutor<TResponse>(
       continue;
     }
 
+    // ── Vision fallthrough (opt-in per alias) ──────────────────────────────
+    // Mirrors dispatcher.ts:317-365, but operates natively on the pi-ai
+    // Context (no UnifiedChatRequest detour). Runs before compaction/limit
+    // enforcement so the candidate's estimated token count and context-limit
+    // check reflect the post-fallthrough (text-only) content.
+    const aliasForRoute = route.canonicalModel
+      ? getConfig().models?.[route.canonicalModel]
+      : undefined;
+    let candidateContext = context;
+    let usedVisionFallthrough = false;
+    let visionFallthroughModel: string | null = null;
+    if (aliasForRoute?.use_image_fallthrough && contextHasImages(candidateContext)) {
+      const vfConfig = getConfig().vision_fallthrough;
+      if (vfConfig?.descriptor_model) {
+        try {
+          candidateContext = await applyVisionFallthrough(
+            candidateContext,
+            vfConfig.descriptor_model,
+            vfConfig.default_prompt || DEFAULT_VISION_DESCRIPTION_PROMPT,
+            usageStorage,
+            { sourceIp, keyName, attribution }
+          );
+          usedVisionFallthrough = true;
+          visionFallthroughModel = vfConfig.descriptor_model;
+        } catch (vfError) {
+          logger.error('[pi-ai-executor] Error in vision fallthrough:', vfError);
+        }
+      } else {
+        logger.warn(
+          `[pi-ai-executor] use_image_fallthrough enabled for alias '${modelAlias}' but 'vision_fallthrough.descriptor_model' not configured globally.`
+        );
+      }
+    }
+
     // ── Context compaction (opt-in per alias/provider/global) ──────────────
     // Runs before force-limit enforcement so a borderline-oversized request can
     // be rescued by compaction before it would be rejected. Fail-open: on any
     // error the original context is returned. Per-candidate, memoized.
     const compaction = await compactContextForSend(
-      context,
+      candidateContext,
       route,
       modelAlias,
       compactionMemo,
       attemptTimeout.signal
     );
-    const sendContext = compaction.compacted ? compaction.context : context;
+    const sendContext = compaction.compacted ? compaction.context : candidateContext;
 
     // ── Force-limit enforcement (opt-in per alias) ─────────────────────────
     // Mirrors dispatcher.ts:384-394. Checked AFTER cooldown and BEFORE
     // acquiring a concurrency slot, so a thrown ContextLengthExceededError
     // (client-side; failover won't help) never leaks an acquired slot.
-    const aliasForLimit = route.canonicalModel
-      ? getConfig().models?.[route.canonicalModel]
-      : undefined;
+    const aliasForLimit = aliasForRoute;
     try {
       enforceContextLimitForRoute(
         sendContext,
@@ -654,6 +688,8 @@ export async function runPiAiExecutor<TResponse>(
           startTime,
           costMetadata: null,
           tokensReasoning: null,
+          isVisionFallthrough: usedVisionFallthrough,
+          visionFallthroughModel,
           ...usageData,
         };
 
@@ -710,6 +746,8 @@ export async function runPiAiExecutor<TResponse>(
           toolsDefined: toolsDefined ?? null,
           messageCount: messageCount ?? null,
           parallelToolCalls: parallelToolCalls ?? null,
+          isVisionFallthrough: usedVisionFallthrough,
+          visionFallthroughModel,
           debug,
           onSuccess,
           serializeChunks,
@@ -788,6 +826,8 @@ interface SSEGeneratorParams {
   toolsDefined: number | null;
   messageCount: number | null;
   parallelToolCalls: boolean | null;
+  isVisionFallthrough: boolean;
+  visionFallthroughModel: string | null;
   debug: DebugManager;
   onSuccess?: (msg: AssistantMessage) => void | Promise<void>;
   serializeChunks: (event: AssistantMessageEvent) => string[];
@@ -818,6 +858,8 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
     toolsDefined,
     messageCount,
     parallelToolCalls,
+    isVisionFallthrough,
+    visionFallthroughModel,
     debug,
     onSuccess,
     serializeChunks,
@@ -920,6 +962,8 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
           startTime,
           costMetadata: null,
           tokensReasoning: null,
+          isVisionFallthrough,
+          visionFallthroughModel,
           ...usageData,
         };
 
@@ -986,6 +1030,8 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
           ttftMs,
           finishReason: 'error',
           toolCallsCount: null,
+          isVisionFallthrough,
+          visionFallthroughModel,
         };
 
         if (transformedStreamSnapshot) {
@@ -1055,6 +1101,8 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
       ttftMs,
       finishReason: 'error',
       toolCallsCount: null,
+      isVisionFallthrough,
+      visionFallthroughModel,
     };
 
     usageStorage.saveRequest(usageRecord as any).catch(() => {});

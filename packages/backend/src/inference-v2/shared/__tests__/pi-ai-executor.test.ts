@@ -181,3 +181,215 @@ describe('runPiAiExecutor streaming errors', () => {
     );
   });
 });
+
+describe('runPiAiExecutor vision fallthrough', () => {
+  beforeEach(() => {
+    DebugManager.getInstance().resetForTesting();
+    setConfigForTesting({
+      providers: {
+        'text-only': {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'text-model': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'text-model',
+            },
+          },
+        },
+        descriptor: {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'gpt-4o': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'gpt-4o',
+            },
+          },
+        },
+      },
+      models: {
+        'text-model': {
+          priority: 'selector',
+          use_image_fallthrough: true,
+          targets: [{ provider: 'text-only', model: 'text-model' }],
+        },
+        'gpt-4o': {
+          priority: 'selector',
+          targets: [{ provider: 'descriptor', model: 'gpt-4o' }],
+        },
+      },
+      vision_fallthrough: { descriptor_model: 'gpt-4o' },
+      keys: {},
+      failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+  });
+
+  it('describes images before dispatching to an alias with use_image_fallthrough', async () => {
+    vi.mocked(piAi.complete)
+      .mockResolvedValueOnce({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'A blue circle.' }],
+        api: 'openai-codex-responses',
+        provider: 'openai-codex',
+        model: 'gpt-4o',
+        usage: { input: 20, output: 8, cacheRead: 0, cacheWrite: 0 },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+      } as any)
+      .mockResolvedValueOnce({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'That is a blue circle.' }],
+        api: 'openai-codex-responses',
+        provider: 'openai-codex',
+        model: 'text-model',
+        usage: { input: 15, output: 6, cacheRead: 0, cacheWrite: 0 },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+      } as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const context = {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What is this?' },
+            {
+              type: 'image',
+              mimeType: 'image/png',
+              data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            },
+          ],
+          timestamp: Date.now(),
+        },
+      ],
+    };
+
+    const result = await runPiAiExecutor({
+      requestId: 'req-vision-fallthrough',
+      incomingApiType: 'chat',
+      modelAlias: 'text-model',
+      context: context as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'opencode',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    // First call describes the image (descriptor model), second call is the
+    // actual text-only target dispatch — never receiving image content.
+    expect(vi.mocked(piAi.complete)).toHaveBeenCalledTimes(2);
+    const [, targetContext] = vi.mocked(piAi.complete).mock.calls[1]!;
+    const targetMessage = (targetContext as any).messages[0];
+    expect(targetMessage.content).toEqual([
+      { type: 'text', text: 'What is this?' },
+      { type: 'text', text: '[Image Description: A blue circle.]' },
+    ]);
+
+    expect(result.response).toEqual(
+      expect.objectContaining({ content: [{ type: 'text', text: 'That is a blue circle.' }] })
+    );
+
+    // Target dispatch usage record reflects the fallthrough having occurred.
+    expect(usageStorage.saveRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req-vision-fallthrough',
+        provider: 'text-only',
+        isVisionFallthrough: true,
+        visionFallthroughModel: 'gpt-4o',
+      })
+    );
+    // Descriptor sub-call gets its own usage record.
+    expect(usageStorage.saveRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ isDescriptorRequest: true, isVisionFallthrough: false })
+    );
+  });
+
+  it('does not trigger fallthrough for aliases without use_image_fallthrough', async () => {
+    setConfigForTesting({
+      providers: {
+        'text-only': {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'text-model': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'text-model',
+            },
+          },
+        },
+      },
+      models: {
+        'text-model': {
+          priority: 'selector',
+          targets: [{ provider: 'text-only', model: 'text-model' }],
+        },
+      },
+      keys: {},
+      failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+
+    vi.mocked(piAi.complete).mockResolvedValueOnce({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'response' }],
+      api: 'openai-codex-responses',
+      provider: 'openai-codex',
+      model: 'text-model',
+      usage: { input: 15, output: 6, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    } as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const context = {
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              mimeType: 'image/png',
+              data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            },
+          ],
+          timestamp: Date.now(),
+        },
+      ],
+    };
+
+    await runPiAiExecutor({
+      requestId: 'req-no-fallthrough',
+      incomingApiType: 'chat',
+      modelAlias: 'text-model',
+      context: context as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: { body: {}, keyName: 'beta-key', attribution: 'opencode', ip: '127.0.0.1' } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    // Only one call — the target dispatch — image content was forwarded verbatim.
+    expect(vi.mocked(piAi.complete)).toHaveBeenCalledTimes(1);
+    const [, sentContext] = vi.mocked(piAi.complete).mock.calls[0]!;
+    expect((sentContext as any).messages[0].content[0].type).toBe('image');
+  });
+});
