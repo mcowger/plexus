@@ -140,7 +140,7 @@ describe('geminiRequestToContext', () => {
               parts: [
                 {
                   functionCall: { name: 'bash', args: { command: 'ls' } },
-                  thoughtSignature: 'SIG_BASE64_PAYLOAD',
+                  thoughtSignature: 'SIGBASE64PAYLOAD',
                 },
               ],
             },
@@ -150,7 +150,7 @@ describe('geminiRequestToContext', () => {
       );
       const asst = result.context.messages[1]!;
       const tc = (asst.content as any[]).find((b: any) => b.type === 'toolCall');
-      expect(tc.thoughtSignature).toBe('SIG_BASE64_PAYLOAD');
+      expect(tc.thoughtSignature).toBe('SIGBASE64PAYLOAD');
     });
 
     it('preserves thoughtSignature nested under functionCall', () => {
@@ -166,7 +166,7 @@ describe('geminiRequestToContext', () => {
                   functionCall: {
                     name: 'bash',
                     args: { command: 'ls' },
-                    thoughtSignature: 'NESTED_SIG',
+                    thoughtSignature: 'NESTEDSIG',
                   },
                 },
               ],
@@ -177,7 +177,7 @@ describe('geminiRequestToContext', () => {
       );
       const asst = result.context.messages[1]!;
       const tc = (asst.content as any[]).find((b: any) => b.type === 'toolCall');
-      expect(tc.thoughtSignature).toBe('NESTED_SIG');
+      expect(tc.thoughtSignature).toBe('NESTEDSIG');
     });
 
     it('propagates a shared thoughtSignature to sibling tool calls in a parallel turn', () => {
@@ -190,7 +190,7 @@ describe('geminiRequestToContext', () => {
             { role: 'user', parts: [{ text: 'Two tools' }] },
             {
               role: 'model',
-              parts: [{ functionCall: { name: 'fn1', args: {} }, thoughtSignature: 'SHARED_SIG' }],
+              parts: [{ functionCall: { name: 'fn1', args: {} }, thoughtSignature: 'SHAREDSIG' }],
             },
             { role: 'model', parts: [{ functionCall: { name: 'fn2', args: {} } }] },
           ],
@@ -201,8 +201,8 @@ describe('geminiRequestToContext', () => {
       expect(assistants).toHaveLength(1);
       const toolCalls = (assistants[0]!.content as any[]).filter((b: any) => b.type === 'toolCall');
       expect(toolCalls).toHaveLength(2);
-      expect(toolCalls[0].thoughtSignature).toBe('SHARED_SIG');
-      expect(toolCalls[1].thoughtSignature).toBe('SHARED_SIG');
+      expect(toolCalls[0].thoughtSignature).toBe('SHAREDSIG');
+      expect(toolCalls[1].thoughtSignature).toBe('SHAREDSIG');
     });
 
     it('preserves thinkingSignature on thought:true parts', () => {
@@ -214,7 +214,7 @@ describe('geminiRequestToContext', () => {
             {
               role: 'model',
               parts: [
-                { text: 'Deep thought', thought: true, thoughtSignature: 'THINK_SIG' },
+                { text: 'Deep thought', thought: true, thoughtSignature: 'THINKSIG' },
                 { text: 'Answer' },
               ],
             },
@@ -225,7 +225,82 @@ describe('geminiRequestToContext', () => {
       const asst = result.context.messages[1]!;
       const thinking = (asst.content as any[]).find((b: any) => b.type === 'thinking');
       expect(thinking?.thinking).toBe('Deep thought');
-      expect(thinking?.thinkingSignature).toBe('THINK_SIG');
+      expect(thinking?.thinkingSignature).toBe('THINKSIG');
+    });
+
+    it('normalizes URL-safe base64 thoughtSignature to standard base64 on functionCall parts', () => {
+      // Gemini 3.x emits the signature as URL-safe base64 (- and _). pi-ai's
+      // outbound serializer only accepts standard base64 (+ and /) and drops
+      // anything else, so we must translate at capture or the next turn 400s.
+      const urlSafe = 'EsAECr0EAQw51-bAgr67Tn_BonzEE';
+      const result = geminiRequestToContext(
+        {
+          model: 'gemini-3.5-flash',
+          contents: [
+            { role: 'user', parts: [{ text: 'Use a tool' }] },
+            {
+              role: 'model',
+              parts: [
+                {
+                  functionCall: { name: 'list_files', args: {} },
+                  thoughtSignature: urlSafe,
+                },
+              ],
+            },
+          ],
+        },
+        false
+      );
+      const asst = result.context.messages[1]!;
+      const tc = (asst.content as any[]).find((b: any) => b.type === 'toolCall');
+      expect(tc.thoughtSignature).toBe('EsAECr0EAQw51+bAgr67Tn/BonzEE');
+      // Byte-identical: URL-safe and standard base64 decode to the same bytes.
+      expect(Buffer.from(tc.thoughtSignature, 'base64')).toEqual(
+        Buffer.from(urlSafe.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+      );
+    });
+
+    it('normalizes URL-safe base64 thinkingSignature on thought parts', () => {
+      const result = geminiRequestToContext(
+        {
+          model: 'gemini-3.5-flash',
+          contents: [
+            { role: 'user', parts: [{ text: 'Think' }] },
+            {
+              role: 'model',
+              parts: [{ text: 'Deep thought', thought: true, thoughtSignature: 'ab-cd_ef' }],
+            },
+          ],
+        },
+        false
+      );
+      const asst = result.context.messages[1]!;
+      const thinking = (asst.content as any[]).find((b: any) => b.type === 'thinking');
+      expect(thinking?.thinkingSignature).toBe('ab+cd/ef');
+    });
+
+    it('leaves a standard-base64 thoughtSignature unchanged', () => {
+      const result = geminiRequestToContext(
+        {
+          model: 'gemini-3.5-flash',
+          contents: [
+            { role: 'user', parts: [{ text: 'Use a tool' }] },
+            {
+              role: 'model',
+              parts: [
+                {
+                  functionCall: { name: 'bash', args: {} },
+                  thoughtSignature: 'Standard+Base64/Value=',
+                },
+              ],
+            },
+          ],
+        },
+        false
+      );
+      const asst = result.context.messages[1]!;
+      const tc = (asst.content as any[]).find((b: any) => b.type === 'toolCall');
+      expect(tc.thoughtSignature).toBe('Standard+Base64/Value=');
     });
 
     it('merges consecutive model turns into one AssistantMessage', () => {

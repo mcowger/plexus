@@ -377,6 +377,63 @@ function buildUsageFromMessage(
   };
 }
 
+// ─── Assistant provenance alignment (signature replay) ──────────────────────
+
+/**
+ * Re-stamp each AssistantMessage's provenance (provider / model / api) to match
+ * the resolved dispatch model, returning a new Context when anything changed
+ * (never mutates the input).
+ *
+ * WHY: pi-ai's request serializers gate replay of provider-specific signatures
+ * — Gemini `thoughtSignature` on functionCall/text/thinking parts, Anthropic
+ * thinking signatures, OpenAI reasoning signatures — on the assistant message's
+ * provenance matching the target model. Google's serializer uses
+ * `isSameProviderAndModel = msg.provider === model.provider && msg.model === model.id`
+ * (see @earendil-works/pi-ai `api/google-shared.js`); the OpenAI-responses
+ * serializer additionally checks `msg.api === model.api`.
+ *
+ * The inference-v2 inbound parsers stamp the CLIENT-FACING provider/alias on
+ * assistant messages (e.g. `provider: 'google'`, `model: 'gemini-3.5-flash'`),
+ * which never matches the resolved egress pi-ai model (`pi_ai_provider` /
+ * `pi_ai_model_id`). Without this alignment pi-ai silently drops the
+ * signatures, and Gemini 3.x rejects the next turn with HTTP 400
+ * "Function call is missing a thought_signature ... This is required for tools
+ * to work correctly". This breaks all multi-turn tool calling for Gemini 3.x
+ * thinking models on the second turn.
+ *
+ * This mirrors the v1 OAuth path, which stamps the resolved model's
+ * provider/model/api onto replayed assistant messages for exactly this reason
+ * (see transformers/oauth/oauth-transformer.ts). Applied per-candidate so a
+ * failover to a different target re-stamps against that target (and pi-ai's
+ * own base64 validity check still guards against replaying a foreign-format
+ * signature to the wrong provider).
+ */
+export function alignAssistantProvenance(
+  context: Context,
+  dispatchModel: { provider: string; id: string; api: string }
+): Context {
+  let mutated = false;
+  const messages = context.messages.map((m) => {
+    if (m.role !== 'assistant') return m;
+    const asst = m as AssistantMessage;
+    if (
+      asst.provider === dispatchModel.provider &&
+      asst.model === dispatchModel.id &&
+      asst.api === dispatchModel.api
+    ) {
+      return m;
+    }
+    mutated = true;
+    return {
+      ...asst,
+      provider: dispatchModel.provider,
+      model: dispatchModel.id,
+      api: dispatchModel.api as AssistantMessage['api'],
+    };
+  });
+  return mutated ? { ...context, messages } : context;
+}
+
 // ─── Main executor ────────────────────────────────────────────────────────────
 
 export async function runPiAiExecutor<TResponse>(
@@ -647,11 +704,25 @@ export async function runPiAiExecutor<TResponse>(
         }
       : undefined;
 
+    // ── Align assistant provenance for signature replay ──────────────────
+    // Re-stamp replayed assistant messages with the DISPATCH model's
+    // provider/model/api so pi-ai's serializers echo provider-specific
+    // signatures (Gemini thoughtSignature, Anthropic thinking, OpenAI
+    // reasoning) instead of silently dropping them. Must use the dispatch
+    // model (post toDispatchModel remap) because that is what pi-ai's
+    // isSameProviderAndModel gate compares against.
+    const dispatchModel = toDispatchModel(piModel as any);
+    const dispatchContext = alignAssistantProvenance(sendContext, {
+      provider: dispatchModel.provider,
+      id: dispatchModel.id,
+      api: dispatchModel.api,
+    });
+
     try {
       if (!streaming) {
         // ── Non-streaming ────────────────────────────────────────────────
         const message = await debugRequestIdStorage.run(requestId, () =>
-          piAiModels.complete(toDispatchModel(piModel as any), sendContext, callOptions)
+          piAiModels.complete(dispatchModel, dispatchContext, callOptions)
         );
 
         cooldown.markProviderSuccess(route.provider, route.model);
@@ -717,7 +788,7 @@ export async function runPiAiExecutor<TResponse>(
       } else {
         // ── Streaming ────────────────────────────────────────────────────
         const eventStream = await debugRequestIdStorage.run(requestId, () =>
-          piAiModels.stream(toDispatchModel(piModel as any), sendContext, callOptions)
+          piAiModels.stream(dispatchModel, dispatchContext, callOptions)
         );
 
         // Build and return the SSE generator — the generator owns

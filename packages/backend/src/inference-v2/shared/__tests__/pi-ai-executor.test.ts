@@ -3,8 +3,9 @@ import * as piAi from '@earendil-works/pi-ai/compat';
 import { setConfigForTesting } from '../../../config';
 import { DebugManager } from '../../../services/debug-manager';
 import { enterRequestContext } from '../../../services/request-context';
-import { runPiAiExecutor } from '../pi-ai-executor';
+import { runPiAiExecutor, alignAssistantProvenance } from '../pi-ai-executor';
 import type { UsageStorageService } from '../../../services/usage-storage';
+import type { Context } from '@earendil-works/pi-ai';
 
 function createUsageStorage(): UsageStorageService {
   return {
@@ -391,5 +392,76 @@ describe('runPiAiExecutor vision fallthrough', () => {
     expect(vi.mocked(piAi.complete)).toHaveBeenCalledTimes(1);
     const [, sentContext] = vi.mocked(piAi.complete).mock.calls[0]!;
     expect((sentContext as any).messages[0].content[0].type).toBe('image');
+  });
+});
+
+describe('alignAssistantProvenance', () => {
+  const dispatchModel = { provider: 'google', id: 'gemini-3-flash', api: 'google-generative-ai' };
+
+  function ctxWithAssistant(overrides: Record<string, unknown>): Context {
+    return {
+      messages: [
+        { role: 'user', content: 'hi', timestamp: 1 },
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'toolCall',
+              id: 'list_files',
+              name: 'list_files',
+              arguments: {},
+              thoughtSignature: 'ENCRYPTED_SIG',
+            },
+          ],
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
+          stopReason: 'toolUse',
+          timestamp: 2,
+          ...overrides,
+        } as any,
+      ],
+    } as Context;
+  }
+
+  it('re-stamps client-alias provenance to the dispatch model so pi-ai replays the signature', () => {
+    // Inbound Gemini parser stamps the CLIENT alias, which never matches the
+    // resolved egress pi-ai model → pi-ai would strip thoughtSignature.
+    const ctx = ctxWithAssistant({
+      provider: 'google',
+      model: 'gemini-3.5-flash', // client alias, not the pi-ai model id
+      api: 'google-generative-ai',
+    });
+
+    const aligned = alignAssistantProvenance(ctx, dispatchModel);
+
+    const asst = aligned.messages[1] as any;
+    expect(asst.provider).toBe('google');
+    expect(asst.model).toBe('gemini-3-flash');
+    expect(asst.api).toBe('google-generative-ai');
+    // The tool call (and its signature) is preserved verbatim.
+    expect(asst.content[0].thoughtSignature).toBe('ENCRYPTED_SIG');
+    // Input context is never mutated.
+    expect((ctx.messages[1] as any).model).toBe('gemini-3.5-flash');
+  });
+
+  it('returns the same reference when provenance already matches (no needless copy)', () => {
+    const ctx = ctxWithAssistant({
+      provider: 'google',
+      model: 'gemini-3-flash',
+      api: 'google-generative-ai',
+    });
+
+    const aligned = alignAssistantProvenance(ctx, dispatchModel);
+    expect(aligned).toBe(ctx);
+  });
+
+  it('leaves non-assistant messages untouched', () => {
+    const ctx = ctxWithAssistant({
+      provider: 'google',
+      model: 'gemini-3.5-flash',
+      api: 'google-generative-ai',
+    });
+
+    const aligned = alignAssistantProvenance(ctx, dispatchModel);
+    expect(aligned.messages[0]).toBe(ctx.messages[0]);
   });
 });

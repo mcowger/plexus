@@ -77,6 +77,29 @@ function mapThinkingLevel(level: string | undefined): string | undefined {
   }
 }
 
+/**
+ * Normalize a Gemini thoughtSignature to standard base64.
+ *
+ * Gemini 3.x emits (and clients echo back) the encrypted thoughtSignature as
+ * URL-safe base64 — it can contain `-` and `_` instead of `+` and `/`. pi-ai's
+ * outbound Google serializer validates signatures with a STANDARD-base64
+ * charset (`/^[A-Za-z0-9+/]+={0,2}$/`, see @earendil-works/pi-ai
+ * `api/google-shared.js` isValidThoughtSignature) and silently DROPS any value
+ * that fails — including every URL-safe signature. A dropped signature yields
+ * Google's HTTP 400 "Function call is missing a thought_signature" on the next
+ * turn, breaking multi-turn tool calling for Gemini 3.x thinking models.
+ *
+ * URL-safe and standard base64 decode to identical bytes, and Google's proto3
+ * JSON parser accepts either form for `bytes` fields, so translating `-`→`+`
+ * and `_`→`/` at capture lets pi-ai's validator pass the signature through and
+ * Google still receives a byte-identical value. Returns the input unchanged
+ * when it contains no URL-safe characters.
+ */
+function normalizeThoughtSignature(sig: string): string {
+  if (sig.indexOf('-') === -1 && sig.indexOf('_') === -1) return sig;
+  return sig.replace(/-/g, '+').replace(/_/g, '/');
+}
+
 /** Parse a Gemini Part into a TextContent or ImageContent, or null to skip. */
 function parseInlineDataPart(part: any): ImageContent | null {
   const inlineData = part.inlineData;
@@ -192,7 +215,9 @@ export function geminiRequestToContext(body: any, streaming: boolean): GeminiToC
             // MUST be replayed on subsequent turns for multi-turn continuity.
             const thinkingBlock: ThinkingContent = { type: 'thinking', thinking: part.text };
             if (typeof part.thoughtSignature === 'string' && part.thoughtSignature) {
-              (thinkingBlock as any).thinkingSignature = part.thoughtSignature;
+              (thinkingBlock as any).thinkingSignature = normalizeThoughtSignature(
+                part.thoughtSignature
+              );
             }
             contentBlocks.push(thinkingBlock);
           } else {
@@ -219,7 +244,7 @@ export function geminiRequestToContext(body: any, streaming: boolean): GeminiToC
             (typeof part.functionCall.thoughtSignature === 'string' &&
               part.functionCall.thoughtSignature) ||
             undefined;
-          if (sig) (tc as any).thoughtSignature = sig;
+          if (sig) (tc as any).thoughtSignature = normalizeThoughtSignature(sig);
           contentBlocks.push(tc);
         }
       }
