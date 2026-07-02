@@ -94,10 +94,17 @@ function mapThinkingLevel(level: string | undefined): string | undefined {
  * and `_`→`/` at capture lets pi-ai's validator pass the signature through and
  * Google still receives a byte-identical value. Returns the input unchanged
  * when it contains no URL-safe characters.
+ *
+ * URL-safe base64 is also frequently emitted WITHOUT `=` padding, and pi-ai's
+ * validator additionally rejects any value whose length is not a multiple of 4
+ * (`signature.length % 4 !== 0`). So when normalizing we also restore the
+ * stripped padding; the padded form still decodes to identical bytes.
  */
 function normalizeThoughtSignature(sig: string): string {
   if (sig.indexOf('-') === -1 && sig.indexOf('_') === -1) return sig;
-  return sig.replace(/-/g, '+').replace(/_/g, '/');
+  const standard = sig.replace(/-/g, '+').replace(/_/g, '/');
+  const remainder = standard.length % 4;
+  return remainder ? standard + '='.repeat(4 - remainder) : standard;
 }
 
 /** Parse a Gemini Part into a TextContent or ImageContent, or null to skip. */

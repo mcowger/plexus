@@ -232,7 +232,8 @@ describe('geminiRequestToContext', () => {
       // Gemini 3.x emits the signature as URL-safe base64 (- and _). pi-ai's
       // outbound serializer only accepts standard base64 (+ and /) and drops
       // anything else, so we must translate at capture or the next turn 400s.
-      const urlSafe = 'EsAECr0EAQw51-bAgr67Tn_BonzEE';
+      // `_--_` (bytes ff ef bf) is a length-4 URL-safe value → standard `/++/`.
+      const urlSafe = '_--_';
       const result = geminiRequestToContext(
         {
           model: 'gemini-3.5-flash',
@@ -253,10 +254,45 @@ describe('geminiRequestToContext', () => {
       );
       const asst = result.context.messages[1]!;
       const tc = (asst.content as any[]).find((b: any) => b.type === 'toolCall');
-      expect(tc.thoughtSignature).toBe('EsAECr0EAQw51+bAgr67Tn/BonzEE');
+      expect(tc.thoughtSignature).toBe('/++/');
       // Byte-identical: URL-safe and standard base64 decode to the same bytes.
       expect(Buffer.from(tc.thoughtSignature, 'base64')).toEqual(
         Buffer.from(urlSafe.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+      );
+    });
+
+    it('restores stripped padding when normalizing an unpadded URL-safe signature', () => {
+      // URL-safe base64 is commonly emitted WITHOUT `=` padding, and pi-ai's
+      // validator rejects any value whose length is not a multiple of 4. The
+      // normalizer must re-append padding so the signature survives.
+      // `-_8` (bytes fb ff, len 3) → standard, padded `+/8=` (len 4).
+      const unpadded = '-_8';
+      const result = geminiRequestToContext(
+        {
+          model: 'gemini-3.5-flash',
+          contents: [
+            { role: 'user', parts: [{ text: 'Use a tool' }] },
+            {
+              role: 'model',
+              parts: [
+                {
+                  functionCall: { name: 'list_files', args: {} },
+                  thoughtSignature: unpadded,
+                },
+              ],
+            },
+          ],
+        },
+        false
+      );
+      const asst = result.context.messages[1]!;
+      const tc = (asst.content as any[]).find((b: any) => b.type === 'toolCall');
+      expect(tc.thoughtSignature).toBe('+/8=');
+      // Valid standard base64: length is a multiple of 4.
+      expect(tc.thoughtSignature.length % 4).toBe(0);
+      // Byte-identical to the original decoded value.
+      expect(Buffer.from(tc.thoughtSignature, 'base64')).toEqual(
+        Buffer.from(unpadded, 'base64url')
       );
     });
 
