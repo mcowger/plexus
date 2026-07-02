@@ -207,6 +207,60 @@ describe('anthropicRequestToContext', () => {
       });
     });
 
+    it('maps thinking.type=adaptive to effort=high (adaptive default)', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-sonnet-5',
+        messages: [{ role: 'user', content: 'Think' }],
+        thinking: { type: 'adaptive', display: 'summarized' },
+      });
+      expect(result.generationIntent.reasoning).toEqual({
+        effort: 'high',
+        enabled: true,
+        visibility: 'summary',
+        source: 'client',
+      });
+    });
+
+    it('maps adaptive display=raw to full visibility', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-sonnet-5',
+        messages: [{ role: 'user', content: 'Think' }],
+        thinking: { type: 'adaptive', display: 'raw' },
+      });
+      expect(result.generationIntent.reasoning).toEqual({
+        effort: 'high',
+        enabled: true,
+        visibility: 'full',
+        source: 'client',
+      });
+    });
+
+    it('maps adaptive with no display to effort=high', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-sonnet-5',
+        messages: [{ role: 'user', content: 'Think' }],
+        thinking: { type: 'adaptive' },
+      });
+      expect(result.generationIntent.reasoning).toEqual({
+        effort: 'high',
+        enabled: true,
+        source: 'client',
+      });
+    });
+
+    it('maps enabled type with no budget_tokens to effort=high', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-sonnet-5',
+        messages: [{ role: 'user', content: 'Think' }],
+        thinking: { type: 'enabled' },
+      });
+      expect(result.generationIntent.reasoning).toEqual({
+        effort: 'high',
+        enabled: true,
+        source: 'client',
+      });
+    });
+
     it('builds an explicit-disable intent when thinking.type is disabled', () => {
       const result = anthropicRequestToContext({
         model: 'claude-opus-4-6',

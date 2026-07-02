@@ -36,7 +36,7 @@ import type {
 } from '@earendil-works/pi-ai';
 import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
 import type { ReasoningIntent } from '../shared/reasoning';
-import { budgetToEffort } from '../shared/reasoning';
+import { budgetToEffort, normalizeVisibility } from '../shared/reasoning';
 import type { GenerationIntent } from '../shared/generation';
 
 // ─── Public result type ───────────────────────────────────────────────────────
@@ -252,18 +252,45 @@ export function anthropicRequestToContext(body: any): AnthropicToContextResult {
   };
 
   // ── Reasoning intent (from thinking config) ──────────────────────────────
-  // Anthropic speaks in token budgets. Preserve the raw budget so an
-  // Anthropic→Anthropic route can round-trip it without re-quantizing.
+  // Anthropic expresses thinking in three ways:
+  //   - { type: 'enabled', budget_tokens } → explicit token budget (legacy)
+  //   - { type: 'adaptive', display }       → thinking on, model picks magnitude
+  //   - { type: 'disabled' }                → explicit off
+  // `display` ('summarized' | 'raw') maps to reasoning-output visibility.
+  // For 'enabled' we preserve the raw budget so an Anthropic→Anthropic route
+  // can round-trip it without re-quantizing.
   let reasoningIntent: ReasoningIntent = { source: 'client' };
-  if (body.thinking?.type === 'enabled' && body.thinking?.budget_tokens != null) {
+  const thinkingType: unknown = body.thinking?.type;
+  const visibility = normalizeVisibility(body.thinking?.display);
+  if (thinkingType === 'enabled' && body.thinking?.budget_tokens != null) {
     const budget: number = body.thinking.budget_tokens;
     const level = budgetToEffort(budget);
     if (level !== 'off') {
-      reasoningIntent = { effort: level, budgetTokens: budget, enabled: true, source: 'client' };
+      reasoningIntent = {
+        effort: level,
+        budgetTokens: budget,
+        enabled: true,
+        source: 'client',
+        ...(visibility ? { visibility } : {}),
+      };
     } else {
       reasoningIntent = { enabled: false, source: 'client' };
     }
-  } else if (body.thinking?.type === 'disabled') {
+  } else if (thinkingType === 'adaptive' || thinkingType === 'enabled') {
+    // Adaptive (or 'enabled' with no explicit budget): thinking is on and the
+    // client did not commit to a token budget. Map to effort 'high' to match
+    // the documented adaptive default (e.g. OpenRouter Claude 5: "adaptive
+    // thinking on at effort high"). Emitting a concrete effort avoids the
+    // shared pipeline collapsing an effort-less intent to a lower magnitude —
+    // and, critically, avoids it being flattened to a reasoning-disabling
+    // "none" on the OpenAI-completions egress.
+    reasoningIntent = {
+      effort: 'high',
+      enabled: true,
+      source: 'client',
+      ...(visibility ? { visibility } : {}),
+    };
+  } else if (thinkingType === 'disabled') {
     reasoningIntent = { enabled: false, source: 'client' };
   }
 
