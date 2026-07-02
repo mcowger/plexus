@@ -432,6 +432,12 @@ export function eventToResponsesSSE(
     }
 
     case 'done': {
+      // Accumulate the final output items, keyed by output_index, so the
+      // terminal response.completed snapshot can carry the full list
+      // (matching OpenAI's behaviour — clients treat this as the source of
+      // truth rather than re-deriving it from output_item.done events).
+      const outputItemsByIndex = new Map<number, Record<string, unknown>>();
+
       // Finalize reasoning item
       if (state.reasoningItemId !== null && state.reasoningOutputIndex !== null) {
         frames.push(
@@ -446,24 +452,26 @@ export function eventToResponsesSSE(
             state.sequenceNumber++
           )
         );
+        const reasoningItem = {
+          id: state.reasoningItemId,
+          type: 'reasoning',
+          status: 'completed',
+          content: state.reasoningText
+            ? [{ type: 'reasoning_text', text: state.reasoningText }]
+            : [],
+          summary: [],
+        };
         frames.push(
           sseEvent(
             'response.output_item.done',
             {
               output_index: state.reasoningOutputIndex,
-              item: {
-                id: state.reasoningItemId,
-                type: 'reasoning',
-                status: 'completed',
-                content: state.reasoningText
-                  ? [{ type: 'reasoning_text', text: state.reasoningText }]
-                  : [],
-                summary: [],
-              },
+              item: reasoningItem,
             },
             state.sequenceNumber++
           )
         );
+        outputItemsByIndex.set(state.reasoningOutputIndex, reasoningItem);
       }
 
       // Finalize message item
@@ -498,29 +506,31 @@ export function eventToResponsesSSE(
             state.sequenceNumber++
           )
         );
+        const messageItem = {
+          id: state.messageItemId,
+          type: 'message',
+          status: 'completed',
+          role: 'assistant',
+          content: [
+            {
+              type: 'output_text',
+              annotations: [],
+              logprobs: [],
+              text: state.messageText,
+            },
+          ],
+        };
         frames.push(
           sseEvent(
             'response.output_item.done',
             {
               output_index: state.messageOutputIndex,
-              item: {
-                id: state.messageItemId,
-                type: 'message',
-                status: 'completed',
-                role: 'assistant',
-                content: [
-                  {
-                    type: 'output_text',
-                    annotations: [],
-                    logprobs: [],
-                    text: state.messageText,
-                  },
-                ],
-              },
+              item: messageItem,
             },
             state.sequenceNumber++
           )
         );
+        outputItemsByIndex.set(state.messageOutputIndex, messageItem);
       }
 
       // Finalize tool items
@@ -529,24 +539,30 @@ export function eventToResponsesSSE(
         const name = state.toolNames.get(idx) ?? '';
         const callId = state.toolCallIds.get(idx) ?? '';
         const itemId = state.toolItemIds.get(idx) ?? '';
+        const toolItem = {
+          id: itemId,
+          type: 'function_call',
+          status: 'completed',
+          call_id: callId,
+          name,
+          arguments: args,
+        };
         frames.push(
           sseEvent(
             'response.output_item.done',
             {
               output_index: outputIndex,
-              item: {
-                id: itemId,
-                type: 'function_call',
-                status: 'completed',
-                call_id: callId,
-                name,
-                arguments: args,
-              },
+              item: toolItem,
             },
             state.sequenceNumber++
           )
         );
+        outputItemsByIndex.set(outputIndex, toolItem);
       }
+
+      const outputItems = Array.from(outputItemsByIndex.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([, item]) => item);
 
       // response.completed
       const usage = event.message.usage;
@@ -560,7 +576,7 @@ export function eventToResponsesSSE(
               created_at: state.createdAt,
               status: 'completed',
               model: state.model,
-              output: [], // clients reconstruct from item.done events
+              output: outputItems,
               usage: mapUsage(usage),
             },
           },
