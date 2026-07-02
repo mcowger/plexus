@@ -725,7 +725,7 @@ export async function runPiAiExecutor<TResponse>(
     if (piAiProvider === 'anthropic' && authMode === 'apiKey') {
       apiKey = `sk-ant-oat-mask-${rawApiKey}`;
     }
-    const isClaudeCodeToken = apiKey?.includes('sk-ant-oat') ?? false;
+    const isClaudeCodeToken = rawApiKey?.includes('sk-ant-oat') ?? false;
 
     if (
       piAiProvider === 'github-copilot' &&
@@ -741,7 +741,7 @@ export async function runPiAiExecutor<TResponse>(
     logger.debug('[pi-ai-executor] RESOLVED_KEYS:', {
       authMode,
       accountId,
-      resolvedApiKeyPrefix: apiKey ? `${apiKey.slice(0, 15)}...` : 'none',
+      hasApiKey: !!apiKey,
       isClaudeCodeToken,
       resolvedBaseUrl: piModel?.baseUrl,
     });
@@ -829,7 +829,6 @@ export async function runPiAiExecutor<TResponse>(
             toolNamesRemapped: true,
           };
           (piModel as any).__oauthContext = oauthContext;
-          finalPayload = finalPayload;
         }
 
         const payloadStr =

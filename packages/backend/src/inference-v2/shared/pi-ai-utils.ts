@@ -782,11 +782,16 @@ export function computeKwhUsed(
 
 export function isOAuthRoute(route: RouteResult, targetApiType: string): boolean {
   if (targetApiType.toLowerCase() === 'oauth') return true;
-  if (typeof route.config.api_base_url === 'string') {
-    return route.config.api_base_url.startsWith('oauth://');
+  const baseUrl = route.config.api_base_url;
+  if (typeof baseUrl === 'string') {
+    return baseUrl.startsWith('oauth://');
   }
-  const urlMap = route.config.api_base_url as Record<string, string>;
-  return Object.values(urlMap).some((value) => value.startsWith('oauth://'));
+  if (baseUrl && typeof baseUrl === 'object') {
+    return Object.values(baseUrl as Record<string, string>).some((value) =>
+      value.startsWith('oauth://')
+    );
+  }
+  return false;
 }
 
 export function isClaudeMaskingApiKeyRoute(route: RouteResult, targetApiType: string): boolean {
