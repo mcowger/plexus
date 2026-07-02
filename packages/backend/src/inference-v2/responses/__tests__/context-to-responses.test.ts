@@ -158,6 +158,39 @@ describe('eventToResponsesSSE', () => {
     expect(frames.join('\n')).toContain('response.completed');
   });
 
+  it('response.completed snapshot includes the full accumulated output items (reasoning + function_call)', () => {
+    const state = makeResponsesChunkSerialiserState('gpt-4');
+    eventToResponsesSSE({ type: 'start', partial: { content: [] } } as any, state);
+    eventToResponsesSSE({ type: 'thinking_delta', delta: 'Thinking...' } as any, state);
+
+    const toolCall = { type: 'toolCall', id: 'call_1', name: 'list_files', arguments: {} };
+    eventToResponsesSSE(
+      {
+        type: 'toolcall_start',
+        contentIndex: 0,
+        partial: { content: [toolCall] },
+      } as any,
+      state
+    );
+    eventToResponsesSSE({ type: 'toolcall_delta', delta: '{"path":"/"}' } as any, state);
+
+    const message = makeMessage({ stopReason: 'toolUse', content: [toolCall as any] });
+    const frames = eventToResponsesSSE({ type: 'done', reason: 'toolUse', message } as any, state);
+
+    const completedFrame = frames.find((f) => f.includes('response.completed'));
+    expect(completedFrame).toBeDefined();
+    const payload = JSON.parse(completedFrame!.split('data: ')[1]!.trim());
+    const output = payload.response.output as any[];
+
+    expect(output.length).toBe(2);
+    expect(output.some((o) => o.type === 'reasoning')).toBe(true);
+    const fcItem = output.find((o) => o.type === 'function_call');
+    expect(fcItem).toBeDefined();
+    expect(fcItem.name).toBe('list_files');
+    expect(fcItem.call_id).toBe('call_1');
+    expect(fcItem.arguments).toBe('{"path":"/"}');
+  });
+
   it('thinking_delta emits reasoning events', () => {
     const state = makeResponsesChunkSerialiserState('gpt-4');
     eventToResponsesSSE({ type: 'start', partial: { content: [] } } as any, state);
