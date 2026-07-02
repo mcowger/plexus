@@ -6,6 +6,8 @@ import { enterRequestContext } from '../../../services/request-context';
 import { runPiAiExecutor, alignAssistantProvenance } from '../pi-ai-executor';
 import type { UsageStorageService } from '../../../services/usage-storage';
 import type { Context } from '@earendil-works/pi-ai';
+import { registerSpy } from '../../../../test/test-utils';
+import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
 
 function createUsageStorage(): UsageStorageService {
   return {
@@ -463,5 +465,70 @@ describe('alignAssistantProvenance', () => {
 
     const aligned = alignAssistantProvenance(ctx, dispatchModel);
     expect(aligned.messages[0]).toBe(ctx.messages[0]);
+  });
+});
+
+describe('runPiAiExecutor with OAuth and Claude Masking', () => {
+  beforeEach(() => {
+    DebugManager.getInstance().resetForTesting();
+    setConfigForTesting({
+      providers: {
+        'anthropic-oauth': {
+          api_base_url: 'oauth://anthropic',
+          oauth_provider: 'anthropic',
+          oauth_account: 'test-account',
+          models: {
+            'claude-3-5-sonnet-20241022': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+            },
+          },
+        },
+      },
+      models: {
+        'claude-3-5-sonnet-20241022': {
+          priority: 'selector',
+          targets: [{ provider: 'anthropic-oauth', model: 'claude-3-5-sonnet-20241022' }],
+        },
+      },
+      keys: {},
+      failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+  });
+
+  it('runs successfully with an OAuth route using resolved credentials', async () => {
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue('mock-oauth-key');
+
+    vi.mocked(piAi.complete).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello oauth' }],
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    } as any);
+
+    const usageStorage = createUsageStorage();
+    const result = await runPiAiExecutor({
+      requestId: 'req-oauth',
+      incomingApiType: 'chat',
+      modelAlias: 'claude-3-5-sonnet-20241022',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'opencode',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    expect(result.response).toBeDefined();
+    expect((result.response as any).content[0].text).toBe('hello oauth');
   });
 });

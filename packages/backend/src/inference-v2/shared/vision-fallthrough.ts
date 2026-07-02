@@ -156,7 +156,7 @@ async function recordDescriptorUsage(
       tokensOutput: usage.output,
       tokensCached: usage.cacheRead,
       tokensCacheWrite: usage.cacheWrite,
-      tokensReasoning: usage.reasoning ?? null,
+      tokensReasoning: (usage as any).reasoning ?? null,
       costInput: cost?.input ?? null,
       costOutput: cost?.output ?? null,
       costCached: cost?.cacheRead ?? null,

@@ -38,6 +38,7 @@ import type { RouteResult } from '../../services/router';
 import { CooldownManager } from '../../services/cooldown-manager';
 import { ConcurrencyTracker } from '../../services/concurrency-tracker';
 import { DebugManager } from '../../services/debug-manager';
+import { CodexVersionService } from '../../services/codex-version-service';
 import type { UsageStorageService } from '../../services/usage-storage';
 import type { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { recordQuotaUsage } from '../../services/quota/quota-middleware';
@@ -50,7 +51,17 @@ import {
   buildGenerationOptions,
   buildGpuParams,
   computeKwhUsed,
+  isOAuthRoute,
+  isClaudeMaskingApiKeyRoute,
 } from './pi-ai-utils';
+import { OAuthAuthManager } from '../../services/oauth-auth-manager';
+import { processBody } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/process-body';
+import { getStainlessHeaders } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/stainless-headers';
+import { reverseMap } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/reverse-map';
+import {
+  DEFAULT_TOOL_RENAMES,
+  DEFAULT_REVERSE_MAP,
+} from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/constants';
 import type { GenerationIntent } from './generation';
 import { splitReasoningSuffix } from './reasoning';
 import { consumeTtfb } from './fetch-tap';
@@ -508,7 +519,18 @@ export async function runPiAiExecutor<TResponse>(
   // (provider, modelId) pair resolves to a pi-ai Model — via the custom
   // registries or the built-in registry. resolvePiAiModel returns null (never
   // throws) for unknown pairs, so a null check is the correct gate.
+  // Also supports OAuth and Claude Masking API key routes natively.
   const betaCandidates = candidates.filter((c) => {
+    const isOAuth = isOAuthRoute(c, incomingApiType);
+    const isClaudeMasking = isClaudeMaskingApiKeyRoute(c, incomingApiType);
+    if (isOAuth || isClaudeMasking) {
+      const piAiProvider = isClaudeMasking
+        ? 'anthropic'
+        : (c.config as any).oauth_provider || c.provider;
+      const piAiModelId = c.model;
+      return resolvePiAiModel(piAiProvider, piAiModelId) != null;
+    }
+
     const piAiProvider = (c.config as any).pi_ai_provider as string | undefined;
     const piAiModelId = (c.modelConfig as any)?.pi_ai_model_id as string | undefined;
     if (!piAiProvider || !piAiModelId) return false;
@@ -621,9 +643,32 @@ export async function runPiAiExecutor<TResponse>(
       continue;
     }
 
-    // ── Build pi-ai model (defensive check — filter should have removed invalids) ──
-    const piAiProvider = (route.config as any).pi_ai_provider as string;
-    const piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string;
+    // ── Resolve pi-ai provider and model ID ──────────────────────────────────
+    const isOAuth = isOAuthRoute(route, incomingApiType);
+    const isClaudeMasking = isClaudeMaskingApiKeyRoute(route, incomingApiType);
+    let piAiProvider: string | undefined;
+    let piAiModelId: string | undefined;
+
+    if (isOAuth || isClaudeMasking) {
+      piAiProvider = isClaudeMasking
+        ? 'anthropic'
+        : (route.config as any).oauth_provider || route.provider;
+      piAiModelId = route.model;
+    } else {
+      piAiProvider = (route.config as any).pi_ai_provider as string | undefined;
+      piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string | undefined;
+    }
+
+    logger.debug('[pi-ai-executor] RESOLVED_CANDIDATE_ROUTE:', {
+      provider: route.provider,
+      model: route.model,
+      api_base_url: route.config.api_base_url,
+      isOAuth,
+      isClaudeMasking,
+      piAiProvider,
+      piAiModelId,
+    });
+
     if (!piAiProvider || !piAiModelId) {
       concurrency.release(route.provider, route.model);
       attemptTimeout.cleanup();
@@ -632,7 +677,14 @@ export async function runPiAiExecutor<TResponse>(
       throw err;
     }
 
-    const piModel = buildPiAiModel(route.config, piAiProvider, piAiModelId, incomingApiType);
+    const configForBuild =
+      isOAuth &&
+      typeof route.config.api_base_url === 'string' &&
+      route.config.api_base_url.startsWith('oauth://')
+        ? { ...route.config, api_base_url: '' }
+        : route.config;
+
+    const piModel = buildPiAiModel(configForBuild, piAiProvider, piAiModelId, incomingApiType);
     if (!piModel) {
       // Should not happen (beta filter resolves the same way) but fail closed.
       concurrency.release(route.provider, route.model);
@@ -643,6 +695,56 @@ export async function runPiAiExecutor<TResponse>(
       err.routingContext = { statusCode: 400, code: 'unresolved_pi_ai_model' };
       throw err;
     }
+
+    // ── Resolve authentication and keys ──────────────────────────────────────
+    let apiKey = route.config.api_key;
+    let authMode: 'oauth' | 'apiKey' = 'apiKey';
+    let accountId = '';
+
+    if (isOAuth || isClaudeMasking) {
+      if (isClaudeMasking) {
+        apiKey = route.config.api_key?.trim() || '';
+        authMode = 'apiKey';
+      } else {
+        authMode = 'oauth';
+        accountId = route.config.oauth_account?.trim() || '';
+        if (!accountId) {
+          concurrency.release(route.provider, route.model);
+          attemptTimeout.cleanup();
+          throw new Error(
+            `OAuth account is not configured for provider '${route.provider}'. ` +
+              `Set providers.${route.provider}.oauth_account in plexus config.`
+          );
+        }
+        const authManager = OAuthAuthManager.getInstance();
+        apiKey = await authManager.getApiKey(piAiProvider, accountId);
+      }
+    }
+
+    const rawApiKey = apiKey;
+    if (piAiProvider === 'anthropic' && authMode === 'apiKey') {
+      apiKey = `sk-ant-oat-mask-${rawApiKey}`;
+    }
+    const isClaudeCodeToken = apiKey?.includes('sk-ant-oat') ?? false;
+
+    if (
+      piAiProvider === 'github-copilot' &&
+      apiKey?.includes('proxy-ep=proxy.business.githubcopilot.com') &&
+      piModel
+    ) {
+      logger.debug(
+        `[pi-ai-executor] GitHub Business account detected; forcing standard API endpoint`
+      );
+      piModel.baseUrl = 'https://api.githubcopilot.com';
+    }
+
+    logger.debug('[pi-ai-executor] RESOLVED_KEYS:', {
+      authMode,
+      accountId,
+      resolvedApiKeyPrefix: apiKey ? `${apiKey.slice(0, 15)}...` : 'none',
+      isClaudeCodeToken,
+      resolvedBaseUrl: piModel?.baseUrl,
+    });
 
     // ── Debug: set provider for this request ──────────────────────────────
     debug.setProviderForRequest(requestId, route.provider);
@@ -670,19 +772,74 @@ export async function runPiAiExecutor<TResponse>(
       reasoning: chosenReasoning,
     };
     const generationOpts = buildGenerationOptions(piModel as any, effectiveGeneration);
+
+    let userAgent = '';
+    let codexVersion = '';
+    if (piAiProvider === 'openai-codex') {
+      const codexVersionService = CodexVersionService.getInstance();
+      codexVersion = codexVersionService.getVersion();
+      userAgent = codexVersionService.getUserAgent();
+    }
+
+    const baseHeaders: Record<string, string> = {
+      ...((generationOpts as any).headers as Record<string, string>),
+      ...(codexVersion ? { Version: codexVersion } : {}),
+      ...(userAgent ? { 'User-Agent': userAgent } : {}),
+      ...(piAiProvider === 'anthropic' && authMode === 'apiKey'
+        ? { 'x-api-key': rawApiKey || '' }
+        : {}),
+      ...(route.config.headers as Record<string, string>),
+    };
+
+    if (piAiProvider === 'anthropic' && (isClaudeCodeToken || authMode === 'apiKey')) {
+      const stainless = getStainlessHeaders();
+      Object.assign(baseHeaders, stainless);
+    }
+
+    let oauthContext = {
+      apiKey: apiKey || '',
+      isOAuth: isOAuth && authMode === 'oauth',
+      toolNamesRemapped: false,
+    };
+
     const callOptions: ProviderStreamOptions = {
       ...generationOpts,
       ...(toolChoice != null ? { toolChoice } : {}),
       ...(parallelToolCalls != null ? { parallelToolCalls } : {}),
-      apiKey: route.config.api_key,
-      headers: route.config.headers,
+      apiKey,
+      headers: baseHeaders,
       signal: attemptTimeout.signal,
       onPayload: (payload: unknown) => {
-        // Run within the debug requestId context so the fetch tap can correlate
+        let finalPayload = payload;
+        if ((isOAuth || isClaudeMasking) && piAiProvider === 'anthropic' && isClaudeCodeToken) {
+          const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+          const result = processBody(payloadStr, {
+            replacements: [],
+            toolRenames: DEFAULT_TOOL_RENAMES,
+            propRenames: [],
+            stripSystemConfig: true,
+            stripToolDescriptions: true,
+            injectCCSyntheticTools: true,
+          });
+          finalPayload = JSON.parse(result.body);
+
+          oauthContext = {
+            apiKey: apiKey || '',
+            isOAuth: true,
+            toolNamesRemapped: true,
+          };
+          (piModel as any).__oauthContext = oauthContext;
+          finalPayload = finalPayload;
+        }
+
+        const payloadStr =
+          typeof finalPayload === 'string' ? finalPayload : JSON.stringify(finalPayload);
+        logger.debug(`[pi-ai-executor] FULL-OUTGOING-PAYLOAD ${payloadStr}`);
+
         debugRequestIdStorage.run(requestId, () => {
-          debug.addTransformedRequest(requestId, payload);
+          debug.addTransformedRequest(requestId, finalPayload);
         });
-        return undefined;
+        return finalPayload;
       },
     };
 
@@ -764,6 +921,18 @@ export async function runPiAiExecutor<TResponse>(
           ...usageData,
         };
 
+        const serialized = serializeMessage(message);
+        let finalResponse = serialized;
+        if (isOAuth || isClaudeMasking) {
+          const serializedStr = JSON.stringify(serialized);
+          const reversedStr = reverseMap(serializedStr, {
+            toolRenames: DEFAULT_TOOL_RENAMES,
+            propRenames: [],
+            reverseMap: DEFAULT_REVERSE_MAP,
+          });
+          finalResponse = JSON.parse(reversedStr);
+        }
+
         debug.addTransformedResponse(requestId, message);
         debug.addTransformedResponseSnapshot(requestId, message);
         await usageStorage.saveRequest(usageRecord as any);
@@ -782,7 +951,7 @@ export async function runPiAiExecutor<TResponse>(
         await onSuccess?.(message);
 
         return {
-          response: serializeMessage(message),
+          response: finalResponse,
           compaction: compactionMeta,
         };
       } else {
@@ -990,13 +1159,23 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
       }
 
       // Serialize and yield frames
+      const isOAuth = isOAuthRoute(route, incomingApiType);
+      const isClaudeMasking = isClaudeMaskingApiKeyRoute(route, incomingApiType);
       const frames = serializeChunks(event);
       for (const frame of frames) {
         if (!hasEmittedClientFrame && frame.trim()) {
           hasEmittedClientFrame = true;
         }
-        transformedStreamSnapshot += frame;
-        yield frame;
+        let finalFrame = frame;
+        if (isOAuth || isClaudeMasking) {
+          finalFrame = reverseMap(frame, {
+            toolRenames: DEFAULT_TOOL_RENAMES,
+            propRenames: [],
+            reverseMap: DEFAULT_REVERSE_MAP,
+          });
+        }
+        transformedStreamSnapshot += finalFrame;
+        yield finalFrame;
       }
 
       // Terminal events — handle success/error and break

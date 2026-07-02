@@ -13,7 +13,8 @@
       "!!packages/frontend/src/assets/**",
       "!!packages/backend/drizzle/migrations/**",
       "!!packages/backend/drizzle/migrations_pg/**",
-      "!!.claude/**"
+      "!!.claude/**",
+      "!!vendor/**"
     ]
   },
   "formatter": {
