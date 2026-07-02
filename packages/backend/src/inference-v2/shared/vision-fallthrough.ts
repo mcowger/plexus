@@ -300,16 +300,27 @@ async function describeImage(
 
     if (!concurrency.acquire(route.provider, route.model)) continue;
 
-    const piAiProvider = (route.config as any).pi_ai_provider as string;
-    const piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string;
-    const piModel = buildPiAiModel(route.config, piAiProvider, piAiModelId, 'chat');
-    if (!piModel) {
+    // Guarantee the concurrency slot is released exactly once regardless of
+    // where in this block a throw occurs (buildPiAiModel, piAiModels.complete,
+    // or the usage-recording call) — mirrors the doRelease pattern used in
+    // pi-ai-executor.ts.
+    let released = false;
+    const doRelease = () => {
+      if (released) return;
+      released = true;
       concurrency.release(route.provider, route.model);
-      continue;
-    }
+    };
 
     const startTime = Date.now();
     try {
+      const piAiProvider = (route.config as any).pi_ai_provider as string;
+      const piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string;
+      const piModel = buildPiAiModel(route.config, piAiProvider, piAiModelId, 'chat');
+      if (!piModel) {
+        doRelease();
+        continue;
+      }
+
       logger.debug(
         `[vision-fallthrough] Dispatching description request to ${route.provider}/${route.model}`
       );
@@ -323,7 +334,7 @@ async function describeImage(
       );
 
       cooldown.markProviderSuccess(route.provider, route.model);
-      concurrency.release(route.provider, route.model);
+      doRelease();
 
       const textBlock = message.content.find((b) => b.type === 'text') as TextContent | undefined;
       const description = textBlock?.text?.trim();
@@ -345,13 +356,17 @@ async function describeImage(
         logger.warn(
           `[vision-fallthrough] Model ${descriptorModel} returned empty description for image`
         );
+        // Cache the negative result too: an empty descriptor response is a
+        // deterministic model output for this image, not a transient failure,
+        // so retrying on every request would just waste descriptor API calls.
+        cacheSet(key, 'No description available.');
         return 'No description available.';
       }
 
       cacheSet(key, description);
       return description;
     } catch (err) {
-      concurrency.release(route.provider, route.model);
+      doRelease();
       cooldown.markProviderFailure(route.provider, route.model);
       logger.error(
         `[vision-fallthrough] Error describing image with ${route.provider}/${route.model}:`,

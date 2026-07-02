@@ -232,4 +232,40 @@ describe('applyVisionFallthrough', () => {
       '[Image Description: Error generating image description.]'
     );
   });
+
+  it('caches an empty descriptor response to avoid repeated wasted calls', async () => {
+    vi.mocked(piAi.complete).mockResolvedValueOnce({
+      role: 'assistant',
+      content: [{ type: 'text', text: '' }],
+      api: 'openai-codex-responses',
+      provider: 'openai-codex',
+      model: 'gpt-4o',
+      usage: { input: 10, output: 0, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    } as any);
+
+    const makeContext = (): Context => ({
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'image', mimeType: 'image/png', data: IMAGE_DATA_A }],
+          timestamp: Date.now(),
+        },
+      ],
+    });
+
+    const callsBefore = vi.mocked(piAi.complete).mock.calls.length;
+    const first = await applyVisionFallthrough(makeContext(), 'gpt-4o', 'Describe this image.');
+    const second = await applyVisionFallthrough(makeContext(), 'gpt-4o', 'Describe this image.');
+
+    // Only one descriptor call — the empty result is cached, not re-fetched.
+    expect(vi.mocked(piAi.complete).mock.calls.length).toBe(callsBefore + 1);
+    expect((first.messages[0] as any).content[0].text).toBe(
+      '[Image Description: No description available.]'
+    );
+    expect((second.messages[0] as any).content[0].text).toBe(
+      '[Image Description: No description available.]'
+    );
+  });
 });
