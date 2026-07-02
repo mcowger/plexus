@@ -44,7 +44,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.3",
     "@types/bun": "latest",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.0",
     "@types/winston": "^2.4.4",
     "drizzle-kit": "^0.31.10",
     "form-data": "^4.0.6"
