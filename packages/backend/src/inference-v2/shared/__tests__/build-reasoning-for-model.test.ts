@@ -98,6 +98,57 @@ describe('buildReasoningOptionsForModel', () => {
       expect(opts.thinkingBudgetTokens).toBeUndefined();
     });
 
+    it('adaptive model + adaptive intent passes through with NO effort (model decides)', () => {
+      const model = {
+        api: 'anthropic-messages',
+        reasoning: true,
+        compat: { forceAdaptiveThinking: true },
+        thinkingLevelMap: { high: 'high', xhigh: 'max' },
+      } as any;
+      const opts = buildReasoningOptionsForModel(
+        model,
+        intent({ adaptive: true, enabled: true, visibility: 'summary' })
+      );
+      // True adaptive: thinking on, no effort pinned, model chooses magnitude.
+      expect(opts.thinkingEnabled).toBe(true);
+      expect(opts.effort).toBeUndefined();
+      expect(opts.thinkingBudgetTokens).toBeUndefined();
+      expect(opts.thinkingDisplay).toBe('summarized');
+      // No leftover streamSimple-compat reasoning level.
+      expect(opts.reasoning).toBeUndefined();
+    });
+
+    it('adaptive model + explicit effort still pins that effort (client committed)', () => {
+      const model = {
+        api: 'anthropic-messages',
+        reasoning: true,
+        compat: { forceAdaptiveThinking: true },
+        thinkingLevelMap: { high: 'high', xhigh: 'max' },
+      } as any;
+      const opts = buildReasoningOptionsForModel(
+        model,
+        intent({ adaptive: true, effort: 'xhigh', enabled: true })
+      );
+      expect(opts.thinkingEnabled).toBe(true);
+      expect(opts.effort).toBe('xhigh');
+    });
+
+    it('legacy (budget) model flattens an adaptive intent to the default-effort budget', () => {
+      const model = { api: 'anthropic-messages', reasoning: true } as any;
+      const opts = buildReasoningOptionsForModel(model, intent({ adaptive: true, enabled: true }));
+      // Non-adaptive model can't express "model decides" — flatten to the
+      // documented default effort (high → 16384 budget).
+      expect(opts.thinkingEnabled).toBe(true);
+      expect(opts.thinkingBudgetTokens).toBe(16384);
+    });
+
+    it('completions egress flattens an adaptive intent to the default effort (not none)', () => {
+      const model = { api: 'openai-completions', reasoning: true } as any;
+      const opts = buildReasoningOptionsForModel(model, intent({ adaptive: true, enabled: true }));
+      expect(opts.reasoningEffort).toBe('high');
+      expect(opts.reasoning).toBe('high');
+    });
+
     it('legacy model uses budget tokens, round-tripping client budget', () => {
       const model = { api: 'anthropic-messages', reasoning: true } as any;
       const opts = buildReasoningOptionsForModel(

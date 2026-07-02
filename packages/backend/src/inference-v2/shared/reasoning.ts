@@ -52,6 +52,18 @@ export interface ReasoningIntent {
    *   undefined → client said nothing; defer to the model's native default
    */
   enabled?: boolean;
+  /**
+   * Adaptive thinking: the client enabled reasoning but did NOT commit to a
+   * magnitude — the model decides how much to think (Anthropic
+   * `thinking.type: 'adaptive'`, the only mode on Claude 5+).
+   *
+   * On a native adaptive-thinking Anthropic egress this is passed through as
+   * `thinkingEnabled: true` with no `effort`, so the model chooses. On egress
+   * families that cannot express "let the model decide" (OpenAI-completions /
+   * OpenRouter, Gemini, legacy budget-based Anthropic) it resolves to the
+   * documented adaptive default effort via {@link intentToEffort}.
+   */
+  adaptive?: boolean;
   /** Unified reasoning-output visibility (summary / full / hidden). */
   visibility?: ReasoningVisibility;
   /**
@@ -184,6 +196,14 @@ export function clampEffortToWindow(
 }
 
 /**
+ * Default effort for adaptive thinking when it must be flattened to a concrete
+ * bucket (egress families that cannot express "let the model decide"). Matches
+ * the documented adaptive default, e.g. OpenRouter Claude 5: "adaptive thinking
+ * on at effort high".
+ */
+export const ADAPTIVE_DEFAULT_EFFORT: ReasoningEffort = 'high';
+
+/**
  * Resolve a ReasoningIntent to a concrete effort bucket (or 'off'), using
  * `budgetTokens` when no explicit `effort` was given.
  */
@@ -191,6 +211,9 @@ export function intentToEffort(intent: ReasoningIntent): ReasoningEffort | 'off'
   if (intent.enabled === false) return 'off';
   if (intent.effort) return intent.effort;
   if (intent.budgetTokens != null) return budgetToEffort(intent.budgetTokens);
+  // Adaptive: model-decides-magnitude, flattened to the documented default for
+  // egress paths that require a concrete effort.
+  if (intent.adaptive) return ADAPTIVE_DEFAULT_EFFORT;
   if (intent.enabled === true) return 'medium'; // enabled but unspecified magnitude
   return undefined;
 }

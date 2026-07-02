@@ -207,18 +207,21 @@ describe('anthropicRequestToContext', () => {
       });
     });
 
-    it('maps thinking.type=adaptive to effort=high (adaptive default)', () => {
+    it('maps thinking.type=adaptive to an adaptive intent (no pinned effort)', () => {
       const result = anthropicRequestToContext({
         model: 'claude-sonnet-5',
         messages: [{ role: 'user', content: 'Think' }],
         thinking: { type: 'adaptive', display: 'summarized' },
       });
       expect(result.generationIntent.reasoning).toEqual({
-        effort: 'high',
+        adaptive: true,
         enabled: true,
         visibility: 'summary',
         source: 'client',
       });
+      // Adaptive must NOT pin a concrete effort at the parser layer — the
+      // egress decides whether to pass through or flatten.
+      expect(result.generationIntent.reasoning.effort).toBeUndefined();
     });
 
     it('maps adaptive display=raw to full visibility', () => {
@@ -228,34 +231,34 @@ describe('anthropicRequestToContext', () => {
         thinking: { type: 'adaptive', display: 'raw' },
       });
       expect(result.generationIntent.reasoning).toEqual({
-        effort: 'high',
+        adaptive: true,
         enabled: true,
         visibility: 'full',
         source: 'client',
       });
     });
 
-    it('maps adaptive with no display to effort=high', () => {
+    it('maps adaptive with no display to a bare adaptive intent', () => {
       const result = anthropicRequestToContext({
         model: 'claude-sonnet-5',
         messages: [{ role: 'user', content: 'Think' }],
         thinking: { type: 'adaptive' },
       });
       expect(result.generationIntent.reasoning).toEqual({
-        effort: 'high',
+        adaptive: true,
         enabled: true,
         source: 'client',
       });
     });
 
-    it('maps enabled type with no budget_tokens to effort=high', () => {
+    it('maps enabled type with no budget_tokens to an adaptive intent', () => {
       const result = anthropicRequestToContext({
         model: 'claude-sonnet-5',
         messages: [{ role: 'user', content: 'Think' }],
         thinking: { type: 'enabled' },
       });
       expect(result.generationIntent.reasoning).toEqual({
-        effort: 'high',
+        adaptive: true,
         enabled: true,
         source: 'client',
       });

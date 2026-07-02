@@ -278,14 +278,15 @@ export function anthropicRequestToContext(body: any): AnthropicToContextResult {
     }
   } else if (thinkingType === 'adaptive' || thinkingType === 'enabled') {
     // Adaptive (or 'enabled' with no explicit budget): thinking is on and the
-    // client did not commit to a token budget. Map to effort 'high' to match
-    // the documented adaptive default (e.g. OpenRouter Claude 5: "adaptive
-    // thinking on at effort high"). Emitting a concrete effort avoids the
-    // shared pipeline collapsing an effort-less intent to a lower magnitude —
-    // and, critically, avoids it being flattened to a reasoning-disabling
-    // "none" on the OpenAI-completions egress.
+    // client did not commit to a magnitude — the model decides. Flag this as
+    // `adaptive` rather than pinning an effort, so a native Anthropic adaptive
+    // egress can pass `thinkingEnabled: true` through with no effort (true
+    // model-decides behavior). Egress families that cannot express adaptive
+    // (OpenAI-completions / OpenRouter, Gemini, legacy budget-based Anthropic)
+    // flatten it to the documented default effort via intentToEffort — which,
+    // critically, is never the reasoning-disabling "none".
     reasoningIntent = {
-      effort: 'high',
+      adaptive: true,
       enabled: true,
       source: 'client',
       ...(visibility ? { visibility } : {}),
