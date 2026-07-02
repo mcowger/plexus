@@ -89,6 +89,16 @@ describe('intentToEffort', () => {
     expect(intentToEffort({ enabled: true, source: 'client' })).toBe('medium');
   });
 
+  it('resolves an adaptive intent to the documented default effort (high)', () => {
+    expect(intentToEffort({ adaptive: true, enabled: true, source: 'client' })).toBe('high');
+  });
+
+  it('prefers an explicit effort over the adaptive default', () => {
+    expect(intentToEffort({ adaptive: true, effort: 'low', enabled: true, source: 'client' })).toBe(
+      'low'
+    );
+  });
+
   it('returns undefined when the client said nothing', () => {
     expect(intentToEffort({ source: 'client' })).toBeUndefined();
   });

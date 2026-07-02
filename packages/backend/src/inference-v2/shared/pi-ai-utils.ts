@@ -406,9 +406,19 @@ function buildEnabledOptions(
       base.thinkingDisplay = 'summarized';
     }
     if ((model.compat as { forceAdaptiveThinking?: boolean })?.forceAdaptiveThinking === true) {
-      // Adaptive thinking: pass the effort and let pi-ai map it via
-      // thinkingLevelMap (e.g. xhigh → "max" on Opus 4.6).
-      base.effort = effort;
+      if (intent?.adaptive === true && intent?.effort == null) {
+        // True adaptive: the client enabled thinking without committing to a
+        // magnitude. Pass `thinkingEnabled: true` alone and let the model
+        // decide how much to think — the native semantics of Anthropic
+        // `thinking.type: 'adaptive'`. Do NOT pin `effort`, and drop the
+        // streamSimple-compat `reasoning` level so nothing re-quantizes it.
+        delete base.reasoning;
+      } else {
+        // Client committed to a magnitude (explicit effort / reasoning suffix):
+        // pass it and let pi-ai map it via thinkingLevelMap (e.g. xhigh → "max"
+        // on Opus 4.6).
+        base.effort = effort;
+      }
     } else {
       // Budget-based thinking for older Claude models. Round-trip the client's
       // exact budget when they gave one; otherwise derive from the effort.
