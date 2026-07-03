@@ -204,10 +204,13 @@ export function anthropicRequestToContext(body: any): AnthropicToContextResult {
         if (block.type === 'text') {
           contentBlocks.push({ type: 'text', text: block.text ?? '' } as TextContent);
         } else if (block.type === 'thinking') {
-          // Preserve thinking blocks — required for multi-turn extended thinking
+          // Preserve thinking blocks — required for multi-turn extended thinking.
+          // The signature must also round-trip or Anthropic rejects the block
+          // as tampered/missing on the next turn.
           contentBlocks.push({
             type: 'thinking',
             thinking: block.thinking ?? '',
+            ...(block.signature ? { thinkingSignature: block.signature } : {}),
           } as ThinkingContent);
         } else if (block.type === 'tool_use') {
           contentBlocks.push({

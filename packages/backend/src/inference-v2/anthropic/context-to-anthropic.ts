@@ -39,7 +39,7 @@ export interface AnthropicUsage {
 
 export type AnthropicContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'thinking'; thinking: string }
+  | { type: 'thinking'; thinking: string; signature?: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
 
 export interface AnthropicMessage {
@@ -84,6 +84,37 @@ function makeMessageId(): string {
   return `msg_${Date.now().toString(36)}`;
 }
 
+/** Full `message_start.message.usage` shape, including the nested cache_creation split. */
+function buildStartUsage(u: Usage | undefined) {
+  const cacheWrite = u?.cacheWrite ?? 0;
+  const cacheWrite1h = u?.cacheWrite1h ?? 0;
+  const cacheWrite5m = Math.max(0, cacheWrite - cacheWrite1h);
+  return {
+    input_tokens: u?.input ?? 0,
+    output_tokens: u?.output ?? 0,
+    cache_read_input_tokens: u?.cacheRead ?? 0,
+    cache_creation_input_tokens: cacheWrite,
+    cache_creation: {
+      ephemeral_5m_input_tokens: cacheWrite5m,
+      ephemeral_1h_input_tokens: cacheWrite1h,
+    },
+  };
+}
+
+/** Full `message_delta.usage` shape, including input/cache tokens and thinking-token breakdown. */
+function buildDeltaUsage(u: Usage) {
+  const usage: Record<string, unknown> = {
+    input_tokens: u.input,
+    output_tokens: u.output,
+    cache_read_input_tokens: u.cacheRead,
+    cache_creation_input_tokens: u.cacheWrite,
+  };
+  if (u.reasoning != null) {
+    usage.output_tokens_details = { thinking_tokens: u.reasoning };
+  }
+  return usage;
+}
+
 // ─── Non-streaming serialiser ─────────────────────────────────────────────────
 
 export function messageToAnthropicResponse(
@@ -114,7 +145,12 @@ export function messageToAnthropicResponse(
 
   for (const block of message.content) {
     if (block.type === 'thinking') {
-      thinkingBlocks.push({ type: 'thinking', thinking: (block as ThinkingContent).thinking });
+      const tb = block as ThinkingContent;
+      thinkingBlocks.push({
+        type: 'thinking',
+        thinking: tb.thinking,
+        ...(tb.thinkingSignature ? { signature: tb.thinkingSignature } : {}),
+      });
     } else if (block.type === 'text') {
       textBlocks.push({ type: 'text', text: (block as TextContent).text });
     } else if (block.type === 'toolCall') {
@@ -149,9 +185,13 @@ export interface AnthropicChunkSerialiserState {
   activeBlockType: 'text' | 'thinking' | 'tool_use' | null;
   /** Index of the currently open content_block */
   activeBlockIndex: number | null;
+  /** Index into the pi-ai partial message's `content` array for the active block */
+  activeContentIndex: number | null;
   /** tool_call id of the active tool_use block */
   activeToolId: string | null;
   sentStart: boolean;
+  /** True after the 'start' event, until message_start has actually been flushed */
+  pendingStart: boolean;
 }
 
 export function makeAnthropicChunkSerialiserState(model: string): AnthropicChunkSerialiserState {
@@ -161,14 +201,40 @@ export function makeAnthropicChunkSerialiserState(model: string): AnthropicChunk
     nextBlockIndex: 0,
     activeBlockType: null,
     activeBlockIndex: null,
+    activeContentIndex: null,
     activeToolId: null,
     sentStart: false,
+    pendingStart: false,
   };
 }
 
 /** Encode one SSE event as `event: <name>\ndata: <json>\n\n` */
 function sseEvent(name: string, data: unknown): string {
   return `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+/**
+ * pi-ai emits its 'start' event before reading any bytes from the upstream
+ * response, so `usage` is always zero at that point even though Anthropic's
+ * own message_start carries real input/cache-read token counts. Real usage
+ * only lands in `output.usage` once the upstream message_start SSE has been
+ * processed, which happens synchronously before the *next* pi-ai event is
+ * emitted. So we defer sending our message_start until that next event,
+ * using its usage snapshot.
+ */
+function usageFromEvent(event: AssistantMessageEvent): Usage | undefined {
+  if (event.type === 'done') return event.message.usage;
+  if (event.type === 'error') return event.error.usage;
+  if ('partial' in event) return event.partial.usage;
+  return undefined;
+}
+
+/** The assistant message's content array, regardless of which event shape carries it. */
+function contentFromEvent(event: AssistantMessageEvent): AssistantMessage['content'] | undefined {
+  if (event.type === 'done') return event.message.content;
+  if (event.type === 'error') return event.error.content;
+  if ('partial' in event) return event.partial.content;
+  return undefined;
 }
 
 /**
@@ -182,8 +248,46 @@ export function eventToAnthropicSSE(
   const frames: string[] = [];
 
   // ── Helpers local to this call ───────────────────────────────────────────
+
+  /** Flush the deferred message_start (+ ping) using the best usage snapshot available. */
+  const ensureStarted = () => {
+    if (!state.pendingStart) return;
+    state.pendingStart = false;
+    frames.push(
+      sseEvent('message_start', {
+        type: 'message_start',
+        message: {
+          id: state.messageId,
+          type: 'message',
+          role: 'assistant',
+          model: state.model,
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: buildStartUsage(usageFromEvent(event)),
+        },
+      })
+    );
+    frames.push(sseEvent('ping', { type: 'ping' }));
+  };
+
   const closeCurrentBlock = () => {
     if (state.activeBlockType !== null && state.activeBlockIndex !== null) {
+      if (state.activeBlockType === 'thinking' && state.activeContentIndex !== null) {
+        const content = contentFromEvent(event);
+        const block = content?.[state.activeContentIndex];
+        const signature =
+          block?.type === 'thinking' ? (block as ThinkingContent).thinkingSignature : undefined;
+        if (signature) {
+          frames.push(
+            sseEvent('content_block_delta', {
+              type: 'content_block_delta',
+              index: state.activeBlockIndex,
+              delta: { type: 'signature_delta', signature },
+            })
+          );
+        }
+      }
       frames.push(
         sseEvent('content_block_stop', {
           type: 'content_block_stop',
@@ -192,24 +296,26 @@ export function eventToAnthropicSSE(
       );
       state.activeBlockType = null;
       state.activeBlockIndex = null;
+      state.activeContentIndex = null;
       state.activeToolId = null;
     }
   };
 
   const openBlock = (
     type: 'text' | 'thinking' | 'tool_use',
-    extra?: { id?: string; name?: string }
+    extra?: { id?: string; name?: string; contentIndex?: number }
   ) => {
     closeCurrentBlock();
     const index = state.nextBlockIndex++;
     state.activeBlockIndex = index;
     state.activeBlockType = type;
+    state.activeContentIndex = extra?.contentIndex ?? null;
 
     let content_block: Record<string, unknown>;
     if (type === 'text') {
       content_block = { type: 'text', text: '' };
     } else if (type === 'thinking') {
-      content_block = { type: 'thinking', thinking: '' };
+      content_block = { type: 'thinking', thinking: '', signature: '' };
     } else {
       // tool_use
       state.activeToolId = extra?.id ?? null;
@@ -229,42 +335,24 @@ export function eventToAnthropicSSE(
 
   switch (event.type) {
     case 'start': {
-      // message_start with empty content and initial usage (all zeros)
+      // Real usage isn't available yet (pi-ai emits 'start' before reading any
+      // upstream bytes) — defer message_start until the next event, which by
+      // then has the upstream message_start's usage merged into `partial.usage`.
       state.sentStart = true;
-      const usage = event.partial.usage;
-      frames.push(
-        sseEvent('message_start', {
-          type: 'message_start',
-          message: {
-            id: state.messageId,
-            type: 'message',
-            role: 'assistant',
-            model: state.model,
-            content: [],
-            stop_reason: null,
-            stop_sequence: null,
-            usage: {
-              input_tokens: usage?.input ?? 0,
-              output_tokens: usage?.output ?? 0,
-              cache_read_input_tokens: usage?.cacheRead ?? 0,
-              cache_creation_input_tokens: usage?.cacheWrite ?? 0,
-            },
-          },
-        })
-      );
-      // Emit an initial ping-style empty delta so clients know the stream started
-      frames.push(sseEvent('ping', { type: 'ping' }));
+      state.pendingStart = true;
       break;
     }
 
     case 'thinking_start': {
-      openBlock('thinking');
+      ensureStarted();
+      openBlock('thinking', { contentIndex: event.contentIndex });
       break;
     }
 
     case 'thinking_delta': {
+      ensureStarted();
       if (state.activeBlockType !== 'thinking') {
-        openBlock('thinking');
+        openBlock('thinking', { contentIndex: event.contentIndex });
       }
       frames.push(
         sseEvent('content_block_delta', {
@@ -277,16 +365,19 @@ export function eventToAnthropicSSE(
     }
 
     case 'thinking_end': {
-      // The block will be closed on the next different block or on done
+      // The block (and its signature_delta) is closed on the next different
+      // block or on done — see closeCurrentBlock.
       break;
     }
 
     case 'text_start': {
+      ensureStarted();
       openBlock('text');
       break;
     }
 
     case 'text_delta': {
+      ensureStarted();
       if (state.activeBlockType !== 'text') {
         openBlock('text');
       }
@@ -306,6 +397,7 @@ export function eventToAnthropicSSE(
     }
 
     case 'toolcall_start': {
+      ensureStarted();
       // Get tool info from the partial message at contentIndex
       const partialBlock = event.partial.content[event.contentIndex];
       const tc = partialBlock?.type === 'toolCall' ? (partialBlock as ToolCall) : null;
@@ -314,6 +406,7 @@ export function eventToAnthropicSSE(
     }
 
     case 'toolcall_delta': {
+      ensureStarted();
       if (state.activeBlockType !== 'tool_use') {
         // Shouldn't happen, but open defensively
         openBlock('tool_use');
@@ -334,8 +427,8 @@ export function eventToAnthropicSSE(
     }
 
     case 'done': {
+      ensureStarted();
       closeCurrentBlock();
-      const finalUsage = event.message.usage;
       frames.push(
         sseEvent('message_delta', {
           type: 'message_delta',
@@ -343,9 +436,7 @@ export function eventToAnthropicSSE(
             stop_reason: mapStopReason(event.reason),
             stop_sequence: null,
           },
-          usage: {
-            output_tokens: finalUsage.output,
-          },
+          usage: buildDeltaUsage(event.message.usage),
         })
       );
       frames.push(sseEvent('message_stop', { type: 'message_stop' }));
@@ -353,12 +444,13 @@ export function eventToAnthropicSSE(
     }
 
     case 'error': {
+      ensureStarted();
       closeCurrentBlock();
       frames.push(
         sseEvent('message_delta', {
           type: 'message_delta',
           delta: { stop_reason: 'error', stop_sequence: null },
-          usage: { output_tokens: 0 },
+          usage: buildDeltaUsage(event.error.usage),
         })
       );
       frames.push(sseEvent('message_stop', { type: 'message_stop' }));

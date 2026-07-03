@@ -154,6 +154,27 @@ describe('anthropicRequestToContext', () => {
       expect(blocks.find((b: any) => b.type === 'thinking')?.thinking).toBe('My thought');
     });
 
+    it('REGRESSION: preserves the thinking block signature in assistant history', () => {
+      // Without this, a thinking block echoed back in a follow-up request (e.g.
+      // multi-turn tool use with extended thinking) loses its signature and
+      // Anthropic rejects it as tampered/missing on the next turn.
+      const result = anthropicRequestToContext({
+        model: 'claude-opus-4-6',
+        messages: [
+          { role: 'user', content: 'Think!' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking: 'My thought', signature: 'sig-xyz' },
+              { type: 'text', text: 'Answer' },
+            ],
+          },
+        ],
+      });
+      const blocks = result.context.messages[1]!.content as any[];
+      expect(blocks.find((b: any) => b.type === 'thinking')?.thinkingSignature).toBe('sig-xyz');
+    });
+
     it('maps tool_use blocks to ToolCall', () => {
       const result = anthropicRequestToContext({
         model: 'claude-opus-4-6',
