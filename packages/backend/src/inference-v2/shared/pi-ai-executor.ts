@@ -55,17 +55,17 @@ import {
   isClaudeMaskingApiKeyRoute,
 } from './pi-ai-utils';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
-import { processBody } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/process-body';
 import { getStainlessHeaders } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/stainless-headers';
 import { reverseMap } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/reverse-map';
 import {
-  DEFAULT_TOOL_RENAMES,
   DEFAULT_REVERSE_MAP,
+  REQUIRED_BETAS,
 } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/constants';
 import type { GenerationIntent } from './generation';
 import { splitReasoningSuffix } from './reasoning';
 import { consumeTtfb } from './fetch-tap';
 import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
+import { applyClaudeCodeMasking, type RenamePair } from './tool-fingerprint';
 import { enforceContextLimitForRoute } from '../../services/enforce-limits';
 import { compactContextForSend } from '../../services/compaction/compaction-service';
 import type { CompactionResult, CompactionStrategyName } from '../../services/compaction/types';
@@ -794,6 +794,13 @@ export async function runPiAiExecutor<TResponse>(
     if (piAiProvider === 'anthropic' && (isClaudeCodeToken || authMode === 'apiKey')) {
       const stainless = getStainlessHeaders();
       Object.assign(baseHeaders, stainless);
+      // pi-ai's own OAuth client only sets 2 of the 8 beta flags real
+      // Claude Code sends (claude-code-20250219, oauth-2025-04-20) plus
+      // whatever interleaved-thinking/fine-grained-streaming flags apply to
+      // the model. `options.headers` is the last-merged (i.e. overriding)
+      // header source in pi-ai's `createClient()`, so setting the full
+      // list here replaces pi-ai's narrower default rather than fighting it.
+      baseHeaders['anthropic-beta'] = REQUIRED_BETAS.join(',');
     }
 
     let oauthContext = {
@@ -801,6 +808,12 @@ export async function runPiAiExecutor<TResponse>(
       isOAuth: isOAuth && authMode === 'oauth',
       toolNamesRemapped: false,
     };
+
+    // Populated inside onPayload from the actual outgoing tool list, then
+    // stashed on piModel so the response-side reverseMap() calls (both the
+    // non-streaming path below and the streaming path in buildSSEGenerator)
+    // can reverse the exact same renames — see tool-fingerprint/registry.ts.
+    let toolRenamePairs: RenamePair[] = [];
 
     const callOptions: ProviderStreamOptions = {
       ...generationOpts,
@@ -813,22 +826,22 @@ export async function runPiAiExecutor<TResponse>(
         let finalPayload = payload;
         if ((isOAuth || isClaudeMasking) && piAiProvider === 'anthropic' && isClaudeCodeToken) {
           const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
-          const result = processBody(payloadStr, {
-            replacements: [],
-            toolRenames: DEFAULT_TOOL_RENAMES,
-            propRenames: [],
-            stripSystemConfig: true,
-            stripToolDescriptions: true,
-            injectCCSyntheticTools: true,
-          });
-          finalPayload = JSON.parse(result.body);
+          // Full v2 Claude Code OAuth-masking pipeline — see
+          // tool-fingerprint/apply-masking.ts for the step-by-step
+          // rationale (tool renames computed for the caller's actual tool
+          // surface, synthetic tool injection + dedupe, system-prompt
+          // identity replacement, CCH signing).
+          const masked = applyClaudeCodeMasking(payloadStr);
+          finalPayload = masked.payload;
+          toolRenamePairs = masked.toolRenamePairs;
 
           oauthContext = {
             apiKey: apiKey || '',
             isOAuth: true,
-            toolNamesRemapped: true,
+            toolNamesRemapped: toolRenamePairs.length > 0,
           };
           (piModel as any).__oauthContext = oauthContext;
+          (piModel as any).__toolRenamePairs = toolRenamePairs;
         }
 
         const payloadStr =
@@ -925,7 +938,7 @@ export async function runPiAiExecutor<TResponse>(
         if (isOAuth || isClaudeMasking) {
           const serializedStr = JSON.stringify(serialized);
           const reversedStr = reverseMap(serializedStr, {
-            toolRenames: DEFAULT_TOOL_RENAMES,
+            toolRenames: toolRenamePairs,
             propRenames: [],
             reverseMap: DEFAULT_REVERSE_MAP,
           });
@@ -966,6 +979,7 @@ export async function runPiAiExecutor<TResponse>(
           eventStream,
           route,
           piModel: piModel as any,
+          toolRenamePairs,
           attemptTimeout,
           stallTtfbMs,
           stallCooldownEnabled,
@@ -1046,6 +1060,7 @@ interface SSEGeneratorParams {
   eventStream: AsyncIterable<AssistantMessageEvent>;
   route: RouteResult;
   piModel: any;
+  toolRenamePairs: RenamePair[];
   attemptTimeout: ReturnType<typeof createAttemptTimeout>;
   stallTtfbMs: number | null;
   stallCooldownEnabled: boolean;
@@ -1078,6 +1093,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
     eventStream,
     route,
     piModel,
+    toolRenamePairs,
     attemptTimeout,
     stallTtfbMs,
     stallCooldownEnabled,
@@ -1168,7 +1184,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
         let finalFrame = frame;
         if (isOAuth || isClaudeMasking) {
           finalFrame = reverseMap(frame, {
-            toolRenames: DEFAULT_TOOL_RENAMES,
+            toolRenames: toolRenamePairs,
             propRenames: [],
             reverseMap: DEFAULT_REVERSE_MAP,
           });
