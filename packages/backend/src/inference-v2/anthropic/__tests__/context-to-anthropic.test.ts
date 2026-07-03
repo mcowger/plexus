@@ -337,6 +337,28 @@ describe('eventToAnthropicSSE', () => {
     expect(allFrames).toContain('message_stop');
   });
 
+  it('REGRESSION: an error event with no preceding start still emits message_start before message_delta', () => {
+    // pi-ai's stream() resolves synchronously and reports pre-flight
+    // connection failures (auth/network issues before any content) as a
+    // lone 'error' event — no 'start' ever fires. The executor's
+    // peekFirstStreamEvent normally folds this into candidate failover
+    // before the client ever sees it, but this serialiser must still be
+    // correct standalone for any provider/ordering that reaches it, since
+    // clients (e.g. the Anthropic SDK) reject a message_delta that arrives
+    // without a prior message_start.
+    const state = makeAnthropicChunkSerialiserState('claude-opus-4-6');
+    const error = { ...makeMessage({ stopReason: 'error' }), errorMessage: 'Upstream error' };
+    const frames = eventToAnthropicSSE({ type: 'error', reason: 'error', error } as any, state);
+
+    const startIndex = frames.findIndex((f) => f.includes('"type":"message_start"'));
+    const deltaIndex = frames.findIndex((f) => f.includes('"type":"message_delta"'));
+    const stopIndex = frames.findIndex((f) => f.includes('"type":"message_stop"'));
+
+    expect(startIndex).toBeGreaterThanOrEqual(0);
+    expect(deltaIndex).toBeGreaterThan(startIndex);
+    expect(stopIndex).toBeGreaterThan(deltaIndex);
+  });
+
   it('SSE frames start with "event: " or "data: "', () => {
     const state = makeAnthropicChunkSerialiserState('claude-opus-4-6');
     eventToAnthropicSSE(

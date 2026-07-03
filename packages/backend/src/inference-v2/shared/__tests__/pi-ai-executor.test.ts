@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as piAi from '@earendil-works/pi-ai/compat';
 import { setConfigForTesting } from '../../../config';
 import { DebugManager } from '../../../services/debug-manager';
+import { CooldownManager } from '../../../services/cooldown-manager';
 import { enterRequestContext } from '../../../services/request-context';
 import { runPiAiExecutor, alignAssistantProvenance } from '../pi-ai-executor';
 import type { UsageStorageService } from '../../../services/usage-storage';
@@ -33,6 +34,13 @@ function createUsageStorage(): UsageStorageService {
   } as unknown as UsageStorageService;
 }
 
+/**
+ * A pre-flight failure: pi-ai reports a connection failure that happened
+ * before any content was produced as a lone `error` event with no
+ * preceding `start` (see anthropic-messages.ts / openai-completions.ts
+ * etc. in pi-ai — `start` is only pushed after the upstream connection
+ * succeeds; failures before that go straight to `error`).
+ */
 async function* errorStream() {
   yield {
     type: 'error',
@@ -61,6 +69,7 @@ async function* successStream() {
 describe('runPiAiExecutor streaming errors', () => {
   beforeEach(() => {
     DebugManager.getInstance().resetForTesting();
+    CooldownManager.resetForTesting();
     setConfigForTesting({
       providers: {
         'openai-s': {
@@ -87,16 +96,101 @@ describe('runPiAiExecutor streaming errors', () => {
     } as any);
   });
 
-  it('saves terminal usage and error records for streamed error events', async () => {
+  it('folds a pre-flight error (no start event) into candidate failover, rejecting once no candidates remain', async () => {
+    // pi-ai's stream() resolves synchronously and reports pre-flight
+    // connection failures as a lone 'error' event with no preceding
+    // 'start'. With only one candidate configured, the peek in
+    // runPiAiExecutor should surface this exactly like a synchronously
+    // thrown stream() failure: no client-visible frames, a rejected
+    // promise once candidates are exhausted.
     vi.mocked(piAi.stream).mockResolvedValue(errorStream() as any);
     const usageStorage = createUsageStorage();
     DebugManager.getInstance().setStorage(usageStorage);
     DebugManager.getInstance().enableForKey('beta-key');
     enterRequestContext({ keyName: 'beta-key' });
 
+    await expect(
+      runPiAiExecutor({
+        requestId: 'req-stream-error',
+        incomingApiType: 'responses',
+        modelAlias: 'gpt-5.4',
+        context: { messages: [] } as any,
+        generationIntent: { reasoning: { source: 'client' } } as any,
+        streaming: true,
+        request: {
+          body: {},
+          keyName: 'beta-key',
+          attribution: 'opencode',
+          ip: '127.0.0.1',
+        } as any,
+        usageStorage,
+        serializeMessage: (msg) => msg as any,
+        serializeChunks: () => ['event: response.completed\ndata: {}\n\n'],
+      })
+    ).rejects.toThrow(/One of "input" or "previous_response_id"/);
+
+    // Nothing was ever committed to the client, so there's no stream-side
+    // usage/error record to save — the caller (HTTP handler) surfaces and
+    // logs the final rejection itself.
+    expect(usageStorage.saveRequest).not.toHaveBeenCalled();
+  });
+
+  it('absorbs a pre-flight error as a transparent retry to the next candidate', async () => {
+    // First candidate fails before any content (bare 'error', no 'start');
+    // second candidate succeeds. The client should only ever see frames
+    // from the successful candidate.
+    vi.mocked(piAi.stream)
+      .mockResolvedValueOnce(errorStream() as any)
+      .mockResolvedValueOnce(successStream() as any);
+
+    setConfigForTesting({
+      providers: {
+        'openai-s': {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'gpt-5.4': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'gpt-5.4',
+            },
+          },
+        },
+        'openai-backup': {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test-2',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'gpt-5.4': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'gpt-5.4',
+            },
+          },
+        },
+      },
+      models: {
+        'gpt-5.4': {
+          priority: 'selector',
+          selector: 'in_order',
+          targets: [
+            { provider: 'openai-s', model: 'gpt-5.4' },
+            { provider: 'openai-backup', model: 'gpt-5.4' },
+          ],
+        },
+      },
+      keys: {},
+      failover: { enabled: true, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+    DebugManager.getInstance().enableForKey('beta-key');
+    enterRequestContext({ keyName: 'beta-key' });
+
     const result = await runPiAiExecutor({
-      requestId: 'req-stream-error',
-      incomingApiType: 'responses',
+      requestId: 'req-stream-failover',
+      incomingApiType: 'gemini',
       modelAlias: 'gpt-5.4',
       context: { messages: [] } as any,
       generationIntent: { reasoning: { source: 'client' } } as any,
@@ -109,7 +203,17 @@ describe('runPiAiExecutor streaming errors', () => {
       } as any,
       usageStorage,
       serializeMessage: (msg) => msg as any,
-      serializeChunks: () => ['event: response.completed\ndata: {}\n\n'],
+      serializeChunks: (event) => {
+        if (event.type === 'text_delta') {
+          return [
+            `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: event.delta }] } }] })}\n\n`,
+          ];
+        }
+        if (event.type === 'done') {
+          return [`data: ${JSON.stringify({ candidates: [{ finishReason: 'STOP' }] })}\n\n`];
+        }
+        return [];
+      },
     });
 
     const frames: string[] = [];
@@ -117,29 +221,19 @@ describe('runPiAiExecutor streaming errors', () => {
       frames.push(frame);
     }
 
-    expect(frames).toHaveLength(1);
+    // Only the second candidate's frames ever reached the "client" — no
+    // trace of the first candidate's pre-flight failure leaked through.
+    const snapshot = frames.join('');
+    expect(snapshot).toContain('"candidates"');
+    expect(vi.mocked(piAi.stream)).toHaveBeenCalledTimes(2);
     expect(usageStorage.saveRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestId: 'req-stream-error',
-        apiKey: 'beta-key',
-        incomingApiType: 'responses',
-        incomingModelAlias: 'gpt-5.4',
-        provider: 'openai-s',
-        responseStatus: 'error',
-        finishReason: 'error',
+        requestId: 'req-stream-failover',
+        provider: 'openai-backup',
+        attemptCount: 2,
+        responseStatus: 'success',
+        allAttemptedProviders: 'openai-s/gpt-5.4, openai-backup/gpt-5.4',
       })
-    );
-    expect(usageStorage.saveError).toHaveBeenCalledWith(
-      'req-stream-error',
-      expect.any(Error),
-      expect.objectContaining({
-        apiType: 'responses',
-        provider: 'openai-s',
-        targetModel: 'gpt-5.4',
-      })
-    );
-    expect(usageStorage.saveDebugLog).toHaveBeenCalledWith(
-      expect.objectContaining({ requestId: 'req-stream-error' })
     );
   });
 

@@ -29,6 +29,11 @@ export class CooldownManager {
     return CooldownManager.instance;
   }
 
+  /** For testing only */
+  public static resetForTesting(): void {
+    CooldownManager.instance = undefined as any;
+  }
+
   private ensureDb() {
     if (!this.db) {
       this.db = getDatabase();

@@ -190,7 +190,15 @@ export interface AnthropicChunkSerialiserState {
   /** tool_call id of the active tool_use block */
   activeToolId: string | null;
   sentStart: boolean;
-  /** True after the 'start' event, until message_start has actually been flushed */
+  /**
+   * True until message_start has actually been flushed. Starts `true`
+   * (rather than being armed only by a 'start' event) so that any event
+   * arriving without a preceding 'start' — e.g. an upstream pre-flight
+   * failure pi-ai reports as a lone 'error' — still gets a message_start
+   * flushed ahead of it instead of silently dropping it. See
+   * pi-ai-executor.ts's peekFirstStreamEvent for the primary defense; this
+   * is the fallback for any provider/event ordering that slips past it.
+   */
   pendingStart: boolean;
 }
 
@@ -204,7 +212,7 @@ export function makeAnthropicChunkSerialiserState(model: string): AnthropicChunk
     activeContentIndex: null,
     activeToolId: null,
     sentStart: false,
-    pendingStart: false,
+    pendingStart: true,
   };
 }
 

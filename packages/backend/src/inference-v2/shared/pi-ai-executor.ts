@@ -277,6 +277,11 @@ function isRetryable(err: any, signal: AbortSignal | undefined): boolean {
   const code = err?.routingContext?.code;
   if (code === 'client_disconnected') return false;
 
+  // Pre-flight stream failure (see peekFirstStreamEvent below): the failure
+  // was discovered before any bytes reached the client, so retrying the next
+  // candidate is always safe — never worse than surfacing it.
+  if (err?.isPreflightStreamError) return true;
+
   // AbortError (from attempt timeout) → upstream_timeout → retryable
   if (err?.name === 'AbortError' || err instanceof DOMException) return true;
 
@@ -327,6 +332,46 @@ function nextWithTtfbTimeout<T>(
       }
     );
   });
+}
+
+// ─── Pre-flight peek ──────────────────────────────────────────────────────────
+
+/**
+ * pi-ai's `stream()` resolves synchronously and never rejects — a connection
+ * failure that happens before any content is produced (auth/network/OAuth
+ * token issues, etc.) is instead reported as a lone `error` event with no
+ * preceding `start`. Left alone, that gets forwarded straight into the
+ * client's SSE stream as a bare `error`/terminal frame with no `start` ever
+ * sent — a protocol violation for wire formats (like Anthropic messages)
+ * that require `message_start` before any other event.
+ *
+ * Since nothing has reached the client yet at this point (no HTTP response
+ * has been committed), this failure is exactly as safe to retry as a
+ * `stream()` call that threw synchronously. This peeks the first event off
+ * the iterator so the per-candidate loop can fold it into the existing
+ * failover path instead of committing a broken stream to the client.
+ */
+async function peekFirstStreamEvent<T>(
+  iterator: AsyncIterator<T>,
+  stallTtfbMs: number | null
+): Promise<IteratorResult<T>> {
+  return stallTtfbMs != null
+    ? nextWithTtfbTimeout(iterator.next() as Promise<IteratorResult<T>>, stallTtfbMs, () => {})
+    : (iterator.next() as Promise<IteratorResult<T>>);
+}
+
+/** Re-attaches an already-consumed first result to the front of an iterator. */
+function primeAsyncIterable<T>(first: T, rest: AsyncIterator<T>): AsyncIterable<T> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield first;
+      while (true) {
+        const next = await rest.next();
+        if (next.done) return;
+        yield next.value;
+      }
+    },
+  };
 }
 
 // ─── UsageRecord population from pi-ai ───────────────────────────────────────
@@ -1020,11 +1065,34 @@ export async function runPiAiExecutor<TResponse>(
           piAiModels.stream(dispatchModel, dispatchContext, callOptions)
         );
 
+        // ── Pre-flight peek ────────────────────────────────────────────
+        // Consume the first event before committing to this candidate. If
+        // it's a pre-`start` `error`, throw so the existing catch(err) below
+        // treats it exactly like a synchronously-thrown stream() failure —
+        // cooldown, retryHistory, and failover to the next candidate — since
+        // nothing has been sent to the client yet.
+        const iterator = (eventStream as AsyncIterable<AssistantMessageEvent>)[
+          Symbol.asyncIterator
+        ]();
+        const firstResult = await peekFirstStreamEvent(iterator, stallTtfbMs);
+
+        if (!firstResult.done && firstResult.value.type === 'error') {
+          const preflightErr = new Error(
+            extractPiAiErrorMessage(firstResult.value.error) ?? 'Upstream error'
+          ) as any;
+          preflightErr.isPreflightStreamError = true;
+          throw preflightErr;
+        }
+
+        const primedStream: AsyncIterable<AssistantMessageEvent> = firstResult.done
+          ? { async *[Symbol.asyncIterator]() {} }
+          : primeAsyncIterable(firstResult.value, iterator);
+
         // Build and return the SSE generator — the generator owns
         // release, timeout cleanup, usage, quota, debug flush.
         const gen = buildSSEGenerator({
           requestId,
-          eventStream,
+          eventStream: primedStream,
           route,
           piModel: piModel as any,
           toolRenamePairs,
