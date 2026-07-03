@@ -9,7 +9,7 @@ import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware, attachQuotaContext } from '../../services/quota/quota-middleware';
-import { saveQuotaExceededUsage } from './_quota-error';
+import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
 import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
@@ -103,7 +103,10 @@ export async function registerGeminiRoute(
       // Check quota before processing
       if (quotaEnforcer) {
         const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-        if (!quotaCheck.ok) return;
+        if (!quotaCheck.ok) {
+          saveQuotaBlockedUsage(usageRecord, usageStorage, requestId, startTime);
+          return;
+        }
         unifiedRequest = attachQuotaContext(unifiedRequest, quotaCheck.context);
       }
 

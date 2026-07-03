@@ -8,6 +8,10 @@ import { DebugManager } from '../../services/debug-manager';
  * persist the request + error rows, and flush debug logs. Used by every
  * inference route's catch block; the caller stays responsible for the
  * protocol-specific 429 reply (`e.routingContext.body`).
+ *
+ * `responseStatus` is the distinct 'quota_exceeded' (not the generic
+ * 'error') so quota rejections are filterable in usage views. Error-rate
+ * metrics count `!= 'success'`, so they see it the same as before.
  */
 export function saveQuotaExceededUsage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,11 +22,31 @@ export function saveQuotaExceededUsage(
   requestId: string,
   startTime: number
 ): void {
-  usageRecord.responseStatus = 'error';
+  usageRecord.responseStatus = 'quota_exceeded';
   usageRecord.durationMs = Date.now() - startTime;
   usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
   usageRecord.retryHistory = e.routingContext?.retryHistory || usageRecord.retryHistory || null;
   usageStorage.saveRequest(usageRecord as UsageRecord);
   usageStorage.saveError(requestId, e, { apiType, ...(e.routingContext || {}) });
+  DebugManager.getInstance().flush(requestId);
+}
+
+/**
+ * Finalize the usage record for a request 429'd up front by
+ * `checkQuotaMiddleware` (blocked GLOBAL quota — the middleware already
+ * sent the 429 reply itself). Every v1 route pre-inserts a
+ * `responseStatus: 'pending'` row via `emitStartedAsync` for the live view;
+ * without this upsert a quota-blocked request would sit "in-flight" in the
+ * dashboard forever.
+ */
+export function saveQuotaBlockedUsage(
+  usageRecord: Partial<UsageRecord>,
+  usageStorage: UsageStorageService,
+  requestId: string,
+  startTime: number
+): void {
+  usageRecord.responseStatus = 'quota_exceeded';
+  usageRecord.durationMs = Date.now() - startTime;
+  usageStorage.saveRequest(usageRecord as UsageRecord);
   DebugManager.getInstance().flush(requestId);
 }

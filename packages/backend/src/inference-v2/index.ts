@@ -151,7 +151,14 @@ function saveBetaErrorUsage(
     startTime,
     durationMs: Date.now() - startTime,
     isStreamed: streaming,
-    responseStatus: error?.routingContext?.code === 'client_disconnected' ? 'cancelled' : 'error',
+    // 'quota_exceeded' mirrors the v1 routes' saveQuotaExceededUsage so
+    // quota rejections are filterable regardless of key generation.
+    responseStatus:
+      error?.routingContext?.code === 'client_disconnected'
+        ? 'cancelled'
+        : error?.routingContext?.code === 'quota_exceeded'
+          ? 'quota_exceeded'
+          : 'error',
   } as any);
 }
 

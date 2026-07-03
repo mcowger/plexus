@@ -521,6 +521,12 @@ describe('beta handlers: terminal scoped-exhaustion carries blocking_quotas into
     expect(body.error.blocking_quotas).toHaveLength(1);
     expect(body.error.blocking_quotas[0].quotaName).toBe('scoped-prov-a');
 
+    // The persisted usage row carries the distinct status (not generic
+    // 'error') so quota rejections are filterable in usage views.
+    expect(usageStorage.saveRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ responseStatus: 'quota_exceeded' })
+    );
+
     expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
     expect(vi.mocked(piAi.stream)).not.toHaveBeenCalled();
   });
