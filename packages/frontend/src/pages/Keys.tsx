@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, KeyConfig, UserQuota } from '../lib/api';
+import { api, KeyConfig, UserQuota, QuotaStatusEntry, Provider } from '../lib/api';
 import { Input } from '../components/ui/Input';
 import { TagSelect } from '../components/ui/TagSelect';
 import { Card } from '../components/ui/Card';
@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Tabs } from '../components/ui/Tabs';
 import { Switch } from '../components/ui/Switch';
+import { QuotaProgressBar } from '../components/quota/QuotaProgressBar';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
@@ -21,9 +22,13 @@ import {
   Shield,
   AlertCircle,
   BarChart3,
+  Wrench,
+  Users,
+  Info,
 } from 'lucide-react';
 import { formatNumber, formatCost } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
+import { statusForPercent, formatQuotaValue, sortMostConstrainedFirst } from '../lib/quota';
 
 const EMPTY_KEY: KeyConfig = {
   key: '',
@@ -38,25 +43,88 @@ const EMPTY_QUOTA: UserQuota & { name: string } = {
   limitType: 'requests',
   limit: 1000,
   duration: '1h',
+  allowedProviders: [],
+  excludedProviders: [],
+  allowedModels: [],
+  excludedModels: [],
+  shared: false,
+  warnAt: undefined,
 };
 
-interface QuotaStatus {
-  key: string;
-  quota_name: string | null;
-  allowed: boolean;
-  current_usage: number;
-  limit: number | null;
-  remaining: number | null;
-  resets_at: string | null;
+// Response shape of `GET /v0/management/quota/status/:key` — kept in sync
+// with `lib/api.ts`'s `getQuotaStatus` return type rather than duplicated by
+// hand.
+type QuotaStatusResponse = NonNullable<Awaited<ReturnType<typeof api.getQuotaStatus>>>;
+
+/** A rolling requests/tokens def is inherently leaky (usage isn't stored
+ * per-request in a recomputable way) — recompute is refused backend-side
+ * for these. Mirrors `QuotaEnforcer.recomputeQuota`'s guard. */
+function isLeakyRollingDef(def: UserQuota | undefined): boolean {
+  if (!def) return false;
+  return def.type === 'rolling' && (def.limitType === 'requests' || def.limitType === 'tokens');
+}
+
+/** The entry with the smallest remaining/limit ratio — mirrors the backend's
+ * `mostConstrained` helper used for the legacy single-quota shim fields.
+ * A `limit === 0` entry is treated as fully constrained (ratio 0). */
+function mostConstrainedEntry(entries: QuotaStatusEntry[]): QuotaStatusEntry | null {
+  if (entries.length === 0) return null;
+  const ratio = (e: QuotaStatusEntry) => (e.limit > 0 ? e.remaining / e.limit : 0);
+  return entries.reduce((min, c) => (ratio(c) < ratio(min) ? c : min));
+}
+
+function entryUsagePercent(entry: QuotaStatusEntry): number {
+  if (!entry.limit || entry.limit === 0) return 0;
+  return Math.min(100, (entry.currentUsage / entry.limit) * 100);
+}
+
+/** Small pill used to label quota scope/source facts (shared, default,
+ * scoped) across the list rows and the status modal. */
+const QuotaChip: React.FC<{ children: React.ReactNode; tone?: 'default' | 'muted' }> = ({
+  children,
+  tone = 'default',
+}) => (
+  <span
+    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-md ${
+      tone === 'muted'
+        ? 'bg-bg-subtle text-text-muted border border-border-glass'
+        : 'bg-primary/10 text-primary border border-primary/20'
+    }`}
+  >
+    {children}
+  </span>
+);
+
+function hasScope(scope: QuotaStatusEntry['scope'] | undefined): boolean {
+  if (!scope) return false;
+  return Boolean(
+    scope.allowedProviders?.length ||
+      scope.excludedProviders?.length ||
+      scope.allowedModels?.length ||
+      scope.excludedModels?.length
+  );
+}
+
+function defHasScope(def: UserQuota | undefined): boolean {
+  if (!def) return false;
+  return Boolean(
+    def.allowedProviders?.length ||
+      def.excludedProviders?.length ||
+      def.allowedModels?.length ||
+      def.excludedModels?.length
+  );
 }
 
 export const Keys = () => {
   const toast = useToast();
   const [keys, setKeys] = useState<KeyConfig[]>([]);
   const [quotas, setQuotas] = useState<Record<string, UserQuota>>({});
-  const [quotaStatuses, setQuotaStatuses] = useState<Record<string, QuotaStatus>>({});
+  const [quotaStatuses, setQuotaStatuses] = useState<Record<string, QuotaStatusResponse>>({});
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [providerIds, setProviderIds] = useState<string[]>([]);
   const [aliasIds, setAliasIds] = useState<string[]>([]);
+  const [defaultQuotaNames, setDefaultQuotaNames] = useState<string[]>([]);
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [search, setSearch] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'keys' | 'quotas'>('keys');
@@ -76,22 +144,37 @@ export const Keys = () => {
   // Quota Detail Modal State
   const [isQuotaDetailOpen, setIsQuotaDetailOpen] = useState(false);
   const [selectedQuotaName, setSelectedQuotaName] = useState<string | null>(null);
-  const [selectedQuotaStatus, setSelectedQuotaStatus] = useState<QuotaStatus | null>(null);
+  const [selectedQuotaStatus, setSelectedQuotaStatus] = useState<QuotaStatusResponse | null>(null);
+  const [recomputingQuota, setRecomputingQuota] = useState<string | null>(null);
+
+  // Union of every model name exposed by any provider — used as the options
+  // list for quota scope TagSelects (allowCustom covers models not yet
+  // synced into a provider's catalog).
+  const allModelNames = Array.from(
+    new Set(
+      providers.flatMap((p) => (p.models && !Array.isArray(p.models) ? Object.keys(p.models) : []))
+    )
+  ).sort();
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  // Returns the refreshed per-key status map so callers (e.g. the reset /
+  // recompute handlers) can reuse it for the detail modal without issuing a
+  // second `getQuotaStatus` fetch for the same key.
+  const loadData = async (): Promise<Record<string, QuotaStatusResponse> | null> => {
     try {
-      const [k, q, provs, aliases] = await Promise.all([
+      const [k, q, provs, aliases, defaults] = await Promise.all([
         api.getKeys(),
         api.getUserQuotas(),
         api.getProviders(),
         api.getAliases(),
+        api.getDefaultQuotas().catch(() => []),
       ]);
       setKeys(k);
       setQuotas(q);
+      setProviders(provs);
       setProviderIds(
         provs
           .filter((p) => p.enabled)
@@ -99,24 +182,33 @@ export const Keys = () => {
           .sort()
       );
       setAliasIds(aliases.map((a) => a.id).sort());
+      setDefaultQuotaNames(defaults);
 
-      // Load quota status for all keys that have quotas
-      const statuses: Record<string, QuotaStatus> = {};
-      for (const key of k) {
-        if (key.quota) {
-          try {
-            const status = await api.getQuotaStatus(key.key);
-            if (status) {
-              statuses[key.key] = status;
+      // Load quota status only for keys that can actually resolve quota
+      // entries: keys with assigned `quotas`, or — when `default_quotas` is
+      // set — every key (bare keys inherit the defaults). A bare key with no
+      // defaults configured can never have entries (the backend returns an
+      // empty context immediately), so skip the fetch for those.
+      const statuses: Record<string, QuotaStatusResponse> = {};
+      await Promise.all(
+        k
+          .filter((key) => (key.quotas?.length ?? 0) > 0 || defaults.length > 0)
+          .map(async (key) => {
+            try {
+              const status = await api.getQuotaStatus(key.key);
+              if (status) {
+                statuses[key.key] = status;
+              }
+            } catch (e) {
+              console.error(`Failed to load quota status for ${key.key}`, e);
             }
-          } catch (e) {
-            console.error(`Failed to load quota status for ${key.key}`, e);
-          }
-        }
-      }
+          })
+      );
       setQuotaStatuses(statuses);
+      return statuses;
     } catch (e) {
       console.error('Failed to load data', e);
+      return null;
     }
   };
 
@@ -191,10 +283,29 @@ export const Keys = () => {
       toast.error('Rolling quotas require a duration');
       return;
     }
+    if (
+      editingQuota.warnAt !== undefined &&
+      (editingQuota.warnAt <= 0 || editingQuota.warnAt >= 1)
+    ) {
+      toast.error('Warn threshold must be between 0% and 100% (exclusive)');
+      return;
+    }
 
     setIsSavingQuota(true);
     try {
-      const { name, ...quotaData } = editingQuota;
+      const { name, allowedProviders, excludedProviders, allowedModels, excludedModels, ...rest } =
+        editingQuota;
+
+      // Empty scope arrays are semantically "unscoped" — send undefined
+      // instead of `[]` so the definition doesn't carry pointless empty
+      // fields around.
+      const quotaData: UserQuota = {
+        ...rest,
+        ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
+        ...(excludedProviders && excludedProviders.length > 0 ? { excludedProviders } : {}),
+        ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
+        ...(excludedModels && excludedModels.length > 0 ? { excludedModels } : {}),
+      };
 
       // If name changed, delete old quota first
       if (originalQuotaName && originalQuotaName !== name) {
@@ -230,20 +341,60 @@ export const Keys = () => {
     }
   };
 
-  const handleClearQuota = async (keyName: string) => {
+  const handleClearQuota = async (keyName: string, quotaName?: string) => {
     const _okr = await toast.confirm({
       title: 'Reset quota?',
-      message: `Reset quota usage for key '${keyName}'?`,
+      message: quotaName
+        ? `Reset usage for quota '${quotaName}' on key '${keyName}'?`
+        : `Reset usage for every quota attached to key '${keyName}'?`,
       confirmLabel: 'Reset',
     });
     if (!_okr) return;
 
     try {
-      await api.clearQuota(keyName);
-      await loadData();
+      await api.clearQuota(keyName, quotaName);
+      const statuses = await loadData();
+      // Keep the detail modal open (if open) showing fresh numbers, reusing
+      // the status loadData just fetched instead of a second round trip.
+      if (selectedQuotaName === keyName && statuses?.[keyName]) {
+        setSelectedQuotaStatus(statuses[keyName]);
+      }
     } catch (e) {
       console.error('Failed to clear quota', e);
-      toast.error('Failed to clear quota');
+      toast.error(e instanceof Error ? e.message : 'Failed to clear quota');
+    }
+  };
+
+  const handleRecomputeQuota = async (keyName: string, quotaName: string) => {
+    setRecomputingQuota(quotaName);
+    try {
+      await api.recomputeQuota(keyName, quotaName);
+      toast.success(`Quota '${quotaName}' recomputed`);
+      const statuses = await loadData();
+      if (selectedQuotaName === keyName && statuses?.[keyName]) {
+        setSelectedQuotaStatus(statuses[keyName]);
+      }
+    } catch (e) {
+      console.error('Failed to recompute quota', e);
+      toast.error(e instanceof Error ? e.message : 'Failed to recompute quota');
+    } finally {
+      setRecomputingQuota(null);
+    }
+  };
+
+  const handleSaveDefaultQuotas = async (names: string[]) => {
+    setIsSavingDefaults(true);
+    const previous = defaultQuotaNames;
+    setDefaultQuotaNames(names);
+    try {
+      await api.setDefaultQuotas(names);
+      await loadData();
+    } catch (e) {
+      console.error('Failed to save default quotas', e);
+      toast.error(e instanceof Error ? e.message : 'Failed to save default quotas');
+      setDefaultQuotaNames(previous);
+    } finally {
+      setIsSavingDefaults(false);
     }
   };
 
@@ -274,7 +425,7 @@ export const Keys = () => {
     (k) =>
       k.key.toLowerCase().includes(search.toLowerCase()) ||
       (k.comment && k.comment.toLowerCase().includes(search.toLowerCase())) ||
-      (k.quota && k.quota.toLowerCase().includes(search.toLowerCase())) ||
+      k.quotas?.some((name) => name.toLowerCase().includes(search.toLowerCase())) ||
       k.allowedModels?.some((model) => model.toLowerCase().includes(search.toLowerCase())) ||
       k.allowedProviders?.some((provider) =>
         provider.toLowerCase().includes(search.toLowerCase())
@@ -289,11 +440,6 @@ export const Keys = () => {
   const filteredQuotas = Object.entries(quotas).filter(([name]) =>
     name.toLowerCase().includes(search.toLowerCase())
   );
-
-  const getQuotaUsagePercent = (status: QuotaStatus) => {
-    if (!status.limit || status.limit === 0) return 0;
-    return Math.min(100, (status.current_usage / status.limit) * 100);
-  };
 
   const getQuotaStatusColor = (percent: number) => {
     if (percent >= 90) return 'var(--color-danger)';
@@ -386,7 +532,10 @@ export const Keys = () => {
               ) : (
                 filteredKeys.map((key) => {
                   const status = quotaStatuses[key.key];
-                  const usagePercent = status ? getQuotaUsagePercent(status) : 0;
+                  const primary = status ? mostConstrainedEntry(status.quotas) : null;
+                  const usagePercent = primary ? entryUsagePercent(primary) : 0;
+                  const quotaNames = key.quotas && key.quotas.length > 0 ? key.quotas : null;
+                  const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
 
                   return (
                     <article
@@ -459,21 +608,33 @@ export const Keys = () => {
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
                             Quota
                           </div>
-                          <div className="mt-1 truncate font-medium text-text-secondary">
-                            {key.quota || '-'}
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {quotaNames ? (
+                              quotaNames.map((n) => <QuotaChip key={n}>{n}</QuotaChip>)
+                            ) : usingDefaults ? (
+                              <>
+                                {defaultQuotaNames.map((n) => (
+                                  <QuotaChip key={n} tone="muted">
+                                    {n}
+                                  </QuotaChip>
+                                ))}
+                                <QuotaChip tone="muted">default</QuotaChip>
+                              </>
+                            ) : (
+                              <span className="text-text-secondary">-</span>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-2">
-                        {status ? (
+                        {primary ? (
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between gap-2 text-xs">
-                              <span className="text-text-muted">Usage</span>
+                              <span className="text-text-muted truncate">{primary.name}</span>
                               <span className="font-medium text-text">
-                                {quotas[key.quota || '']?.limitType === 'cost'
-                                  ? `${formatCost(status.current_usage, 5)} / ${formatCost(status.limit || 0, 5)}`
-                                  : `${formatNumber(status.current_usage)} / ${formatNumber(status.limit || 0)}`}
+                                {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
+                                {formatQuotaValue(primary.limit, primary.limitType)}
                               </span>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
@@ -485,6 +646,12 @@ export const Keys = () => {
                                 }}
                               />
                             </div>
+                            {status && status.quotas.length > 1 && (
+                              <p className="text-[11px] text-text-muted">
+                                +{status.quotas.length - 1} more quota
+                                {status.quotas.length - 1 !== 1 ? 's' : ''}
+                              </p>
+                            )}
                             <div className="flex items-center justify-end gap-2">
                               <Button
                                 variant="ghost"
@@ -506,7 +673,9 @@ export const Keys = () => {
                           </div>
                         ) : (
                           <div className="text-xs text-text-muted">
-                            {key.quota ? 'Loading quota status...' : 'No quota assigned'}
+                            {quotaNames || usingDefaults
+                              ? 'Loading quota status...'
+                              : 'No quota assigned'}
                           </div>
                         )}
                       </div>
@@ -546,7 +715,10 @@ export const Keys = () => {
                 <tbody>
                   {filteredKeys.map((key) => {
                     const status = quotaStatuses[key.key];
-                    const usagePercent = status ? getQuotaUsagePercent(status) : 0;
+                    const primary = status ? mostConstrainedEntry(status.quotas) : null;
+                    const usagePercent = primary ? entryUsagePercent(primary) : 0;
+                    const quotaNames = key.quotas && key.quotas.length > 0 ? key.quotas : null;
+                    const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
 
                     return (
                       <tr key={key.key} className="hover:bg-bg-hover">
@@ -587,11 +759,27 @@ export const Keys = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          {key.quota ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary">
-                              <Shield size={12} />
-                              {key.quota}
-                            </span>
+                          {quotaNames ? (
+                            <div className="flex flex-wrap items-center gap-1">
+                              {quotaNames.map((n) => (
+                                <span
+                                  key={n}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary"
+                                >
+                                  <Shield size={12} />
+                                  {n}
+                                </span>
+                              ))}
+                            </div>
+                          ) : usingDefaults ? (
+                            <div className="flex flex-wrap items-center gap-1">
+                              {defaultQuotaNames.map((n) => (
+                                <QuotaChip key={n} tone="muted">
+                                  {n}
+                                </QuotaChip>
+                              ))}
+                              <QuotaChip tone="muted">default</QuotaChip>
+                            </div>
                           ) : (
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                               -
@@ -599,7 +787,7 @@ export const Keys = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          {status ? (
+                          {primary ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <div
                                 style={{
@@ -610,10 +798,14 @@ export const Keys = () => {
                                 }}
                               />
                               <span style={{ fontSize: '12px' }}>
-                                {quotas[key.quota || '']?.limitType === 'cost'
-                                  ? `${formatCost(status.current_usage, 5)} / ${formatCost(status.limit || 0, 5)}`
-                                  : `${formatNumber(status.current_usage)} / ${formatNumber(status.limit || 0)}`}
+                                {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
+                                {formatQuotaValue(primary.limit, primary.limitType)}
                               </span>
+                              {status && status.quotas.length > 1 && (
+                                <span className="text-[11px] text-text-muted">
+                                  (+{status.quotas.length - 1})
+                                </span>
+                              )}
                               <button
                                 className="bg-transparent border-0 text-text-muted p-1 rounded-sm cursor-pointer hover:text-primary"
                                 onClick={() => handleViewQuotaStatus(key.key)}
@@ -622,7 +814,7 @@ export const Keys = () => {
                                 <BarChart3 size={14} />
                               </button>
                             </div>
-                          ) : key.quota ? (
+                          ) : quotaNames || usingDefaults ? (
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
                               Loading...
                             </span>
@@ -640,7 +832,7 @@ export const Keys = () => {
                             <Button variant="ghost" size="sm" onClick={() => handleEditKey(key)}>
                               <Edit2 size={14} />
                             </Button>
-                            {key.quota && (
+                            {(quotaNames || usingDefaults) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -678,182 +870,216 @@ export const Keys = () => {
 
         {/* Quotas Tab */}
         {activeTab === 'quotas' && (
-          <Card title="User Quotas" className="mb-6">
-            <div className="space-y-3 md:hidden">
-              {filteredQuotas.length === 0 ? (
-                <div className="py-10 text-center text-sm text-text-muted">
-                  {Object.keys(quotas).length === 0 ? 'No quotas defined yet' : 'No quotas found'}
-                </div>
-              ) : (
-                filteredQuotas.map(([name, quota]) => {
-                  const keysUsingQuota = keys.filter((k) => k.quota === name).length;
+          <>
+            <Card title="Default quotas" className="mb-6">
+              <p className="text-xs text-text-muted mb-3">
+                Applied to any key with no quotas of its own (non-stacking — a key's own{' '}
+                <code>quotas</code> always wins over this fallback when set).
+              </p>
+              <TagSelect
+                placeholder="No default quotas — select one or more..."
+                options={Object.keys(quotas).sort()}
+                selected={defaultQuotaNames}
+                onChange={handleSaveDefaultQuotas}
+              />
+              {isSavingDefaults && <p className="mt-2 text-xs text-text-muted">Saving…</p>}
+            </Card>
 
-                  return (
-                    <article
-                      key={name}
-                      className="rounded-md border border-border-glass bg-bg-subtle p-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate font-heading text-sm font-semibold text-text">
-                            {name}
-                          </div>
-                          <div className="mt-1 text-xs text-text-muted">
-                            {quota.type}
-                            {quota.type === 'rolling' && quota.duration
-                              ? ` (${quota.duration})`
-                              : ''}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditQuota(name, quota)}
-                            aria-label={`Edit ${name}`}
-                          >
-                            <Edit2 size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteQuota(name)}
-                            className="text-danger"
-                            aria-label={`Delete ${name}`}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Limit
-                          </div>
-                          <div className="truncate font-mono text-text">
-                            {quota.limitType === 'cost'
-                              ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
-                              : `${formatNumber(quota.limit)} ${quota.limitType}`}
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Keys
-                          </div>
-                          <div className="truncate font-medium text-text-secondary">
-                            {keysUsingQuota} key{keysUsingQuota !== 1 ? 's' : ''}
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full border-collapse font-body text-[13px]">
-                <thead>
-                  <tr>
-                    <th
-                      className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                      style={{ paddingLeft: '24px' }}
-                    >
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Limit
-                    </th>
-                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Keys Using
-                    </th>
-                    <th
-                      className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                      style={{ paddingRight: '24px', textAlign: 'right' }}
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredQuotas.map(([name, quota]) => {
-                    const keysUsingQuota = keys.filter((k) => k.quota === name).length;
+            <Card title="User Quotas" className="mb-6">
+              <div className="space-y-3 md:hidden">
+                {filteredQuotas.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-text-muted">
+                    {Object.keys(quotas).length === 0 ? 'No quotas defined yet' : 'No quotas found'}
+                  </div>
+                ) : (
+                  filteredQuotas.map(([name, quota]) => {
+                    const keysUsingQuota = keys.filter((k) => k.quotas?.includes(name)).length;
 
                     return (
-                      <tr key={name} className="hover:bg-bg-hover">
-                        <td
-                          className="px-4 py-3 text-left border-b border-border-glass text-text"
-                          style={{ fontWeight: 600, paddingLeft: '24px' }}
-                        >
-                          {name}
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-bg-subtle text-text-secondary">
-                            {quota.type}
-                            {quota.type === 'rolling' && quota.duration && (
-                              <span className="text-text-muted">({quota.duration})</span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          <span className="font-mono text-xs">
-                            {quota.limitType === 'cost'
-                              ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
-                              : `${formatNumber(quota.limit)} ${quota.limitType}`}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md ${
-                              keysUsingQuota > 0
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-bg-subtle text-text-muted'
-                            }`}
-                          >
-                            {keysUsingQuota} key{keysUsingQuota !== 1 ? 's' : ''}
-                          </span>
-                        </td>
-                        <td
-                          className="px-4 py-3 text-left border-b border-border-glass text-text"
-                          style={{ paddingRight: '24px', textAlign: 'right' }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <article
+                        key={name}
+                        className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="truncate font-heading text-sm font-semibold text-text">
+                                {name}
+                              </span>
+                              {quota.shared && (
+                                <QuotaChip>
+                                  <Users size={10} /> shared
+                                </QuotaChip>
+                              )}
+                              {defHasScope(quota) && <QuotaChip tone="muted">scoped</QuotaChip>}
+                            </div>
+                            <div className="mt-1 text-xs text-text-muted">
+                              {quota.type}
+                              {quota.type === 'rolling' && quota.duration
+                                ? ` (${quota.duration})`
+                                : ''}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleEditQuota(name, quota)}
+                              aria-label={`Edit ${name}`}
                             >
                               <Edit2 size={14} />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleDeleteQuota(name)}
-                              style={{ color: 'var(--color-danger)' }}
+                              className="text-danger"
+                              aria-label={`Delete ${name}`}
                             >
                               <Trash2 size={14} />
                             </Button>
                           </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                              Limit
+                            </div>
+                            <div className="truncate font-mono text-text">
+                              {quota.limitType === 'cost'
+                                ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
+                                : `${formatNumber(quota.limit)} ${quota.limitType}`}
+                            </div>
+                          </div>
+                          <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                              Keys
+                            </div>
+                            <div className="truncate font-medium text-text-secondary">
+                              {keysUsingQuota} key{keysUsingQuota !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full border-collapse font-body text-[13px]">
+                  <thead>
+                    <tr>
+                      <th
+                        className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                        style={{ paddingLeft: '24px' }}
+                      >
+                        Name
+                      </th>
+                      <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Limit
+                      </th>
+                      <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Keys Using
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                        style={{ paddingRight: '24px', textAlign: 'right' }}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredQuotas.map(([name, quota]) => {
+                      const keysUsingQuota = keys.filter((k) => k.quotas?.includes(name)).length;
+
+                      return (
+                        <tr key={name} className="hover:bg-bg-hover">
+                          <td
+                            className="px-4 py-3 text-left border-b border-border-glass text-text"
+                            style={{ fontWeight: 600, paddingLeft: '24px' }}
+                          >
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span>{name}</span>
+                              {quota.shared && (
+                                <QuotaChip>
+                                  <Users size={10} /> shared
+                                </QuotaChip>
+                              )}
+                              {defHasScope(quota) && <QuotaChip tone="muted">scoped</QuotaChip>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-bg-subtle text-text-secondary">
+                              {quota.type}
+                              {quota.type === 'rolling' && quota.duration && (
+                                <span className="text-text-muted">({quota.duration})</span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                            <span className="font-mono text-xs">
+                              {quota.limitType === 'cost'
+                                ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
+                                : `${formatNumber(quota.limit)} ${quota.limitType}`}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md ${
+                                keysUsingQuota > 0
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'bg-bg-subtle text-text-muted'
+                              }`}
+                            >
+                              {keysUsingQuota} key{keysUsingQuota !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                          <td
+                            className="px-4 py-3 text-left border-b border-border-glass text-text"
+                            style={{ paddingRight: '24px', textAlign: 'right' }}
+                          >
+                            <div
+                              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditQuota(name, quota)}
+                              >
+                                <Edit2 size={14} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteQuota(name)}
+                                style={{ color: 'var(--color-danger)' }}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredQuotas.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center text-text-muted p-12">
+                          {Object.keys(quotas).length === 0
+                            ? 'No quotas defined yet'
+                            : 'No quotas found'}
                         </td>
                       </tr>
-                    );
-                  })}
-                  {filteredQuotas.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center text-text-muted p-12">
-                        {Object.keys(quotas).length === 0
-                          ? 'No quotas defined yet'
-                          : 'No quotas found'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </>
         )}
 
         {/* Key Modal */}
@@ -1028,33 +1254,20 @@ export const Keys = () => {
               CIDR (e.g. <code>10.0.0.0/8</code>), and ranges (e.g. <code>10.1.0.10-20</code>).
             </p>
 
-            <div className="flex flex-col gap-2">
-              <label className="font-body text-[13px] font-medium text-text-secondary">
-                Quota Assignment
-              </label>
-              <select
-                className="w-full px-3 py-2 bg-bg-subtle border border-border-glass rounded-md font-body text-sm text-text focus:border-primary focus:outline-none"
-                value={editingKey.quota || ''}
-                onChange={(e) =>
-                  setEditingKey({ ...editingKey, quota: e.target.value || undefined })
-                }
-              >
-                <option value="">&lt;None&gt;</option>
-                {Object.entries(quotas).map(([name, quota]) => (
-                  <option key={name} value={name}>
-                    {name} ({quota.type},{' '}
-                    {quota.limitType === 'cost'
-                      ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
-                      : `${quota.limit} ${quota.limitType}`}
-                    )
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-text-muted">
-                Optional: assign a quota to this key. Allowlist/denylist checks run before and
-                during routing.
-              </p>
-            </div>
+            <TagSelect
+              label="Quota Assignment"
+              placeholder="No quotas — falls back to default quotas, if any..."
+              options={Object.keys(quotas).sort()}
+              selected={editingKey.quotas || []}
+              onChange={(names) =>
+                setEditingKey({ ...editingKey, quotas: names.length > 0 ? names : undefined })
+              }
+            />
+            <p className="text-xs text-text-muted -mt-1">
+              Optional: assign one or more quotas to this key (usage against each is tracked
+              independently). When left empty, this key falls back to the system's default quotas,
+              if any are configured.
+            </p>
           </div>
         </Modal>
 
@@ -1169,6 +1382,99 @@ export const Keys = () => {
                 allowed
               </p>
             </div>
+
+            <div className="flex items-start justify-between gap-4 rounded-md border border-border-glass bg-bg-subtle p-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-body text-[13px] font-medium text-text-secondary">
+                  Shared bucket
+                </div>
+                <p className="mt-1 text-xs text-text-muted">
+                  Pool usage across every key that references this quota into a single counter,
+                  instead of tracking each key independently.
+                </p>
+              </div>
+              <Switch
+                checked={!!editingQuota.shared}
+                onChange={(shared) => setEditingQuota({ ...editingQuota, shared })}
+                aria-label="Toggle shared quota bucket"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Input
+                label="Warn threshold (optional)"
+                type="number"
+                min={1}
+                max={99}
+                value={
+                  editingQuota.warnAt !== undefined ? Math.round(editingQuota.warnAt * 100) : ''
+                }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setEditingQuota({ ...editingQuota, warnAt: undefined });
+                    return;
+                  }
+                  const pct = parseInt(raw, 10);
+                  if (Number.isNaN(pct)) return;
+                  setEditingQuota({
+                    ...editingQuota,
+                    warnAt: Math.min(99, Math.max(1, pct)) / 100,
+                  });
+                }}
+                placeholder="e.g. 80"
+              />
+              <p className="text-xs text-text-muted">
+                Percent of the limit at which to flag usage as approaching exhaustion. Leave empty
+                to disable early-warning.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-border-glass">
+              <p className="text-xs font-medium text-text-secondary">
+                Scope (optional — unscoped applies to every provider/model)
+              </p>
+            </div>
+
+            <TagSelect
+              label="Allowed Providers"
+              placeholder="Optional: restrict to these providers..."
+              options={providerIds}
+              selected={editingQuota.allowedProviders || []}
+              onChange={(allowedProviders) =>
+                setEditingQuota({ ...editingQuota, allowedProviders })
+              }
+            />
+            <TagSelect
+              label="Excluded Providers"
+              placeholder="Optional: exclude these providers..."
+              options={providerIds}
+              selected={editingQuota.excludedProviders || []}
+              onChange={(excludedProviders) =>
+                setEditingQuota({ ...editingQuota, excludedProviders })
+              }
+            />
+            <TagSelect
+              label="Allowed Models"
+              placeholder="Optional: restrict to these models..."
+              options={allModelNames}
+              selected={editingQuota.allowedModels || []}
+              allowCustom
+              onChange={(allowedModels) => setEditingQuota({ ...editingQuota, allowedModels })}
+            />
+            <TagSelect
+              label="Excluded Models"
+              placeholder="Optional: exclude these models..."
+              options={allModelNames}
+              selected={editingQuota.excludedModels || []}
+              allowCustom
+              onChange={(excludedModels) => setEditingQuota({ ...editingQuota, excludedModels })}
+            />
+            <p className="text-xs text-text-muted -mt-1">
+              Only requests matching the allowed/not-excluded provider and model count against this
+              quota. Model names accept free-typing since not every model is synced into a
+              provider's catalog yet.
+            </p>
           </div>
         </Modal>
 
@@ -1177,86 +1483,127 @@ export const Keys = () => {
           isOpen={isQuotaDetailOpen}
           onClose={() => setIsQuotaDetailOpen(false)}
           title={`Quota Status: ${selectedQuotaName}`}
-          size="sm"
+          size="md"
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="ghost" onClick={() => setIsQuotaDetailOpen(false)}>
                 Close
               </Button>
-              {selectedQuotaStatus && (
+              {selectedQuotaStatus && selectedQuotaStatus.quotas.length > 0 && (
                 <Button
-                  onClick={() => {
-                    handleClearQuota(selectedQuotaStatus.key);
-                    setIsQuotaDetailOpen(false);
-                  }}
+                  onClick={() => handleClearQuota(selectedQuotaStatus.key)}
                   variant="secondary"
                 >
-                  Reset Usage
+                  Reset All
                 </Button>
               )}
             </div>
           }
         >
           {selectedQuotaStatus && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="flex items-center gap-3 p-3 bg-bg-subtle rounded-md">
-                {selectedQuotaStatus.allowed ? (
-                  <Check className="text-success" size={24} />
-                ) : (
-                  <AlertCircle className="text-danger" size={24} />
-                )}
-                <div>
-                  <p className="font-medium text-text">
-                    {selectedQuotaStatus.allowed ? 'Quota Active' : 'Quota Exhausted'}
+            <div className="flex flex-col gap-4">
+              {selectedQuotaStatus.quotas.length === 0 ? (
+                <div className="flex items-center gap-3 p-3 bg-bg-subtle rounded-md">
+                  <AlertCircle className="text-text-muted" size={20} />
+                  <p className="text-sm text-text-secondary">
+                    No quota assigned to this key, and no default quotas are configured.
                   </p>
-                  <p className="text-sm text-text-secondary">{selectedQuotaStatus.quota_name}</p>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-text-secondary">Usage</span>
-                    <span className="font-medium text-text">
-                      {quotas[selectedQuotaStatus.quota_name || '']?.limitType === 'cost'
-                        ? `${formatCost(selectedQuotaStatus.current_usage, 5)} / ${formatCost(selectedQuotaStatus.limit || 0, 5)}`
-                        : `${formatNumber(selectedQuotaStatus.current_usage)} / ${formatNumber(selectedQuotaStatus.limit || 0)}`}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-bg-hover rounded-full overflow-hidden">
+              ) : (
+                sortMostConstrainedFirst(selectedQuotaStatus.quotas).map((entry) => {
+                  const def = quotas[entry.name];
+                  const leaky = isLeakyRollingDef(def);
+                  const pct = entryUsagePercent(entry);
+                  return (
                     <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.min(100, getQuotaUsagePercent(selectedQuotaStatus))}%`,
-                        backgroundColor: getQuotaStatusColor(
-                          getQuotaUsagePercent(selectedQuotaStatus)
-                        ),
-                      }}
-                    />
-                  </div>
-                </div>
+                      key={entry.name}
+                      className="flex flex-col gap-2 p-3 bg-bg-subtle rounded-md border border-border-glass"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                          {entry.allowed ? (
+                            <Check className="text-success shrink-0" size={16} />
+                          ) : (
+                            <AlertCircle className="text-danger shrink-0" size={16} />
+                          )}
+                          <span className="font-medium text-text truncate">{entry.name}</span>
+                          {entry.source === 'default' && (
+                            <QuotaChip tone="muted">default</QuotaChip>
+                          )}
+                          {entry.shared && (
+                            <QuotaChip>
+                              <Users size={10} /> shared
+                            </QuotaChip>
+                          )}
+                          {hasScope(entry.scope) && <QuotaChip tone="muted">scoped</QuotaChip>}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleClearQuota(selectedQuotaStatus.key, entry.name)}
+                            aria-label={`Reset ${entry.name}`}
+                            title="Reset usage"
+                          >
+                            <RefreshCw size={14} />
+                          </Button>
+                          <span
+                            title={
+                              leaky
+                                ? 'Recompute is unavailable for rolling requests/tokens quotas — their usage cannot be reconstructed from historical data.'
+                                : 'Recompute usage from historical request logs'
+                            }
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleRecomputeQuota(selectedQuotaStatus.key, entry.name)
+                              }
+                              disabled={leaky || recomputingQuota === entry.name}
+                              aria-label={`Recompute ${entry.name}`}
+                            >
+                              {leaky ? <Info size={14} /> : <Wrench size={14} />}
+                            </Button>
+                          </span>
+                        </div>
+                      </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                  <div className="p-3 bg-bg-subtle rounded-md">
-                    <p className="text-xs text-text-secondary mb-1">Remaining</p>
-                    <p className="font-mono text-lg text-text">
-                      {selectedQuotaStatus.remaining !== null
-                        ? quotas[selectedQuotaStatus.quota_name || '']?.limitType === 'cost'
-                          ? formatCost(selectedQuotaStatus.remaining, 5)
-                          : formatNumber(selectedQuotaStatus.remaining)
-                        : '-'}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-bg-subtle rounded-md">
-                    <p className="text-xs text-text-secondary mb-1">Resets At</p>
-                    <p className="font-mono text-sm text-text">
-                      {selectedQuotaStatus.resets_at
-                        ? new Date(selectedQuotaStatus.resets_at).toLocaleString()
-                        : '-'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                      <QuotaProgressBar
+                        label={`${entry.limitType}${entry.global ? '' : ' (scoped)'}`}
+                        value={entry.currentUsage}
+                        max={entry.limit}
+                        displayValue={`${formatQuotaValue(entry.currentUsage, entry.limitType)} / ${formatQuotaValue(entry.limit, entry.limitType)}`}
+                        status={statusForPercent(pct)}
+                        size="md"
+                      />
+
+                      <div className="flex items-center justify-between text-xs text-text-muted">
+                        <span>
+                          Remaining:{' '}
+                          <span className="text-text font-medium">
+                            {formatQuotaValue(entry.remaining, entry.limitType)}
+                          </span>
+                        </span>
+                        <span>Resets {new Date(entry.resetsAt).toLocaleString()}</span>
+                      </div>
+
+                      {entry.warnAt !== undefined && (
+                        <p className="text-[11px] text-text-muted">
+                          Warns at {Math.round(entry.warnAt * 100)}% usage
+                        </p>
+                      )}
+
+                      {!entry.allowed && (
+                        <div className="flex items-center gap-2 text-xs text-danger">
+                          <AlertCircle size={12} />
+                          <span>Exhausted — requests using this quota are being rejected.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </Modal>

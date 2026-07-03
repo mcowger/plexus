@@ -16,7 +16,7 @@ import { StallInspector, type StallConfig } from './inspectors/stall-inspector';
 import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
-import { recordQuotaUsage } from '../services/quota/quota-middleware';
+import { recordQuotaUsage, buildQuotaHeaders } from '../services/quota/quota-middleware';
 import { CooldownManager } from './cooldown-manager';
 /**
  * handleResponse
@@ -80,6 +80,24 @@ export async function handleResponse(
 
   // Always return Plexus request ID so callers can trace the full story
   reply.header('x-request-id', usageRecord.requestId!);
+
+  // Quota headers (x-plexus-quota*) — works for both unary and streaming
+  // since headers are set before the reply is piped either way. Computed
+  // from the context checkQuotaMiddleware stashed on the raw request, and
+  // the FINAL attempt's resolved provider/model — already known at this
+  // point (set immediately above from unifiedResponse.plexus, which reflects
+  // the winning candidate after any failover).
+  const quotaContext = (request as any).quotaContext ?? null;
+  if (quotaContext) {
+    const quotaHeaders = buildQuotaHeaders(
+      quotaContext,
+      usageRecord.finalAttemptProvider || '',
+      usageRecord.finalAttemptModel || ''
+    );
+    for (const [headerName, headerValue] of Object.entries(quotaHeaders)) {
+      reply.header(headerName, headerValue);
+    }
+  }
 
   const pricing = unifiedResponse.plexus?.pricing;
   const providerDiscount = unifiedResponse.plexus?.providerDiscount;
@@ -566,10 +584,14 @@ async function finalizeUsage(
     );
   }
 
-  // Record quota usage after costs are calculated
+  // Record quota usage after costs are calculated — against the FINAL
+  // attempt's resolved provider/model, not necessarily the candidate that
+  // was selected before failover.
   if (quotaEnforcer && keyName) {
     await recordQuotaUsage(
       keyName,
+      usageRecord.finalAttemptProvider,
+      usageRecord.finalAttemptModel,
       {
         tokensInput: usageRecord.tokensInput,
         tokensOutput: usageRecord.tokensOutput,

@@ -9,9 +9,11 @@ import {
   UnifiedImageGenerationResponse,
   UnifiedImageEditRequest,
   UnifiedImageEditResponse,
-  KeyAccessPolicy,
 } from '../types/unified';
 import { Router } from './router';
+import { applyKeyAccessPolicy } from './key-access-policy';
+import { QuotaEnforcer } from './quota/quota-enforcer';
+import { buildQuotaExceededError } from './quota/quota-middleware';
 import { TransformerFactory } from './transformer-factory';
 import { logger } from '../utils/logger';
 import { QUOTA_ERROR_PATTERNS } from '../utils/constants';
@@ -294,11 +296,18 @@ export class Dispatcher {
       throw new Error(`No route candidates found for model '${request.model}'`);
     }
 
-    candidates = this.applyKeyAccessPolicy(request, candidates, request.incomingApiType || 'chat');
+    candidates = applyKeyAccessPolicy(request, candidates, request.incomingApiType || 'chat');
+
+    const retryHistory: RetryAttemptRecord[] = [];
+    candidates = this.applyQuotaFilter(
+      request,
+      candidates,
+      retryHistory,
+      request.incomingApiType || 'chat'
+    );
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
-    const retryHistory: RetryAttemptRecord[] = [];
     let lastError: any = null;
 
     // Check if this is already a vision descriptor request to prevent recursion
@@ -1372,6 +1381,55 @@ export class Dispatcher {
     });
   }
 
+  /**
+   * Quota-aware candidate filter. Reads the QuotaContext attached by
+   * `attachQuotaContext` (quota-middleware.ts) at
+   * `metadata.plexus_metadata.plexus_quota_context` — absent whenever the
+   * caller never attached one (no quota assigned, or one of the non-chat
+   * dispatch paths that doesn't attach a context at all) — in which case
+   * this is a no-op and `candidates` is returned unchanged.
+   *
+   * Candidates blocked by a scope-matching exhausted quota are dropped and
+   * recorded as `skipped` retryHistory entries (reason
+   * `quota_exceeded:<quotaName>`) — routing silently narrows to the
+   * remaining candidates. Only when EVERY candidate ends up blocked does
+   * this throw a terminal `buildQuotaExceededError`, carrying every
+   * blocking snapshot so the 429 body's `blocking_quotas` reflects the full
+   * set.
+   */
+  private applyQuotaFilter<C extends RouteResult>(
+    request: { metadata?: Record<string, any> },
+    candidates: C[],
+    retryHistory: RetryAttemptRecord[],
+    apiType?: string
+  ): C[] {
+    const ctx = request.metadata?.plexus_metadata?.plexus_quota_context ?? null;
+    if (!ctx) return candidates;
+
+    const { allowed, blocked } = QuotaEnforcer.filterCandidates(ctx, candidates);
+    if (blocked.length === 0) return candidates;
+
+    for (const { candidate, quota } of blocked) {
+      this.appendSkippedAttempt(
+        retryHistory,
+        candidate,
+        `quota_exceeded:${quota.quotaName}`,
+        apiType
+      );
+    }
+
+    if (allowed.length === 0) {
+      // Terminal: keep the quota-skip breadcrumbs on the error so the saved
+      // UsageRecord's retryHistory isn't null when everything was blocked.
+      throw buildQuotaExceededError(
+        blocked.map((b) => b.quota),
+        retryHistory
+      );
+    }
+
+    return allowed;
+  }
+
   private appendSuccessAttempt(
     retryHistory: RetryAttemptRecord[],
     route: RouteResult,
@@ -1430,99 +1488,6 @@ export class Dispatcher {
     };
 
     return enriched;
-  }
-
-  private buildAccessDeniedError(message: string): Error {
-    const error = new Error(message) as Error & {
-      routingContext?: Record<string, unknown>;
-    };
-    error.routingContext = {
-      statusCode: 403,
-      errorType: 'access_denied',
-    };
-    return error;
-  }
-
-  private getKeyAccessPolicy(request: {
-    metadata?: {
-      plexus_metadata?: {
-        plexus_key_policy?: KeyAccessPolicy;
-      };
-    };
-  }): KeyAccessPolicy | null {
-    const policy = request.metadata?.plexus_metadata?.plexus_key_policy;
-    if (!policy) return null;
-
-    // Normalization (trim/filter) is already performed by attachKeyAccessPolicy()
-    // in auth.ts before the policy is attached to the request metadata.
-    // This method trusts that the policy is already clean.
-    if (
-      (!policy.allowedModels || policy.allowedModels.length === 0) &&
-      (!policy.allowedProviders || policy.allowedProviders.length === 0) &&
-      (!policy.excludedModels || policy.excludedModels.length === 0) &&
-      (!policy.excludedProviders || policy.excludedProviders.length === 0)
-    ) {
-      return null;
-    }
-
-    return policy;
-  }
-
-  private applyKeyAccessPolicy(
-    request: {
-      model: string;
-      metadata?: {
-        plexus_metadata?: {
-          plexus_key_policy?: KeyAccessPolicy;
-        };
-      };
-    },
-    candidates: RouteResult[],
-    apiType: string
-  ): RouteResult[] {
-    const policy = this.getKeyAccessPolicy(request);
-    if (!policy) return candidates;
-
-    // Excluded models: block if the requested model is in the denylist
-    if (policy.excludedModels && policy.excludedModels.includes(request.model)) {
-      throw this.buildAccessDeniedError(
-        `Key is not allowed to access model '${request.model}' for ${apiType}`
-      );
-    }
-
-    // Allowed models: block if the requested model is NOT in the allowlist
-    if (policy.allowedModels && !policy.allowedModels.includes(request.model)) {
-      throw this.buildAccessDeniedError(
-        `Key is not allowed to access model '${request.model}' for ${apiType}`
-      );
-    }
-
-    // Excluded providers: filter out candidates on the denylist
-    let filtered = candidates;
-    if (policy.excludedProviders && policy.excludedProviders.length > 0) {
-      filtered = filtered.filter(
-        (candidate) => !policy.excludedProviders!.includes(candidate.provider)
-      );
-      if (filtered.length === 0) {
-        throw this.buildAccessDeniedError(
-          `Key is not allowed to access any provider configured for model '${request.model}'`
-        );
-      }
-    }
-
-    // Allowed providers: filter candidates to only those on the allowlist
-    if (policy.allowedProviders && policy.allowedProviders.length > 0) {
-      filtered = filtered.filter((candidate) =>
-        policy.allowedProviders!.includes(candidate.provider)
-      );
-      if (filtered.length === 0) {
-        throw this.buildAccessDeniedError(
-          `Key is not allowed to access any provider configured for model '${request.model}'`
-        );
-      }
-    }
-
-    return filtered;
   }
 
   private async parseJsonResponseBody(
@@ -3195,11 +3160,13 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
-    candidates = this.applyKeyAccessPolicy(request, candidates, 'embeddings');
+    candidates = applyKeyAccessPolicy(request, candidates, 'embeddings');
+
+    const retryHistory: RetryAttemptRecord[] = [];
+    candidates = this.applyQuotaFilter(request, candidates, retryHistory, 'embeddings');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
-    const retryHistory: RetryAttemptRecord[] = [];
     let lastError: any = null;
 
     for (let i = 0; i < targets.length; i++) {
@@ -3454,11 +3421,13 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
-    candidates = this.applyKeyAccessPolicy(request, candidates, 'transcriptions');
+    candidates = applyKeyAccessPolicy(request, candidates, 'transcriptions');
+
+    const retryHistory: RetryAttemptRecord[] = [];
+    candidates = this.applyQuotaFilter(request, candidates, retryHistory, 'transcriptions');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
-    const retryHistory: RetryAttemptRecord[] = [];
     let lastError: any = null;
 
     for (let i = 0; i < targets.length; i++) {
@@ -3695,11 +3664,13 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
-    candidates = this.applyKeyAccessPolicy(request, candidates, 'speech');
+    candidates = applyKeyAccessPolicy(request, candidates, 'speech');
+
+    const retryHistory: RetryAttemptRecord[] = [];
+    candidates = this.applyQuotaFilter(request, candidates, retryHistory, 'speech');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
-    const retryHistory: RetryAttemptRecord[] = [];
     let lastError: any = null;
 
     for (let i = 0; i < targets.length; i++) {
@@ -3980,11 +3951,13 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
-    candidates = this.applyKeyAccessPolicy(request, candidates, 'images');
+    candidates = applyKeyAccessPolicy(request, candidates, 'images');
+
+    const retryHistory: RetryAttemptRecord[] = [];
+    candidates = this.applyQuotaFilter(request, candidates, retryHistory, 'images');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
-    const retryHistory: RetryAttemptRecord[] = [];
     let lastError: any = null;
 
     for (let i = 0; i < targets.length; i++) {
@@ -4220,11 +4193,13 @@ export class Dispatcher {
       candidates = [singleRoute];
     }
 
-    candidates = this.applyKeyAccessPolicy(request, candidates, 'images');
+    candidates = applyKeyAccessPolicy(request, candidates, 'images');
+
+    const retryHistory: RetryAttemptRecord[] = [];
+    candidates = this.applyQuotaFilter(request, candidates, retryHistory, 'images');
 
     const targets = failoverEnabled ? candidates : [candidates[0]!];
     const attemptedProviders: string[] = [];
-    const retryHistory: RetryAttemptRecord[] = [];
     let lastError: any = null;
 
     for (let i = 0; i < targets.length; i++) {

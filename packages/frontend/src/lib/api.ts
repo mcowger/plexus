@@ -968,7 +968,11 @@ export interface KeyConfig {
   key: string; // The user-facing alias/name for the key (e.g. 'my-app')
   secret: string; // The actual sk-uuid
   comment?: string;
-  quota?: string; // Optional quota assignment
+  // Zero or more quota-definition names assigned to this key (non-stacking:
+  // when empty, the system's `default_quotas` fallback applies instead).
+  // The deprecated single `quota` field is still accepted by the backend on
+  // write, but responses only ever emit `quotas` — this type follows suit.
+  quotas?: string[];
   allowedModels?: string[];
   allowedProviders?: string[];
   excludedModels?: string[];
@@ -987,11 +991,50 @@ export type UsageSortField =
 
 export type UsageSortDirection = 'asc' | 'desc';
 
-export interface UserQuota {
+/**
+ * Scope-restriction fields shared by every quota definition type. Empty (all
+ * fields absent/empty) means the quota applies to every provider/model pair.
+ * Mirrors `QuotaScopeFields` in `packages/backend/src/config.ts`.
+ */
+export interface QuotaScope {
+  allowedProviders?: string[];
+  excludedProviders?: string[];
+  allowedModels?: string[];
+  excludedModels?: string[];
+}
+
+export interface UserQuota extends QuotaScope {
   type: 'rolling' | 'daily' | 'weekly' | 'monthly';
   limitType: 'requests' | 'tokens' | 'cost';
   limit: number;
   duration?: string; // Required for rolling type
+  // Pools usage across every key referencing this quota into a single bucket
+  // instead of counting each key independently.
+  shared?: boolean;
+  // Early-warning threshold as a fraction of `limit`, e.g. 0.8 = 80%. Must be
+  // in (0, 1) exclusive when set (validated backend-side).
+  warnAt?: number;
+}
+
+/**
+ * Wire shape of one entry in the `quotas[]` array returned by
+ * `GET /v0/management/quota/status/:key` and `GET /v0/management/self/quota`.
+ * Mirrors `QuotaSnapshotJson` in
+ * `packages/backend/src/routes/management/_quota-response.ts`.
+ */
+export interface QuotaStatusEntry {
+  name: string;
+  limitType: 'requests' | 'tokens' | 'cost';
+  limit: number;
+  currentUsage: number;
+  remaining: number;
+  allowed: boolean;
+  resetsAt: string;
+  scope: QuotaScope;
+  global: boolean;
+  shared: boolean;
+  warnAt?: number;
+  source: 'assigned' | 'default';
 }
 
 export interface QuotaConfig {
@@ -1639,6 +1682,39 @@ export const api = {
     return await res.json();
   },
 
+  /** All system settings (a flat key/value bag; `default_quotas` lives here). */
+  getSystemSettings: async (): Promise<Record<string, unknown>> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`);
+    if (!res.ok) throw new Error('Failed to fetch system settings');
+    return await res.json();
+  },
+
+  /** Merge-patch one or more system settings (e.g. `{ default_quotas: [...] }`). */
+  updateSystemSettings: async (settings: Record<string, unknown>): Promise<void> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error?.message || err.error || 'Failed to update system settings');
+    }
+  },
+
+  /** Convenience wrapper: the key names substituted in when a key has no
+   * `quotas` of its own. */
+  getDefaultQuotas: async (): Promise<string[]> => {
+    const settings = await api.getSystemSettings();
+    return Array.isArray(settings.default_quotas)
+      ? settings.default_quotas.filter((v): v is string => typeof v === 'string')
+      : [];
+  },
+
+  setDefaultQuotas: async (names: string[]): Promise<void> => {
+    await api.updateSystemSettings({ default_quotas: names });
+  },
+
   restart: async (): Promise<{ success: boolean; message: string }> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/restart`, {
       method: 'POST',
@@ -1659,7 +1735,7 @@ export const api = {
         {
           secret: string;
           comment?: string;
-          quota?: string;
+          quotas?: string[];
           allowedModels?: string[];
           allowedProviders?: string[];
           excludedModels?: string[];
@@ -1673,7 +1749,7 @@ export const api = {
         key,
         secret: val.secret,
         comment: val.comment,
-        quota: val.quota,
+        quotas: val.quotas,
         allowedModels: val.allowedModels,
         allowedProviders: val.allowedProviders,
         excludedModels: val.excludedModels,
@@ -1696,7 +1772,7 @@ export const api = {
         body: JSON.stringify({
           secret: keyConfig.secret,
           comment: keyConfig.comment,
-          ...(keyConfig.quota ? { quota: keyConfig.quota } : {}),
+          quotas: keyConfig.quotas ?? [],
           allowedModels: keyConfig.allowedModels ?? [],
           allowedProviders: keyConfig.allowedProviders ?? [],
           excludedModels: keyConfig.excludedModels ?? [],
@@ -3011,6 +3087,8 @@ export const api = {
     key: string
   ): Promise<{
     key: string;
+    quotas: QuotaStatusEntry[];
+    // Legacy shim fields, derived from the most-constrained entry in `quotas`.
     quota_name: string | null;
     allowed: boolean;
     current_usage: number;
@@ -3033,16 +3111,51 @@ export const api = {
     }
   },
 
-  clearQuota: async (key: string): Promise<void> => {
+  /** Reset usage for a key's quota(s). Omit `quota` to clear every quota
+   * currently attached to the key. */
+  clearQuota: async (key: string, quota?: string): Promise<void> => {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/quota/clear`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
+      body: JSON.stringify({ key, ...(quota ? { quota } : {}) }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(err.error?.message || err.error || 'Failed to clear quota');
     }
+  },
+
+  /**
+   * Repair a quota bucket by recomputing it from request_usage instead of
+   * trusting the (potentially drifted) counter. Rejected (400, `reason:
+   * 'unsupported_quota_type'`) for rolling requests/tokens defs, which are
+   * inherently leaky (see backend `QuotaEnforcer.recomputeQuota`) — the
+   * thrown error carries `.reason` so callers can special-case that message.
+   */
+  recomputeQuota: async (
+    key: string,
+    quota: string
+  ): Promise<{
+    success: true;
+    key: string;
+    quota: string;
+    usage: number;
+    windowStartMs: number;
+    message: string;
+  }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/quota/recompute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, quota }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      const message = err.error?.message || err.error || 'Failed to recompute quota';
+      const wrapped = new Error(message) as Error & { reason?: string };
+      wrapped.reason = err.reason;
+      throw wrapped;
+    }
+    return res.json();
   },
 
   /**
@@ -3127,6 +3240,7 @@ export const api = {
     keyName?: string;
     allowedProviders?: string[];
     allowedModels?: string[];
+    quotaNames?: string[];
     quotaName?: string | null;
     comment?: string | null;
     beta?: boolean;
@@ -3185,6 +3299,8 @@ export const api = {
    */
   getSelfQuota: async (): Promise<{
     key: string;
+    quotas: QuotaStatusEntry[];
+    // Legacy shim fields, derived from the most-constrained entry in `quotas`.
     quotaName: string | null;
     allowed: boolean;
     currentUsage: number;

@@ -1,21 +1,15 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
 import parseDuration from 'parse-duration';
 import { logger } from '../../utils/logger';
-import { getConfig, QuotaDefinition, KeyConfig } from '../../config';
-import { getDatabase, getCurrentDialect } from '../../db/client';
+import { getConfig, PlexusConfig, QuotaDefinition, KeyConfig } from '../../config';
+import { getDatabase, getSchema, getCurrentDialect } from '../../db/client';
 import { toDbTimestampMs } from '../../utils/normalize';
-import * as sqliteSchema from '../../../drizzle/schema/sqlite';
-import * as postgresSchema from '../../../drizzle/schema/postgres';
+import { ScopeLists, scopeMatches, isGlobalScope } from '../scope-match';
 
-export interface QuotaCheckResult {
-  allowed: boolean;
-  quotaName: string;
-  currentUsage: number;
-  limit: number;
-  remaining: number;
-  resetsAt: Date | null;
-  limitType: 'requests' | 'tokens' | 'cost';
-}
+/** Sentinel `key_name` used for `shared: true` quota definitions — a single
+ * pooled bucket accrued across every key that references the quota, instead
+ * of one independent counter per key. */
+export const SHARED_OWNER = '*';
 
 export interface UsageRecord {
   tokensInput?: number | null;
@@ -26,543 +20,653 @@ export interface UsageRecord {
   costTotal?: number | null;
 }
 
+/** Point-in-time read of a single quota definition's state for one key (or
+ * the shared bucket). Purely computed in memory — never a side effect of
+ * reading it. */
+export interface QuotaCheckSnapshot {
+  quotaName: string;
+  limitType: 'requests' | 'tokens' | 'cost';
+  limit: number;
+  currentUsage: number;
+  remaining: number;
+  allowed: boolean;
+  resetsAtMs: number;
+  scope: ScopeLists;
+  global: boolean;
+  shared: boolean;
+  warnAt?: number;
+  source: 'assigned' | 'default';
+}
+
+/** The full set of quotas that apply to a key for the current request,
+ * resolved once per request. `blockedGlobal` is the first exhausted
+ * quota with global scope (applies regardless of candidate provider/model) —
+ * middleware/route shims use it to preserve the old single-quota 429 shape. */
+export interface QuotaContext {
+  keyName: string;
+  checks: QuotaCheckSnapshot[];
+  blockedGlobal: QuotaCheckSnapshot | null;
+}
+
+/** Minimal candidate shape `filterCandidates`/`selectHeaderQuota` need —
+ * kept generic so callers can pass their own richer candidate/route types. */
+export interface QuotaCandidate {
+  provider: string;
+  model: string;
+}
+
+interface QuotaStateRow {
+  keyName: string;
+  quotaName: string;
+  limitType: string;
+  currentUsage: number;
+  lastUpdated: Date | number;
+  windowStart: Date | number | null;
+}
+
+type CalendarType = 'daily' | 'weekly' | 'monthly';
+
+/**
+ * Effective quota-name set for a key: `keyConfig.quotas` when non-empty,
+ * else `config.default_quotas`. Non-stacking substitution, not a union —
+ * a key with its own quotas never also gets the defaults. Exported so the
+ * management routes (`_quota-response.ts`) validate quota membership with
+ * the exact same resolution enforcement uses.
+ */
+export function resolveQuotaNames(
+  keyConfig: KeyConfig,
+  config: PlexusConfig
+): { names: string[]; source: 'assigned' | 'default' } | null {
+  if (keyConfig.quotas && keyConfig.quotas.length > 0) {
+    return { names: keyConfig.quotas, source: 'assigned' };
+  }
+  if (config.default_quotas && config.default_quotas.length > 0) {
+    return { names: config.default_quotas, source: 'default' };
+  }
+  return null;
+}
+
 export class QuotaEnforcer {
   private db: ReturnType<typeof getDatabase>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private schema: any;
   private dialect: 'sqlite' | 'postgres';
 
   constructor() {
     this.db = getDatabase();
+    this.schema = getSchema();
     this.dialect = getCurrentDialect() === 'postgres' ? 'postgres' : 'sqlite';
   }
 
   /**
-   * Convert a DB-returned value for lastUpdated/windowStart to a Date.
+   * Convert a DB-returned value for lastUpdated/windowStart to epoch ms.
    * PostgreSQL bigint(mode:'number') returns epoch ms as a number.
    * SQLite integer(mode:'timestamp_ms') returns a Date object.
    */
-  private fromDbTimestamp(value: Date | number | null): Date | null {
+  private toMs(value: Date | number | null | undefined): number | null {
     if (value == null) return null;
-    if (value instanceof Date) return value;
-    return new Date(value as number);
+    return value instanceof Date ? value.getTime() : value;
   }
 
-  /**
-   * Check if the key should be allowed to make a request.
-   * Returns null if no quota is assigned to the key.
-   */
-  async checkQuota(keyName: string): Promise<QuotaCheckResult | null> {
-    const config = getConfig();
-
-    // Get key configuration
-    const keyConfig = config.keys?.[keyName];
-    if (!keyConfig) {
-      logger.debug(`Key ${keyName} not found`);
-      return null;
-    }
-
-    // Check if key has a quota assigned
-    const quotaName = keyConfig.quota;
-    if (!quotaName) {
-      logger.debug(`No quota assigned to key ${keyName}`);
-      return null;
-    }
-
-    // Get quota definition
-    const quotaDef = config.user_quotas?.[quotaName];
-    if (!quotaDef) {
-      logger.warn(`Quota definition ${quotaName} not found for key ${keyName}`);
-      return null;
-    }
-
-    const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
-    const nowMs = Date.now();
-    const nowDate = new Date(nowMs);
-
-    // Load current state from database
-    const existingState = await this.db
-      .select()
-      .from(schema.quotaState)
-      .where(eq(schema.quotaState.keyName, keyName))
-      .limit(1);
-
-    if (existingState.length > 0) {
-      const s = existingState[0]!;
-      logger.debug(
-        `checkQuota DB state for ${keyName}: currentUsage=${s.currentUsage}, windowStart=${JSON.stringify(s.windowStart)}, lastUpdated=${JSON.stringify(s.lastUpdated)}, quotaName=${s.quotaName}, limitType=${s.limitType}`
-      );
-    } else {
-      logger.debug(`checkQuota: no DB state found for ${keyName}`);
-    }
-
-    let currentUsage: number;
-    let windowStartDate: Date | null = null;
-    let lastUpdatedDate: Date;
-
-    if (existingState.length === 0) {
-      // No state exists yet, start fresh
-      currentUsage = 0;
-      lastUpdatedDate = nowDate;
-
-      // For calendar quotas, set window start
-      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly' || quotaDef.type === 'monthly') {
-        windowStartDate = new Date(this.getWindowStart(quotaDef.type));
-      }
-      // For rolling cost quotas, align window start to calendar boundary
-      else if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
-        const durationMs = parseDuration(quotaDef.duration);
-        if (durationMs) {
-          const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
-          windowStartDate = new Date(alignedStart);
-        }
-      }
-    } else {
-      const state = existingState[0];
-      const storedLimitType = state!.limitType as 'requests' | 'tokens' | 'cost';
-      const storedQuotaName = state!.quotaName as string;
-
-      // Check if quota name has changed (key assigned to different quota)
-      if (storedQuotaName !== quotaName) {
-        logger.debug(
-          `Quota name changed for ${keyName} from '${storedQuotaName}' to '${quotaName}'. ` +
-            `Resetting usage — persisting to DB.`
-        );
-        currentUsage = 0;
-        lastUpdatedDate = nowDate;
-        windowStartDate = null;
-
-        // For calendar quotas, set new window start
-        if (
-          quotaDef.type === 'daily' ||
-          quotaDef.type === 'weekly' ||
-          quotaDef.type === 'monthly'
-        ) {
-          windowStartDate = new Date(this.getWindowStart(quotaDef.type));
-        }
-        // For rolling cost quotas, align window start to calendar boundary
-        else if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
-          const durationMs = parseDuration(quotaDef.duration);
-          if (durationMs) {
-            const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
-            windowStartDate = new Date(alignedStart);
-          }
-        }
-
-        // Persist the reset to DB
-        await this.db
-          .update(schema.quotaState)
-          .set({
-            quotaName,
-            currentUsage: 0,
-            windowStart: toDbTimestampMs(windowStartDate, this.dialect),
-            lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-          })
-          .where(eq(schema.quotaState.keyName, keyName));
-        // Check if quota definition has changed (e.g., requests -> tokens)
-      } else if (storedLimitType !== quotaDef.limitType) {
-        logger.debug(
-          `Quota ${quotaName} limitType changed from ${storedLimitType} to ${quotaDef.limitType}. ` +
-            `Resetting usage for ${keyName} — persisting to DB.`
-        );
-        currentUsage = 0;
-        lastUpdatedDate = nowDate;
-        windowStartDate = null;
-
-        // For calendar quotas, set new window start
-        if (
-          quotaDef.type === 'daily' ||
-          quotaDef.type === 'weekly' ||
-          quotaDef.type === 'monthly'
-        ) {
-          windowStartDate = new Date(this.getWindowStart(quotaDef.type));
-        }
-
-        // Persist the reset to DB
-        await this.db
-          .update(schema.quotaState)
-          .set({
-            limitType: quotaDef.limitType,
-            currentUsage: 0,
-            windowStart: toDbTimestampMs(windowStartDate, this.dialect),
-            lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-          })
-          .where(eq(schema.quotaState.keyName, keyName));
-      } else {
-        // Quota definition unchanged, proceed normally
-        currentUsage = state!.currentUsage;
-        lastUpdatedDate = this.fromDbTimestamp(state!.lastUpdated)!;
-        windowStartDate = this.fromDbTimestamp(state!.windowStart);
-
-        // Handle calendar quota reset
-        if (
-          quotaDef.type === 'daily' ||
-          quotaDef.type === 'weekly' ||
-          quotaDef.type === 'monthly'
-        ) {
-          const expectedWindowStart = this.getWindowStart(quotaDef.type);
-          logger.debug(
-            `checkQuota calendar check for ${keyName}: windowStartFromDB=${windowStartDate?.getTime()}, expectedWindowStart=${expectedWindowStart}, match=${windowStartDate?.getTime() === expectedWindowStart}`
-          );
-          if (!windowStartDate || windowStartDate.getTime() !== expectedWindowStart) {
-            // Window has reset — persist the reset to the DB so recordUsage
-            // doesn't keep accumulating on top of stale values
-            logger.debug(`Calendar quota ${quotaName} for ${keyName} reset — persisting to DB`);
-            currentUsage = 0;
-            windowStartDate = new Date(expectedWindowStart);
-            lastUpdatedDate = nowDate;
-
-            await this.db
-              .update(schema.quotaState)
-              .set({
-                currentUsage: 0,
-                windowStart: toDbTimestampMs(windowStartDate, this.dialect)!,
-                lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-              })
-              .where(eq(schema.quotaState.keyName, keyName));
-          }
-        } else if (quotaDef.type === 'rolling') {
-          // Calculate leak for rolling quotas
-          const durationMs = parseDuration(quotaDef.duration);
-          if (!durationMs) {
-            logger.warn(
-              `Invalid duration '${quotaDef.duration}' for rolling quota ${quotaName}. ` +
-                `Cannot calculate quota leak. Allowing request (fail-open). ` +
-                `Please fix the duration in your config (e.g., '1h', '30m', '1d').`
-            );
-            return null;
-          }
-
-          const elapsedMs = nowMs - lastUpdatedDate.getTime();
-
-          // Cost quotas use cumulative spending (no leak), reset when window expires
-          if (quotaDef.limitType === 'cost') {
-            // Check if the rolling window has expired
-            // For cost, we track when the spending window started via windowStartDate
-            if (!windowStartDate || elapsedMs >= durationMs) {
-              // Window expired or not set - reset and persist to DB
-              const alignedStart = this.alignToPeriodStart(nowMs, durationMs);
-              logger.debug(
-                `Rolling cost quota ${quotaName} for ${keyName} reset (window expired), aligned to ${new Date(alignedStart).toISOString()} — persisting to DB`
-              );
-              currentUsage = 0;
-              windowStartDate = new Date(alignedStart);
-              lastUpdatedDate = nowDate;
-
-              await this.db
-                .update(schema.quotaState)
-                .set({
-                  currentUsage: 0,
-                  windowStart: toDbTimestampMs(windowStartDate, this.dialect)!,
-                  lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-                })
-                .where(eq(schema.quotaState.keyName, keyName));
-            }
-            // Otherwise keep accumulating - no leak for cost
-          } else {
-            // Tokens and requests use leaky bucket
-            const leakRate = quotaDef.limit / durationMs;
-            const leaked = elapsedMs * leakRate;
-
-            currentUsage = Math.max(0, currentUsage - leaked);
-            lastUpdatedDate = nowDate;
-          }
-        }
-      }
-    }
-
-    // Check if quota exceeded
-    const allowed = currentUsage < quotaDef.limit;
-    const remaining = Math.max(0, quotaDef.limit - currentUsage);
-
-    // Calculate resetsAt
-    let resetsAt: Date | null = null;
-    if (quotaDef.type === 'rolling') {
-      const durationMs = parseDuration(quotaDef.duration);
-      if (durationMs) {
-        if (quotaDef.limitType === 'cost' && windowStartDate) {
-          // For cost, reset is when the window expires
-          resetsAt = new Date(windowStartDate.getTime() + durationMs);
-        } else {
-          // For tokens/requests, estimate when current usage will fully leak out
-          const timeToLeakAll = (currentUsage / quotaDef.limit) * durationMs;
-          resetsAt = new Date(nowMs + timeToLeakAll);
-        }
-      } else {
-        logger.warn(
-          `Cannot calculate resetsAt for quota ${quotaName}: invalid duration '${quotaDef.duration}'`
-        );
-      }
-    } else if (quotaDef.type === 'daily') {
-      // Reset at next UTC midnight
-      const tomorrow = new Date(nowMs);
-      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-      tomorrow.setUTCHours(0, 0, 0, 0);
-      resetsAt = tomorrow;
-    } else if (quotaDef.type === 'monthly') {
-      // Reset at 00:00 UTC on the 1st of next month
-      const nowDateObj = new Date(nowMs);
-      const nextMonth = new Date(
-        Date.UTC(nowDateObj.getUTCFullYear(), nowDateObj.getUTCMonth() + 1, 1, 0, 0, 0, 0)
-      );
-      resetsAt = nextMonth;
-    } else if (quotaDef.type === 'weekly') {
-      // Reset at next UTC Sunday midnight
-      const nowDateObj = new Date(nowMs);
-      const daysUntilSunday = 7 - nowDateObj.getUTCDay();
-      const nextSunday = new Date(nowMs);
-      nextSunday.setUTCDate(nowDateObj.getUTCDate() + daysUntilSunday);
-      nextSunday.setUTCHours(0, 0, 0, 0);
-      resetsAt = nextSunday;
-    }
-
-    // Round for tokens/requests, preserve precision for cost
-    const displayUsage = quotaDef.limitType === 'cost' ? currentUsage : Math.round(currentUsage);
-    const displayRemaining = quotaDef.limitType === 'cost' ? remaining : Math.round(remaining);
-
-    const result: QuotaCheckResult = {
-      allowed,
-      quotaName,
-      currentUsage: displayUsage,
-      limit: quotaDef.limit,
-      remaining: displayRemaining,
-      resetsAt,
-      limitType: quotaDef.limitType,
+  private scopeOf(def: QuotaDefinition): ScopeLists {
+    return {
+      allowedModels: def.allowedModels,
+      allowedProviders: def.allowedProviders,
+      excludedModels: def.excludedModels,
+      excludedProviders: def.excludedProviders,
     };
-
-    logger.debug(
-      `Quota check result for ${keyName}: currentUsage=${result.currentUsage}, remaining=${result.remaining}, allowed=${result.allowed}`
-    );
-    logger.debug(`Quota check for ${keyName}:`, result);
-
-    return result;
   }
 
   /**
-   * Records actual usage after request completes.
+   * Start of the current calendar window (UTC), given `type`.
+   * Weekly anchors to Monday (ISO week start) — matches the "Resets at
+   * midnight UTC on Monday" copy already shown in the admin UI. Existing
+   * Sunday-anchored rows persisted before this change simply look "stale"
+   * (window_start mismatch) on next read/write and lazily reset — no
+   * migration needed.
    */
-  async recordUsage(keyName: string, usageRecord: UsageRecord): Promise<void> {
-    const config = getConfig();
-
-    logger.debug(
-      `recordUsage called for ${keyName}: costTotal=${usageRecord.costTotal}, tokensInput=${usageRecord.tokensInput}, tokensOutput=${usageRecord.tokensOutput}`
-    );
-
-    // Get key configuration
-    const keyConfig = config.keys?.[keyName];
-    if (!keyConfig?.quota) {
-      logger.debug(`recordUsage: no quota assigned for key ${keyName}, skipping`);
-      return; // No quota assigned, nothing to record
-    }
-
-    // Get quota definition
-    const quotaDef = config.user_quotas?.[keyConfig.quota];
-    if (!quotaDef) {
-      logger.debug(
-        `recordUsage: quota definition ${keyConfig.quota} not found for key ${keyName}, skipping`
-      );
-      return;
-    }
-
-    // Calculate usage value based on limitType
-    let usageValue: number;
-    if (quotaDef.limitType === 'requests') {
-      usageValue = 1;
-    } else if (quotaDef.limitType === 'cost') {
-      // cost: use costTotal directly
-      usageValue = usageRecord.costTotal || 0;
-      logger.debug(
-        `recordUsage cost calculation: costTotal=${usageRecord.costTotal}, usageValue=${usageValue}`
-      );
-    } else {
-      // tokens: sum of input + output
-      usageValue =
-        (usageRecord.tokensInput || 0) +
-        (usageRecord.tokensOutput || 0) +
-        (usageRecord.tokensReasoning || 0) +
-        (usageRecord.tokensCached || 0) +
-        (usageRecord.tokensCacheWrite || 0);
-    }
-
-    const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
-    const nowMs = Date.now();
-    const nowDate = new Date(nowMs);
-
-    // Get current state to check if we need to update or insert
-    const existingState = await this.db
-      .select()
-      .from(schema.quotaState)
-      .where(eq(schema.quotaState.keyName, keyName))
-      .limit(1);
-
-    if (existingState.length === 0) {
-      // Insert new state
-      let windowStartDate: Date | null = null;
-      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly' || quotaDef.type === 'monthly') {
-        windowStartDate = new Date(this.getWindowStart(quotaDef.type));
-      } else if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
-        // Rolling cost quotas need a window start to track when the window expires
-        // Align to period start for predictable reset times
-        const durationMs = parseDuration(quotaDef.duration);
-        const alignedStart = durationMs ? this.alignToPeriodStart(nowMs, durationMs) : nowMs;
-        windowStartDate = new Date(alignedStart);
-      }
-
-      await this.db.insert(schema.quotaState).values({
-        keyName,
-        quotaName: keyConfig.quota,
-        limitType: quotaDef.limitType,
-        currentUsage: usageValue,
-        lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-        windowStart: toDbTimestampMs(windowStartDate, this.dialect),
-      });
-    } else if (existingState[0]) {
-      // Update existing state with leak calculation for rolling quotas
-      const state = existingState[0];
-      const storedLimitType = state.limitType as 'requests' | 'tokens' | 'cost';
-      const storedQuotaName = state.quotaName as string;
-
-      // Check if quota name or limitType has changed - if so, start fresh
-      let newUsage: number;
-      if (storedQuotaName !== keyConfig.quota) {
-        logger.debug(
-          `Quota name changed for ${keyName} from '${storedQuotaName}' to '${keyConfig.quota}' in recordUsage`
-        );
-        newUsage = usageValue; // Start fresh with just this request's usage
-      } else if (storedLimitType !== quotaDef.limitType) {
-        logger.debug(
-          `Quota ${keyConfig.quota} limitType changed from ${storedLimitType} to ${quotaDef.limitType} in recordUsage`
-        );
-        newUsage = usageValue; // Start fresh with just this request's usage
-      } else {
-        newUsage = state.currentUsage + usageValue;
-
-        if (quotaDef.type === 'rolling') {
-          const durationMs = parseDuration(quotaDef.duration);
-          if (durationMs) {
-            const lastUpdatedDate = this.fromDbTimestamp(state.lastUpdated)!;
-            const elapsedMs = nowMs - lastUpdatedDate.getTime();
-
-            // Cost quotas use cumulative spending (no leak), reset when window expires
-            if (quotaDef.limitType === 'cost') {
-              const windowStart = this.fromDbTimestamp(state.windowStart);
-              // Check if window has expired
-              if (!windowStart || elapsedMs >= durationMs) {
-                // Window expired - start fresh with just this request's usage
-                logger.debug(`Rolling cost quota window expired for ${keyName}, resetting`);
-                newUsage = usageValue;
-                // Update windowStart below
-              }
-              // Otherwise keep accumulating - no leak for cost
-            } else {
-              // Tokens and requests use leaky bucket
-              const leakRate = quotaDef.limit / durationMs;
-              const leaked = elapsedMs * leakRate;
-              newUsage = Math.max(0, state.currentUsage - leaked) + usageValue;
-            }
-          } else {
-            logger.warn(
-              `Invalid duration '${quotaDef.duration}' for rolling quota ${keyConfig.quota}. ` +
-                `Recording usage without leak calculation. Usage will accumulate without decay. ` +
-                `Please fix the duration in your config (e.g., '1h', '30m', '1d').`
-            );
-          }
-        }
-      }
-
-      // Prepare update values
-      const updateValues: Record<string, unknown> = {
-        quotaName: keyConfig.quota,
-        limitType: quotaDef.limitType,
-        currentUsage: newUsage,
-        lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-      };
-
-      // For rolling cost quotas, also update windowStart if needed
-      if (quotaDef.type === 'rolling' && quotaDef.limitType === 'cost') {
-        const durationMs = parseDuration(quotaDef.duration);
-        const lastUpdatedDate = this.fromDbTimestamp(state.lastUpdated)!;
-        const elapsedMs = nowMs - lastUpdatedDate.getTime();
-        const windowStart = this.fromDbTimestamp(state.windowStart);
-
-        if (!windowStart || elapsedMs >= (durationMs || 0)) {
-          // Window expired or not set - set new window start aligned to period
-          const alignedStart = durationMs ? this.alignToPeriodStart(nowMs, durationMs) : nowMs;
-          updateValues.windowStart = toDbTimestampMs(new Date(alignedStart), this.dialect);
-        }
-      }
-
-      // For calendar quotas, update windowStart to current period if stale
-      if (quotaDef.type === 'daily' || quotaDef.type === 'weekly' || quotaDef.type === 'monthly') {
-        const expectedWindowStart = this.getWindowStart(quotaDef.type);
-        const currentWindowStart = this.fromDbTimestamp(state.windowStart);
-        if (!currentWindowStart || currentWindowStart.getTime() !== expectedWindowStart) {
-          // Window has rolled over since last update
-          updateValues.windowStart = toDbTimestampMs(new Date(expectedWindowStart), this.dialect)!;
-          // Reset usage to just this request since the old window is done
-          updateValues.currentUsage = usageValue;
-        }
-      }
-
-      await this.db
-        .update(schema.quotaState)
-        .set(updateValues)
-        .where(eq(schema.quotaState.keyName, keyName));
-    }
-
-    logger.debug(`Recorded ${usageValue} ${quotaDef.limitType} usage for ${keyName}`);
-  }
-
-  /**
-   * Admin method to reset quota to zero.
-   */
-  async clearQuota(keyName: string): Promise<void> {
-    const schema = getCurrentDialect() === 'postgres' ? postgresSchema : sqliteSchema;
-    const nowDate = new Date();
-
-    await this.db
-      .update(schema.quotaState)
-      .set({
-        currentUsage: 0,
-        lastUpdated: toDbTimestampMs(nowDate, this.dialect)!,
-      })
-      .where(eq(schema.quotaState.keyName, keyName));
-
-    logger.debug(`Quota cleared for ${keyName}`);
-  }
-
-  /**
-   * Get the current window start timestamp for calendar quotas.
-   */
-  private getWindowStart(type: 'daily' | 'weekly' | 'monthly'): number {
-    const now = new Date();
-
+  private getWindowStart(type: CalendarType, nowMs: number): number {
+    const now = new Date(nowMs);
     if (type === 'daily') {
-      // Start of current UTC day
       now.setUTCHours(0, 0, 0, 0);
       return now.getTime();
     } else if (type === 'weekly') {
-      // Start of current UTC week (Sunday)
-      const dayOfWeek = now.getUTCDay();
-      now.setUTCDate(now.getUTCDate() - dayOfWeek);
+      const daysSinceMonday = (now.getUTCDay() + 6) % 7;
+      now.setUTCDate(now.getUTCDate() - daysSinceMonday);
       now.setUTCHours(0, 0, 0, 0);
       return now.getTime();
+    }
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0);
+  }
+
+  /** End of the calendar window that starts at `windowStartMs`. */
+  private getWindowEnd(type: CalendarType, windowStartMs: number): number {
+    if (type === 'daily') return windowStartMs + 24 * 60 * 60 * 1000;
+    if (type === 'weekly') return windowStartMs + 7 * 24 * 60 * 60 * 1000;
+    const d = new Date(windowStartMs);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0);
+  }
+
+  /**
+   * Align a timestamp to the start of the current rolling period.
+   * E.g. if now is 10:30 and duration is 1h, returns 10:00.
+   */
+  private alignToPeriodStart(nowMs: number, durationMs: number): number {
+    return Math.floor(nowMs / durationMs) * durationMs;
+  }
+
+  /**
+   * Compute a read-only snapshot for one quota definition from its stored
+   * row (if any). No DB writes happen here — resets/leak are applied purely
+   * in memory so `loadQuotaContext` stays a single SELECT.
+   *
+   * Returns null when the quota can't be evaluated at all (invalid rolling
+   * duration) — matches the legacy single-quota checker's fail-open
+   * behavior of skipping the check entirely rather than blocking.
+   */
+  private computeSnapshot(
+    name: string,
+    def: QuotaDefinition,
+    row: QuotaStateRow | undefined,
+    nowMs: number,
+    source: 'assigned' | 'default'
+  ): QuotaCheckSnapshot | null {
+    const scope = this.scopeOf(def);
+    const global = isGlobalScope(scope);
+    const shared = def.shared === true;
+
+    let currentUsage: number;
+    let resetsAtMs: number;
+
+    if (def.type === 'daily' || def.type === 'weekly' || def.type === 'monthly') {
+      const expectedWindowStart = this.getWindowStart(def.type, nowMs);
+      const storedWindowStart = row ? this.toMs(row.windowStart) : null;
+      const stale =
+        !row || storedWindowStart !== expectedWindowStart || row.limitType !== def.limitType;
+      currentUsage = stale ? 0 : row!.currentUsage;
+      resetsAtMs = this.getWindowEnd(def.type, expectedWindowStart);
+    } else if (def.type === 'rolling' && def.limitType === 'cost') {
+      const durationMs = parseDuration(def.duration);
+      if (!durationMs) {
+        logger.warn(
+          `Invalid duration '${def.duration}' for rolling cost quota '${name}'. Skipping check (fail-open).`
+        );
+        return null;
+      }
+      const expectedWindowStart = this.alignToPeriodStart(nowMs, durationMs);
+      const storedWindowStart = row ? this.toMs(row.windowStart) : null;
+      const stale =
+        !row || storedWindowStart !== expectedWindowStart || row.limitType !== def.limitType;
+      currentUsage = stale ? 0 : row!.currentUsage;
+      resetsAtMs = expectedWindowStart + durationMs;
     } else {
-      // type === 'monthly' - Start of current UTC month (1st day)
-      return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0);
+      // rolling requests/tokens — leaky bucket
+      const durationMs = parseDuration(def.duration);
+      if (!durationMs) {
+        logger.warn(
+          `Invalid duration '${def.duration}' for rolling quota '${name}'. Skipping check (fail-open).`
+        );
+        return null;
+      }
+      if (!row || row.limitType !== def.limitType) {
+        currentUsage = 0;
+      } else {
+        const lastUpdatedMs = this.toMs(row.lastUpdated)!;
+        const elapsedMs = Math.max(0, nowMs - lastUpdatedMs);
+        const leakRate = def.limit / durationMs;
+        currentUsage = Math.max(0, row.currentUsage - elapsedMs * leakRate);
+      }
+      const timeToLeakAll = (currentUsage / def.limit) * durationMs;
+      resetsAtMs = nowMs + timeToLeakAll;
+    }
+
+    const allowed = currentUsage < def.limit;
+    const remaining = Math.max(0, def.limit - currentUsage);
+    const displayUsage = def.limitType === 'cost' ? currentUsage : Math.round(currentUsage);
+    const displayRemaining = def.limitType === 'cost' ? remaining : Math.round(remaining);
+
+    return {
+      quotaName: name,
+      limitType: def.limitType,
+      limit: def.limit,
+      currentUsage: displayUsage,
+      remaining: displayRemaining,
+      allowed,
+      resetsAtMs,
+      scope,
+      global,
+      shared,
+      ...(def.warnAt !== undefined ? { warnAt: def.warnAt } : {}),
+      source,
+    };
+  }
+
+  /**
+   * Resolve the effective quota set for `keyName` and read all of it in ONE
+   * SELECT. Strictly read-only — no writes, no side effects. Returns null
+   * when the key is unknown or resolves to no quota names at all (assigned
+   * empty and no `default_quotas` configured).
+   */
+  async loadQuotaContext(keyName: string): Promise<QuotaContext | null> {
+    const config = getConfig();
+    const keyConfig = config.keys?.[keyName];
+    if (!keyConfig) return null;
+
+    const resolved = resolveQuotaNames(keyConfig, config);
+    if (!resolved) return null;
+
+    const defs: Array<{ name: string; def: QuotaDefinition; owner: string }> = [];
+    for (const name of resolved.names) {
+      const def = config.user_quotas?.[name];
+      if (!def) {
+        logger.warn(`Quota definition '${name}' not found for key '${keyName}'`);
+        continue;
+      }
+      defs.push({ name, def, owner: def.shared ? SHARED_OWNER : keyName });
+    }
+
+    if (defs.length === 0) {
+      return { keyName, checks: [], blockedGlobal: null };
+    }
+
+    const nonSharedNames = defs.filter((d) => d.owner === keyName).map((d) => d.name);
+    const sharedNames = defs.filter((d) => d.owner === SHARED_OWNER).map((d) => d.name);
+
+    const conditions = [];
+    if (nonSharedNames.length > 0) {
+      conditions.push(
+        and(
+          eq(this.schema.quotaState.keyName, keyName),
+          inArray(this.schema.quotaState.quotaName, nonSharedNames)
+        )
+      );
+    }
+    if (sharedNames.length > 0) {
+      conditions.push(
+        and(
+          eq(this.schema.quotaState.keyName, SHARED_OWNER),
+          inArray(this.schema.quotaState.quotaName, sharedNames)
+        )
+      );
+    }
+
+    const rows: QuotaStateRow[] =
+      conditions.length > 0
+        ? await this.db
+            .select()
+            .from(this.schema.quotaState)
+            .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+        : [];
+
+    const rowMap = new Map<string, QuotaStateRow>();
+    for (const r of rows) rowMap.set(`${r.keyName}::${r.quotaName}`, r);
+
+    const nowMs = Date.now();
+    const checks: QuotaCheckSnapshot[] = [];
+    for (const { name, def, owner } of defs) {
+      const row = rowMap.get(`${owner}::${name}`);
+      const snapshot = this.computeSnapshot(name, def, row, nowMs, resolved.source);
+      if (snapshot) checks.push(snapshot);
+    }
+
+    const blockedGlobal = checks.find((c) => c.global && !c.allowed) ?? null;
+
+    return { keyName, checks, blockedGlobal };
+  }
+
+  /**
+   * Split candidates into those allowed by every scope-matching quota and
+   * those blocked by at least one exhausted scope-matching quota. Pure —
+   * takes an already-loaded context, does no I/O.
+   */
+  static filterCandidates<C extends QuotaCandidate>(
+    ctx: QuotaContext | null,
+    candidates: C[]
+  ): { allowed: C[]; blocked: Array<{ candidate: C; quota: QuotaCheckSnapshot }> } {
+    if (!ctx) return { allowed: candidates, blocked: [] };
+
+    const allowed: C[] = [];
+    const blocked: Array<{ candidate: C; quota: QuotaCheckSnapshot }> = [];
+
+    for (const candidate of candidates) {
+      const exhausted = ctx.checks.find(
+        (c) => !c.allowed && scopeMatches(c.scope, candidate.provider, candidate.model)
+      );
+      if (exhausted) {
+        blocked.push({ candidate, quota: exhausted });
+      } else {
+        allowed.push(candidate);
+      }
+    }
+
+    return { allowed, blocked };
+  }
+
+  /**
+   * Among the checks that apply to (provider, model) — global or
+   * scope-matching — pick the most-constrained one (smallest
+   * remaining/limit ratio). Used to populate legacy single-quota response
+   * shapes / rate-limit headers. Pure.
+   */
+  static selectHeaderQuota(
+    ctx: QuotaContext | null,
+    provider: string,
+    model: string
+  ): QuotaCheckSnapshot | null {
+    if (!ctx) return null;
+
+    const applicable = ctx.checks.filter((c) => scopeMatches(c.scope, provider, model));
+    if (applicable.length === 0) return null;
+
+    return applicable.reduce((min, c) =>
+      c.remaining / c.limit < min.remaining / min.limit ? c : min
+    );
+  }
+
+  private computeUsageValue(limitType: 'requests' | 'tokens' | 'cost', usage: UsageRecord): number {
+    if (limitType === 'requests') return 1;
+    if (limitType === 'cost') return usage.costTotal || 0;
+    return (
+      (usage.tokensInput || 0) +
+      (usage.tokensOutput || 0) +
+      (usage.tokensReasoning || 0) +
+      (usage.tokensCached || 0) +
+      (usage.tokensCacheWrite || 0)
+    );
+  }
+
+  /**
+   * Atomic upsert of one quota bucket's usage. A single
+   * `insert(...).onConflictDoUpdate(...)` statement — no read-then-write —
+   * so concurrent recordUsage calls against the same bucket sum exactly on
+   * both dialects (row-level upsert on Postgres, single-writer serialization
+   * on SQLite).
+   */
+  private async upsertQuotaState(
+    owner: string,
+    quotaName: string,
+    def: QuotaDefinition,
+    usageValue: number,
+    nowMs: number
+  ): Promise<void> {
+    const limitType = def.limitType;
+    const maxFn = this.dialect === 'postgres' ? sql.raw('GREATEST') : sql.raw('MAX');
+    const nowDb = toDbTimestampMs(nowMs, this.dialect)!;
+
+    if (def.type === 'rolling' && limitType !== 'cost') {
+      // Leaky bucket (rolling tokens/requests). limitType change still
+      // resets the bucket, mirroring the existing (pre-rewrite) behavior.
+      const durationMs = parseDuration(def.duration);
+      if (!durationMs) {
+        logger.warn(
+          `Invalid duration '${def.duration}' for rolling quota '${quotaName}'. ` +
+            `Recording usage without leak calculation.`
+        );
+      }
+      const leakPerMs = durationMs ? def.limit / durationMs : 0;
+
+      const currentUsageExpr = sql`CASE WHEN ${this.schema.quotaState.limitType} != ${limitType} THEN ${usageValue}
+        ELSE ${maxFn}(0, ${this.schema.quotaState.currentUsage} - (${nowMs} - ${this.schema.quotaState.lastUpdated}) * ${leakPerMs}) + ${usageValue}
+        END`;
+
+      await this.db
+        .insert(this.schema.quotaState)
+        .values({
+          keyName: owner,
+          quotaName,
+          limitType,
+          currentUsage: usageValue,
+          lastUpdated: nowDb,
+          windowStart: null,
+        })
+        .onConflictDoUpdate({
+          target: [this.schema.quotaState.keyName, this.schema.quotaState.quotaName],
+          set: {
+            currentUsage: currentUsageExpr,
+            lastUpdated: nowDb,
+            limitType,
+          },
+        });
+      return;
+    }
+
+    // Rolling-cost & calendar (daily/weekly/monthly): reset to the boundary
+    // exactly rather than leaking. NOTE deliberate change from the old
+    // implementation: rolling-cost quotas used to ALSO reset when
+    // `now - lastUpdated >= duration` (an "elapsed since last write" check),
+    // which was redundant with — and could fire earlier/later than — the
+    // aligned window boundary below. That branch is dropped: rolling-cost
+    // now resets exactly at aligned period boundaries, same as calendar
+    // quotas.
+    let expectedWindowStart: number;
+    if (def.type === 'rolling') {
+      const durationMs = parseDuration(def.duration);
+      if (!durationMs) {
+        logger.warn(
+          `Invalid duration '${def.duration}' for rolling cost quota '${quotaName}'. ` +
+            `Using current time as window start.`
+        );
+      }
+      expectedWindowStart = durationMs ? this.alignToPeriodStart(nowMs, durationMs) : nowMs;
+    } else {
+      expectedWindowStart = this.getWindowStart(def.type, nowMs);
+    }
+    const windowStartDb = toDbTimestampMs(expectedWindowStart, this.dialect);
+
+    const currentUsageExpr = sql`CASE WHEN ${this.schema.quotaState.windowStart} IS NULL OR ${this.schema.quotaState.windowStart} != ${expectedWindowStart} OR ${this.schema.quotaState.limitType} != ${limitType}
+      THEN ${usageValue}
+      ELSE ${this.schema.quotaState.currentUsage} + ${usageValue}
+      END`;
+
+    await this.db
+      .insert(this.schema.quotaState)
+      .values({
+        keyName: owner,
+        quotaName,
+        limitType,
+        currentUsage: usageValue,
+        lastUpdated: nowDb,
+        windowStart: windowStartDb,
+      })
+      .onConflictDoUpdate({
+        target: [this.schema.quotaState.keyName, this.schema.quotaState.quotaName],
+        set: {
+          currentUsage: currentUsageExpr,
+          lastUpdated: nowDb,
+          windowStart: windowStartDb,
+          limitType,
+        },
+      });
+  }
+
+  /**
+   * Record usage against every quota attached to `keyName` whose scope
+   * matches (finalProvider, finalModel) — the resolved candidate/model at
+   * filter time may differ from the model actually dispatched, so recording
+   * uses the final attempt, not the original candidate list.
+   */
+  async recordUsage(
+    keyName: string,
+    finalProvider: string,
+    finalModel: string,
+    usage: UsageRecord
+  ): Promise<void> {
+    const config = getConfig();
+    const keyConfig = config.keys?.[keyName];
+    if (!keyConfig) return;
+
+    const resolved = resolveQuotaNames(keyConfig, config);
+    if (!resolved) return;
+
+    const nowMs = Date.now();
+    for (const name of resolved.names) {
+      const def = config.user_quotas?.[name];
+      if (!def) continue;
+      if (!scopeMatches(this.scopeOf(def), finalProvider, finalModel)) continue;
+
+      const owner = def.shared ? SHARED_OWNER : keyName;
+      const usageValue = this.computeUsageValue(def.limitType, usage);
+      await this.upsertQuotaState(owner, name, def, usageValue, nowMs);
     }
   }
 
   /**
-   * Align timestamp to the start of the current period.
-   * E.g., if now is 10:30 and duration is 1h, returns 10:00 (start of current hour).
-   * Uses simple floor division for all durations.
-   *
-   * @param nowMs - Current timestamp in milliseconds
-   * @param durationMs - Duration of the rolling window in milliseconds
-   * @returns Aligned timestamp at the start of the current period
+   * Reset quota usage to zero. With no `quotaName`, clears every quota
+   * currently attached to the key (assigned, or default_quotas if the key
+   * has none of its own). Shared defs clear the pooled '*' bucket.
    */
-  private alignToPeriodStart(nowMs: number, durationMs: number): number {
-    // Floor division: find how many periods have passed, then multiply back
-    // This gives us the start of the current period
-    return Math.floor(nowMs / durationMs) * durationMs;
+  async clearQuota(keyName: string, quotaName?: string): Promise<void> {
+    const config = getConfig();
+    const keyConfig = config.keys?.[keyName];
+
+    let names: string[];
+    if (quotaName) {
+      names = [quotaName];
+    } else {
+      const resolved = keyConfig ? resolveQuotaNames(keyConfig, config) : null;
+      names = resolved?.names ?? [];
+    }
+
+    if (names.length === 0) return;
+
+    const nowMs = Date.now();
+    const nowDb = toDbTimestampMs(nowMs, this.dialect)!;
+
+    for (const name of names) {
+      const def = config.user_quotas?.[name];
+      const owner = def?.shared ? SHARED_OWNER : keyName;
+      await this.db
+        .update(this.schema.quotaState)
+        .set({ currentUsage: 0, lastUpdated: nowDb })
+        .where(
+          and(eq(this.schema.quotaState.keyName, owner), eq(this.schema.quotaState.quotaName, name))
+        );
+    }
+
+    logger.debug(`Quota cleared for ${keyName}${quotaName ? `/${quotaName}` : ' (all attached)'}`);
+  }
+
+  /** Every key whose resolved quota set (assigned, or default_quotas
+   * fallback) includes `quotaName` — used to recompute a shared bucket from
+   * `request_usage` across every key that pools into it. */
+  private keysAttachingQuota(quotaName: string, config: PlexusConfig): string[] {
+    const keys: string[] = [];
+    for (const [name, keyConfig] of Object.entries(config.keys ?? {})) {
+      const resolved = resolveQuotaNames(keyConfig, config);
+      if (resolved?.names.includes(quotaName)) keys.push(name);
+    }
+    return keys;
+  }
+
+  /**
+   * Repair a quota bucket by recomputing it from `request_usage` instead of
+   * trusting the (potentially drifted) counter. Exact for calendar types and
+   * rolling-cost, since those are reconstructable from a bounded time
+   * window. Refused for leaky rolling tokens/requests — decay depends on the
+   * exact sequence and timing of past writes, which isn't recoverable from
+   * request_usage alone.
+   */
+  async recomputeQuota(
+    keyName: string,
+    quotaName: string
+  ): Promise<{ recomputed: boolean; usage?: number; windowStartMs?: number; reason?: string }> {
+    const config = getConfig();
+    const def = config.user_quotas?.[quotaName];
+    if (!def) return { recomputed: false, reason: 'quota_not_found' };
+
+    if (def.type === 'rolling' && def.limitType !== 'cost') {
+      return { recomputed: false, reason: 'unsupported_quota_type' };
+    }
+
+    const nowMs = Date.now();
+    let windowStartMs: number;
+    if (def.type === 'rolling') {
+      const durationMs = parseDuration(def.duration);
+      if (!durationMs) return { recomputed: false, reason: 'invalid_duration' };
+      windowStartMs = this.alignToPeriodStart(nowMs, durationMs);
+    } else {
+      windowStartMs = this.getWindowStart(def.type, nowMs);
+    }
+
+    const owner = def.shared ? SHARED_OWNER : keyName;
+    const apiKeys = def.shared ? this.keysAttachingQuota(quotaName, config) : [keyName];
+    if (apiKeys.length === 0) apiKeys.push(keyName);
+
+    const ru = this.schema.requestUsage;
+    const conditions = [
+      inArray(ru.apiKey, apiKeys),
+      gte(ru.startTime, windowStartMs),
+      eq(ru.responseStatus, 'success'),
+      // Non-chat routes (embeddings/images/speech/transcriptions) write
+      // request_usage rows with NULL final_attempt_provider/model and never
+      // record quota usage on the live path. Exclude them here so recompute
+      // repair doesn't inflate the counter with traffic live recording never
+      // counted (chat-path rows always set final_attempt_provider).
+      isNotNull(ru.finalAttemptProvider),
+    ];
+    if (def.allowedProviders && def.allowedProviders.length > 0) {
+      conditions.push(inArray(ru.finalAttemptProvider, def.allowedProviders));
+    }
+    if (def.excludedProviders && def.excludedProviders.length > 0) {
+      conditions.push(notInArray(ru.finalAttemptProvider, def.excludedProviders));
+    }
+    if (def.allowedModels && def.allowedModels.length > 0) {
+      conditions.push(inArray(ru.finalAttemptModel, def.allowedModels));
+    }
+    if (def.excludedModels && def.excludedModels.length > 0) {
+      conditions.push(notInArray(ru.finalAttemptModel, def.excludedModels));
+    }
+
+    let usage: number;
+    if (def.limitType === 'requests') {
+      const rows = await this.db
+        .select({ value: sql<number>`count(*)` })
+        .from(ru)
+        .where(and(...conditions));
+      usage = Number(rows[0]?.value ?? 0);
+    } else if (def.limitType === 'cost') {
+      const rows = await this.db
+        .select({ value: sql<number>`COALESCE(SUM(${ru.costTotal}), 0)` })
+        .from(ru)
+        .where(and(...conditions));
+      usage = Number(rows[0]?.value ?? 0);
+    } else {
+      const rows = await this.db
+        .select({
+          value: sql<number>`COALESCE(SUM(
+            COALESCE(${ru.tokensInput}, 0) + COALESCE(${ru.tokensOutput}, 0) +
+            COALESCE(${ru.tokensReasoning}, 0) + COALESCE(${ru.tokensCached}, 0) +
+            COALESCE(${ru.tokensCacheWrite}, 0)
+          ), 0)`,
+        })
+        .from(ru)
+        .where(and(...conditions));
+      usage = Number(rows[0]?.value ?? 0);
+    }
+
+    const nowDb = toDbTimestampMs(nowMs, this.dialect)!;
+    const windowStartDb = toDbTimestampMs(windowStartMs, this.dialect);
+
+    await this.db
+      .insert(this.schema.quotaState)
+      .values({
+        keyName: owner,
+        quotaName,
+        limitType: def.limitType,
+        currentUsage: usage,
+        lastUpdated: nowDb,
+        windowStart: windowStartDb,
+      })
+      .onConflictDoUpdate({
+        target: [this.schema.quotaState.keyName, this.schema.quotaState.quotaName],
+        set: {
+          limitType: def.limitType,
+          currentUsage: usage,
+          lastUpdated: nowDb,
+          windowStart: windowStartDb,
+        },
+      });
+
+    return { recomputed: true, usage, windowStartMs };
   }
 }

@@ -6,6 +6,7 @@ import {
   KeyConfigSchema,
   McpServerConfigSchema,
   CompactionConfigSchema,
+  normalizeKeyConfig,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
 import { isValidIpRule } from '../../utils/ip-match';
@@ -364,12 +365,17 @@ export async function registerConfigRoutes(
   // PUT — full create-or-replace with Zod validation
   fastify.put('/v0/management/keys/:name', async (request, reply) => {
     const { name } = request.params as { name: string };
+    if (name.includes('*')) {
+      return reply
+        .code(400)
+        .send({ error: "Key name cannot contain '*' (reserved for the shared-quota bucket)" });
+    }
     const result = KeyConfigSchema.safeParse(request.body);
     if (!result.success) {
       return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
     try {
-      await configService.saveKey(name, result.data);
+      await configService.saveKey(name, normalizeKeyConfig(result.data));
       logger.debug(`API key '${name}' saved via API (PUT)`);
       return reply.send({ success: true, name });
     } catch (e: any) {
@@ -391,7 +397,10 @@ export async function registerConfigRoutes(
       if (!existing) {
         return reply.code(404).send({ error: `API key '${name}' not found` });
       }
-      const merged = { ...existing, ...body };
+      // Normalize a legacy `quota` field on the incoming body BEFORE merging,
+      // so a legacy-format PATCH replaces the key's `quotas` instead of being
+      // shadowed by the existing config's `quotas`.
+      const merged = { ...existing, ...normalizeKeyConfig(body) };
       const result = KeyConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });

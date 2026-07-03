@@ -6,7 +6,8 @@ export const apiKeys = sqliteTable('api_keys', {
   secret: text('secret').notNull().unique(),
   secretHash: text('secret_hash').unique(),
   comment: text('comment'),
-  quotaName: text('quota_name'),
+  quotaName: text('quota_name'), // deprecated: read-fallback only, superseded by quotaNames
+  quotaNames: text('quota_names'),
   allowedModels: text('allowed_models'),
   allowedProviders: text('allowed_providers'),
   excludedModels: text('excluded_models'),

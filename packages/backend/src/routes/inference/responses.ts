@@ -9,7 +9,8 @@ import { handleResponse } from '../../services/response-handler';
 import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { checkQuotaMiddleware } from '../../services/quota/quota-middleware';
+import { checkQuotaMiddleware, attachQuotaContext } from '../../services/quota/quota-middleware';
+import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
 import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
@@ -176,8 +177,12 @@ export async function registerResponsesRoute(
 
       // Check quota before processing
       if (quotaEnforcer) {
-        const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-        if (!allowed) return;
+        const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+        if (!quotaCheck.ok) {
+          saveQuotaBlockedUsage(usageRecord, usageStorage, requestId, startTime);
+          return;
+        }
+        unifiedRequest = attachQuotaContext(unifiedRequest, quotaCheck.context);
       }
 
       const abortController = new AbortController();
@@ -259,6 +264,10 @@ export async function registerResponsesRoute(
           `Request ${requestId}: ${e.message}, usage recorded as ${e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'cancelled'}`
         );
         return;
+      }
+      if (e?.routingContext?.code === 'quota_exceeded') {
+        saveQuotaExceededUsage(e, 'responses', usageRecord, usageStorage, requestId, startTime);
+        return reply.code(429).send(e.routingContext.body);
       }
       usageRecord.responseStatus =
         e?.routingContext?.code === 'upstream_timeout' ? 'timeout' : 'error';

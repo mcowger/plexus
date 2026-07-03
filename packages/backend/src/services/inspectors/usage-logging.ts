@@ -192,10 +192,13 @@ export class UsageInspector extends PassThrough {
         logger.error(`Failed to save usage record for ${this.usageRecord.requestId}:`, err);
       });
 
-      // Record quota usage after costs are calculated (fire-and-forget)
+      // Record quota usage after costs are calculated (fire-and-forget) —
+      // against the FINAL attempt's resolved provider/model.
       if (this.quotaEnforcer && this.keyName) {
         recordQuotaUsage(
           this.keyName,
+          this.usageRecord.finalAttemptProvider,
+          this.usageRecord.finalAttemptModel,
           {
             tokensInput: this.usageRecord.tokensInput,
             tokensOutput: this.usageRecord.tokensOutput,

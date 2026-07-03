@@ -206,6 +206,124 @@ describe('Plexus management MCP routes', () => {
           ? json({ name: id, ...quota })
           : json({ error: { message: `Quota not found: ${id}`, type: 'not_found_error' } }, 404);
       }
+      if (method === 'GET' && path.startsWith('/v0/management/quota/status/')) {
+        const key = decodeURIComponent(path.replace('/v0/management/quota/status/', ''));
+        if (key === 'missing-key') {
+          return json(
+            { error: { message: `Key not found: ${key}`, type: 'not_found_error' } },
+            404
+          );
+        }
+        return json({
+          key,
+          quotas: [
+            {
+              name: 'daily',
+              limitType: 'requests',
+              limit: 100,
+              currentUsage: 10,
+              remaining: 90,
+              allowed: true,
+              resetsAt: '2026-07-03T00:00:00.000Z',
+              scope: {},
+              global: true,
+              shared: false,
+              source: 'assigned',
+            },
+          ],
+          quota_name: 'daily',
+          allowed: true,
+          current_usage: 10,
+          limit: 100,
+          remaining: 90,
+          resets_at: '2026-07-03T00:00:00.000Z',
+        });
+      }
+      if (method === 'POST' && path === '/v0/management/quota/clear') {
+        const body = (request.payload ?? {}) as { key?: string; quota?: string };
+        if (!body.key) {
+          return json(
+            { error: { message: 'Missing required field: key', type: 'invalid_request_error' } },
+            400
+          );
+        }
+        if (body.key === 'missing-key') {
+          return json(
+            { error: { message: `Key not found: ${body.key}`, type: 'not_found_error' } },
+            404
+          );
+        }
+        if (body.quota === 'unattached') {
+          return json(
+            {
+              error: {
+                message: `Quota '${body.quota}' is not attached to key '${body.key}'`,
+                type: 'invalid_request_error',
+              },
+            },
+            400
+          );
+        }
+        return json({
+          success: true,
+          key: body.key,
+          quota: body.quota ?? null,
+          message: body.quota
+            ? `Quota '${body.quota}' reset successfully`
+            : 'Quota reset successfully',
+        });
+      }
+      if (method === 'POST' && path === '/v0/management/quota/recompute') {
+        const body = (request.payload ?? {}) as { key?: string; quota?: string };
+        if (!body.key || !body.quota) {
+          return json(
+            {
+              error: {
+                message: 'Missing required field(s): key, quota',
+                type: 'invalid_request_error',
+              },
+            },
+            400
+          );
+        }
+        if (body.key === 'missing-key') {
+          return json(
+            { error: { message: `Key not found: ${body.key}`, type: 'not_found_error' } },
+            404
+          );
+        }
+        if (body.quota === 'unattached') {
+          return json(
+            {
+              error: {
+                message: `Quota '${body.quota}' is not attached to key '${body.key}'`,
+                type: 'invalid_request_error',
+              },
+            },
+            400
+          );
+        }
+        if (body.quota === 'leaky') {
+          return json(
+            {
+              error: {
+                message: `Failed to recompute quota '${body.quota}': unsupported_quota_type`,
+                type: 'invalid_request_error',
+              },
+              reason: 'unsupported_quota_type',
+            },
+            400
+          );
+        }
+        return json({
+          success: true,
+          key: body.key,
+          quota: body.quota,
+          usage: 42,
+          windowStartMs: 1700000000000,
+          message: `Quota '${body.quota}' recomputed successfully`,
+        });
+      }
       if (method === 'GET' && path === '/v0/management/mcp-servers') {
         return json(setConfigSnapshot().mcpServers ?? setConfigSnapshot().mcp_servers ?? {});
       }
@@ -931,6 +1049,233 @@ describe('Plexus management MCP routes', () => {
     );
     const getBody = parseJsonRpcResponse(getResponse);
     expect(getBody.result.structuredContent.data.beta).toBe(true);
+  });
+
+  test('implements plexus_quota status for a key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'status', id: 'test-key' },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.structuredContent.ok).toBe(true);
+    expect(body.result.structuredContent.data.key).toBe('test-key');
+    expect(body.result.structuredContent.data.quotas).toEqual([
+      expect.objectContaining({ name: 'daily', source: 'assigned', shared: false }),
+    ]);
+    expect(body.result.structuredContent.data.quota_name).toBe('daily');
+  });
+
+  test('plexus_quota status surfaces 404 for an unknown key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'status', id: 'missing-key' },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.code).toBe(404);
+    expect(body.result.structuredContent.error.type).toBe('not_found_error');
+  });
+
+  test('plexus_quota clear requires acknowledgement', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'clear', body: { key: 'test-key' } },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.type).toBe('confirmation_required');
+  });
+
+  test('implements plexus_quota clear for every quota attached to a key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: {
+            operation: 'clear',
+            body: { key: 'test-key' },
+            destructive: 'acknowledged',
+          },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.structuredContent.ok).toBe(true);
+    expect(body.result.structuredContent.data).toEqual(
+      expect.objectContaining({ success: true, key: 'test-key', quota: null })
+    );
+  });
+
+  test('implements plexus_quota clear for a single named quota', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: {
+            operation: 'clear',
+            body: { key: 'test-key', quota: 'daily' },
+            destructive: 'acknowledged',
+          },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.structuredContent.ok).toBe(true);
+    expect(body.result.structuredContent.data).toEqual(
+      expect.objectContaining({ success: true, key: 'test-key', quota: 'daily' })
+    );
+  });
+
+  test('plexus_quota clear surfaces 400 for a quota not attached to the key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: {
+            operation: 'clear',
+            body: { key: 'test-key', quota: 'unattached' },
+            destructive: 'acknowledged',
+          },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.code).toBe(400);
+  });
+
+  test('plexus_quota clear surfaces 404 for an unknown key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: {
+            operation: 'clear',
+            body: { key: 'missing-key' },
+            destructive: 'acknowledged',
+          },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.code).toBe(404);
+  });
+
+  test('implements plexus_quota recompute for a named quota', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'recompute', body: { key: 'test-key', quota: 'daily' } },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.structuredContent.ok).toBe(true);
+    expect(body.result.structuredContent.data).toEqual(
+      expect.objectContaining({ success: true, key: 'test-key', quota: 'daily', usage: 42 })
+    );
+    expect(body.result.structuredContent.data.windowStartMs).toBe(1700000000000);
+  });
+
+  test('plexus_quota recompute passes through the 400 reason for unsupported quota types', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'recompute', body: { key: 'test-key', quota: 'leaky' } },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.code).toBe(400);
+    expect(body.result.structuredContent.error.message).toContain('unsupported_quota_type');
+  });
+
+  test('plexus_quota recompute surfaces 404 for an unknown key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'recompute', body: { key: 'missing-key', quota: 'daily' } },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.code).toBe(404);
+  });
+
+  test('plexus_quota recompute surfaces 400 for a quota not attached to the key', async () => {
+    const response = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_quota',
+          arguments: { operation: 'recompute', body: { key: 'test-key', quota: 'unattached' } },
+        },
+      },
+      adminHeaders()
+    );
+    const body = parseJsonRpcResponse(response);
+
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.error.code).toBe(400);
   });
 
   function postPlexusMcp(payload: Record<string, unknown>, headers: Record<string, string> = {}) {

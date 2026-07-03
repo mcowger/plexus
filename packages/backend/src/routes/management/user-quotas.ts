@@ -165,13 +165,27 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
         // Check if any keys are using this quota
         const keys = await configService.getRepository().getAllKeys();
         const keysUsingQuota = Object.entries(keys)
-          .filter(([, keyConfig]) => keyConfig.quota === name)
+          .filter(([, keyConfig]) => keyConfig.quotas?.includes(name))
           .map(([keyName]) => keyName);
 
-        if (keysUsingQuota.length > 0) {
+        // Check if the `default_quotas` system setting references this quota
+        const settings = await configService.getAllSettings();
+        const defaultQuotas = Array.isArray(settings.default_quotas)
+          ? (settings.default_quotas as unknown[]).filter((v): v is string => typeof v === 'string')
+          : [];
+        const usedAsDefault = defaultQuotas.includes(name);
+
+        if (keysUsingQuota.length > 0 || usedAsDefault) {
+          const reasons: string[] = [];
+          if (keysUsingQuota.length > 0) {
+            reasons.push(`assigned to the following keys: ${keysUsingQuota.join(', ')}`);
+          }
+          if (usedAsDefault) {
+            reasons.push(`referenced by the 'default_quotas' system setting`);
+          }
           return reply.code(409).send({
             error: {
-              message: `Cannot delete quota '${name}'. It is assigned to the following keys: ${keysUsingQuota.join(', ')}`,
+              message: `Cannot delete quota '${name}'. It is ${reasons.join(' and ')}.`,
               type: 'conflict_error',
             },
           });

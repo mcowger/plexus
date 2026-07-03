@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { RotateCw } from 'lucide-react';
-import { api } from '../lib/api';
+import { RotateCw, AlertTriangle, Users } from 'lucide-react';
+import { api, type QuotaStatusEntry } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
@@ -10,15 +10,18 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Switch } from '../components/ui/Switch';
 import { CopyButton } from '../components/ui/CopyButton';
+import { QuotaProgressBar } from '../components/quota/QuotaProgressBar';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { Skeleton } from '../components/ui/Skeleton';
+import { statusForPercent, formatQuotaValue, sortMostConstrainedFirst } from '../lib/quota';
 
 interface SelfInfo {
   role: 'admin' | 'limited';
   keyName?: string;
   allowedProviders?: string[];
   allowedModels?: string[];
+  quotaNames?: string[];
   quotaName?: string | null;
   comment?: string | null;
   beta?: boolean;
@@ -30,6 +33,8 @@ export const MyKey: React.FC = () => {
   const { isLimited, isAdmin, login } = useAuth();
   const toast = useToast();
   const [info, setInfo] = useState<SelfInfo | null>(null);
+  const [quotas, setQuotas] = useState<QuotaStatusEntry[] | null>(null);
+  const [quotaError, setQuotaError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
   const [savingComment, setSavingComment] = useState(false);
@@ -50,6 +55,14 @@ export const MyKey: React.FC = () => {
       .catch((e) => toast.error(String(e), 'Load failed'))
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    api
+      .getSelfQuota()
+      .then((data) => {
+        if (!cancelled) setQuotas(data.quotas);
+      })
+      .catch(() => {
+        if (!cancelled) setQuotaError(true);
       });
     return () => {
       cancelled = true;
@@ -151,7 +164,11 @@ export const MyKey: React.FC = () => {
               <dt className="text-text-muted">Key name</dt>
               <dd className="font-mono text-text break-all">{info.keyName}</dd>
               <dt className="text-text-muted">Quota</dt>
-              <dd className="text-text">{info.quotaName || '—'}</dd>
+              <dd className="text-text">
+                {info.quotaNames && info.quotaNames.length > 0
+                  ? info.quotaNames.join(', ')
+                  : info.quotaName || '—'}
+              </dd>
               <dt className="text-text-muted">Inference path</dt>
               <dd className="text-text">{info.beta ? 'Beta' : 'Stable'}</dd>
               <dt className="text-text-muted">Allowed providers</dt>
@@ -163,6 +180,69 @@ export const MyKey: React.FC = () => {
                 {allowedModels.length > 0 ? allowedModels.join(', ') : 'Any (unrestricted)'}
               </dd>
             </dl>
+          </Card>
+
+          <Card title="Quota">
+            {quotaError ? (
+              <div className="flex items-start gap-2 text-sm text-warning">
+                <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                <span>Could not load quota status — try refreshing.</span>
+              </div>
+            ) : quotas === null ? (
+              <p className="text-sm text-text-muted">Loading…</p>
+            ) : quotas.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                No quota is assigned to this key — requests are unrestricted by quota policy.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {sortMostConstrainedFirst(quotas).map((q) => {
+                  const pct = q.limit > 0 ? Math.min(100, (q.currentUsage / q.limit) * 100) : 0;
+                  return (
+                    <div key={q.name} className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="font-medium text-text">{q.name}</span>
+                        {q.source === 'default' && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-bg-subtle border border-border-glass text-text-muted uppercase tracking-wider text-[10px]">
+                            default
+                          </span>
+                        )}
+                        {q.shared && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary uppercase tracking-wider text-[10px]">
+                            <Users size={10} /> shared
+                          </span>
+                        )}
+                      </div>
+                      <QuotaProgressBar
+                        label={q.limitType}
+                        value={q.currentUsage}
+                        max={q.limit}
+                        displayValue={`${formatQuotaValue(q.currentUsage, q.limitType)} / ${formatQuotaValue(q.limit, q.limitType)}`}
+                        status={statusForPercent(pct)}
+                        size="md"
+                      />
+                      <div className="flex items-center justify-between text-xs text-text-muted">
+                        <span>
+                          Remaining:{' '}
+                          <span className="text-text font-medium">
+                            {formatQuotaValue(q.remaining, q.limitType)}
+                          </span>
+                        </span>
+                        <span>Resets {new Date(q.resetsAt).toLocaleString()}</span>
+                      </div>
+                      {!q.allowed && (
+                        <div className="flex items-center gap-2 text-xs text-danger">
+                          <AlertTriangle size={14} />
+                          <span>
+                            Quota exhausted — new requests will be rejected until it resets.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Card>
 
           <Card title="Comment">

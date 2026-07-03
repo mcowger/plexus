@@ -34,6 +34,8 @@ export type Principal =
       allowedModels: string[];
       excludedProviders: string[];
       excludedModels: string[];
+      quotaNames: string[];
+      // Deprecated: first entry of quotaNames, kept for transition compat.
       quotaName?: string | null;
       comment?: string | null;
       beta?: boolean;
@@ -100,7 +102,7 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
       allowedModels?: string[];
       excludedProviders?: string[];
       excludedModels?: string[];
-      quota?: string | null;
+      quotas?: string[];
       comment?: string | null;
       allowedIps?: string[];
       beta?: boolean;
@@ -118,7 +120,8 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
       allowedModels: cfg.allowedModels ?? [],
       excludedProviders: cfg.excludedProviders ?? [],
       excludedModels: cfg.excludedModels ?? [],
-      quotaName: cfg.quota ?? null,
+      quotaNames: cfg.quotas ?? [],
+      quotaName: cfg.quotas?.[0] ?? null,
       comment: cfg.comment ?? null,
       beta: cfg.beta ?? false,
     };

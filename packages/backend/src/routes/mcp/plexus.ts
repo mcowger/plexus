@@ -24,7 +24,7 @@ Common workflows:
 - Inspect or update model routing with plexus_model_alias list, get, put, update, delete, or delete_all.
 - Inspect or update inference keys with plexus_key list, get, put, update, or delete; normal responses redact secrets.
 - Check upstream quota state with plexus_quota_checker types, list, or get.
-- Inspect or update user quota definitions with plexus_quota list, get, put, update, or delete.
+- Inspect or update user quota definitions with plexus_quota list, get, put, update, or delete; check or repair a key's quota usage with plexus_quota status, clear, or recompute.
 - Review or update MCP gateway configuration with plexus_mcp_gateway servers_list, get, put, update, or delete.
 - Inspect general settings with plexus_settings get and a category.
 - Inspect recent system logs with plexus_system_logs recent.
@@ -77,7 +77,9 @@ const ToolInputSchema = {
   id: z
     .string()
     .optional()
-    .describe('Optional resource identifier for get/update/delete operations.'),
+    .describe(
+      'Optional resource identifier for get/update/delete operations (the key name for plexus_quota status).'
+    ),
   category: z.string().optional().describe('Optional settings or subdomain category.'),
   query: z
     .record(z.string(), z.unknown())
@@ -328,29 +330,29 @@ async function handleToolCall(
 
     switch (toolName) {
       case 'plexus_config':
-        return handleConfigTool(input, config, shimContext);
+        return await handleConfigTool(input, config, shimContext);
       case 'plexus_provider':
-        return handleProviderTool(input, shimContext);
+        return await handleProviderTool(input, shimContext);
       case 'plexus_model_alias':
-        return handleModelAliasTool(input, shimContext);
+        return await handleModelAliasTool(input, shimContext);
       case 'plexus_key':
-        return handleKeyTool(input, shimContext);
+        return await handleKeyTool(input, shimContext);
       case 'plexus_quota':
-        return handleQuotaTool(input, shimContext);
+        return await handleQuotaTool(input, shimContext);
       case 'plexus_quota_checker':
         return handleQuotaCheckerTool(input, config);
       case 'plexus_mcp_gateway':
-        return handleMcpGatewayTool(input, shimContext);
+        return await handleMcpGatewayTool(input, shimContext);
       case 'plexus_settings':
-        return handleSettingsTool(input, shimContext);
+        return await handleSettingsTool(input, shimContext);
       case 'plexus_system_logs':
-        return handleSystemLogsTool(input, shimContext);
+        return await handleSystemLogsTool(input, shimContext);
       case 'plexus_usage':
-        return handleUsageTool(input, shimContext);
+        return await handleUsageTool(input, shimContext);
       case 'plexus_debug':
-        return handleDebugTool(input, shimContext);
+        return await handleDebugTool(input, shimContext);
       case 'plexus_operations':
-        return handleOperationsTool(input, shimContext);
+        return await handleOperationsTool(input, shimContext);
     }
   } catch (error) {
     if (error instanceof McpToolError) {
@@ -885,6 +887,35 @@ async function handleQuotaTool(
           `/v0/management/user-quotas/${encodeURIComponent(requireId(input, 'quota'))}`
         )
       );
+    case 'status': {
+      const key = requireId(input, 'key');
+      const status = await callManagementRoute(
+        shimContext,
+        'GET',
+        `/v0/management/quota/status/${encodeURIComponent(key)}`
+      );
+      return successResponse(input.operation, status);
+    }
+    case 'clear':
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'POST',
+          '/v0/management/quota/clear',
+          input.body ?? {}
+        )
+      );
+    case 'recompute':
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'POST',
+          '/v0/management/quota/recompute',
+          input.body ?? {}
+        )
+      );
     default:
       throw unsupportedOperation(input.operation, [
         'list',
@@ -893,6 +924,9 @@ async function handleQuotaTool(
         'create',
         'update',
         'delete',
+        'status',
+        'clear',
+        'recompute',
       ]);
   }
 }
@@ -1365,9 +1399,9 @@ function getToolDescription(toolName: string) {
     case 'plexus_model_alias':
       return 'Inspect and manage model aliases, targets, and target groups. Operations: list, get, put, create, update, delete, delete_all.';
     case 'plexus_key':
-      return 'Inspect and manage inference keys with secrets redacted. Operations: list, get, put, create, update, delete.';
+      return 'Inspect and manage inference keys with secrets redacted. Operations: list, get, put, create, update, delete. Keys carry quotas: string[] to assign one or more quota definitions (legacy singular quota field is still accepted on input and folded into quotas).';
     case 'plexus_quota':
-      return 'Inspect and manage user quota definitions. Operations: list, get, put, create, update, delete.';
+      return "Inspect and manage user quota definitions, and check or repair per-key quota usage. Operations: list, get, put, create, update, delete, status, clear, recompute. Quota definitions carry scope fields (allowedProviders, excludedProviders, allowedModels, excludedModels; omitted when unscoped), shared (pooled across keys), and an optional warnAt threshold. status (id: key) returns { key, quotas: [...] } — one entry per quota attached to the key (assigned or default-sourced), each with name, limitType, limit, currentUsage, remaining, allowed, resetsAt, scope, global, shared, source ('assigned' | 'default'), and warnAt (only when set on the definition), plus legacy top-level quota_name/allowed/current_usage/limit/remaining/resets_at fields derived from the most-constrained entry. clear (body: { key, quota? }, destructive: \"acknowledged\") resets usage for one named quota, or every quota attached to the key when quota is omitted. recompute (body: { key, quota }, both required) repairs a quota's cached usage by recalculating from stored request records; it 400s with a reason (e.g. unsupported_quota_type) for leaky rolling tokens/requests quotas that cannot be recomputed, and its windowStartMs is a raw epoch-ms number. clear and recompute 404 when the key does not exist and 400 when the quota is not attached to that key.";
     case 'plexus_quota_checker':
       return 'Inspect upstream provider quota checker configuration. Initial operations: types, list, get.';
     case 'plexus_usage':

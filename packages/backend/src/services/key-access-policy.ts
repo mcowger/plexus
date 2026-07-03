@@ -2,17 +2,15 @@
  * Shared key-access-policy helpers.
  *
  * Extracted from Dispatcher so the beta pi-ai executor can apply the same
- * policy logic without depending on the full Dispatcher class.
+ * policy logic without depending on the full Dispatcher class. Membership
+ * decisions (allow/exclude list matching) are delegated to the shared
+ * scope-match util.
  */
 
 import type { RouteResult } from './router';
+import { isGlobalScope, listAllows, type ScopeLists } from './scope-match';
 
-export interface KeyAccessPolicy {
-  allowedModels?: string[];
-  allowedProviders?: string[];
-  excludedModels?: string[];
-  excludedProviders?: string[];
-}
+export type KeyAccessPolicy = ScopeLists;
 
 export interface PolicyRequest {
   model: string;
@@ -38,14 +36,7 @@ export function getKeyAccessPolicy(request: PolicyRequest): KeyAccessPolicy | nu
   const policy = request.metadata?.plexus_metadata?.plexus_key_policy;
   if (!policy) return null;
 
-  if (
-    (!policy.allowedModels || policy.allowedModels.length === 0) &&
-    (!policy.allowedProviders || policy.allowedProviders.length === 0) &&
-    (!policy.excludedModels || policy.excludedModels.length === 0) &&
-    (!policy.excludedProviders || policy.excludedProviders.length === 0)
-  ) {
-    return null;
-  }
+  if (isGlobalScope(policy)) return null;
 
   return policy;
 }
@@ -58,43 +49,21 @@ export function applyKeyAccessPolicy(
   const policy = getKeyAccessPolicy(request);
   if (!policy) return candidates;
 
-  // Excluded models: block if the requested model is in the denylist
-  if (policy.excludedModels && policy.excludedModels.includes(request.model)) {
+  // Model-level: excluded wins, then the model must be on the allowlist (if any).
+  if (!listAllows(policy.allowedModels, policy.excludedModels, request.model)) {
     throw buildAccessDeniedError(
       `Key is not allowed to access model '${request.model}' for ${apiType}`
     );
   }
 
-  // Allowed models: block if the requested model is NOT in the allowlist
-  if (policy.allowedModels && !policy.allowedModels.includes(request.model)) {
+  // Provider-level: excluded wins, then candidates are narrowed to the allowlist (if any).
+  const filtered = candidates.filter((candidate) =>
+    listAllows(policy.allowedProviders, policy.excludedProviders, candidate.provider)
+  );
+  if (filtered.length === 0) {
     throw buildAccessDeniedError(
-      `Key is not allowed to access model '${request.model}' for ${apiType}`
+      `Key is not allowed to access any provider configured for model '${request.model}'`
     );
-  }
-
-  // Excluded providers: filter out candidates on the denylist
-  let filtered = candidates;
-  if (policy.excludedProviders && policy.excludedProviders.length > 0) {
-    filtered = filtered.filter(
-      (candidate) => !policy.excludedProviders!.includes(candidate.provider)
-    );
-    if (filtered.length === 0) {
-      throw buildAccessDeniedError(
-        `Key is not allowed to access any provider configured for model '${request.model}'`
-      );
-    }
-  }
-
-  // Allowed providers: filter candidates to only those on the allowlist
-  if (policy.allowedProviders && policy.allowedProviders.length > 0) {
-    filtered = filtered.filter((candidate) =>
-      policy.allowedProviders!.includes(candidate.provider)
-    );
-    if (filtered.length === 0) {
-      throw buildAccessDeniedError(
-        `Key is not allowed to access any provider configured for model '${request.model}'`
-      );
-    }
   }
 
   return filtered;

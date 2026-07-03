@@ -40,8 +40,12 @@ import { ConcurrencyTracker } from '../../services/concurrency-tracker';
 import { DebugManager } from '../../services/debug-manager';
 import { CodexVersionService } from '../../services/codex-version-service';
 import type { UsageStorageService } from '../../services/usage-storage';
-import type { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { recordQuotaUsage } from '../../services/quota/quota-middleware';
+import { QuotaEnforcer, type QuotaContext } from '../../services/quota/quota-enforcer';
+import {
+  recordQuotaUsage,
+  buildQuotaHeaders,
+  buildQuotaExceededError,
+} from '../../services/quota/quota-middleware';
 import { logger } from '../../utils/logger';
 import { getConfig } from '../../config';
 import { applyKeyAccessPolicy, type PolicyRequest } from '../../services/key-access-policy';
@@ -124,6 +128,11 @@ export interface PiAiExecutorResult<TResponse> {
     tokensBefore: number;
     tokensAfter: number;
   };
+  /** x-plexus-quota* headers for the winning route (empty object when no
+   * quota context or no matching quota — see buildQuotaHeaders). Set for
+   * both non-streaming and streaming, since the winning route is known
+   * before either path starts sending bytes. */
+  quotaHeaders?: Record<string, string>;
 }
 
 // ─── Attempt-timeout helper (mirrors Dispatcher.createAttemptTimeout) ─────────
@@ -520,7 +529,7 @@ export async function runPiAiExecutor<TResponse>(
   // registries or the built-in registry. resolvePiAiModel returns null (never
   // throws) for unknown pairs, so a null check is the correct gate.
   // Also supports OAuth and Claude Masking API key routes natively.
-  const betaCandidates = candidates.filter((c) => {
+  let betaCandidates = candidates.filter((c) => {
     const isOAuth = isOAuthRoute(c, incomingApiType);
     const isClaudeMasking = isClaudeMaskingApiKeyRoute(c, incomingApiType);
     if (isOAuth || isClaudeMasking) {
@@ -541,8 +550,42 @@ export async function runPiAiExecutor<TResponse>(
     throw buildNoBetaCandidatesError();
   }
 
-  // ── Failover loop ─────────────────────────────────────────────────────────
   const retryHistory: RetryAttemptRecord[] = [];
+
+  // ── Quota-aware candidate filter ─────────────────────────────────────────
+  // Reads the QuotaContext checkQuotaMiddleware stashed on the raw Fastify
+  // request (`(request as any).quotaContext`) before this executor ran.
+  // A globally-exhausted quota already 429'd from checkQuotaMiddleware
+  // before we got here, so this only ever narrows around SCOPED exhausted
+  // quotas — dropped candidates are recorded as skipped retryHistory
+  // entries, and the request only fails here if every remaining candidate
+  // ends up blocked.
+  const quotaContext: QuotaContext | null = (request as any).quotaContext ?? null;
+  if (quotaContext) {
+    const { allowed, blocked } = QuotaEnforcer.filterCandidates(quotaContext, betaCandidates);
+    if (blocked.length > 0) {
+      for (const { candidate, quota } of blocked) {
+        appendSkippedAttempt(
+          retryHistory,
+          candidate,
+          `quota_exceeded:${quota.quotaName}`,
+          incomingApiType
+        );
+      }
+      if (allowed.length === 0) {
+        // Terminal: keep the quota-skip breadcrumbs on the error so the
+        // saved UsageRecord's retryHistory isn't null when everything was
+        // blocked (mirrors buildAllTargetsFailedError).
+        throw buildQuotaExceededError(
+          blocked.map((b) => b.quota),
+          retryHistory
+        );
+      }
+      betaCandidates = allowed;
+    }
+  }
+
+  // ── Failover loop ─────────────────────────────────────────────────────────
   const attemptedProviders: string[] = [];
   let lastError: any = null;
   const failoverEnabled = betaCandidates.length > 1;
@@ -874,6 +917,11 @@ export async function runPiAiExecutor<TResponse>(
         }
       : undefined;
 
+    // x-plexus-quota* headers for this candidate — computed here (not just
+    // at the return points) so it's available identically on both the
+    // non-streaming and streaming success paths below.
+    const quotaHeaders = buildQuotaHeaders(quotaContext, route.provider, route.model);
+
     // ── Align assistant provenance for signature replay ──────────────────
     // Re-stamp replayed assistant messages with the DISPATCH model's
     // provider/model/api so pi-ai's serializers echo provider-specific
@@ -954,7 +1002,9 @@ export async function runPiAiExecutor<TResponse>(
           usageData.durationMs,
           requestId
         );
-        if (quotaEnforcer) await recordQuotaUsage(keyName, usageRecord, quotaEnforcer);
+        if (quotaEnforcer) {
+          await recordQuotaUsage(keyName, route.provider, route.model, usageRecord, quotaEnforcer);
+        }
         debug.flush(requestId);
 
         await onSuccess?.(message);
@@ -962,6 +1012,7 @@ export async function runPiAiExecutor<TResponse>(
         return {
           response: finalResponse,
           compaction: compactionMeta,
+          quotaHeaders,
         };
       } else {
         // ── Streaming ────────────────────────────────────────────────────
@@ -1003,7 +1054,7 @@ export async function runPiAiExecutor<TResponse>(
           serializeChunks,
         });
 
-        return { stream: gen, compaction: compactionMeta };
+        return { stream: gen, compaction: compactionMeta, quotaHeaders };
       }
     } catch (err: any) {
       const effectiveErr = attemptTimeout.isTimedOut() ? buildTimeoutError() : err;
@@ -1249,7 +1300,9 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
           usageData.durationMs,
           requestId
         );
-        if (quotaEnforcer) await recordQuotaUsage(keyName, usageRecord, quotaEnforcer);
+        if (quotaEnforcer) {
+          await recordQuotaUsage(keyName, route.provider, route.model, usageRecord, quotaEnforcer);
+        }
         await onSuccess?.(msg);
         break;
       }

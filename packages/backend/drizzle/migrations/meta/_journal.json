@@ -379,6 +379,13 @@
       "when": 1782437360666,
       "tag": "0053_add_context_compaction",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1783053909476,
+      "tag": "0054_add_scoped_multi_quotas",
+      "breakpoints": true
     }
   ]
 }

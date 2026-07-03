@@ -87,6 +87,28 @@ function applyCompactionHeaders(reply: FastifyReply, compaction?: CompactionHead
     .header('x-plexus-compaction-tokens-after', String(compaction.tokensAfter));
 }
 
+function applyQuotaHeaders(reply: FastifyReply, quotaHeaders?: Record<string, string>): void {
+  if (!quotaHeaders) return;
+  for (const [name, value] of Object.entries(quotaHeaders)) {
+    reply.header(name, value);
+  }
+}
+
+/**
+ * Names of every quota that contributed to a terminal
+ * `buildQuotaExceededError` (quota-middleware.ts) — read off the
+ * `routingContext.body` (an OpenAI-error-shaped `buildQuotaExceededBody`)
+ * threaded onto the error. Used by handlers whose wire shape can't carry the
+ * full v1-parity body (Anthropic messages, Gemini) so the blocking quotas
+ * are still surfaced in the error message. Empty array if the shape isn't
+ * what's expected.
+ */
+function blockingQuotaNamesFromError(e: any): string[] {
+  const blockingQuotas = e?.routingContext?.body?.error?.blocking_quotas;
+  if (!Array.isArray(blockingQuotas)) return [];
+  return blockingQuotas.map((q: any) => q?.quotaName).filter((name: unknown) => Boolean(name));
+}
+
 function saveBetaErrorUsage(
   usageStorage: UsageStorageService,
   request: FastifyRequest,
@@ -129,7 +151,14 @@ function saveBetaErrorUsage(
     startTime,
     durationMs: Date.now() - startTime,
     isStreamed: streaming,
-    responseStatus: error?.routingContext?.code === 'client_disconnected' ? 'cancelled' : 'error',
+    // 'quota_exceeded' mirrors the v1 routes' saveQuotaExceededUsage so
+    // quota rejections are filterable regardless of key generation.
+    responseStatus:
+      error?.routingContext?.code === 'client_disconnected'
+        ? 'cancelled'
+        : error?.routingContext?.code === 'quota_exceeded'
+          ? 'quota_exceeded'
+          : 'error',
   } as any);
 }
 
@@ -155,8 +184,11 @@ export async function handleBetaChatCompletions(
 
   // ── Quota check ────────────────────────────────────────────────────────
   if (quotaEnforcer) {
-    const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-    if (!allowed) return;
+    // checkQuotaMiddleware sends the 429 itself on a blocked global quota
+    // and stashes the loaded context on (request as any).quotaContext, which
+    // is where runPiAiExecutor reads it for scoped candidate filtering.
+    const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+    if (!quotaCheck.ok) return;
   }
 
   // ── Wire abort / disconnect ────────────────────────────────────────────
@@ -208,12 +240,14 @@ export async function handleBetaChatCompletions(
     if (result.response != null) {
       // Non-streaming
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Streaming — SSE. Compaction headers must be set before the stream starts.
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -267,6 +301,13 @@ export async function handleBetaChatCompletions(
       .saveError(requestId, e, { apiType: 'chat', ...(e?.routingContext ?? {}) })
       .catch(() => {});
 
+    // Terminal scoped-exhaustion (every candidate quota-blocked): reuse the
+    // v1-parity body — OpenAI-error-shaped with legacy top-level fields plus
+    // blocking_quotas — so ops can see every quota that contributed.
+    if (errorCode === 'quota_exceeded' && e?.routingContext?.body) {
+      return reply.code(statusCode).send(e.routingContext.body);
+    }
+
     return reply.code(statusCode).send({
       error: {
         message: e?.message ?? 'Internal server error',
@@ -299,8 +340,11 @@ export async function handleBetaMessages(
 
   // ── Quota check ──────────────────────────────────────────────────────────
   if (quotaEnforcer) {
-    const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-    if (!allowed) return;
+    // checkQuotaMiddleware sends the 429 itself on a blocked global quota
+    // and stashes the loaded context on (request as any).quotaContext, which
+    // is where runPiAiExecutor reads it for scoped candidate filtering.
+    const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+    if (!quotaCheck.ok) return;
   }
 
   // ── Wire abort / disconnect ──────────────────────────────────────────────
@@ -311,6 +355,26 @@ export async function handleBetaMessages(
 
   const anthropicError = (e: any) => {
     const statusCode = e?.routingContext?.statusCode ?? 500;
+    const errorCode = e?.routingContext?.code;
+
+    // Terminal scoped-exhaustion (every candidate quota-blocked): Anthropic
+    // wire shape has no room for a v1-parity body, so a 429 maps to
+    // rate_limit_error and the blocking quota names ride in the message.
+    if (errorCode === 'quota_exceeded') {
+      const names = blockingQuotaNamesFromError(e);
+      const message =
+        names.length > 0
+          ? `${e?.message ?? 'Quota exceeded'} (blocking quotas: ${names.join(', ')})`
+          : (e?.message ?? 'Quota exceeded');
+      return reply.code(statusCode).send({
+        type: 'error',
+        error: {
+          type: 'rate_limit_error',
+          message,
+        },
+      });
+    }
+
     const errorType =
       statusCode === 401
         ? 'authentication_error'
@@ -361,12 +425,14 @@ export async function handleBetaMessages(
 
     if (result.response != null) {
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Compaction headers must be set before the stream starts.
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -431,8 +497,11 @@ export async function handleBetaResponses(
 
   // ── Quota check ──────────────────────────────────────────────────────────
   if (quotaEnforcer) {
-    const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-    if (!allowed) return;
+    // checkQuotaMiddleware sends the 429 itself on a blocked global quota
+    // and stashes the loaded context on (request as any).quotaContext, which
+    // is where runPiAiExecutor reads it for scoped candidate filtering.
+    const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+    if (!quotaCheck.ok) return;
   }
 
   // ── State loading: previous_response_id ──────────────────────────────────
@@ -537,12 +606,14 @@ export async function handleBetaResponses(
 
     if (result.response != null) {
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Compaction headers must be set before the stream starts.
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       reply
         .code(200)
         .header('content-type', 'text/event-stream; charset=utf-8')
@@ -587,6 +658,14 @@ export async function handleBetaResponses(
     usageStorage
       .saveError(requestId, e, { apiType: 'responses', ...(e?.routingContext ?? {}) })
       .catch(() => {});
+
+    // Terminal scoped-exhaustion (every candidate quota-blocked): reuse the
+    // v1-parity body — OpenAI-error-shaped with legacy top-level fields plus
+    // blocking_quotas — so ops can see every quota that contributed.
+    if (errorCode === 'quota_exceeded' && e?.routingContext?.body) {
+      return reply.code(statusCode).send(e.routingContext.body);
+    }
+
     return reply.code(statusCode).send({
       error: {
         message: e?.message ?? 'Internal server error',
@@ -627,8 +706,11 @@ export async function handleBetaGeminiRequest(
 
   // ── Quota check ──────────────────────────────────────────────────────────
   if (quotaEnforcer) {
-    const allowed = await checkQuotaMiddleware(request, reply, quotaEnforcer);
-    if (!allowed) return;
+    // checkQuotaMiddleware sends the 429 itself on a blocked global quota
+    // and stashes the loaded context on (request as any).quotaContext, which
+    // is where runPiAiExecutor reads it for scoped candidate filtering.
+    const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
+    if (!quotaCheck.ok) return;
   }
 
   // ── Wire abort / disconnect ──────────────────────────────────────────────
@@ -668,12 +750,14 @@ export async function handleBetaGeminiRequest(
 
     if (result.response != null) {
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       return reply.code(200).header('content-type', 'application/json').send(result.response);
     }
 
     if (result.stream != null) {
       // Gemini streamGenerateContent uses data-prefixed JSON frames.
       applyCompactionHeaders(reply, result.compaction);
+      applyQuotaHeaders(reply, result.quotaHeaders);
       reply
         .code(200)
         .header('content-type', 'text/event-stream')
@@ -728,6 +812,26 @@ export async function handleBetaGeminiRequest(
     usageStorage
       .saveError(requestId, e, { apiType: 'gemini', ...(e?.routingContext ?? {}) })
       .catch(() => {});
+
+    // Terminal scoped-exhaustion (every candidate quota-blocked): keep
+    // RESOURCE_EXHAUSTED status, but fold the blocking quota names into the
+    // message since Gemini's error shape has no dedicated field for them.
+    const errorCode = e?.routingContext?.code;
+    if (errorCode === 'quota_exceeded') {
+      const names = blockingQuotaNamesFromError(e);
+      const message =
+        names.length > 0
+          ? `${e?.message ?? 'Quota exceeded'} (blocking quotas: ${names.join(', ')})`
+          : (e?.message ?? 'Quota exceeded');
+      return reply.code(statusCode).send({
+        error: {
+          code: statusCode,
+          message,
+          status: geminiStatus,
+        },
+      });
+    }
+
     return reply.code(statusCode).send({
       error: {
         code: statusCode,

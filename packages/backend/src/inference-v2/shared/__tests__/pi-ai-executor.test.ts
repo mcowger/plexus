@@ -6,6 +6,7 @@ import { enterRequestContext } from '../../../services/request-context';
 import { runPiAiExecutor, alignAssistantProvenance } from '../pi-ai-executor';
 import type { UsageStorageService } from '../../../services/usage-storage';
 import type { Context } from '@earendil-works/pi-ai';
+import type { QuotaContext, QuotaCheckSnapshot } from '../../../services/quota/quota-enforcer';
 import { registerSpy } from '../../../../test/test-utils';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
 
@@ -477,6 +478,252 @@ describe('alignAssistantProvenance', () => {
 
     const aligned = alignAssistantProvenance(ctx, dispatchModel);
     expect(aligned.messages[0]).toBe(ctx.messages[0]);
+  });
+});
+
+describe('runPiAiExecutor quota filter + headers', () => {
+  function makeSnapshot(overrides: Partial<QuotaCheckSnapshot> = {}): QuotaCheckSnapshot {
+    return {
+      quotaName: 'test-quota',
+      limitType: 'requests',
+      limit: 10,
+      currentUsage: 10,
+      remaining: 0,
+      allowed: false,
+      resetsAtMs: Date.now() + 60_000,
+      scope: {},
+      global: false,
+      shared: false,
+      source: 'assigned',
+      ...overrides,
+    };
+  }
+
+  function makeQuotaContext(checks: QuotaCheckSnapshot[]): QuotaContext {
+    return {
+      keyName: 'beta-key',
+      checks,
+      blockedGlobal: checks.find((c) => c.global && !c.allowed) ?? null,
+    };
+  }
+
+  function successMessage(provider: string, model: string) {
+    return {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hi' }],
+      api: 'openai-codex-responses',
+      provider,
+      model,
+      usage: { input: 5, output: 3, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    };
+  }
+
+  beforeEach(() => {
+    DebugManager.getInstance().resetForTesting();
+    setConfigForTesting({
+      providers: {
+        'prov-a': {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'gpt-5.4': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'gpt-5.4',
+            },
+          },
+        },
+        'prov-b': {
+          api_base_url: 'https://api.openai.com/v1',
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai-codex',
+          models: {
+            'gpt-5.5': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+              pi_ai_model_id: 'gpt-5.5',
+            },
+          },
+        },
+      },
+      models: {
+        'test-alias': {
+          selector: 'in_order',
+          targets: [
+            { provider: 'prov-a', model: 'gpt-5.4' },
+            { provider: 'prov-b', model: 'gpt-5.5' },
+          ],
+        },
+      },
+      keys: {},
+      failover: { enabled: true, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+  });
+
+  it('routes around a candidate blocked by a scoped exhausted quota', async () => {
+    vi.mocked(piAi.complete).mockResolvedValueOnce(successMessage('prov-b', 'gpt-5.5') as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const blockedForProvA = makeSnapshot({
+      quotaName: 'prov-a-only',
+      scope: { allowedProviders: ['prov-a'] },
+    });
+
+    const result = await runPiAiExecutor({
+      requestId: 'req-quota-narrow',
+      incomingApiType: 'chat',
+      modelAlias: 'test-alias',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: null,
+        ip: '127.0.0.1',
+        quotaContext: makeQuotaContext([blockedForProvA]),
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    expect(vi.mocked(piAi.complete)).toHaveBeenCalledTimes(1);
+    const [dispatchModel] = vi.mocked(piAi.complete).mock.calls[0]!;
+    expect((dispatchModel as any).id).toBe('gpt-5.5');
+    expect(result.response).toEqual(expect.objectContaining({ provider: 'prov-b' }));
+
+    expect(usageStorage.saveRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'prov-b',
+        retryHistory: expect.stringContaining('quota_exceeded:prov-a-only'),
+      })
+    );
+  });
+
+  it('throws a terminal quota_exceeded error when every candidate is blocked', async () => {
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const blockedForProvA = makeSnapshot({
+      quotaName: 'prov-a-quota',
+      scope: { allowedProviders: ['prov-a'] },
+    });
+    const blockedForProvB = makeSnapshot({
+      quotaName: 'prov-b-quota',
+      scope: { allowedProviders: ['prov-b'] },
+    });
+
+    let thrown: any = null;
+    try {
+      await runPiAiExecutor({
+        requestId: 'req-quota-all-blocked',
+        incomingApiType: 'chat',
+        modelAlias: 'test-alias',
+        context: { messages: [] } as any,
+        generationIntent: { reasoning: { source: 'client' } } as any,
+        streaming: false,
+        request: {
+          body: {},
+          keyName: 'beta-key',
+          attribution: null,
+          ip: '127.0.0.1',
+          quotaContext: makeQuotaContext([blockedForProvA, blockedForProvB]),
+        } as any,
+        usageStorage,
+        serializeMessage: (msg) => msg as any,
+        serializeChunks: () => [],
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).not.toBeNull();
+    expect(thrown.routingContext).toEqual(
+      expect.objectContaining({ statusCode: 429, code: 'quota_exceeded' })
+    );
+
+    // Terminal 429 carries the quota-skip breadcrumbs so the saved usage
+    // record's retryHistory isn't null when everything was blocked.
+    const retryHistory = JSON.parse(thrown.routingContext.retryHistory ?? 'null');
+    expect(retryHistory).toHaveLength(2);
+    expect(retryHistory.map((r: any) => r.status)).toEqual(['skipped', 'skipped']);
+    expect(retryHistory.map((r: any) => r.reason).sort()).toEqual([
+      'quota_exceeded:prov-a-quota',
+      'quota_exceeded:prov-b-quota',
+    ]);
+
+    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
+  });
+
+  it('is inert when no quotaContext is attached to the request', async () => {
+    vi.mocked(piAi.complete).mockResolvedValueOnce(successMessage('prov-a', 'gpt-5.4') as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const result = await runPiAiExecutor({
+      requestId: 'req-quota-inert',
+      incomingApiType: 'chat',
+      modelAlias: 'test-alias',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: { body: {}, keyName: 'beta-key', attribution: null, ip: '127.0.0.1' } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    expect(vi.mocked(piAi.complete)).toHaveBeenCalledTimes(1);
+    expect(result.response).toEqual(expect.objectContaining({ provider: 'prov-a' }));
+    expect(result.quotaHeaders).toEqual({});
+  });
+
+  it('sets x-plexus-quota* headers on the result for the winning route', async () => {
+    vi.mocked(piAi.complete).mockResolvedValueOnce(successMessage('prov-a', 'gpt-5.4') as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const notExhausted = makeSnapshot({
+      quotaName: 'informational-quota',
+      allowed: true,
+      limit: 100,
+      currentUsage: 40,
+      remaining: 60,
+      scope: { allowedProviders: ['prov-a'] },
+    });
+
+    const result = await runPiAiExecutor({
+      requestId: 'req-quota-headers',
+      incomingApiType: 'chat',
+      modelAlias: 'test-alias',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: null,
+        ip: '127.0.0.1',
+        quotaContext: makeQuotaContext([notExhausted]),
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    expect(result.quotaHeaders).toEqual({
+      'x-plexus-quota': 'informational-quota',
+      'x-plexus-quota-limit': '100',
+      'x-plexus-quota-remaining': '60',
+      'x-plexus-quota-reset': new Date(notExhausted.resetsAtMs).toISOString(),
+    });
   });
 });
 

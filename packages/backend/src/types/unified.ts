@@ -93,6 +93,12 @@ export interface PlexusMetadata {
   oauthAccount?: string;
   clientHeaders?: Record<string, unknown>;
   plexus_key_policy?: KeyAccessPolicy;
+  /** Attached by attachQuotaContext() (quota-middleware.ts) after the
+   * per-request quota check — read by Dispatcher.applyQuotaFilter() to
+   * narrow candidates around exhausted scoped quotas. `QuotaContext` type
+   * import kept here rather than duplicated; quota-enforcer.ts has no
+   * dependency back on this module. */
+  plexus_quota_context?: import('../services/quota/quota-enforcer').QuotaContext;
 }
 
 export interface UnifiedChatRequest {

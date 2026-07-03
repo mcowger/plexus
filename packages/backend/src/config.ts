@@ -792,6 +792,23 @@ const ModelTargetGroupSchema = z.object({
   targets: z.array(ModelTargetSchema),
 });
 
+// Shared scope/limit fields applied to every quota-type union member below:
+//  - allowed*/excluded* restrict which provider/model pairs the quota counts
+//    against (see services/scope-match.ts for matching semantics; all-empty
+//    scope means "applies to everything").
+//  - shared marks the quota as a single pooled bucket across every key that
+//    references it (vs. one independent counter per key).
+//  - warnAt is an optional early-warning threshold, expressed as a fraction
+//    of `limit` in (0, 1) exclusive (e.g. 0.8 = warn at 80% usage).
+const QuotaScopeFields = {
+  allowedProviders: z.array(z.string()).optional(),
+  excludedProviders: z.array(z.string()).optional(),
+  allowedModels: z.array(z.string()).optional(),
+  excludedModels: z.array(z.string()).optional(),
+  shared: z.boolean().optional(),
+  warnAt: z.number().gt(0).lt(1).optional(),
+};
+
 // Quota definition schemas for user quota enforcement
 export const QuotaDefinitionSchema = z.discriminatedUnion('type', [
   z.object({
@@ -799,21 +816,25 @@ export const QuotaDefinitionSchema = z.discriminatedUnion('type', [
     limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
     duration: z.string().min(1), // e.g., "1h", "30m", "1d"
+    ...QuotaScopeFields,
   }),
   z.object({
     type: z.literal('daily'),
     limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
+    ...QuotaScopeFields,
   }),
   z.object({
     type: z.literal('weekly'),
     limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
+    ...QuotaScopeFields,
   }),
   z.object({
     type: z.literal('monthly'),
     limitType: z.enum(['requests', 'tokens', 'cost']),
     limit: z.number().min(1),
+    ...QuotaScopeFields,
   }),
 ]);
 
@@ -977,10 +998,25 @@ export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinking
 export type ModelMetadata = z.infer<typeof ModelMetadataSchema>;
 export type MetadataOverrides = z.infer<typeof MetadataOverridesSchema>;
 
+// NOTE: intentionally a plain z.object (no `.transform`). A `.transform`
+// turns this into a ZodEffects whose inferred output makes `quotas` a
+// REQUIRED property (always present on the returned object literal, even
+// when `undefined`) — that ripples into every object literal typed against
+// `KeyConfig` / `PlexusConfig['keys']` across the codebase (dozens of test
+// fixtures construct `{ secret, comment }` etc. without `quotas`), which
+// fails typecheck. Keeping `quotas` a genuinely optional schema field avoids
+// that, at the cost of normalization being explicit (via
+// `normalizeKeyConfig` below) rather than automatic at every parse.
 export const KeyConfigSchema = z.object({
   secret: z.string(),
   comment: z.string().optional(),
-  quota: z.string().optional(), // References a quota definition name
+  // Deprecated: single quota-definition reference. Still accepted on input
+  // (indefinitely) for backward compat. Not auto-normalized by this schema —
+  // callers must run parsed/merged data through `normalizeKeyConfig` (see
+  // below) at the parse boundary, and should read `quotas`, never `quota`.
+  quota: z.string().optional(),
+  // References zero or more quota-definition names (see QuotaDefinitionSchema).
+  quotas: z.array(z.string().min(1)).optional(),
   allowedModels: z.array(z.string().min(1)).optional(),
   allowedProviders: z.array(z.string().min(1)).optional(),
   excludedModels: z.array(z.string().min(1)).optional(),
@@ -995,6 +1031,24 @@ export const KeyConfigSchema = z.object({
     )
     .optional(),
 });
+
+/**
+ * Normalize a legacy `quota` field into `quotas`. Explicit `quotas` (even an
+ * empty array) always wins; `quota` is only used as a fallback when `quotas`
+ * is entirely absent. Returns a new object; does not mutate `data`.
+ *
+ * Used at key-config parse boundaries (PUT body after validation, PATCH body
+ * BEFORE the shallow merge with the existing stored config — merging first
+ * would let a stale `quotas` already on `existing` shadow a caller's legacy
+ * `quota` in the patch body).
+ */
+export function normalizeKeyConfig<T extends { quota?: unknown; quotas?: unknown }>(data: T): T {
+  if (data.quotas !== undefined) return data;
+  if (typeof data.quota === 'string' && data.quota.length > 0) {
+    return { ...data, quotas: [data.quota] };
+  }
+  return data;
+}
 
 const QuotaConfigSchema = z.object({
   id: z.string(),
@@ -1071,6 +1125,9 @@ const RawPlexusConfigSchema = z
     backgroundExploration: BackgroundExplorationConfigSchema.optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
     user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
+    // Applied to keys with NO quotas assigned (`quotas` absent/empty). Non-stacking:
+    // a key either uses its own `quotas` or falls back to this list, never both.
+    default_quotas: z.array(z.string()).optional(),
     // Workspace-level pi-ai custom provider / model registries (inference-v2).
     pi_ai_custom_providers: z.record(z.string(), PiAiCustomProviderSchema).optional(),
     pi_ai_custom_models: z.record(z.string(), PiAiCustomModelSchema).optional(),
@@ -1270,9 +1327,19 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
     }
   }
 
+  // Normalize legacy `quota` → `quotas` for every key at load time (explicit
+  // `quotas` always wins — see normalizeKeyConfig).
+  const normalizedKeys = Object.fromEntries(
+    Object.entries(config.keys).map(([keyName, keyConfig]) => [
+      keyName,
+      normalizeKeyConfig(keyConfig),
+    ])
+  );
+
   return {
     ...config,
     providers: resolvedProviders,
+    keys: normalizedKeys,
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
     cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
     quotas: buildProviderQuotaConfigs(config),
