@@ -471,10 +471,24 @@ function buildUsageFromMessage(
  *
  * This mirrors the v1 OAuth path, which stamps the resolved model's
  * provider/model/api onto replayed assistant messages for exactly this reason
- * (see transformers/oauth/oauth-transformer.ts). Applied per-candidate so a
- * failover to a different target re-stamps against that target (and pi-ai's
- * own base64 validity check still guards against replaying a foreign-format
- * signature to the wrong provider).
+ * (see transformers/oauth/oauth-transformer.ts).
+ *
+ * SCOPED TO SAME-PROVIDER ALIAS RESOLUTION ONLY: this must only re-stamp an
+ * assistant message when it already belongs to the SAME provider as the
+ * dispatch target — i.e. the client-alias-vs-resolved-pi-ai-id mismatch this
+ * function was built for. It must NOT re-stamp across a provider change.
+ * On cross-provider failover (e.g. Anthropic errors mid-conversation and we
+ * fail over to a different provider), the assistant message's signature
+ * (Anthropic `thinking.signature`, Gemini `thoughtSignature`, ...) is only
+ * ever valid for the ORIGINAL provider that generated it. Force-aligning
+ * provenance to the new candidate would make pi-ai's own
+ * `isSameModel`/`isSameProviderAndModel` gate (in `transformMessages`)
+ * falsely believe the signature belongs to the new target, so pi-ai replays
+ * it verbatim instead of stripping it — and the new provider's API then
+ * rejects the request (e.g. Anthropic 400 "Invalid signature in thinking
+ * block"). Leaving cross-provider messages untouched lets pi-ai's own
+ * provenance check correctly fail and fall back to its designed behavior
+ * (dropping the signature / degrading thinking to plain text).
  */
 export function alignAssistantProvenance(
   context: Context,
@@ -489,6 +503,11 @@ export function alignAssistantProvenance(
       asst.model === dispatchModel.id &&
       asst.api === dispatchModel.api
     ) {
+      return m;
+    }
+    // Cross-provider: don't force a match — let pi-ai's own provenance gate
+    // see the mismatch and strip the (foreign) signature itself.
+    if (asst.provider !== dispatchModel.provider) {
       return m;
     }
     mutated = true;
@@ -972,11 +991,15 @@ export async function runPiAiExecutor<TResponse>(
 
     // ── Align assistant provenance for signature replay ──────────────────
     // Re-stamp replayed assistant messages with the DISPATCH model's
-    // provider/model/api so pi-ai's serializers echo provider-specific
-    // signatures (Gemini thoughtSignature, Anthropic thinking, OpenAI
-    // reasoning) instead of silently dropping them. Must use the dispatch
-    // model (post toDispatchModel remap) because that is what pi-ai's
-    // isSameProviderAndModel gate compares against.
+    // provider/model/api (SAME PROVIDER ONLY — see alignAssistantProvenance)
+    // so pi-ai's serializers echo provider-specific signatures (Gemini
+    // thoughtSignature, Anthropic thinking, OpenAI reasoning) instead of
+    // silently dropping them. Must use the dispatch model (post
+    // toDispatchModel remap) because that is what pi-ai's
+    // isSameProviderAndModel gate compares against. On cross-provider
+    // failover this is a no-op per-message, leaving pi-ai's own provenance
+    // check to correctly strip signatures that aren't valid for the new
+    // target.
     const dispatchModel = toDispatchModel(piModel as any);
     const dispatchContext = alignAssistantProvenance(sendContext, {
       provider: dispatchModel.provider,
