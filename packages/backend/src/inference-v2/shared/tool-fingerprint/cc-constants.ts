@@ -30,7 +30,7 @@
  * inspect a genuine Claude Code session's `user-agent` header
  * (`claude-cli/<version> (external, cli)`).
  */
-export const CC_VERSION = '2.1.97';
+export const CC_VERSION = '2.1.200';
 
 /**
  * Billing fingerprint salt + character-index selection, used to compute the
@@ -89,37 +89,19 @@ export const REQUIRED_BETAS: readonly string[] = [
  * full real tool set (see pi-ai's own `claudeCodeTools` list in
  * anthropic-messages.js for the 17 canonical names, sourced from
  * https://cchistory.mariozechner.at/data/prompts-2.1.11.md /
- * https://github.com/badlogic/cchistory) — these 5 are the subset most
- * likely to be MISSING from a third-party client's own tool surface and
- * therefore worth padding in. Add/remove entries here if a captured real CC
- * session's tool list diverges.
+ * https://github.com/badlogic/cchistory) — these are the subset most likely
+ * to be MISSING from a third-party client's own tool surface and therefore
+ * worth padding in. Add/remove entries here if a captured real CC session's
+ * tool list diverges. `Glob`, `Grep`, and `TodoRead` were removed: real
+ * Claude Code no longer sends these (confirmed against a genuine on-the-wire
+ * capture, see rawrequest.json), so injecting them caused the model to call
+ * a tool the real client never registers a handler for.
  */
 export const CC_SYNTHETIC_TOOLS: readonly {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
 }[] = [
-  {
-    name: 'Glob',
-    description: 'Find files by pattern',
-    input_schema: {
-      type: 'object',
-      properties: { pattern: { type: 'string', description: 'Glob pattern' } },
-      required: ['pattern'],
-    },
-  },
-  {
-    name: 'Grep',
-    description: 'Search file contents',
-    input_schema: {
-      type: 'object',
-      properties: {
-        pattern: { type: 'string', description: 'Regex pattern' },
-        path: { type: 'string', description: 'Search path' },
-      },
-      required: ['pattern'],
-    },
-  },
   {
     name: 'Agent',
     description: 'Launch a subagent for complex tasks',
@@ -137,10 +119,5 @@ export const CC_SYNTHETIC_TOOLS: readonly {
       properties: { notebook_path: { type: 'string' }, cell_index: { type: 'integer' } },
       required: ['notebook_path'],
     },
-  },
-  {
-    name: 'TodoRead',
-    description: 'Read current task list',
-    input_schema: { type: 'object', properties: {} },
   },
 ];
