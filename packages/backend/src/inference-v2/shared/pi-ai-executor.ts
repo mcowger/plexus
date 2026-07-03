@@ -1090,7 +1090,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
     eventStream,
     route,
     piModel,
-    toolRenamePairs,
+    toolRenamePairs: initialToolRenamePairs,
     attemptTimeout,
     stallTtfbMs,
     stallCooldownEnabled,
@@ -1174,6 +1174,13 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
       const isOAuth = isOAuthRoute(route, incomingApiType);
       const isClaudeMasking = isClaudeMaskingApiKeyRoute(route, incomingApiType);
       const frames = serializeChunks(event);
+      // `initialToolRenamePairs` is a snapshot taken before pi-ai's lazyStream
+      // ran its async setup (which calls onPayload and computes the real
+      // rename pairs), so it is always [] here — see pi-ai-executor.ts's
+      // onPayload comment. onPayload mutates piModel.__toolRenamePairs
+      // in place before emitting any event, so read that live value instead.
+      const toolRenamePairs: RenamePair[] =
+        (piModel as any).__toolRenamePairs ?? initialToolRenamePairs;
       for (const frame of frames) {
         if (!hasEmittedClientFrame && frame.trim()) {
           hasEmittedClientFrame = true;

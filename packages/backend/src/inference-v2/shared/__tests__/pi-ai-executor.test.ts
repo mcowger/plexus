@@ -9,6 +9,18 @@ import type { Context } from '@earendil-works/pi-ai';
 import { registerSpy } from '../../../../test/test-utils';
 import { OAuthAuthManager } from '../../../services/oauth-auth-manager';
 
+// Isolates the executor-wiring regression test below from the real
+// tool-rename-clustering pipeline (already covered by
+// tool-fingerprint/__tests__/apply-masking.test.ts) — we only care that
+// whatever rename pairs onPayload computes actually reach the SSE reverse
+// step.
+vi.mock('../tool-fingerprint/apply-masking', () => ({
+  applyClaudeCodeMasking: vi.fn((payloadStr: string) => ({
+    payload: JSON.parse(payloadStr),
+    toolRenamePairs: [['search_web', 'mcp__search__web']],
+  })),
+}));
+
 function createUsageStorage(): UsageStorageService {
   return {
     saveRequest: vi.fn(async () => undefined),
@@ -530,5 +542,109 @@ describe('runPiAiExecutor with OAuth and Claude Masking', () => {
 
     expect(result.response).toBeDefined();
     expect((result.response as any).content[0].text).toBe('hello oauth');
+  });
+});
+
+describe('runPiAiExecutor Claude-masking streaming tool-rename reversal (regression)', () => {
+  // Regression for trace 0aa9f550-2234-4e8f-8220-a6f7e50835b6: a client's
+  // `search_web` tool got fingerprint-renamed to `mcp__search__web` on the
+  // outgoing request, but the renamed name leaked back into the streamed
+  // tool_use block unreversed, so the client never recognized its own call.
+  //
+  // Root cause: pi-ai's `piAiModels.stream()` returns its event stream
+  // synchronously via `lazyStream()` (see @earendil-works/pi-ai's
+  // dist/api/lazy.js) — the async setup that actually calls `onPayload`
+  // (and, through it, computes `toolRenamePairs`) only runs once the
+  // returned stream is iterated. `buildSSEGenerator()` used to snapshot
+  // `toolRenamePairs` into its params BEFORE that iteration started, so it
+  // was permanently bound to the pre-onPayload `[]`. This test reproduces
+  // that exact ordering with a fake stream whose generator body — like the
+  // real pi-ai driver — calls `onPayload` only once iteration begins.
+  beforeEach(() => {
+    DebugManager.getInstance().resetForTesting();
+    setConfigForTesting({
+      providers: {
+        'anthropic-masked': {
+          api_base_url: 'https://api.anthropic.com',
+          api_key: 'sk-ant-oat01-test-masking-key',
+          useClaudeMasking: true,
+          models: {
+            'claude-3-5-sonnet-20241022': {
+              pricing: { source: 'simple', input: 0, output: 0 },
+            },
+          },
+        },
+      },
+      models: {
+        'claude-3-5-sonnet-20241022': {
+          priority: 'selector',
+          targets: [{ provider: 'anthropic-masked', model: 'claude-3-5-sonnet-20241022' }],
+        },
+      },
+      keys: {},
+      failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+  });
+
+  it('reverses a fingerprint-renamed tool name in streamed SSE frames even though onPayload resolves after piAiModels.stream() returns', async () => {
+    vi.mocked(piAi.stream).mockImplementation((async (_model: any, _context: any, options: any) => {
+      // Returning the un-started async generator here — before its body
+      // (and thus onPayload) has run — mirrors pi-ai's real lazyStream
+      // timing exactly.
+      return (async function* () {
+        await options.onPayload?.(JSON.stringify({ tools: [{ name: 'search_web' }] }));
+        const partial = {
+          role: 'assistant',
+          content: [{ type: 'toolCall', id: 'call-1', name: 'mcp__search__web', arguments: {} }],
+          api: 'anthropic-messages',
+          provider: 'anthropic',
+          model: 'claude-3-5-sonnet-20241022',
+          usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          stopReason: 'toolUse',
+          timestamp: Date.now(),
+        };
+        yield { type: 'toolcall_start', partial } as any;
+        yield { type: 'done', message: partial, reason: 'toolUse' } as any;
+      })();
+    }) as any);
+
+    const usageStorage = createUsageStorage();
+    DebugManager.getInstance().setStorage(usageStorage);
+
+    const result = await runPiAiExecutor({
+      requestId: 'req-claude-masking-tool-rename',
+      incomingApiType: 'messages',
+      modelAlias: 'claude-3-5-sonnet-20241022',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: true,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'open-webui',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: (event: any) => {
+        if (event.type === 'toolcall_start') {
+          const name = event.partial.content[0].name;
+          return [
+            `event: content_block_start\ndata: {"type":"content_block_start","content_block":{"type":"tool_use","id":"call-1","name":"${name}"}}\n\n`,
+          ];
+        }
+        return [];
+      },
+    });
+
+    const frames: string[] = [];
+    for await (const frame of result.stream!) {
+      frames.push(frame);
+    }
+    const snapshot = frames.join('');
+
+    expect(snapshot).toContain('"name":"search_web"');
+    expect(snapshot).not.toContain('mcp__search__web');
   });
 });
