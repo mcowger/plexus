@@ -4,13 +4,13 @@
  * our own computed `toolRenames` (see `registry.ts`).
  *
  * That injector unconditionally *prepends* a fixed set of synthetic Claude
- * Code tool stubs (Glob, Grep, Agent, NotebookEdit, TodoRead) to make the
- * tool set fingerprint like a real Claude Code session — required for
- * OAuth masking; Anthropic flags tool sets that don't resemble this list as
- * non-Claude-Code traffic. The injector has no awareness of the caller's
- * actual tools, so if a computed rename happens to target one of those 5
- * reserved names, the result is two tools with the same name — which
- * Anthropic rejects with `400 tools: Tool names must be unique.`
+ * Code tool stubs (Agent, NotebookEdit) to make the tool set fingerprint
+ * like a real Claude Code session — required for OAuth masking; Anthropic
+ * flags tool sets that don't resemble this list as non-Claude-Code traffic.
+ * The injector has no awareness of the caller's actual tools, so if a
+ * computed rename happens to target one of those reserved names, the result
+ * is two tools with the same name — which Anthropic rejects with `400
+ * tools: Tool names must be unique.`
  *
  * The registry's shapes are designed to avoid this (each shape only
  * proposes a rename when schema-compatible with the target name), so in

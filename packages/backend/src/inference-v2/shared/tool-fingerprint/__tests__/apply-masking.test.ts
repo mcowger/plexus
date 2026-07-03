@@ -33,22 +33,27 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
     expect(uniqueNames.size).toBe(names.length);
   });
 
-  it('injects the 5 synthetic Claude Code tools and de-dupes the Glob/Grep collision', () => {
+  it('injects the synthetic Claude Code tools (Agent, NotebookEdit) with no collision', () => {
     const { payload } = applyClaudeCodeMasking(JSON.stringify(buildPiAiOutputFixture()));
     const names: string[] = payload.tools.map((t: any) => t.name);
 
-    // Agent/NotebookEdit/TodoRead have no client-side collision and survive.
+    // Agent/NotebookEdit have no client-side collision and survive.
     expect(names).toContain('Agent');
     expect(names).toContain('NotebookEdit');
-    expect(names).toContain('TodoRead');
 
-    // Glob/Grep exist exactly once (client's real tool wins over the
-    // synthetic stub — see dedupe.ts's "keep last occurrence" rationale).
+    // Glob/Grep/TodoRead are no longer injected as synthetic stubs — real
+    // Claude Code stopped sending these (confirmed against a genuine
+    // on-the-wire capture), so padding them in caused clients whose own
+    // tool surface lacks Grep/Glob to receive tool_use calls for tools they
+    // never registered a handler for. The fixture's own Glob/Grep tools
+    // (which our pipeline also leaves untouched — see the "stale-collision"
+    // test below) still exist exactly once each, unaffected.
     expect(names.filter((n) => n === 'Glob')).toHaveLength(1);
     expect(names.filter((n) => n === 'Grep')).toHaveLength(1);
+    expect(names).not.toContain('TodoRead');
 
-    // 161 fixture tools + 5 synthetic - 2 deduped collisions = 164.
-    expect(payload.tools).toHaveLength(buildFixtureTools().length + 5 - 2);
+    // 161 fixture tools + 2 synthetic (Agent, NotebookEdit) - 0 collisions = 163.
+    expect(payload.tools).toHaveLength(buildFixtureTools().length + 2);
   });
 
   it('renames MCP-server tools to the mcp__<server>__<tool> convention, clustered per server', () => {
@@ -79,6 +84,46 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
       'type_check',
     ]) {
       expect(names).toContain(untouched);
+    }
+  });
+
+  it('leaves a real-CC-name collision alone when its shape already matches', () => {
+    // Fixture's "Bash" tool requires only "command" — identical to real
+    // CC's Bash — so there's nothing to disambiguate.
+    const { payload } = applyClaudeCodeMasking(JSON.stringify(buildPiAiOutputFixture()));
+    const names: string[] = payload.tools.map((t: any) => t.name);
+    expect(names).toContain('Bash');
+    expect(names).not.toContain('mcp__Bash');
+  });
+
+  it('leaves a stale-collision tool (Glob/Grep/TodoWrite) alone since it matches no CURRENT real CC tool name', () => {
+    const { payload } = applyClaudeCodeMasking(JSON.stringify(buildPiAiOutputFixture()));
+    const names: string[] = payload.tools.map((t: any) => t.name);
+    expect(names).toContain('Glob');
+    expect(names).toContain('Grep');
+    expect(names).toContain('TodoWrite');
+  });
+
+  it('renames a real-CC-name collision with an incompatible shape and appends a preference note', () => {
+    // Fixture's Edit/Read/Write/WebFetch/Skill carry opencode's own argument
+    // shape (camelCase, or a differing required set) even though pi-ai
+    // capitalized their names to match real CC's — the exact "same name,
+    // different shape" collision cc-collision-shape.ts exists to catch.
+    const { payload } = applyClaudeCodeMasking(JSON.stringify(buildPiAiOutputFixture()));
+    const toolsByName = new Map(payload.tools.map((t: any) => [t.name, t]));
+
+    for (const [original, renamed] of [
+      ['Edit', 'mcp__Edit'],
+      ['Read', 'mcp__Read'],
+      ['Write', 'mcp__Write'],
+      ['WebFetch', 'mcp__WebFetch'],
+      ['Skill', 'mcp__Skill'],
+    ]) {
+      expect(toolsByName.has(original)).toBe(false);
+      expect(toolsByName.has(renamed)).toBe(true);
+      expect((toolsByName.get(renamed) as any).description).toBe(
+        `ALWAYS USE THIS TOOL INSTEAD OF ${original}.`
+      );
     }
   });
 

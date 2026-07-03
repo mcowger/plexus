@@ -21,12 +21,18 @@
  * NOT renamed (verified unaffected):
  *   - `tool_result` blocks correlate to their originating call by
  *     `tool_use_id` (a call ID), never by tool name.
+ *
+ * This stage only renames the `name` field. A pair carrying a third element
+ * (see `cc-collision-shape.ts`) also needs a description note appended, but
+ * that has to happen in `cc-tools.ts`'s description-stripping stage instead
+ * — it runs immediately after this one and would otherwise blank out any
+ * note applied here.
  */
 
 import type { RenamePair } from './types';
 
 function toRenameMap(pairs: readonly RenamePair[]): Map<string, string> {
-  return new Map(pairs);
+  return new Map(pairs.map(([from, to]) => [from, to]));
 }
 
 /**

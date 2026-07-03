@@ -3,35 +3,35 @@ import { buildToolRenamePairs } from '../registry';
 import { dedupeSyntheticToolCollisions } from '../dedupe';
 import type { ToolDescriptor } from '../types';
 
-function tool(name: string): ToolDescriptor {
-  return { name };
+function tool(name: string, required: string[] = []): ToolDescriptor {
+  return { name, parameters: { type: 'object', required } };
 }
 
 describe('buildToolRenamePairs', () => {
-  it('renames opencode built-ins with real Claude Code schema equivalents', () => {
-    const tools = [
-      tool('bash'),
-      tool('read'),
-      tool('write'),
-      tool('edit'),
-      tool('glob'),
-      tool('grep'),
-      tool('todowrite'),
-    ];
+  it('renames a tool whose name collides with a real Claude Code tool but has an incompatible shape', () => {
+    // opencode's pre-pi-ai-rename Write uses filePath/content; real CC's
+    // Write requires file_path/content — same name, different shape.
+    const tools = [tool('Write', ['filePath', 'content'])];
     const pairs = buildToolRenamePairs(tools);
-    expect(Object.fromEntries(pairs)).toEqual({
-      bash: 'Bash',
-      read: 'Read',
-      write: 'Write',
-      edit: 'Edit',
-      glob: 'Glob',
-      grep: 'Grep',
-      todowrite: 'TodoWrite',
-    });
+    expect(pairs).toEqual([['Write', 'mcp__Write', 'ALWAYS USE THIS TOOL INSTEAD OF Write.']]);
   });
 
-  it('does not rename opencode tools with no schema-compatible Claude Code equivalent', () => {
-    const tools = [tool('webfetch'), tool('skill'), tool('question')];
+  it('does not rename a tool whose name collides with a real Claude Code tool and already matches its shape', () => {
+    // Genuinely the same tool as real CC's Bash — nothing to disambiguate.
+    const tools = [tool('Bash', ['command'])];
+    expect(buildToolRenamePairs(tools)).toEqual([]);
+  });
+
+  it('does not rename tools with no name collision against any real Claude Code tool', () => {
+    // None of these names appear in the CC reference table at all (case-
+    // sensitive exact match), regardless of which client sent them.
+    const tools = [
+      tool('webfetch', ['url']),
+      tool('skill', ['name']),
+      tool('question'),
+      tool('glob', ['pattern']),
+      tool('grep', ['pattern']),
+    ];
     expect(buildToolRenamePairs(tools)).toEqual([]);
   });
 
@@ -43,7 +43,7 @@ describe('buildToolRenamePairs', () => {
       tool('github_create_gist'),
     ];
     const pairs = buildToolRenamePairs(tools);
-    expect(Object.fromEntries(pairs)).toEqual({
+    expect(Object.fromEntries(pairs.map(([from, to]) => [from, to]))).toEqual({
       github_search_users: 'mcp__github__search_users',
       github_get_me: 'mcp__github__get_me',
       github_list_issues: 'mcp__github__list_issues',
@@ -63,42 +63,49 @@ describe('buildToolRenamePairs', () => {
     expect(buildToolRenamePairs(tools)).toEqual([]);
   });
 
-  it('does not double-rename a name already claimed by the opencode shape', () => {
-    // "glob" is an opencode built-in; even if enough underscore-prefixed
-    // siblings existed under some hypothetical "glob_*" cluster, the
-    // opencode shape claims "glob" first and the MCP shape never sees it as
-    // a candidate for its own prefix.
-    const tools = [tool('glob'), tool('bash')];
+  it('does not double-rename a name already claimed by the CC-collision shape', () => {
+    // "Edit" collides with real CC's Edit under an incompatible shape and is
+    // claimed by cc-collision-shape first; mcp-shape never sees "Edit" (nor
+    // would it match — no underscore) as a candidate for its own clustering.
+    const tools = [tool('Edit', ['filePath', 'oldString', 'newString']), tool('bash_run')];
     const pairs = buildToolRenamePairs(tools);
-    expect(pairs).toEqual([
-      ['bash', 'Bash'],
-      ['glob', 'Glob'],
-    ]);
+    expect(pairs).toEqual([['Edit', 'mcp__Edit', 'ALWAYS USE THIS TOOL INSTEAD OF Edit.']]);
   });
 
   it('handles the full real-world trace shape (opencode + 3 MCP servers + unmatched extras)', () => {
     const tools = [
-      ...['bash', 'edit', 'glob', 'grep', 'read', 'write', 'todowrite'].map(tool),
-      ...['webfetch', 'skill', 'question'].map(tool),
-      ...['list_mcp_resource_templates', 'list_mcp_resources', 'read_mcp_resource'].map(tool),
-      ...['list_types', 'lookup_type', 'type_check'].map(tool),
+      // opencode built-ins, pre-pi-ai-rename casing/shape: lowercase names
+      // don't collide with any real CC tool name at all (case-sensitive).
+      ...['bash', 'edit', 'read', 'write', 'todowrite'].map((n) => tool(n)),
+      ...['webfetch', 'skill', 'question', 'glob', 'grep'].map((n) => tool(n)),
+      ...['list_mcp_resource_templates', 'list_mcp_resources', 'read_mcp_resource'].map((n) =>
+        tool(n)
+      ),
+      ...['list_types', 'lookup_type', 'type_check'].map((n) => tool(n)),
       ...Array.from({ length: 13 }, (_, i) => tool(`ESPhome_tool_${i}`)),
       ...Array.from({ length: 55 }, (_, i) => tool(`github_tool_${i}`)),
       ...Array.from({ length: 58 }, (_, i) => tool(`home-assistant_tool_${i}`)),
     ];
     const pairs = buildToolRenamePairs(tools);
     const renamedNames = new Set(pairs.map(([, renamed]) => renamed));
-    // 7 opencode built-ins + 13 + 55 + 58 MCP tools = 133
-    expect(pairs).toHaveLength(7 + 13 + 55 + 58);
+    // No CC-name collisions here (all lowercase) — only the 3 MCP clusters: 13 + 55 + 58 = 126.
+    expect(pairs).toHaveLength(13 + 55 + 58);
     // No collisions among the renamed target names.
     expect(renamedNames.size).toBe(pairs.length);
-    // Unmatched tools (webfetch/skill/question, opencode's own MCP-management
-    // tools, and the 3 non-opencode augmented tools) are untouched.
+    // Unmatched tools (the opencode built-ins/extras, none of which collide
+    // with a real CC name while lowercase) are untouched.
     const renamedSources = new Set(pairs.map(([from]) => from));
     for (const untouched of [
+      'bash',
+      'edit',
+      'read',
+      'write',
+      'todowrite',
       'webfetch',
       'skill',
       'question',
+      'glob',
+      'grep',
       'list_mcp_resource_templates',
       'list_mcp_resources',
       'read_mcp_resource',
@@ -115,22 +122,22 @@ describe('dedupeSyntheticToolCollisions', () => {
   it('keeps the last occurrence when names collide', () => {
     const body = {
       tools: [
-        { name: 'Glob', description: '' },
         { name: 'Agent', description: '' },
+        { name: 'NotebookEdit', description: '' },
         {
-          name: 'Glob',
+          name: 'Agent',
           description: 'client real schema',
-          input_schema: { properties: { pattern: {} } },
+          input_schema: { properties: { prompt: {} } },
         },
       ],
     };
     const result = dedupeSyntheticToolCollisions(body);
     expect(result.tools).toEqual([
-      { name: 'Agent', description: '' },
+      { name: 'NotebookEdit', description: '' },
       {
-        name: 'Glob',
+        name: 'Agent',
         description: 'client real schema',
-        input_schema: { properties: { pattern: {} } },
+        input_schema: { properties: { prompt: {} } },
       },
     ]);
   });

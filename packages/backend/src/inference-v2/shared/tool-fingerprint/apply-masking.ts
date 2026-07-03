@@ -21,15 +21,18 @@
  * Pipeline, in order (each step's rationale is documented at its own
  * module — this is just the composition):
  *
- *   1. `buildToolRenamePairs()` — compute schema-safe renames for the
- *      caller's actual tool surface (opencode built-ins, MCP-server tools).
+ *   1. `buildToolRenamePairs()` — compute renames: real-Claude-Code-name
+ *      collisions with an incompatible shape (`cc-collision-shape.ts`), and
+ *      MCP-server tools clustered into the `mcp__<server>__<tool>`
+ *      convention (`mcp-shape.ts`).
  *   2. `applyToolRenames()` — apply those renames across `tools[]`,
  *      `tool_choice`, and any `tool_use` blocks in message history.
  *   3. `stripDescriptionsAndInjectSyntheticTools()` — strip caller tool
- *      descriptions (fingerprint parity) and prepend the 5 synthetic
- *      Claude Code tool stubs.
+ *      descriptions (fingerprint parity), except collision renames get a
+ *      note instructing the model to prefer them over the real CC tool of
+ *      their original name; prepend the synthetic Claude Code tool stubs.
  *   4. `dedupeSyntheticToolCollisions()` — defensive backstop for the rare
- *      case a computed rename collides with one of the 5 synthetic names.
+ *      case a computed rename collides with one of the synthetic names.
  *   5. `injectClaudeCodeIdentity()` — replace `system[]` with the genuine
  *      Claude Code system-prompt shape; relocate the caller's real system
  *      content into the first user message.
@@ -68,15 +71,21 @@ export interface ClaudeCodeMaskingResult {
  */
 export function applyClaudeCodeMasking(payloadStr: string): ClaudeCodeMaskingResult {
   const parsedPayload = JSON.parse(payloadStr);
-  const toolRenamePairs = buildToolRenamePairs(parsedPayload.tools ?? []);
+  // Anthropic's wire format calls a tool's schema `input_schema`; `ToolShape`
+  // detectors (see cc-collision-shape.ts) read it as `parameters`.
+  const toolDescriptors = (parsedPayload.tools ?? []).map((t: any) => ({
+    name: t?.name,
+    parameters: t?.input_schema,
+  }));
+  const toolRenamePairs = buildToolRenamePairs(toolDescriptors);
 
   let payload = applyToolRenames(parsedPayload, toolRenamePairs);
-  payload = stripDescriptionsAndInjectSyntheticTools(payload);
-  // A computed rename above may target one of the 5 reserved synthetic tool
-  // names (Glob/Grep/Agent/NotebookEdit/TodoRead), producing a duplicate
-  // Anthropic rejects with `400 tools: Tool names must be unique.`. This is
-  // a defensive backstop; in practice the tool-fingerprint shapes are
-  // designed to avoid it (see opencode-shape.ts).
+  payload = stripDescriptionsAndInjectSyntheticTools(payload, toolRenamePairs);
+  // A computed rename above may target one of the reserved synthetic tool
+  // names (Agent/NotebookEdit), producing a duplicate Anthropic rejects with
+  // `400 tools: Tool names must be unique.`. This is a defensive backstop;
+  // in practice the tool-fingerprint shapes are designed to avoid it (see
+  // cc-collision-shape.ts).
   payload = dedupeSyntheticToolCollisions(payload);
   payload = injectClaudeCodeIdentity(payload);
   payload = injectClaudeCodeMetadata(payload);

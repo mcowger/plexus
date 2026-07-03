@@ -9,12 +9,24 @@
  * reproduces only the *shape* that matters for the masking pipeline
  * (tool-name distribution, system-block count/order, message structure)
  * with entirely synthetic content. Tool name distribution verified against
- * the real trace: 7 opencode-overlapping tools (already capitalized by
- * pi-ai's own OAuth transform before our pipeline runs — see
- * apply-masking.ts's module doc), 2 more pi-ai renames we deliberately don't
- * duplicate (Skill, WebFetch), 145 MCP-server tools across 3 servers
- * (78 home-assistant, 55 github, 12 ESPhome), and 9 tools with no CC
- * equivalent that must pass through untouched.
+ * the real trace: 7 opencode built-ins already capitalized by pi-ai's own
+ * OAuth transform before our pipeline runs (Bash/Edit/Glob/Grep/Read/Write/
+ * TodoWrite — pi-ai's rename is upstream of and independent from our own
+ * `cc-collision-shape.ts`), 2 more pi-ai renames of the same kind
+ * (WebFetch, Skill), 145 MCP-server tools across 3 servers (78
+ * home-assistant, 55 github, 12 ESPhome), and 7 opencode-specific tools
+ * with no CC-name overlap at all.
+ *
+ * Because pi-ai's rename only touches the `name` field, these 9
+ * already-capitalized tools keep opencode's own argument shape (e.g.
+ * `filePath`/`oldString`/`newString` for Edit) rather than real Claude
+ * Code's (`file_path`/`old_string`/`new_string`) — which is exactly the
+ * same-name-different-shape collision `cc-collision-shape.ts` exists to
+ * catch. `Bash` is the one exception: opencode's `command`-only shape
+ * happens to already match real CC's, so it passes through unrenamed.
+ * `Glob`/`Grep`/`TodoWrite` collide with no CURRENT real CC tool name (CC
+ * dropped Glob/Grep/TodoRead; TodoWrite was never a CC name to begin with)
+ * so they're untouched for a different reason: no collision at all.
  */
 
 import type { ToolDescriptor } from '../types';
@@ -38,8 +50,18 @@ function tool(
  * to Claude Code casing before our pipeline sees the payload (pi-ai's
  * `toClaudeCodeName()` matches case-insensitively against its own 17-tool
  * list, which includes all 7). Included here at their POST-pi-ai-rename
- * names — this is the actual input shape our pipeline receives, confirmed
- * against the real trace's `transformedRequest.tools`.
+ * names but with opencode's OWN argument shape (unaffected by pi-ai's
+ * name-only rename) — this is the actual input shape our pipeline receives,
+ * confirmed against the real trace's `transformedRequest.tools`.
+ *
+ * `Edit`/`Read`/`Write` collide with a real CC tool name under an
+ * INCOMPATIBLE shape (opencode's camelCase params vs. real CC's snake_case
+ * — see rawrequest.json) and are exactly what `cc-collision-shape.ts`
+ * exists to catch. `Bash` collides too, but its shape already matches real
+ * CC's (`command`-only), so it's left alone. `Glob`/`Grep`/`TodoWrite`
+ * don't collide with any CURRENT real CC tool name at all (CC dropped
+ * Glob/Grep/TodoRead; TodoWrite was never a CC name) — untouched for a
+ * different reason: no name collision to begin with.
  */
 function opencodeToolsAlreadyRenamedByPiAi(): AnthropicToolFixture[] {
   return [
@@ -86,11 +108,12 @@ function opencodeToolsAlreadyRenamedByPiAi(): AnthropicToolFixture[] {
 }
 
 /**
- * pi-ai also renames these two despite our `opencode-shape.ts` deliberately
- * excluding them (opencode's `webfetch` has a different arg shape/behavior
- * than real CC's `WebFetch`; `skill` has no CC equivalent at all) — pi-ai's
- * rename is unconditional and out of our control, so this fixture reflects
- * what actually arrives.
+ * pi-ai also renames these two to Claude Code casing before our pipeline
+ * runs. Both collide with a real CC tool name under an incompatible shape
+ * (opencode's `webfetch` takes `url`, no `prompt`; real CC's `WebFetch`
+ * requires both — see rawrequest.json) or no CC equivalent's shape at all
+ * (`Skill` here uses `name`; real CC's `Skill` requires `skill`) — either
+ * way `cc-collision-shape.ts` catches both.
  */
 function toolsRenamedByPiAiOnly(): AnthropicToolFixture[] {
   return [

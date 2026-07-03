@@ -1,18 +1,19 @@
 /**
  * Ordered registry of tool shapes for v2 Claude-masking fingerprint renames.
  *
- * To support a new client tool surface, add a new `ToolShape` module and
+ * To support a new detection strategy, add a new `ToolShape` module and
  * register it here. Order matters: a tool name claimed by an earlier shape
- * is removed from consideration before later shapes run, so more specific
- * detectors (e.g. a known client's exact built-in names) should precede
- * general heuristics (e.g. MCP-prefix clustering).
+ * is removed from consideration before later shapes run. `cc-collision-shape`
+ * runs first since it targets exact real-CC-name collisions specifically;
+ * `mcp-shape`'s prefix clustering is a general heuristic that should not see
+ * names already resolved above it.
  */
 
-import { opencodeShape } from './opencode-shape';
+import { ccCollisionShape } from './cc-collision-shape';
 import { mcpShape } from './mcp-shape';
 import type { RenamePair, ToolDescriptor, ToolShape } from './types';
 
-const SHAPES: readonly ToolShape[] = [opencodeShape, mcpShape];
+const SHAPES: readonly ToolShape[] = [ccCollisionShape, mcpShape];
 
 /**
  * Computes the full set of rename pairs for the given outgoing tool list by

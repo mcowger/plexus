@@ -17,26 +17,50 @@
  * collision.
  *
  * This module replaces `DEFAULT_TOOL_RENAMES` with a purpose-built,
- * extensible set of "shapes" — one per known client tool surface — each of
- * which recognizes its own tools by name (and, where relevant, schema) and
- * proposes safe rename pairs. "Safe" means: only rename to a real Claude
- * Code tool name when the argument schema is actually compatible enough
- * that passing arguments straight through won't break the tool (see
- * `opencode-shape.ts` for the worked example of what's excluded and why).
+ * extensible set of "shapes". Two currently apply regardless of which
+ * client is connecting:
  *
- * Adding support for a new client (e.g. a different CLI agent) means adding
- * a new shape file and registering it in `registry.ts` — no changes to
- * `pi-ai-executor.ts` itself.
+ *   - `cc-collision-shape.ts`: a caller tool is renamed ONLY when its name
+ *     collides with a real Claude Code tool name (see
+ *     `cc-reference-tools.ts`) AND its shape (required parameters) differs
+ *     from that CC tool's — i.e. it looks like the real tool by name but
+ *     isn't actually compatible, which would otherwise mislead the model
+ *     or collide outright as a duplicate name. A same-name/same-shape tool
+ *     (the caller genuinely has that CC tool) is left alone.
+ *   - `mcp-shape.ts`: clusters MCP-server tools by shared name prefix into
+ *     the `mcp__<server>__<tool>` convention real Claude Code uses.
+ *
+ * This is a deliberate departure from an earlier per-client design (a
+ * hardcoded opencode-specific allowlist that proactively renamed opencode's
+ * `bash`/`read`/`write`/... to their apparent CC equivalents): that
+ * approach silently went stale whenever CC's own tool set changed (it did,
+ * twice) and only ever helped one named client. Name-collision detection
+ * against a live reference table generalizes to any client without a
+ * per-client shape file, and only ever touches a tool that would otherwise
+ * be ambiguous with a real CC tool.
+ *
+ * Adding support for a new detection strategy means adding a new shape file
+ * and registering it in `registry.ts` — no changes to `pi-ai-executor.ts`
+ * itself.
  */
 
-/** A single (wireName, renamedName) pair. */
-export type RenamePair = readonly [string, string];
+/**
+ * A single (wireName, renamedName) pair, with an optional description note
+ * to append to the tool's description when the rename exists to disambiguate
+ * a name collision with a real Claude Code tool (see `cc-collision-shape.ts`)
+ * — e.g. `["Write", "mcp__Write", "ALWAYS USE THIS TOOL INSTEAD OF WRITE."]`.
+ * Renames with no collision to disambiguate (e.g. MCP-server prefix
+ * clustering) omit the third element.
+ */
+export type RenamePair = readonly [string, string, string?];
 
 /**
  * One named tool's minimal wire description, sufficient for a shape to
  * decide whether it recognizes the tool and whether renaming it is
- * argument-safe. Only `name` is required; `parameters` lets a shape check
- * required-parameter overlap before proposing a rename.
+ * argument-safe. Only `name` is required; `parameters` is the tool's
+ * `input_schema` (JSON Schema), which lets a shape compare
+ * `parameters.required` against a reference tool's required parameters
+ * before proposing a rename.
  */
 export interface ToolDescriptor {
   name: string;
