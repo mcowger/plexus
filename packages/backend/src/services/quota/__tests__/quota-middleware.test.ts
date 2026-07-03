@@ -6,6 +6,7 @@ import {
   buildQuotaHeaders,
   attachQuotaContext,
   checkQuotaMiddleware,
+  recordQuotaUsage,
 } from '../quota-middleware';
 import type { QuotaContext, QuotaCheckSnapshot, QuotaEnforcer } from '../quota-enforcer';
 
@@ -293,5 +294,60 @@ describe('checkQuotaMiddleware', () => {
     const result = await checkQuotaMiddleware(request, reply, quotaEnforcer);
     expect(result).toEqual({ ok: true, context: null });
     expect(reply.code).not.toHaveBeenCalled();
+  });
+});
+
+describe('recordQuotaUsage', () => {
+  function makeEnforcer(recordUsage = vi.fn(async () => undefined)): QuotaEnforcer {
+    return { recordUsage } as unknown as QuotaEnforcer;
+  }
+
+  test('no keyName — returns without touching the enforcer', async () => {
+    const quotaEnforcer = makeEnforcer();
+    await recordQuotaUsage(undefined, 'openai', 'gpt-5', { costTotal: 1 }, quotaEnforcer);
+    expect(quotaEnforcer.recordUsage).not.toHaveBeenCalled();
+  });
+
+  test('normalizes nullable usage fields to undefined and forwards provider/model positionally', async () => {
+    const quotaEnforcer = makeEnforcer();
+    await recordQuotaUsage(
+      'k1',
+      'openai',
+      'gpt-5',
+      {
+        tokensInput: 100,
+        tokensOutput: null,
+        tokensCacheWrite: null,
+        tokensReasoning: 7,
+        costTotal: null,
+      },
+      quotaEnforcer
+    );
+
+    expect(quotaEnforcer.recordUsage).toHaveBeenCalledTimes(1);
+    const [keyArg, providerArg, modelArg, usageArg] = vi.mocked(quotaEnforcer.recordUsage).mock
+      .calls[0]!;
+    expect(keyArg).toBe('k1');
+    expect(providerArg).toBe('openai');
+    expect(modelArg).toBe('gpt-5');
+    // toEqual treats null as a real value, so any null leaking through
+    // (instead of being ??-normalized to undefined) fails here.
+    expect(usageArg).toEqual({ tokensInput: 100, tokensReasoning: 7 });
+  });
+
+  test('null/undefined finalProvider and finalModel fall back to empty strings', async () => {
+    const quotaEnforcer = makeEnforcer();
+    await recordQuotaUsage('k1', null, undefined, {}, quotaEnforcer);
+
+    const [, providerArg, modelArg] = vi.mocked(quotaEnforcer.recordUsage).mock.calls[0]!;
+    expect(providerArg).toBe('');
+    expect(modelArg).toBe('');
+  });
+
+  test('a failing enforcer is swallowed — quota accounting must not fail the request', async () => {
+    const quotaEnforcer = makeEnforcer(vi.fn().mockRejectedValue(new Error('db down')));
+    await expect(
+      recordQuotaUsage('k1', 'openai', 'gpt-5', { costTotal: 1 }, quotaEnforcer)
+    ).resolves.toBeUndefined();
   });
 });

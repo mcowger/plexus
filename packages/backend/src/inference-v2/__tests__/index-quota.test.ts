@@ -107,6 +107,42 @@ const MOCK_ASSISTANT_MESSAGE = {
   timestamp: Date.now(),
 } as any;
 
+/** An exhausted GLOBAL quota — checkQuotaMiddleware 429s up front and the
+ * executor must never run. */
+function blockedGlobalQuota() {
+  return {
+    quotaName: 'global-daily',
+    limitType: 'requests' as const,
+    limit: 100,
+    currentUsage: 100,
+    remaining: 0,
+    allowed: false,
+    resetsAtMs: Date.now() + 60_000,
+    scope: {},
+    global: true,
+    shared: false,
+    source: 'assigned' as const,
+  };
+}
+
+/** A scoped quota exhausted for a provider OUTSIDE the candidate set — must
+ * not block the request, since scoped quotas only narrow routing. */
+function scopedExhaustedOtherProvider() {
+  return {
+    quotaName: 'scoped-other-provider',
+    limitType: 'requests' as const,
+    limit: 100,
+    currentUsage: 100,
+    remaining: 0,
+    allowed: false,
+    resetsAtMs: Date.now() + 60_000,
+    scope: { allowedProviders: ['some-other-provider'] },
+    global: false,
+    shared: false,
+    source: 'assigned' as const,
+  };
+}
+
 describe('beta handlers: exhausted GLOBAL quota 429s once, executor never runs', () => {
   beforeEach(() => {
     DebugManager.getInstance().resetForTesting();
@@ -137,19 +173,7 @@ describe('beta handlers: exhausted GLOBAL quota 429s once, executor never runs',
   });
 
   it('handleBetaChatCompletions sends exactly one 429 and never invokes the executor', async () => {
-    const blockedGlobal = {
-      quotaName: 'global-daily',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: {},
-      global: true,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const blockedGlobal = blockedGlobalQuota();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [blockedGlobal],
@@ -182,19 +206,7 @@ describe('beta handlers: exhausted GLOBAL quota 429s once, executor never runs',
   });
 
   it('handleBetaChatCompletions proceeds into the executor when only a scoped quota is exhausted', async () => {
-    const scopedExhausted = {
-      quotaName: 'scoped-other-provider',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: { allowedProviders: ['some-other-provider'] },
-      global: false,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const scopedExhausted = scopedExhaustedOtherProvider();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [scopedExhausted],
@@ -268,19 +280,7 @@ describe('handleBetaMessages: quota gating', () => {
   });
 
   it('sends exactly one 429 and never invokes the executor when a GLOBAL quota is exhausted', async () => {
-    const blockedGlobal = {
-      quotaName: 'global-daily',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: {},
-      global: true,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const blockedGlobal = blockedGlobalQuota();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [blockedGlobal],
@@ -313,19 +313,7 @@ describe('handleBetaMessages: quota gating', () => {
   });
 
   it('proceeds into the executor when only a scoped quota is exhausted', async () => {
-    const scopedExhausted = {
-      quotaName: 'scoped-other-provider',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: { allowedProviders: ['some-other-provider'] },
-      global: false,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const scopedExhausted = scopedExhaustedOtherProvider();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [scopedExhausted],
@@ -363,19 +351,7 @@ describe('handleBetaResponses: quota gating', () => {
   });
 
   it('sends exactly one 429 and never invokes the executor when a GLOBAL quota is exhausted', async () => {
-    const blockedGlobal = {
-      quotaName: 'global-daily',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: {},
-      global: true,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const blockedGlobal = blockedGlobalQuota();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [blockedGlobal],
@@ -407,19 +383,7 @@ describe('handleBetaResponses: quota gating', () => {
   });
 
   it('proceeds into the executor when only a scoped quota is exhausted', async () => {
-    const scopedExhausted = {
-      quotaName: 'scoped-other-provider',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: { allowedProviders: ['some-other-provider'] },
-      global: false,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const scopedExhausted = scopedExhaustedOtherProvider();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [scopedExhausted],
@@ -454,19 +418,7 @@ describe('handleBetaGeminiRequest: quota gating', () => {
   });
 
   it('sends exactly one 429 and never invokes the executor when a GLOBAL quota is exhausted', async () => {
-    const blockedGlobal = {
-      quotaName: 'global-daily',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: {},
-      global: true,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const blockedGlobal = blockedGlobalQuota();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [blockedGlobal],
@@ -498,19 +450,7 @@ describe('handleBetaGeminiRequest: quota gating', () => {
   });
 
   it('proceeds into the executor when only a scoped quota is exhausted', async () => {
-    const scopedExhausted = {
-      quotaName: 'scoped-other-provider',
-      limitType: 'requests' as const,
-      limit: 100,
-      currentUsage: 100,
-      remaining: 0,
-      allowed: false,
-      resetsAtMs: Date.now() + 60_000,
-      scope: { allowedProviders: ['some-other-provider'] },
-      global: false,
-      shared: false,
-      source: 'assigned' as const,
-    };
+    const scopedExhausted = scopedExhaustedOtherProvider();
     const ctx: QuotaContext = {
       keyName: 'beta-key',
       checks: [scopedExhausted],

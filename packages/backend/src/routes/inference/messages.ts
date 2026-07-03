@@ -9,6 +9,7 @@ import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import { checkQuotaMiddleware, attachQuotaContext } from '../../services/quota/quota-middleware';
+import { saveQuotaExceededUsage } from './_quota-error';
 import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
@@ -156,14 +157,7 @@ export async function registerMessagesRoute(
         return;
       }
       if (e?.routingContext?.code === 'quota_exceeded') {
-        usageRecord.responseStatus = 'error';
-        usageRecord.durationMs = Date.now() - startTime;
-        usageRecord.attemptCount = e.routingContext?.attemptCount || usageRecord.attemptCount || 1;
-        usageRecord.retryHistory =
-          e.routingContext?.retryHistory || usageRecord.retryHistory || null;
-        usageStorage.saveRequest(usageRecord as UsageRecord);
-        usageStorage.saveError(requestId, e, { apiType: 'messages', ...(e.routingContext || {}) });
-        DebugManager.getInstance().flush(requestId);
+        saveQuotaExceededUsage(e, 'messages', usageRecord, usageStorage, requestId, startTime);
         return reply.code(429).send(e.routingContext.body);
       }
       usageRecord.responseStatus =

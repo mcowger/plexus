@@ -66,6 +66,26 @@ interface QuotaStateRow {
 
 type CalendarType = 'daily' | 'weekly' | 'monthly';
 
+/**
+ * Effective quota-name set for a key: `keyConfig.quotas` when non-empty,
+ * else `config.default_quotas`. Non-stacking substitution, not a union —
+ * a key with its own quotas never also gets the defaults. Exported so the
+ * management routes (`_quota-response.ts`) validate quota membership with
+ * the exact same resolution enforcement uses.
+ */
+export function resolveQuotaNames(
+  keyConfig: KeyConfig,
+  config: PlexusConfig
+): { names: string[]; source: 'assigned' | 'default' } | null {
+  if (keyConfig.quotas && keyConfig.quotas.length > 0) {
+    return { names: keyConfig.quotas, source: 'assigned' };
+  }
+  if (config.default_quotas && config.default_quotas.length > 0) {
+    return { names: config.default_quotas, source: 'default' };
+  }
+  return null;
+}
+
 export class QuotaEnforcer {
   private db: ReturnType<typeof getDatabase>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,24 +106,6 @@ export class QuotaEnforcer {
   private toMs(value: Date | number | null | undefined): number | null {
     if (value == null) return null;
     return value instanceof Date ? value.getTime() : value;
-  }
-
-  /**
-   * Effective quota-name set for a key: `keyConfig.quotas` when non-empty,
-   * else `config.default_quotas`. Non-stacking substitution, not a union —
-   * a key with its own quotas never also gets the defaults.
-   */
-  private resolveQuotaNames(
-    keyConfig: KeyConfig,
-    config: PlexusConfig
-  ): { names: string[]; source: 'assigned' | 'default' } | null {
-    if (keyConfig.quotas && keyConfig.quotas.length > 0) {
-      return { names: keyConfig.quotas, source: 'assigned' };
-    }
-    if (config.default_quotas && config.default_quotas.length > 0) {
-      return { names: config.default_quotas, source: 'default' };
-    }
-    return null;
   }
 
   private scopeOf(def: QuotaDefinition): ScopeLists {
@@ -250,7 +252,7 @@ export class QuotaEnforcer {
     const keyConfig = config.keys?.[keyName];
     if (!keyConfig) return null;
 
-    const resolved = this.resolveQuotaNames(keyConfig, config);
+    const resolved = resolveQuotaNames(keyConfig, config);
     if (!resolved) return null;
 
     const defs: Array<{ name: string; def: QuotaDefinition; owner: string }> = [];
@@ -493,7 +495,7 @@ export class QuotaEnforcer {
     const keyConfig = config.keys?.[keyName];
     if (!keyConfig) return;
 
-    const resolved = this.resolveQuotaNames(keyConfig, config);
+    const resolved = resolveQuotaNames(keyConfig, config);
     if (!resolved) return;
 
     const nowMs = Date.now();
@@ -521,7 +523,7 @@ export class QuotaEnforcer {
     if (quotaName) {
       names = [quotaName];
     } else {
-      const resolved = keyConfig ? this.resolveQuotaNames(keyConfig, config) : null;
+      const resolved = keyConfig ? resolveQuotaNames(keyConfig, config) : null;
       names = resolved?.names ?? [];
     }
 
@@ -550,7 +552,7 @@ export class QuotaEnforcer {
   private keysAttachingQuota(quotaName: string, config: PlexusConfig): string[] {
     const keys: string[] = [];
     for (const [name, keyConfig] of Object.entries(config.keys ?? {})) {
-      const resolved = this.resolveQuotaNames(keyConfig, config);
+      const resolved = resolveQuotaNames(keyConfig, config);
       if (resolved?.names.includes(quotaName)) keys.push(name);
     }
     return keys;

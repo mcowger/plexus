@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { formatNumber, formatCost } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
-import type { MeterStatus } from '../types/quota';
+import { statusForPercent, formatQuotaValue } from '../lib/quota';
 
 const EMPTY_KEY: KeyConfig = {
   key: '',
@@ -74,17 +74,6 @@ function mostConstrainedEntry(entries: QuotaStatusEntry[]): QuotaStatusEntry | n
 function entryUsagePercent(entry: QuotaStatusEntry): number {
   if (!entry.limit || entry.limit === 0) return 0;
   return Math.min(100, (entry.currentUsage / entry.limit) * 100);
-}
-
-function statusForPercent(pct: number): MeterStatus {
-  if (pct >= 100) return 'exhausted';
-  if (pct >= 90) return 'critical';
-  if (pct >= 75) return 'warning';
-  return 'ok';
-}
-
-function formatQuotaEntryValue(value: number, limitType: QuotaStatusEntry['limitType']): string {
-  return limitType === 'cost' ? formatCost(value, 5) : formatNumber(value);
 }
 
 /** Small pill used to label quota scope/source facts (shared, default,
@@ -642,8 +631,8 @@ export const Keys = () => {
                             <div className="flex items-center justify-between gap-2 text-xs">
                               <span className="text-text-muted truncate">{primary.name}</span>
                               <span className="font-medium text-text">
-                                {formatQuotaEntryValue(primary.currentUsage, primary.limitType)} /{' '}
-                                {formatQuotaEntryValue(primary.limit, primary.limitType)}
+                                {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
+                                {formatQuotaValue(primary.limit, primary.limitType)}
                               </span>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
@@ -807,8 +796,8 @@ export const Keys = () => {
                                 }}
                               />
                               <span style={{ fontSize: '12px' }}>
-                                {formatQuotaEntryValue(primary.currentUsage, primary.limitType)} /{' '}
-                                {formatQuotaEntryValue(primary.limit, primary.limitType)}
+                                {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
+                                {formatQuotaValue(primary.limit, primary.limitType)}
                               </span>
                               {status && status.quotas.length > 1 && (
                                 <span className="text-[11px] text-text-muted">
@@ -1584,7 +1573,7 @@ export const Keys = () => {
                           label={`${entry.limitType}${entry.global ? '' : ' (scoped)'}`}
                           value={entry.currentUsage}
                           max={entry.limit}
-                          displayValue={`${formatQuotaEntryValue(entry.currentUsage, entry.limitType)} / ${formatQuotaEntryValue(entry.limit, entry.limitType)}`}
+                          displayValue={`${formatQuotaValue(entry.currentUsage, entry.limitType)} / ${formatQuotaValue(entry.limit, entry.limitType)}`}
                           status={statusForPercent(pct)}
                           size="md"
                         />
@@ -1593,7 +1582,7 @@ export const Keys = () => {
                           <span>
                             Remaining:{' '}
                             <span className="text-text font-medium">
-                              {formatQuotaEntryValue(entry.remaining, entry.limitType)}
+                              {formatQuotaValue(entry.remaining, entry.limitType)}
                             </span>
                           </span>
                           <span>Resets {new Date(entry.resetsAt).toLocaleString()}</span>

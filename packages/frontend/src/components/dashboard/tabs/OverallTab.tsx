@@ -27,7 +27,7 @@ import { formatNumber, formatTokens, formatCost } from '../../../lib/format';
 import { Card } from '../../ui/Card';
 import { QuotaProgressBar } from '../../quota/QuotaProgressBar';
 import { TimeRangeSelector } from '../TimeRangeSelector';
-import type { MeterStatus } from '../../../types/quota';
+import { statusForPercent, formatQuotaValue, sortMostConstrainedFirst } from '../../../lib/quota';
 
 type TimeRange = 'hour' | 'day' | 'week' | 'month';
 
@@ -69,31 +69,6 @@ function formatResetsIn(iso: string | null): string {
   if (days > 0) return `in ${days}d ${hours}h`;
   if (hours > 0) return `in ${hours}h ${minutes}m`;
   return `in ${minutes}m`;
-}
-
-/**
- * Map a quota utilization percentage onto the progress-bar status colors
- * used elsewhere in the UI. Kept in sync with `QuotaProgressBar`'s palette.
- */
-function statusForPercent(pct: number): MeterStatus {
-  if (pct >= 100) return 'exhausted';
-  if (pct >= 90) return 'critical';
-  if (pct >= 75) return 'warning';
-  return 'ok';
-}
-
-/**
- * Format a quota usage value based on its limitType. `tokens` and `requests`
- * reuse the compact number formatter; `cost` falls through to formatCost.
- */
-function formatQuotaValue(value: number, limitType: QuotaStatusEntry['limitType']): string {
-  if (limitType === 'cost') return formatCost(value);
-  return formatNumber(value, 1);
-}
-
-/** Sort most-constrained (least remaining headroom) first. */
-function sortMostConstrainedFirst(entries: QuotaStatusEntry[]): QuotaStatusEntry[] {
-  return [...entries].sort((a, b) => a.remaining / a.limit - b.remaining / b.limit);
 }
 
 /**

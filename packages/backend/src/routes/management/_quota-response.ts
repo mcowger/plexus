@@ -1,4 +1,4 @@
-import { QuotaCheckSnapshot } from '../../services/quota/quota-enforcer';
+import { QuotaCheckSnapshot, resolveQuotaNames } from '../../services/quota/quota-enforcer';
 import type { KeyConfig, PlexusConfig } from '../../config';
 
 /** Wire shape for one entry of the `quotas` array — see task-5 brief. Scope
@@ -71,16 +71,12 @@ export function mostConstrained(checks: QuotaCheckSnapshot[]): QuotaCheckSnapsho
 }
 
 /**
- * Effective quota-name set for a key: `keyConfig.quotas` when non-empty,
- * else `config.default_quotas`. Mirrors the (private) resolution logic in
- * `QuotaEnforcer.resolveQuotaNames` — duplicated here (rather than exported
- * from the enforcer) because routes need it purely for membership
- * validation on `/quota/clear` and `/quota/recompute`, which the enforcer
- * itself does not guard.
+ * Effective quota-name set for a key, flattened to a plain name list for
+ * membership validation on `/quota/clear` and `/quota/recompute` (which the
+ * enforcer itself does not guard). Delegates to the enforcer's own
+ * `resolveQuotaNames` so route validation and live enforcement can never
+ * drift apart.
  */
 export function resolveAttachedQuotaNames(keyConfig: KeyConfig, config: PlexusConfig): string[] {
-  if (keyConfig.quotas && keyConfig.quotas.length > 0) {
-    return keyConfig.quotas;
-  }
-  return config.default_quotas ?? [];
+  return resolveQuotaNames(keyConfig, config)?.names ?? [];
 }

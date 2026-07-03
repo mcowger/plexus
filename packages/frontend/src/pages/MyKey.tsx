@@ -14,8 +14,7 @@ import { QuotaProgressBar } from '../components/quota/QuotaProgressBar';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { Skeleton } from '../components/ui/Skeleton';
-import { formatNumber, formatCost } from '../lib/format';
-import type { MeterStatus } from '../types/quota';
+import { statusForPercent, formatQuotaValue, sortMostConstrainedFirst } from '../lib/quota';
 
 interface SelfInfo {
   role: 'admin' | 'limited';
@@ -28,23 +27,6 @@ interface SelfInfo {
   beta?: boolean;
   traceEnabled?: boolean;
   traceEnabledGlobal?: boolean;
-}
-
-function statusForPercent(pct: number): MeterStatus {
-  if (pct >= 100) return 'exhausted';
-  if (pct >= 90) return 'critical';
-  if (pct >= 75) return 'warning';
-  return 'ok';
-}
-
-function formatQuotaValue(value: number, limitType: QuotaStatusEntry['limitType']): string {
-  return limitType === 'cost' ? formatCost(value, 5) : formatNumber(value);
-}
-
-/** Sort most-constrained (least remaining headroom) first, mirroring the
- * admin Keys page and the backend's own `mostConstrained` shim. */
-function sortMostConstrainedFirst(entries: QuotaStatusEntry[]): QuotaStatusEntry[] {
-  return [...entries].sort((a, b) => a.remaining / a.limit - b.remaining / b.limit);
 }
 
 export const MyKey: React.FC = () => {

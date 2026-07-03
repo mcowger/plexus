@@ -463,6 +463,40 @@ describe('QuotaEnforcer', () => {
       expect(ctx!.checks[0]!.limitType).toBe('requests');
     });
 
+    test('SQL-side leak: recordUsage decays the persisted bucket before adding new usage', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const start = new Date('2026-03-15T12:00:00.000Z');
+      vi.setSystemTime(start);
+
+      setConfigForTesting(
+        createTestConfig(
+          { q: { type: 'rolling', limitType: 'tokens', limit: 1000, duration: '1h' } },
+          { k: { secret: 'sk-test', quotas: ['q'] } }
+        )
+      );
+      quotaEnforcer = new QuotaEnforcer();
+
+      await quotaEnforcer.recordUsage('k', 'openai', 'gpt-4', { tokensInput: 800 });
+
+      // 30 minutes later; leak rate is 1000/3600000 tokens/ms → 500 leaked.
+      // Unlike the loadQuotaContext leak test above (in-memory computeSnapshot
+      // math over a seeded row), this exercises upsertQuotaState's SQL CASE
+      // expression: the DB row itself must decay from lastUpdated before the
+      // new usage is added.
+      vi.setSystemTime(new Date(start.getTime() + 30 * 60 * 1000));
+      await quotaEnforcer.recordUsage('k', 'openai', 'gpt-4', { tokensInput: 100 });
+
+      const rows = await db.select().from(schema.quotaState);
+      expect(rows).toHaveLength(1);
+      // max(0, 800 - 500) + 100
+      expect(rows[0]!.currentUsage).toBeCloseTo(400, 6);
+
+      // lastUpdated advanced to the second write, so a fresh read decays
+      // nothing further and reports the same value.
+      const ctx = await quotaEnforcer.loadQuotaContext('k');
+      expect(ctx!.checks[0]!.currentUsage).toBeCloseTo(400, 6);
+    });
+
     test('rolling-cost accumulates cumulatively within a window (no leak)', async () => {
       setConfigForTesting(
         createTestConfig(
