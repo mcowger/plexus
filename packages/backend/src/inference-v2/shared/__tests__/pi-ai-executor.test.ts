@@ -235,6 +235,19 @@ describe('runPiAiExecutor streaming errors', () => {
         allAttemptedProviders: 'openai-s/gpt-5.4, openai-backup/gpt-5.4',
       })
     );
+
+    // The absorbed pre-flight failure is still persisted to the errors
+    // table, flagged as a preflight failure, even though the client never
+    // saw it.
+    expect(usageStorage.saveError).toHaveBeenCalledWith(
+      'req-stream-failover',
+      expect.objectContaining({ isPreflightStreamError: true }),
+      expect.objectContaining({
+        provider: 'openai-s',
+        targetModel: 'gpt-5.4',
+        preflight: true,
+      })
+    );
   });
 
   it('saves serialized stream frames as the transformed response snapshot', async () => {

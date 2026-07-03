@@ -211,6 +211,8 @@ interface RetryAttemptRecord {
   reason: string;
   statusCode?: number;
   retryable?: boolean;
+  /** True when pi-ai reported this failure before any 'start' event — see peekFirstStreamEvent. */
+  preflight?: boolean;
 }
 
 function appendSkippedAttempt(
@@ -264,6 +266,7 @@ function appendFailureAttempt(
     reason,
     statusCode: typeof statusCode === 'number' ? statusCode : undefined,
     retryable,
+    preflight: error?.isPreflightStreamError === true || undefined,
   });
 }
 
@@ -1151,10 +1154,28 @@ export async function runPiAiExecutor<TResponse>(
       const canRetry = failoverEnabled && !isLast && isRetryable(effectiveErr, signal);
       appendFailureAttempt(retryHistory, route, effectiveErr, incomingApiType, canRetry);
 
+      // Pre-flight failures (see peekFirstStreamEvent) are invisible to the
+      // client whenever they're absorbed by failover, so they'd otherwise
+      // leave no trace anywhere but the DB usage/error record. Surface them
+      // in the application log too.
+      if (effectiveErr?.isPreflightStreamError) {
+        logger.warn(
+          `[pi-ai-executor] Pre-flight stream error on ${route.provider}/${route.model} (requestId=${requestId}): ${effectiveErr.message}${
+            canRetry ? ' — retrying next candidate' : ' — no candidates remain'
+          }`
+        );
+      }
+
       if (canRetry) {
         if (usageStorage) {
           usageStorage
-            .saveError(requestId, effectiveErr, { apiType: incomingApiType })
+            .saveError(requestId, effectiveErr, {
+              apiType: incomingApiType,
+              provider: route.provider,
+              targetModel: route.model,
+              preflight: effectiveErr?.isPreflightStreamError === true || undefined,
+              retryHistory: JSON.stringify(retryHistory),
+            })
             .catch(() => {});
         }
         lastError = effectiveErr;
