@@ -12,13 +12,25 @@
  * string-level substitution is the only approach that works uniformly for
  * both streaming and non-streaming callers.
  *
- * Handles both plain (`"Name"`) and escaped (`\"Name\"`) quoted forms,
- * because a tool name can appear either as a real JSON string value
- * (`{"name":"Name"}`) or embedded inside another JSON string that itself
- * contains escaped JSON (SSE `input_json_delta` partial-argument chunks).
+ * Matches are scoped to the `"name":"<value>"` key/value pair specifically
+ * (both plain and backslash-escaped-quote forms) rather than a bare
+ * `"<value>"` match anywhere in the text. Every wire format v2 emits a tool
+ * name in (Anthropic `tool_use.name`, OpenAI chat `function.name`, OpenAI
+ * Responses, Gemini `functionCall.name`) uses the literal JSON key `name`
+ * for it — see context-to-anthropic.ts / context-to-openai.ts. A bare
+ * substring match would also incorrectly rewrite a renamed tool's actual
+ * name if it happens to appear as some OTHER field's string value — e.g.
+ * opencode's `question` tool takes model-authored free-text `label`/
+ * `description` fields, and the model could legitimately produce an option
+ * labeled exactly "Bash" while discussing shell tools, which is indistinguishable
+ * from a real tool_use.name match without this scoping.
  */
 
 import type { RenamePair } from './types';
+
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
  * @param text - Raw response text (one SSE frame, or a full JSON body)
@@ -29,8 +41,12 @@ import type { RenamePair } from './types';
 export function reverseToolRenames(text: string, pairs: readonly RenamePair[]): string {
   let result = text;
   for (const [orig, renamed] of pairs) {
-    result = result.split(`"${renamed}"`).join(`"${orig}"`);
-    result = result.split(`\\"${renamed}\\"`).join(`\\"${orig}\\"`);
+    const escapedRenamed = escapeForRegex(renamed);
+    result = result.replace(new RegExp(`"name":"${escapedRenamed}"`, 'g'), `"name":"${orig}"`);
+    result = result.replace(
+      new RegExp(`\\\\"name\\\\":\\\\"${escapedRenamed}\\\\"`, 'g'),
+      `\\"name\\":\\"${orig}\\"`
+    );
   }
   return result;
 }

@@ -105,6 +105,14 @@ Keep responses concise and focused on the user's request.
 Prefer acting on the user's task over describing product-specific workflows.`;
 }
 
+/**
+ * Returns a NEW messages array with a `<system-reminder>` block prepended
+ * to the first user message's content. Never mutates the input array or
+ * any message object within it — builds a new message object and a new
+ * array via `slice`/spread instead of `unshift`/property assignment, so
+ * callers can safely retain a reference to the original `messages` (or
+ * `body.messages`) after calling this.
+ */
 function prependToFirstUserMessage(messages: any[], text: string): any[] {
   if (!Array.isArray(messages)) {
     return messages;
@@ -124,17 +132,20 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
 `;
 
   const msg = messages[firstUserIdx];
+  let newContent: any;
   if (Array.isArray(msg.content)) {
-    if (msg.content.length === 0) {
-      msg.content = [{ type: 'text', text: prefixBlock }];
-    } else {
-      msg.content.unshift({ type: 'text', text: prefixBlock });
-    }
+    newContent =
+      msg.content.length === 0
+        ? [{ type: 'text', text: prefixBlock }]
+        : [{ type: 'text', text: prefixBlock }, ...msg.content];
   } else if (typeof msg.content === 'string') {
-    msg.content = prefixBlock + msg.content;
+    newContent = prefixBlock + msg.content;
+  } else {
+    return messages;
   }
 
-  return messages;
+  const newMsg = { ...msg, content: newContent };
+  return [...messages.slice(0, firstUserIdx), newMsg, ...messages.slice(firstUserIdx + 1)];
 }
 
 /**
@@ -182,10 +193,7 @@ export function injectClaudeCodeIdentity(body: any): any {
   if (userSystemParts.length > 0) {
     const sanitized = sanitizeForwardedSystemPrompt(userSystemParts.join('\n\n'));
     if (sanitized.trim()) {
-      result.messages = prependToFirstUserMessage(
-        Array.isArray(body.messages) ? [...body.messages] : body.messages,
-        sanitized
-      );
+      result.messages = prependToFirstUserMessage(body.messages, sanitized);
     }
   }
 
