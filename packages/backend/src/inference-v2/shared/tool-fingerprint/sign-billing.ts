@@ -1,14 +1,14 @@
 /**
  * CCH (Client Consistency Hash) signing — v2-native.
  *
- * BACKGROUND: the vendored eliza pipeline's `buildBillingBlock()`
- * (vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/billing-
- * fingerprint.ts) computes the `cc_version` build-hash suffix using what its
- * own comments describe as real CC's `utils/fingerprint.ts` algorithm
- * (SHA256 over specific message-text character indices, salted) — that part
- * is genuine and left untouched. But it ALWAYS emits the literal placeholder
- * `cch=00000;` for the actual signature; nothing in the vendored pipeline
- * ever signs it. Real Claude Code signs this field per-request. Debug trace
+ * BACKGROUND: `cc-billing.ts`'s `buildBillingHeaderText()` (itself ported
+ * from vendor/eliza's `buildBillingBlock()`, see cc-constants.ts's module
+ * doc for the de-vendoring rationale) computes the `cc_version` build-hash
+ * suffix using what the original vendored code's comments describe as real
+ * CC's `utils/fingerprint.ts` algorithm (SHA256 over specific message-text
+ * character indices, salted). But it always emits the literal placeholder
+ * `cch=00000;` for the actual signature — nothing computes a real one.
+ * Real Claude Code signs this field per-request. Debug trace
  * 17404760-e986-49b3-8a20-f1a4a469a0ac shows the literal `cch=00000;`
  * reaching Anthropic — a static, trivially-detectable placeholder is itself
  * a deterministic non-CC signal, independent of the tool-array and system-
@@ -31,8 +31,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import { BILLING_HEADER_PREFIX } from './cc-billing';
 
-const BILLING_HEADER_PREFIX = 'x-anthropic-billing-header:';
 const UNSIGNED_CCH_PATTERN = /cch=00000;/;
 
 /**

@@ -2,34 +2,49 @@
  * Single entry point for the v2 Claude Code OAuth-masking transformation
  * pipeline applied to an outgoing Anthropic `/v1/messages` request body.
  *
- * Extracted out of `pi-ai-executor.ts`'s `onPayload` callback so the exact
- * production sequence is directly unit-testable (see `__tests__/apply-
- * masking.test.ts`) rather than re-implemented/approximated in a test file,
- * which could silently drift from what actually ships.
+ * Fully v2-native — no dependency on vendor/eliza/plugins/plugin-anthropic-
+ * proxy. That package was audited (see cc-constants.ts's module doc) and
+ * found to be mostly dead weight for this use case: half its layers
+ * (`stripSystemConfig`, assistant-prefill strip, thinking-block strip) are
+ * either eliza-specific no-ops for any other client or speculative behavior
+ * never confirmed necessary for our traffic; the CCH-signing gap it left
+ * (see sign-billing.ts) and the tool-rename dictionary gap it left (see
+ * registry.ts) were the actual production bugs this pipeline exists to fix.
+ * v1 (`transformers/oauth/oauth-claude.ts`) already proves the eliza
+ * dependency was never load-bearing for Claude Code fingerprinting in
+ * general — it has zero vendor/eliza imports. The remaining genuinely
+ * useful surface (fingerprint constants, the billing-hash formula, the
+ * synthetic tool list) is ported natively with sourcing comments in
+ * cc-constants.ts so it can be independently re-derived from a real Claude
+ * Code capture if Anthropic ever changes these values.
  *
  * Pipeline, in order (each step's rationale is documented at its own
  * module — this is just the composition):
  *
  *   1. `buildToolRenamePairs()` — compute schema-safe renames for the
- *      caller's actual tool surface (opencode built-ins, MCP-server tools),
- *      replacing eliza's own `DEFAULT_TOOL_RENAMES` dictionary.
- *   2. Vendored `processBody()` — tool description stripping + synthetic
- *      Claude Code tool injection (fingerprint parity) using the renames
- *      from step 1.
- *   3. `dedupeSyntheticToolCollisions()` — defensive backstop for the rare
- *      case a computed rename collides with one of the 5 synthetic tool
- *      names.
- *   4. `injectClaudeCodeIdentity()` — replace `system[]` with the genuine
+ *      caller's actual tool surface (opencode built-ins, MCP-server tools).
+ *   2. `applyToolRenames()` — apply those renames across `tools[]`,
+ *      `tool_choice`, and any `tool_use` blocks in message history.
+ *   3. `stripDescriptionsAndInjectSyntheticTools()` — strip caller tool
+ *      descriptions (fingerprint parity) and prepend the 5 synthetic
+ *      Claude Code tool stubs.
+ *   4. `dedupeSyntheticToolCollisions()` — defensive backstop for the rare
+ *      case a computed rename collides with one of the 5 synthetic names.
+ *   5. `injectClaudeCodeIdentity()` — replace `system[]` with the genuine
  *      Claude Code system-prompt shape; relocate the caller's real system
  *      content into the first user message.
- *   5. `signBillingHeader()` — sign the CCH placeholder over the finalized
+ *   6. `injectClaudeCodeMetadata()` — set `metadata.user_id` to the
+ *      device_id/session_id shape real Claude Code sends.
+ *   7. `signBillingHeader()` — sign the CCH placeholder over the finalized
  *      body. Must run last so the signature covers everything above.
  */
 
-import { processBody } from '../../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/process-body';
 import { buildToolRenamePairs } from './registry';
+import { applyToolRenames } from './rename-apply';
+import { stripDescriptionsAndInjectSyntheticTools } from './cc-tools';
 import { dedupeSyntheticToolCollisions } from './dedupe';
 import { injectClaudeCodeIdentity } from './cc-identity';
+import { injectClaudeCodeMetadata } from './cc-metadata';
 import { signBillingHeader } from './sign-billing';
 import type { RenamePair } from './types';
 
@@ -55,36 +70,17 @@ export function applyClaudeCodeMasking(payloadStr: string): ClaudeCodeMaskingRes
   const parsedPayload = JSON.parse(payloadStr);
   const toolRenamePairs = buildToolRenamePairs(parsedPayload.tools ?? []);
 
-  const result = processBody(payloadStr, {
-    replacements: [],
-    toolRenames: toolRenamePairs,
-    propRenames: [],
-    stripSystemConfig: true,
-    stripToolDescriptions: true,
-    // Keep synthetic tool injection ON for Claude Code fingerprint parity
-    // (Glob/Grep/Agent/NotebookEdit/TodoRead — see vendor/eliza/.../cc-tool-
-    // injection.ts). The vendored injector unconditionally prepends all 5
-    // stubs with no awareness of the caller's real tools, so if a computed
-    // rename above happens to target one of those 5 reserved names, the
-    // result is two tools with the same name — Anthropic rejects that with
-    // `400 tools: Tool names must be unique.` dedupeSyntheticToolCollisions()
-    // below is a defensive backstop for that case; in practice the
-    // tool-fingerprint shapes are designed to avoid it (see
-    // opencode-shape.ts).
-    injectCCSyntheticTools: true,
-  });
-
-  let transformed = dedupeSyntheticToolCollisions(JSON.parse(result.body));
-
-  // processBody() only prepends an unsigned billing block ahead of whatever
-  // system[] pi-ai already built (its own CC identity block followed by the
-  // caller's raw, unmodified system prompt — see cc-identity.ts for why
-  // that's a deterministic non-CC signal on its own). Replace the whole
-  // system[] with the genuine CC shape and relocate the caller's real system
-  // content into the first user message, then sign the billing header last
-  // so the signature covers the final, actually-transmitted body.
-  transformed = injectClaudeCodeIdentity(transformed);
-  const payload = signBillingHeader(transformed);
+  let payload = applyToolRenames(parsedPayload, toolRenamePairs);
+  payload = stripDescriptionsAndInjectSyntheticTools(payload);
+  // A computed rename above may target one of the 5 reserved synthetic tool
+  // names (Glob/Grep/Agent/NotebookEdit/TodoRead), producing a duplicate
+  // Anthropic rejects with `400 tools: Tool names must be unique.`. This is
+  // a defensive backstop; in practice the tool-fingerprint shapes are
+  // designed to avoid it (see opencode-shape.ts).
+  payload = dedupeSyntheticToolCollisions(payload);
+  payload = injectClaudeCodeIdentity(payload);
+  payload = injectClaudeCodeMetadata(payload);
+  payload = signBillingHeader(payload);
 
   return { payload, toolRenamePairs };
 }

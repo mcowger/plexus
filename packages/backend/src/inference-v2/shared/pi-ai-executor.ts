@@ -55,17 +55,17 @@ import {
   isClaudeMaskingApiKeyRoute,
 } from './pi-ai-utils';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
-import { getStainlessHeaders } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/stainless-headers';
-import { reverseMap } from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/reverse-map';
-import {
-  DEFAULT_REVERSE_MAP,
-  REQUIRED_BETAS,
-} from '../../../../../vendor/eliza/plugins/plugin-anthropic-proxy/src/proxy/constants';
 import type { GenerationIntent } from './generation';
 import { splitReasoningSuffix } from './reasoning';
 import { consumeTtfb } from './fetch-tap';
 import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
-import { applyClaudeCodeMasking, type RenamePair } from './tool-fingerprint';
+import {
+  applyClaudeCodeMasking,
+  getStainlessHeaders,
+  reverseToolRenames,
+  REQUIRED_BETAS,
+  type RenamePair,
+} from './tool-fingerprint';
 import { enforceContextLimitForRoute } from '../../services/enforce-limits';
 import { compactContextForSend } from '../../services/compaction/compaction-service';
 import type { CompactionResult, CompactionStrategyName } from '../../services/compaction/types';
@@ -810,9 +810,10 @@ export async function runPiAiExecutor<TResponse>(
     };
 
     // Populated inside onPayload from the actual outgoing tool list, then
-    // stashed on piModel so the response-side reverseMap() calls (both the
-    // non-streaming path below and the streaming path in buildSSEGenerator)
-    // can reverse the exact same renames — see tool-fingerprint/registry.ts.
+    // stashed on piModel so the response-side reverseToolRenames() calls
+    // (both the non-streaming path below and the streaming path in
+    // buildSSEGenerator) can reverse the exact same renames — see
+    // tool-fingerprint/registry.ts.
     let toolRenamePairs: RenamePair[] = [];
 
     const callOptions: ProviderStreamOptions = {
@@ -937,11 +938,7 @@ export async function runPiAiExecutor<TResponse>(
         let finalResponse = serialized;
         if (isOAuth || isClaudeMasking) {
           const serializedStr = JSON.stringify(serialized);
-          const reversedStr = reverseMap(serializedStr, {
-            toolRenames: toolRenamePairs,
-            propRenames: [],
-            reverseMap: DEFAULT_REVERSE_MAP,
-          });
+          const reversedStr = reverseToolRenames(serializedStr, toolRenamePairs);
           finalResponse = JSON.parse(reversedStr);
         }
 
@@ -1183,11 +1180,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
         }
         let finalFrame = frame;
         if (isOAuth || isClaudeMasking) {
-          finalFrame = reverseMap(frame, {
-            toolRenames: toolRenamePairs,
-            propRenames: [],
-            reverseMap: DEFAULT_REVERSE_MAP,
-          });
+          finalFrame = reverseToolRenames(frame, toolRenamePairs);
         }
         transformedStreamSnapshot += finalFrame;
         yield finalFrame;

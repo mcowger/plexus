@@ -29,7 +29,7 @@
  * `pi-ai-executor.ts` itself.
  */
 
-/** A single (wireName, renamedName) pair, same shape as eliza's `Pair`. */
+/** A single (wireName, renamedName) pair. */
 export type RenamePair = readonly [string, string];
 
 /**
