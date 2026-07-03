@@ -16,10 +16,6 @@ type Command = {
 const commands: readonly Command[] = [
   { label: 'Trust mise configuration', cmd: ['mise', 'trust'] },
   { label: 'Install mise-managed tools', cmd: ['mise', 'install'] },
-  {
-    label: 'Initialize and update git submodules',
-    cmd: ['git', 'submodule', 'update', '--init', '--recursive'],
-  },
   { label: 'Install Bun dependencies', cmd: ['bun', 'install'] },
   { label: 'Build frontend', cmd: ['bun', 'run', 'build:frontend'] },
 ];

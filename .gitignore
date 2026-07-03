@@ -83,7 +83,3 @@ plexus
 .prof/
 .grepai/
 mise.local.toml
-
-# Vendored submodule — excluded from opencode's ripgrep-based file
-# indexing (48k+ files was adding 20-30s to session startup).
-vendor/eliza

@@ -44,7 +44,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ steps.sha.outputs.sha }}
-          submodules: recursive
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2

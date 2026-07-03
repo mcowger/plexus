@@ -27,5 +27,5 @@
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun-types"]
   },
-  "exclude": ["CAP-UI", "llms", "CLIProxyAPI", "vendor"]
+  "exclude": ["CAP-UI", "llms", "CLIProxyAPI"]
 }
