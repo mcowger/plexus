@@ -12,6 +12,12 @@ import { DebugManager } from '../../services/debug-manager';
  * `responseStatus` is the distinct 'quota_exceeded' (not the generic
  * 'error') so quota rejections are filterable in usage views. Error-rate
  * metrics count `!= 'success'`, so they see it the same as before.
+ *
+ * Persistence is intentionally fire-and-forget, matching every sibling
+ * branch of the route catch blocks: both storage calls swallow their own
+ * failures internally (they never reject), the debug flush writes an
+ * unrelated table with no ordering dependency on either save, and the
+ * caller's 429 reply must not wait on telemetry writes.
  */
 export function saveQuotaExceededUsage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +43,8 @@ export function saveQuotaExceededUsage(
  * sent the 429 reply itself). Every v1 route pre-inserts a
  * `responseStatus: 'pending'` row via `emitStartedAsync` for the live view;
  * without this upsert a quota-blocked request would sit "in-flight" in the
- * dashboard forever.
+ * dashboard forever. Fire-and-forget like `saveQuotaExceededUsage` above —
+ * the save never rejects and nothing downstream depends on its completion.
  */
 export function saveQuotaBlockedUsage(
   usageRecord: Partial<UsageRecord>,
