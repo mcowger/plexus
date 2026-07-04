@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { AssistantMessage, AssistantMessageEvent } from '@earendil-works/pi-ai';
 import {
   messageToAnthropicResponse,
@@ -7,6 +7,22 @@ import {
 } from '../context-to-anthropic';
 
 // @earendil-works/pi-ai and utils/logger are globally mocked in test/vitest.setup.ts
+
+// For the server-tool-block splicing tests below: context-to-anthropic.ts
+// consumes captured blocks from fetch-tap.ts's module-private map, which is
+// only populated via the real fetch interception pipeline (no test-only
+// seed export exists). So those tests stub `fetch`, reset modules, and
+// dynamically import fetch-tap + context-to-anthropic together so both
+// share the same fresh module instance and map.
+async function loadWithMockedFetch(mockFetch: typeof fetch) {
+  vi.stubGlobal('fetch', mockFetch);
+  vi.resetModules();
+  const fetchTap = await import('../../shared/fetch-tap');
+  const executor = await import('../../shared/pi-ai-executor');
+  const contextToAnthropic = await import('../context-to-anthropic');
+  fetchTap.installFetchTap();
+  return { fetchTap, contextToAnthropic, debugRequestIdStorage: executor.debugRequestIdStorage };
+}
 
 function zeroUsage() {
   return {
@@ -18,6 +34,11 @@ function zeroUsage() {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.resetModules();
+});
 
 function makeMessage(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
   return {
@@ -449,5 +470,112 @@ describe('eventToAnthropicSSE', () => {
         expect(line).toMatch(/^(event:|data:)/);
       }
     }
+  });
+});
+
+describe('server-tool block splicing (web_search etc.)', () => {
+  it('messageToAnthropicResponse appends captured server_tool_use/web_search_tool_result blocks after tool_use', async () => {
+    const body = JSON.stringify({
+      content: [
+        { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'q' } },
+        {
+          type: 'web_search_tool_result',
+          tool_use_id: 'srvtoolu_1',
+          content: [{ type: 'web_search_result', title: 't', url: 'https://example.com' }],
+        },
+      ],
+    });
+    const mockFetch = vi.fn(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'content-length': String(body.length) },
+        })
+    );
+    const { fetchTap, contextToAnthropic, debugRequestIdStorage } = await loadWithMockedFetch(
+      mockFetch as any
+    );
+
+    const requestId = 'req-splice-1';
+    fetchTap.watchForServerToolBlocks(requestId);
+    await debugRequestIdStorage.run(requestId, () => fetch('https://upstream.example/x'));
+
+    const msg = makeMessage({
+      stopReason: 'toolUse',
+      content: [{ type: 'toolCall', id: 'toolu_1', name: 'search', arguments: { q: 'hi' } } as any],
+    });
+    const result = contextToAnthropic.messageToAnthropicResponse(
+      msg,
+      'claude-opus-4-6',
+      undefined,
+      requestId
+    );
+
+    expect(result.content).toHaveLength(3);
+    expect(result.content[0]).toMatchObject({ type: 'tool_use', id: 'toolu_1' });
+    expect(result.content[1]).toMatchObject({ type: 'server_tool_use', id: 'srvtoolu_1' });
+    expect(result.content[2]).toMatchObject({
+      type: 'web_search_tool_result',
+      tool_use_id: 'srvtoolu_1',
+    });
+  });
+
+  it('messageToAnthropicResponse omits extra blocks when no requestId is passed', () => {
+    const msg = makeMessage({ content: [{ type: 'text', text: 'Hello!' }] });
+    const result = messageToAnthropicResponse(msg, 'claude-opus-4-6');
+    expect(result.content).toHaveLength(1);
+  });
+
+  it('eventToAnthropicSSE emits extra content_block_start/stop frames for spliced blocks before message_delta on done', async () => {
+    const body = JSON.stringify({
+      content: [{ type: 'server_tool_use', id: 'srvtoolu_2', name: 'web_search', input: {} }],
+    });
+    const mockFetch = vi.fn(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'content-length': String(body.length) },
+        })
+    );
+    const { fetchTap, contextToAnthropic, debugRequestIdStorage } = await loadWithMockedFetch(
+      mockFetch as any
+    );
+
+    const requestId = 'req-splice-2';
+    fetchTap.watchForServerToolBlocks(requestId);
+    await debugRequestIdStorage.run(requestId, () => fetch('https://upstream.example/x'));
+
+    const state = contextToAnthropic.makeAnthropicChunkSerialiserState(
+      'claude-opus-4-6',
+      requestId
+    );
+    contextToAnthropic.eventToAnthropicSSE(
+      { type: 'start', partial: { content: [], usage: zeroUsage() } } as any,
+      state
+    );
+    const message = makeMessage({ stopReason: 'stop' });
+    const frames = contextToAnthropic.eventToAnthropicSSE(
+      { type: 'done', reason: 'stop', message } as any,
+      state
+    );
+
+    const allFrames = frames.join('\n---\n');
+    const blockStartIndex = allFrames.indexOf('server_tool_use');
+    const deltaIndex = allFrames.indexOf('message_delta');
+    expect(blockStartIndex).toBeGreaterThan(-1);
+    expect(deltaIndex).toBeGreaterThan(-1);
+    expect(blockStartIndex).toBeLessThan(deltaIndex);
+    expect(allFrames).toContain('content_block_stop');
+  });
+
+  it('eventToAnthropicSSE does not emit extra frames when no requestId is set on state', () => {
+    const state = makeAnthropicChunkSerialiserState('claude-opus-4-6');
+    eventToAnthropicSSE(
+      { type: 'start', partial: { content: [], usage: zeroUsage() } } as any,
+      state
+    );
+    const message = makeMessage({ stopReason: 'stop' });
+    const frames = eventToAnthropicSSE({ type: 'done', reason: 'stop', message } as any, state);
+    expect(frames.join('\n')).not.toContain('server_tool_use');
   });
 });

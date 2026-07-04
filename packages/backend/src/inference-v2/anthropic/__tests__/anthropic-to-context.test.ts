@@ -211,6 +211,46 @@ describe('anthropicRequestToContext', () => {
       expect(result.context.tools![0]!.name).toBe('calculator');
       expect(result.toolsDefined).toBe(1);
     });
+
+    it('splits Anthropic builtin tools (web_search_20250305) out of context.tools', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-opus-4-6',
+        messages: [{ role: 'user', content: 'Hi' }],
+        tools: [
+          {
+            name: 'calculator',
+            description: 'Compute',
+            input_schema: { type: 'object', properties: { x: { type: 'number' } } },
+          },
+          { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+        ],
+      });
+      expect(result.context.tools).toHaveLength(1);
+      expect(result.context.tools![0]!.name).toBe('calculator');
+      expect(result.builtinTools).toEqual([
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+      ]);
+      expect(result.toolsDefined).toBe(2);
+    });
+
+    it('omits context.tools entirely when only builtin tools are present', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-opus-4-6',
+        messages: [{ role: 'user', content: 'Hi' }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      });
+      expect(result.context.tools).toBeUndefined();
+      expect(result.builtinTools).toEqual([{ type: 'web_search_20250305', name: 'web_search' }]);
+      expect(result.toolsDefined).toBe(1);
+    });
+
+    it('returns an empty builtinTools array when no tools are present', () => {
+      const result = anthropicRequestToContext({
+        model: 'claude-opus-4-6',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+      expect(result.builtinTools).toEqual([]);
+    });
   });
 
   describe('reasoning effort', () => {

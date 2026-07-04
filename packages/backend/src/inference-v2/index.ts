@@ -397,7 +397,7 @@ export async function handleBetaMessages(
     const parsed = anthropicRequestToContext(body);
 
     // ── Serialiser state ─────────────────────────────────────────────────
-    const chunkState = makeAnthropicChunkSerialiserState(modelAlias);
+    const chunkState = makeAnthropicChunkSerialiserState(modelAlias, requestId);
 
     // ── Execute ──────────────────────────────────────────────────────────
     const result = await runPiAiExecutor({
@@ -414,10 +414,11 @@ export async function handleBetaMessages(
       signal,
       toolsDefined: parsed.toolsDefined,
       messageCount: parsed.messageCount,
+      builtinTools: parsed.builtinTools,
       onSuccess: async () => {
         // Stage 2: no-op
       },
-      serializeMessage: (msg) => messageToAnthropicResponse(msg, modelAlias, requestId),
+      serializeMessage: (msg) => messageToAnthropicResponse(msg, modelAlias, requestId, requestId),
       serializeChunks: (event) => eventToAnthropicSSE(event, chunkState),
     });
 
