@@ -1529,6 +1529,10 @@ export class ConfigRepository {
     return { enabled, retryableStatusCodes, retryableErrors };
   }
 
+  async getCaptureTraceOnError(): Promise<boolean> {
+    return this.getSetting<boolean>('debug.captureOnError', false);
+  }
+
   async getCooldownPolicy(): Promise<CooldownPolicy> {
     const initialMinutes = await this.getSetting<number>('cooldown.initialMinutes', 2);
     const maxMinutes = await this.getSetting<number>('cooldown.maxMinutes', 300);

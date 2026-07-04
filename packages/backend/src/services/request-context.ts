@@ -9,6 +9,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  */
 export interface RequestContext {
   keyName?: string;
+  requestId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -34,6 +35,24 @@ export function getRequestContext(): RequestContext | undefined {
  */
 export function getCurrentKeyName(): string | undefined {
   return storage.getStore()?.keyName;
+}
+
+/**
+ * Read just the request id from the active request context.
+ */
+export function getCurrentRequestId(): string | undefined {
+  return storage.getStore()?.requestId;
+}
+
+/**
+ * Attach the request id to the active request context. Mutates the current
+ * store so downstream code (notably DebugManager, reached via the cooldown
+ * path) can resolve the request id without explicit plumbing. No-op when
+ * called outside a request context.
+ */
+export function setCurrentRequestId(requestId: string): void {
+  const store = storage.getStore();
+  if (store) store.requestId = requestId;
 }
 
 /**

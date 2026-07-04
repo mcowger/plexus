@@ -9,6 +9,7 @@ import {
   normalizeKeyConfig,
 } from '../../config';
 import { ConfigService } from '../../services/config-service';
+import { DebugManager } from '../../services/debug-manager';
 import { isValidIpRule } from '../../utils/ip-match';
 import { getCheckerDefinitions } from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/usage-storage';
@@ -495,6 +496,42 @@ export async function registerConfigRoutes(
       return reply.send(updated);
     } catch (e: any) {
       logger.error('Failed to patch failover config', e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  // ─── Capture Trace on Error ──────────────────────────────────────
+  // Persisted admin toggle. When enabled, DebugManager captures traces for
+  // every request and persists them only when a request writes an inference
+  // error or triggers a cooldown, even if global/per-key debug is off.
+
+  fastify.get('/v0/management/config/capture-trace-on-error', async (_request, reply) => {
+    try {
+      const enabled = await configService.getRepository().getCaptureTraceOnError();
+      return reply.send({ enabled });
+    } catch (e: any) {
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.patch('/v0/management/config/capture-trace-on-error', async (request, reply) => {
+    const body = request.body as { enabled?: unknown } | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+    if (typeof body.enabled !== 'boolean') {
+      return reply.code(400).send({ error: 'enabled must be a boolean' });
+    }
+
+    try {
+      // Persist to the database, then mirror to the in-memory DebugManager so
+      // the change takes effect immediately without a restart.
+      await configService.setSetting('debug.captureOnError', body.enabled);
+      DebugManager.getInstance().setCaptureOnError(body.enabled);
+      logger.debug('Capture-trace-on-error updated via API');
+      return reply.send({ enabled: body.enabled });
+    } catch (e: any) {
+      logger.error('Failed to patch capture-trace-on-error config', e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

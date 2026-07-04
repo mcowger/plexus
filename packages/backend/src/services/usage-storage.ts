@@ -4,7 +4,7 @@ import { getDatabase, getSchema } from '../db/client';
 import { NewRequestUsage } from '../db/types';
 import { EventEmitter } from 'node:events';
 import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
-import { DebugLogRecord } from './debug-manager';
+import { DebugLogRecord, DebugManager } from './debug-manager';
 import { getCurrentKeyName } from './request-context';
 import { estimateKwhUsed } from './inference-energy';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
@@ -357,6 +357,10 @@ export class UsageStorageService extends EventEmitter {
         });
 
       logger.debug(`Inference error saved for request ${requestId}`);
+
+      // In capture-on-error mode, persist this request's debug trace even if
+      // debug capture isn't otherwise enabled. No-op when the mode is off.
+      DebugManager.getInstance().markForcePersist(requestId);
     } catch (e) {
       logger.error('Failed to save inference error', e);
     }
