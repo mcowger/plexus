@@ -480,7 +480,14 @@ function toAnthropicToolChoice(choice: unknown): unknown {
     return choice === 'required' ? 'any' : choice;
   }
   if (typeof choice === 'object' && (choice as any).type === 'function') {
-    return { type: 'tool', name: (choice as any).function?.name };
+    const name = (choice as any).function?.name;
+    // Malformed inbound tool_choice (missing function.name) — fall through
+    // to forwarding it as-is rather than manufacturing an Anthropic
+    // tool_choice with no name, which Anthropic would reject anyway (JSON.
+    // stringify drops the undefined key entirely).
+    if (typeof name === 'string' && name.length > 0) {
+      return { type: 'tool', name };
+    }
   }
   return choice;
 }

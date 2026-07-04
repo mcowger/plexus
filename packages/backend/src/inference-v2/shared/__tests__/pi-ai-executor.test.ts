@@ -1164,6 +1164,48 @@ describe('runPiAiExecutor with OAuth and Claude Masking', () => {
     const [, , callOptions] = vi.mocked(piAi.complete).mock.calls[0]!;
     expect((callOptions as any).toolChoice).toEqual({ type: 'tool', name: 'web_search' });
   });
+
+  // PR review follow-up: a malformed inbound tool_choice missing
+  // function.name must not be converted into an Anthropic tool_choice with
+  // no name (JSON.stringify would silently drop the undefined key,
+  // producing `{"type":"tool"}`, which Anthropic also rejects) — forward
+  // the original, still-invalid shape unchanged instead.
+  it('forwards a malformed tool_choice unchanged instead of manufacturing a nameless Anthropic tool_choice', async () => {
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue('mock-oauth-key');
+
+    vi.mocked(piAi.complete).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello oauth' }],
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    } as any);
+
+    const usageStorage = createUsageStorage();
+    await runPiAiExecutor({
+      requestId: 'req-tool-choice-malformed',
+      incomingApiType: 'messages',
+      modelAlias: 'claude-3-5-sonnet-20241022',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      toolChoice: { type: 'function', function: {} },
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'opencode',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    const [, , callOptions] = vi.mocked(piAi.complete).mock.calls[0]!;
+    expect((callOptions as any).toolChoice).toEqual({ type: 'function', function: {} });
+  });
 });
 
 describe('runPiAiExecutor Claude-masking streaming tool-rename reversal (regression)', () => {
