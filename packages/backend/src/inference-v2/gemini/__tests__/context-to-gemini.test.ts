@@ -98,6 +98,22 @@ describe('messageToGeminiResponse', () => {
     expect(thinkPart?.thoughtSignature).toBe('THINK_SIG');
   });
 
+  it('omits thoughtSignature when thinkingSignature is a pi-ai field-name placeholder', () => {
+    // Same underlying pi-ai bug as the Anthropic path: thinkingSignature can be
+    // left holding the matched JSON field name ("reasoning", "reasoning_content",
+    // "reasoning_text") instead of a real signature when the provider's
+    // reasoning_details shape isn't recognized. Must not be forwarded as a
+    // thoughtSignature.
+    const msg = makeMessage({
+      content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'reasoning' } as any],
+    });
+    const result = messageToGeminiResponse(msg, 'gemini-3.5-flash');
+    const thinkPart = (result.candidates[0]!.content.parts as any[]).find(
+      (p) => p.thought === true
+    );
+    expect(thinkPart?.thoughtSignature).toBeUndefined();
+  });
+
   it('emits thoughtSignature on text parts from textSignature', () => {
     const msg = makeMessage({
       content: [{ type: 'text', text: 'answer', textSignature: 'TEXT_SIG' } as any],

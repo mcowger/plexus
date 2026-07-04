@@ -27,6 +27,7 @@ import type {
   ThinkingContent,
   ToolCall,
 } from '@earendil-works/pi-ai';
+import { isPlaceholderThinkingSignature } from '../shared/pi-ai-utils';
 
 // ─── Anthropic wire types ─────────────────────────────────────────────────────
 
@@ -149,7 +150,9 @@ export function messageToAnthropicResponse(
       thinkingBlocks.push({
         type: 'thinking',
         thinking: tb.thinking,
-        ...(tb.thinkingSignature ? { signature: tb.thinkingSignature } : {}),
+        ...(tb.thinkingSignature && !isPlaceholderThinkingSignature(tb.thinkingSignature)
+          ? { signature: tb.thinkingSignature }
+          : {}),
       });
     } else if (block.type === 'text') {
       textBlocks.push({ type: 'text', text: (block as TextContent).text });
@@ -286,7 +289,7 @@ export function eventToAnthropicSSE(
         const block = content?.[state.activeContentIndex];
         const signature =
           block?.type === 'thinking' ? (block as ThinkingContent).thinkingSignature : undefined;
-        if (signature) {
+        if (signature && !isPlaceholderThinkingSignature(signature)) {
           frames.push(
             sseEvent('content_block_delta', {
               type: 'content_block_delta',

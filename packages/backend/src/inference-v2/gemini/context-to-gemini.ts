@@ -36,6 +36,7 @@ import type {
   ThinkingContent,
   ToolCall,
 } from '@earendil-works/pi-ai';
+import { isPlaceholderThinkingSignature } from '../shared/pi-ai-utils';
 
 // ─── Gemini wire types ────────────────────────────────────────────────────────
 
@@ -99,7 +100,11 @@ function buildParts(message: AssistantMessage): GeminiPart[] {
     if (block.type === 'thinking') {
       const tc = block as ThinkingContent;
       const part: GeminiPart = { text: tc.thinking, thought: true };
-      if (typeof tc.thinkingSignature === 'string' && tc.thinkingSignature) {
+      if (
+        typeof tc.thinkingSignature === 'string' &&
+        tc.thinkingSignature &&
+        !isPlaceholderThinkingSignature(tc.thinkingSignature)
+      ) {
         (part as any).thoughtSignature = tc.thinkingSignature;
       }
       parts.push(part);

@@ -815,3 +815,31 @@ export function isClaudeMaskingApiKeyRoute(route: RouteResult, targetApiType: st
 
   return route.config.useClaudeMasking === true;
 }
+
+// ─── Thinking signature validation ───────────────────────────────────────────
+//
+// pi-ai's openai-completions parser (ensureThinkingBlock) stamps a thinking
+// block's `thinkingSignature` with the *JSON field name* it matched
+// (`reasoning` | `reasoning_content` | `reasoning_text`) as soon as any
+// reasoning delta arrives — before it knows whether the provider will ever
+// send a real cryptographic signature via `reasoning_details[].signature`.
+// When a provider's `reasoning_details` entries don't match pi-ai's
+// `isEncryptedReasoningDetail` shape (Gemini-style {type, id, data}) — e.g.
+// Bedrock/OpenRouter's `{type: "reasoning.text", signature: "..."}` — the real
+// signature is never picked up, and this placeholder field-name string is all
+// that's left on the block. Forwarding it to a client as if it were a genuine
+// signature is worse than omitting it: a later replay to a provider that
+// actually validates signatures (e.g. Anthropic) is rejected outright with
+// "Invalid signature in thinking block", and it could just as easily be
+// mistaken for a signature from an entirely different provider.
+
+const THINKING_SIGNATURE_FIELD_NAME_PLACEHOLDERS = new Set([
+  'reasoning',
+  'reasoning_content',
+  'reasoning_text',
+]);
+
+/** True when `signature` is pi-ai's leftover field-name placeholder, not a real signature. */
+export function isPlaceholderThinkingSignature(signature: string | undefined): boolean {
+  return signature != null && THINKING_SIGNATURE_FIELD_NAME_PLACEHOLDERS.has(signature);
+}

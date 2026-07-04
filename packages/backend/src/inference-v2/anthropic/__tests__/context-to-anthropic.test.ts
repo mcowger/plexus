@@ -86,6 +86,26 @@ describe('messageToAnthropicResponse', () => {
     expect(thinkBlock?.thinking).toBe('Deep thought');
   });
 
+  it('omits signature when thinkingSignature is a pi-ai field-name placeholder, not a real signature', () => {
+    // Reproduces the bug behind "Invalid `signature` in `thinking` block" 400s:
+    // pi-ai's openai-completions parser stamps thinkingSignature with the
+    // matched JSON field name (e.g. "reasoning") before a real signature
+    // arrives. If the provider's reasoning_details never carry one (e.g.
+    // Bedrock via OpenRouter using the reasoning.text shape), that leftover
+    // field name is all that's left — it must never be forwarded as if it
+    // were a genuine signature.
+    const msg = makeMessage({
+      content: [
+        { type: 'thinking', thinking: 'Deep thought', thinkingSignature: 'reasoning' } as any,
+      ],
+    });
+    const result = messageToAnthropicResponse(msg, 'claude-opus-4-6');
+    const thinkBlock = result.content.find((b) => b.type === 'thinking') as
+      | { type: 'thinking'; thinking: string; signature?: string }
+      | undefined;
+    expect(thinkBlock?.signature).toBeUndefined();
+  });
+
   it('includes tool_use content block', () => {
     const msg = makeMessage({
       stopReason: 'toolUse',
@@ -234,6 +254,54 @@ describe('eventToAnthropicSSE', () => {
     expect(stopIndex).toBeGreaterThan(-1);
     expect(sigIndex).toBeLessThan(stopIndex);
     expect(allFrames).toContain('sig-abc');
+  });
+
+  it('does not emit signature_delta when thinkingSignature is a placeholder field name', () => {
+    const state = makeAnthropicChunkSerialiserState('claude-opus-4-6');
+    eventToAnthropicSSE(
+      { type: 'start', partial: { content: [], usage: zeroUsage() } } as any,
+      state
+    );
+    eventToAnthropicSSE(
+      {
+        type: 'thinking_start',
+        contentIndex: 0,
+        partial: {
+          content: [{ type: 'thinking', thinking: '', thinkingSignature: '' }],
+          usage: zeroUsage(),
+        },
+      } as any,
+      state
+    );
+    eventToAnthropicSSE(
+      {
+        type: 'thinking_delta',
+        contentIndex: 0,
+        delta: 'Hmm',
+        partial: { content: [], usage: zeroUsage() },
+      } as any,
+      state
+    );
+    // Closing the block: the underlying content carries pi-ai's leftover
+    // field-name placeholder ("reasoning") instead of a real signature —
+    // no signature_delta should be emitted for it.
+    const frames = eventToAnthropicSSE(
+      {
+        type: 'text_start',
+        contentIndex: 1,
+        partial: {
+          content: [
+            { type: 'thinking', thinking: 'Hmm', thinkingSignature: 'reasoning' },
+            { type: 'text', text: '' },
+          ],
+          usage: zeroUsage(),
+        },
+      } as any,
+      state
+    );
+    const allFrames = frames.join('\n---\n');
+    expect(allFrames).not.toContain('signature_delta');
+    expect(allFrames).toContain('content_block_stop');
   });
 
   it('message_delta on done includes full usage breakdown, not just output_tokens', () => {
