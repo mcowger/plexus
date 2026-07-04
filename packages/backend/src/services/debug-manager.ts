@@ -2,7 +2,7 @@ import { UsageStorageService } from './usage-storage';
 import { logger } from '../utils/logger';
 import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
-import { getCurrentKeyName } from './request-context';
+import { getCurrentKeyName, setCurrentRequestId } from './request-context';
 
 export interface DebugLogRecord {
   requestId: string;
@@ -18,12 +18,19 @@ export interface DebugLogRecord {
   responseStatus?: number;
   provider?: string;
   createdAt?: number;
+  /**
+   * When true, this log is persisted on flush even if debug capture is not
+   * otherwise enabled for its key. Set by the "capture trace on error" mode
+   * when a request writes an inference error or triggers a cooldown.
+   */
+  forcePersist?: boolean;
 }
 
 export class DebugManager {
   private static instance: DebugManager;
   private storage: UsageStorageService | null = null;
   private enabledGlobal: boolean = false;
+  private captureOnError: boolean = false;
   private enabledKeys: Set<string> = new Set();
   private providerFilter: string[] | null = null;
   private pendingLogs: Map<string, DebugLogRecord> = new Map();
@@ -52,6 +59,19 @@ export class DebugManager {
     return this.enabledGlobal;
   }
 
+  // ─── Capture-on-error toggle ────────────────────────────────────
+  // When enabled, traces are captured in memory for every request but only
+  // persisted if the request writes an inference error or triggers a cooldown
+  // (see markForcePersist). Successful requests are discarded on flush.
+  setCaptureOnError(enabled: boolean) {
+    this.captureOnError = enabled;
+    logger.warn(`Debug capture-on-error ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  isCaptureOnError(): boolean {
+    return this.captureOnError;
+  }
+
   // ─── Per-key toggle ─────────────────────────────────────────────
   enableForKey(keyName: string): void {
     this.enabledKeys.add(keyName);
@@ -74,7 +94,9 @@ export class DebugManager {
    * Reads the key name from the request context when one is available.
    */
   isCaptureEnabled(): boolean {
-    return this.isEnabledForKey(getCurrentKeyName() ?? null);
+    // Capture-on-error mode buffers every request so a trace exists to persist
+    // if the request later errors or triggers a cooldown.
+    return this.captureOnError || this.isEnabledForKey(getCurrentKeyName() ?? null);
   }
 
   getEnabledKeys(): string[] {
@@ -109,6 +131,9 @@ export class DebugManager {
 
   // ─── Log capture ────────────────────────────────────────────────
   startLog(requestId: string, rawRequest: any, requestHeaders?: Record<string, string | string[]>) {
+    // Seed the request id into the async-local context so the cooldown path
+    // (which lacks a requestId) can force-persist this request's trace.
+    setCurrentRequestId(requestId);
     if (!this.isCaptureEnabled()) return;
     this.pendingLogs.set(requestId, {
       requestId,
@@ -193,8 +218,9 @@ export class DebugManager {
     const log = this.pendingLogs.get(requestId);
     if (!log) return;
 
-    // Only persist to database if debug mode is enabled for this request's key
-    if (!this.isEnabledForKey(log.apiKey ?? null)) {
+    // Persist if debug mode is enabled for this request's key, or if the
+    // request was flagged for forced persistence (capture-on-error mode).
+    if (!this.isEnabledForKey(log.apiKey ?? null) && !log.forcePersist) {
       logger.debug(
         `Skipping flush for ${requestId} - debug mode not enabled for key '${log.apiKey ?? '(none)'}'`
       );
@@ -216,6 +242,18 @@ export class DebugManager {
       this.storage.saveDebugLog(log);
     }
     this.pendingLogs.delete(requestId);
+  }
+
+  /**
+   * Flag a request's pending trace for persistence on flush even when debug
+   * capture is not otherwise enabled for its key. Used by capture-on-error
+   * mode when a request writes an inference error or triggers a cooldown.
+   * No-op unless capture-on-error is enabled and a pending log exists.
+   */
+  markForcePersist(requestId: string | undefined | null): void {
+    if (!this.captureOnError || !requestId) return;
+    const log = this.pendingLogs.get(requestId);
+    if (log) log.forcePersist = true;
   }
 
   /**

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../components/ui/Button';
+import { Switch } from '../components/ui/Switch';
 import { Modal } from '../components/ui/Modal';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useLocation } from 'react-router-dom';
@@ -55,6 +56,9 @@ export const Debug: React.FC = () => {
   // Provider filter state
   const [providers, setProviders] = useState<Provider[]>([]);
   const [debugEnabled, setDebugEnabled] = useState(false);
+  const [captureTraceOnError, setCaptureTraceOnError] = useState(false);
+  const [captureTraceLoaded, setCaptureTraceLoaded] = useState(false);
+  const [captureTraceSaving, setCaptureTraceSaving] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -162,9 +166,34 @@ export const Debug: React.FC = () => {
       } catch (e) {
         console.error('Failed to fetch providers or debug status', e);
       }
+      // Capture-trace-on-error is an admin-only persisted setting.
+      if (isAdmin) {
+        try {
+          const { enabled } = await api.getCaptureTraceOnError();
+          setCaptureTraceOnError(enabled);
+          setCaptureTraceLoaded(true);
+        } catch (e) {
+          console.error('Failed to fetch capture-trace-on-error setting', e);
+        }
+      }
     };
     fetchProvidersAndStatus();
-  }, []);
+  }, [isAdmin]);
+
+  const handleToggleCaptureTraceOnError = async (checked: boolean) => {
+    const previous = captureTraceOnError;
+    setCaptureTraceOnError(checked);
+    setCaptureTraceSaving(true);
+    try {
+      const { enabled } = await api.setCaptureTraceOnError(checked);
+      setCaptureTraceOnError(enabled);
+    } catch (e) {
+      setCaptureTraceOnError(previous);
+      console.error('Failed to update capture-trace-on-error setting', e);
+    } finally {
+      setCaptureTraceSaving(false);
+    }
+  };
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -303,6 +332,18 @@ export const Debug: React.FC = () => {
           }
           actions={
             <>
+              {/* Capture-trace-on-error — admin-only persisted setting. */}
+              {isAdmin && (
+                <label className="flex items-center gap-2 text-sm text-text-muted">
+                  <span className="hidden sm:inline">Capture on Error</span>
+                  <Switch
+                    checked={captureTraceOnError}
+                    onChange={handleToggleCaptureTraceOnError}
+                    disabled={!captureTraceLoaded || captureTraceSaving}
+                    aria-label="Toggle capture trace on error"
+                  />
+                </label>
+              )}
               {/* Provider Filter — admin-only: the global filter affects all users. */}
               {isAdmin && (
                 <div className="relative provider-filter-dropdown">

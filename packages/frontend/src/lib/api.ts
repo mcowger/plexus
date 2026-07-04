@@ -3446,6 +3446,26 @@ export const api = {
     return res.json();
   },
 
+  // ─── Capture Trace on Error ─────────────────────────────────────────
+
+  /** Fetch whether traces are captured on error even when debug is off. */
+  getCaptureTraceOnError: async (): Promise<{ enabled: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/capture-trace-on-error`);
+    if (!res.ok) throw new Error('Failed to fetch capture-trace-on-error setting');
+    return res.json();
+  },
+
+  /** Toggle capturing traces on error even when debug is off. */
+  setCaptureTraceOnError: async (enabled: boolean): Promise<{ enabled: boolean }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/capture-trace-on-error`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!res.ok) throw new Error('Failed to update capture-trace-on-error setting');
+    return res.json();
+  },
+
   // ─── Cooldown Settings ──────────────────────────────────────────────
 
   /** Fetch current cooldown policy. */

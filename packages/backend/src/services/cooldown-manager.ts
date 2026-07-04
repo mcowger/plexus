@@ -2,6 +2,8 @@ import { logger } from '../utils/logger';
 import { getDatabase, getSchema } from '../db/client';
 import { lt, eq, sql, and, desc } from 'drizzle-orm';
 import { getConfig } from '../config';
+import { DebugManager } from './debug-manager';
+import { getCurrentRequestId } from './request-context';
 
 export interface Target {
   provider: string;
@@ -199,6 +201,11 @@ export class CooldownManager {
     const expiry = Date.now() + duration;
 
     this.cooldowns.set(key, { expiry, consecutiveFailures, lastError });
+
+    // In capture-on-error mode, persist the triggering request's debug trace.
+    // Resolved from the async-local context since this path has no requestId;
+    // no-op when the mode is off or outside a request context (e.g. probes).
+    DebugManager.getInstance().markForcePersist(getCurrentRequestId());
 
     logger.warn(
       `Provider '${provider}' model '${model}' placed on cooldown for ${duration / 1000}s ` +

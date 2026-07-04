@@ -170,6 +170,11 @@ try {
   await configService.initialize();
   logger.debug('Configuration loaded from database');
 
+  // Restore the persisted "capture trace on error" toggle into DebugManager.
+  DebugManager.getInstance().setCaptureOnError(
+    await configService.getRepository().getCaptureTraceOnError()
+  );
+
   // Register pi_ai_custom_providers with the piAiModels instance so custom
   // providers can be dispatched directly by api type without remapping hacks.
   const { registerCustomProvidersWithPiAi } = await import('./inference-v2/shared/pi-ai-utils');
