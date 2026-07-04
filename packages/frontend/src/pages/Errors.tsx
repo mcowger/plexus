@@ -426,6 +426,9 @@ export const Errors: React.FC = () => {
   );
 };
 
+const EDITOR_MIN_HEIGHT = 60;
+const EDITOR_MAX_HEIGHT = 600;
+
 const AccordionPanel: React.FC<{
   title: string;
   content: unknown;
@@ -435,6 +438,7 @@ const AccordionPanel: React.FC<{
 }> = ({ title, content, color, defaultOpen = false, language = 'json' }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
+  const [editorHeight, setEditorHeight] = useState(EDITOR_MIN_HEIGHT);
 
   const editorContent = (() => {
     if (content == null) return '';
@@ -477,17 +481,25 @@ const AccordionPanel: React.FC<{
         </button>
       </div>
       <div
-        className={clsx(
-          'overflow-hidden transition-[max-height] duration-300 ease-in-out',
-          isOpen ? 'max-h-[500px]' : 'max-h-0'
-        )}
+        className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+        style={{ maxHeight: isOpen ? editorHeight : 0 }}
       >
-        <div className="h-[280px] bg-[#1e1e1e] sm:h-[400px]">
+        <div className="bg-[#1e1e1e]" style={{ height: editorHeight }}>
           <Editor
             height="100%"
             defaultLanguage={language}
             theme="vs-dark"
             value={editorContent}
+            onMount={(editor) => {
+              const updateHeight = () => {
+                const contentHeight = editor.getContentHeight();
+                setEditorHeight(
+                  Math.min(Math.max(contentHeight, EDITOR_MIN_HEIGHT), EDITOR_MAX_HEIGHT)
+                );
+              };
+              updateHeight();
+              editor.onDidContentSizeChange(updateHeight);
+            }}
             options={{
               readOnly: true,
               minimap: { enabled: false },
