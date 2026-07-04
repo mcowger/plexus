@@ -61,7 +61,7 @@ import {
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
 import type { GenerationIntent } from './generation';
 import { splitReasoningSuffix } from './reasoning';
-import { consumeTtfb } from './fetch-tap';
+import { consumeTtfb, consumeServerToolBlocks, watchForServerToolBlocks } from './fetch-tap';
 import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
 import {
   applyClaudeCodeMasking,
@@ -111,6 +111,15 @@ export interface PiAiExecutorInput<TResponse, TChunk extends string = string> {
   toolsDefined?: number;
   /** Number of non-system messages (forwarded from parser result) */
   messageCount?: number;
+  /**
+   * Anthropic built-in server-side tool declarations (e.g. web_search_20250305)
+   * extracted verbatim by the inbound parser — see anthropic-to-context.ts.
+   * pi-ai's Tool type can't represent these (no `type` field, always emits a
+   * function-tool schema), so they're re-injected directly into the outgoing
+   * payload here, bypassing pi-ai's tool serialization for just these entries.
+   * Only applied when the resolved pi-ai provider is 'anthropic'.
+   */
+  builtinTools?: any[];
   /** Converts a final AssistantMessage to the wire-format response object */
   serializeMessage: (msg: AssistantMessage) => TResponse;
   /** Converts one AssistantMessageEvent to zero or more SSE/NDJSON frame strings */
@@ -445,6 +454,37 @@ function buildUsageFromMessage(
   };
 }
 
+// ─── tool_choice provider-shape conversion ───────────────────────────────────
+
+/**
+ * Every inbound parser (openai-to-context.ts, responses-to-context.ts,
+ * anthropic-to-context.ts) normalizes `tool_choice` to OpenAI's shape —
+ * a string (`"auto"`/`"none"`/`"required"`) or `{ type: "function", function:
+ * { name } }` — since pi-ai's own OpenAI/Chat-Completions provider expects
+ * exactly that shape verbatim (see `@earendil-works/pi-ai`
+ * `api/openai-completions.js`). But pi-ai's Anthropic provider does NOT
+ * convert `options.toolChoice` for us — `api/anthropic-messages.js` only
+ * wraps bare strings in `{ type: ... }` and otherwise forwards objects
+ * as-is, assuming they're already Anthropic-shaped
+ * (`{ type: "tool", name }` / `{ type: "auto" | "any" | "none" }`). Left
+ * unconverted, the OpenAI-shaped object round-trips straight through to
+ * Anthropic's API, which rejects `type: "function"` with a 400
+ * invalid_request_error — this must be converted here, right before
+ * dispatch, once the resolved provider is known.
+ */
+function toAnthropicToolChoice(choice: unknown): unknown {
+  if (choice == null) return choice;
+  if (typeof choice === 'string') {
+    // OpenAI's "required" has no literal Anthropic equivalent; Anthropic's
+    // closest semantic match is "any" (force some tool call).
+    return choice === 'required' ? 'any' : choice;
+  }
+  if (typeof choice === 'object' && (choice as any).type === 'function') {
+    return { type: 'tool', name: (choice as any).function?.name };
+  }
+  return choice;
+}
+
 // ─── Assistant provenance alignment (signature replay) ──────────────────────
 
 /**
@@ -542,6 +582,7 @@ export async function runPiAiExecutor<TResponse>(
     onSuccess,
     toolsDefined,
     messageCount,
+    builtinTools,
     serializeMessage,
     serializeChunks,
   } = input;
@@ -926,9 +967,12 @@ export async function runPiAiExecutor<TResponse>(
     // tool-fingerprint/registry.ts.
     let toolRenamePairs: RenamePair[] = [];
 
+    const dispatchToolChoice =
+      piAiProvider === 'anthropic' ? toAnthropicToolChoice(toolChoice) : toolChoice;
+
     const callOptions: ProviderStreamOptions = {
       ...generationOpts,
-      ...(toolChoice != null ? { toolChoice } : {}),
+      ...(dispatchToolChoice != null ? { toolChoice: dispatchToolChoice } : {}),
       ...(parallelToolCalls != null ? { parallelToolCalls } : {}),
       apiKey,
       headers: baseHeaders,
@@ -953,6 +997,18 @@ export async function runPiAiExecutor<TResponse>(
           };
           (piModel as any).__oauthContext = oauthContext;
           (piModel as any).__toolRenamePairs = toolRenamePairs;
+        }
+
+        // Re-inject Anthropic builtin server-side tools (e.g. web_search_20250305)
+        // that anthropicRequestToContext() split out because pi-ai's Tool type
+        // can't represent them. This is independent of the masking branch above
+        // — it must also apply on the OAuth-without-masking and apiKey paths.
+        if (piAiProvider === 'anthropic' && builtinTools && builtinTools.length > 0) {
+          const payloadObj: any =
+            typeof finalPayload === 'string' ? JSON.parse(finalPayload) : finalPayload;
+          payloadObj.tools = [...(payloadObj.tools ?? []), ...builtinTools];
+          finalPayload = payloadObj;
+          watchForServerToolBlocks(requestId);
         }
 
         const payloadStr =
@@ -1153,8 +1209,11 @@ export async function runPiAiExecutor<TResponse>(
     } catch (err: any) {
       const effectiveErr = attemptTimeout.isTimedOut() ? buildTimeoutError() : err;
 
-      // Clean up any TTFB entry that wasn't consumed (non-streaming error path)
+      // Clean up any TTFB / server-tool-block entries that weren't consumed
+      // (non-streaming error path) — this attempt's serializeMessage() never
+      // ran, so nothing else would clear them.
       consumeTtfb(requestId);
+      consumeServerToolBlocks(requestId);
 
       if (signal?.aborted) {
         concurrency.release(route.provider, route.model);
@@ -1558,5 +1617,9 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
   } finally {
     doRelease();
     debug.flush(requestId);
+    // Defensive: if the generator threw before a 'done'/'error' event ever
+    // reached serializeChunks (e.g. abort/timeout), consumeServerToolBlocks()
+    // inside eventToAnthropicSSE never ran — clear here so nothing leaks.
+    consumeServerToolBlocks(requestId);
   }
 }
