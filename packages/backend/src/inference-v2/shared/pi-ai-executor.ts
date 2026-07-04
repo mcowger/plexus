@@ -193,10 +193,8 @@ function buildAllTargetsFailedError(
 }
 
 function buildNoBetaCandidatesError(): Error {
-  const err = new Error(
-    'No beta-compatible candidate found: no configured provider has both pi_ai_provider and pi_ai_model_id set to registry-valid values.'
-  ) as any;
-  err.routingContext = { statusCode: 400, code: 'no_beta_compatible_candidate' };
+  const err = new Error('No candidate targets available') as any;
+  err.routingContext = { statusCode: 503, code: 'no_candidate_targets' };
   return err;
 }
 
