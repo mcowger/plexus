@@ -28,6 +28,7 @@ import type {
   ToolCall,
 } from '@earendil-works/pi-ai';
 import { isPlaceholderThinkingSignature } from '../shared/pi-ai-utils';
+import { consumeServerToolBlocks } from '../shared/fetch-tap';
 
 // ─── Anthropic wire types ─────────────────────────────────────────────────────
 
@@ -41,7 +42,15 @@ export interface AnthropicUsage {
 export type AnthropicContentBlock =
   | { type: 'text'; text: string }
   | { type: 'thinking'; thinking: string; signature?: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  // Anthropic built-in server-side tool blocks (e.g. web_search_20250305,
+  // web_fetch_20250910). pi-ai's parser drops these entirely — see
+  // fetch-tap.ts's watchForServerToolBlocks()/consumeServerToolBlocks(),
+  // which reconstruct them from the raw upstream bytes for splicing in here
+  // verbatim.
+  | { type: 'server_tool_use'; [key: string]: unknown }
+  | { type: 'web_search_tool_result'; [key: string]: unknown }
+  | { type: 'web_fetch_tool_result'; [key: string]: unknown };
 
 export interface AnthropicMessage {
   id: string;
@@ -121,9 +130,15 @@ function buildDeltaUsage(u: Usage) {
 export function messageToAnthropicResponse(
   message: AssistantMessage,
   modelAlias: string,
-  messageId?: string
+  messageId?: string,
+  requestId?: string
 ): AnthropicMessage {
   const id = messageId ?? makeMessageId();
+  // Blocks pi-ai's parser dropped (server_tool_use / web_search_tool_result),
+  // reconstructed by fetch-tap.ts from the raw upstream bytes. Appended after
+  // tool_use blocks rather than interleaved in original wire order — exact
+  // ordering fidelity was explicitly out of scope for this fix.
+  const extraBlocks: AnthropicContentBlock[] = requestId ? consumeServerToolBlocks(requestId) : [];
 
   // Error / aborted: surface errorMessage as a text block
   if (message.stopReason === 'error' || message.stopReason === 'aborted') {
@@ -167,7 +182,7 @@ export function messageToAnthropicResponse(
     type: 'message',
     role: 'assistant',
     model: modelAlias,
-    content: [...thinkingBlocks, ...textBlocks, ...toolBlocks],
+    content: [...thinkingBlocks, ...textBlocks, ...toolBlocks, ...extraBlocks],
     stop_reason: mapStopReason(message.stopReason),
     stop_sequence: null,
     usage: mapUsage(message.usage),
@@ -180,6 +195,7 @@ export function messageToAnthropicResponse(
  * Mutable state threaded through `eventToAnthropicSSE` calls for one stream.
  */
 export interface AnthropicChunkSerialiserState {
+  requestId?: string;
   messageId: string;
   model: string;
   /** Next block index to assign */
@@ -205,8 +221,12 @@ export interface AnthropicChunkSerialiserState {
   pendingStart: boolean;
 }
 
-export function makeAnthropicChunkSerialiserState(model: string): AnthropicChunkSerialiserState {
+export function makeAnthropicChunkSerialiserState(
+  model: string,
+  requestId?: string
+): AnthropicChunkSerialiserState {
   return {
+    requestId,
     messageId: makeMessageId(),
     model,
     nextBlockIndex: 0,
@@ -342,6 +362,29 @@ export function eventToAnthropicSSE(
     );
   };
 
+  /**
+   * Emit any captured server-tool blocks (web_search etc.) as their own
+   * content_block_start/stop frame pairs. Called just before message_delta
+   * on 'done'/'error' — these blocks only become available once the whole
+   * response has been captured, so they can't stream incrementally on this
+   * path; they land as a batch at the end instead of interleaved with text.
+   */
+  const emitExtraServerToolBlocks = () => {
+    if (!state.requestId) return;
+    const extraBlocks = consumeServerToolBlocks(state.requestId);
+    for (const block of extraBlocks) {
+      const index = state.nextBlockIndex++;
+      frames.push(
+        sseEvent('content_block_start', {
+          type: 'content_block_start',
+          index,
+          content_block: block,
+        })
+      );
+      frames.push(sseEvent('content_block_stop', { type: 'content_block_stop', index }));
+    }
+  };
+
   // ── Event dispatch ────────────────────────────────────────────────────────
 
   switch (event.type) {
@@ -440,6 +483,7 @@ export function eventToAnthropicSSE(
     case 'done': {
       ensureStarted();
       closeCurrentBlock();
+      emitExtraServerToolBlocks();
       frames.push(
         sseEvent('message_delta', {
           type: 'message_delta',
@@ -457,6 +501,7 @@ export function eventToAnthropicSSE(
     case 'error': {
       ensureStarted();
       closeCurrentBlock();
+      emitExtraServerToolBlocks();
       frames.push(
         sseEvent('message_delta', {
           type: 'message_delta',

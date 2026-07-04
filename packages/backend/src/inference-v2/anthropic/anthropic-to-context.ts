@@ -35,6 +35,7 @@ import type {
   Tool,
 } from '@earendil-works/pi-ai';
 import { jsonSchemaToTypeBox } from '../../transformers/oauth/type-mappers';
+import { isAnthropicBuiltinTool } from './builtin-tools';
 import type { ReasoningIntent } from '../shared/reasoning';
 import { budgetToEffort, normalizeVisibility } from '../shared/reasoning';
 import type { GenerationIntent } from '../shared/generation';
@@ -50,6 +51,15 @@ export interface AnthropicToContextResult {
   toolChoice?: unknown;
   toolsDefined: number;
   messageCount: number;
+  /**
+   * Anthropic built-in server-side tool declarations (e.g. web_search_20250305),
+   * extracted verbatim from the request body. These have no `input_schema` and
+   * are not representable as pi-ai `Tool`s (which only model client-side
+   * function tools), so they're carried out-of-band here and re-injected into
+   * the outgoing payload by the executor's onPayload hook. See
+   * ANTHROPIC_BUILTIN_TOOL_TYPES in ./builtin-tools.
+   */
+  builtinTools: any[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,12 +90,22 @@ function parseUserContentBlock(block: any): TextContent | ImageContent | null {
   return null; // unknown / skipped block type
 }
 
-function parseTools(tools: any[]): Tool[] {
-  return tools.map((t) => ({
-    name: t.name ?? '',
-    description: t.description ?? '',
-    parameters: jsonSchemaToTypeBox(t.input_schema ?? {}),
-  }));
+/** Splits inbound tools into pi-ai-representable function tools and raw builtin tool objects. */
+function parseTools(tools: any[]): { tools: Tool[]; builtinTools: any[] } {
+  const functionTools: Tool[] = [];
+  const builtinTools: any[] = [];
+  for (const t of tools) {
+    if (isAnthropicBuiltinTool(t)) {
+      builtinTools.push(t);
+      continue;
+    }
+    functionTools.push({
+      name: t.name ?? '',
+      description: t.description ?? '',
+      parameters: jsonSchemaToTypeBox(t.input_schema ?? {}),
+    });
+  }
+  return { tools: functionTools, builtinTools };
 }
 
 function mapToolChoice(raw: any): unknown | undefined {
@@ -245,8 +265,12 @@ export function anthropicRequestToContext(body: any): AnthropicToContextResult {
   }
 
   // ── Tools ─────────────────────────────────────────────────────────────────
-  const tools =
-    Array.isArray(body.tools) && body.tools.length > 0 ? parseTools(body.tools) : undefined;
+  const parsedTools =
+    Array.isArray(body.tools) && body.tools.length > 0
+      ? parseTools(body.tools)
+      : { tools: [], builtinTools: [] };
+  const tools = parsedTools.tools.length > 0 ? parsedTools.tools : undefined;
+  const builtinTools = parsedTools.builtinTools;
 
   const context: Context = {
     systemPrompt,
@@ -314,7 +338,8 @@ export function anthropicRequestToContext(body: any): AnthropicToContextResult {
     generationIntent,
     streaming: body.stream === true,
     toolChoice: mapToolChoice(body.tool_choice),
-    toolsDefined: tools?.length ?? 0,
+    toolsDefined: (tools?.length ?? 0) + builtinTools.length,
     messageCount,
+    builtinTools,
   };
 }

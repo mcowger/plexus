@@ -1068,6 +1068,144 @@ describe('runPiAiExecutor with OAuth and Claude Masking', () => {
     expect(result.response).toBeDefined();
     expect((result.response as any).content[0].text).toBe('hello oauth');
   });
+
+  it('injects builtinTools into the outgoing payload.tools via onPayload', async () => {
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue('mock-oauth-key');
+
+    let capturedPayload: any;
+    vi.mocked(piAi.complete).mockImplementation((async (
+      _model: any,
+      _context: any,
+      options: any
+    ) => {
+      capturedPayload = await options.onPayload?.({
+        model: 'claude-3-5-sonnet-20241022',
+        tools: [{ name: 'calculator', description: 'Compute', parameters: {} }],
+      });
+      return {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'hello oauth' }],
+        provider: 'anthropic',
+        model: 'claude-3-5-sonnet-20241022',
+        usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+        stopReason: 'stop',
+        timestamp: Date.now(),
+      } as any;
+    }) as any);
+
+    const usageStorage = createUsageStorage();
+    await runPiAiExecutor({
+      requestId: 'req-builtin-tools',
+      incomingApiType: 'messages',
+      modelAlias: 'claude-3-5-sonnet-20241022',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'opencode',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      builtinTools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    expect(capturedPayload.tools).toEqual([
+      { name: 'calculator', description: 'Compute', parameters: {} },
+      { type: 'web_search_20250305', name: 'web_search' },
+    ]);
+  });
+
+  // Regression for trace 6689d862-69e6-40e7-a4b3-cb949fa3ecaf /
+  // eb4b54e5-853c-4ae9-8416-cfef6a33dde7: anthropic-to-context.ts normalizes
+  // inbound Anthropic `tool_choice: { type: "tool", name }` to OpenAI's
+  // `{ type: "function", function: { name } }` shape (the shape pi-ai's own
+  // OpenAI provider expects verbatim). But pi-ai's Anthropic provider does
+  // NOT convert it back — it forwards non-string toolChoice objects as-is —
+  // so the OpenAI-shaped object reached Anthropic's API and was rejected
+  // with a 400 invalid_request_error ("tool_choice: Input tag 'function' ...
+  // does not match any of the expected tags: 'auto', 'any', 'tool', 'none'").
+  it('converts OpenAI-shaped tool_choice back to Anthropic shape when dispatching to an Anthropic provider', async () => {
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue('mock-oauth-key');
+
+    vi.mocked(piAi.complete).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello oauth' }],
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    } as any);
+
+    const usageStorage = createUsageStorage();
+    await runPiAiExecutor({
+      requestId: 'req-tool-choice',
+      incomingApiType: 'messages',
+      modelAlias: 'claude-3-5-sonnet-20241022',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      toolChoice: { type: 'function', function: { name: 'web_search' } },
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'opencode',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    const [, , callOptions] = vi.mocked(piAi.complete).mock.calls[0]!;
+    expect((callOptions as any).toolChoice).toEqual({ type: 'tool', name: 'web_search' });
+  });
+
+  // PR review follow-up: a malformed inbound tool_choice missing
+  // function.name must not be converted into an Anthropic tool_choice with
+  // no name (JSON.stringify would silently drop the undefined key,
+  // producing `{"type":"tool"}`, which Anthropic also rejects) — forward
+  // the original, still-invalid shape unchanged instead.
+  it('forwards a malformed tool_choice unchanged instead of manufacturing a nameless Anthropic tool_choice', async () => {
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue('mock-oauth-key');
+
+    vi.mocked(piAi.complete).mockResolvedValue({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello oauth' }],
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    } as any);
+
+    const usageStorage = createUsageStorage();
+    await runPiAiExecutor({
+      requestId: 'req-tool-choice-malformed',
+      incomingApiType: 'messages',
+      modelAlias: 'claude-3-5-sonnet-20241022',
+      context: { messages: [] } as any,
+      generationIntent: { reasoning: { source: 'client' } } as any,
+      toolChoice: { type: 'function', function: {} },
+      streaming: false,
+      request: {
+        body: {},
+        keyName: 'beta-key',
+        attribution: 'opencode',
+        ip: '127.0.0.1',
+      } as any,
+      usageStorage,
+      serializeMessage: (msg) => msg as any,
+      serializeChunks: () => [],
+    });
+
+    const [, , callOptions] = vi.mocked(piAi.complete).mock.calls[0]!;
+    expect((callOptions as any).toolChoice).toEqual({ type: 'function', function: {} });
+  });
 });
 
 describe('runPiAiExecutor Claude-masking streaming tool-rename reversal (regression)', () => {
