@@ -45,14 +45,16 @@ export function getCurrentRequestId(): string | undefined {
 }
 
 /**
- * Attach the request id to the active request context. Mutates the current
- * store so downstream code (notably DebugManager, reached via the cooldown
- * path) can resolve the request id without explicit plumbing. No-op when
- * called outside a request context.
+ * Attach the request id to the active request context so downstream code
+ * (notably DebugManager, reached via the cooldown path) can resolve the
+ * request id without explicit plumbing. Replaces the store via `enterWith`
+ * rather than mutating the existing object in place, so any other holder of
+ * a reference to the prior store is unaffected. No-op when called outside a
+ * request context.
  */
 export function setCurrentRequestId(requestId: string): void {
   const store = storage.getStore();
-  if (store) store.requestId = requestId;
+  if (store) storage.enterWith({ ...store, requestId });
 }
 
 /**
