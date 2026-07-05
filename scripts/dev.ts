@@ -1,7 +1,7 @@
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
 import { createServer } from 'net';
-import { writeFileSync, unlinkSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process';
 
 // --- Dev defaults (only applied when not already set in environment) ---
@@ -20,6 +20,24 @@ function readOptionValue(args: string[], index: number, option: string) {
 let fullMode = false;
 let profileMode = false;
 let noOpen = false;
+
+function sqlitePathFromDatabaseUrl(databaseUrl: string): string | null {
+  if (!databaseUrl.startsWith('sqlite://')) return null;
+  return databaseUrl.slice('sqlite://'.length);
+}
+
+function shouldLoadFullData(): boolean {
+  if (!fullMode) return false;
+
+  if (process.env.PLEXUS_POSTGRES_DRIVER === 'pglite') {
+    return process.env.PLEXUS_PGLITE_DATA_DIR
+      ? !existsSync(process.env.PLEXUS_PGLITE_DATA_DIR)
+      : true;
+  }
+
+  const dbPath = sqlitePathFromDatabaseUrl(process.env.DATABASE_URL!);
+  return dbPath ? !existsSync(dbPath) : false;
+}
 
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
@@ -88,6 +106,8 @@ if (!process.env.DATABASE_URL) {
     process.env.DATABASE_URL = `sqlite://${join(tmpdir(), `plexus-${dirName}.db`)}`;
   }
 }
+
+const shouldLoadFullDevData = shouldLoadFullData();
 
 // Dev-only admin key.
 // Override with: ADMIN_KEY=secret bun run dev
@@ -298,6 +318,11 @@ async function waitForServer(timeout = 30000): Promise<void> {
 
 if (fullMode) {
   (async () => {
+    if (!shouldLoadFullDevData) {
+      console.log('[full] Existing dev database found. Skipping prep-dev restore.');
+      return;
+    }
+
     console.log(`\n[full] Waiting for server at http://localhost:${process.env.PORT}...`);
     try {
       await waitForServer();
