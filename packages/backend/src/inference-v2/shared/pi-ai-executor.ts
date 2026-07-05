@@ -780,7 +780,8 @@ export async function runPiAiExecutor<TResponse>(
             vfConfig.descriptor_model,
             vfConfig.default_prompt || DEFAULT_VISION_DESCRIPTION_PROMPT,
             usageStorage,
-            { sourceIp, keyName, attribution }
+            { sourceIp, keyName, attribution },
+            incomingApiType
           );
           usedVisionFallthrough = true;
           visionFallthroughModel = vfConfig.descriptor_model;

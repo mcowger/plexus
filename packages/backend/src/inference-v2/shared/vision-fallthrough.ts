@@ -227,7 +227,8 @@ async function describeImage(
   descriptorModel: string,
   prompt: string,
   usageStorage?: UsageStorageService,
-  parentMeta?: VisionFallthroughParentMeta
+  parentMeta?: VisionFallthroughParentMeta,
+  incomingApiType?: string
 ): Promise<string> {
   const key = cacheKeyFor(image, descriptorModel);
   const cached = cacheGet(key);
@@ -270,6 +271,11 @@ async function describeImage(
           : getProviderTypes(c.config);
 
       let targetType = availableTypes[0] || 'chat';
+      if (incomingApiType) {
+        const incoming = incomingApiType.toLowerCase();
+        const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
+        if (match) targetType = match;
+      }
 
       switch (targetType.toLowerCase()) {
         case 'messages':
@@ -354,6 +360,11 @@ async function describeImage(
             : getProviderTypes(route.config);
 
         let targetType = availableTypes[0] || 'chat';
+        if (incomingApiType) {
+          const incoming = incomingApiType.toLowerCase();
+          const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
+          if (match) targetType = match;
+        }
 
         switch (targetType.toLowerCase()) {
           case 'messages':
@@ -467,7 +478,8 @@ export async function applyVisionFallthrough(
   descriptorModel: string,
   prompt: string,
   usageStorage?: UsageStorageService,
-  parentMeta?: VisionFallthroughParentMeta
+  parentMeta?: VisionFallthroughParentMeta,
+  incomingApiType?: string
 ): Promise<Context> {
   const images = collectImages(context.messages);
   if (images.length === 0) return context;
@@ -477,7 +489,9 @@ export async function applyVisionFallthrough(
   );
 
   const descriptions = await Promise.all(
-    images.map((image) => describeImage(image, descriptorModel, prompt, usageStorage, parentMeta))
+    images.map((image) =>
+      describeImage(image, descriptorModel, prompt, usageStorage, parentMeta, incomingApiType)
+    )
   );
 
   const messages = injectDescriptions(context.messages, descriptions);

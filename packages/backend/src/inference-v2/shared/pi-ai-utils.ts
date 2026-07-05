@@ -795,14 +795,29 @@ export function resolveModelCost(
           cost.cacheRead *= multiplier;
           cost.cacheWrite *= multiplier;
         }
+      } else if (effectiveDiscount) {
+        // Fall back to discounting the base cost if openrouter pricing hasn't loaded yet
+        const multiplier = 1 - effectiveDiscount;
+        cost.input = (cost.input ?? 0) * multiplier;
+        cost.output = (cost.output ?? 0) * multiplier;
+        cost.cacheRead = (cost.cacheRead ?? 0) * multiplier;
+        cost.cacheWrite = (cost.cacheWrite ?? 0) * multiplier;
       }
+    } else if (effectiveDiscount) {
+      // For any other pricing source that didn't get explicit cost mapping here,
+      // still apply the discount to the base cost as a fallback
+      const multiplier = 1 - effectiveDiscount;
+      cost.input = (cost.input ?? 0) * multiplier;
+      cost.output = (cost.output ?? 0) * multiplier;
+      cost.cacheRead = (cost.cacheRead ?? 0) * multiplier;
+      cost.cacheWrite = (cost.cacheWrite ?? 0) * multiplier;
     }
   } else if (routeConfig.discount) {
     const multiplier = 1 - routeConfig.discount;
-    cost.input *= multiplier;
-    cost.output *= multiplier;
-    cost.cacheRead *= multiplier;
-    cost.cacheWrite *= multiplier;
+    cost.input = (cost.input ?? 0) * multiplier;
+    cost.output = (cost.output ?? 0) * multiplier;
+    cost.cacheRead = (cost.cacheRead ?? 0) * multiplier;
+    cost.cacheWrite = (cost.cacheWrite ?? 0) * multiplier;
   }
 
   return cost;
