@@ -25,6 +25,7 @@
     "@plexus/shared": "workspace:*",
     "@types/human-format": "^1.0.3",
     "clsx": "^2.1.1",
+    "deep-chat-react": "^2.4.2",
     "fuse.js": "^7.4.2",
     "human-format": "^1.2.1",
     "lucide-react": "^1.23.0",

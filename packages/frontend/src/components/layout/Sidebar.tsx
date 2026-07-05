@@ -17,6 +17,7 @@ import {
   PlugZap,
   UserCircle2,
   Library,
+  FlaskConical,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, fetchQuotaCheckers } from '../../lib/api';
@@ -348,6 +349,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
         </div>
         {isAdmin && (
           <NavItem to="/system-logs" icon={Terminal} label="System Logs" collapsed={collapsed} />
+        )}
+        {isAdmin && (
+          <NavItem to="/playground" icon={FlaskConical} label="Playground" collapsed={collapsed} />
         )}
       </nav>
 
