@@ -18,6 +18,7 @@ import crypto from 'node:crypto';
 import { calculateCost } from '@earendil-works/pi-ai';
 import type { Context, ImageContent, Message, TextContent } from '@earendil-works/pi-ai';
 import { Router } from '../../services/router';
+import { getProviderTypes } from '../../config';
 import { CooldownManager } from '../../services/cooldown-manager';
 import { ConcurrencyTracker } from '../../services/concurrency-tracker';
 import type { UsageStorageService } from '../../services/usage-storage';
@@ -259,8 +260,38 @@ async function describeImage(
   }
 
   const betaCandidates = candidates.filter((c) => {
-    const piAiProvider = (c.config as any).pi_ai_provider as string | undefined;
-    const piAiModelId = (c.modelConfig as any)?.pi_ai_model_id as string | undefined;
+    let piAiProvider = (c.config as any).pi_ai_provider as string | undefined;
+    let piAiModelId = (c.modelConfig as any)?.pi_ai_model_id as string | undefined;
+
+    if (!piAiProvider) {
+      const availableTypes =
+        c.modelConfig?.access_via && c.modelConfig.access_via.length > 0
+          ? c.modelConfig.access_via
+          : getProviderTypes(c.config);
+
+      let targetType = availableTypes[0] || 'chat';
+
+      switch (targetType.toLowerCase()) {
+        case 'messages':
+          piAiProvider = 'fallback-anthropic';
+          break;
+        case 'gemini':
+          piAiProvider = 'fallback-gemini';
+          break;
+        case 'responses':
+          piAiProvider = 'fallback-responses';
+          break;
+        case 'chat':
+        default:
+          piAiProvider = 'fallback-chat';
+          break;
+      }
+
+      if (!piAiModelId) {
+        piAiModelId = c.model;
+      }
+    }
+
     if (!piAiProvider || !piAiModelId) return false;
     return resolvePiAiModel(piAiProvider, piAiModelId) != null;
   });
@@ -313,9 +344,45 @@ async function describeImage(
 
     const startTime = Date.now();
     try {
-      const piAiProvider = (route.config as any).pi_ai_provider as string;
-      const piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string;
-      const piModel = buildPiAiModel(route.config, piAiProvider, piAiModelId, 'chat');
+      let piAiProvider = (route.config as any).pi_ai_provider as string;
+      let piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string;
+
+      if (!piAiProvider) {
+        const availableTypes =
+          route.modelConfig?.access_via && route.modelConfig.access_via.length > 0
+            ? route.modelConfig.access_via
+            : getProviderTypes(route.config);
+
+        let targetType = availableTypes[0] || 'chat';
+
+        switch (targetType.toLowerCase()) {
+          case 'messages':
+            piAiProvider = 'fallback-anthropic';
+            break;
+          case 'gemini':
+            piAiProvider = 'fallback-gemini';
+            break;
+          case 'responses':
+            piAiProvider = 'fallback-responses';
+            break;
+          case 'chat':
+          default:
+            piAiProvider = 'fallback-chat';
+            break;
+        }
+
+        if (!piAiModelId) {
+          piAiModelId = route.model;
+        }
+      }
+
+      const piModel = buildPiAiModel(
+        route.config,
+        piAiProvider,
+        piAiModelId,
+        'chat',
+        route.modelConfig
+      );
       if (!piModel) {
         doRelease();
         continue;

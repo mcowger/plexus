@@ -639,6 +639,7 @@ function ProviderRow({
 
   // Child models: those scoped to this provider (def.provider === name).
   const childModels = Object.entries(models).filter(([, m]) => m.provider === name);
+  const isSystemDefault = name.startsWith('fallback-');
 
   return (
     <div className="border border-border-glass rounded-md">
@@ -649,6 +650,11 @@ function ProviderRow({
         <div className="flex items-center gap-2">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <span className="font-mono text-[13px] text-text">{name}</span>
+          {isSystemDefault && (
+            <Badge status="info" style={{ fontSize: '10px', padding: '2px 8px' }}>
+              System Default
+            </Badge>
+          )}
           <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
             {apiVal}
           </Badge>
@@ -656,22 +662,24 @@ function ProviderRow({
             {childModels.length} model{childModels.length === 1 ? '' : 's'}
           </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={async (e) => {
-            e.stopPropagation();
-            try {
-              await api.deletePiCustomProvider(name);
-              toast.success(`Deleted '${name}'`);
-              onChanged();
-            } catch (e: any) {
-              toast.error(e?.message ?? 'Failed to delete');
-            }
-          }}
-        >
-          <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
-        </Button>
+        {!isSystemDefault && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                await api.deletePiCustomProvider(name);
+                toast.success(`Deleted '${name}'`);
+                onChanged();
+              } catch (e: any) {
+                toast.error(e?.message ?? 'Failed to delete');
+              }
+            }}
+          >
+            <Trash2 size={14} style={{ color: 'var(--color-danger)' }} />
+          </Button>
+        )}
       </div>
       {open && (
         <div className="p-3 pt-0">

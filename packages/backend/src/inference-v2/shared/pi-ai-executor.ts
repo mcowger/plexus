@@ -46,8 +46,9 @@ import {
   buildQuotaHeaders,
   buildQuotaExceededError,
 } from '../../services/quota/quota-middleware';
+import { calculateCosts } from '../../utils/calculate-costs';
 import { logger } from '../../utils/logger';
-import { getConfig } from '../../config';
+import { getConfig, getProviderTypes } from '../../config';
 import { applyKeyAccessPolicy, type PolicyRequest } from '../../services/key-access-policy';
 import {
   buildPiAiModel,
@@ -653,8 +654,43 @@ export async function runPiAiExecutor<TResponse>(
       return resolvePiAiModel(piAiProvider, piAiModelId) != null;
     }
 
-    const piAiProvider = (c.config as any).pi_ai_provider as string | undefined;
-    const piAiModelId = (c.modelConfig as any)?.pi_ai_model_id as string | undefined;
+    let piAiProvider = (c.config as any).pi_ai_provider as string | undefined;
+    let piAiModelId = (c.modelConfig as any)?.pi_ai_model_id as string | undefined;
+
+    if (!piAiProvider) {
+      const availableTypes =
+        c.modelConfig?.access_via && c.modelConfig.access_via.length > 0
+          ? c.modelConfig.access_via
+          : getProviderTypes(c.config);
+
+      let targetType = availableTypes[0] || 'chat';
+      if (incomingApiType) {
+        const incoming = incomingApiType.toLowerCase();
+        const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
+        if (match) targetType = match;
+      }
+
+      switch (targetType.toLowerCase()) {
+        case 'messages':
+          piAiProvider = 'fallback-anthropic';
+          break;
+        case 'gemini':
+          piAiProvider = 'fallback-gemini';
+          break;
+        case 'responses':
+          piAiProvider = 'fallback-responses';
+          break;
+        case 'chat':
+        default:
+          piAiProvider = 'fallback-chat';
+          break;
+      }
+
+      if (!piAiModelId) {
+        piAiModelId = c.model;
+      }
+    }
+
     if (!piAiProvider || !piAiModelId) return false;
     return resolvePiAiModel(piAiProvider, piAiModelId) != null;
   });
@@ -813,6 +849,40 @@ export async function runPiAiExecutor<TResponse>(
     } else {
       piAiProvider = (route.config as any).pi_ai_provider as string | undefined;
       piAiModelId = (route.modelConfig as any)?.pi_ai_model_id as string | undefined;
+
+      if (!piAiProvider) {
+        const availableTypes =
+          route.modelConfig?.access_via && route.modelConfig.access_via.length > 0
+            ? route.modelConfig.access_via
+            : getProviderTypes(route.config);
+
+        let targetType = availableTypes[0] || 'chat';
+        if (incomingApiType) {
+          const incoming = incomingApiType.toLowerCase();
+          const match = availableTypes.find((t: string) => t.toLowerCase() === incoming);
+          if (match) targetType = match;
+        }
+
+        switch (targetType.toLowerCase()) {
+          case 'messages':
+            piAiProvider = 'fallback-anthropic';
+            break;
+          case 'gemini':
+            piAiProvider = 'fallback-gemini';
+            break;
+          case 'responses':
+            piAiProvider = 'fallback-responses';
+            break;
+          case 'chat':
+          default:
+            piAiProvider = 'fallback-chat';
+            break;
+        }
+
+        if (!piAiModelId) {
+          piAiModelId = route.model;
+        }
+      }
     }
 
     logger.debug('[pi-ai-executor] RESOLVED_CANDIDATE_ROUTE:', {
@@ -840,7 +910,13 @@ export async function runPiAiExecutor<TResponse>(
         ? { ...route.config, api_base_url: '' }
         : route.config;
 
-    const piModel = buildPiAiModel(configForBuild, piAiProvider, piAiModelId, incomingApiType);
+    const piModel = buildPiAiModel(
+      configForBuild,
+      piAiProvider,
+      piAiModelId,
+      incomingApiType,
+      route.modelConfig
+    );
     if (!piModel) {
       // Should not happen (beta filter resolves the same way) but fail closed.
       concurrency.release(route.provider, route.model);
@@ -1083,7 +1159,7 @@ export async function runPiAiExecutor<TResponse>(
         // ── Build usage record ─────────────────────────────────────────
         const ttftMs = consumeTtfb(requestId);
         const usageData = buildUsageFromMessage(message, piModel as any, startTime, ttftMs, route);
-        const usageRecord = {
+        const usageRecord: any = {
           requestId,
           date: new Date().toISOString(),
           sourceIp,
@@ -1113,6 +1189,18 @@ export async function runPiAiExecutor<TResponse>(
           visionFallthroughModel,
           ...usageData,
         };
+
+        if (route.modelConfig?.pricing) {
+          calculateCosts(usageRecord, route.modelConfig.pricing, route.config.discount);
+        } else if (route.config.discount) {
+          const discountMultiplier = 1 - route.config.discount;
+          usageRecord.costInput = (usageRecord.costInput ?? 0) * discountMultiplier;
+          usageRecord.costOutput = (usageRecord.costOutput ?? 0) * discountMultiplier;
+          usageRecord.costCached = (usageRecord.costCached ?? 0) * discountMultiplier;
+          usageRecord.costCacheWrite = (usageRecord.costCacheWrite ?? 0) * discountMultiplier;
+          usageRecord.costTotal = (usageRecord.costTotal ?? 0) * discountMultiplier;
+          usageRecord.costMetadata = JSON.stringify({ discount: route.config.discount });
+        }
 
         const serialized = serializeMessage(message);
         let finalResponse = serialized;
@@ -1428,7 +1516,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
         doRelease();
 
         const usageData = buildUsageFromMessage(msg, piModel, startTime, ttftMs, route);
-        const usageRecord = {
+        const usageRecord: any = {
           requestId,
           date: new Date().toISOString(),
           sourceIp,
@@ -1459,6 +1547,18 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
           ...usageData,
         };
 
+        if (route.modelConfig?.pricing) {
+          calculateCosts(usageRecord, route.modelConfig.pricing, route.config.discount);
+        } else if (route.config.discount) {
+          const discountMultiplier = 1 - route.config.discount;
+          usageRecord.costInput = (usageRecord.costInput ?? 0) * discountMultiplier;
+          usageRecord.costOutput = (usageRecord.costOutput ?? 0) * discountMultiplier;
+          usageRecord.costCached = (usageRecord.costCached ?? 0) * discountMultiplier;
+          usageRecord.costCacheWrite = (usageRecord.costCacheWrite ?? 0) * discountMultiplier;
+          usageRecord.costTotal = (usageRecord.costTotal ?? 0) * discountMultiplier;
+          usageRecord.costMetadata = JSON.stringify({ discount: route.config.discount });
+        }
+
         if (transformedStreamSnapshot) {
           debug.addTransformedResponse(requestId, transformedStreamSnapshot);
           debug.addTransformedResponseSnapshot(requestId, transformedStreamSnapshot);
@@ -1485,7 +1585,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
 
       if (event.type === 'error') {
         const errorMessage = extractPiAiErrorMessage(event.error) ?? 'Upstream error';
-        const usageRecord = {
+        const usageRecord: any = {
           requestId,
           date: new Date().toISOString(),
           sourceIp,
@@ -1528,6 +1628,18 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
           visionFallthroughModel,
         };
 
+        if (route.modelConfig?.pricing) {
+          calculateCosts(usageRecord, route.modelConfig.pricing, route.config.discount);
+        } else if (route.config.discount) {
+          const discountMultiplier = 1 - route.config.discount;
+          usageRecord.costInput = (usageRecord.costInput ?? 0) * discountMultiplier;
+          usageRecord.costOutput = (usageRecord.costOutput ?? 0) * discountMultiplier;
+          usageRecord.costCached = (usageRecord.costCached ?? 0) * discountMultiplier;
+          usageRecord.costCacheWrite = (usageRecord.costCacheWrite ?? 0) * discountMultiplier;
+          usageRecord.costTotal = (usageRecord.costTotal ?? 0) * discountMultiplier;
+          usageRecord.costMetadata = JSON.stringify({ discount: route.config.discount });
+        }
+
         if (transformedStreamSnapshot) {
           debug.addTransformedResponse(requestId, transformedStreamSnapshot);
           debug.addTransformedResponseSnapshot(requestId, transformedStreamSnapshot);
@@ -1552,7 +1664,7 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
     doRelease();
 
     // Save error usage record
-    const usageRecord = {
+    const usageRecord: any = {
       requestId,
       date: new Date().toISOString(),
       sourceIp,
@@ -1598,6 +1710,18 @@ async function* buildSSEGenerator(p: SSEGeneratorParams): AsyncGenerator<string>
       isVisionFallthrough,
       visionFallthroughModel,
     };
+
+    if (route.modelConfig?.pricing) {
+      calculateCosts(usageRecord, route.modelConfig.pricing, route.config.discount);
+    } else if (route.config.discount) {
+      const discountMultiplier = 1 - route.config.discount;
+      usageRecord.costInput = (usageRecord.costInput ?? 0) * discountMultiplier;
+      usageRecord.costOutput = (usageRecord.costOutput ?? 0) * discountMultiplier;
+      usageRecord.costCached = (usageRecord.costCached ?? 0) * discountMultiplier;
+      usageRecord.costCacheWrite = (usageRecord.costCacheWrite ?? 0) * discountMultiplier;
+      usageRecord.costTotal = (usageRecord.costTotal ?? 0) * discountMultiplier;
+      usageRecord.costMetadata = JSON.stringify({ discount: route.config.discount });
+    }
 
     usageStorage.saveRequest(usageRecord as any).catch(() => {});
     usageStorage.saveError(requestId, err, { apiType: incomingApiType }).catch(() => {});

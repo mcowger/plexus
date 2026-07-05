@@ -62,6 +62,14 @@ export async function registerPiAiCustomRoutes(fastify: FastifyInstance) {
     '/v0/management/pi/custom-providers/:name',
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { name } = request.params as { name: string };
+      if (name.startsWith('fallback-')) {
+        return reply.code(403).send({
+          error: {
+            message: 'System fallback providers cannot be deleted',
+            type: 'forbidden_error',
+          },
+        });
+      }
       try {
         const all = await configService.getRepository().getAllPiAiCustomProviders();
         if (!all[name]) {

@@ -71,6 +71,7 @@ import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
 import { isEncryptionEnabled } from './utils/encryption';
 import { mcpProcessManager } from './services/mcp-local/mcp-process-manager';
+import { seedFallbackProviders } from './db/seed-fallback-providers';
 
 /**
  * Plexus Backend Server
@@ -152,6 +153,7 @@ try {
   initializeDatabase();
   await runMigrations();
   await runEncryptionMigration();
+  await seedFallbackProviders();
 } catch (e) {
   logger.error('Failed to initialize database or run migrations', e);
   process.exit(1);

@@ -15,6 +15,7 @@ import {
 } from '@earendil-works/pi-ai';
 import { getBuiltinModel, builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type { Model as PiAiModel, ModelThinkingLevel } from '@earendil-works/pi-ai';
+import { PricingManager } from '../../services/pricing-manager';
 
 export const piAiModels = builtinModels();
 
@@ -668,16 +669,19 @@ export function resolvePiAiModel(piAiProvider: string, piAiModelId: string): PiA
   //    when its `provider` field equals the referencing pi-ai provider.
   //    First, look up via the compound key `${piAiProvider}:${piAiModelId}`,
   //    then fall back to the plain key `piAiModelId` for backwards compatibility.
-  const compoundKey = piAiModelId.includes(':') ? piAiModelId : `${piAiProvider}:${piAiModelId}`;
-  const modelSpec = customModels?.[compoundKey] ?? customModels?.[piAiModelId];
+  //    We bypass custom models for system fallback providers so they always fall through to the skeleton.
+  if (!piAiProvider.startsWith('fallback-')) {
+    const compoundKey = piAiModelId.includes(':') ? piAiModelId : `${piAiProvider}:${piAiModelId}`;
+    const modelSpec = customModels?.[compoundKey] ?? customModels?.[piAiModelId];
 
-  if (modelSpec && modelSpec.provider === piAiProvider) {
-    const resolved = resolveCustomModel(modelSpec, piAiProvider, piAiModelId);
-    if (resolved) {
-      // A custom provider may still override the wire api/compat.
-      return applyCustomProvider(resolved, customProviders?.[piAiProvider]);
+    if (modelSpec && modelSpec.provider === piAiProvider) {
+      const resolved = resolveCustomModel(modelSpec, piAiProvider, piAiModelId);
+      if (resolved) {
+        // A custom provider may still override the wire api/compat.
+        return applyCustomProvider(resolved, customProviders?.[piAiProvider]);
+      }
+      return null;
     }
-    return null;
   }
 
   // 2. Custom provider with a registry/base model.
@@ -746,16 +750,78 @@ function applyCustomProvider(
 // resolved (caller fails the candidate). Base URL resolution keys off the
 // *upstream* pi-ai API (piModel.api), not the client-facing route type.
 
+export function resolveModelCost(
+  baseCost: PiAiModel<any>['cost'],
+  routeConfig: RouteResult['config'],
+  modelConfig?: RouteResult['modelConfig']
+): PiAiModel<any>['cost'] {
+  let cost = { ...baseCost };
+
+  if (modelConfig?.pricing) {
+    const pricing = modelConfig.pricing;
+    const pricingDiscount = 'discount' in pricing ? (pricing as any).discount : undefined;
+    const effectiveDiscount = pricingDiscount ?? routeConfig.discount;
+
+    if (pricing.source === 'simple') {
+      cost = {
+        input: pricing.input || 0,
+        output: pricing.output || 0,
+        cacheRead: pricing.cached || 0,
+        cacheWrite: pricing.cache_write || 0,
+      };
+
+      if (effectiveDiscount) {
+        const multiplier = 1 - effectiveDiscount;
+        cost.input *= multiplier;
+        cost.output *= multiplier;
+        cost.cacheRead *= multiplier;
+        cost.cacheWrite *= multiplier;
+      }
+    } else if (pricing.source === 'openrouter' && pricing.slug) {
+      const openRouterPricing = PricingManager.getInstance().getPricing(pricing.slug);
+      if (openRouterPricing) {
+        cost = {
+          // OpenRouter pricing is per-token floats, pi-ai expects per-million
+          input: (parseFloat(openRouterPricing.prompt) || 0) * 1_000_000,
+          output: (parseFloat(openRouterPricing.completion) || 0) * 1_000_000,
+          cacheRead: (parseFloat(openRouterPricing.input_cache_read || '0') || 0) * 1_000_000,
+          cacheWrite: (parseFloat(openRouterPricing.input_cache_write || '0') || 0) * 1_000_000,
+        };
+
+        if (effectiveDiscount) {
+          const multiplier = 1 - effectiveDiscount;
+          cost.input *= multiplier;
+          cost.output *= multiplier;
+          cost.cacheRead *= multiplier;
+          cost.cacheWrite *= multiplier;
+        }
+      }
+    }
+  } else if (routeConfig.discount) {
+    const multiplier = 1 - routeConfig.discount;
+    cost.input *= multiplier;
+    cost.output *= multiplier;
+    cost.cacheRead *= multiplier;
+    cost.cacheWrite *= multiplier;
+  }
+
+  return cost;
+}
+
 export function buildPiAiModel(
-  providerConfig: Pick<ProviderConfig, 'api_base_url'>,
+  routeConfig: RouteResult['config'],
   piAiProvider: string,
   piAiModelId: string,
-  incomingApiType?: string
+  incomingApiType?: string,
+  modelConfig?: RouteResult['modelConfig']
 ): PiAiModel<any> | null {
   const piModel = resolvePiAiModel(piAiProvider, piAiModelId);
   if (!piModel) return null;
-  const baseUrl = resolveBaseUrl(providerConfig.api_base_url, piModel.api, incomingApiType);
-  return { ...piModel, baseUrl };
+
+  const baseUrl = resolveBaseUrl(routeConfig.api_base_url, piModel.api, incomingApiType);
+  const cost = resolveModelCost(piModel.cost, routeConfig, modelConfig);
+
+  return { ...piModel, baseUrl, cost };
 }
 
 // ─── Energy helpers ───────────────────────────────────────────────────────────
