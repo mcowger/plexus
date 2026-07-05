@@ -32,6 +32,7 @@ import type { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { checkQuotaMiddleware } from '../services/quota/quota-middleware';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../utils/timeout';
 import { getClientIp } from '../utils/ip';
+import { attachKeyAccessPolicy } from '../utils/auth';
 import { sanitizeHeaders } from '../utils/sanitize-headers';
 import { logger } from '../utils/logger';
 import { openaiRequestToContext } from './openai/openai-to-context';
@@ -179,6 +180,7 @@ export async function handleBetaChatCompletions(
 
   const debug = DebugManager.getInstance();
   const body = request.body as any;
+  body.metadata = attachKeyAccessPolicy(request, { metadata: body.metadata }).metadata;
 
   debug.startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
@@ -335,6 +337,7 @@ export async function handleBetaMessages(
 
   const debug = DebugManager.getInstance();
   const body = request.body as any;
+  body.metadata = attachKeyAccessPolicy(request, { metadata: body.metadata }).metadata;
 
   debug.startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
@@ -492,6 +495,7 @@ export async function handleBetaResponses(
 
   const debug = DebugManager.getInstance();
   const body = request.body as any;
+  body.metadata = attachKeyAccessPolicy(request, { metadata: body.metadata }).metadata;
   const modelAlias: string = body.model ?? '';
 
   debug.startLog(requestId, body, sanitizeHeaders(request.headers as any));
@@ -694,6 +698,7 @@ export async function handleBetaGeminiRequest(
 
   const debug = DebugManager.getInstance();
   const body = request.body as any;
+  body.metadata = attachKeyAccessPolicy(request, { metadata: body.metadata }).metadata;
   // Model alias comes from the URL param — inject into body for the parser
   const params = request.params as any;
   const modelAlias: string =

@@ -62,6 +62,11 @@ async function createApp(): Promise<{
     keys: {
       stable: { secret: 'sk-stable' },
       beta: { secret: 'sk-beta', beta: true },
+      'beta-restricted': {
+        secret: 'sk-beta-restricted',
+        beta: true,
+        allowedProviders: ['kilocode'],
+      },
     },
     failover: {
       enabled: false,
@@ -175,6 +180,46 @@ describe('beta key stable route routing', () => {
     expect(vi.mocked(runPiAiExecutor).mock.calls[0]![0]).toMatchObject({
       incomingApiType: 'gemini',
       modelAlias: 'test-model',
+    });
+    await fastify.close();
+  });
+
+  it.each([
+    {
+      name: 'chat completions',
+      url: '/v1/chat/completions',
+      payload: { model: 'test-model', messages: [{ role: 'user', content: 'hi' }] },
+    },
+    {
+      name: 'messages',
+      url: '/v1/messages',
+      payload: { model: 'test-model', max_tokens: 16, messages: [{ role: 'user', content: 'hi' }] },
+    },
+    {
+      name: 'responses',
+      url: '/v1/responses',
+      payload: { model: 'test-model', input: 'hi' },
+    },
+    {
+      name: 'gemini generateContent',
+      url: '/v1beta/models/test-model:generateContent',
+      payload: { contents: [{ role: 'user', parts: [{ text: 'hi' }] }] },
+    },
+  ])('attaches the key access policy for restricted beta keys on $name', async (testCase) => {
+    const { fastify } = await createApp();
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: testCase.url,
+      headers: { authorization: 'Bearer sk-beta-restricted', 'content-type': 'application/json' },
+      payload: testCase.payload,
+    });
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect(runPiAiExecutor).toHaveBeenCalledTimes(1);
+    const executorInput = vi.mocked(runPiAiExecutor).mock.calls[0]![0] as any;
+    expect(executorInput.request.body.metadata?.plexus_metadata?.plexus_key_policy).toEqual({
+      allowedProviders: ['kilocode'],
     });
     await fastify.close();
   });
