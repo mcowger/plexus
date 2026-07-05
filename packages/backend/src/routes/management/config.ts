@@ -460,7 +460,7 @@ export async function registerConfigRoutes(
         });
       }
       const defined = await configService.getRepository().getAllUserQuotas();
-      const unknown = dq.filter((name) => !(name in defined));
+      const unknown = dq.filter((name) => !Object.hasOwn(defined, name));
       if (unknown.length > 0) {
         return reply.code(400).send({
           error: {

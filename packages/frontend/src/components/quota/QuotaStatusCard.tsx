@@ -4,7 +4,7 @@ import type { QuotaStatusEntry } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { QuotaProgressBar } from './QuotaProgressBar';
 import { QuotaChip, hasScope } from './QuotaChip';
-import { statusForPercent, formatQuotaValue } from '../../lib/quota';
+import { statusForPercent, formatQuotaValue, quotaUsagePercent } from '../../lib/quota';
 import { formatResetsIn } from '../../lib/format';
 
 export interface QuotaStatusCardProps {
@@ -46,7 +46,7 @@ export const QuotaStatusCard: React.FC<QuotaStatusCardProps> = ({
   recomputing = false,
 }) => {
   const detailed = variant === 'detailed';
-  const pct = entry.limit > 0 ? Math.min(100, (entry.currentUsage / entry.limit) * 100) : 0;
+  const pct = quotaUsagePercent(entry);
   const resetsLabel =
     resetsAtFormat === 'relative'
       ? formatResetsIn(entry.resetsAt)

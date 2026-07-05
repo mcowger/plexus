@@ -59,7 +59,7 @@ export function formatResetsIn(iso: string | null): string {
   if (days > 7) return `on ${new Date(iso).toLocaleDateString()}`;
   if (days > 0) return `in ${days}d ${hours}h`;
   if (hours > 0) return `in ${hours}h ${minutes}m`;
-  return `in ${minutes}m`;
+  return minutes > 0 ? `in ${minutes}m` : 'in <1m';
 }
 
 /**

@@ -26,3 +26,16 @@ export function formatQuotaValue(value: number, limitType: QuotaStatusEntry['lim
 /** Most-constrained ranking now lives in @plexus/shared so the backend's
  * selectors and every frontend view use the exact same ratio logic. */
 export { mostConstrained, sortMostConstrainedFirst } from '@plexus/shared';
+
+/**
+ * Usage percentage for a quota entry, shared by QuotaStatusCard and the Keys
+ * list rows so the zero-limit behavior can't drift. A `limit <= 0` entry has
+ * no headroom at all, so when blocked it renders as fully used (100%) rather
+ * than an ok-looking empty bar.
+ */
+export function quotaUsagePercent(
+  entry: Pick<QuotaStatusEntry, 'limit' | 'currentUsage' | 'allowed'>
+): number {
+  if (entry.limit > 0) return Math.min(100, (entry.currentUsage / entry.limit) * 100);
+  return entry.allowed ? 0 : 100;
+}

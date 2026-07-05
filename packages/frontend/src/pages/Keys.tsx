@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, KeyConfig, UserQuota, QuotaStatusEntry, Provider } from '../lib/api';
+import { api, KeyConfig, UserQuota, Provider } from '../lib/api';
 import { Input } from '../components/ui/Input';
 import { TagSelect } from '../components/ui/TagSelect';
 import { Card } from '../components/ui/Card';
@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Tabs } from '../components/ui/Tabs';
 import { Switch } from '../components/ui/Switch';
-import { QuotaStatusCard, QuotaChip } from '../components/quota';
+import { QuotaStatusCard, QuotaChip, hasScope } from '../components/quota';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
@@ -26,7 +26,12 @@ import {
 } from 'lucide-react';
 import { formatNumber, formatCost } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
-import { formatQuotaValue, sortMostConstrainedFirst, mostConstrained } from '../lib/quota';
+import {
+  formatQuotaValue,
+  sortMostConstrainedFirst,
+  mostConstrained,
+  quotaUsagePercent,
+} from '../lib/quota';
 
 const EMPTY_KEY: KeyConfig = {
   key: '',
@@ -59,21 +64,6 @@ type QuotaStatusResponse = NonNullable<Awaited<ReturnType<typeof api.getQuotaSta
 function isLeakyRollingDef(def: UserQuota | undefined): boolean {
   if (!def) return false;
   return def.type === 'rolling' && (def.limitType === 'requests' || def.limitType === 'tokens');
-}
-
-function entryUsagePercent(entry: QuotaStatusEntry): number {
-  if (!entry.limit || entry.limit === 0) return 0;
-  return Math.min(100, (entry.currentUsage / entry.limit) * 100);
-}
-
-function defHasScope(def: UserQuota | undefined): boolean {
-  if (!def) return false;
-  return Boolean(
-    def.allowedProviders?.length ||
-      def.excludedProviders?.length ||
-      def.allowedModels?.length ||
-      def.excludedModels?.length
-  );
 }
 
 export const Keys = () => {
@@ -491,7 +481,7 @@ export const Keys = () => {
                 filteredKeys.map((key) => {
                   const status = quotaStatuses[key.key];
                   const primary = status ? mostConstrained(status.quotas) : null;
-                  const usagePercent = primary ? entryUsagePercent(primary) : 0;
+                  const usagePercent = primary ? quotaUsagePercent(primary) : 0;
                   const quotaNames = key.quotas && key.quotas.length > 0 ? key.quotas : null;
                   const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
 
@@ -669,7 +659,7 @@ export const Keys = () => {
                   {filteredKeys.map((key) => {
                     const status = quotaStatuses[key.key];
                     const primary = status ? mostConstrained(status.quotas) : null;
-                    const usagePercent = primary ? entryUsagePercent(primary) : 0;
+                    const usagePercent = primary ? quotaUsagePercent(primary) : 0;
                     const quotaNames = key.quotas && key.quotas.length > 0 ? key.quotas : null;
                     const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
 
@@ -859,7 +849,7 @@ export const Keys = () => {
                                   <Users size={10} /> shared
                                 </QuotaChip>
                               )}
-                              {defHasScope(quota) && <QuotaChip tone="muted">scoped</QuotaChip>}
+                              {hasScope(quota) && <QuotaChip tone="muted">scoped</QuotaChip>}
                             </div>
                             <div className="mt-1 text-xs text-text-muted">
                               {quota.type}
@@ -958,7 +948,7 @@ export const Keys = () => {
                                   <Users size={10} /> shared
                                 </QuotaChip>
                               )}
-                              {defHasScope(quota) && <QuotaChip tone="muted">scoped</QuotaChip>}
+                              {hasScope(quota) && <QuotaChip tone="muted">scoped</QuotaChip>}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-left border-b border-border-glass text-text">

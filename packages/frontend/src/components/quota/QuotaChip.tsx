@@ -1,5 +1,4 @@
 import React from 'react';
-import type { QuotaStatusEntry } from '../../lib/api';
 
 /** Small pill used to label quota scope/source facts (shared, default,
  * scoped) across the Keys list rows, the quota status modal, and the shared
@@ -19,8 +18,17 @@ export const QuotaChip: React.FC<{ children: React.ReactNode; tone?: 'default' |
   </span>
 );
 
-/** Whether a quota entry's scope narrows it to specific providers/models. */
-export function hasScope(scope: QuotaStatusEntry['scope'] | undefined): boolean {
+/** The four optional scope-narrowing lists shared by quota status entries
+ * (`QuotaStatusEntry['scope']`) and quota definitions (`UserQuota`). */
+export interface QuotaScopeFields {
+  allowedProviders?: string[];
+  excludedProviders?: string[];
+  allowedModels?: string[];
+  excludedModels?: string[];
+}
+
+/** Whether a quota's scope narrows it to specific providers/models. */
+export function hasScope(scope: QuotaScopeFields | undefined): boolean {
   if (!scope) return false;
   return Boolean(
     scope.allowedProviders?.length ||
