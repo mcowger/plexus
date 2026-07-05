@@ -13,6 +13,7 @@ import { Debug } from './pages/Debug';
 import { Errors } from './pages/Errors';
 import { Quotas } from './pages/Quotas';
 import { McpPage } from './pages/Mcp';
+import { Playground } from './pages/Playground';
 import { Login } from './pages/Login';
 import { MyKey } from './pages/MyKey';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -123,6 +124,14 @@ const AppRoutes = () => {
                   element={
                     <ProtectedRoute requireAdmin>
                       <McpPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/playground"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <Playground />
                     </ProtectedRoute>
                   }
                 />
