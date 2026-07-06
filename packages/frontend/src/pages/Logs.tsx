@@ -820,6 +820,8 @@ export const Logs = () => {
                   Number(log.tokensCached || 0) +
                   Number(log.tokensCacheWrite || 0) +
                   Number(log.tokensReasoning || 0);
+                const e2eOutputTokens =
+                  Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
                 const status = log.responseStatus || (log.hasError ? 'error' : 'unknown');
                 const statusClass =
                   status === 'success'
@@ -950,11 +952,8 @@ export const Logs = () => {
                         <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
                           <div className="truncate text-text">
                             <span className="text-[9px] uppercase text-text-muted">E2E </span>
-                            {log.durationMs != null &&
-                            log.durationMs > 0 &&
-                            log.tokensOutput &&
-                            log.tokensOutput > 0
-                              ? formatTPS(log.tokensOutput / (log.durationMs / 1000))
+                            {log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0
+                              ? formatTPS(e2eOutputTokens / (log.durationMs / 1000))
                               : '-'}
                           </div>
                         </div>
@@ -1496,14 +1495,13 @@ export const Logs = () => {
                                 : null;
                           const liveDuration =
                             rawDurationMs != null ? formatMs(rawDurationMs) : '-';
-                          // End-to-end throughput: total output tokens / full request duration.
+                          const e2eOutputTokens =
+                            Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
+                          // End-to-end throughput: output plus reasoning tokens / full request duration.
                           // Unlike TPS (which excludes the TTFT delay), E2E includes it.
                           const e2e =
-                            log.durationMs != null &&
-                            log.durationMs > 0 &&
-                            log.tokensOutput &&
-                            log.tokensOutput > 0
-                              ? log.tokensOutput / (log.durationMs / 1000)
+                            log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0
+                              ? e2eOutputTokens / (log.durationMs / 1000)
                               : null;
                           if (progress) {
                             return (
