@@ -60,6 +60,12 @@ describe('Responses responses -> responses round-trip preserves native fields', 
         {
           type: 'function_call',
           name: 'exec_command',
+          call_id: 'call_short|fc_short',
+          arguments: '{}',
+        },
+        {
+          type: 'function_call',
+          name: 'exec_command',
           call_id:
             'call_enS4L7YycCRyOiWOg31Xpvwm|fc_0281edd961557cf2016a4b062d87948195968b8fa6c46b8c7a',
           arguments: '{}',
@@ -87,6 +93,7 @@ describe('Responses responses -> responses round-trip preserves native fields', 
 
     expect(normalizeCompositeResponsesCallIds(body)).toBe(2);
     expect(body.input.map((item) => item.call_id)).toEqual([
+      'call_short|fc_short',
       'call_enS4L7YycCRyOiWOg31Xpvwm',
       'call_enS4L7YycCRyOiWOg31Xpvwm',
       'call_plain',
