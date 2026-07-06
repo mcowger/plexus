@@ -454,14 +454,6 @@ paths:
     $ref: paths/v0_management_quota-checker-types.yaml
   /v0/management/quota-checkers:
     $ref: paths/v0_management_quota-checkers.yaml
-  /v0/management/quotas/backup-legacy-snapshots:
-    $ref: paths/v0_management_quotas_backup-legacy-snapshots.yaml
-  /v0/management/quotas/legacy-snapshot-status:
-    $ref: paths/v0_management_quotas_legacy-snapshot-status.yaml
-  /v0/management/quotas/migrate-legacy-snapshots:
-    $ref: paths/v0_management_quotas_migrate-legacy-snapshots.yaml
-  /v0/management/quotas/truncate-legacy-snapshots:
-    $ref: paths/v0_management_quotas_truncate-legacy-snapshots.yaml
   /v0/management/usage:
     $ref: paths/v0_management_usage.yaml
   /v0/management/usage/summary:

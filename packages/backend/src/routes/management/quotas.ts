@@ -3,13 +3,6 @@ import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
 import { getCheckerDefinitions } from '../../services/quota/checker-registry';
-import {
-  getLegacySnapshotStatus,
-  migrateLegacySnapshots,
-  truncateLegacySnapshots,
-  exportLegacySnapshots,
-  type ExportFormat,
-} from '../../services/quota/legacy-snapshot-migrator';
 
 function getOAuthMetadata(checkerId: string) {
   const quotaConfig = getConfig().quotas?.find((q) => q.id === checkerId);
@@ -152,55 +145,6 @@ export async function registerQuotaRoutes(
         `Failed to get quota history for '${(request.params as any).checkerId}': ${error}`
       );
       return reply.status(500).send({ error: 'Failed to retrieve quota history' });
-    }
-  });
-
-  fastify.get('/v0/management/quotas/backup-legacy-snapshots', async (request, reply) => {
-    try {
-      const { format = 'csv' } = request.query as { format?: string };
-      const fmt: ExportFormat = format === 'sql' ? 'sql' : 'csv';
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `quota_snapshots_backup_${timestamp}.${fmt}`;
-      const body = await exportLegacySnapshots(fmt);
-      reply
-        .header(
-          'Content-Type',
-          fmt === 'sql' ? 'text/plain; charset=utf-8' : 'text/csv; charset=utf-8'
-        )
-        .header('Content-Disposition', `attachment; filename="${filename}"`);
-      return reply.send(body);
-    } catch (error) {
-      logger.error(`Failed to export legacy snapshots: ${error}`);
-      return reply.status(500).send({ error: 'Failed to export legacy snapshots' });
-    }
-  });
-
-  fastify.get('/v0/management/quotas/legacy-snapshot-status', async (_request, reply) => {
-    try {
-      return await getLegacySnapshotStatus();
-    } catch (error) {
-      logger.error(`Failed to get legacy snapshot status: ${error}`);
-      return reply.status(500).send({ error: 'Failed to get legacy snapshot status' });
-    }
-  });
-
-  fastify.post('/v0/management/quotas/migrate-legacy-snapshots', async (_request, reply) => {
-    try {
-      const result = await migrateLegacySnapshots();
-      return result;
-    } catch (error) {
-      logger.error(`Failed to migrate legacy snapshots: ${error}`);
-      return reply.status(500).send({ error: 'Failed to migrate legacy snapshots' });
-    }
-  });
-
-  fastify.post('/v0/management/quotas/truncate-legacy-snapshots', async (_request, reply) => {
-    try {
-      await truncateLegacySnapshots();
-      return { ok: true };
-    } catch (error) {
-      logger.error(`Failed to truncate legacy snapshots: ${error}`);
-      return reply.status(500).send({ error: 'Failed to truncate legacy snapshots' });
     }
   });
 
