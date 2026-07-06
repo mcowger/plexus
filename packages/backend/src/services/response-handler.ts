@@ -446,6 +446,13 @@ export async function handleResponse(
     return reply.send(pipeline);
   } else {
     // --- Scenario B: Non-Streaming (Unary) Response ---
+    const includePlaygroundRouting = request.headers?.['x-plexus-playground'] === 'true';
+    const playgroundRouting = includePlaygroundRouting
+      ? {
+          requestId: usageRecord.requestId,
+          ...unifiedResponse.plexus,
+        }
+      : undefined;
 
     // Remove internal plexus metadata before sending to client
     if (unifiedResponse.plexus) {
@@ -458,6 +465,9 @@ export async function handleResponse(
     } else {
       // Re-format the unified JSON body to match the client's expected API format
       responseBody = await clientTransformer.formatResponse(unifiedResponse);
+    }
+    if (playgroundRouting && responseBody && typeof responseBody === 'object') {
+      responseBody.plexus = playgroundRouting;
     }
 
     // Capture transformed response for debugging

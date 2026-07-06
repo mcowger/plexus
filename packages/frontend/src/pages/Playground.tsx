@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
 import {
+  CheckCircle2,
+  Clock,
   FlaskConical,
   Key,
   LockKeyhole,
   RefreshCw,
+  Route,
   ShieldAlert,
   SlidersHorizontal,
+  XCircle,
 } from 'lucide-react';
 import { api, KeyConfig } from '../lib/api';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -28,6 +32,36 @@ type DeepChatRequestDetails = {
 type OpenAiMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+};
+
+type RetryAttempt = {
+  index?: number;
+  provider?: string;
+  model?: string;
+  apiType?: string;
+  status?: 'success' | 'failed' | 'skipped';
+  reason?: string;
+  statusCode?: number;
+  retryable?: boolean;
+};
+
+type RoutingInfo = {
+  status: 'idle' | 'pending' | 'complete' | 'error';
+  error?: string;
+  routing?: PlaygroundRouting;
+};
+
+type PlaygroundRouting = {
+  requestId?: string;
+  provider?: string;
+  model?: string;
+  apiType?: string;
+  canonicalModel?: string;
+  attemptCount?: number;
+  finalAttemptProvider?: string;
+  finalAttemptModel?: string;
+  allAttemptedProviders?: string;
+  retryHistory?: string;
 };
 
 const CHAT_COMPLETIONS_ENDPOINT = '/v1/chat/completions';
@@ -182,6 +216,193 @@ const responseToMessage = (response: unknown) => {
   return { error: 'Plexus returned an unsupported response shape.' };
 };
 
+const parseRetryHistory = (value?: string | null): RetryAttempt[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const parseAttemptedProviders = (value?: string | null): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const formatRoute = (provider?: string | null, model?: string | null) =>
+  provider && model ? `${provider}/${model}` : provider || model || 'Pending';
+
+type ChatSimulationProps = {
+  selectedKey: KeyConfig;
+  selectedModel: string;
+  onRoutingPending: () => void;
+  onRoutingResponse: (routing: PlaygroundRouting | null, error?: string) => void;
+};
+
+const ChatSimulation = memo(
+  ({ selectedKey, selectedModel, onRoutingPending, onRoutingResponse }: ChatSimulationProps) => {
+    const requestInterceptor = (details: DeepChatRequestDetails) => {
+      window.setTimeout(onRoutingPending, 0);
+      const body = details.body && typeof details.body === 'object' ? details.body : {};
+      return {
+        ...details,
+        body: {
+          ...body,
+          model: selectedModel,
+          stream: false,
+          messages: extractMessages(body),
+        },
+      };
+    };
+
+    const responseInterceptor = (response: unknown) => {
+      const routing =
+        response && typeof response === 'object' && 'plexus' in response
+          ? ((response as { plexus?: PlaygroundRouting }).plexus ?? null)
+          : null;
+      const message = responseToMessage(response);
+      window.setTimeout(() => onRoutingResponse(routing, message.error), 0);
+      return message;
+    };
+
+    return (
+      <DeepChat
+        key={`${selectedKey.key}:${selectedModel}`}
+        connect={{
+          url: CHAT_COMPLETIONS_ENDPOINT,
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${selectedKey.secret}`,
+            'x-plexus-playground': 'true',
+          },
+          additionalBodyProps: {
+            model: selectedModel,
+            stream: false,
+          },
+        }}
+        requestInterceptor={requestInterceptor}
+        responseInterceptor={responseInterceptor}
+        introMessage={{
+          text: `Simulation active using key "${selectedKey.key}" and model "${selectedModel}".`,
+        }}
+        textInput={{
+          placeholder: {
+            text: 'Send a test prompt through Plexus...',
+            style: { color: '#64748b' },
+          },
+          styles: {
+            container: {
+              backgroundColor: '#020617',
+              border: '1px solid #334155',
+              borderRadius: '0.625rem',
+              boxShadow: 'none',
+            },
+            text: {
+              color: '#f8fafc',
+            },
+            focus: {
+              border: '1px solid #f59e0b',
+              boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.18)',
+            },
+          },
+        }}
+        errorMessages={{ displayServiceErrorMessages: true }}
+        auxiliaryStyle={deepChatAuxiliaryStyle}
+        style={{
+          border: '1px solid rgb(30 41 59)',
+          borderRadius: '0.625rem',
+          height: '100%',
+          width: '100%',
+          background: 'rgb(15 23 42)',
+          boxShadow: 'none',
+          color: '#f8fafc',
+          fontFamily: 'var(--font-body)',
+          overflow: 'hidden',
+        }}
+        chatStyle={{
+          backgroundColor: 'transparent',
+          paddingTop: '0.75rem',
+          paddingBottom: '0.75rem',
+        }}
+        inputAreaStyle={{
+          backgroundColor: '#0b1324',
+          borderTop: '1px solid #1e293b',
+        }}
+        messageStyles={{
+          default: {
+            shared: {
+              bubble: {
+                borderRadius: '0.625rem',
+                fontSize: '0.8125rem',
+                lineHeight: '1.35',
+                boxShadow: 'none',
+              },
+            },
+            user: {
+              bubble: {
+                backgroundColor: '#f59e0b',
+                color: '#1a1006',
+              },
+            },
+            ai: {
+              bubble: {
+                backgroundColor: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid #334155',
+              },
+            },
+          },
+          intro: {
+            bubble: {
+              backgroundColor: '#111a30',
+              color: '#e2e8f0',
+              border: '1px solid #334155',
+            },
+          },
+          error: {
+            bubble: {
+              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+              color: '#fecaca',
+              border: '1px solid rgba(239, 68, 68, 0.28)',
+            },
+          },
+        }}
+        submitButtonStyles={{
+          submit: {
+            container: {
+              default: {
+                backgroundColor: '#f59e0b',
+                borderRadius: '0.5rem',
+              },
+              hover: {
+                backgroundColor: '#fbbf24',
+              },
+            },
+            svg: {
+              styles: {
+                default: {
+                  filter: 'brightness(0) saturate(100%)',
+                },
+              },
+            },
+          },
+        }}
+      />
+    );
+  }
+);
+
+ChatSimulation.displayName = 'ChatSimulation';
+
 export const Playground = () => {
   const [keys, setKeys] = useState<KeyConfig[]>([]);
   const [selectedKeyName, setSelectedKeyName] = useState('');
@@ -190,6 +411,7 @@ export const Playground = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [routingInfo, setRoutingInfo] = useState<RoutingInfo>({ status: 'idle' });
 
   const selectedKey = useMemo(
     () => keys.find((key) => key.key === selectedKeyName) ?? null,
@@ -247,18 +469,28 @@ export const Playground = () => {
     loadData();
   };
 
-  const requestInterceptor = (details: DeepChatRequestDetails) => {
-    const body = details.body && typeof details.body === 'object' ? details.body : {};
-    return {
-      ...details,
-      body: {
-        ...body,
-        model: selectedModel,
-        stream: false,
-        messages: extractMessages(body),
-      },
-    };
-  };
+  const handleRoutingPending = useCallback(() => {
+    setRoutingInfo({ status: 'pending' });
+  }, []);
+
+  const handleRoutingResponse = useCallback((routing: PlaygroundRouting | null, error?: string) => {
+    if (routing) {
+      setRoutingInfo({
+        status: error ? 'error' : 'complete',
+        routing,
+        error,
+      });
+    } else if (error) {
+      setRoutingInfo({ status: 'error', error });
+    }
+  }, []);
+
+  const retryHistory = parseRetryHistory(routingInfo.routing?.retryHistory);
+  const attemptedProviders = parseAttemptedProviders(routingInfo.routing?.allAttemptedProviders);
+  const finalRoute = formatRoute(
+    routingInfo.routing?.finalAttemptProvider || routingInfo.routing?.provider,
+    routingInfo.routing?.finalAttemptModel || routingInfo.routing?.model
+  );
 
   if (loading) {
     return (
@@ -439,7 +671,7 @@ export const Playground = () => {
           )}
         </Card>
 
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <Card
             className="min-h-0"
             title="Chat Simulation"
@@ -452,127 +684,12 @@ export const Playground = () => {
             flush
           >
             {selectedKey && selectedModel ? (
-              <div className="h-[calc(100dvh-15rem)] min-h-[20rem] overflow-hidden p-3 sm:h-[calc(100dvh-13rem)] sm:min-h-[32rem] sm:p-4 xl:h-[42.5rem]">
-                <DeepChat
-                  key={`${selectedKey.key}:${selectedModel}`}
-                  connect={{
-                    url: CHAT_COMPLETIONS_ENDPOINT,
-                    method: 'POST',
-                    headers: {
-                      Authorization: `Bearer ${selectedKey.secret}`,
-                    },
-                    additionalBodyProps: {
-                      model: selectedModel,
-                      stream: false,
-                    },
-                  }}
-                  requestInterceptor={requestInterceptor}
-                  responseInterceptor={responseToMessage}
-                  introMessage={{
-                    text: `Simulation active using key "${selectedKey.key}" and model "${selectedModel}".`,
-                  }}
-                  textInput={{
-                    placeholder: {
-                      text: 'Send a test prompt through Plexus...',
-                      style: { color: '#64748b' },
-                    },
-                    styles: {
-                      container: {
-                        backgroundColor: '#020617',
-                        border: '1px solid #334155',
-                        borderRadius: '0.625rem',
-                        boxShadow: 'none',
-                      },
-                      text: {
-                        color: '#f8fafc',
-                      },
-                      focus: {
-                        border: '1px solid #f59e0b',
-                        boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.18)',
-                      },
-                    },
-                  }}
-                  errorMessages={{ displayServiceErrorMessages: true }}
-                  auxiliaryStyle={deepChatAuxiliaryStyle}
-                  style={{
-                    border: '1px solid rgb(30 41 59)',
-                    borderRadius: '0.625rem',
-                    height: '100%',
-                    width: '100%',
-                    background: 'rgb(15 23 42)',
-                    boxShadow: 'none',
-                    color: '#f8fafc',
-                    fontFamily: 'var(--font-body)',
-                    overflow: 'hidden',
-                  }}
-                  chatStyle={{
-                    backgroundColor: 'transparent',
-                    paddingTop: '0.75rem',
-                    paddingBottom: '0.75rem',
-                  }}
-                  inputAreaStyle={{
-                    backgroundColor: '#0b1324',
-                    borderTop: '1px solid #1e293b',
-                  }}
-                  messageStyles={{
-                    default: {
-                      shared: {
-                        bubble: {
-                          borderRadius: '0.625rem',
-                          fontSize: '0.8125rem',
-                          lineHeight: '1.35',
-                          boxShadow: 'none',
-                        },
-                      },
-                      user: {
-                        bubble: {
-                          backgroundColor: '#f59e0b',
-                          color: '#1a1006',
-                        },
-                      },
-                      ai: {
-                        bubble: {
-                          backgroundColor: '#1e293b',
-                          color: '#f8fafc',
-                          border: '1px solid #334155',
-                        },
-                      },
-                    },
-                    intro: {
-                      bubble: {
-                        backgroundColor: '#111a30',
-                        color: '#e2e8f0',
-                        border: '1px solid #334155',
-                      },
-                    },
-                    error: {
-                      bubble: {
-                        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                        color: '#fecaca',
-                        border: '1px solid rgba(239, 68, 68, 0.28)',
-                      },
-                    },
-                  }}
-                  submitButtonStyles={{
-                    submit: {
-                      container: {
-                        default: {
-                          backgroundColor: '#f59e0b',
-                          borderRadius: '0.5rem',
-                        },
-                        hover: {
-                          backgroundColor: '#fbbf24',
-                        },
-                      },
-                      svg: {
-                        styles: {
-                          default: {
-                            filter: 'brightness(0) saturate(100%)',
-                          },
-                        },
-                      },
-                    },
-                  }}
+              <div className="h-[clamp(18rem,calc(100dvh-22rem),42.5rem)] overflow-hidden p-3 sm:p-4">
+                <ChatSimulation
+                  selectedKey={selectedKey}
+                  selectedModel={selectedModel}
+                  onRoutingPending={handleRoutingPending}
+                  onRoutingResponse={handleRoutingResponse}
                 />
               </div>
             ) : (
@@ -583,6 +700,140 @@ export const Playground = () => {
                 </span>
               </div>
             )}
+          </Card>
+
+          <Card
+            className="min-h-0"
+            title="Routing Decision"
+            extra={
+              <div className="flex items-center gap-2 text-xs text-text-muted">
+                {routingInfo.status === 'pending' ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : routingInfo.status === 'complete' ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                ) : routingInfo.status === 'error' ? (
+                  <XCircle className="h-3.5 w-3.5 text-danger" />
+                ) : (
+                  <Route className="h-3.5 w-3.5" />
+                )}
+                {routingInfo.status === 'idle'
+                  ? 'Waiting'
+                  : routingInfo.status === 'pending'
+                    ? 'Resolving'
+                    : routingInfo.status === 'complete'
+                      ? 'Routed'
+                      : 'Failed'}
+              </div>
+            }
+            dense
+          >
+            <div className="space-y-3 text-xs text-text-secondary">
+              <div className="rounded-md border border-border bg-bg-subtle/60 p-3">
+                <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                  Final route
+                </div>
+                <div className="break-words text-sm font-medium text-text">{finalRoute}</div>
+                <div className="mt-1 break-all font-mono text-[10px] text-text-muted">
+                  {routingInfo.routing?.requestId || 'Send a prompt to inspect routing.'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-md bg-slate-950/30 p-2">
+                  <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Alias
+                  </div>
+                  <div className="truncate text-text" title={selectedModel}>
+                    {selectedModel || '-'}
+                  </div>
+                </div>
+                <div className="rounded-md bg-slate-950/30 p-2">
+                  <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Canonical
+                  </div>
+                  <div
+                    className="truncate text-text"
+                    title={routingInfo.routing?.canonicalModel || undefined}
+                  >
+                    {routingInfo.routing?.canonicalModel || '-'}
+                  </div>
+                </div>
+                <div className="rounded-md bg-slate-950/30 p-2">
+                  <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Attempts
+                  </div>
+                  <div className="text-text">{routingInfo.routing?.attemptCount ?? '-'}</div>
+                </div>
+                <div className="rounded-md bg-slate-950/30 p-2">
+                  <div className="mb-0.5 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    <Clock className="h-3 w-3" />
+                    API
+                  </div>
+                  <div className="text-text">{routingInfo.routing?.apiType || '-'}</div>
+                </div>
+              </div>
+
+              {attemptedProviders.length > 0 && (
+                <div className="rounded-md border border-border bg-bg-subtle/40 p-3">
+                  <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                    Candidate path
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {attemptedProviders.map((attempted) => (
+                      <Badge key={attempted} status="neutral">
+                        {attempted}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-md border border-border bg-bg-subtle/40 p-3">
+                <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                  Decision trail
+                </div>
+                {retryHistory.length > 0 ? (
+                  <ol className="space-y-2">
+                    {retryHistory.map((attempt, index) => (
+                      <li
+                        key={`${attempt.provider}:${attempt.model}:${index}`}
+                        className="rounded-md bg-slate-950/40 p-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-medium text-text">
+                            {formatRoute(attempt.provider, attempt.model)}
+                          </span>
+                          <Badge
+                            status={
+                              attempt.status === 'success'
+                                ? 'success'
+                                : attempt.status === 'failed'
+                                  ? 'danger'
+                                  : 'neutral'
+                            }
+                          >
+                            {attempt.status || 'attempt'}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 line-clamp-3 text-[11px] text-text-muted">
+                          {attempt.reason || 'No decision reason recorded'}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="text-[11px] text-text-muted">
+                    Routing details appear after the next playground request.
+                  </div>
+                )}
+              </div>
+
+              {routingInfo.error && (
+                <div className="rounded-md border border-danger/30 bg-danger/10 p-3 text-danger">
+                  {routingInfo.error}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
       </PageContainer>
