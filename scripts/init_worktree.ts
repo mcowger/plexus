@@ -14,6 +14,11 @@ type Command = {
 };
 
 const commands: readonly Command[] = [
+  {
+    label: 'Fetch latest main from origin',
+    cmd: ['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'],
+  },
+  { label: 'Rebase worktree onto origin/main', cmd: ['git', 'rebase', 'origin/main'] },
   { label: 'Trust mise configuration', cmd: ['mise', 'trust'] },
   { label: 'Install mise-managed tools', cmd: ['mise', 'install'] },
   { label: 'Install Bun dependencies', cmd: ['bun', 'install'] },
