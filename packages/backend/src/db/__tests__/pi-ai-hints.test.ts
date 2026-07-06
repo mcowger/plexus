@@ -29,11 +29,13 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
       stall_cooldown: false,
       estimateTokens: false,
       useClaudeMasking: false,
+      auto_compat: true,
       pi_ai_provider: 'anthropic',
       models: {
         'claude-opus-4-6': {
           pricing: { source: 'simple', input: 3.0, output: 15.0 },
           pi_ai_model_id: 'claude-opus-4-6',
+          auto_compat: true,
         },
         'claude-sonnet-4': {
           pricing: { source: 'simple', input: 1.0, output: 5.0 },
@@ -47,10 +49,12 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
     const loaded = await repo.getProvider('pi-ai-test');
 
     expect(loaded).not.toBeNull();
+    expect(loaded?.auto_compat).toBe(true);
     expect(loaded?.pi_ai_provider).toBe('anthropic');
 
     const models = loaded?.models as Record<string, any>;
     expect(models?.['claude-opus-4-6']?.pi_ai_model_id).toBe('claude-opus-4-6');
+    expect(models?.['claude-opus-4-6']?.auto_compat).toBe(true);
     // Model without pi_ai_model_id should not have the field
     expect(models?.['claude-sonnet-4']?.pi_ai_model_id).toBeUndefined();
   });

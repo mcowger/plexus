@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, vi, test } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { OAuthAuthManager } from '../../services/oauth-auth-manager';
+import { piAiModels } from '../../services/pi-ai/registry';
+import { REQUIRED_BETAS } from '../oauth/masking';
 
 // @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here.  With isolate: false all files share one
@@ -10,6 +12,19 @@ const { OAuthTransformer } = await import('../oauth/oauth-transformer');
 describe('OAuthTransformer', () => {
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
+    vi.mocked(piAiModels.complete).mockResolvedValue({
+      content: [{ type: 'text', text: 'ok' }],
+      stopReason: 'stop',
+      usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+      provider: 'anthropic',
+      model: 'claude-test',
+      timestamp: Date.now(),
+    } as any);
+    vi.mocked(piAiModels.stream).mockResolvedValue(
+      (async function* () {
+        // Empty default stream for tests that only assert request-side behavior.
+      })() as any
+    );
   });
 
   afterEach(() => {
@@ -84,6 +99,163 @@ describe('OAuthTransformer', () => {
 
     expect(context.tools[0]?.name).toBe('proxy_MyTool');
     expect(getApiKeySpy).not.toHaveBeenCalled();
+  });
+
+  test('applies relocated Claude Code masking pipeline to outbound Anthropic OAuth payload', async () => {
+    const authManager = OAuthAuthManager.getInstance();
+    registerSpy(authManager, 'getApiKey').mockResolvedValue('sk-ant-oat-test');
+
+    let capturedPayload: any;
+    let capturedHeaders: Record<string, string | null> | undefined;
+
+    vi.mocked(piAiModels.complete).mockImplementation(
+      async (_model: any, _context: any, options: any) => {
+        capturedHeaders = options.headers;
+        const onPayload = options.onPayload as (payload: any) => any;
+        capturedPayload = onPayload({
+          model: 'claude-test',
+          system: [{ type: 'text', text: 'opencode-specific system instructions' }],
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello world' }] }],
+          tools: [
+            { name: 'github_search_users', input_schema: { type: 'object' } },
+            { name: 'github_list_repos', input_schema: { type: 'object' } },
+            { name: 'github_create_issue', input_schema: { type: 'object' } },
+            { name: 'github_get_issue', input_schema: { type: 'object' } },
+          ],
+        });
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          stopReason: 'stop',
+          usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          provider: 'anthropic',
+          model: 'claude-test',
+        } as any;
+      }
+    );
+
+    const transformer = new OAuthTransformer();
+    await transformer.executeRequest(
+      { tools: [], messages: [] },
+      'anthropic' as any,
+      'claude-test',
+      false,
+      {
+        clientHeaders: { 'x-app': 'cli' },
+      },
+      { authMode: 'oauth', accountId: 'test-account' }
+    );
+
+    expect(capturedHeaders?.['anthropic-beta']).toBe(REQUIRED_BETAS.join(','));
+    expect(capturedHeaders?.['x-stainless-lang']).toBe('js');
+    expect(capturedHeaders?.['user-agent']).toContain('claude-cli/');
+
+    expect(capturedPayload.system[0]?.text).toMatch(/x-anthropic-billing-header:/);
+    expect(capturedPayload.system[0]?.text).toMatch(/cch=(?!00000;)[0-9a-f]{5};/);
+    expect(capturedPayload.system[1]?.text).toBe(
+      "You are Claude Code, Anthropic's official CLI for Claude."
+    );
+    expect(capturedPayload.messages[0]?.content[0]?.text).toContain('<system-reminder>');
+    expect(capturedPayload.tools.map((tool: any) => tool.name)).toContain(
+      'mcp__github__search_users'
+    );
+    expect(capturedPayload.tools.map((tool: any) => tool.name)).toContain('Agent');
+  });
+
+  test('reverses relocated Claude Code tool renames on non-streaming responses', async () => {
+    const authManager = OAuthAuthManager.getInstance();
+    registerSpy(authManager, 'getApiKey').mockResolvedValue('sk-ant-oat-test');
+
+    vi.mocked(piAiModels.complete).mockImplementation(
+      async (_model: any, _context: any, options: any) => {
+        const onPayload = options.onPayload as (payload: any) => any;
+        onPayload({
+          model: 'claude-test',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello world' }] }],
+          tools: [
+            { name: 'github_search_users', input_schema: { type: 'object' } },
+            { name: 'github_list_repos', input_schema: { type: 'object' } },
+            { name: 'github_create_issue', input_schema: { type: 'object' } },
+            { name: 'github_get_issue', input_schema: { type: 'object' } },
+          ],
+        });
+        return {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'mcp__github__search_users',
+              input: {},
+            },
+          ],
+          stopReason: 'tool_use',
+          usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          provider: 'anthropic',
+          model: 'claude-test',
+        } as any;
+      }
+    );
+
+    const transformer = new OAuthTransformer();
+    const result = await transformer.executeRequest(
+      { tools: [], messages: [] },
+      'anthropic' as any,
+      'claude-test',
+      false,
+      {
+        clientHeaders: { 'x-app': 'cli' },
+      },
+      { authMode: 'oauth', accountId: 'test-account' }
+    );
+
+    expect(result.content[0]?.name).toBe('github_search_users');
+  });
+
+  test('reverses relocated Claude Code tool renames on streaming response events', async () => {
+    const authManager = OAuthAuthManager.getInstance();
+    registerSpy(authManager, 'getApiKey').mockResolvedValue('sk-ant-oat-test');
+
+    (vi.mocked(piAiModels.stream) as any).mockImplementation(
+      (_model: any, _context: any, options: any) => {
+        const onPayload = options.onPayload as (payload: any) => any;
+        onPayload({
+          model: 'claude-test',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello world' }] }],
+          tools: [
+            { name: 'github_search_users', input_schema: { type: 'object' } },
+            { name: 'github_list_repos', input_schema: { type: 'object' } },
+            { name: 'github_create_issue', input_schema: { type: 'object' } },
+            { name: 'github_get_issue', input_schema: { type: 'object' } },
+          ],
+        });
+
+        return (async function* () {
+          yield {
+            type: 'content_block_start',
+            content_block: {
+              type: 'tool_use',
+              name: 'mcp__github__search_users',
+              input: {},
+            },
+          };
+        })() as any;
+      }
+    );
+
+    const transformer = new OAuthTransformer();
+    const stream = (await transformer.executeRequest(
+      { tools: [], messages: [] },
+      'anthropic' as any,
+      'claude-test',
+      true,
+      {
+        clientHeaders: { 'x-app': 'cli' },
+      },
+      { authMode: 'oauth', accountId: 'test-account' }
+    )) as AsyncIterable<any>;
+
+    const iterator = stream[Symbol.asyncIterator]();
+    const first = await iterator.next();
+
+    expect(first.value.content_block.name).toBe('github_search_users');
   });
 
   test('transformRequest normalises string assistant content to array blocks (issue #162)', async () => {

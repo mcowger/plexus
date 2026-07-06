@@ -15,7 +15,6 @@ import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import { handleBetaResponses } from '../../inference-v2';
 
 export async function registerResponsesRoute(
   fastify: FastifyInstance,
@@ -38,14 +37,6 @@ export async function registerResponsesRoute(
    */
   // Handler for Responses API requests (shared between /v1/responses and /v1/codex/responses)
   const responsesHandler = async (request: FastifyRequest, reply: FastifyReply) => {
-    if ((request as any).keyConfig?.beta === true) {
-      return handleBetaResponses(request, reply, {
-        usageStorage,
-        quotaEnforcer,
-        responsesStorage,
-      });
-    }
-
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();

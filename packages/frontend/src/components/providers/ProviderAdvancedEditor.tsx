@@ -1032,6 +1032,23 @@ export function ProviderAdvancedEditor({
                     </div>
                   </div>
                 </label>
+                <label className="flex items-start gap-2 py-1 cursor-pointer">
+                  <Switch
+                    checked={editingProvider.auto_compat || false}
+                    onChange={(checked) =>
+                      setEditingProvider({ ...editingProvider, auto_compat: checked })
+                    }
+                  />
+                  <div>
+                    <div className="font-body text-[12px] text-text">Auto Compat</div>
+                    <div
+                      className="font-body text-[11px] text-text-muted"
+                      style={{ lineHeight: 1.35 }}
+                    >
+                      Use pi-ai registry reasoning and generation compatibility.
+                    </div>
+                  </div>
+                </label>
               </div>
 
               {/* Right: inputs */}

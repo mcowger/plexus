@@ -51,6 +51,7 @@ export const providers = pgTable(
     gpuFlopsTflop: real('gpu_flops_tflop'), // FLOPS in TFLOP
     gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Power draw in watts
     adapter: jsonb('adapter'), // string[] — provider-level adapter names
+    autoCompat: boolean('auto_compat').notNull().default(false), // Enable pi-ai registry-aware compatibility mapping
     timeoutMs: integer('timeout_ms'), // Per-provider upstream request timeout in ms (NULL = use global default)
     // Per-provider stall detection overrides (NULL = use global setting)
     stallTtfbMs: integer('stall_ttfb_ms'), // TTFB timeout in ms

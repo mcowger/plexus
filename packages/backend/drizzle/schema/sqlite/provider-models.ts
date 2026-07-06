@@ -14,6 +14,7 @@ export const providerModels = sqliteTable(
     accessVia: text('access_via'), // JSON: string[]
     extraBody: text('extra_body'), // JSON: Record<string, any>
     adapter: text('adapter'), // JSON: string[] — model-level adapter names
+    autoCompat: integer('auto_compat'), // Model-level override for pi-ai registry-aware compatibility mapping
     maxConcurrency: integer('max_concurrency'), // Max concurrent requests for this model (NULL = no limit)
     piAiModelId: text('pi_ai_model_id'), // pi-ai model ID within the pi-ai provider (e.g. 'claude-opus-4-6')
     sortOrder: integer('sort_order').notNull().default(0),

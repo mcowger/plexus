@@ -1,6 +1,6 @@
 /**
- * Tests for enforceContextLimitForRoute — the thin bridge helper that gates
- * the inference-v2 / beta / pi path against context-window limits.
+ * Tests for enforceContextLimitForRoute — the thin bridge helper that gates a
+ * context-shaped request against context-window limits.
  *
  * TDD: these tests were written BEFORE the implementation (RED), then the
  * helper was added to enforce-limits.ts (GREEN).

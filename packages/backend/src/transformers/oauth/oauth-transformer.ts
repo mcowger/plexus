@@ -5,7 +5,7 @@ import type {
   UnifiedChatStreamChunk,
 } from '../../types/unified';
 import type { Model as PiAiModel } from '@earendil-works/pi-ai';
-import { piAiModels } from '../../inference-v2/shared/pi-ai-utils';
+import { piAiModels } from '../../services/pi-ai/registry';
 import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import {
   applyClaudeCodeToolProxy,
@@ -22,13 +22,18 @@ import {
 import { logger } from '../../utils/logger';
 import {
   applyClaudeOAuthTransform,
-  reverseClaudeOAuthTransform,
-  reverseClaudeOAuthTransformForStreamLine,
   isClaudeOAuthToken,
   type ClaudeOAuthContext,
 } from './oauth-claude';
 import { CodexVersionService } from '../../services/codex-version-service';
-import { buildThinkingOptions } from '../../inference-v2/shared/pi-ai-utils';
+import { buildThinkingOptions } from '../../services/pi-ai/registry';
+import {
+  applyClaudeCodeMasking,
+  getStainlessHeaders,
+  REQUIRED_BETAS,
+  reverseToolRenames,
+} from './masking';
+import type { RenamePair } from './masking/types';
 
 export { buildThinkingOptions };
 
@@ -98,6 +103,60 @@ function describeStreamResult(result: any): Record<string, any> {
     hasGetReader: !!result && typeof result.getReader === 'function',
     constructorName: result?.constructor?.name || typeof result,
   };
+}
+
+function reverseToolRenamesInValue<T>(value: T, pairs: readonly RenamePair[]): T {
+  if (pairs.length === 0 || value == null) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return reverseToolRenames(value, pairs) as T;
+  }
+
+  if (value instanceof Uint8Array) {
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+    return encoder.encode(reverseToolRenames(decoder.decode(value), pairs)) as T;
+  }
+
+  try {
+    return JSON.parse(reverseToolRenames(JSON.stringify(value), pairs));
+  } catch {
+    return value;
+  }
+}
+
+function wrapStreamWithToolRenameReversal<T>(
+  streamInput: ReadableStream<T> | AsyncIterable<T>,
+  pairs: readonly RenamePair[]
+): ReadableStream<T> | AsyncIterable<T> {
+  if (pairs.length === 0) {
+    return streamInput;
+  }
+
+  if (isReadableStream<T>(streamInput)) {
+    const reader = streamInput.getReader();
+    return new ReadableStream<T>({
+      async pull(controller) {
+        const { value, done } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(reverseToolRenamesInValue(value, pairs));
+      },
+      cancel(reason) {
+        return reader.cancel(reason);
+      },
+    });
+  }
+
+  return (async function* () {
+    for await (const event of streamInput) {
+      yield reverseToolRenamesInValue(event, pairs);
+    }
+  })();
 }
 
 export class OAuthTransformer implements Transformer {
@@ -386,11 +445,8 @@ export class OAuthTransformer implements Transformer {
       const claudeCodeHeaders = {
         accept: 'application/json',
         'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'anthropic-beta':
-          'claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14',
-        'user-agent': 'claude-cli/2.1.2 (external, cli)',
-        'x-app': 'cli',
+        'anthropic-beta': REQUIRED_BETAS.join(','),
+        ...getStainlessHeaders(),
       };
 
       requestOptions.headers = {
@@ -434,10 +490,13 @@ export class OAuthTransformer implements Transformer {
       isOAuth: false,
       toolNamesRemapped: false,
     };
+    let toolRenamePairs: RenamePair[] = [];
 
     // Log the actual HTTP payload pi-ai sends so we can verify tool schemas
     // Also apply Claude OAuth transforms when using OAuth tokens
     requestOptions.onPayload = (payload: any) => {
+      let outgoingPayload = payload;
+
       // Apply OAuth transforms for Claude OAuth tokens
       if (provider === 'anthropic' && isClaudeCodeToken) {
         const { payload: transformedPayload, context } = applyClaudeOAuthTransform(
@@ -454,18 +513,21 @@ export class OAuthTransformer implements Transformer {
 
         // Store OAuth context on the model for response transformation
         (model as any).__oauthContext = oauthContext;
-
-        const payloadStr =
-          typeof transformedPayload === 'string'
-            ? transformedPayload
-            : JSON.stringify(transformedPayload);
-        logger.debug(`${this.name}: FULL-OUTGOING-PAYLOAD ${payloadStr}`);
-        return transformedPayload;
+        outgoingPayload = transformedPayload;
       }
 
-      const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+      if (provider === 'anthropic' && isClaudeCodeToken) {
+        const payloadStr =
+          typeof outgoingPayload === 'string' ? outgoingPayload : JSON.stringify(outgoingPayload);
+        const maskingResult = applyClaudeCodeMasking(payloadStr);
+        outgoingPayload = maskingResult.payload;
+        toolRenamePairs = [...maskingResult.toolRenamePairs];
+      }
+
+      const payloadStr =
+        typeof outgoingPayload === 'string' ? outgoingPayload : JSON.stringify(outgoingPayload);
       logger.debug(`${this.name}: FULL-OUTGOING-PAYLOAD ${payloadStr}`);
-      return payload;
+      return outgoingPayload;
     };
 
     logger.info(
@@ -480,7 +542,7 @@ export class OAuthTransformer implements Transformer {
       try {
         const result = await piAiModels.stream(model, context, requestOptions);
         logger.debug(`${this.name}: OAuth stream result type`, describeStreamResult(result));
-        return result;
+        return wrapStreamWithToolRenameReversal(result, toolRenamePairs);
       } catch (error: any) {
         if (error?.name === 'AbortError' || signal?.aborted) {
           const isTimeout = signal?.reason?.name === 'TimeoutError';
@@ -497,7 +559,8 @@ export class OAuthTransformer implements Transformer {
     }
 
     try {
-      return await piAiModels.complete(model, context, requestOptions);
+      const result = await piAiModels.complete(model, context, requestOptions);
+      return reverseToolRenamesInValue(result, toolRenamePairs);
     } catch (error: any) {
       if (error?.name === 'AbortError' || signal?.aborted) {
         const isTimeout = signal?.reason?.name === 'TimeoutError';

@@ -22,8 +22,6 @@ import type {
   TimeoutConfig,
   StallConfigType,
   MetadataOverrides,
-  PiAiCustomProvider,
-  PiAiCustomModel,
 } from '../config';
 import { resolveGpuParams } from '@plexus/shared';
 
@@ -270,8 +268,6 @@ export class ConfigRepository {
     await this.db().delete(schema.mcpServers);
     await this.db().delete(schema.oauthCredentials);
     await this.db().delete(schema.systemSettings);
-    await this.db().delete(schema.piAiCustomProviders);
-    await this.db().delete(schema.piAiCustomModels);
   }
 
   // ─── Providers ───────────────────────────────────────────────────
@@ -390,6 +386,7 @@ export class ConfigRepository {
         config.adapter && Array.isArray(config.adapter) && config.adapter.length > 0
           ? toJson(config.adapter)
           : null,
+      autoCompat: fromBool(config.auto_compat === true),
       timeoutMs: config.timeoutMs ?? null,
       maxConcurrency: config.maxConcurrency ?? null,
       piAiProvider: config.pi_ai_provider ?? null,
@@ -455,6 +452,7 @@ export class ConfigRepository {
             cfg.adapter && Array.isArray(cfg.adapter) && cfg.adapter.length > 0
               ? toJson(cfg.adapter)
               : null,
+          autoCompat: cfg.auto_compat == null ? null : fromBool(cfg.auto_compat === true),
           maxConcurrency: cfg.maxConcurrency ?? null,
           piAiModelId: cfg.pi_ai_model_id ?? null,
           sortOrder: idx,
@@ -575,6 +573,7 @@ export class ConfigRepository {
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
             ...(m.adapter ? { adapter: normalizeAdapterEntries(parseJson(m.adapter)) } : {}),
+            ...(m.autoCompat != null ? { auto_compat: toBool(m.autoCompat) } : {}),
             ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
             ...(m.piAiModelId != null ? { pi_ai_model_id: m.piAiModelId } : {}),
           };
@@ -612,6 +611,7 @@ export class ConfigRepository {
       estimateTokens: toBool(row.estimateTokens),
       useClaudeMasking: toBool(row.useClaudeMasking),
       gemini_thinking_enabled: toBool(row.geminiThinkingEnabled),
+      auto_compat: toBool(row.autoCompat),
       ...(models ? { models } : {}),
       ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),
       ...(() => {
@@ -1047,7 +1047,6 @@ export class ConfigRepository {
         ...(excludedModels ? { excludedModels } : {}),
         ...(excludedProviders ? { excludedProviders } : {}),
         ...(allowedIps ? { allowedIps } : {}),
-        ...(row.beta ? { beta: true } : {}),
       };
     }
 
@@ -1102,7 +1101,6 @@ export class ConfigRepository {
         ...(excludedModels ? { excludedModels } : {}),
         ...(excludedProviders ? { excludedProviders } : {}),
         ...(allowedIps ? { allowedIps } : {}),
-        ...(row.beta ? { beta: true } : {}),
       },
     };
   }
@@ -1128,7 +1126,6 @@ export class ConfigRepository {
       excludedModels: stringifyStringArray(config.excludedModels),
       excludedProviders: stringifyStringArray(config.excludedProviders),
       allowedIps: stringifyStringArray(config.allowedIps),
-      beta: config.beta ?? false,
       generation: null,
       updatedAt: timestamp,
     };
@@ -1225,84 +1222,6 @@ export class ConfigRepository {
     await this.db()
       .delete(schema.userQuotaDefinitions)
       .where(eq(schema.userQuotaDefinitions.name, name));
-  }
-
-  // ─── pi-ai Custom Providers ──────────────────────────────────────
-
-  async getAllPiAiCustomProviders(): Promise<Record<string, PiAiCustomProvider>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.piAiCustomProviders);
-    const result: Record<string, PiAiCustomProvider> = {};
-    for (const row of rows) {
-      const def = parseJson<PiAiCustomProvider>(row.definition);
-      if (def) result[row.name] = def;
-    }
-    return result;
-  }
-
-  async savePiAiCustomProvider(name: string, def: PiAiCustomProvider): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-    const existing = await this.db()
-      .select()
-      .from(schema.piAiCustomProviders)
-      .where(eq(schema.piAiCustomProviders.name, name))
-      .limit(1);
-    if (existing.length > 0) {
-      await this.db()
-        .update(schema.piAiCustomProviders)
-        .set({ definition: toJson(def), updatedAt: timestamp })
-        .where(eq(schema.piAiCustomProviders.name, name));
-    } else {
-      await this.db()
-        .insert(schema.piAiCustomProviders)
-        .values({ name, definition: toJson(def), createdAt: timestamp, updatedAt: timestamp });
-    }
-  }
-
-  async deletePiAiCustomProvider(name: string): Promise<void> {
-    const schema = this.schema();
-    await this.db()
-      .delete(schema.piAiCustomProviders)
-      .where(eq(schema.piAiCustomProviders.name, name));
-  }
-
-  // ─── pi-ai Custom Models ─────────────────────────────────────────
-
-  async getAllPiAiCustomModels(): Promise<Record<string, PiAiCustomModel>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.piAiCustomModels);
-    const result: Record<string, PiAiCustomModel> = {};
-    for (const row of rows) {
-      const def = parseJson<PiAiCustomModel>(row.definition);
-      if (def) result[row.name] = def;
-    }
-    return result;
-  }
-
-  async savePiAiCustomModel(name: string, def: PiAiCustomModel): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-    const existing = await this.db()
-      .select()
-      .from(schema.piAiCustomModels)
-      .where(eq(schema.piAiCustomModels.name, name))
-      .limit(1);
-    if (existing.length > 0) {
-      await this.db()
-        .update(schema.piAiCustomModels)
-        .set({ definition: toJson(def), updatedAt: timestamp })
-        .where(eq(schema.piAiCustomModels.name, name));
-    } else {
-      await this.db()
-        .insert(schema.piAiCustomModels)
-        .values({ name, definition: toJson(def), createdAt: timestamp, updatedAt: timestamp });
-    }
-  }
-
-  async deletePiAiCustomModel(name: string): Promise<void> {
-    const schema = this.schema();
-    await this.db().delete(schema.piAiCustomModels).where(eq(schema.piAiCustomModels.name, name));
   }
 
   // ─── MCP Servers ─────────────────────────────────────────────────

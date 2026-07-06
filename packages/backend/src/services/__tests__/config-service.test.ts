@@ -35,8 +35,6 @@ function createMockRepo() {
     getAllKeys: vi.fn(() => Promise.resolve({})),
     getAllUserQuotas: vi.fn(() => Promise.resolve({})),
     getAllMcpServers: vi.fn(() => Promise.resolve({})),
-    getAllPiAiCustomProviders: vi.fn(() => Promise.resolve({})),
-    getAllPiAiCustomModels: vi.fn(() => Promise.resolve({})),
     getFailoverPolicy: vi.fn(() => Promise.resolve({ enabled: false })),
     getCooldownPolicy: vi.fn(() => Promise.resolve({ enabled: false })),
     getBackgroundExplorationConfig: vi.fn(() => Promise.resolve({ enabled: false })),

@@ -2138,6 +2138,14 @@ export function ProviderModelsEditor({
                               Concurrency: {mCfg.maxConcurrency}
                             </Badge>
                           )}
+                          {mCfg.auto_compat === true && (
+                            <Badge
+                              status="neutral"
+                              style={{ fontSize: '10px', padding: '2px 8px' }}
+                            >
+                              Auto Compat
+                            </Badge>
+                          )}
                         </div>
                         {modelAdvancedOpen[mId] && (
                           <div
@@ -2150,6 +2158,28 @@ export function ProviderModelsEditor({
                               background: 'var(--color-bg-subtle)',
                             }}
                           >
+                            <div className="flex flex-col gap-0.5">
+                              <label className="flex items-start gap-2 py-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={mCfg.auto_compat === true}
+                                  onChange={(e) =>
+                                    updateModelConfig(mId, {
+                                      auto_compat: e.target.checked ? true : undefined,
+                                    })
+                                  }
+                                />
+                                <div>
+                                  <div className="font-body text-[12px] text-text">Auto Compat</div>
+                                  <div
+                                    className="font-body text-[11px] text-text-muted"
+                                    style={{ lineHeight: 1.35 }}
+                                  >
+                                    Use pi-ai registry hints for this model.
+                                  </div>
+                                </div>
+                              </label>
+                            </div>
                             <div className="flex flex-col gap-0.5">
                               <label className="font-body text-[11px] font-medium text-text-secondary">
                                 Max Concurrency

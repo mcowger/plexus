@@ -12,8 +12,6 @@ import type {
   QuotaConfig,
   TimeoutConfig,
   StallConfigType,
-  PiAiCustomProvider,
-  PiAiCustomModel,
 } from '../config';
 
 import { QuotaScheduler } from './quota/quota-scheduler';
@@ -198,32 +196,6 @@ export class ConfigService {
     this.rebuildCache();
   }
 
-  // ─── pi-ai Custom Provider / Model CRUD ──────────────────────────
-
-  async savePiAiCustomProvider(name: string, def: PiAiCustomProvider): Promise<void> {
-    await this.repo.savePiAiCustomProvider(name, def);
-    this.pendingWrites++;
-    this.rebuildCache();
-  }
-
-  async deletePiAiCustomProvider(name: string): Promise<void> {
-    await this.repo.deletePiAiCustomProvider(name);
-    this.pendingWrites++;
-    this.rebuildCache();
-  }
-
-  async savePiAiCustomModel(name: string, def: PiAiCustomModel): Promise<void> {
-    await this.repo.savePiAiCustomModel(name, def);
-    this.pendingWrites++;
-    this.rebuildCache();
-  }
-
-  async deletePiAiCustomModel(name: string): Promise<void> {
-    await this.repo.deletePiAiCustomModel(name);
-    this.pendingWrites++;
-    this.rebuildCache();
-  }
-
   // ─── MCP Server CRUD ─────────────────────────────────────────────
 
   async saveMcpServer(name: string, config: McpServerConfig): Promise<void> {
@@ -325,8 +297,6 @@ export class ConfigService {
     const keys = await this.repo.getAllKeys();
     const userQuotas = await this.repo.getAllUserQuotas();
     const mcpServers = await this.repo.getAllMcpServers();
-    const piAiCustomProviders = await this.repo.getAllPiAiCustomProviders();
-    const piAiCustomModels = await this.repo.getAllPiAiCustomModels();
     const settings = await this.repo.getAllSettings();
     const oauthProviders = await this.repo.getAllOAuthProviders();
 
@@ -336,8 +306,6 @@ export class ConfigService {
       keys,
       user_quotas: userQuotas,
       mcp_servers: mcpServers,
-      pi_ai_custom_providers: piAiCustomProviders,
-      pi_ai_custom_models: piAiCustomModels,
       settings,
       oauth_providers: oauthProviders,
     };
@@ -425,8 +393,6 @@ export class ConfigService {
     const keys = await this.repo.getAllKeys();
     const userQuotas = await this.repo.getAllUserQuotas();
     const mcpServers = await this.repo.getAllMcpServers();
-    const piAiCustomProviders = await this.repo.getAllPiAiCustomProviders();
-    const piAiCustomModels = await this.repo.getAllPiAiCustomModels();
     const failover = await this.repo.getFailoverPolicy();
     const cooldown = await this.repo.getCooldownPolicy();
     const backgroundExploration = await this.repo.getBackgroundExplorationConfig();
@@ -457,9 +423,6 @@ export class ConfigService {
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       mcp_servers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       user_quotas: Object.keys(userQuotas).length > 0 ? userQuotas : undefined,
-      pi_ai_custom_providers:
-        Object.keys(piAiCustomProviders).length > 0 ? piAiCustomProviders : undefined,
-      pi_ai_custom_models: Object.keys(piAiCustomModels).length > 0 ? piAiCustomModels : undefined,
     };
 
     // Reload the quota scheduler with the updated quota configs so that

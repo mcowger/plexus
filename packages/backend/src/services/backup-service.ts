@@ -47,8 +47,6 @@ export interface ConfigBackupData {
   keys: Record<string, unknown>;
   user_quotas: Record<string, unknown>;
   mcp_servers: Record<string, unknown>;
-  pi_ai_custom_providers?: Record<string, unknown>;
-  pi_ai_custom_models?: Record<string, unknown>;
   settings: Record<string, unknown>;
   oauth_credentials: Array<{
     provider_type: string;
@@ -412,8 +410,6 @@ export class BackupService {
         keys: configData.keys as Record<string, unknown>,
         user_quotas: configData.user_quotas as Record<string, unknown>,
         mcp_servers: configData.mcp_servers as Record<string, unknown>,
-        pi_ai_custom_providers: configData.pi_ai_custom_providers as Record<string, unknown>,
-        pi_ai_custom_models: configData.pi_ai_custom_models as Record<string, unknown>,
         settings: configData.settings as Record<string, unknown>,
         oauth_credentials: oauthCredentials,
       },
@@ -540,19 +536,6 @@ export class BackupService {
       await repo.saveMcpServer(name, config);
     }
     counts['mcp_servers'] = Object.keys(mcpServers).length;
-
-    // pi-ai custom providers / models (inference-v2 registries)
-    const piProviders = (data.data.pi_ai_custom_providers as Record<string, any>) ?? {};
-    for (const [name, def] of Object.entries(piProviders)) {
-      await repo.savePiAiCustomProvider(name, def);
-    }
-    counts['pi_ai_custom_providers'] = Object.keys(piProviders).length;
-
-    const piModels = (data.data.pi_ai_custom_models as Record<string, any>) ?? {};
-    for (const [name, def] of Object.entries(piModels)) {
-      await repo.savePiAiCustomModel(name, def);
-    }
-    counts['pi_ai_custom_models'] = Object.keys(piModels).length;
 
     // System settings
     const settings = data.data.settings as Record<string, unknown>;

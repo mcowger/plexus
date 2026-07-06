@@ -14,7 +14,6 @@ import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import { handleBetaGeminiRequest } from '../../inference-v2';
 
 export async function registerGeminiRoute(
   fastify: FastifyInstance,
@@ -28,16 +27,6 @@ export async function registerGeminiRoute(
    * Supports both unary and streamGenerateContent actions.
    */
   fastify.post('/v1beta/models/:modelWithAction', async (request, reply) => {
-    if ((request as any).keyConfig?.beta === true) {
-      const modelWithAction = (request.params as any).modelWithAction as string;
-      return handleBetaGeminiRequest(
-        request,
-        reply,
-        modelWithAction.includes('streamGenerateContent'),
-        { usageStorage, quotaEnforcer }
-      );
-    }
-
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();

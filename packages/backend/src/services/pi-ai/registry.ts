@@ -1,115 +1,26 @@
 /**
- * Shared pi-ai utilities for the beta inference path.
+ * Shared pi-ai utilities used by the v1 OAuth path and registry-aware adapter work.
  *
  * This module owns:
  *  - buildThinkingOptions: per-provider reasoning option construction (moved from oauth-transformer.ts)
  *  - resolveBaseUrl: resolve api_base_url union and apply SDK-specific stripping rules
  *  - buildReasoningOptions: wrap buildThinkingOptions with explicit-disable defaults
- *  - buildPiAiModel: construct a call-ready pi-ai Model with base URL override applied
  */
 
-import {
-  clampThinkingLevel,
-  getSupportedThinkingLevels,
-  createProvider,
-} from '@earendil-works/pi-ai';
+import { clampThinkingLevel, getSupportedThinkingLevels } from '@earendil-works/pi-ai';
 import { getBuiltinModel, builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type { Model as PiAiModel, ModelThinkingLevel } from '@earendil-works/pi-ai';
-import { PricingManager } from '../../services/pricing-manager';
+import { PricingManager } from '../pricing-manager';
 
 export const piAiModels = builtinModels();
 
-// Lazy API implementation factories, keyed by pi-ai api id.
-// Imported here so we can instantiate the right one when registering custom providers.
-const API_IMPLEMENTATIONS: Record<string, () => any> = {
-  'openai-completions': () =>
-    import('@earendil-works/pi-ai/api/openai-completions.lazy').then((m) =>
-      m.openAICompletionsApi()
-    ),
-  'openai-responses': () =>
-    import('@earendil-works/pi-ai/api/openai-responses.lazy').then((m) => m.openAIResponsesApi()),
-  'openai-codex-responses': () =>
-    import('@earendil-works/pi-ai/api/openai-codex-responses.lazy').then((m) =>
-      m.openAICodexResponsesApi()
-    ),
-  'anthropic-messages': () =>
-    import('@earendil-works/pi-ai/api/anthropic-messages.lazy').then((m) =>
-      m.anthropicMessagesApi()
-    ),
-  'google-generative-ai': () =>
-    import('@earendil-works/pi-ai/api/google-generative-ai.lazy').then((m) =>
-      m.googleGenerativeAIApi()
-    ),
-  'google-generative-ai-vertex': () =>
-    import('@earendil-works/pi-ai/api/google-vertex.lazy').then((m) => m.googleVertexApi()),
-  'azure-openai-responses': () =>
-    import('@earendil-works/pi-ai/api/azure-openai-responses.lazy').then((m) =>
-      m.azureOpenAIResponsesApi()
-    ),
-};
-
-/**
- * Register each pi_ai_custom_provider from Plexus config with the piAiModels
- * instance via createProvider() + setProvider(). This must be called at startup
- * so that toDispatchModel() can find custom providers by id and piAiModels.stream()
- * routes to the correct API implementation instead of falling back to the openai
- * builtin (which only supports openai-responses).
- */
-export async function registerCustomProvidersWithPiAi(): Promise<void> {
-  let cfg: ReturnType<typeof getConfig> | undefined;
-  try {
-    cfg = getConfig();
-  } catch {
-    return;
-  }
-  const customProviders = (cfg as any)?.pi_ai_custom_providers as
-    | Record<string, PiAiCustomProvider>
-    | undefined;
-  if (!customProviders || Object.keys(customProviders).length === 0) return;
-
-  for (const [id, spec] of Object.entries(customProviders)) {
-    if (piAiModels.getProvider(id)) {
-      // Already registered (e.g. duplicate call at reload) — skip.
-      continue;
-    }
-    const apiFactory = API_IMPLEMENTATIONS[spec.api];
-    if (!apiFactory) {
-      logger.warn(
-        `[registerCustomProvidersWithPiAi] Unknown api '${spec.api}' for custom provider '${id}' — skipping`
-      );
-      continue;
-    }
-    try {
-      const apiImpl = await apiFactory();
-      const provider = createProvider({
-        id,
-        name: spec.display_name ?? id,
-        auth: { apiKey: { name: id, resolve: async () => ({ auth: {} }) } },
-        models: [],
-        api: apiImpl,
-      });
-      piAiModels.setProvider(provider);
-    } catch (e: any) {
-      logger.warn(
-        `[registerCustomProvidersWithPiAi] Failed to register custom provider '${id}': ${e.message}`
-      );
-    }
-  }
-}
-
-import {
-  getConfig,
-  type ProviderConfig,
-  type PiAiCustomModel,
-  type PiAiCustomProvider,
-} from '../../config';
-import type { RouteResult } from '../../services/router';
-import { estimateKwhUsed } from '../../services/inference-energy';
+import type { ProviderConfig } from '../../config';
+import type { RouteResult } from '../router';
+import { estimateKwhUsed } from '../inference-energy';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { ReasoningEffort, ReasoningIntent } from './reasoning';
 import { effortToBudget, intentToEffort } from './reasoning';
 import type { GenerationIntent } from './generation';
-import { logger } from '../../utils/logger';
 
 // ─── buildThinkingOptions ─────────────────────────────────────────────────────
 //
@@ -531,63 +442,6 @@ function isOpenAiFamily(api: string | undefined): boolean {
   );
 }
 
-// ─── resolvePiAiModel ─────────────────────────────────────────────────────────
-//
-// Single resolution point for a pi-ai Model object given a (provider, modelId)
-// pair from Plexus config. Resolution precedence:
-//
-//   1. Custom model registry  (config.pi_ai_custom_models[modelId])
-//        - provider-scoped: only matches when the model's `provider` equals
-//          the referencing provider.
-//        - `inherits` clones a registry base, then deep-merges overrides;
-//        - otherwise a full standalone spec.
-//   2. Custom provider registry (config.pi_ai_custom_providers[provider])
-//        - supplies the wire `api` + compat for a base model resolved from the
-//          registry (or a custom model), for niche hosts pi-ai doesn't know.
-//   3. pi-ai built-in registry (getModel()).
-//   4. null when nothing resolves.
-//
-// IMPORTANT: pi-ai 0.79.x `getModel()` returns `undefined` (it does NOT throw)
-// for unknown pairs, so callers MUST null-check the result of this function
-// rather than relying on a try/catch.
-
-function deepMerge<T>(base: T, patch: Partial<T> | undefined): T {
-  if (!patch) return base;
-  const out: any = Array.isArray(base) ? [...(base as any)] : { ...(base as any) };
-  for (const [k, v] of Object.entries(patch)) {
-    if (v === undefined) continue;
-    const cur = (out as any)[k];
-    if (
-      v !== null &&
-      typeof v === 'object' &&
-      !Array.isArray(v) &&
-      cur !== null &&
-      typeof cur === 'object' &&
-      !Array.isArray(cur)
-    ) {
-      (out as any)[k] = deepMerge(cur, v as any);
-    } else {
-      (out as any)[k] = v;
-    }
-  }
-  return out;
-}
-
-/** Apply a custom-model spec's fields onto a base Model via deep merge. */
-function applyCustomModelFields(base: PiAiModel<any>, spec: PiAiCustomModel): PiAiModel<any> {
-  const overrides: Record<string, any> = {};
-  if (spec.api != null) overrides.api = spec.api;
-  if (spec.name != null) overrides.name = spec.name;
-  if (spec.contextWindow != null) overrides.contextWindow = spec.contextWindow;
-  if (spec.maxTokens != null) overrides.maxTokens = spec.maxTokens;
-  if (spec.reasoning != null) overrides.reasoning = spec.reasoning;
-  if (spec.thinkingLevelMap != null) overrides.thinkingLevelMap = spec.thinkingLevelMap;
-  if (spec.input != null) overrides.input = spec.input;
-  if (spec.cost != null) overrides.cost = spec.cost;
-  if (spec.compat != null) overrides.compat = spec.compat;
-  return deepMerge(base, overrides);
-}
-
 /**
  * getModel may return undefined (pi-ai 0.79.x) or throw (older versions /
  * mocked) for unknown pairs — normalise both to null.
@@ -598,42 +452,6 @@ function safeGetModel(provider: string, modelId: string): PiAiModel<any> | null 
   } catch {
     return null;
   }
-}
-
-/** A minimal Model skeleton used when a custom model has no inheritance base. */
-function emptyModelSkeleton(id: string, provider: string, api: string): PiAiModel<any> {
-  return {
-    id,
-    name: id,
-    api,
-    provider,
-    baseUrl: '',
-    reasoning: false,
-    input: ['text'],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 0,
-    maxTokens: 0,
-  } as PiAiModel<any>;
-}
-
-function resolveCustomModel(
-  spec: PiAiCustomModel,
-  provider: string,
-  modelId: string
-): PiAiModel<any> | null {
-  let base: PiAiModel<any> | null = null;
-  if (spec.inherits) {
-    base = safeGetModel(spec.inherits.provider, spec.inherits.model_id);
-    if (!base) return null; // inheritance target missing → unresolved
-  }
-  if (!base) {
-    const api = spec.api;
-    if (!api) return null; // standalone spec must declare an api
-    base = emptyModelSkeleton(modelId, provider, api);
-  }
-  // Preserve the caller's id/provider identity on the resolved model.
-  const merged = applyCustomModelFields(base, spec);
-  return { ...merged, id: modelId, provider };
 }
 
 const API_TO_BUILTIN_PROVIDER: Record<string, string> = {
@@ -647,58 +465,10 @@ const API_TO_BUILTIN_PROVIDER: Record<string, string> = {
 };
 
 /**
- * Resolve a pi-ai Model for a (provider, modelId) pair, consulting the custom
- * registries before the built-in pi-ai registry. Returns null when unresolved.
+ * Resolve a builtin pi-ai Model for a (provider, modelId) pair.
+ * Returns null when unresolved.
  */
 export function resolvePiAiModel(piAiProvider: string, piAiModelId: string): PiAiModel<any> | null {
-  // Config may not be loaded in some unit contexts; degrade to registry-only.
-  let cfg: ReturnType<typeof getConfig> | undefined;
-  try {
-    cfg = getConfig();
-  } catch {
-    cfg = undefined;
-  }
-  const customModels = (cfg as any)?.pi_ai_custom_models as
-    | Record<string, PiAiCustomModel>
-    | undefined;
-  const customProviders = (cfg as any)?.pi_ai_custom_providers as
-    | Record<string, PiAiCustomProvider>
-    | undefined;
-
-  // 1. Custom model definition. A model is provider-scoped: it only matches
-  //    when its `provider` field equals the referencing pi-ai provider.
-  //    First, look up via the compound key `${piAiProvider}:${piAiModelId}`,
-  //    then fall back to the plain key `piAiModelId` for backwards compatibility.
-  //    We bypass custom models for system fallback providers so they always fall through to the skeleton.
-  if (!piAiProvider.startsWith('fallback-')) {
-    const compoundKey = piAiModelId.includes(':') ? piAiModelId : `${piAiProvider}:${piAiModelId}`;
-    const modelSpec = customModels?.[compoundKey] ?? customModels?.[piAiModelId];
-
-    if (modelSpec && modelSpec.provider === piAiProvider) {
-      const resolved = resolveCustomModel(modelSpec, piAiProvider, piAiModelId);
-      if (resolved) {
-        // A custom provider may still override the wire api/compat.
-        return applyCustomProvider(resolved, customProviders?.[piAiProvider]);
-      }
-      return null;
-    }
-  }
-
-  // 2. Custom provider with a registry/base model.
-  const providerSpec = customProviders?.[piAiProvider];
-  if (providerSpec) {
-    // The base model still has to be a known registry model id (the custom
-    // provider only supplies api/compat, not the model's token/cost metadata).
-    // We try the registry under any known provider that owns this model id by
-    // using the spec.api as the wire; if not found, build a skeleton.
-    const builtinProvider = API_TO_BUILTIN_PROVIDER[providerSpec.api] ?? 'openai';
-    const base =
-      safeGetModel(builtinProvider, piAiModelId) ??
-      emptyModelSkeleton(piAiModelId, piAiProvider, providerSpec.api);
-    return applyCustomProvider({ ...base, id: piAiModelId, provider: piAiProvider }, providerSpec);
-  }
-
-  // 3. Built-in registry.
   return safeGetModel(piAiProvider, piAiModelId);
 }
 
@@ -731,21 +501,9 @@ export function toDispatchModel(model: PiAiModel<any>): PiAiModel<any> {
   return { ...model, provider: builtinProvider };
 }
 
-function applyCustomProvider(
-  model: PiAiModel<any>,
-  providerSpec: PiAiCustomProvider | undefined
-): PiAiModel<any> {
-  if (!providerSpec) return model;
-  const merged: any = { ...model, api: providerSpec.api };
-  if (providerSpec.compat) {
-    merged.compat = deepMerge((model as any).compat ?? {}, providerSpec.compat);
-  }
-  return merged;
-}
-
 // ─── buildPiAiModel ───────────────────────────────────────────────────────────
 //
-// Resolves a pi-ai Model (registry or custom) and applies the baseUrl override
+// Resolves a builtin pi-ai Model and applies the baseUrl override
 // from the Plexus provider config. Returns null when the model cannot be
 // resolved (caller fails the candidate). Base URL resolution keys off the
 // *upstream* pi-ai API (piModel.api), not the client-facing route type.

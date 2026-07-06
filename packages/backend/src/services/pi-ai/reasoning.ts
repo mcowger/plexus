@@ -1,5 +1,5 @@
 /**
- * Canonical reasoning/thinking intent for the inference-v2 path.
+ * Canonical reasoning/thinking intent for pi-ai registry compatibility.
  *
  * Every inbound protocol (OpenAI chat, Anthropic messages, OpenAI Responses,
  * Gemini) expresses "how much should the model think" differently:
@@ -19,7 +19,7 @@
  *   - `summary`      : whether the client asked for a reasoning summary
  *   - `source`       : provenance, for debugging / policy resolution
  *
- * The egress side (`pi-ai-utils.ts`) consumes this intent together with the
+ * The egress side (`registry.ts`) consumes this intent together with the
  * resolved pi-ai model's capabilities to produce the correct per-provider
  * request options. Preserving `budgetTokens` lets us round-trip the client's
  * exact budget when the ingress and egress families match (e.g. Anthropic →

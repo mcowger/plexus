@@ -1,5 +1,5 @@
 /**
- * Generalized generation intent for the inference-v2 path.
+ * Generalized generation intent for pi-ai registry compatibility.
  *
  * This is the carrier the inbound parsers populate and the executor threads
  * into the capability-aware egress builder. It supersedes the ad-hoc
@@ -8,7 +8,7 @@
  *
  * The design mirrors the reasoning work: every protocol expresses these knobs
  * differently, so each parser normalizes its dialect into ONE canonical
- * {@link GenerationIntent}; the egress side (`pi-ai-utils.ts`) then re-expands
+ * {@link GenerationIntent}; the egress side (`registry.ts`) then re-expands
  * the intent against the resolved pi-ai model's capabilities.
  *
  * Fields here are deliberately raw client intent — clamping to model limits,

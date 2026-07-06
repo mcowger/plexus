@@ -1331,10 +1331,6 @@ export const Config = () => {
             }
           >
             <div className="flex flex-col gap-3">
-              <p className="font-body text-[11px] text-text-muted">
-                Applies to <code>/beta/</code> (inference-v2) routes.
-              </p>
-
               {/* enabled toggle */}
               <div className="flex items-center justify-between gap-4">
                 <div>

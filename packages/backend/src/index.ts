@@ -71,7 +71,6 @@ import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
 import { isEncryptionEnabled } from './utils/encryption';
 import { mcpProcessManager } from './services/mcp-local/mcp-process-manager';
-import { seedFallbackProviders } from './db/seed-fallback-providers';
 
 /**
  * Plexus Backend Server
@@ -153,7 +152,6 @@ try {
   initializeDatabase();
   await runMigrations();
   await runEncryptionMigration();
-  await seedFallbackProviders();
 } catch (e) {
   logger.error('Failed to initialize database or run migrations', e);
   process.exit(1);
@@ -176,11 +174,6 @@ try {
   DebugManager.getInstance().setCaptureOnError(
     await configService.getRepository().getCaptureTraceOnError()
   );
-
-  // Register pi_ai_custom_providers with the piAiModels instance so custom
-  // providers can be dispatched directly by api type without remapping hacks.
-  const { registerCustomProvidersWithPiAi } = await import('./inference-v2/shared/pi-ai-utils');
-  await registerCustomProvidersWithPiAi();
 
   // One-time migration of legacy flat-format aliases to target groups.
   // TODO(#target-groups-cleanup): remove this after migration period.

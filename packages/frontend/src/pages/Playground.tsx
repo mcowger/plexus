@@ -343,9 +343,6 @@ export const Playground = () => {
               </div>
               {selectedKey ? (
                 <div className="flex flex-wrap gap-1.5">
-                  <Badge status={selectedKey.beta ? 'warning' : 'neutral'}>
-                    {selectedKey.beta ? 'Beta key' : 'Standard key'}
-                  </Badge>
                   {selectedKey.quotas?.length ? (
                     <Badge status="info">{selectedKey.quotas.length} quota(s)</Badge>
                   ) : (

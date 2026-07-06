@@ -24,7 +24,6 @@ interface SelfInfo {
   quotaNames?: string[];
   quotaName?: string | null;
   comment?: string | null;
-  beta?: boolean;
   traceEnabled?: boolean;
   traceEnabledGlobal?: boolean;
 }
@@ -169,8 +168,6 @@ export const MyKey: React.FC = () => {
                   ? info.quotaNames.join(', ')
                   : info.quotaName || '—'}
               </dd>
-              <dt className="text-text-muted">Inference path</dt>
-              <dd className="text-text">{info.beta ? 'Beta' : 'Stable'}</dd>
               <dt className="text-text-muted">Allowed providers</dt>
               <dd className="text-text break-words">
                 {allowedProviders.length > 0 ? allowedProviders.join(', ') : 'Any (unrestricted)'}

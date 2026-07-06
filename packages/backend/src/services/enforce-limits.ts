@@ -148,10 +148,10 @@ export interface EnforceRouteInfo {
 }
 
 /**
- * Gate + bridge for the v2/beta path: enforce the context limit for one routing
- * candidate. No-op unless the alias has `enforce_limits` AND the candidate has a
- * canonicalModel (mirrors dispatcher.ts:392). Throws ContextLengthExceededError
- * on violation; the caller catches it (no failover on context-length).
+ * Enforce the context limit for one routing candidate using a context-shaped
+ * request. No-op unless the alias has `enforce_limits` AND the candidate has a
+ * canonicalModel. Throws ContextLengthExceededError on violation; the caller
+ * catches it (no failover on context-length).
  */
 export function enforceContextLimitForRoute(
   context: Context,
@@ -169,10 +169,9 @@ export function enforceContextLimitForRoute(
 }
 
 /**
- * Inference-v2 (pi path) analogue of enforceContextLimit. Counts tokens from a
- * pi-ai Context (the v2 path has no originalBody) and throws
- * ContextLengthExceededError when estimate + reserved output exceeds the
- * resolved context window. Fail-open when no context length is known.
+ * Context-shaped analogue of enforceContextLimit. Counts tokens from a pi-ai
+ * Context and throws ContextLengthExceededError when estimate + reserved output
+ * exceeds the resolved context window. Fail-open when no context length is known.
  */
 export function enforceContextLimitForContext(
   context: Context,
@@ -184,7 +183,7 @@ export function enforceContextLimitForContext(
   const contextLength =
     opts.contextLength ?? merged?.top_provider?.context_length ?? merged?.context_length;
   if (!contextLength || contextLength <= 0) {
-    logger.debug(`[enforce-limits:v2] Skipping '${aliasSlug}': no context_length known.`);
+    logger.debug(`[enforce-limits:context] Skipping '${aliasSlug}': no context_length known.`);
     return; // fail open — we can't enforce what we don't know
   }
 

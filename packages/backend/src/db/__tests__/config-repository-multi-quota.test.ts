@@ -35,7 +35,6 @@ describe('config-repository multi-quota round-trips', () => {
       secret: 'sk-legacy',
       secretHash: 'hash-legacy',
       quotaName: 'legacy-quota',
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -51,7 +50,6 @@ describe('config-repository multi-quota round-trips', () => {
       secretHash: 'hash-multi',
       quotaName: 'stale-legacy-quota',
       quotaNames: JSON.stringify(['quota-a', 'quota-b']),
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -65,7 +63,6 @@ describe('config-repository multi-quota round-trips', () => {
       name: 'no-quota-key',
       secret: 'sk-none',
       secretHash: 'hash-none',
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -80,7 +77,6 @@ describe('config-repository multi-quota round-trips', () => {
       secret: 'sk-secret-lookup',
       secretHash: 'hash-secret-lookup',
       quotaName: 'legacy-only',
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -105,7 +101,6 @@ describe('config-repository multi-quota round-trips', () => {
       secret: 'sk-old-secret',
       secretHash: 'hash-old-secret',
       quotaName: 'do-not-touch',
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -135,7 +130,6 @@ describe('config-repository multi-quota round-trips', () => {
       secret: 'sk-clearing',
       secretHash: 'hash-clearing',
       quotaName: 'stale-legacy-quota',
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -160,7 +154,6 @@ describe('config-repository multi-quota round-trips', () => {
       secret: 'sk-untouched',
       secretHash: 'hash-untouched',
       quotaName: 'still-legacy',
-      beta: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

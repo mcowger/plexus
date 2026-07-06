@@ -15,7 +15,6 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
         allowedProviders?: string[];
         excludedModels?: string[];
         excludedProviders?: string[];
-        beta?: boolean;
       }
     | undefined;
 

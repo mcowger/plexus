@@ -3,7 +3,6 @@ import { logger } from '../../utils/logger';
 import { HuggingFaceModelFetcher } from '../../services/huggingface-model-fetcher';
 import { ModelMetadataManager } from '../../services/model-metadata-manager';
 import { getBuiltinModels, getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
-import { ConfigService } from '../../services/config-service';
 
 interface FetchModelRequest {
   Params: {
@@ -81,18 +80,7 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
    * Returns the list of provider IDs known to the pi-ai library.
    */
   fastify.get('/v0/management/pi/providers', async (_request, reply) => {
-    // Built-in pi-ai providers plus any workspace custom providers.
-    const builtin = getBuiltinProviders();
-    let custom: string[] = [];
-    try {
-      custom = Object.keys(
-        await ConfigService.getInstance().getRepository().getAllPiAiCustomProviders()
-      );
-    } catch {
-      /* non-fatal */
-    }
-    const merged = Array.from(new Set([...builtin, ...custom])).sort();
-    return reply.send({ data: merged });
+    return reply.send({ data: getBuiltinProviders().sort() });
   });
 
   /**
@@ -109,7 +97,7 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: `Missing 'provider' parameter` });
     }
 
-    // Built-in registry models for this provider (may be empty for a custom provider).
+    // Built-in registry models for this provider.
     let builtin: ReturnType<typeof getBuiltinModels> = [];
     try {
       builtin = getBuiltinModels(query.provider as any) ?? [];
@@ -117,34 +105,12 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
       builtin = [];
     }
 
-    // Custom models are provider-scoped: surface only the ones belonging to this
-    // provider (def.provider === provider). Models scoped to other providers are
-    // hidden so the picker only offers resolvable options.
-    let customEntries: Array<{ id: string; name: string; api: string; custom: true }> = [];
-    try {
-      const customModels = await ConfigService.getInstance()
-        .getRepository()
-        .getAllPiAiCustomModels();
-      customEntries = Object.entries(customModels)
-        .filter(([, def]) => def.provider === query.provider)
-        .map(([id, def]) => {
-          const cleanId = id.includes(':') ? id.split(':').slice(1).join(':') : id;
-          return {
-            id: cleanId,
-            name: (def as any).name ?? cleanId,
-            api: (def as any).api ?? 'custom',
-            custom: true as const,
-          };
-        });
-    } catch {
-      /* non-fatal */
-    }
-
-    const merged = [
-      ...builtin.map((m) => ({ id: m.id, name: m.name, api: m.api as string, custom: false })),
-      // Avoid duplicating a custom model id that also exists in the registry.
-      ...customEntries.filter((c) => !builtin.some((m) => m.id === c.id)),
-    ];
+    const merged = builtin.map((m) => ({
+      id: m.id,
+      name: m.name,
+      api: m.api as string,
+      custom: false,
+    }));
 
     const q = (query.q ?? '').toLowerCase();
     const filtered = q

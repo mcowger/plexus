@@ -16,7 +16,6 @@ import {
   Gauge,
   PlugZap,
   UserCircle2,
-  Library,
   FlaskConical,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -315,12 +314,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
             <NavSection title="Configuration" collapsed={collapsed} />
             <NavItem to="/providers" icon={Server} label="Providers" collapsed={collapsed} />
             <NavItem to="/models" icon={Boxes} label="Models" collapsed={collapsed} />
-            <NavItem
-              to="/pi-registry"
-              icon={Library}
-              label="pi-ai Registry"
-              collapsed={collapsed}
-            />
             <NavItem to="/keys" icon={Key} label="Keys" collapsed={collapsed} />
             <NavItem to="/quotas" icon={Gauge} label="Quotas" collapsed={collapsed} />
             <NavItem to="/mcp" icon={PlugZap} label="MCP & Skills" collapsed={collapsed} />

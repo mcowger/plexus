@@ -205,14 +205,13 @@ export const Logs = () => {
     gemini: geminiLogo,
     responses: responsesLogo,
     'openai-responses': responsesLogo,
-    // inference-v2 (pi-ai) outgoing API types
+    // pi-ai/OAuth outgoing API types
     'google-generative-ai': geminiLogo,
     'openai-completions': chatLogo,
     'anthropic-messages': messagesLogo,
   };
 
-  // Outgoing API types produced exclusively by the inference-v2 (pi-ai native) path
-  const INFERENCE_V2_OUTGOING_TYPES = new Set([
+  const PI_AI_OUTGOING_TYPES = new Set([
     'google-generative-ai',
     'openai-completions',
     'anthropic-messages',
@@ -1114,7 +1113,7 @@ export const Logs = () => {
                       </td>
                       <td
                         className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
-                        title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.outgoingApiType && INFERENCE_V2_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
+                        title={`Incoming: ${log.incomingApiType || '?'} → Outgoing: ${log.outgoingApiType || '?'} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
                         style={{ cursor: 'help' }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -1191,7 +1190,7 @@ export const Logs = () => {
                               style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
                             >
                               {log.outgoingApiType &&
-                              INFERENCE_V2_OUTGOING_TYPES.has(log.outgoingApiType) ? (
+                              PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
                                 <Pi size={12} className="text-emerald-400" />
                               ) : log.isPassthrough ? (
                                 <MoveHorizontal size={12} className="text-yellow-500" />

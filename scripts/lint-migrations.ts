@@ -141,8 +141,61 @@ const DESCRIPTIVE_PREFIXES = [
   'release_',
 ];
 
+const PROJECT_DOMAIN_TERMS = new Set([
+  'adapter',
+  'alias',
+  'api',
+  'auth',
+  'autosync',
+  'balance',
+  'billing',
+  'cache',
+  'checker',
+  'checkers',
+  'compaction',
+  'config',
+  'cooldown',
+  'debug',
+  'gateway',
+  'inference',
+  'key',
+  'keys',
+  'log',
+  'logs',
+  'mcp',
+  'metadata',
+  'model',
+  'models',
+  'oauth',
+  'provider',
+  'providers',
+  'quota',
+  'request',
+  'response',
+  'route',
+  'scoped',
+  'server',
+  'setting',
+  'settings',
+  'snapshot',
+  'sync',
+  'token',
+  'tokens',
+  'trace',
+  'traces',
+  'usage',
+  'user',
+]);
+
 function isDescriptive(name: string): boolean {
-  return DESCRIPTIVE_PREFIXES.some((prefix) => name.startsWith(prefix));
+  if (DESCRIPTIVE_PREFIXES.some((prefix) => name.startsWith(prefix))) {
+    return true;
+  }
+
+  const parts = name.split('_').filter(Boolean);
+  const domainTermCount = parts.filter((part) => PROJECT_DOMAIN_TERMS.has(part)).length;
+
+  return parts.length >= 2 && domainTermCount >= 2;
 }
 
 let hasError = false;

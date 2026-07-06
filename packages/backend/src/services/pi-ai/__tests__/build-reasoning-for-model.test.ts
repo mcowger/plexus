@@ -38,7 +38,7 @@ vi.mock('@earendil-works/pi-ai', () => {
   };
 });
 
-import { buildReasoningOptionsForModel, buildGenerationOptions } from '../pi-ai-utils';
+import { buildReasoningOptionsForModel, buildGenerationOptions } from '../registry';
 import type { GenerationIntent } from '../generation';
 
 const intent = (o: Partial<ReasoningIntent>): ReasoningIntent => ({ source: 'client', ...o });

@@ -620,7 +620,7 @@ export function estimateInputTokens(originalBody: any, apiType: string): number 
 
 /**
  * Estimate the input-token count of a pi-ai `Context`. This is the
- * Context-shaped equivalent of `estimateInputTokens` for the v2/beta
+ * Context-shaped equivalent of `estimateInputTokens` for pi-ai/OAuth
  * inference path, which parses every wire format into a single `Context`
  * (no `originalBody` available there).
  *
