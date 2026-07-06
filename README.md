@@ -130,11 +130,9 @@ Existing plaintext values are encrypted on first startup with a key. See [Config
 Pass a subcommand as the first argument to the binary or `bun run src/index.ts`:
 
 - `rekey` decrypts sensitive fields with the current `ENCRYPTION_KEY` and re-encrypts them with `NEW_ENCRYPTION_KEY`.
-- `migrate-quota-snapshots` copies legacy `quota_snapshots` rows into `meter_snapshots`; it is idempotent and safe to rerun.
 
 ```bash
 ENCRYPTION_KEY="<current-key>" NEW_ENCRYPTION_KEY="<new-key>" ./plexus rekey
-DATABASE_URL=sqlite://./data/plexus.db ./plexus migrate-quota-snapshots
 ```
 
 ---

@@ -2481,65 +2481,6 @@ export const api = {
     }
   },
 
-  getLegacySnapshotStatus: async (): Promise<{ tableExists: boolean; rowCount: number } | null> => {
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/legacy-snapshot-status`);
-      if (!res.ok) throw new Error('Failed to get legacy snapshot status');
-      return (await res.json()) as { tableExists: boolean; rowCount: number };
-    } catch (e) {
-      console.error('API Error getLegacySnapshotStatus', e);
-      return null;
-    }
-  },
-
-  migrateLegacySnapshots: async (): Promise<{
-    inserted: number;
-    skipped: number;
-    totalSource: number;
-  } | null> => {
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/v0/management/quotas/migrate-legacy-snapshots`, {
-        method: 'POST',
-      });
-      if (!res.ok) throw new Error('Failed to migrate legacy snapshots');
-      return (await res.json()) as { inserted: number; skipped: number; totalSource: number };
-    } catch (e) {
-      console.error('API Error migrateLegacySnapshots', e);
-      return null;
-    }
-  },
-
-  truncateLegacySnapshots: async (): Promise<boolean> => {
-    try {
-      const res = await fetchWithAuth(
-        `${API_BASE}/v0/management/quotas/truncate-legacy-snapshots`,
-        { method: 'POST' }
-      );
-      if (!res.ok) throw new Error('Failed to truncate legacy snapshots');
-      return true;
-    } catch (e) {
-      console.error('API Error truncateLegacySnapshots', e);
-      return false;
-    }
-  },
-
-  downloadLegacySnapshotsBackup: async (format: 'csv' | 'sql'): Promise<void> => {
-    const res = await fetchWithAuth(
-      `${API_BASE}/v0/management/quotas/backup-legacy-snapshots?format=${format}`
-    );
-    if (!res.ok) throw new Error('Failed to download backup');
-    const blob = await res.blob();
-    const disposition = res.headers.get('Content-Disposition') ?? '';
-    const match = disposition.match(/filename="([^"]+)"/);
-    const filename = match?.[1] ?? `quota_snapshots_backup.${format}`;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  },
-
   deleteAlias: async (aliasId: string): Promise<void> => {
     const res = await fetchWithAuth(
       `${API_BASE}/v0/management/models/${encodeURIComponent(aliasId)}`,

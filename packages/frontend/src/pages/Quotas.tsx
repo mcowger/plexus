@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { RefreshCw, Cpu, Gauge, AlertTriangle, DatabaseZap, Download } from 'lucide-react';
+import { RefreshCw, Cpu, Gauge, AlertTriangle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { api, fetchQuotaCheckers } from '../lib/api';
 import { Card } from '../components/ui/Card';
@@ -18,16 +18,6 @@ export const Quotas = () => {
   const [displayNameMap, setDisplayNameMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
-  const [legacyRowCount, setLegacyRowCount] = useState<number | null>(null);
-  const [migrating, setMigrating] = useState(false);
-  const [migrationResult, setMigrationResult] = useState<{
-    inserted: number;
-    skipped: number;
-    totalSource: number;
-  } | null>(null);
-  const [truncating, setTruncating] = useState(false);
-  const [truncated, setTruncated] = useState(false);
-  const [downloading, setDownloading] = useState<'csv' | 'sql' | null>(null);
   const [historyTarget, setHistoryTarget] = useState<{
     quota: QuotaCheckerInfo;
     meter: Meter;
@@ -50,44 +40,6 @@ export const Quotas = () => {
     const interval = setInterval(fetchQuotas, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    api.getLegacySnapshotStatus().then((status) => {
-      if (status?.tableExists && status.rowCount > 0) {
-        setLegacyRowCount(status.rowCount);
-      }
-    });
-  }, []);
-
-  const handleMigrate = async () => {
-    setMigrating(true);
-    const result = await api.migrateLegacySnapshots();
-    setMigrating(false);
-    if (result) {
-      setMigrationResult(result);
-      setLegacyRowCount(null);
-      fetchQuotas();
-    }
-  };
-
-  const handleTruncate = async () => {
-    if (!confirm('Truncate quota_snapshots? This cannot be undone.')) return;
-    setTruncating(true);
-    const ok = await api.truncateLegacySnapshots();
-    setTruncating(false);
-    if (ok) setTruncated(true);
-  };
-
-  const handleDownloadBackup = async (format: 'csv' | 'sql') => {
-    setDownloading(format);
-    try {
-      await api.downloadLegacySnapshotsBackup(format);
-    } catch (e) {
-      console.error('Backup download failed', e);
-    } finally {
-      setDownloading(null);
-    }
-  };
 
   const handleRefresh = async (checkerId: string) => {
     setRefreshing((prev) => new Set(prev).add(checkerId));
@@ -199,104 +151,6 @@ export const Quotas = () => {
       />
 
       <PageContainer>
-        {legacyRowCount !== null && (
-          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm sm:flex-row sm:items-start sm:px-4">
-            <DatabaseZap size={16} className="mt-0.5 shrink-0 text-amber-400" />
-            <div className="flex-1">
-              <p className="font-medium text-amber-300">
-                Legacy quota data detected ({legacyRowCount.toLocaleString()} row
-                {legacyRowCount !== 1 ? 's' : ''} in{' '}
-                <code className="font-mono">quota_snapshots</code>)
-              </p>
-              <p className="mt-0.5 text-text-secondary">
-                Migrate this historical data into the new meter snapshots table to preserve it.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-              <Button
-                size="sm"
-                variant="ghost"
-                isLoading={downloading === 'csv'}
-                disabled={downloading !== null}
-                onClick={() => handleDownloadBackup('csv')}
-                leftIcon={<Download size={13} />}
-              >
-                CSV
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                isLoading={downloading === 'sql'}
-                disabled={downloading !== null}
-                onClick={() => handleDownloadBackup('sql')}
-                leftIcon={<Download size={13} />}
-              >
-                SQL
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                isLoading={migrating}
-                onClick={handleMigrate}
-                leftIcon={<DatabaseZap size={13} />}
-              >
-                Migrate now
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {migrationResult !== null && (
-          <div className="flex flex-col gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-3 text-sm sm:flex-row sm:items-start sm:px-4">
-            <DatabaseZap size={16} className="mt-0.5 shrink-0 text-green-400" />
-            <div className="flex-1">
-              <p className="font-medium text-green-300">
-                Migration complete — {migrationResult.inserted.toLocaleString()} row
-                {migrationResult.inserted !== 1 ? 's' : ''} inserted
-                {migrationResult.skipped > 0
-                  ? `, ${migrationResult.skipped.toLocaleString()} already existed`
-                  : ''}
-                .
-              </p>
-              {!truncated && (
-                <p className="mt-0.5 text-text-secondary">
-                  You can now truncate the old <code className="font-mono">quota_snapshots</code>{' '}
-                  table to free up space.
-                </p>
-              )}
-            </div>
-            {truncated ? (
-              <span className="text-xs text-text-muted self-center">quota_snapshots truncated</span>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  isLoading={downloading === 'csv'}
-                  disabled={downloading !== null}
-                  onClick={() => handleDownloadBackup('csv')}
-                  leftIcon={<Download size={13} />}
-                >
-                  CSV
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  isLoading={downloading === 'sql'}
-                  disabled={downloading !== null}
-                  onClick={() => handleDownloadBackup('sql')}
-                  leftIcon={<Download size={13} />}
-                >
-                  SQL
-                </Button>
-                <Button size="sm" variant="danger" isLoading={truncating} onClick={handleTruncate}>
-                  Truncate quota_snapshots
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
         {loading && quotas.length === 0 ? (
           <div className="flex items-center justify-center h-64 gap-3">
             <RefreshCw size={20} className="animate-spin text-primary" />
