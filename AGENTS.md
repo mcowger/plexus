@@ -77,11 +77,23 @@ Rules:
 - Import assets with ES6 imports only.
 - Do not use dynamic asset paths.
 
+### If the task changes the frontend UI
+
+After editing anything a user sees in the browser (React `.tsx`/`.jsx`, routes, forms,
+Tailwind/CSS, layout, or any file under `packages/frontend/src`), verify it yourself
+instead of handing it back unchecked:
+
+1. Read the **`frontend-testing`** skill.
+2. Boot the worktree-safe dev stack, auto-log into the UI, and drive it with a real
+   browser to confirm your change renders and behaves correctly.
+
 ## Canonical project commands
 
 Use these commands exactly:
 
 - Dev server: `bun run dev`
+- Dev stack for agents (background, worktree-safe): `bun run dev:agent`
+- Stop the agent dev stack: `bun run dev:stop`
 - Dev port: `PORT=$(bun run dev:get:port)`
 - Dev DB path: `DB_PATH=$(bun run dev:get:db_path)`
 - Tests: `bun run test`
@@ -91,6 +103,7 @@ Use these commands exactly:
 
 Notes:
 - `bun run dev` derives the backend port from the worktree name and runs the frontend watcher.
+- `bun run dev:agent` boots the full stack detached and returns once healthy (unlike `dev:full`, which runs in the foreground and never returns); use it when an agent needs a running instance to test against.
 - `bun test` is intentionally blocked. Use `bun run test`.
 
 ## Project overview

@@ -18,6 +18,8 @@
     "profile": "bun run dev --profile",
     "dev:pglite": "bun run scripts/dev.ts --pglite",
     "dev:full": "bun run scripts/dev.ts --full",
+    "dev:agent": "bun run scripts/dev-agent.ts",
+    "dev:stop": "bun run scripts/dev-agent.ts stop",
     "dev:get:port": "bun run scripts/dev-config.ts port",
     "dev:get:db_path": "bun run scripts/dev-config.ts db_path",
     "build:frontend": "cd packages/frontend && bun run build",
