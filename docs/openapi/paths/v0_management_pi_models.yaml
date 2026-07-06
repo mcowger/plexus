@@ -19,13 +19,14 @@ get:
     - Management — PI (Plexus Internal)
   summary: List models for a pi-ai provider (admin only)
   description: |
-    Returns the list of models available from a specific provider in the
-    `pi-ai` library, optionally filtered by a search query.
+    Returns the list of builtin models available from a specific provider in
+    the `pi-ai` library, optionally filtered by a search query.
 
     ## Use case
 
-    Discover available models from a provider to configure model aliases
-    or understand what's available for routing.
+    Discover builtin registry model IDs for `ProviderConfig.models[*].pi_ai_model_id`.
+    These IDs power registry-aware `auto_compat` mapping. Custom pi-ai
+    providers/models are not managed by Plexus.
 
     ## Query parameters
 
@@ -38,6 +39,7 @@ get:
     - `id` — Model identifier
     - `name` — Human-readable model name
     - `api` — API type (e.g., `chat`, `embeddings`)
+    - `custom` — Always `false`; only builtin registry models are returned
 
     **Admin only** — limited principals receive 403.
   security:
@@ -64,6 +66,11 @@ get:
                     api:
                       type: string
                       description: API type (e.g., chat, embeddings)
+                    custom:
+                      type: boolean
+                      enum:
+                        - false
+                      description: Always false; only builtin pi-ai registry models are returned.
     '400':
       description: Missing or invalid provider parameter.
       content:

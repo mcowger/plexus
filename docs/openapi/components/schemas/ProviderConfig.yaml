@@ -100,16 +100,32 @@ properties:
             type:
               type: string
               enum:
-                - chat
-                - responses
+                - text
                 - embeddings
                 - transcriptions
                 - speech
                 - image
+              description: >
+                Model capability type. Text models serve chat/messages/responses
+                inference surfaces.
             extraBody:
               type: object
               additionalProperties: true
               description: Extra fields merged into the request body for this model.
+            auto_compat:
+              type: boolean
+              default: false
+              description: >
+                When true, enables registry-aware compatibility mapping for this
+                model. Requires `pi_ai_model_id` to resolve to a builtin pi-ai
+                model. Overrides are opt-in; omitted/false means no automatic
+                reasoning/thinking/generation compatibility fields are injected.
+            pi_ai_model_id:
+              type: string
+              description: >
+                Builtin pi-ai model ID used to resolve registry metadata for
+                `auto_compat`. If omitted or not resolvable, auto-compat skips
+                this model without failing the request.
             adapter:
               oneOf:
                 - type: string
@@ -170,6 +186,22 @@ properties:
     description: >
       When true, enables Gemini-native thinking (extended reasoning) for this
       provider. Only applicable to Gemini-compatible providers.
+  auto_compat:
+    type: boolean
+    default: false
+    description: >
+      When true, enables registry-aware compatibility mapping for all models
+      under this provider that have a resolvable `pi_ai_model_id`. Plexus uses
+      pi-ai builtin registry metadata to map client reasoning/thinking and
+      generation intent to provider-specific request fields. The step is
+      opt-in and skipped for models without a registry link.
+  pi_ai_provider:
+    type: string
+    description: >
+      Builtin pi-ai provider ID used to validate `models[*].pi_ai_model_id`
+      links and populate registry-backed model selectors. Custom pi-ai
+      providers/models are not managed through Plexus; this field links only
+      to pi-ai's builtin registry.
   useClaudeMasking:
     type: boolean
     default: false
@@ -270,7 +302,9 @@ properties:
         array in options where each rule specifies a `source` dotted path,
         an optional `when` condition (with `op` and `value`), an array of
         `rewrites` (each with `target` and `value`), and optional `strip`
-        paths to remove after rewriting.
+        paths to remove after rewriting. This overlaps with registry-aware
+        `auto_compat`; prefer `auto_compat` for models linked to the pi-ai
+        builtin registry and keep manual rewrites as an explicit escape hatch.
 
       - `web_search_coercion` — Translates server-side web search tool entries
         to the format expected by this provider. Clients may send any known web

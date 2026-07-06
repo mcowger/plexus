@@ -1,6 +1,18 @@
 # NOMOV2 — Retire the v2 (pi-ai) inference path, harden v1
 
-Status: planning. Author-driven; solo project ("I", not "we").
+Status: implemented. Author-driven; solo project ("I", not "we").
+
+Current checkpoint:
+- `a6af66ba` — retires `inference-v2`, removes beta/custom pi-ai surfaces, relocates the
+  retained pi-ai helpers and Claude masking code into v1, and adds `auto_compat` support.
+- `04ee17a5` — commits the generated `auto_compat` migrations.
+- Verification at commit time: pre-commit hooks passed, including changed backend tests,
+  frontend build, workspace typecheck, biome checks, and migration-name linting. Full M2
+  verification also passed `bun run test`, `bun run typecheck`, `bun run format:check`,
+  and browser verification of provider/model Auto Compat controls.
+- Documentation follow-up: `docs/CONFIGURATION.md` and OpenAPI provider/pi-ai discovery
+  schemas now document builtin registry linkage, `auto_compat`, `pi_ai_provider`, and
+  `pi_ai_model_id`.
 
 ## Why (one paragraph)
 The v2 / `inference-v2` path was an experiment built on `@earendil-works/pi-ai` as the
@@ -74,6 +86,8 @@ New homes (decided — function-grouped):
 ---
 
 ## Milestone 1 — Remove the v2 inference path
+
+Status: done.
 
 ### Goal
 Delete `inference-v2/`, the `/beta/*` routes, the per-key `beta` routing branch, the
@@ -355,7 +369,10 @@ _All resolved — see "Decisions made" above._
 
 ## Definition of done
 - No code path reaches `inference-v2/`; directory deleted; `beta` key flag gone end-to-end
-  (schema/db/API/UI) with a generated migration.
+  from schema reads/writes, API surface, routing, and UI. The dormant `keys.beta` DB column
+  remains intentionally untouched; no drop migration was generated.
+- `auto_compat` has generated SQLite/Postgres migrations committed separately in
+  `04ee17a5`.
 - OAuth/Claude routes retain (and improve on) current masking behavior via the relocated
   pipeline; all OAuth/masking tests green.
 - Reasoning/thinking/temperature compat is applied automatically from the registry on both

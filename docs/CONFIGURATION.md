@@ -93,6 +93,8 @@ A **provider** represents an upstream AI service that Plexus routes requests to.
 | **Upstream Timeout** | Per-provider request timeout override in milliseconds. If unset, the global timeout is used. | No |
 | **Disable Cooldown** | Exclude from automatic cooldown on errors | No |
 | **Stall Detection Overrides** | Optional per-provider overrides for TTFB/throughput stall detection. Empty = inherit global setting for that field. | No |
+| **pi-ai Provider** | Builtin pi-ai provider ID used for registry model lookup (for example, `anthropic`, `openai`, `google`) | No |
+| **Auto Compat** | Use pi-ai registry metadata to automatically map reasoning/thinking and generation options for models with a `pi_ai_model_id` | No (default: false) |
 | **Adapters** | Request/response rewrite hooks applied to every model under this provider (see [Provider Adapters](#provider-adapters)) | No |
 
 ### Multi-Protocol Providers
@@ -130,6 +132,58 @@ Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/pac
 
 Once configured, log in via the Admin UI to authorize Plexus. Tokens are stored encrypted (when `ENCRYPTION_KEY` is set) and auto-refreshed.
 
+### Registry-Aware Compatibility
+
+Plexus can use pi-ai's builtin model registry as compatibility metadata while still
+preserving v1 pass-through request fidelity. This is separate from OAuth execution and
+does not re-enable the removed `inference-v2` path.
+
+Enable it with `auto_compat: true` at the provider level or on an individual provider
+model. A model must also have `pi_ai_model_id` set to a builtin pi-ai model ID. When the
+provider has `pi_ai_provider`, Plexus validates that the pair resolves in the builtin
+registry and warns rather than failing if it does not.
+
+When enabled, Plexus extracts the client's reasoning/thinking intent from the incoming
+request and maps it to the provider fields supported by the resolved registry model. If
+the model has no resolvable `pi_ai_model_id`, the compatibility step is skipped.
+
+```json
+PUT /v0/management/providers/anthropic_oauth
+{
+  "api_base_url": "oauth://",
+  "api_key": "oauth",
+  "oauth_provider": "anthropic",
+  "oauth_account": "work",
+  "pi_ai_provider": "anthropic",
+  "auto_compat": true,
+  "models": {
+    "claude-opus-4-6": {
+      "type": "text",
+      "pi_ai_model_id": "claude-opus-4-6"
+    }
+  }
+}
+```
+
+You can also enable compatibility only for selected models:
+
+```json
+{
+  "pi_ai_provider": "anthropic",
+  "models": {
+    "claude-opus-4-6": {
+      "type": "text",
+      "pi_ai_model_id": "claude-opus-4-6",
+      "auto_compat": true
+    }
+  }
+}
+```
+
+`reasoning_rewrite` remains available as a manual escape hatch, but it overlaps with
+`auto_compat`. Prefer `auto_compat` for registry-backed models, and revisit existing
+custom rewrites before running both surfaces in parallel.
+
 ### Provider Adapters
 
 Adapters rewrite request payloads outbound to a provider and raw response payloads inbound, fixing provider-specific field-name incompatibilities without modifying the core transformer pipeline.
@@ -141,6 +195,7 @@ Adapters can be set at **provider level** (applied to every model under the prov
 | `reasoning_content` | Renames `reasoning` / `thinking.content` → `reasoning_content` on outbound assistant messages for providers that use Fireworks/DeepSeek field naming (e.g. Fireworks DeepSeek-R1). Fixes *"Extra inputs are not permitted, field: messages[N].reasoning"* errors. |
 | `suppress_developer_role` | Rewrites the `developer` role to `system` on outbound messages for providers that do not support the newer OpenAI `developer` role. |
 | `model_override` | Conditionally rewrites the provider model name based on request payload fields. Used for providers that expose reasoning variants as separate model names rather than respecting reasoning-related fields in the request body. See [Model Override Adapter](#model-override-adapter) below. |
+| `reasoning_rewrite` | Manually rewrites reasoning/thinking request fields for providers with bespoke compatibility requirements. Prefer `auto_compat` for models linked to the pi-ai builtin registry; this adapter is now best treated as an escape hatch. |
 | `web_search_coercion` | Translates server-side web search tool entries to the format expected by the target provider. Clients can use any web search format; Plexus rewrites it transparently. See [Web Search Coercion Adapter](#web-search-coercion-adapter) below. |
 
 **Example — provider-level:**
