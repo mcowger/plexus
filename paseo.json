@@ -34,6 +34,14 @@
     "prep-dev:reset": {
       "type": "service",
       "command": "PLEXUS_URL=http://localhost PLEXUS_PORT=$PASEO_SERVICE_DEV_PORT bun run prep-dev --reset"
+    },
+    "deploy:staging": {
+      "type": "command",
+      "command": "bun run deploy:staging"
+    },
+    "release": {
+      "type": "command",
+      "command": "bun run release"
     }
   },
   "metadataGeneration": {
