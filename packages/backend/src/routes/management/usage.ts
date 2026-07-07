@@ -83,6 +83,7 @@ export async function registerUsageRoutes(
     const filters: any = {
       startDate: query.startDate,
       endDate: query.endDate,
+      requestId: query.requestId,
       apiKey: query.apiKey,
       incomingApiType: query.incomingApiType,
       provider: query.provider,

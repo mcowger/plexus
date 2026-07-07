@@ -1,4 +1,5 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import crypto from 'node:crypto';
 import { UnifiedChatResponse } from '../types/unified';
 import { Transformer } from '../types/transformer';
 import { UsageRecord } from '../types/usage';
@@ -18,6 +19,24 @@ import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { recordQuotaUsage, buildQuotaHeaders } from '../services/quota/quota-middleware';
 import { CooldownManager } from './cooldown-manager';
+
+function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
+  const value = request.headers?.[headerName];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function hasValidAdminKey(request: FastifyRequest): boolean {
+  const adminKey = process.env.ADMIN_KEY;
+  const providedKey = getHeaderValue(request, 'x-admin-key');
+  if (!adminKey || !providedKey) return false;
+  const adminKeyHash = crypto.createHash('sha256').update(adminKey).digest();
+  const providedKeyHash = crypto.createHash('sha256').update(providedKey).digest();
+  return crypto.timingSafeEqual(adminKeyHash, providedKeyHash);
+}
+
+function shouldIncludePlaygroundRouting(request: FastifyRequest): boolean {
+  return getHeaderValue(request, 'x-plexus-playground') === 'true' && hasValidAdminKey(request);
+}
 /**
  * handleResponse
  *
@@ -446,6 +465,13 @@ export async function handleResponse(
     return reply.send(pipeline);
   } else {
     // --- Scenario B: Non-Streaming (Unary) Response ---
+    const includePlaygroundRouting = shouldIncludePlaygroundRouting(request);
+    const playgroundRouting = includePlaygroundRouting
+      ? {
+          requestId: usageRecord.requestId,
+          ...unifiedResponse.plexus,
+        }
+      : undefined;
 
     // Remove internal plexus metadata before sending to client
     if (unifiedResponse.plexus) {
@@ -458,6 +484,9 @@ export async function handleResponse(
     } else {
       // Re-format the unified JSON body to match the client's expected API format
       responseBody = await clientTransformer.formatResponse(unifiedResponse);
+    }
+    if (playgroundRouting && responseBody && typeof responseBody === 'object') {
+      responseBody.plexus = playgroundRouting;
     }
 
     // Capture transformed response for debugging

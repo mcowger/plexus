@@ -503,7 +503,11 @@ export interface UsageRecord {
   incomingApiType?: string;
   provider?: string;
   incomingModelAlias?: string;
+  canonicalModelName?: string | null;
   selectedModelName?: string;
+  finalAttemptProvider?: string | null;
+  finalAttemptModel?: string | null;
+  allAttemptedProviders?: string | null;
   outgoingApiType?: string;
   tokensInput?: number;
   tokensOutput?: number;
@@ -582,6 +586,7 @@ type UsageRecordField = keyof UsageRecord;
 interface UsageQueryParams<T extends UsageRecordField> {
   limit?: number;
   offset?: number;
+  requestId?: string;
   startDate?: string;
   endDate?: string;
   incomingApiType?: string;
