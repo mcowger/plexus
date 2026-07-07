@@ -1,5 +1,6 @@
 const SENSITIVE_HEADERS = [
   'authorization',
+  'x-admin-key',
   'x-auth-token',
   'x-api-key',
   'x-goog-api-key',

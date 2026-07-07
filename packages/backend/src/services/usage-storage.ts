@@ -23,6 +23,7 @@ export interface ProgressUpdate {
 // ModelArchitecture is now imported from @plexus/shared
 
 export interface UsageFilters {
+  requestId?: string;
   startDate?: string;
   endDate?: string;
   apiKey?: string;
@@ -528,6 +529,9 @@ export class UsageStorageService extends EventEmitter {
     const schema = this.schema!;
     const conditions = [];
 
+    if (filters.requestId) {
+      conditions.push(eq(schema.requestUsage.requestId, filters.requestId));
+    }
     if (filters.startDate) {
       conditions.push(gte(schema.requestUsage.date, filters.startDate));
     }
