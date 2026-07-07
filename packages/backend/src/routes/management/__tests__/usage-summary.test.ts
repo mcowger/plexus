@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { registerUsageRoutes } from '../usage';
 import { UsageStorageService } from '../../../services/usage-storage';
@@ -26,11 +26,15 @@ describe('Usage summary route', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await fastify.close();
     await closeDatabase();
   });
 
   it('aggregates kwhUsed in summary series buckets', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
+
     const now = new Date();
     now.setSeconds(0, 0);
 
