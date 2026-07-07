@@ -18,6 +18,13 @@ describe('sanitizeHeaders', () => {
     expect(result['x-auth-token']).toBe('toke...cdef');
   });
 
+  test('masks admin key header', () => {
+    const result = sanitizeHeaders({
+      'x-admin-key': 'correct-admin-key',
+    });
+    expect(result['x-admin-key']).toBe('corr...-key');
+  });
+
   test('masks x-api-key header', () => {
     const result = sanitizeHeaders({
       'x-api-key': 'my-long-api-key-value',

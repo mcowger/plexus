@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { handleResponse } from '../../services/response-handler';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { UsageStorageService } from '../../services/usage-storage';
@@ -7,6 +7,8 @@ import { UnifiedChatResponse } from '../../types/unified';
 import { UsageRecord } from '../../types/usage';
 
 describe('handleResponse', () => {
+  const originalAdminKey = process.env.ADMIN_KEY;
+
   const mockStorage = {
     saveRequest: vi.fn(),
     saveError: vi.fn(),
@@ -38,6 +40,19 @@ describe('handleResponse', () => {
   const mockRequest = {
     id: 'test-req-id',
   } as unknown as FastifyRequest;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.ADMIN_KEY = originalAdminKey;
+  });
+
+  afterEach(() => {
+    if (originalAdminKey === undefined) {
+      delete process.env.ADMIN_KEY;
+    } else {
+      process.env.ADMIN_KEY = originalAdminKey;
+    }
+  });
 
   test('should process non-streaming response correctly', async () => {
     const unifiedResponse: UnifiedChatResponse = {
@@ -90,6 +105,126 @@ describe('handleResponse', () => {
     const result = lastCall[0];
     expect(result.plexus).toBeUndefined();
     expect(result.formatted).toBe(true);
+  });
+
+  test('includes playground routing metadata only with a valid admin key', async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-playground',
+      model: 'model-1',
+      content: 'Hello',
+      plexus: {
+        provider: 'provider-1',
+        model: 'model-orig',
+        canonicalModel: 'model-canonical',
+        apiType: 'chat',
+        attemptCount: 2,
+      },
+    };
+    const usageRecord: Partial<UsageRecord> = {
+      requestId: 'req-playground',
+    };
+    const request = {
+      headers: {
+        'x-plexus-playground': 'true',
+        'x-admin-key': 'correct-admin-key',
+      },
+    } as unknown as FastifyRequest;
+
+    await handleResponse(
+      request,
+      mockReply,
+      unifiedResponse,
+      mockTransformer,
+      usageRecord,
+      mockStorage,
+      Date.now(),
+      'chat'
+    );
+
+    const lastCall = (mockReply.send as any).mock.calls.at(-1);
+    const result = lastCall[0];
+    expect(result.plexus).toEqual({
+      requestId: 'req-playground',
+      provider: 'provider-1',
+      model: 'model-orig',
+      canonicalModel: 'model-canonical',
+      apiType: 'chat',
+      attemptCount: 2,
+    });
+  });
+
+  test('does not include playground routing metadata without an admin key', async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-no-admin',
+      model: 'model-1',
+      content: 'Hello',
+      plexus: {
+        provider: 'provider-1',
+        model: 'model-orig',
+        apiType: 'chat',
+      },
+    };
+    const usageRecord: Partial<UsageRecord> = {
+      requestId: 'req-no-admin',
+    };
+    const request = {
+      headers: {
+        'x-plexus-playground': 'true',
+      },
+    } as unknown as FastifyRequest;
+
+    await handleResponse(
+      request,
+      mockReply,
+      unifiedResponse,
+      mockTransformer,
+      usageRecord,
+      mockStorage,
+      Date.now(),
+      'chat'
+    );
+
+    const lastCall = (mockReply.send as any).mock.calls.at(-1);
+    expect(lastCall[0].plexus).toBeUndefined();
+  });
+
+  test('does not include playground routing metadata with the wrong admin key', async () => {
+    process.env.ADMIN_KEY = 'correct-admin-key';
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-wrong-admin',
+      model: 'model-1',
+      content: 'Hello',
+      plexus: {
+        provider: 'provider-1',
+        model: 'model-orig',
+        apiType: 'chat',
+      },
+    };
+    const usageRecord: Partial<UsageRecord> = {
+      requestId: 'req-wrong-admin',
+    };
+    const request = {
+      headers: {
+        'x-plexus-playground': 'true',
+        'x-admin-key': 'wrong-admin-key',
+      },
+    } as unknown as FastifyRequest;
+
+    await handleResponse(
+      request,
+      mockReply,
+      unifiedResponse,
+      mockTransformer,
+      usageRecord,
+      mockStorage,
+      Date.now(),
+      'chat'
+    );
+
+    const lastCall = (mockReply.send as any).mock.calls.at(-1);
+    expect(lastCall[0].plexus).toBeUndefined();
   });
 
   test('should fallback to unifiedResponse.model if plexus.model missing', async () => {

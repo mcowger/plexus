@@ -244,12 +244,19 @@ const formatRoute = (provider?: string | null, model?: string | null) =>
 type ChatSimulationProps = {
   selectedKey: KeyConfig;
   selectedModel: string;
+  adminKey: string;
   onRoutingPending: () => void;
   onRoutingResponse: (routing: PlaygroundRouting | null, error?: string) => void;
 };
 
 const ChatSimulation = memo(
-  ({ selectedKey, selectedModel, onRoutingPending, onRoutingResponse }: ChatSimulationProps) => {
+  ({
+    selectedKey,
+    selectedModel,
+    adminKey,
+    onRoutingPending,
+    onRoutingResponse,
+  }: ChatSimulationProps) => {
     const requestInterceptor = (details: DeepChatRequestDetails) => {
       window.setTimeout(onRoutingPending, 0);
       const body = details.body && typeof details.body === 'object' ? details.body : {};
@@ -283,6 +290,7 @@ const ChatSimulation = memo(
           headers: {
             Authorization: `Bearer ${selectedKey.secret}`,
             'x-plexus-playground': 'true',
+            'x-admin-key': adminKey,
           },
           additionalBodyProps: {
             model: selectedModel,
@@ -412,6 +420,7 @@ export const Playground = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [routingInfo, setRoutingInfo] = useState<RoutingInfo>({ status: 'idle' });
+  const adminKey = useMemo(() => localStorage.getItem('plexus_admin_key') ?? '', []);
 
   const selectedKey = useMemo(
     () => keys.find((key) => key.key === selectedKeyName) ?? null,
@@ -482,6 +491,12 @@ export const Playground = () => {
       });
     } else if (error) {
       setRoutingInfo({ status: 'error', error });
+    } else {
+      setRoutingInfo({
+        status: 'error',
+        error:
+          'Routing metadata was not returned. Verify admin access and use a unary JSON request.',
+      });
     }
   }, []);
 
@@ -688,6 +703,7 @@ export const Playground = () => {
                 <ChatSimulation
                   selectedKey={selectedKey}
                   selectedModel={selectedModel}
+                  adminKey={adminKey}
                   onRoutingPending={handleRoutingPending}
                   onRoutingResponse={handleRoutingResponse}
                 />
@@ -823,7 +839,7 @@ export const Playground = () => {
                   </ol>
                 ) : (
                   <div className="text-[11px] text-text-muted">
-                    Routing details appear after the next playground request.
+                    Routing details appear after the next unary playground request.
                   </div>
                 )}
               </div>
