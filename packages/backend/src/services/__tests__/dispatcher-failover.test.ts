@@ -226,7 +226,7 @@ describe('Dispatcher Failover', () => {
       await dispatcher.dispatch({ ...makeChatRequest(), requestId: 'req-malformed-json' });
       throw new Error('expected dispatch to fail');
     } catch (error: any) {
-      expect(error.message).toContain(invalidJson);
+      expect(error.message).toContain(invalidJson.trim());
       expect(error.routingContext?.attemptCount).toBe(1);
       expect(error.routingContext?.rawResponseText).toBe(invalidJson);
       expect(error.routingContext?.providerResponse).toBe(invalidJson);
@@ -234,6 +234,47 @@ describe('Dispatcher Failover', () => {
       const retryHistory = JSON.parse(error.routingContext?.retryHistory || '[]');
       expect(retryHistory).toHaveLength(1);
       expect(retryHistory[0]?.reason).toContain('{"broken":');
+    }
+  });
+
+  test('large upstream validation bodies are not echoed into client-facing error messages', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 1 }));
+    const largeValidationDetails = 'invalid input '.repeat(25_000);
+    const providerBody = JSON.stringify({
+      error: {
+        message: 'Invalid Responses API request',
+        code: 'invalid_prompt',
+      },
+      metadata: {
+        raw: largeValidationDetails,
+      },
+    });
+
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(providerBody, {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+      throw new Error('expected dispatch to fail');
+    } catch (error: any) {
+      expect(error.message).toContain('All targets failed');
+      expect(error.message).toContain('Invalid Responses API request');
+      expect(error.message).not.toContain(largeValidationDetails);
+      expect(error.message.length).toBeLessThan(500);
+      expect(error.routingContext?.providerResponse).toBe(providerBody);
+
+      const retryHistory = JSON.parse(error.routingContext?.retryHistory || '[]');
+      expect(retryHistory.length).toBeGreaterThanOrEqual(1);
+      expect(
+        retryHistory.every((attempt: any) => attempt.reason === 'Invalid Responses API request')
+      ).toBe(true);
     }
   });
 

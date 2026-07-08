@@ -70,6 +70,8 @@ interface RetryHistoryLikeEntry {
 
 type ResolveTimeoutMs = (timeoutMs?: number | null) => number;
 
+const CLIENT_ERROR_MESSAGE_LIMIT = 1000;
+
 /**
  * Request-level API types (e.g. embeddings, transcriptions) share base URLs
  * with their provider-level counterparts (e.g. chat, gemini). This map defines
@@ -410,6 +412,21 @@ function stripTrailingApiVersion(url: string): string {
 
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
+
+  private compactClientErrorMessage(value: unknown): string {
+    const text = String(value || 'Unknown provider error').trim();
+
+    if (text.length <= CLIENT_ERROR_MESSAGE_LIMIT) {
+      return text;
+    }
+
+    return `${text.slice(0, CLIENT_ERROR_MESSAGE_LIMIT)}... [truncated ${text.length - CLIENT_ERROR_MESSAGE_LIMIT} chars]`;
+  }
+
+  private formatClientProviderError(statusCode: number, errorText: string): string {
+    const reason = this.extractFailureReason(errorText) || errorText || 'Unknown provider error';
+    return `Provider failed: ${statusCode} ${this.compactClientErrorMessage(reason)}`;
+  }
 
   private extractFailureReason(value: unknown): string | undefined {
     if (typeof value === 'string') {
@@ -1795,7 +1812,9 @@ export class Dispatcher {
     retryHistory: RetryAttemptRecord[] = []
   ): Error {
     const summary = attemptedProviders.length > 0 ? attemptedProviders.join(', ') : 'none';
-    const baseMessage = lastError?.message || 'Unknown provider error';
+    const baseMessage = this.compactClientErrorMessage(
+      this.formatFailureReason(lastError) || lastError?.message || 'Unknown provider error'
+    );
     const enriched = new Error(`All targets failed: ${summary}. Last error: ${baseMessage}`) as any;
 
     enriched.cause = lastError;
@@ -3302,7 +3321,7 @@ export class Dispatcher {
     }
 
     // Create enriched error with routing context
-    const error = new Error(`Provider failed: ${response.status} ${errorText}`) as any;
+    const error = new Error(this.formatClientProviderError(response.status, errorText)) as any;
     error.routingContext = {
       provider: route.provider,
       targetModel: route.model,
