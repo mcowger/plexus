@@ -252,8 +252,19 @@ export class OAuthTransformer implements Transformer {
         )
       );
     }
-    if (request.prompt_cache_key) {
-      options.sessionId = request.prompt_cache_key;
+    // xAI (and OpenAI-compatible Responses) sticky routing for prompt cache hits:
+    // - Responses body: prompt_cache_key (mapped to pi-ai sessionId)
+    // - Chat Completions header: x-grok-conv-id (see xAI prompt-caching docs)
+    const clientGrokConvId =
+      clientHeaders && typeof clientHeaders['x-grok-conv-id'] === 'string'
+        ? clientHeaders['x-grok-conv-id'].trim()
+        : '';
+    const promptCacheKey =
+      (typeof request.prompt_cache_key === 'string' && request.prompt_cache_key.trim()) ||
+      clientGrokConvId ||
+      '';
+    if (promptCacheKey) {
+      options.sessionId = promptCacheKey;
     }
     if (Array.isArray(request.include) && request.include.length > 0) {
       options.include = request.include;
@@ -417,12 +428,26 @@ export class OAuthTransformer implements Transformer {
       userAgent = codexVersionService.getUserAgent();
     }
 
+    const sessionAffinityKey =
+      typeof (filteredOptions as any).sessionId === 'string'
+        ? String((filteredOptions as any).sessionId).trim()
+        : typeof clientHeaders?.['x-grok-conv-id'] === 'string'
+          ? String(clientHeaders['x-grok-conv-id']).trim()
+          : '';
+
     const baseHeaders: Record<string, string> = {
       ...((filteredOptions as any).headers as Record<string, string>),
       ...(codexVersion ? { Version: codexVersion } : {}),
       ...(provider === 'anthropic' && auth.authMode === 'apiKey' ? { 'x-api-key': rawApiKey } : {}),
       ...(userAgent ? { 'User-Agent': userAgent } : {}),
+      // xAI sticky routing for multi-turn cache hits (Chat Completions path + dual signal).
+      // Responses also gets prompt_cache_key via pi-ai from options.sessionId.
+      ...(provider === 'xai' && sessionAffinityKey ? { 'x-grok-conv-id': sessionAffinityKey } : {}),
     };
+
+    if (provider === 'xai' && sessionAffinityKey && !requestOptions.sessionId) {
+      requestOptions.sessionId = sessionAffinityKey;
+    }
 
     requestOptions.headers = baseHeaders;
     const isClaudeCodeAgent =

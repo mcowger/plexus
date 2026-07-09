@@ -320,8 +320,11 @@ export const xaiOAuthProvider: OAuthProviderInterface = {
  * the OAuth path rewrites to openai-responses via applyXaiOAuthModelTransport.
  *
  * Metadata sources:
- * - Grok 4.5: xAI docs ($2/$6 per 1M, 500K ctx, reasoning low|medium|high)
+ * - Grok 4.5: xAI docs ($2/$6 per 1M, 500K ctx, reasoning low|medium|high default high;
+ *   Responses + Chat Completions; recommend prompt_cache_key / x-grok-conv-id)
  * - Composer / multi-agent: Hermes + pi-xai-oauth curated SuperGrok lists
+ *
+ * OAuth inference always rewrites api → openai-responses (Responses API).
  */
 export const XAI_OAUTH_EXTRA_MODELS: PiAiModel<'openai-completions'>[] = [
   {
@@ -335,6 +338,7 @@ export const XAI_OAUTH_EXTRA_MODELS: PiAiModel<'openai-completions'>[] = [
       supportsDeveloperRole: false,
       supportsReasoningEffort: true,
     },
+    // Default reasoning is high per xAI docs when effort is requested.
     reasoning: true,
     input: ['text', 'image'],
     cost: {
