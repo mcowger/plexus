@@ -6,6 +6,10 @@ import type {
 } from '../../types/unified';
 import type { Model as PiAiModel } from '@earendil-works/pi-ai';
 import { piAiModels } from '../../services/pi-ai/registry';
+import {
+  applyXaiOAuthModelTransport,
+  getXaiOAuthExtraModel,
+} from '../../services/oauth/xai-oauth-provider';
 import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
 import {
   applyClaudeCodeToolProxy,
@@ -165,11 +169,16 @@ export class OAuthTransformer implements Transformer {
   readonly defaultModel = 'gpt-5-mini';
 
   protected getPiAiModel(provider: OAuthProvider, modelId: string): PiAiModel<any> {
-    const model = piAiModels.getModel(provider as any, modelId);
+    let model = piAiModels.getModel(provider as any, modelId);
+    // SuperGrok-only models (e.g. grok-4.5) may not be in pi-ai's generated catalog.
+    if (!model && provider === 'xai') {
+      model = getXaiOAuthExtraModel(modelId);
+    }
     if (!model) {
       throw new Error(`Model '${modelId}' not found for provider '${provider}'`);
     }
-    return model;
+    // SuperGrok / X Premium+ OAuth uses xAI Responses API (not chat completions).
+    return applyXaiOAuthModelTransport(model);
   }
 
   private async resolveApiKey(

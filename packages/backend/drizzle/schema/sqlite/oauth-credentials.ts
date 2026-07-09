@@ -4,7 +4,7 @@ export const oauthCredentials = sqliteTable(
   'oauth_credentials',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    oauthProviderType: text('oauth_provider_type').notNull(), // 'anthropic' | 'openai-codex' | 'github-copilot' | 'google-gemini-cli' | 'google-antigravity'
+    oauthProviderType: text('oauth_provider_type').notNull(), // 'anthropic' | 'openai-codex' | 'github-copilot' | 'google-gemini-cli' | 'google-antigravity' | 'xai'
     accountId: text('account_id').notNull(),
     accessToken: text('access_token').notNull(),
     refreshToken: text('refresh_token').notNull(),

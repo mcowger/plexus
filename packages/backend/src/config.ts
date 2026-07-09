@@ -207,6 +207,7 @@ const OAuthProviderSchema = z.enum([
   'github-copilot',
   'google-gemini-cli',
   'google-antigravity',
+  'xai',
 ]);
 
 const NagaQuotaCheckerOptionsSchema = z.object({

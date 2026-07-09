@@ -43,6 +43,7 @@ properties:
       - github-copilot
       - google-gemini-cli
       - google-antigravity
+      - xai
     description: >
       OAuth provider identifier. Required when `api_base_url` uses an
       `oauth://` URI. Determines which OAuth flow is used to obtain

@@ -49,6 +49,7 @@ import { SelectorFactory } from './services/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
 import { ResponsesStorageService } from './services/responses-storage';
 import { OAuthAuthManager } from './services/oauth-auth-manager';
+import { registerXaiOAuthProvider } from './services/oauth/xai-oauth-provider';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
@@ -170,6 +171,9 @@ try {
 
   // One-time migration: rewrite legacy model_type 'chat'/'responses' → 'text'.
   await configService.migrateModelTypes();
+
+  // Register custom OAuth providers (not built into pi-ai) before auth init.
+  registerXaiOAuthProvider();
 
   // Eagerly initialize OAuth auth manager so auth.json schema migration
   // runs during startup (instead of waiting for first OAuth request).

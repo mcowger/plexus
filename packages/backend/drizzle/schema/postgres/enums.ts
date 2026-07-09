@@ -6,6 +6,7 @@ export const oauthProviderTypeEnum = pgEnum('oauth_provider_type', [
   'github-copilot',
   'google-gemini-cli',
   'google-antigravity',
+  'xai',
 ]);
 
 export const quotaCheckerTypeEnum = pgEnum('quota_checker_type', [

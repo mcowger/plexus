@@ -1,6 +1,7 @@
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
 import { getProviderTypes, type ProviderConfig } from '../config';
 import { logger } from '../utils/logger';
+import { XAI_OAUTH_EXTRA_MODELS } from './oauth/xai-oauth-provider';
 
 export interface DiscoveredModel {
   id: string;
@@ -119,7 +120,11 @@ export async function fetchModelsFromUrl(
 }
 
 export function getOAuthProviderModels(providerId: string): DiscoveredModel[] {
-  return getBuiltinModels(providerId as any).map((model) => ({
+  const builtin = getBuiltinModels(providerId as any) ?? [];
+  // SuperGrok OAuth: merge models not yet in pi-ai's generated xAI catalog.
+  const models = providerId === 'xai' ? mergeModelsById(builtin, XAI_OAUTH_EXTRA_MODELS) : builtin;
+
+  return models.map((model) => ({
     id: model.id,
     name: model.name,
     context_length: model.contextWindow,
@@ -130,6 +135,21 @@ export function getOAuthProviderModels(providerId: string): DiscoveredModel[] {
         }
       : undefined,
   }));
+}
+
+function mergeModelsById<T extends { id: string }>(
+  builtin: readonly T[],
+  extras: readonly T[]
+): T[] {
+  const merged = [...builtin];
+  const ids = new Set(merged.map((m) => m.id));
+  for (const extra of extras) {
+    if (!ids.has(extra.id)) {
+      merged.push(extra);
+      ids.add(extra.id);
+    }
+  }
+  return merged;
 }
 
 export function deriveModelsUrl(provider: ProviderConfig): string | null {

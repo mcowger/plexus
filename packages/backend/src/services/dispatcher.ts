@@ -29,6 +29,7 @@ import { EmbeddingsTransformerFactory } from './embeddings-transformer-factory';
 import { resolveAdapters } from './adapter-resolver';
 import type { ResolvedAdapter } from '../types/provider-adapter';
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
+import { getXaiOAuthExtraModelIds } from './oauth/xai-oauth-provider';
 import { buildGenerationOptions, resolvePiAiModel } from './pi-ai/registry';
 import type { GenerationIntent } from './pi-ai/generation';
 import { normalizeVerbosity } from './pi-ai/generation';
@@ -2859,17 +2860,17 @@ export class Dispatcher {
   }
 
   private assertOAuthModelSupported(oauthProvider: string, modelId: string) {
-    const supportedModels = getBuiltinModels(oauthProvider as any);
-    if (!supportedModels || supportedModels.length === 0) {
+    const supportedModels = getBuiltinModels(oauthProvider as any) ?? [];
+    // SuperGrok OAuth extras (e.g. grok-4.5) are not in pi-ai's generated catalog yet.
+    const extraIds = oauthProvider === 'xai' ? getXaiOAuthExtraModelIds() : [];
+    const knownIds = new Set([...supportedModels.map((model) => model.id), ...extraIds]);
+
+    if (knownIds.size === 0) {
       throw new Error(`OAuth provider '${oauthProvider}' has no known models.`);
     }
 
-    const isSupported = supportedModels.some((model) => model.id === modelId);
-    if (!isSupported) {
-      const modelList = supportedModels
-        .map((model) => model.id)
-        .sort()
-        .join(', ');
+    if (!knownIds.has(modelId)) {
+      const modelList = Array.from(knownIds).sort().join(', ');
       throw new Error(
         `OAuth model '${modelId}' is not supported for provider '${oauthProvider}'. ` +
           `Supported models: ${modelList}`

@@ -143,6 +143,7 @@ Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/pac
 - OpenAI Codex
 - Gemini CLI
 - Antigravity
+- xAI Grok (SuperGrok / X Premium+ subscription via device-code OAuth; inference uses the xAI Responses API)
 - OpenAI o1-pro
 
 **Configuration:**

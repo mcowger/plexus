@@ -24,6 +24,7 @@ export const OAUTH_PROVIDERS = [
   { value: 'google-gemini-cli', label: 'Google Cloud Code Assist (Gemini CLI)' },
   { value: 'google-antigravity', label: 'Antigravity (Gemini 3, Claude, GPT-OSS)' },
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' },
+  { value: 'xai', label: 'xAI Grok (SuperGrok / X Premium+)' },
 ];
 
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
