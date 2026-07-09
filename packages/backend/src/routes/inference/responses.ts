@@ -20,6 +20,21 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/t
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 
+export function detectResponsesApiType(
+  headers: Record<string, unknown>,
+  body: any
+): 'responses' | 'responses:lite' {
+  const rawHeader = headers['x-openai-internal-codex-responses-lite'];
+  const header = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+  if (typeof header === 'string' && header.toLowerCase() === 'true') {
+    return 'responses:lite';
+  }
+
+  const hasAdditionalTools =
+    Array.isArray(body?.input) && body.input.some((item: any) => item?.type === 'additional_tools');
+  return hasAdditionalTools ? 'responses:lite' : 'responses';
+}
+
 export async function registerResponsesRoute(
   fastify: FastifyInstance,
   dispatcher: Dispatcher,
@@ -44,11 +59,15 @@ export async function registerResponsesRoute(
     const requestId = crypto.randomUUID();
     reply.header('x-request-id', requestId);
     const startTime = Date.now();
+    const incomingApiType = detectResponsesApiType(
+      request.headers as Record<string, unknown>,
+      request.body
+    );
     let usageRecord: Partial<UsageRecord> = {
       requestId,
       date: new Date().toISOString(),
       sourceIp: getClientIp(request),
-      incomingApiType: 'responses',
+      incomingApiType,
       startTime,
       isStreamed: false,
       responseStatus: 'pending',
@@ -154,7 +173,7 @@ export async function registerResponsesRoute(
       }
 
       let unifiedRequest = await transformer.parseRequest(body);
-      unifiedRequest.incomingApiType = 'responses';
+      unifiedRequest.incomingApiType = incomingApiType;
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
       if (body.previous_response_id) {
@@ -295,7 +314,7 @@ export async function registerResponsesRoute(
       usageStorage.saveRequest(usageRecord as UsageRecord);
 
       const errorDetails = {
-        apiType: 'responses',
+        apiType: incomingApiType,
         ...(e.routingContext || {}),
       };
 

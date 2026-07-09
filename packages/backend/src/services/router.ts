@@ -15,6 +15,7 @@ import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
 import { StickySessionManager } from './sticky-session-manager';
 import type { ModelArchitecture } from '@plexus/shared';
+import { normalizeApiAccessList } from '../utils/api-format';
 
 export interface RouteResult {
   provider: string;
@@ -201,11 +202,14 @@ async function filterGroupTargets(
       if (!providerConfig) return false;
 
       const providerTypes = getProviderTypes(providerConfig);
-      let modelSpecificTypes: string[] | undefined;
+      let modelSpecificTypes: ModelProviderConfig['access_via'];
       if (!Array.isArray(providerConfig.models) && providerConfig.models) {
         modelSpecificTypes = providerConfig.models[target.model]?.access_via;
       }
-      const availableTypes = modelSpecificTypes || providerTypes;
+      const availableTypes =
+        modelSpecificTypes && modelSpecificTypes.length > 0
+          ? normalizeApiAccessList(modelSpecificTypes)
+          : providerTypes;
       return availableTypes.some((t) => t.toLowerCase() === normalizedIncoming);
     });
 

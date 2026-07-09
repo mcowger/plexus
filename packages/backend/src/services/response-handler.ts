@@ -20,6 +20,7 @@ import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { recordQuotaUsage, buildQuotaHeaders } from '../services/quota/quota-middleware';
 import { CooldownManager } from './cooldown-manager';
 import { sanitizeHeaders } from '../utils/sanitize-headers';
+import { getApiBaseType } from '../utils/api-format';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];
@@ -99,7 +100,7 @@ export async function handleResponse(
       `${usageRecord.provider || 'unknown'}/${usageRecord.selectedModelName || unifiedResponse.model}`,
     ]);
 
-  let outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
+  const outgoingApiType = unifiedResponse.plexus?.apiType?.toLowerCase();
   usageRecord.outgoingApiType = outgoingApiType?.toLocaleLowerCase();
   usageRecord.isStreamed = !!unifiedResponse.stream;
   usageRecord.isPassthrough = unifiedResponse.bypassTransformation;
@@ -128,7 +129,7 @@ export async function handleResponse(
   const pricing = unifiedResponse.plexus?.pricing;
   const providerDiscount = unifiedResponse.plexus?.providerDiscount;
   // Normalize the provider API type to our supported internal constants: 'chat', 'messages', 'gemini'
-  const providerApiType = (unifiedResponse.plexus?.apiType || 'chat').toLowerCase();
+  const providerApiType = getApiBaseType(unifiedResponse.plexus?.apiType || 'chat');
 
   // Enable ephemeral debug capture if token estimation is needed
   const debugManager = DebugManager.getInstance();

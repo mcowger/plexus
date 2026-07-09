@@ -46,6 +46,7 @@ import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { GpuParams, ModelParams } from '@plexus/shared';
 import { ConcurrencyTracker } from './concurrency-tracker';
 import { sanitizeHeaders } from '../utils/sanitize-headers';
+import { getApiBaseType, isApiSubtype, normalizeApiAccessList } from '../utils/api-format';
 
 interface RetryAttemptRecord {
   index: number;
@@ -656,6 +657,15 @@ export class Dispatcher {
       if (signal?.aborted) throw this.buildCancelledError(signal);
       let currentRequest = { ...request };
       const route = targets[i]!;
+      const apiSelection = this.selectTargetApiType(route, currentRequest.incomingApiType);
+      if (!apiSelection.targetApiType) {
+        const reason = apiSelection.selectionReason;
+        logger.info(`Skipping ${route.provider}/${route.model} - ${reason}`);
+        lastError = new Error(reason);
+        this.appendSkippedAttempt(retryHistory, route, reason, currentRequest.incomingApiType);
+        continue;
+      }
+      const { targetApiType, selectionReason } = apiSelection;
       const attemptTimeout = this.createAttemptTimeout(
         signal,
         route.config.timeoutMs,
@@ -771,11 +781,6 @@ export class Dispatcher {
 
       try {
         // Determine Target API Type
-        const { targetApiType, selectionReason } = this.selectTargetApiType(
-          route,
-          currentRequest.incomingApiType
-        );
-
         logger.info(
           `Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`
         );
@@ -1890,7 +1895,7 @@ export class Dispatcher {
 
     // Use static API key
     if (route.config.api_key) {
-      const type = apiType.toLowerCase();
+      const type = getApiBaseType(apiType);
       if (type === 'messages') {
         headers['x-api-key'] = route.config.api_key;
         headers['anthropic-version'] = '2023-06-01';
@@ -1921,6 +1926,10 @@ export class Dispatcher {
       }
     }
 
+    if (apiType.toLowerCase() === 'responses:lite') {
+      headers['x-openai-internal-codex-responses-lite'] = 'true';
+    }
+
     return headers;
   }
 
@@ -1943,7 +1952,7 @@ export class Dispatcher {
   private selectTargetApiType(
     route: RouteResult,
     incomingApiType?: string
-  ): { targetApiType: string; selectionReason: string } {
+  ): { targetApiType?: string; selectionReason: string } {
     const providerTypes = this.extractProviderTypes(route);
 
     // Check if model specific access_via is defined
@@ -1952,7 +1961,9 @@ export class Dispatcher {
     // The available types for this specific routing
     // If model specific types are defined and not empty, use them. Otherwise fallback to provider types.
     const availableTypes =
-      modelSpecificTypes && modelSpecificTypes.length > 0 ? modelSpecificTypes : providerTypes;
+      modelSpecificTypes && modelSpecificTypes.length > 0
+        ? normalizeApiAccessList(modelSpecificTypes)
+        : providerTypes;
 
     let targetApiType = availableTypes[0]; // Default to first one
 
@@ -1971,6 +1982,10 @@ export class Dispatcher {
       if (match) {
         targetApiType = match;
         selectionReason = `matched incoming request type '${incoming}'`;
+      } else if (isApiSubtype(incoming)) {
+        return {
+          selectionReason: `incoming API subtype '${incoming}' is not supported by this target`,
+        };
       } else {
         selectionReason = `incoming type '${incoming}' not supported, defaulted to '${targetApiType}'`;
       }
@@ -1994,7 +2009,7 @@ export class Dispatcher {
       const typeKey = targetApiType.toLowerCase();
       // Check exact match first, then fallback to just looking for keys that might match?
       // Actually the config keys should probably match the api types (chat, messages, etc)
-      const specificUrl = urlMap[typeKey];
+      const specificUrl = urlMap[typeKey] || urlMap[getApiBaseType(typeKey)];
       const defaultUrl = urlMap['default'];
 
       if (specificUrl) {

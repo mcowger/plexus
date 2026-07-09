@@ -292,7 +292,10 @@ export class ResponsesTransformer implements Transformer {
     // the floor when the client is talking the same API type as the upstream
     // provider. Only fields not already set are carried through, so the
     // unified pipeline output is never overridden.
-    if (request.incomingApiType?.toLowerCase() === 'responses' && request.originalBody) {
+    if (
+      request.incomingApiType?.toLowerCase().split(':', 1)[0] === 'responses' &&
+      request.originalBody
+    ) {
       const passthroughFields = [
         'user',
         'store',

@@ -7,6 +7,7 @@ import {
 } from '../transformers';
 import { ResponsesTransformer } from '../transformers/responses';
 import { OllamaTransformer } from '../transformers/ollama';
+import { getApiBaseType } from '../utils/api-format';
 
 /**
  * TransformerFactory
@@ -16,7 +17,7 @@ import { OllamaTransformer } from '../transformers/ollama';
  */
 export class TransformerFactory {
   static getTransformer(providerType: string): Transformer {
-    switch (providerType.toLowerCase()) {
+    switch (getApiBaseType(providerType)) {
       case 'messages':
         return new AnthropicTransformer();
       case 'gemini':

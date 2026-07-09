@@ -186,13 +186,18 @@ export type MatchCondition = z.infer<typeof MatchConditionSchema>;
 export type ReasoningRewriteRule = z.infer<typeof ReasoningRewriteRuleSchema>;
 export type ReasoningRewriteOptions = z.infer<typeof ReasoningRewriteOptionsSchema>;
 
+const ApiFormatSchema = z.object({
+  type: z.string().trim().min(1),
+  subtype: z.string().trim().min(1).optional(),
+});
+
 const ModelProviderConfigSchema = z.object({
   pricing: PricingSchema.default({
     source: 'simple',
     input: 0,
     output: 0,
   }),
-  access_via: z.array(z.string()).optional(),
+  access_via: z.array(z.union([z.string().trim().min(1), ApiFormatSchema])).optional(),
   type: z.enum(['text', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   extraBody: z.record(z.string(), z.any()).optional(),
   adapter: AdapterConfigSchema,

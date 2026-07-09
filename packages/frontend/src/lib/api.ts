@@ -1,4 +1,5 @@
 import { formatNumber, formatPoints } from './format';
+import { normalizeApiAccessList } from './apiFormats';
 
 import type { QuotaCheckerInfo } from '../types/quota';
 
@@ -2099,7 +2100,7 @@ export const api = {
           if (providerConfig?.models && !Array.isArray(providerConfig.models)) {
             const modelConfig = providerConfig.models[t.model];
             if (modelConfig?.access_via?.length > 0) {
-              apiType = modelConfig.access_via;
+              apiType = normalizeApiAccessList(modelConfig.access_via);
             }
           }
           return {
