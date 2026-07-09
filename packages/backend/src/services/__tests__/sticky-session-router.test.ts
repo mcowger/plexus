@@ -107,6 +107,22 @@ describe('Router sticky_session integration', () => {
     expect(result[0]?.provider).toBe('p1');
   });
 
+  test('filters incompatible API subtype targets before sticky-session hoisting', async () => {
+    const cfg = configWithThreeTargets();
+    cfg.providers.p1.models.m1.access_via = ['responses'];
+    cfg.providers.p2.models.m2.access_via = [{ type: 'responses', subtype: 'lite' }];
+    cfg.providers.p3.models.m3.access_via = ['chat'];
+    setConfigForTesting(cfg as any);
+
+    // Sticky entry points at p1, but p1 only supports base Responses. A
+    // Responses Lite request must not be pinned there before selection.
+    StickySessionManager.getInstance().set('sticky-alias', 'm:abc', 'p1', 'm1');
+
+    const result = await Router.resolveCandidates('sticky-alias', 'responses:lite', 'm:abc');
+
+    expect(result.map((r) => `${r.provider}/${r.model}`)).toEqual(['p2/m2']);
+  });
+
   test('falls back to normal ordering when sticky pick no longer exists in alias targets', async () => {
     setConfigForTesting(configWithThreeTargets() as any);
 

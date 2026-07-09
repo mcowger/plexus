@@ -89,6 +89,29 @@ function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
+function stripUnsupportedResponsesCustomToolCallNamespaces(payload: any): any {
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.input)) {
+    return payload;
+  }
+
+  let changed = false;
+  const input = payload.input.map((item: any) => {
+    if (
+      item &&
+      typeof item === 'object' &&
+      item.type === 'custom_tool_call' &&
+      hasOwn(item, 'namespace')
+    ) {
+      const { namespace: _namespace, ...rest } = item;
+      changed = true;
+      return rest;
+    }
+    return item;
+  });
+
+  return changed ? { ...payload, input } : payload;
+}
+
 function normalizeReasoningFromUnified(
   reasoning: UnifiedChatRequest['reasoning']
 ): ReasoningIntent {
@@ -3086,6 +3109,10 @@ export class Dispatcher {
       );
       providerPayload = JSON.parse(JSON.stringify(request.originalBody));
       providerPayload.model = route.model;
+
+      if (getApiBaseType(targetApiType) === 'responses') {
+        providerPayload = stripUnsupportedResponsesCustomToolCallNamespaces(providerPayload);
+      }
 
       // Add metadata from request
       if (request.metadata) {

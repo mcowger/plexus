@@ -81,4 +81,52 @@ describe('Dispatcher API subtypes', () => {
     expect(result.payload.input).toEqual(originalBody.input);
     expect(result.payload.model).toBe('upstream-model');
   });
+
+  test('strips unsupported namespace from Responses custom tool call history only', async () => {
+    const dispatcher = new Dispatcher() as any;
+    const route = makeRoute([{ type: 'responses', subtype: 'lite' }]);
+    const originalBody = {
+      model: 'alias',
+      input: [
+        { type: 'additional_tools', role: 'developer', tools: [] },
+        {
+          type: 'function_call',
+          name: 'list_open_orders',
+          namespace: 'crm',
+          call_id: 'call_function',
+          arguments: '{}',
+        },
+        {
+          type: 'custom_tool_call',
+          status: 'completed',
+          call_id: 'call_custom',
+          name: 'exec',
+          namespace: 'exec',
+          input: 'text("ok")',
+        },
+      ],
+    };
+    const result = await dispatcher.transformRequestPayload(
+      {
+        model: 'alias',
+        messages: [],
+        incomingApiType: 'responses:lite',
+        originalBody,
+      },
+      route,
+      TransformerFactory.getTransformer('responses:lite'),
+      'responses:lite'
+    );
+
+    expect(result.bypassTransformation).toBe(true);
+    expect(result.payload.input[1]).toMatchObject({ namespace: 'crm' });
+    expect(result.payload.input[2]).toEqual({
+      type: 'custom_tool_call',
+      status: 'completed',
+      call_id: 'call_custom',
+      name: 'exec',
+      input: 'text("ok")',
+    });
+    expect(originalBody.input[2]).toHaveProperty('namespace', 'exec');
+  });
 });
