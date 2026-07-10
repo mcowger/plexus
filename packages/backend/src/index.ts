@@ -98,8 +98,15 @@ const fastify = Fastify({
 fastify.register(cors, {
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-admin-key', 'x-goog-api-key'],
-  exposedHeaders: ['Content-Type'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-api-key',
+    'x-admin-key',
+    'x-goog-api-key',
+    'x-client-request-id',
+  ],
+  exposedHeaders: ['Content-Type', 'x-request-id', 'x-client-request-id'],
 });
 
 // Enable multipart/form-data support for file uploads (audio transcriptions)

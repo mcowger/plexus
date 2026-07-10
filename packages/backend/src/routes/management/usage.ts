@@ -11,6 +11,7 @@ import { isLimited, scopedKeyName } from './_principal';
 
 const USAGE_FIELDS = new Set([
   'requestId',
+  'clientRequestId',
   'date',
   'sourceIp',
   'apiKey',
@@ -84,6 +85,7 @@ export async function registerUsageRoutes(
       startDate: query.startDate,
       endDate: query.endDate,
       requestId: query.requestId,
+      clientRequestId: query.clientRequestId,
       apiKey: query.apiKey,
       incomingApiType: query.incomingApiType,
       provider: query.provider,

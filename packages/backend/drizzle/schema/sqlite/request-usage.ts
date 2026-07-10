@@ -6,6 +6,7 @@ export const requestUsage = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     requestId: text('request_id').notNull().unique(),
+    clientRequestId: text('client_request_id'),
     date: text('date').notNull(),
     sourceIp: text('source_ip'),
     apiKey: text('api_key'),
@@ -62,6 +63,7 @@ export const requestUsage = sqliteTable(
     dateIdx: index('idx_request_usage_date').on(table.date),
     providerIdx: index('idx_request_usage_provider').on(table.provider),
     requestIdIdx: index('idx_request_usage_request_id').on(table.requestId),
+    clientRequestIdIdx: index('idx_request_usage_client_request_id').on(table.clientRequestId),
     apiKeyIdx: index('idx_request_usage_api_key').on(table.apiKey, table.startTime),
   })
 );

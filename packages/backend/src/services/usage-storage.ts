@@ -24,6 +24,7 @@ export interface ProgressUpdate {
 
 export interface UsageFilters {
   requestId?: string;
+  clientRequestId?: string;
   startDate?: string;
   endDate?: string;
   apiKey?: string;
@@ -204,6 +205,7 @@ export class UsageStorageService extends EventEmitter {
         .insert(this.schema.requestUsage)
         .values({
           requestId: record.requestId!,
+          clientRequestId: record.clientRequestId || null,
           date: record.date || new Date().toISOString(),
           sourceIp: record.sourceIp || null,
           apiKey: record.apiKey || null,
@@ -532,6 +534,9 @@ export class UsageStorageService extends EventEmitter {
     if (filters.requestId) {
       conditions.push(eq(schema.requestUsage.requestId, filters.requestId));
     }
+    if (filters.clientRequestId) {
+      conditions.push(eq(schema.requestUsage.clientRequestId, filters.clientRequestId));
+    }
     if (filters.startDate) {
       conditions.push(gte(schema.requestUsage.date, filters.startDate));
     }
@@ -593,6 +598,7 @@ export class UsageStorageService extends EventEmitter {
       const data = await db
         .select({
           requestId: schema.requestUsage.requestId,
+          clientRequestId: schema.requestUsage.clientRequestId,
           date: schema.requestUsage.date,
           sourceIp: schema.requestUsage.sourceIp,
           apiKey: schema.requestUsage.apiKey,
@@ -648,6 +654,7 @@ export class UsageStorageService extends EventEmitter {
 
       const mappedData: UsageRecord[] = data.map((row: any) => ({
         requestId: row.requestId,
+        clientRequestId: row.clientRequestId,
         date: row.date,
         sourceIp: row.sourceIp,
         apiKey: row.apiKey,
