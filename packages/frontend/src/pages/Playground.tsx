@@ -273,10 +273,10 @@ const deepChatAuxiliaryStyle = `
   }
 
   .playground-tool-call {
-    min-width: 15rem;
+    min-width: 12.5rem;
     overflow: hidden;
     border: 1px solid rgba(245, 158, 11, 0.45);
-    border-radius: 0.5rem;
+    border-radius: 0.375rem;
     background: #111827;
     color: #e2e8f0;
   }
@@ -284,8 +284,8 @@ const deepChatAuxiliaryStyle = `
   .playground-tool-call__header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.625rem;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
     border-bottom: 1px solid rgba(245, 158, 11, 0.25);
     background: rgba(245, 158, 11, 0.08);
   }
@@ -293,7 +293,7 @@ const deepChatAuxiliaryStyle = `
   .playground-tool-call__eyebrow {
     color: #fbbf24;
     font-family: var(--font-mono, monospace);
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 700;
     letter-spacing: 0.08em;
   }
@@ -301,21 +301,22 @@ const deepChatAuxiliaryStyle = `
   .playground-tool-call__name {
     color: #f8fafc;
     font-family: var(--font-mono, monospace);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
   }
 
   .playground-tool-call__body {
     display: grid;
-    gap: 0.625rem;
-    padding: 0.625rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem 0.5rem;
   }
 
   .playground-tool-call__section-label {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
     color: #94a3b8;
     font-family: var(--font-mono, monospace);
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -323,17 +324,17 @@ const deepChatAuxiliaryStyle = `
 
   .playground-tool-call__rows {
     display: grid;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .playground-tool-call__row {
     display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: 0.5rem;
-    padding: 0.3rem 0.4rem;
-    border-radius: 0.25rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.3rem;
+    padding: 0.2rem 0.3rem;
+    border-radius: 0.1875rem;
     background: rgba(2, 6, 23, 0.6);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
   }
 
   .playground-tool-call__key {
@@ -432,7 +433,7 @@ const formatToolRows = (serialized: string) => {
 };
 
 const formatToolCallHtml = (toolCall: PlaygroundToolCall) =>
-  `<div class="playground-tool-call"><div class="playground-tool-call__header"><span class="playground-tool-call__eyebrow">TOOL CALL</span><span class="playground-tool-call__name">${escapeHtml(toolCall.name)}</span></div><div class="playground-tool-call__body"><section><div class="playground-tool-call__section-label">Arguments</div><div class="playground-tool-call__rows">${formatToolRows(toolCall.arguments)}</div></section><section><div class="playground-tool-call__section-label">Result</div><div class="playground-tool-call__rows">${formatToolRows(toolCall.result)}</div></section></div></div>`;
+  `<div class="playground-tool-call"><div class="playground-tool-call__header"><span class="playground-tool-call__eyebrow">TOOL</span><span class="playground-tool-call__name">${escapeHtml(toolCall.name)}</span></div><div class="playground-tool-call__body"><section class="playground-tool-call__section"><div class="playground-tool-call__section-label">Arguments</div><div class="playground-tool-call__rows">${formatToolRows(toolCall.arguments)}</div></section><section class="playground-tool-call__section"><div class="playground-tool-call__section-label">Result</div><div class="playground-tool-call__rows">${formatToolRows(toolCall.result)}</div></section></div></div>`;
 
 // Deep Chat follows a browser tool call with another request containing its tool
 // result. That follow-up must not reset the routing panel (or its tool details).
