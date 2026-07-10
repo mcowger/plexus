@@ -92,9 +92,7 @@ const NavSection: React.FC<{ title: string; collapsed: boolean }> = ({ title, co
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
-  const appVersion: string =
-    // @ts-expect-error — replaced at build time by build.ts
-    process.env.APP_VERSION || 'dev';
+  const appVersion: string = process.env.APP_VERSION || 'dev';
   const [debugMode, setDebugMode] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);

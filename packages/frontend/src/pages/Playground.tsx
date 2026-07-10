@@ -1,12 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DeepChat } from 'deep-chat-react';
-import type { DeepChat as DeepChatElement } from 'deep-chat';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Clock,
-  FlaskConical,
-  Key,
-  LockKeyhole,
   RefreshCw,
   Route,
   ShieldAlert,
@@ -20,14 +15,16 @@ import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import {
+  PlaygroundChat,
+  type PlaygroundApi,
+  type PlaygroundToolCall,
+  type ToolMode,
+} from '../components/playground/PlaygroundChat';
 
 type ModelListResponse = {
   data?: Array<{ id?: string }>;
 };
-
-type PlaygroundApi = 'openai-completions' | 'openai-responses' | 'anthropic-messages' | 'gemini';
-type ToolMode = 'off' | 'sample-tools';
-type BrowserToolCall = { name: string; arguments: string };
 
 type PlaygroundPreferences = {
   selectedKeyName?: string;
@@ -39,25 +36,20 @@ type PlaygroundPreferences = {
 const PLAYGROUND_PREFERENCES_STORAGE_KEY = 'plexus_playground_preferences';
 
 const playgroundApiOptions: Array<{ value: PlaygroundApi; label: string }> = [
-  { value: 'openai-completions', label: 'OpenAI Chat Completions' },
-  { value: 'openai-responses', label: 'OpenAI Responses' },
-  { value: 'anthropic-messages', label: 'Anthropic Messages' },
-  { value: 'gemini', label: 'Gemini Generate Content' },
+  { value: 'openai-completions', label: 'chat' },
+  { value: 'anthropic-messages', label: 'messages' },
+  { value: 'openai-responses', label: 'responses' },
+  { value: 'gemini', label: 'gemini' },
 ];
 
 const playgroundApiLabel = (apiType: PlaygroundApi) =>
   playgroundApiOptions.find((option) => option.value === apiType)?.label ?? apiType;
 
-const toolModeOptions: Array<{ value: ToolMode; label: string }> = [
-  { value: 'off', label: 'No tools' },
-  { value: 'sample-tools', label: 'Sample browser tools' },
-];
-
 const isPlaygroundApi = (value: unknown): value is PlaygroundApi =>
   playgroundApiOptions.some((option) => option.value === value);
 
 const isToolMode = (value: unknown): value is ToolMode =>
-  toolModeOptions.some((option) => option.value === value);
+  value === 'off' || value === 'sample-tools';
 
 const loadPlaygroundPreferences = (): PlaygroundPreferences => {
   if (typeof window === 'undefined') return {};
@@ -80,81 +72,6 @@ const loadPlaygroundPreferences = (): PlaygroundPreferences => {
   } catch {
     return {};
   }
-};
-
-const toolParameters = {
-  get_date: {
-    type: 'object',
-    properties: {
-      timezone: {
-        type: 'string',
-        description: 'IANA timezone, such as America/Los_Angeles. Use UTC when none is specified.',
-      },
-    },
-    required: ['timezone'],
-    additionalProperties: false,
-  },
-  add_tasks: {
-    type: 'object',
-    properties: {
-      titles: {
-        type: 'array',
-        description: 'One or more tasks to add together',
-        items: { type: 'string' },
-      },
-    },
-    required: ['titles'],
-    additionalProperties: false,
-  },
-  list_tasks: {
-    type: 'object',
-    properties: {},
-    additionalProperties: false,
-  },
-} satisfies Record<
-  string,
-  { type: 'object'; properties: object; required?: string[]; additionalProperties: false }
->;
-
-const toolDescriptions = {
-  get_date:
-    'Get the current date and time in a specified timezone. Use UTC when none is specified.',
-  add_tasks:
-    'Add one or more tasks to this browser-only test task list. Use one call with every task in titles.',
-  list_tasks: 'List tasks added during this current Playground chat session.',
-};
-
-// Deep Chat normalizes this function-tool shape for both OpenAI APIs.
-const openAiTools = Object.entries(toolParameters).map(([name, parameters]) => ({
-  type: 'function' as const,
-  name,
-  description: toolDescriptions[name as keyof typeof toolDescriptions],
-  parameters,
-  strict: true as const,
-}));
-
-const responsesTools = openAiTools;
-
-const claudeTools = Object.entries(toolParameters).map(([name, input_schema]) => ({
-  name,
-  description: toolDescriptions[name as keyof typeof toolDescriptions],
-  input_schema,
-}));
-
-const geminiTools = [
-  {
-    functionDeclarations: Object.entries(toolParameters).map(([name, parameters]) => ({
-      name,
-      description: toolDescriptions[name as keyof typeof toolDescriptions],
-      parameters,
-    })),
-  },
-];
-
-type PlaygroundToolCall = {
-  name: string;
-  arguments: string;
-  result: string;
 };
 
 type RetryAttempt = {
@@ -187,180 +104,6 @@ type PlaygroundRouting = {
   retryHistory?: string;
 };
 
-const deepChatAuxiliaryStyle = `
-  :host {
-    display: block !important;
-    height: 100% !important;
-    min-height: 0 !important;
-  }
-
-  #chat-view {
-    background: transparent !important;
-    display: flex !important;
-    flex-direction: column !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  #messages {
-    flex: 1 1 auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow-y: scroll !important;
-    overscroll-behavior: contain !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-color: #334155 transparent;
-  }
-
-  #input {
-    flex: 0 0 auto !important;
-    background: #0b1324 !important;
-    border-top: 1px solid #1e293b !important;
-  }
-
-  #text-input-container {
-    background: #020617 !important;
-    border: 1px solid #334155 !important;
-    box-shadow: none !important;
-  }
-
-  #text-input {
-    color: #f8fafc !important;
-    caret-color: #f59e0b !important;
-  }
-
-  #text-input:empty:before {
-    color: #64748b !important;
-  }
-
-  #file-attachment-container {
-    box-sizing: border-box !important;
-    width: calc(100% - 2px) !important;
-    height: 3.6em !important;
-    top: -3.6em !important;
-    left: 1px !important;
-    padding: 4px !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    background: #0b1324 !important;
-    border: 1px solid #334155 !important;
-    border-bottom: 0 !important;
-    border-radius: 0.625rem 0.625rem 0 0 !important;
-  }
-
-  .file-attachment {
-    margin: 0 0.5em 0 0 !important;
-    background: #020617 !important;
-    border: 1px solid #334155 !important;
-    border-radius: 0.375rem !important;
-  }
-
-  .border-bound-attachment {
-    width: 100% !important;
-    height: 100% !important;
-    border: 0 !important;
-    border-radius: 0.3125rem !important;
-  }
-
-  .image-attachment {
-    border-radius: 0.3125rem !important;
-  }
-
-  .remove-file-attachment-button {
-    border-color: #64748b !important;
-    background: #0f172a !important;
-  }
-
-  .playground-tool-call {
-    min-width: 12.5rem;
-    overflow: hidden;
-    border: 1px solid rgba(245, 158, 11, 0.45);
-    border-radius: 0.375rem;
-    background: #111827;
-    color: #e2e8f0;
-  }
-
-  .playground-tool-call__header {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid rgba(245, 158, 11, 0.25);
-    background: rgba(245, 158, 11, 0.08);
-  }
-
-  .playground-tool-call__eyebrow {
-    color: #fbbf24;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-
-  .playground-tool-call__name {
-    color: #f8fafc;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.7rem;
-    font-weight: 600;
-  }
-
-  .playground-tool-call__body {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.375rem;
-    padding: 0.375rem 0.5rem 0.5rem;
-  }
-
-  .playground-tool-call__section-label {
-    margin-bottom: 0.2rem;
-    color: #94a3b8;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .playground-tool-call__rows {
-    display: grid;
-    gap: 0.2rem;
-  }
-
-  .playground-tool-call__row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.3rem;
-    padding: 0.2rem 0.3rem;
-    border-radius: 0.1875rem;
-    background: rgba(2, 6, 23, 0.6);
-    font-size: 0.65rem;
-  }
-
-  .playground-tool-call__key {
-    color: #94a3b8;
-    font-family: var(--font-mono, monospace);
-  }
-
-  .playground-tool-call__value {
-    overflow-wrap: anywhere;
-    color: #e2e8f0;
-  }
-
-  #messages::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  #messages::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  #messages::-webkit-scrollbar-thumb {
-    background: #334155;
-    border-radius: 999px;
-  }
-`;
-
 const formatList = (items?: string[], emptyLabel = 'All') =>
   items && items.length > 0 ? items.join(', ') : emptyLabel;
 
@@ -388,419 +131,6 @@ const parseAttemptedProviders = (value?: string | null): string[] => {
 
 const formatRoute = (provider?: string | null, model?: string | null) =>
   provider && model ? `${provider}/${model}` : provider || model || 'Pending';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-
-const formatToolValue = (value: unknown): string => {
-  if (Array.isArray(value))
-    return value.length > 0 ? value.map(formatToolValue).join(', ') : 'None';
-  if (isRecord(value)) {
-    return Object.entries(value)
-      .map(([key, entry]) => `${key}: ${formatToolValue(entry)}`)
-      .join(', ');
-  }
-  if (value === null || value === undefined || value === '') return 'None';
-  return String(value);
-};
-
-const formatToolRows = (serialized: string) => {
-  try {
-    const parsed = JSON.parse(serialized);
-    if (isRecord(parsed)) {
-      const entries = Object.entries(parsed);
-      if (entries.length > 0) {
-        return entries
-          .map(
-            ([key, value]) =>
-              `<div class="playground-tool-call__row"><span class="playground-tool-call__key">${escapeHtml(key)}</span><span class="playground-tool-call__value">${escapeHtml(formatToolValue(value))}</span></div>`
-          )
-          .join('');
-      }
-    }
-  } catch {
-    // Tool adapters normally return JSON. Preserve a non-JSON value safely if they do not.
-  }
-
-  return `<div class="playground-tool-call__row"><span class="playground-tool-call__key">Value</span><span class="playground-tool-call__value">${escapeHtml(serialized || 'None')}</span></div>`;
-};
-
-const formatToolCallHtml = (toolCall: PlaygroundToolCall) =>
-  `<div class="playground-tool-call"><div class="playground-tool-call__header"><span class="playground-tool-call__eyebrow">TOOL</span><span class="playground-tool-call__name">${escapeHtml(toolCall.name)}</span></div><div class="playground-tool-call__body"><section class="playground-tool-call__section"><div class="playground-tool-call__section-label">Arguments</div><div class="playground-tool-call__rows">${formatToolRows(toolCall.arguments)}</div></section><section class="playground-tool-call__section"><div class="playground-tool-call__section-label">Result</div><div class="playground-tool-call__rows">${formatToolRows(toolCall.result)}</div></section></div></div>`;
-
-// Deep Chat follows a browser tool call with another request containing its tool
-// result. That follow-up must not reset the routing panel (or its tool details).
-// Each supported API encodes the result differently.
-const isToolContinuationRequest = (body: unknown) => {
-  if (!isRecord(body)) return false;
-
-  const messages = body.messages;
-  if (Array.isArray(messages)) {
-    const lastMessage = messages.at(-1);
-    if (
-      isRecord(lastMessage) &&
-      (lastMessage.role === 'tool' ||
-        (Array.isArray(lastMessage.content) &&
-          lastMessage.content.some((block) => isRecord(block) && block.type === 'tool_result')))
-    ) {
-      return true;
-    }
-  }
-
-  const input = body.input;
-  if (
-    Array.isArray(input) &&
-    isRecord(input.at(-1)) &&
-    input.at(-1).type === 'function_call_output'
-  ) {
-    return true;
-  }
-
-  const contents = body.contents;
-  if (Array.isArray(contents) && isRecord(contents.at(-1))) {
-    const parts = contents.at(-1).parts;
-    if (
-      Array.isArray(parts) &&
-      parts.some((part) => isRecord(part) && 'functionResponse' in part)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-type ChatSimulationProps = {
-  selectedKey: KeyConfig;
-  selectedModel: string;
-  selectedApi: PlaygroundApi;
-  toolMode: ToolMode;
-  onRoutingPending: (clientRequestId: string) => void;
-  onToolCalls: (calls: PlaygroundToolCall[]) => void;
-};
-
-const ChatSimulation = memo(
-  ({
-    selectedKey,
-    selectedModel,
-    selectedApi,
-    toolMode,
-    onRoutingPending,
-    onToolCalls,
-  }: ChatSimulationProps) => {
-    const chatRef = useRef<DeepChatElement>(null);
-    const tasksRef = useRef<string[]>([]);
-    const pendingOpenAiToolCallsRef = useRef(false);
-    const runBrowserTools = (calls: BrowserToolCall[]) => {
-      const results = calls.map((call) => {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(call.arguments) as Record<string, unknown>;
-        } catch {
-          // The adapter validates tool calls; this is a final defensive fallback.
-        }
-
-        switch (call.name) {
-          case 'get_date': {
-            const timezone = typeof args.timezone === 'string' ? args.timezone : undefined;
-            try {
-              return {
-                response: JSON.stringify({
-                  datetime: new Date().toLocaleString('en-US', { timeZone: timezone }),
-                  timezone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-                }),
-              };
-            } catch {
-              return { response: JSON.stringify({ error: `Invalid timezone: ${timezone}` }) };
-            }
-          }
-          case 'add_tasks': {
-            const titles = Array.isArray(args.titles)
-              ? args.titles
-                  .filter((title): title is string => typeof title === 'string')
-                  .map((title) => title.trim())
-                  .filter(Boolean)
-              : [];
-            if (titles.length === 0) {
-              return {
-                response: JSON.stringify({ error: 'At least one task title is required.' }),
-              };
-            }
-            tasksRef.current.push(...titles);
-            return {
-              response: JSON.stringify({ added: titles, taskCount: tasksRef.current.length }),
-            };
-          }
-          case 'list_tasks':
-            return { response: JSON.stringify({ tasks: tasksRef.current }) };
-          default:
-            return { response: JSON.stringify({ error: `Unknown browser tool: ${call.name}` }) };
-        }
-      });
-      const completedCalls = calls.map((call, index) => ({
-        name: call.name,
-        arguments: call.arguments,
-        result: results[index]?.response ?? '',
-      }));
-
-      // Deep Chat handles tool execution internally but does not add an entry to
-      // its transcript. Add a non-sendable AI message so the action appears
-      // between the user's prompt and the model's follow-up response.
-      for (const toolCall of completedCalls) {
-        chatRef.current?.addMessage({
-          role: 'ai',
-          html: formatToolCallHtml(toolCall),
-        });
-      }
-      window.setTimeout(() => onToolCalls(completedCalls), 0);
-      return results;
-    };
-
-    const requestInterceptor = (details: { body: unknown; headers?: Record<string, string> }) => {
-      const clientRequestId = crypto.randomUUID();
-      if (!isToolContinuationRequest(details.body)) {
-        window.setTimeout(() => onRoutingPending(clientRequestId), 0);
-      }
-      return {
-        ...details,
-        headers: {
-          ...details.headers,
-          'x-client-request-id': clientRequestId,
-          ...(selectedApi === 'gemini' ? { 'x-goog-api-key': selectedKey.secret } : {}),
-        },
-      };
-    };
-
-    const responseInterceptor: NonNullable<DeepChatElement['responseInterceptor']> = (response) => {
-      // Deep Chat 2.4.x starts its browser-side tool continuation only when the
-      // terminal OpenAI chunk says `tool_calls`. Plexus-compatible streams may
-      // validly finish with `stop` after emitting tool deltas, so normalize that
-      // one compatibility detail locally without changing the gateway response.
-      if (selectedApi !== 'openai-completions' || toolMode !== 'sample-tools') return response;
-      if (!response || typeof response !== 'object' || !('choices' in response)) return response;
-
-      const choice = (response as { choices?: Array<Record<string, unknown>> }).choices?.[0];
-      if (!choice) return response;
-      const delta = choice.delta as { tool_calls?: unknown[] } | undefined;
-      if (delta?.tool_calls?.length) {
-        pendingOpenAiToolCallsRef.current = true;
-        return response;
-      }
-      if (pendingOpenAiToolCallsRef.current && choice.finish_reason === 'stop') {
-        pendingOpenAiToolCallsRef.current = false;
-        return {
-          ...(response as Record<string, unknown>),
-          choices: [{ ...choice, finish_reason: 'tool_calls' }],
-        } as typeof response;
-      }
-      return response;
-    };
-
-    const connection = (() => {
-      const baseUrl = window.location.origin;
-      const enableTools = toolMode === 'sample-tools';
-      switch (selectedApi) {
-        case 'openai-responses':
-          return {
-            connect: { url: `${baseUrl}/v1/responses`, stream: true },
-            directConnection: {
-              openAI: {
-                key: selectedKey.secret,
-                chat: {
-                  model: selectedModel,
-                  ...(enableTools
-                    ? {
-                        tools: responsesTools,
-                        function_handler: runBrowserTools,
-                        // Keep browser-only sample tools sequential until parallel
-                        // Responses-to-Chat-Completions translation is fixed.
-                        parallel_tool_calls: false,
-                      }
-                    : {}),
-                },
-              },
-            },
-          };
-        case 'anthropic-messages':
-          return {
-            connect: { url: `${baseUrl}/v1/messages`, stream: true },
-            directConnection: {
-              claude: {
-                key: selectedKey.secret,
-                model: selectedModel,
-                ...(enableTools ? { tools: claudeTools, function_handler: runBrowserTools } : {}),
-              },
-            },
-          };
-        case 'gemini':
-          return {
-            connect: {
-              url: `${baseUrl}/v1beta/models/${encodeURIComponent(selectedModel)}:streamGenerateContent?alt=sse`,
-              stream: true,
-            },
-            directConnection: {
-              gemini: {
-                key: selectedKey.secret,
-                model: selectedModel,
-                ...(enableTools ? { tools: geminiTools, function_handler: runBrowserTools } : {}),
-              },
-            },
-          };
-        case 'openai-completions':
-        default:
-          return {
-            connect: { url: `${baseUrl}/v1/chat/completions`, stream: true },
-            directConnection: {
-              openAI: {
-                key: selectedKey.secret,
-                // Deep Chat 2.4.x selects its Chat Completions service from
-                // `completions`, but reads its model configuration from `chat`.
-                completions: true as const,
-                chat: {
-                  model: selectedModel,
-                  ...(enableTools
-                    ? {
-                        tools: openAiTools,
-                        function_handler: runBrowserTools,
-                        // Keep browser-only sample tools sequential until parallel
-                        // Responses-to-Chat-Completions translation is fixed.
-                        parallel_tool_calls: false,
-                      }
-                    : {}),
-                },
-              },
-            },
-          };
-      }
-    })();
-
-    return (
-      <DeepChat
-        ref={chatRef}
-        key={`${selectedKey.key}:${selectedModel}:${selectedApi}:${toolMode}`}
-        connect={connection.connect}
-        directConnection={connection.directConnection}
-        requestInterceptor={requestInterceptor}
-        responseInterceptor={responseInterceptor}
-        images={true}
-        introMessage={{
-          text: `Simulation active using key "${selectedKey.key}" and model "${selectedModel}".`,
-        }}
-        textInput={{
-          placeholder: {
-            text: 'Send a test prompt through Plexus...',
-            style: { color: '#64748b' },
-          },
-          styles: {
-            container: {
-              backgroundColor: '#020617',
-              border: '1px solid #334155',
-              borderRadius: '0.625rem',
-              boxShadow: 'none',
-            },
-            text: {
-              color: '#f8fafc',
-            },
-            focus: {
-              border: '1px solid #f59e0b',
-              boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.18)',
-            },
-          },
-        }}
-        errorMessages={{ displayServiceErrorMessages: true }}
-        auxiliaryStyle={deepChatAuxiliaryStyle}
-        style={{
-          border: '1px solid rgb(30 41 59)',
-          borderRadius: '0.625rem',
-          height: '100%',
-          width: '100%',
-          background: 'rgb(15 23 42)',
-          boxShadow: 'none',
-          color: '#f8fafc',
-          fontFamily: 'var(--font-body)',
-          overflow: 'hidden',
-        }}
-        chatStyle={{
-          backgroundColor: 'transparent',
-          paddingTop: '0.75rem',
-          paddingBottom: '0.75rem',
-        }}
-        inputAreaStyle={{
-          backgroundColor: '#0b1324',
-          borderTop: '1px solid #1e293b',
-        }}
-        messageStyles={{
-          default: {
-            shared: {
-              bubble: {
-                borderRadius: '0.625rem',
-                fontSize: '0.8125rem',
-                lineHeight: '1.35',
-                boxShadow: 'none',
-              },
-            },
-            user: {
-              bubble: {
-                backgroundColor: '#f59e0b',
-                color: '#1a1006',
-              },
-            },
-            ai: {
-              bubble: {
-                backgroundColor: '#1e293b',
-                color: '#f8fafc',
-                border: '1px solid #334155',
-              },
-            },
-          },
-          intro: {
-            bubble: {
-              backgroundColor: '#111a30',
-              color: '#e2e8f0',
-              border: '1px solid #334155',
-            },
-          },
-          error: {
-            bubble: {
-              backgroundColor: 'rgba(239, 68, 68, 0.12)',
-              color: '#fecaca',
-              border: '1px solid rgba(239, 68, 68, 0.28)',
-            },
-          },
-        }}
-        submitButtonStyles={{
-          submit: {
-            container: {
-              default: {
-                backgroundColor: '#f59e0b',
-                borderRadius: '0.5rem',
-              },
-              hover: {
-                backgroundColor: '#fbbf24',
-              },
-            },
-            svg: {
-              styles: {
-                default: {
-                  filter: 'brightness(0) saturate(100%)',
-                },
-              },
-            },
-          },
-        }}
-      />
-    );
-  }
-);
-
-ChatSimulation.displayName = 'ChatSimulation';
 
 export const Playground = () => {
   const [preferences] = useState(loadPlaygroundPreferences);
@@ -1001,154 +331,153 @@ export const Playground = () => {
           </div>
         )}
 
-        <Card
-          title="Test Configuration"
-          extra={
-            <div className="flex items-center gap-2 text-primary">
-              <FlaskConical className="h-4 w-4" />
-              <LockKeyhole className="h-4 w-4" />
-            </div>
-          }
-          dense
-        >
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <Select
-              label="Simulate Key"
-              value={selectedKeyName}
-              onChange={setSelectedKeyName}
-              options={keys.map((key) => ({ value: key.key, label: key.key }))}
-              placeholder="Select a key"
-              disabled={keys.length === 0}
-              className="h-9 truncate text-xs sm:text-sm"
-            />
-
-            <Select
-              label="Target Model"
-              value={selectedModel}
-              onChange={setSelectedModel}
-              options={models.map((model) => ({ value: model, label: model }))}
-              placeholder="Select a model"
-              disabled={models.length === 0}
-              className="h-9 truncate text-xs sm:text-sm"
-            />
-
-            <Select
-              label="Request API"
-              value={selectedApi}
-              onChange={(value) => setSelectedApi(value as PlaygroundApi)}
-              options={playgroundApiOptions}
-              className="h-9 truncate text-xs sm:text-sm"
-            />
-
-            <Select
-              label="Tool Mode"
-              value={toolMode}
-              onChange={(value) => setToolMode(value as ToolMode)}
-              options={toolModeOptions}
-              className="h-9 truncate text-xs sm:text-sm"
-            />
-
-            <div className="min-w-0 rounded-md border border-border bg-bg-subtle/60 p-2">
-              <div className="mb-1 flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-text-muted sm:text-[10px]">
-                <Key className="h-3 w-3" />
-                Key Status
+        <Card title="Test Configuration" dense>
+          <div className="grid gap-3 sm:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)]">
+            <div className="space-y-1.5">
+              <div className="space-y-1">
+                <label
+                  htmlFor="playground-key"
+                  className="font-mono text-[9px] uppercase tracking-wider text-text-muted"
+                >
+                  Key
+                </label>
+                <Select
+                  id="playground-key"
+                  value={selectedKeyName}
+                  onChange={setSelectedKeyName}
+                  options={keys.map((key) => ({ value: key.key, label: key.key }))}
+                  placeholder="Select a key"
+                  disabled={keys.length === 0}
+                  className="h-8 truncate py-1 text-xs"
+                />
               </div>
-              {selectedKey ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedKey.quotas?.length ? (
-                    <Badge status="info">{selectedKey.quotas.length} quota(s)</Badge>
-                  ) : (
-                    <Badge status="neutral">Default quotas</Badge>
-                  )}
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="playground-model"
+                  className="font-mono text-[9px] uppercase tracking-wider text-text-muted"
+                >
+                  Model
+                </label>
+                <Select
+                  id="playground-model"
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  options={models.map((model) => ({ value: model, label: model }))}
+                  placeholder="Select a model"
+                  disabled={models.length === 0}
+                  className="h-8 truncate py-1 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="playground-api"
+                  className="font-mono text-[9px] uppercase tracking-wider text-text-muted"
+                >
+                  API
+                </label>
+                <Select
+                  id="playground-api"
+                  value={selectedApi}
+                  onChange={(value) => setSelectedApi(value as PlaygroundApi)}
+                  options={playgroundApiOptions}
+                  className="h-8 truncate py-1 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                  Tool Mode
                 </div>
-              ) : (
-                <span className="text-[11px] text-text-secondary sm:text-xs">
-                  No client key configured
-                </span>
-              )}
+                <label className="flex h-8 cursor-pointer items-center gap-2 text-xs text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={toolMode === 'sample-tools'}
+                    onChange={(event) => setToolMode(event.target.checked ? 'sample-tools' : 'off')}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  Sample browser tools
+                </label>
+              </div>
             </div>
 
-            <div className="min-w-0 rounded-md border border-border bg-bg-subtle/60 p-2 text-[11px] sm:text-xs">
-              <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-text-muted sm:text-[10px]">
-                Policy Check
-              </div>
-              {selectedKey &&
-              selectedModel &&
-              (!keyAllowsSelectedModel || keyExcludesSelectedModel) ? (
-                <div className="flex items-start gap-2 text-amber-200">
-                  <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="line-clamp-2">Expected rejection by model policy.</span>
+            {selectedKey ? (
+              <dl className="grid content-start gap-1.5 border-t border-border pt-3 text-[11px] text-text-secondary sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+                  <dt className="font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Policy
+                  </dt>
+                  <dd
+                    className={
+                      selectedModel && (!keyAllowsSelectedModel || keyExcludesSelectedModel)
+                        ? 'inline-flex items-center gap-1 font-medium text-amber-200'
+                        : 'inline-flex items-center gap-1 font-medium text-success'
+                    }
+                  >
+                    {selectedModel && (!keyAllowsSelectedModel || keyExcludesSelectedModel) ? (
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    )}
+                    {selectedModel && (!keyAllowsSelectedModel || keyExcludesSelectedModel)
+                      ? 'Model blocked by key policy'
+                      : 'Model allowed'}
+                  </dd>
                 </div>
-              ) : (
-                <span className="line-clamp-2 text-text-secondary">
-                  Selection is allowed by key model scope.
-                </span>
-              )}
-            </div>
+
+                <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+                  <dt className="font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Comment
+                  </dt>
+                  <dd className="truncate text-text" title={selectedKey.comment || 'None'}>
+                    {selectedKey.comment || 'None'}
+                  </dd>
+                </div>
+
+                <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+                  <dt className="font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Models
+                  </dt>
+                  <dd
+                    className="truncate"
+                    title={`Allow: ${formatList(selectedKey.allowedModels, 'All models')} · Exclude: ${formatList(selectedKey.excludedModels, 'None')}`}
+                  >
+                    Allow {formatList(selectedKey.allowedModels, 'All')} · exclude{' '}
+                    {formatList(selectedKey.excludedModels, 'None')}
+                  </dd>
+                </div>
+
+                <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+                  <dt className="font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Providers
+                  </dt>
+                  <dd
+                    className="truncate"
+                    title={`Allow: ${formatList(selectedKey.allowedProviders, 'All providers')} · Exclude: ${formatList(selectedKey.excludedProviders, 'None')}`}
+                  >
+                    Allow {formatList(selectedKey.allowedProviders, 'All')} · exclude{' '}
+                    {formatList(selectedKey.excludedProviders, 'None')}
+                  </dd>
+                </div>
+
+                <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2">
+                  <dt className="font-mono text-[9px] uppercase tracking-wider text-text-muted">
+                    Access
+                  </dt>
+                  <dd className="truncate">
+                    IPs {formatList(selectedKey.allowedIps, 'Any')} · quotas{' '}
+                    {formatList(selectedKey.quotas, 'Defaults')}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <div className="flex items-center gap-2 border-t border-border pt-3 text-[11px] text-text-secondary sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                <ShieldAlert className="h-3.5 w-3.5 text-text-muted" />
+                Create a client key before using the playground.
+              </div>
+            )}
           </div>
-
-          {selectedKey ? (
-            <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-[11px] text-text-secondary lg:grid-cols-4 xl:text-xs">
-              <div className="min-w-0 rounded-md bg-slate-950/30 p-2">
-                <dt className="mb-0.5 truncate font-mono text-[9px] uppercase tracking-wider text-text-muted sm:text-[10px]">
-                  Comment
-                </dt>
-                <dd className="truncate text-text" title={selectedKey.comment || 'None'}>
-                  {selectedKey.comment || 'None'}
-                </dd>
-              </div>
-              <div className="min-w-0 rounded-md bg-slate-950/30 p-2">
-                <dt className="mb-0.5 truncate font-mono text-[9px] uppercase tracking-wider text-text-muted sm:text-[10px]">
-                  Models
-                </dt>
-                <dd
-                  className="truncate"
-                  title={formatList(selectedKey.allowedModels, 'All models')}
-                >
-                  Allow: {formatList(selectedKey.allowedModels, 'All')}
-                </dd>
-                <dd className="truncate" title={formatList(selectedKey.excludedModels, 'None')}>
-                  Exclude: {formatList(selectedKey.excludedModels, 'None')}
-                </dd>
-              </div>
-              <div className="min-w-0 rounded-md bg-slate-950/30 p-2">
-                <dt className="mb-0.5 truncate font-mono text-[9px] uppercase tracking-wider text-text-muted sm:text-[10px]">
-                  Providers
-                </dt>
-                <dd
-                  className="truncate"
-                  title={formatList(selectedKey.allowedProviders, 'All providers')}
-                >
-                  Allow: {formatList(selectedKey.allowedProviders, 'All')}
-                </dd>
-                <dd className="truncate" title={formatList(selectedKey.excludedProviders, 'None')}>
-                  Exclude: {formatList(selectedKey.excludedProviders, 'None')}
-                </dd>
-              </div>
-              <div className="min-w-0 rounded-md bg-slate-950/30 p-2">
-                <dt className="mb-0.5 truncate font-mono text-[9px] uppercase tracking-wider text-text-muted sm:text-[10px]">
-                  IPs / Quotas
-                </dt>
-                <dd
-                  className="truncate"
-                  title={formatList(selectedKey.allowedIps, 'Any source IP')}
-                >
-                  IPs: {formatList(selectedKey.allowedIps, 'Any')}
-                </dd>
-                <dd
-                  className="truncate"
-                  title={formatList(selectedKey.quotas, 'None — uses defaults')}
-                >
-                  Quotas: {formatList(selectedKey.quotas, 'Defaults')}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs text-text-secondary">
-              <ShieldAlert className="h-4 w-4 text-text-muted" />
-              Create a client key before using the playground.
-            </div>
-          )}
         </Card>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -1167,7 +496,8 @@ export const Playground = () => {
           >
             {selectedKey && selectedModel ? (
               <div className="h-[clamp(18rem,calc(100dvh-22rem),42.5rem)] overflow-hidden p-3 sm:p-4">
-                <ChatSimulation
+                <PlaygroundChat
+                  key={`${selectedKey.key}:${selectedModel}:${selectedApi}:${toolMode}`}
                   selectedKey={selectedKey}
                   selectedModel={selectedModel}
                   selectedApi={selectedApi}
