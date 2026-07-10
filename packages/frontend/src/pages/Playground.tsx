@@ -124,6 +124,15 @@ const openAiTools = Object.entries(toolParameters).map(([name, parameters]) => (
   },
 }));
 
+// Chat Completions expects function definitions nested under `function`, while
+// Responses defines the same fields directly on the tool object.
+const responsesTools = Object.entries(toolParameters).map(([name, parameters]) => ({
+  type: 'function',
+  name,
+  description: toolDescriptions[name as keyof typeof toolDescriptions],
+  parameters,
+}));
+
 const claudeTools = Object.entries(toolParameters).map(([name, input_schema]) => ({
   name,
   description: toolDescriptions[name as keyof typeof toolDescriptions],
@@ -443,7 +452,7 @@ const ChatSimulation = memo(
                   model: selectedModel,
                   ...(enableTools
                     ? {
-                        tools: openAiTools,
+                        tools: responsesTools,
                         function_handler: runBrowserTools,
                         // Keep browser-only sample tools sequential until parallel
                         // Responses-to-Chat-Completions translation is fixed.
