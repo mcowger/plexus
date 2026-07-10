@@ -22,7 +22,9 @@ import {
 import { logger } from '../../utils/logger';
 import {
   applyClaudeOAuthTransform,
+  canonicalizeOAuthToolName,
   isClaudeOAuthToken,
+  restoreOriginalOAuthToolName,
   type ClaudeOAuthContext,
 } from './oauth-claude';
 import { CodexVersionService } from '../../services/codex-version-service';
@@ -36,6 +38,17 @@ import {
 import type { RenamePair } from './masking/types';
 
 export { buildThinkingOptions };
+
+const oauthContextSymbol = Symbol('oauthContext');
+
+function attachOAuthContext<T extends object>(value: T, getContext: () => ClaudeOAuthContext): T {
+  Object.defineProperty(value, oauthContextSymbol, { get: getContext });
+  return value;
+}
+
+function getOAuthContext(value: unknown): ClaudeOAuthContext | undefined {
+  return (value as { [oauthContextSymbol]?: ClaudeOAuthContext } | undefined)?.[oauthContextSymbol];
+}
 
 function streamFromAsyncIterable<T>(iterable: AsyncIterable<T>): ReadableStream<T> {
   const iterator = iterable[Symbol.asyncIterator]();
@@ -127,14 +140,41 @@ function reverseToolRenamesInValue<T>(value: T, pairs: readonly RenamePair[]): T
   }
 }
 
-function wrapStreamWithToolRenameReversal<T>(
-  streamInput: ReadableStream<T> | AsyncIterable<T>,
-  pairs: readonly RenamePair[]
-): ReadableStream<T> | AsyncIterable<T> {
-  if (pairs.length === 0) {
-    return streamInput;
+function reverseOAuthToolNamesInStreamValue<T>(value: T, context: ClaudeOAuthContext): T {
+  if (!context.isOAuth || !context.toolNamesRemapped || value == null) {
+    return value;
   }
 
+  const reverseToolCallNames = (input: any): any => {
+    if (Array.isArray(input)) {
+      return input.map(reverseToolCallNames);
+    }
+
+    if (!input || typeof input !== 'object') {
+      return input;
+    }
+
+    const result = Object.fromEntries(
+      Object.entries(input).map(([key, nested]) => [key, reverseToolCallNames(nested)])
+    );
+    if (result.type !== 'toolCall' || typeof result.name !== 'string') {
+      return result;
+    }
+
+    const name = result.name.startsWith('proxy_')
+      ? result.name.slice('proxy_'.length)
+      : result.name;
+    return { ...result, name: restoreOriginalOAuthToolName(name, context) };
+  };
+
+  return reverseToolCallNames(value);
+}
+
+function wrapStreamWithToolRenameReversal<T>(
+  streamInput: ReadableStream<T> | AsyncIterable<T>,
+  getPairs: () => readonly RenamePair[],
+  getContext: () => ClaudeOAuthContext
+): ReadableStream<T> | AsyncIterable<T> {
   if (isReadableStream<T>(streamInput)) {
     const reader = streamInput.getReader();
     return new ReadableStream<T>({
@@ -144,7 +184,12 @@ function wrapStreamWithToolRenameReversal<T>(
           controller.close();
           return;
         }
-        controller.enqueue(reverseToolRenamesInValue(value, pairs));
+        controller.enqueue(
+          reverseOAuthToolNamesInStreamValue(
+            reverseToolRenamesInValue(value, getPairs()),
+            getContext()
+          )
+        );
       },
       cancel(reason) {
         return reader.cancel(reason);
@@ -154,7 +199,10 @@ function wrapStreamWithToolRenameReversal<T>(
 
   return (async function* () {
     for await (const event of streamInput) {
-      yield reverseToolRenamesInValue(event, pairs);
+      yield reverseOAuthToolNamesInStreamValue(
+        reverseToolRenamesInValue(event, getPairs()),
+        getContext()
+      );
     }
   })();
 }
@@ -280,7 +328,12 @@ export class OAuthTransformer implements Transformer {
       error.piAiResponse = piAiError.payload;
       throw error;
     }
-    const unified = piAiMessageToUnified(response, response.provider, response.model);
+    const unified = piAiMessageToUnified(
+      response,
+      response.provider,
+      response.model,
+      getOAuthContext(response)
+    );
 
     logger.debug(`${this.name}: Converted pi-ai response to unified`, {
       hasContent: !!unified.content,
@@ -299,6 +352,7 @@ export class OAuthTransformer implements Transformer {
   }
 
   transformStream(streamInput: ReadableStream | AsyncIterable<any>): ReadableStream {
+    const getStreamOAuthContext = () => getOAuthContext(streamInput);
     const mapped = (async function* () {
       const source = isAsyncIterable<any>(streamInput)
         ? streamInput
@@ -313,7 +367,7 @@ export class OAuthTransformer implements Transformer {
           event.partial?.provider || event.message?.provider || event.error?.provider;
         const eventModel =
           event.partial?.model || event.message?.model || event.error?.model || 'unknown';
-        const chunk = piAiEventToChunk(event, eventModel, provider);
+        const chunk = piAiEventToChunk(event, eventModel, provider, getStreamOAuthContext());
         if (chunk) {
           yield chunk;
         }
@@ -381,6 +435,11 @@ export class OAuthTransformer implements Transformer {
     const usesClaudeCodeOAuthShim =
       provider === 'anthropic' && auth.authMode === 'apiKey' && apiKey.includes('sk-ant-oat');
     const model = { ...this.getPiAiModel(provider, modelId) };
+    const originalToolNames = new Map<string, string>(
+      (context.tools ?? [])
+        .filter((tool: any) => typeof tool?.name === 'string')
+        .map((tool: any) => [canonicalizeOAuthToolName(tool.name), tool.name])
+    );
 
     // GitHub Copilot Business account fix:
     // pi-ai extracts proxy-ep from the token and incorrectly derives api.business.githubcopilot.com
@@ -509,7 +568,7 @@ export class OAuthTransformer implements Transformer {
             oauthMode: true,
           }
         );
-        oauthContext = context;
+        oauthContext = { ...context, originalToolNames };
 
         // Store OAuth context on the model for response transformation
         (model as any).__oauthContext = oauthContext;
@@ -542,7 +601,14 @@ export class OAuthTransformer implements Transformer {
       try {
         const result = await piAiModels.stream(model, context, requestOptions);
         logger.debug(`${this.name}: OAuth stream result type`, describeStreamResult(result));
-        return wrapStreamWithToolRenameReversal(result, toolRenamePairs);
+        return attachOAuthContext(
+          wrapStreamWithToolRenameReversal(
+            result,
+            () => toolRenamePairs,
+            () => oauthContext
+          ),
+          () => oauthContext
+        );
       } catch (error: any) {
         if (error?.name === 'AbortError' || signal?.aborted) {
           const isTimeout = signal?.reason?.name === 'TimeoutError';
@@ -560,7 +626,10 @@ export class OAuthTransformer implements Transformer {
 
     try {
       const result = await piAiModels.complete(model, context, requestOptions);
-      return reverseToolRenamesInValue(result, toolRenamePairs);
+      return attachOAuthContext(
+        reverseToolRenamesInValue(result, toolRenamePairs),
+        () => oauthContext
+      );
     } catch (error: any) {
       if (error?.name === 'AbortError' || signal?.aborted) {
         const isTimeout = signal?.reason?.name === 'TimeoutError';

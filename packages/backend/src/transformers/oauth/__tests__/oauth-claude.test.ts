@@ -6,6 +6,7 @@ import {
   reverseRemapOAuthToolNamesFromStreamLine,
   injectClaudeCodeSystemPrompt,
   applyClaudeOAuthTransform,
+  restoreOriginalOAuthToolName,
 } from '../oauth-claude';
 
 describe('Claude OAuth', () => {
@@ -113,6 +114,19 @@ describe('Claude OAuth', () => {
       const result = reverseRemapOAuthToolNames(input);
 
       expect(result.content[0].name).toBe('CustomTool');
+    });
+  });
+
+  describe('restoreOriginalOAuthToolName', () => {
+    test('preserves the client-provided tool-name case', () => {
+      const context = {
+        apiKey: 'sk-ant-oat-test-token',
+        isOAuth: true,
+        toolNamesRemapped: true,
+        originalToolNames: new Map([['Read', 'Read']]),
+      };
+
+      expect(restoreOriginalOAuthToolName('Read', context)).toBe('Read');
     });
   });
 

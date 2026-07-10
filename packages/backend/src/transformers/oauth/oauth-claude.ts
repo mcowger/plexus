@@ -57,7 +57,7 @@ function shouldRemapToolName(name: string): boolean {
 /**
  * Remap a single tool name from lowercase to TitleCase.
  */
-function remapToolName(name: string): string {
+export function canonicalizeOAuthToolName(name: string): string {
   const lowerName = name.toLowerCase();
   return OAUTH_TOOL_RENAME_MAP[lowerName] ?? name;
 }
@@ -90,7 +90,7 @@ export function remapOAuthToolNames(body: any): { body: any; renamed: boolean } 
 
       const name = tool.name;
       if (name && shouldRemapToolName(name)) {
-        tool.name = remapToolName(name);
+        tool.name = canonicalizeOAuthToolName(name);
         renamed = true;
       }
     }
@@ -100,7 +100,7 @@ export function remapOAuthToolNames(body: any): { body: any; renamed: boolean } 
   if (result.tool_choice?.type === 'tool' || result.tool_choice?.type === 'function') {
     const tcName = result.tool_choice.name;
     if (tcName && shouldRemapToolName(tcName)) {
-      result.tool_choice.name = remapToolName(tcName);
+      result.tool_choice.name = canonicalizeOAuthToolName(tcName);
       renamed = true;
     }
   }
@@ -115,7 +115,7 @@ export function remapOAuthToolNames(body: any): { body: any; renamed: boolean } 
           case 'tool_use': {
             const name = part.name;
             if (name && shouldRemapToolName(name)) {
-              part.name = remapToolName(name);
+              part.name = canonicalizeOAuthToolName(name);
               renamed = true;
             }
             break;
@@ -124,7 +124,7 @@ export function remapOAuthToolNames(body: any): { body: any; renamed: boolean } 
           case 'tool_reference': {
             const toolName = part.tool_name;
             if (toolName && shouldRemapToolName(toolName)) {
-              part.tool_name = remapToolName(toolName);
+              part.tool_name = canonicalizeOAuthToolName(toolName);
               renamed = true;
             }
             break;
@@ -137,7 +137,7 @@ export function remapOAuthToolNames(body: any): { body: any; renamed: boolean } 
                 if (nested.type === 'tool_reference') {
                   const nestedToolName = nested.tool_name;
                   if (nestedToolName && shouldRemapToolName(nestedToolName)) {
-                    nested.tool_name = remapToolName(nestedToolName);
+                    nested.tool_name = canonicalizeOAuthToolName(nestedToolName);
                     renamed = true;
                   }
                 }
@@ -644,6 +644,11 @@ export interface ClaudeOAuthContext {
   apiKey: string;
   isOAuth: boolean;
   toolNamesRemapped: boolean;
+  originalToolNames?: ReadonlyMap<string, string>;
+}
+
+export function restoreOriginalOAuthToolName(name: string, context: ClaudeOAuthContext): string {
+  return context.originalToolNames?.get(name) ?? name;
 }
 
 /**

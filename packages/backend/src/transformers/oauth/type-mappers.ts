@@ -17,7 +17,7 @@ import type {
   MessageContent,
   UnifiedUsage,
 } from '../../types/unified';
-import type { ClaudeOAuthContext } from './oauth-claude';
+import { restoreOriginalOAuthToolName, type ClaudeOAuthContext } from './oauth-claude';
 export function unifiedToContext(
   request: UnifiedChatRequest,
   provider?: string,
@@ -351,30 +351,7 @@ export function piAiMessageToUnified(
     if (!oauthContext?.isOAuth || !oauthContext?.toolNamesRemapped) {
       return name;
     }
-    // Map of TitleCase Claude Code tool names to lowercase
-    const reverseMap: Record<string, string> = {
-      Bash: 'bash',
-      Read: 'read',
-      Write: 'write',
-      Edit: 'edit',
-      Glob: 'glob',
-      Grep: 'grep',
-      Task: 'task',
-      WebFetch: 'webfetch',
-      TodoWrite: 'todowrite',
-      Question: 'question',
-      Skill: 'skill',
-      LS: 'ls',
-      TodoRead: 'todoread',
-      NotebookEdit: 'notebookedit',
-      AskUserQuestion: 'askuserquestion',
-      EnterPlanMode: 'enterplanmode',
-      ExitPlanMode: 'exitplanmode',
-      KillShell: 'killshell',
-      TaskOutput: 'taskoutput',
-      WebSearch: 'websearch',
-    };
-    return reverseMap[name] ?? name;
+    return restoreOriginalOAuthToolName(name, oauthContext);
   };
 
   // Combined tool name normalizer
@@ -449,29 +426,7 @@ export function piAiEventToChunk(
     if (!oauthContext?.isOAuth || !oauthContext?.toolNamesRemapped) {
       return name;
     }
-    const reverseMap: Record<string, string> = {
-      Bash: 'bash',
-      Read: 'read',
-      Write: 'write',
-      Edit: 'edit',
-      Glob: 'glob',
-      Grep: 'grep',
-      Task: 'task',
-      WebFetch: 'webfetch',
-      TodoWrite: 'todowrite',
-      Question: 'question',
-      Skill: 'skill',
-      LS: 'ls',
-      TodoRead: 'todoread',
-      NotebookEdit: 'notebookedit',
-      AskUserQuestion: 'askuserquestion',
-      EnterPlanMode: 'enterplanmode',
-      ExitPlanMode: 'exitplanmode',
-      KillShell: 'killshell',
-      TaskOutput: 'taskoutput',
-      WebSearch: 'websearch',
-    };
-    return reverseMap[name] ?? name;
+    return restoreOriginalOAuthToolName(name, oauthContext);
   };
 
   // Combined tool name normalizer

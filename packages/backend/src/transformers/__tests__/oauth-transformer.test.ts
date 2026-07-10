@@ -216,24 +216,32 @@ describe('OAuthTransformer', () => {
     (vi.mocked(piAiModels.stream) as any).mockImplementation(
       (_model: any, _context: any, options: any) => {
         const onPayload = options.onPayload as (payload: any) => any;
-        onPayload({
-          model: 'claude-test',
-          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello world' }] }],
-          tools: [
-            { name: 'github_search_users', input_schema: { type: 'object' } },
-            { name: 'github_list_repos', input_schema: { type: 'object' } },
-            { name: 'github_create_issue', input_schema: { type: 'object' } },
-            { name: 'github_get_issue', input_schema: { type: 'object' } },
-          ],
-        });
-
         return (async function* () {
+          onPayload({
+            model: 'claude-test',
+            messages: [{ role: 'user', content: [{ type: 'text', text: 'hello world' }] }],
+            tools: [
+              {
+                name: 'Read',
+                input_schema: { type: 'object', required: ['path'] },
+              },
+            ],
+          });
           yield {
-            type: 'content_block_start',
-            content_block: {
-              type: 'tool_use',
-              name: 'mcp__github__search_users',
-              input: {},
+            type: 'toolcall_delta',
+            contentIndex: 0,
+            delta: '{}',
+            partial: {
+              provider: 'anthropic',
+              model: 'claude-test',
+              content: [
+                {
+                  type: 'toolCall',
+                  id: 'toolu_test',
+                  name: 'mcp__Read',
+                  arguments: {},
+                },
+              ],
             },
           };
         })() as any;
@@ -242,7 +250,7 @@ describe('OAuthTransformer', () => {
 
     const transformer = new OAuthTransformer();
     const stream = (await transformer.executeRequest(
-      { tools: [], messages: [] },
+      { tools: [{ name: 'read' }], messages: [] },
       'anthropic' as any,
       'claude-test',
       true,
@@ -255,7 +263,7 @@ describe('OAuthTransformer', () => {
     const iterator = stream[Symbol.asyncIterator]();
     const first = await iterator.next();
 
-    expect(first.value.content_block.name).toBe('github_search_users');
+    expect(first.value?.partial.content[0]?.name).toBe('read');
   });
 
   test('transformRequest normalises string assistant content to array blocks (issue #162)', async () => {
