@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
 import {
   CheckCircle2,
@@ -24,14 +24,88 @@ type ModelListResponse = {
   data?: Array<{ id?: string }>;
 };
 
-type DeepChatRequestDetails = {
-  body: unknown;
-  headers?: Record<string, string>;
+type PlaygroundApi = 'openai-completions' | 'openai-responses' | 'anthropic-messages' | 'gemini';
+type ToolMode = 'off' | 'sample-tools';
+type BrowserToolCall = { name: string; arguments: string };
+
+const playgroundApiOptions: Array<{ value: PlaygroundApi; label: string }> = [
+  { value: 'openai-completions', label: 'OpenAI Chat Completions' },
+  { value: 'openai-responses', label: 'OpenAI Responses' },
+  { value: 'anthropic-messages', label: 'Anthropic Messages' },
+  { value: 'gemini', label: 'Gemini Generate Content' },
+];
+
+const playgroundApiLabel = (apiType: PlaygroundApi) =>
+  playgroundApiOptions.find((option) => option.value === apiType)?.label ?? apiType;
+
+const toolModeOptions: Array<{ value: ToolMode; label: string }> = [
+  { value: 'off', label: 'No tools' },
+  { value: 'sample-tools', label: 'Sample browser tools' },
+];
+
+const toolParameters = {
+  get_date: {
+    type: 'object',
+    properties: {
+      timezone: {
+        type: 'string',
+        description: 'Optional IANA timezone, such as America/Los_Angeles',
+      },
+    },
+  },
+  add_tasks: {
+    type: 'object',
+    properties: {
+      titles: {
+        type: 'array',
+        description: 'One or more tasks to add together',
+        items: { type: 'string' },
+      },
+    },
+    required: ['titles'],
+  },
+  list_tasks: {
+    type: 'object',
+    properties: {},
+  },
 };
 
-type OpenAiMessage = {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+const toolDescriptions = {
+  get_date: 'Get the current date and time in an optional timezone.',
+  add_tasks:
+    'Add one or more tasks to this browser-only test task list. Use one call with every task in titles.',
+  list_tasks: 'List tasks added during this current Playground chat session.',
+};
+
+const openAiTools = Object.entries(toolParameters).map(([name, parameters]) => ({
+  type: 'function',
+  function: {
+    name,
+    description: toolDescriptions[name as keyof typeof toolDescriptions],
+    parameters,
+  },
+}));
+
+const claudeTools = Object.entries(toolParameters).map(([name, input_schema]) => ({
+  name,
+  description: toolDescriptions[name as keyof typeof toolDescriptions],
+  input_schema,
+}));
+
+const geminiTools = [
+  {
+    functionDeclarations: Object.entries(toolParameters).map(([name, parameters]) => ({
+      name,
+      description: toolDescriptions[name as keyof typeof toolDescriptions],
+      parameters,
+    })),
+  },
+];
+
+type PlaygroundToolCall = {
+  name: string;
+  arguments: string;
+  result: string;
 };
 
 type RetryAttempt = {
@@ -63,8 +137,6 @@ type PlaygroundRouting = {
   allAttemptedProviders?: string;
   retryHistory?: string;
 };
-
-const CHAT_COMPLETIONS_ENDPOINT = '/v1/chat/completions';
 
 const deepChatAuxiliaryStyle = `
   :host {
@@ -113,6 +185,44 @@ const deepChatAuxiliaryStyle = `
     color: #64748b !important;
   }
 
+  #file-attachment-container {
+    box-sizing: border-box !important;
+    width: calc(100% - 2px) !important;
+    height: 3.6em !important;
+    top: -3.6em !important;
+    left: 1px !important;
+    padding: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    background: #0b1324 !important;
+    border: 1px solid #334155 !important;
+    border-bottom: 0 !important;
+    border-radius: 0.625rem 0.625rem 0 0 !important;
+  }
+
+  .file-attachment {
+    margin: 0 0.5em 0 0 !important;
+    background: #020617 !important;
+    border: 1px solid #334155 !important;
+    border-radius: 0.375rem !important;
+  }
+
+  .border-bound-attachment {
+    width: 100% !important;
+    height: 100% !important;
+    border: 0 !important;
+    border-radius: 0.3125rem !important;
+  }
+
+  .image-attachment {
+    border-radius: 0.3125rem !important;
+  }
+
+  .remove-file-attachment-button {
+    border-color: #64748b !important;
+    background: #0f172a !important;
+  }
+
   #messages::-webkit-scrollbar {
     width: 8px;
   }
@@ -129,92 +239,6 @@ const deepChatAuxiliaryStyle = `
 
 const formatList = (items?: string[], emptyLabel = 'All') =>
   items && items.length > 0 ? items.join(', ') : emptyLabel;
-
-const deepChatRoleToOpenAiRole = (role?: string): OpenAiMessage['role'] => {
-  if (role === 'ai' || role === 'assistant') return 'assistant';
-  if (role === 'system' || role === 'tool') return role;
-  return 'user';
-};
-
-const stringifyContent = (content: unknown): string => {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object' && 'text' in item) {
-          return String((item as { text?: unknown }).text ?? '');
-        }
-        return '';
-      })
-      .filter(Boolean)
-      .join('\n');
-  }
-  return '';
-};
-
-const extractMessages = (body: unknown): OpenAiMessage[] => {
-  if (!body || typeof body !== 'object' || !('messages' in body)) return [];
-  const messages = (body as { messages?: unknown }).messages;
-  if (!Array.isArray(messages)) return [];
-
-  return messages
-    .map((message): OpenAiMessage | null => {
-      if (!message || typeof message !== 'object') return null;
-      const record = message as { role?: string; text?: unknown; content?: unknown };
-      const content = stringifyContent(record.content ?? record.text);
-      if (!content.trim()) return null;
-      return {
-        role: deepChatRoleToOpenAiRole(record.role),
-        content,
-      };
-    })
-    .filter((message): message is OpenAiMessage => message !== null);
-};
-
-const extractResponseText = (content: unknown): string => {
-  const directText = stringifyContent(content);
-  if (directText) return directText;
-
-  if (content && typeof content === 'object' && 'message' in content) {
-    const message = (content as { message?: { content?: unknown } }).message;
-    return stringifyContent(message?.content);
-  }
-
-  return '';
-};
-
-const responseToMessage = (response: unknown) => {
-  if (response && typeof response === 'object' && 'error' in response) {
-    const error = (response as { error?: string | { message?: string } }).error;
-    return { error: typeof error === 'string' ? error : error?.message || 'Request failed' };
-  }
-
-  const choices =
-    response && typeof response === 'object' && 'choices' in response
-      ? (response as { choices?: unknown[] }).choices
-      : undefined;
-  const firstChoice = Array.isArray(choices) ? choices[0] : undefined;
-  if (firstChoice && typeof firstChoice === 'object') {
-    const choice = firstChoice as {
-      message?: { content?: unknown };
-      delta?: { content?: unknown };
-      text?: unknown;
-    };
-    const text =
-      extractResponseText(choice.message?.content) ||
-      extractResponseText(choice.delta?.content) ||
-      extractResponseText(choice.text);
-    if (text) return { text };
-  }
-
-  if (response && typeof response === 'object' && 'text' in response) {
-    const text = extractResponseText((response as { text?: unknown }).text);
-    if (text) return { text };
-  }
-
-  return { error: 'Plexus returned an unsupported response shape.' };
-};
 
 const parseRetryHistory = (value?: string | null): RetryAttempt[] => {
   if (!value) return [];
@@ -244,61 +268,215 @@ const formatRoute = (provider?: string | null, model?: string | null) =>
 type ChatSimulationProps = {
   selectedKey: KeyConfig;
   selectedModel: string;
-  adminKey: string;
-  onRoutingPending: () => void;
-  onRoutingResponse: (routing: PlaygroundRouting | null, error?: string) => void;
+  selectedApi: PlaygroundApi;
+  toolMode: ToolMode;
+  onRoutingPending: (clientRequestId: string) => void;
+  onToolCalls: (calls: PlaygroundToolCall[]) => void;
 };
 
 const ChatSimulation = memo(
   ({
     selectedKey,
     selectedModel,
-    adminKey,
+    selectedApi,
+    toolMode,
     onRoutingPending,
-    onRoutingResponse,
+    onToolCalls,
   }: ChatSimulationProps) => {
-    const requestInterceptor = (details: DeepChatRequestDetails) => {
-      window.setTimeout(onRoutingPending, 0);
-      const body = details.body && typeof details.body === 'object' ? details.body : {};
+    const tasksRef = useRef<string[]>([]);
+    const pendingOpenAiToolCallsRef = useRef(false);
+    const runBrowserTools = (calls: BrowserToolCall[]) => {
+      const results = calls.map((call) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.arguments) as Record<string, unknown>;
+        } catch {
+          // The adapter validates tool calls; this is a final defensive fallback.
+        }
+
+        switch (call.name) {
+          case 'get_date': {
+            const timezone = typeof args.timezone === 'string' ? args.timezone : undefined;
+            try {
+              return {
+                response: JSON.stringify({
+                  datetime: new Date().toLocaleString('en-US', { timeZone: timezone }),
+                  timezone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+                }),
+              };
+            } catch {
+              return { response: JSON.stringify({ error: `Invalid timezone: ${timezone}` }) };
+            }
+          }
+          case 'add_tasks': {
+            const titles = Array.isArray(args.titles)
+              ? args.titles
+                  .filter((title): title is string => typeof title === 'string')
+                  .map((title) => title.trim())
+                  .filter(Boolean)
+              : [];
+            if (titles.length === 0) {
+              return {
+                response: JSON.stringify({ error: 'At least one task title is required.' }),
+              };
+            }
+            tasksRef.current.push(...titles);
+            return {
+              response: JSON.stringify({ added: titles, taskCount: tasksRef.current.length }),
+            };
+          }
+          case 'list_tasks':
+            return { response: JSON.stringify({ tasks: tasksRef.current }) };
+          default:
+            return { response: JSON.stringify({ error: `Unknown browser tool: ${call.name}` }) };
+        }
+      });
+      window.setTimeout(
+        () =>
+          onToolCalls(
+            calls.map((call, index) => ({
+              name: call.name,
+              arguments: call.arguments,
+              result: results[index]?.response ?? '',
+            }))
+          ),
+        0
+      );
+      return results;
+    };
+
+    const requestInterceptor = (details: { body: unknown; headers?: Record<string, string> }) => {
+      const clientRequestId = crypto.randomUUID();
+      const messages =
+        details.body && typeof details.body === 'object' && 'messages' in details.body
+          ? (details.body as { messages?: Array<{ role?: string }> }).messages
+          : undefined;
+      const isToolContinuation =
+        messages !== undefined &&
+        messages.length > 0 &&
+        messages[messages.length - 1]?.role === 'tool';
+      if (!isToolContinuation) window.setTimeout(() => onRoutingPending(clientRequestId), 0);
       return {
         ...details,
-        body: {
-          ...body,
-          model: selectedModel,
-          stream: false,
-          messages: extractMessages(body),
+        headers: {
+          ...details.headers,
+          'x-client-request-id': clientRequestId,
+          ...(selectedApi === 'gemini' ? { 'x-goog-api-key': selectedKey.secret } : {}),
         },
       };
     };
 
     const responseInterceptor = (response: unknown) => {
-      const routing =
-        response && typeof response === 'object' && 'plexus' in response
-          ? ((response as { plexus?: PlaygroundRouting }).plexus ?? null)
-          : null;
-      const message = responseToMessage(response);
-      window.setTimeout(() => onRoutingResponse(routing, message.error), 0);
-      return message;
+      // Deep Chat 2.4.x starts its browser-side tool continuation only when the
+      // terminal OpenAI chunk says `tool_calls`. Plexus-compatible streams may
+      // validly finish with `stop` after emitting tool deltas, so normalize that
+      // one compatibility detail locally without changing the gateway response.
+      if (selectedApi !== 'openai-completions' || toolMode !== 'sample-tools') return response;
+      if (!response || typeof response !== 'object' || !('choices' in response)) return response;
+
+      const choice = (response as { choices?: Array<Record<string, unknown>> }).choices?.[0];
+      if (!choice) return response;
+      const delta = choice.delta as { tool_calls?: unknown[] } | undefined;
+      if (delta?.tool_calls?.length) {
+        pendingOpenAiToolCallsRef.current = true;
+        return response;
+      }
+      if (pendingOpenAiToolCallsRef.current && choice.finish_reason === 'stop') {
+        pendingOpenAiToolCallsRef.current = false;
+        return {
+          ...(response as Record<string, unknown>),
+          choices: [{ ...choice, finish_reason: 'tool_calls' }],
+        };
+      }
+      return response;
     };
+
+    const connection = (() => {
+      const baseUrl = window.location.origin;
+      const enableTools = toolMode === 'sample-tools';
+      switch (selectedApi) {
+        case 'openai-responses':
+          return {
+            connect: { url: `${baseUrl}/v1/responses`, stream: true },
+            directConnection: {
+              openAI: {
+                key: selectedKey.secret,
+                chat: {
+                  model: selectedModel,
+                  ...(enableTools
+                    ? {
+                        tools: openAiTools,
+                        function_handler: runBrowserTools,
+                        // Keep browser-only sample tools sequential until parallel
+                        // Responses-to-Chat-Completions translation is fixed.
+                        parallel_tool_calls: false,
+                      }
+                    : {}),
+                },
+              },
+            },
+          };
+        case 'anthropic-messages':
+          return {
+            connect: { url: `${baseUrl}/v1/messages`, stream: true },
+            directConnection: {
+              claude: {
+                key: selectedKey.secret,
+                model: selectedModel,
+                ...(enableTools ? { tools: claudeTools, function_handler: runBrowserTools } : {}),
+              },
+            },
+          };
+        case 'gemini':
+          return {
+            connect: {
+              url: `${baseUrl}/v1beta/models/${encodeURIComponent(selectedModel)}:streamGenerateContent?alt=sse`,
+              stream: true,
+            },
+            directConnection: {
+              gemini: {
+                key: selectedKey.secret,
+                model: selectedModel,
+                ...(enableTools ? { tools: geminiTools, function_handler: runBrowserTools } : {}),
+              },
+            },
+          };
+        case 'openai-completions':
+        default:
+          return {
+            connect: { url: `${baseUrl}/v1/chat/completions`, stream: true },
+            directConnection: {
+              openAI: {
+                key: selectedKey.secret,
+                // Deep Chat 2.4.x selects its Chat Completions service from
+                // `completions`, but reads its model configuration from `chat`.
+                completions: true as const,
+                chat: {
+                  model: selectedModel,
+                  ...(enableTools
+                    ? {
+                        tools: openAiTools,
+                        function_handler: runBrowserTools,
+                        // Keep browser-only sample tools sequential until parallel
+                        // Responses-to-Chat-Completions translation is fixed.
+                        parallel_tool_calls: false,
+                      }
+                    : {}),
+                },
+              },
+            },
+          };
+      }
+    })();
 
     return (
       <DeepChat
-        key={`${selectedKey.key}:${selectedModel}`}
-        connect={{
-          url: CHAT_COMPLETIONS_ENDPOINT,
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${selectedKey.secret}`,
-            'x-plexus-playground': 'true',
-            'x-admin-key': adminKey,
-          },
-          additionalBodyProps: {
-            model: selectedModel,
-            stream: false,
-          },
-        }}
+        key={`${selectedKey.key}:${selectedModel}:${selectedApi}:${toolMode}`}
+        connect={connection.connect}
+        directConnection={connection.directConnection}
         requestInterceptor={requestInterceptor}
         responseInterceptor={responseInterceptor}
+        images={true}
         introMessage={{
           text: `Simulation active using key "${selectedKey.key}" and model "${selectedModel}".`,
         }}
@@ -416,11 +594,14 @@ export const Playground = () => {
   const [selectedKeyName, setSelectedKeyName] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
+  const [selectedApi, setSelectedApi] = useState<PlaygroundApi>('openai-completions');
+  const [toolMode, setToolMode] = useState<ToolMode>('off');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [routingInfo, setRoutingInfo] = useState<RoutingInfo>({ status: 'idle' });
-  const adminKey = useMemo(() => localStorage.getItem('plexus_admin_key') ?? '', []);
+  const [toolCalls, setToolCalls] = useState<PlaygroundToolCall[]>([]);
+  const routingRequestRef = useRef(0);
 
   const selectedKey = useMemo(
     () => keys.find((key) => key.key === selectedKeyName) ?? null,
@@ -478,26 +659,67 @@ export const Playground = () => {
     loadData();
   };
 
-  const handleRoutingPending = useCallback(() => {
+  const handleRoutingPending = useCallback((clientRequestId: string) => {
+    const requestNumber = ++routingRequestRef.current;
     setRoutingInfo({ status: 'pending' });
+    setToolCalls([]);
+
+    // Streaming responses do not have a JSON body to carry Playground metadata.
+    // The inference route persists its routing decision before it starts SSE,
+    // allowing this authenticated management request to retrieve it separately.
+    const pollRouting = async (attempt = 0): Promise<void> => {
+      try {
+        const result = await api.getLogs(1, 0, { clientRequestId });
+        const record = result.data[0];
+        if (routingRequestRef.current !== requestNumber) return;
+
+        if (record?.provider || record?.selectedModelName) {
+          const isComplete = record.responseStatus !== 'pending';
+          setRoutingInfo({
+            // The initial record contains the selected provider/model, but the
+            // API type and retry trail are written when the stream finishes.
+            status: isComplete
+              ? record.responseStatus === 'error'
+                ? 'error'
+                : 'complete'
+              : 'pending',
+            error: record.responseStatus === 'error' ? 'The request failed.' : undefined,
+            routing: {
+              requestId: record.requestId,
+              provider: record.provider ?? undefined,
+              model: record.selectedModelName ?? undefined,
+              apiType: record.outgoingApiType ?? undefined,
+              canonicalModel: record.canonicalModelName ?? undefined,
+              attemptCount: record.attemptCount ?? undefined,
+              finalAttemptProvider: record.finalAttemptProvider ?? record.provider ?? undefined,
+              finalAttemptModel: record.finalAttemptModel ?? record.selectedModelName ?? undefined,
+              allAttemptedProviders: record.allAttemptedProviders ?? undefined,
+              retryHistory: record.retryHistory ?? undefined,
+            },
+          });
+          if (isComplete) return;
+        }
+      } catch {
+        // The pending record is inserted asynchronously; retry below.
+      }
+
+      if (attempt >= 20) {
+        if (routingRequestRef.current === requestNumber) {
+          setRoutingInfo({
+            status: 'error',
+            error: 'Routing metadata was not available for this request.',
+          });
+        }
+        return;
+      }
+      window.setTimeout(() => void pollRouting(attempt + 1), 250);
+    };
+
+    void pollRouting();
   }, []);
 
-  const handleRoutingResponse = useCallback((routing: PlaygroundRouting | null, error?: string) => {
-    if (routing) {
-      setRoutingInfo({
-        status: error ? 'error' : 'complete',
-        routing,
-        error,
-      });
-    } else if (error) {
-      setRoutingInfo({ status: 'error', error });
-    } else {
-      setRoutingInfo({
-        status: 'error',
-        error:
-          'Routing metadata was not returned. Verify admin access and use a unary JSON request.',
-      });
-    }
+  const handleToolCalls = useCallback((calls: PlaygroundToolCall[]) => {
+    setToolCalls((current) => [...current, ...calls]);
   }, []);
 
   const retryHistory = parseRetryHistory(routingInfo.routing?.retryHistory);
@@ -580,6 +802,22 @@ export const Playground = () => {
               options={models.map((model) => ({ value: model, label: model }))}
               placeholder="Select a model"
               disabled={models.length === 0}
+              className="h-9 truncate text-xs sm:text-sm"
+            />
+
+            <Select
+              label="Request API"
+              value={selectedApi}
+              onChange={(value) => setSelectedApi(value as PlaygroundApi)}
+              options={playgroundApiOptions}
+              className="h-9 truncate text-xs sm:text-sm"
+            />
+
+            <Select
+              label="Tool Mode"
+              value={toolMode}
+              onChange={(value) => setToolMode(value as ToolMode)}
+              options={toolModeOptions}
               className="h-9 truncate text-xs sm:text-sm"
             />
 
@@ -693,7 +931,9 @@ export const Playground = () => {
             extra={
               <div className="flex items-center gap-2 text-xs text-text-muted">
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                {selectedModel || 'No model selected'}
+                {selectedModel
+                  ? `${playgroundApiLabel(selectedApi)} · ${toolMode === 'sample-tools' ? 'tools on · ' : ''}${selectedModel}`
+                  : 'No model selected'}
               </div>
             }
             flush
@@ -703,9 +943,10 @@ export const Playground = () => {
                 <ChatSimulation
                   selectedKey={selectedKey}
                   selectedModel={selectedModel}
-                  adminKey={adminKey}
+                  selectedApi={selectedApi}
+                  toolMode={toolMode}
                   onRoutingPending={handleRoutingPending}
-                  onRoutingResponse={handleRoutingResponse}
+                  onToolCalls={handleToolCalls}
                 />
               </div>
             ) : (
@@ -789,6 +1030,34 @@ export const Playground = () => {
                 </div>
               </div>
 
+              {toolCalls.length > 0 && (
+                <div className="rounded-md border border-border bg-bg-subtle/40 p-3">
+                  <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                    Browser tool calls
+                  </div>
+                  <ol className="space-y-2">
+                    {toolCalls.map((toolCall, index) => (
+                      <li
+                        key={`${toolCall.name}:${toolCall.arguments}:${index}`}
+                        className="rounded border border-border/70 bg-slate-950/30 p-2"
+                      >
+                        <div className="mb-1 font-medium text-text">
+                          {index + 1}. {toolCall.name}
+                        </div>
+                        <div className="font-mono text-[10px] text-text-muted">Arguments</div>
+                        <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950/60 p-1.5 font-mono text-[10px] text-text-secondary">
+                          {toolCall.arguments}
+                        </pre>
+                        <div className="mt-2 font-mono text-[10px] text-text-muted">Result</div>
+                        <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950/60 p-1.5 font-mono text-[10px] text-text-secondary">
+                          {toolCall.result}
+                        </pre>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
               {attemptedProviders.length > 0 && (
                 <div className="rounded-md border border-border bg-bg-subtle/40 p-3">
                   <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
@@ -839,7 +1108,7 @@ export const Playground = () => {
                   </ol>
                 ) : (
                   <div className="text-[11px] text-text-muted">
-                    Routing details appear after the next unary playground request.
+                    Routing details appear once the next playground request is routed.
                   </div>
                 )}
               </div>

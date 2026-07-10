@@ -1,5 +1,6 @@
 export interface UsageRecord {
   requestId: string;
+  clientRequestId?: string | null;
   date: string; // ISO string
   sourceIp: string | null;
   apiKey: string | null;

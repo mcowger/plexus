@@ -505,6 +505,7 @@ export interface Cooldown {
 // Backend Types
 export interface UsageRecord {
   requestId: string;
+  clientRequestId?: string | null;
   date: string;
   sourceIp?: string;
   apiKey?: string;
@@ -596,6 +597,7 @@ interface UsageQueryParams<T extends UsageRecordField> {
   limit?: number;
   offset?: number;
   requestId?: string;
+  clientRequestId?: string;
   startDate?: string;
   endDate?: string;
   incomingApiType?: string;
@@ -839,6 +841,8 @@ const buildUsageQuery = <T extends UsageRecordField>(params: UsageQueryParams<T>
 
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
   if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+  if (params.requestId) searchParams.set('requestId', params.requestId);
+  if (params.clientRequestId) searchParams.set('clientRequestId', params.clientRequestId);
   if (params.startDate) searchParams.set('startDate', params.startDate);
   if (params.endDate) searchParams.set('endDate', params.endDate);
   if (params.incomingApiType) searchParams.set('incomingApiType', params.incomingApiType);

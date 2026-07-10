@@ -82,6 +82,30 @@ describe('Auth Middleware', () => {
     expect(lastCall[0].apiKey).toBe('test-key-1');
   });
 
+  it('persists and echoes a client request ID separately from the Plexus request ID', async () => {
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: {
+        authorization: 'Bearer sk-valid-key',
+        'content-type': 'application/json',
+        'x-client-request-id': 'client-request-123',
+      },
+      payload: {
+        model: 'gpt-4',
+        messages: [],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['x-client-request-id']).toBe('client-request-123');
+    expect(response.headers['x-request-id']).not.toBe('client-request-123');
+
+    const saveRequestCalls = (mockUsageStorage.saveRequest as any).mock.calls;
+    const lastCall = saveRequestCalls[saveRequestCalls.length - 1];
+    expect(lastCall[0].clientRequestId).toBe('client-request-123');
+  });
+
   it('should allow request with x-api-key header', async () => {
     const response = await fastify.inject({
       method: 'POST',

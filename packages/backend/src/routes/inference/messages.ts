@@ -14,6 +14,7 @@ import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
 
 export async function registerMessagesRoute(
   fastify: FastifyInstance,
@@ -27,10 +28,13 @@ export async function registerMessagesRoute(
    */
   fastify.post('/v1/messages', async (request, reply) => {
     const requestId = crypto.randomUUID();
+    const clientRequestId = getClientRequestId(request.headers);
     reply.header('x-request-id', requestId);
+    if (clientRequestId) reply.header(CLIENT_REQUEST_ID_HEADER, clientRequestId);
     const startTime = Date.now();
     let usageRecord: Partial<UsageRecord> = {
       requestId,
+      clientRequestId,
       date: new Date().toISOString(),
       sourceIp: getClientIp(request),
       incomingApiType: 'messages',

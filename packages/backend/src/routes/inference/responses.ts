@@ -19,6 +19,7 @@ import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
 
 export function detectResponsesApiType(
   headers: Record<string, unknown>,
@@ -57,7 +58,9 @@ export async function registerResponsesRoute(
   // Handler for Responses API requests (shared between /v1/responses and /v1/codex/responses)
   const responsesHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const requestId = crypto.randomUUID();
+    const clientRequestId = getClientRequestId(request.headers);
     reply.header('x-request-id', requestId);
+    if (clientRequestId) reply.header(CLIENT_REQUEST_ID_HEADER, clientRequestId);
     const startTime = Date.now();
     const incomingApiType = detectResponsesApiType(
       request.headers as Record<string, unknown>,
@@ -65,6 +68,7 @@ export async function registerResponsesRoute(
     );
     let usageRecord: Partial<UsageRecord> = {
       requestId,
+      clientRequestId,
       date: new Date().toISOString(),
       sourceIp: getClientIp(request),
       incomingApiType,
