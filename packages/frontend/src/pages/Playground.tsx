@@ -28,6 +28,15 @@ type PlaygroundApi = 'openai-completions' | 'openai-responses' | 'anthropic-mess
 type ToolMode = 'off' | 'sample-tools';
 type BrowserToolCall = { name: string; arguments: string };
 
+type PlaygroundPreferences = {
+  selectedKeyName?: string;
+  selectedModel?: string;
+  selectedApi?: PlaygroundApi;
+  toolMode?: ToolMode;
+};
+
+const PLAYGROUND_PREFERENCES_STORAGE_KEY = 'plexus_playground_preferences';
+
 const playgroundApiOptions: Array<{ value: PlaygroundApi; label: string }> = [
   { value: 'openai-completions', label: 'OpenAI Chat Completions' },
   { value: 'openai-responses', label: 'OpenAI Responses' },
@@ -42,6 +51,35 @@ const toolModeOptions: Array<{ value: ToolMode; label: string }> = [
   { value: 'off', label: 'No tools' },
   { value: 'sample-tools', label: 'Sample browser tools' },
 ];
+
+const isPlaygroundApi = (value: unknown): value is PlaygroundApi =>
+  playgroundApiOptions.some((option) => option.value === value);
+
+const isToolMode = (value: unknown): value is ToolMode =>
+  toolModeOptions.some((option) => option.value === value);
+
+const loadPlaygroundPreferences = (): PlaygroundPreferences => {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const saved = JSON.parse(
+      window.localStorage.getItem(PLAYGROUND_PREFERENCES_STORAGE_KEY) ?? '{}'
+    );
+    if (!saved || typeof saved !== 'object') return {};
+
+    const preferences = saved as Record<string, unknown>;
+    return {
+      selectedKeyName:
+        typeof preferences.selectedKeyName === 'string' ? preferences.selectedKeyName : undefined,
+      selectedModel:
+        typeof preferences.selectedModel === 'string' ? preferences.selectedModel : undefined,
+      selectedApi: isPlaygroundApi(preferences.selectedApi) ? preferences.selectedApi : undefined,
+      toolMode: isToolMode(preferences.toolMode) ? preferences.toolMode : undefined,
+    };
+  } catch {
+    return {};
+  }
+};
 
 const toolParameters = {
   get_date: {
@@ -590,12 +628,15 @@ const ChatSimulation = memo(
 ChatSimulation.displayName = 'ChatSimulation';
 
 export const Playground = () => {
+  const [preferences] = useState(loadPlaygroundPreferences);
   const [keys, setKeys] = useState<KeyConfig[]>([]);
-  const [selectedKeyName, setSelectedKeyName] = useState('');
+  const [selectedKeyName, setSelectedKeyName] = useState(() => preferences.selectedKeyName ?? '');
   const [models, setModels] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState('');
-  const [selectedApi, setSelectedApi] = useState<PlaygroundApi>('openai-completions');
-  const [toolMode, setToolMode] = useState<ToolMode>('off');
+  const [selectedModel, setSelectedModel] = useState(() => preferences.selectedModel ?? '');
+  const [selectedApi, setSelectedApi] = useState<PlaygroundApi>(
+    () => preferences.selectedApi ?? 'openai-completions'
+  );
+  const [toolMode, setToolMode] = useState<ToolMode>(() => preferences.toolMode ?? 'off');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -653,6 +694,17 @@ export const Playground = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        PLAYGROUND_PREFERENCES_STORAGE_KEY,
+        JSON.stringify({ selectedKeyName, selectedModel, selectedApi, toolMode })
+      );
+    } catch {
+      // Storage may be unavailable or full; the playground should remain usable.
+    }
+  }, [selectedKeyName, selectedModel, selectedApi, toolMode]);
 
   const handleRefresh = () => {
     setRefreshing(true);
