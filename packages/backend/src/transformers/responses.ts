@@ -702,6 +702,37 @@ export class ResponsesTransformer implements Transformer {
     const decoder = new TextDecoder();
     let responseModel = '';
     let responseId = '';
+    // Responses output indexes identify items in the whole response, whereas
+    // Chat Completions tool call indexes identify only tool calls. Keep a
+    // stable mapping so parallel calls remain independently assemblable even
+    // when their argument deltas are interleaved with other output items.
+    const toolCallIndexByOutputIndex = new Map<number, number>();
+    const toolCallIndexByItemId = new Map<string, number>();
+    let nextToolCallIndex = 0;
+
+    const getToolCallIndex = (data: any): number => {
+      const outputIndex =
+        typeof data.output_index === 'number' ? (data.output_index as number) : undefined;
+      const itemId =
+        typeof data.item_id === 'string'
+          ? data.item_id
+          : typeof data.item?.id === 'string'
+            ? data.item.id
+            : undefined;
+      const index =
+        (outputIndex === undefined ? undefined : toolCallIndexByOutputIndex.get(outputIndex)) ??
+        (itemId === undefined ? undefined : toolCallIndexByItemId.get(itemId)) ??
+        nextToolCallIndex++;
+
+      if (outputIndex !== undefined) {
+        toolCallIndexByOutputIndex.set(outputIndex, index);
+      }
+      if (itemId !== undefined) {
+        toolCallIndexByItemId.set(itemId, index);
+      }
+
+      return index;
+    };
 
     return new ReadableStream({
       async start(controller) {
@@ -750,7 +781,7 @@ export class ResponsesTransformer implements Transformer {
                   delta: {
                     tool_calls: [
                       {
-                        index: 0,
+                        index: getToolCallIndex(data),
                         function: {
                           arguments: data.delta,
                         },
@@ -771,7 +802,7 @@ export class ResponsesTransformer implements Transformer {
                   delta: {
                     tool_calls: [
                       {
-                        index: 0,
+                        index: getToolCallIndex(data),
                         id: data.item.call_id,
                         type: 'function',
                         function: {
