@@ -14,9 +14,7 @@ export const Login: React.FC = () => {
   const location = useLocation();
 
   const from = (location.state as any)?.from?.pathname || '/';
-  const appVersion: string =
-    // @ts-expect-error — replaced at build time by build.ts
-    process.env.APP_VERSION || 'dev';
+  const appVersion: string = process.env.APP_VERSION || 'dev';
 
   useEffect(() => {
     if (isAuthenticated) {
