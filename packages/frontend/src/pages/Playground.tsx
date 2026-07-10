@@ -351,7 +351,10 @@ const ChatSimulation = memo(
         details.body && typeof details.body === 'object' && 'messages' in details.body
           ? (details.body as { messages?: Array<{ role?: string }> }).messages
           : undefined;
-      const isToolContinuation = messages?.some((message) => message.role === 'tool') ?? false;
+      const isToolContinuation =
+        messages !== undefined &&
+        messages.length > 0 &&
+        messages[messages.length - 1]?.role === 'tool';
       if (!isToolContinuation) window.setTimeout(() => onRoutingPending(clientRequestId), 0);
       return {
         ...details,
