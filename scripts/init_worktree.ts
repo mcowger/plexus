@@ -20,7 +20,6 @@ const commands: readonly Command[] = [
   },
   { label: 'Rebase worktree onto origin/main', cmd: ['git', 'rebase', 'origin/main'] },
   { label: 'Trust mise configuration', cmd: ['mise', 'trust'] },
-  { label: 'Install mise-managed tools', cmd: ['mise', 'install'] },
   { label: 'Install Bun dependencies', cmd: ['bun', 'install'] },
   { label: 'Build frontend', cmd: ['bun', 'run', 'build:frontend'] },
 ];
