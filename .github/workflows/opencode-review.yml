@@ -1,0 +1,36 @@
+name: OpenCode PR Review
+run-name: "Queue OpenCode review: PR #${{ github.event.pull_request.number }}"
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: opencode-review-queue-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  queue-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: none
+
+    steps:
+      # This privileged trigger never checks out or inspects pull-request content. It forwards only
+      # immutable PR identifiers to a trusted workflow_dispatch run from the default branch.
+      - name: Queue isolated review
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'opencode-review-run.yml',
+              ref: context.payload.repository.default_branch,
+              inputs: {
+                pr_number: String(context.payload.pull_request.number),
+                head_sha: context.payload.pull_request.head.sha,
+              },
+            });
