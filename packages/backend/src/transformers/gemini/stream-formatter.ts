@@ -85,7 +85,6 @@ function buildGeminiFunctionCallPart(
 export function formatGeminiStream(stream: ReadableStream): ReadableStream {
   const encoder = new TextEncoder();
   const toolCallStates = new Map<string, PendingGeminiToolCall>();
-  let anonymousToolCallCounter = 0;
 
   const transformer = new TransformStream({
     transform(chunk: any, controller) {
@@ -200,7 +199,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
 
       if (chunk.delta?.tool_calls) {
         chunk.delta.tool_calls.forEach((tc: any, callPosition: number) => {
-          const fallbackKey = `anon:${anonymousToolCallCounter + callPosition}`;
+          const fallbackKey = `anon:${callPosition}`;
           const keys = getToolCallKeys(tc, fallbackKey);
 
           let state: PendingGeminiToolCall | undefined;
@@ -255,8 +254,6 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
             completedToolCallParts.push(functionCallPart);
           }
         });
-
-        anonymousToolCallCounter += chunk.delta.tool_calls.length;
       }
 
       if (chunk.finish_reason) {
