@@ -42,7 +42,8 @@ export function resolveApiRoot(
   env: Pick<NodeJS.ProcessEnv, 'PLEXUS_URL' | 'PLEXUS_PORT'> = process.env,
   cwd = process.cwd()
 ): string {
-  const url = new URL(env.PLEXUS_URL ?? 'http://localhost');
+  const configuredUrl = env.PLEXUS_URL ?? 'http://localhost';
+  const url = new URL(configuredUrl.includes('://') ? configuredUrl : `http://${configuredUrl}`);
   if (!url.port) {
     const port = env.PLEXUS_PORT ?? (env.PLEXUS_URL ? undefined : deriveDevPort(cwd));
     if (port) url.port = port;
@@ -262,29 +263,36 @@ async function main(): Promise<void> {
   );
   console.log('  Note: quotas must exist before keys that reference them\n');
 
-  const providerResults = await seedProviders(data.providers ?? {});
-  const quotaResults = await seedQuotas(data.quotas ?? {});
-  const aliasResults = await seedAliases(data.aliases ?? {});
-  const keyResults = await seedKeys(data.keys ?? {});
+  const completedResults: Result[] = [];
+  const seedStage = async (label: string, seed: () => Promise<Result[]>): Promise<boolean> => {
+    const results = await seed();
+    completedResults.push(...results);
+    printSection(label, results);
+    return results.every((result) => result.ok);
+  };
 
   console.log('\n──────────────────────────────────────────');
-  printSection('Providers', providerResults);
-  printSection('Quotas', quotaResults);
-  printSection('Aliases', aliasResults);
-  printSection('Keys', keyResults);
-
-  const allResults = [...providerResults, ...quotaResults, ...aliasResults, ...keyResults];
-  const totalOk = allResults.filter((r) => r.ok).length;
-  const totalErr = allResults.filter((r) => !r.ok).length;
-  console.log('\n──────────────────────────────────────────');
-  if (totalErr === 0) {
-    console.log(
-      `\n  ✓  Done! ${totalOk}/${allResults.length} resources created/updated successfully.\n`
-    );
-  } else {
-    console.log(`\n  ✗  Completed with errors: ${totalOk} ok, ${totalErr} failed.\n`);
+  if (!(await seedStage('Providers', () => seedProviders(data.providers ?? {})))) {
+    console.error('\n  ✗  Stopped before seeding dependent aliases and keys.\n');
     process.exit(1);
   }
+  if (!(await seedStage('Quotas', () => seedQuotas(data.quotas ?? {})))) {
+    console.error('\n  ✗  Stopped before seeding aliases and quota-dependent keys.\n');
+    process.exit(1);
+  }
+  if (!(await seedStage('Aliases', () => seedAliases(data.aliases ?? {})))) {
+    console.error('\n  ✗  Stopped before seeding keys.\n');
+    process.exit(1);
+  }
+  if (!(await seedStage('Keys', () => seedKeys(data.keys ?? {})))) {
+    console.error('\n  ✗  Key seeding failed.\n');
+    process.exit(1);
+  }
+
+  console.log('\n──────────────────────────────────────────');
+  console.log(
+    `\n  ✓  Done! ${completedResults.length}/${completedResults.length} resources created/updated successfully.\n`
+  );
 }
 
 if (import.meta.main) await main();

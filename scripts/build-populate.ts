@@ -79,34 +79,57 @@ function generateMockInferenceKey(name: string): string {
   return `sk-dev-${slug || 'key'}-00000000000000000000000000000000`;
 }
 
+function isSensitiveField(name: string): boolean {
+  const normalized = name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  const finalSegment = normalized.split(/[-_]/).at(-1);
+  return new Set([
+    'authorization',
+    'cookie',
+    'credential',
+    'credentials',
+    'key',
+    'password',
+    'secret',
+    'session',
+    'token',
+  ]).has(finalSegment ?? '');
+}
+
+export function redactSensitiveValues(value: unknown, parentKey?: string): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitiveValues(item, parentKey));
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const redactAllChildren = parentKey?.toLowerCase() === 'headers';
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => {
+      if ((redactAllChildren || isSensitiveField(key)) && typeof child !== 'object') {
+        return [key, `mock-${key.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-value`];
+      }
+      return [key, redactSensitiveValues(child, key)];
+    })
+  );
+}
+
 export function buildPopulate(stagingData: any) {
   // 1. Map Providers
   const providers: Record<string, any> = {};
   for (const [name, config] of Object.entries(stagingData.providers || {})) {
     const cleanConfig = cleanNulls({ ...(config as any) });
-    if (cleanConfig.api_key) {
-      cleanConfig.api_key = generateMockKey(name, cleanConfig.api_key);
+    const originalApiKey = cleanConfig.api_key;
+    const safeConfig = redactSensitiveValues(cleanConfig) as Record<string, any>;
+    if (typeof originalApiKey === 'string') {
+      safeConfig.api_key = generateMockKey(name, originalApiKey);
     }
-    cleanConfig.api_base_url = localizeApiBaseUrl(cleanConfig.api_base_url);
-    if (cleanConfig.quota_checker) {
-      cleanConfig.quota_checker.enabled = false;
-      if (cleanConfig.quota_checker.options?.session) {
-        cleanConfig.quota_checker.options.session = 'mock-session-token';
+    safeConfig.api_base_url = localizeApiBaseUrl(safeConfig.api_base_url);
+    if (safeConfig.quota_checker) {
+      safeConfig.quota_checker.enabled = false;
+      if (safeConfig.quota_checker.options?.endpoint) {
+        safeConfig.quota_checker.options.endpoint = `${LOCAL_MOCK_ORIGIN}/mock/quota`;
       }
-      if (cleanConfig.quota_checker.options?.endpoint) {
-        cleanConfig.quota_checker.options.endpoint = `${LOCAL_MOCK_ORIGIN}/mock/quota`;
-      }
     }
-    // Also clean oauth credentials inside providers if they exist
-    if (cleanConfig.oauth_credentials) {
-      cleanConfig.oauth_credentials = cleanConfig.oauth_credentials.map((cred: any) => {
-        const c = { ...cred };
-        if (c.access_token) c.access_token = 'sk-mock-access-token';
-        if (c.refresh_token) c.refresh_token = 'sk-mock-refresh-token';
-        return c;
-      });
-    }
-    providers[name] = cleanConfig;
+    providers[name] = safeConfig;
   }
 
   // 2. Map Quotas (user_quotas in backup -> quotas in default-populate)

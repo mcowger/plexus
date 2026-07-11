@@ -22,6 +22,14 @@ describe('buildPopulate', () => {
         example: {
           api_key: 'sk-live-provider-secret',
           api_base_url: { chat: 'https://api.example.com/v1' },
+          headers: {
+            Authorization: 'Bearer live-header-secret',
+            'x-custom-auth': 'another-live-header-secret',
+          },
+          extraBody: {
+            nested: { clientSecret: 'nested-live-secret', id_token: 'live-id-token' },
+            estimateTokens: true,
+          },
           quota_checker: {
             enabled: true,
             options: {
@@ -36,12 +44,26 @@ describe('buildPopulate', () => {
 
     expect(result.keys.CI.secret).toBe('sk-dev-ci-00000000000000000000000000000000');
     expect(JSON.stringify(result)).not.toContain(sourceSecret);
+    expect(JSON.stringify(result)).not.toContain('live-header-secret');
+    expect(JSON.stringify(result)).not.toContain('nested-live-secret');
+    expect(JSON.stringify(result)).not.toContain('live-id-token');
+    expect(result.providers.example.headers).toEqual({
+      Authorization: 'mock-authorization-value',
+      'x-custom-auth': 'mock-x-custom-auth-value',
+    });
+    expect(result.providers.example.extraBody).toMatchObject({
+      nested: {
+        clientSecret: 'mock-clientsecret-value',
+        id_token: 'mock-id-token-value',
+      },
+      estimateTokens: true,
+    });
     expect(result.providers.example.api_base_url.chat).toBe('http://localhost:4010/v1');
     expect(result.providers.example.quota_checker).toMatchObject({
       enabled: false,
       options: {
         endpoint: 'http://localhost:4010/mock/quota',
-        session: 'mock-session-token',
+        session: 'mock-session-value',
       },
     });
   });

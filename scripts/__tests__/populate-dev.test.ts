@@ -8,10 +8,12 @@ describe('resolveApiRoot', () => {
     expect(resolveApiRoot({}, cwd)).toBe(`http://localhost:${deriveDevPort(cwd)}`);
   });
 
-  it('combines a hostname-only URL with an explicit port', () => {
-    expect(resolveApiRoot({ PLEXUS_URL: 'https://plexus.example.com', PLEXUS_PORT: '8443' })).toBe(
-      'https://plexus.example.com:8443'
-    );
+  it.each([
+    ['plexus.example.com', 'http://plexus.example.com:8443'],
+    ['localhost', 'http://localhost:8443'],
+    ['https://plexus.example.com', 'https://plexus.example.com:8443'],
+  ])('combines hostname %s with an explicit port', (configuredUrl, expected) => {
+    expect(resolveApiRoot({ PLEXUS_URL: configuredUrl, PLEXUS_PORT: '8443' })).toBe(expected);
   });
 
   it('preserves the port already present in PLEXUS_URL', () => {

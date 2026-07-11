@@ -461,7 +461,7 @@
         "enabled": false,
         "intervalMinutes": 5,
         "options": {
-          "session": "mock-session-token",
+          "session": "mock-session-value",
           "endpoint": "http://localhost:4010/mock/quota"
         }
       },
@@ -1241,7 +1241,7 @@
       "pi_ai_provider": "anthropic"
     },
     "cc-sigma": {
-      "api_base_url": "http://localhost:4010",
+      "api_base_url": "http://localhost:4010/",
       "display_name": "CC-Sigma",
       "api_key": "oauth",
       "oauth_provider": "anthropic",
@@ -1303,7 +1303,7 @@
       "pi_ai_provider": "anthropic"
     },
     "cc": {
-      "api_base_url": "http://localhost:4010",
+      "api_base_url": "http://localhost:4010/",
       "display_name": "CC Personal",
       "api_key": "oauth",
       "oauth_provider": "anthropic",
