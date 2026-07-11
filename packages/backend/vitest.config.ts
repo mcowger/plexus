@@ -9,7 +9,11 @@ export default defineConfig({
       './vitest.sqlite.config.ts',
       './vitest.postgres.config.ts',
     ],
-    include: ['src/**/*.{test,spec}.ts', 'test/**/*.{test,spec}.ts'],
+    include: [
+      'src/**/*.{test,spec}.ts',
+      'test/**/*.{test,spec}.ts',
+      '../../scripts/**/*.{test,spec}.ts',
+    ],
     exclude: [
       '../frontend/**',
       '../../node_modules/**',

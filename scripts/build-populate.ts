@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-function generateMockKey(providerName: string, originalKey: string): string {
+const LOCAL_MOCK_ORIGIN = 'http://localhost:4010';
+
+export function generateMockKey(providerName: string, originalKey: string): string {
   if (originalKey === 'oauth') return 'oauth';
   if (originalKey.startsWith('eyJhbGciOiJIUzI1Ni')) {
     // JWT token
@@ -29,7 +31,7 @@ function generateMockKey(providerName: string, originalKey: string): string {
  * Recursively removes null values from objects, converting them to undefined (which omits them in JSON serialization).
  * This ensures compatibility with Zod's .optional() schemas which reject nulls but accept omitted/undefined.
  */
-function cleanNulls(obj: any): any {
+export function cleanNulls(obj: any): any {
   if (obj === null || obj === undefined) return undefined;
   if (Array.isArray(obj)) {
     return obj.map(cleanNulls).filter((v) => v !== undefined);
@@ -47,26 +49,37 @@ function cleanNulls(obj: any): any {
   return obj;
 }
 
-function main() {
-  const scriptsDir = import.meta.dir;
-  const backupPath = join('/tmp', 'staging-config.json');
-  const outputPath = join(scriptsDir, 'default-populate.json');
-
-  if (!existsSync(backupPath)) {
-    console.error(`Error: Backup file not found at ${backupPath}`);
-    process.exit(1);
+function localizeUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return `${LOCAL_MOCK_ORIGIN}${url.protocol === 'http:' || url.protocol === 'https:' ? url.pathname : ''}`;
+  } catch {
+    return LOCAL_MOCK_ORIGIN;
   }
+}
 
-  console.log(`Reading backup from ${backupPath}...`);
-  const raw = readFileSync(backupPath, 'utf8');
-  const backup = JSON.parse(raw);
-
-  const stagingData = backup.data;
-  if (!stagingData) {
-    console.error('Error: No data object found in backup');
-    process.exit(1);
+function localizeApiBaseUrl(value: unknown): unknown {
+  if (typeof value === 'string') return localizeUrl(value);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([api, url]) => [
+        api,
+        typeof url === 'string' ? localizeUrl(url) : url,
+      ])
+    );
   }
+  return value;
+}
 
+function generateMockInferenceKey(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  return `sk-dev-${slug || 'key'}-00000000000000000000000000000000`;
+}
+
+export function buildPopulate(stagingData: any) {
   // 1. Map Providers
   const providers: Record<string, any> = {};
   for (const [name, config] of Object.entries(stagingData.providers || {})) {
@@ -74,9 +87,15 @@ function main() {
     if (cleanConfig.api_key) {
       cleanConfig.api_key = generateMockKey(name, cleanConfig.api_key);
     }
-    // Remove provider-specific session credentials from generated fixtures.
-    if (cleanConfig.quota_checker?.options?.session) {
-      cleanConfig.quota_checker.options.session = 'mock-session-token';
+    cleanConfig.api_base_url = localizeApiBaseUrl(cleanConfig.api_base_url);
+    if (cleanConfig.quota_checker) {
+      cleanConfig.quota_checker.enabled = false;
+      if (cleanConfig.quota_checker.options?.session) {
+        cleanConfig.quota_checker.options.session = 'mock-session-token';
+      }
+      if (cleanConfig.quota_checker.options?.endpoint) {
+        cleanConfig.quota_checker.options.endpoint = `${LOCAL_MOCK_ORIGIN}/mock/quota`;
+      }
     }
     // Also clean oauth credentials inside providers if they exist
     if (cleanConfig.oauth_credentials) {
@@ -96,20 +115,36 @@ function main() {
   // 3. Map Aliases (models in backup -> aliases in default-populate)
   const aliases = cleanNulls(stagingData.models || {});
 
-  // 4. Map Keys
+  // 4. Map Keys and replace every source secret with a deterministic dev-only value.
   const keys = cleanNulls(stagingData.keys || {});
+  for (const [name, config] of Object.entries(keys)) {
+    (config as Record<string, unknown>).secret = generateMockInferenceKey(name);
+  }
 
-  // Build the unified populate object
-  const populate = {
-    providers,
-    quotas,
-    aliases,
-    keys,
-  };
-
-  console.log(`Writing transformed populate configuration to ${outputPath}...`);
-  writeFileSync(outputPath, JSON.stringify(populate, null, 2), 'utf8');
-  console.log('✓ Successfully created default-populate.json with real-looking data!');
+  return { providers, quotas, aliases, keys };
 }
 
-main();
+function main() {
+  const scriptsDir = import.meta.dir;
+  const backupPath = join('/tmp', 'staging-config.json');
+  const outputPath = join(scriptsDir, 'default-populate.json');
+
+  if (!existsSync(backupPath)) {
+    console.error(`Error: Backup file not found at ${backupPath}`);
+    process.exit(1);
+  }
+
+  console.log(`Reading backup from ${backupPath}...`);
+  const backup = JSON.parse(readFileSync(backupPath, 'utf8'));
+  if (!backup.data) {
+    console.error('Error: No data object found in backup');
+    process.exit(1);
+  }
+
+  const populate = buildPopulate(backup.data);
+  console.log(`Writing transformed populate configuration to ${outputPath}...`);
+  writeFileSync(outputPath, JSON.stringify(populate, null, 2), 'utf8');
+  console.log('✓ Successfully created safe default-populate.json fixtures!');
+}
+
+if (import.meta.main) main();

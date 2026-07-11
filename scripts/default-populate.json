@@ -2,7 +2,7 @@
   "providers": {
     "kilocode": {
       "api_base_url": {
-        "chat": "https://api.kilo.ai/api/gateway"
+        "chat": "http://localhost:4010/api/gateway"
       },
       "display_name": "Kilocode",
       "api_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJwcm9kdWN0aW9uIiwia2lsb1VzZXJJZCI6Im9hdXRoL2dvb2dsZToxMDQyOTkwNDU4Mzg1MTUzMTQyMjciLCJhcGlUb2tlblBlcHBlciI6bnVsbCwidmVyc2lvbiI6MywiaWF0IjoxNzc1NTE3MzMwLCJleHAiOjE5MzMxOTczMzB9.mock-signature",
@@ -347,7 +347,7 @@
       },
       "quota_checker": {
         "type": "kilo",
-        "enabled": true,
+        "enabled": false,
         "intervalMinutes": 10,
         "options": {}
       },
@@ -367,8 +367,8 @@
     },
     "wisgate": {
       "api_base_url": {
-        "chat": "https://api.wisgate.ai/v1",
-        "responses": "https://api.wisgate.ai/v1"
+        "chat": "http://localhost:4010/v1",
+        "responses": "http://localhost:4010/v1"
       },
       "display_name": "Wisgate",
       "api_key": "sk-mock-wisgate-key-00000000000000000000000000000000",
@@ -458,11 +458,11 @@
       "extraBody": {},
       "quota_checker": {
         "type": "wisdomgate",
-        "enabled": true,
+        "enabled": false,
         "intervalMinutes": 5,
         "options": {
           "session": "mock-session-token",
-          "endpoint": "https://wisgate.ai/api/dashboard/billing/usage/details"
+          "endpoint": "http://localhost:4010/mock/quota"
         }
       },
       "model_autosync": {
@@ -472,7 +472,7 @@
     },
     "neuralwatt": {
       "api_base_url": {
-        "chat": "https://api.neuralwatt.com/v1"
+        "chat": "http://localhost:4010/v1"
       },
       "display_name": "NeuralWatt",
       "api_key": "sk-mock-neuralwatt-key-00000000000000000000000000000000",
@@ -510,7 +510,7 @@
       "extraBody": {},
       "quota_checker": {
         "type": "neuralwatt",
-        "enabled": true,
+        "enabled": false,
         "intervalMinutes": 3,
         "options": {}
       },
@@ -526,9 +526,9 @@
     },
     "openrouter-s": {
       "api_base_url": {
-        "messages": "https://openrouter.ai/api/v1",
-        "responses": "https://openrouter.ai/api/v1",
-        "chat": "https://openrouter.ai/api/v1"
+        "messages": "http://localhost:4010/api/v1",
+        "responses": "http://localhost:4010/api/v1",
+        "chat": "http://localhost:4010/api/v1"
       },
       "display_name": "Openrouter-S",
       "api_key": "sk-or-v1-mock-openrouter-key-0000000000000000000000000000000000000000000",
@@ -803,9 +803,9 @@
     },
     "google-s": {
       "api_base_url": {
-        "gemini": "https://generativelanguage.googleapis.com/v1beta",
-        "chat": "https://generativelanguage.googleapis.com/v1beta/openai/v1",
-        "embeddings": "https://generativelanguage.googleapis.com/v1beta/openai/v1"
+        "gemini": "http://localhost:4010/v1beta",
+        "chat": "http://localhost:4010/v1beta/openai/v1",
+        "embeddings": "http://localhost:4010/v1beta/openai/v1"
       },
       "display_name": "Google-S",
       "api_key": "AIzaSyAD_mock-google-key-0000000000000000000000000000000",
@@ -935,11 +935,11 @@
     },
     "openai-s": {
       "api_base_url": {
-        "chat": "https://api.openai.com/v1",
-        "responses": "https://api.openai.com/v1",
-        "transcriptions": "https://api.openai.com/v1",
-        "speech": "https://api.openai.com/v1",
-        "embeddings": "https://api.openai.com/v1"
+        "chat": "http://localhost:4010/v1",
+        "responses": "http://localhost:4010/v1",
+        "transcriptions": "http://localhost:4010/v1",
+        "speech": "http://localhost:4010/v1",
+        "embeddings": "http://localhost:4010/v1"
       },
       "display_name": "OpenAI-S",
       "api_key": "sk-svcacct-mock-openai-service-key-0000000000000000000000000000000000000000",
@@ -1181,7 +1181,7 @@
     },
     "anthropic": {
       "api_base_url": {
-        "messages": "https://api.anthropic.com/v1"
+        "messages": "http://localhost:4010/v1"
       },
       "display_name": "Anthropic",
       "api_key": "sk-ant-api03-mock-anthropic-key-000000000000000000000000000000000000000000000",
@@ -1241,7 +1241,7 @@
       "pi_ai_provider": "anthropic"
     },
     "cc-sigma": {
-      "api_base_url": "oauth://",
+      "api_base_url": "http://localhost:4010",
       "display_name": "CC-Sigma",
       "api_key": "oauth",
       "oauth_provider": "anthropic",
@@ -1292,7 +1292,7 @@
       "extraBody": {},
       "quota_checker": {
         "type": "claude-code",
-        "enabled": true,
+        "enabled": false,
         "intervalMinutes": 5,
         "options": {}
       },
@@ -1303,7 +1303,7 @@
       "pi_ai_provider": "anthropic"
     },
     "cc": {
-      "api_base_url": "oauth://",
+      "api_base_url": "http://localhost:4010",
       "display_name": "CC Personal",
       "api_key": "oauth",
       "oauth_provider": "anthropic",
@@ -1371,7 +1371,7 @@
       "extraBody": {},
       "quota_checker": {
         "type": "claude-code",
-        "enabled": true,
+        "enabled": false,
         "intervalMinutes": 10,
         "options": {}
       },
@@ -1382,9 +1382,9 @@
     },
     "openlimits": {
       "api_base_url": {
-        "chat": "https://openlimits.app/v1",
-        "messages": "https://openlimits.app/v1",
-        "responses": "https://openlimits.app/v1"
+        "chat": "http://localhost:4010/v1",
+        "messages": "http://localhost:4010/v1",
+        "responses": "http://localhost:4010/v1"
       },
       "display_name": "OpenLimits",
       "api_key": "sk-mock-openlimits-key-00000000000000000000000000000000",
@@ -1625,8 +1625,8 @@
     },
     "ozore": {
       "api_base_url": {
-        "chat": "https://ozore.com/v1",
-        "messages": "https://ozore.com"
+        "chat": "http://localhost:4010/v1",
+        "messages": "http://localhost:4010/"
       },
       "display_name": "Ozore",
       "api_key": "sk-mock-ozore-key-00000000000000000000000000000000",
@@ -2537,12 +2537,12 @@
   },
   "keys": {
     "Default": {
-      "secret": "sk-SuperSecretValue",
+      "secret": "sk-dev-default-00000000000000000000000000000000",
       "comment": "Matt's Key",
       "quotas": ["basicallyunlimited"]
     },
     "OWUI": {
-      "secret": "sk-01fe4496-af56-4e2d-96e1-9b279ee17f82",
+      "secret": "sk-dev-owui-00000000000000000000000000000000",
       "comment": "OWUI Key",
       "quotas": [],
       "allowedModels": [
@@ -2577,12 +2577,12 @@
       ]
     },
     "GithubKey": {
-      "secret": "sk-5ba61ab0-5ee9-4976-993a-5b05bf8a582d",
+      "secret": "sk-dev-githubkey-00000000000000000000000000000000",
       "comment": "Key Used in Github Actions",
       "quotas": ["githublimit"]
     },
     "GHAKey": {
-      "secret": "sk-a5cbf611-b61c-4e26-80c6-5ca6118cb5fb",
+      "secret": "sk-dev-ghakey-00000000000000000000000000000000",
       "quotas": ["githublimit"],
       "allowedIps": ["0.0.0.0/0", "::/0"]
     }

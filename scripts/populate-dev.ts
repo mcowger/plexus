@@ -9,8 +9,8 @@
  *   bun run scripts/populate-dev.ts
  *
  * Environment variables (all optional — defaults match `bun run dev` defaults):
- *   PLEXUS_URL       Base URL of the Plexus instance  (default: http://localhost)
- *   PLEXUS_PORT      Port                             (default: 4000)
+ *   PLEXUS_URL       Complete Plexus origin, or a hostname to combine with PLEXUS_PORT
+ *   PLEXUS_PORT      Port (default: worktree-derived when PLEXUS_URL is unset)
  *   PLEXUS_ADMIN_KEY Admin key                        (default: password)
  *
  * Data sources (applied in order — later entries win on name collision):
@@ -25,13 +25,12 @@ import type { components } from './openapi-types';
 // Config from environment
 // ---------------------------------------------------------------------------
 
-const BASE_URL = process.env.PLEXUS_URL ?? 'http://localhost';
 const ADMIN_KEY = process.env.PLEXUS_ADMIN_KEY ?? 'password';
 
 // Mirrors the stable port derivation in scripts/dev.ts so this script targets
 // the correct worktree instance without any configuration.
-function deriveDevPort(): string {
-  const dirName = basename(process.cwd());
+export function deriveDevPort(cwd = process.cwd()): string {
+  const dirName = basename(cwd);
   let hash = 5381;
   for (let i = 0; i < dirName.length; i++) {
     hash = (hash * 33) ^ dirName.charCodeAt(i);
@@ -39,9 +38,19 @@ function deriveDevPort(): string {
   return String(10000 + (Math.abs(hash) % 10000));
 }
 
-const PORT = process.env.PLEXUS_PORT ?? deriveDevPort();
+export function resolveApiRoot(
+  env: Pick<NodeJS.ProcessEnv, 'PLEXUS_URL' | 'PLEXUS_PORT'> = process.env,
+  cwd = process.cwd()
+): string {
+  const url = new URL(env.PLEXUS_URL ?? 'http://localhost');
+  if (!url.port) {
+    const port = env.PLEXUS_PORT ?? (env.PLEXUS_URL ? undefined : deriveDevPort(cwd));
+    if (port) url.port = port;
+  }
+  return url.origin;
+}
 
-const API_ROOT = `${BASE_URL}:${PORT}`;
+const API_ROOT = resolveApiRoot();
 
 // ---------------------------------------------------------------------------
 // Types directly from the OpenAPI schemas
@@ -214,73 +223,68 @@ async function checkConnectivity(): Promise<void> {
 // Main
 // ---------------------------------------------------------------------------
 
-console.log('╔════════════════════════════════════════╗');
-console.log('║       Plexus Dev Populate Script       ║');
-console.log('╚════════════════════════════════════════╝');
-console.log(`\n  Target:    ${API_ROOT}`);
-console.log(
-  `  Admin key: ${ADMIN_KEY.slice(0, 4)}${'*'.repeat(Math.max(0, ADMIN_KEY.length - 4))}`
-);
-
-// Connectivity
-process.stdout.write('\n  Checking connectivity...');
-await checkConnectivity();
-console.log(' ok\n');
-
-// Load data files
-const scriptsDir = join(import.meta.dir);
-const defaultFile = join(scriptsDir, 'default-populate.json');
-const userFile = join(scriptsDir, 'user-populate.json');
-
-const defaultData = await loadPopulateFile(defaultFile);
-const userData = await loadPopulateFile(userFile);
-
-if (!defaultData) {
-  console.error(`  ✗  Could not load ${defaultFile}`);
-  process.exit(1);
-}
-
-if (userData) {
-  console.log('  ℹ  user-populate.json found — merging over defaults');
-} else {
-  console.log('  ℹ  No user-populate.json found — using defaults only');
-}
-
-const data = mergePopulateFiles(defaultData, userData);
-
-const providerCount = Object.keys(data.providers ?? {}).length;
-const quotaCount = Object.keys(data.quotas ?? {}).length;
-const aliasCount = Object.keys(data.aliases ?? {}).length;
-const keyCount = Object.keys(data.keys ?? {}).length;
-
-console.log(
-  `\n  Plan: ${providerCount} provider(s), ${quotaCount} quota(s), ${aliasCount} alias(es), ${keyCount} key(s)`
-);
-console.log('  Note: quotas must exist before keys that reference them\n');
-
-// Seed — order matters: quotas before keys (referential integrity)
-const providerResults = await seedProviders(data.providers ?? {});
-const quotaResults = await seedQuotas(data.quotas ?? {});
-const aliasResults = await seedAliases(data.aliases ?? {});
-const keyResults = await seedKeys(data.keys ?? {});
-
-// Report
-console.log('\n──────────────────────────────────────────');
-printSection('Providers', providerResults);
-printSection('Quotas', quotaResults);
-printSection('Aliases', aliasResults);
-printSection('Keys', keyResults);
-
-const allResults = [...providerResults, ...quotaResults, ...aliasResults, ...keyResults];
-const totalOk = allResults.filter((r) => r.ok).length;
-const totalErr = allResults.filter((r) => !r.ok).length;
-
-console.log('\n──────────────────────────────────────────');
-if (totalErr === 0) {
+async function main(): Promise<void> {
+  console.log('╔════════════════════════════════════════╗');
+  console.log('║       Plexus Dev Populate Script       ║');
+  console.log('╚════════════════════════════════════════╝');
+  console.log(`\n  Target:    ${API_ROOT}`);
   console.log(
-    `\n  ✓  Done! ${totalOk}/${allResults.length} resources created/updated successfully.\n`
+    `  Admin key: ${ADMIN_KEY.slice(0, 4)}${'*'.repeat(Math.max(0, ADMIN_KEY.length - 4))}`
   );
-} else {
-  console.log(`\n  ✗  Completed with errors: ${totalOk} ok, ${totalErr} failed.\n`);
-  process.exit(1);
+
+  process.stdout.write('\n  Checking connectivity...');
+  await checkConnectivity();
+  console.log(' ok\n');
+
+  const scriptsDir = join(import.meta.dir);
+  const defaultFile = join(scriptsDir, 'default-populate.json');
+  const userFile = join(scriptsDir, 'user-populate.json');
+  const defaultData = await loadPopulateFile(defaultFile);
+  const userData = await loadPopulateFile(userFile);
+
+  if (!defaultData) {
+    console.error(`  ✗  Could not load ${defaultFile}`);
+    process.exit(1);
+  }
+  console.log(
+    userData
+      ? '  ℹ  user-populate.json found — merging over defaults'
+      : '  ℹ  No user-populate.json found — using defaults only'
+  );
+
+  const data = mergePopulateFiles(defaultData, userData);
+  const providerCount = Object.keys(data.providers ?? {}).length;
+  const quotaCount = Object.keys(data.quotas ?? {}).length;
+  const aliasCount = Object.keys(data.aliases ?? {}).length;
+  const keyCount = Object.keys(data.keys ?? {}).length;
+  console.log(
+    `\n  Plan: ${providerCount} provider(s), ${quotaCount} quota(s), ${aliasCount} alias(es), ${keyCount} key(s)`
+  );
+  console.log('  Note: quotas must exist before keys that reference them\n');
+
+  const providerResults = await seedProviders(data.providers ?? {});
+  const quotaResults = await seedQuotas(data.quotas ?? {});
+  const aliasResults = await seedAliases(data.aliases ?? {});
+  const keyResults = await seedKeys(data.keys ?? {});
+
+  console.log('\n──────────────────────────────────────────');
+  printSection('Providers', providerResults);
+  printSection('Quotas', quotaResults);
+  printSection('Aliases', aliasResults);
+  printSection('Keys', keyResults);
+
+  const allResults = [...providerResults, ...quotaResults, ...aliasResults, ...keyResults];
+  const totalOk = allResults.filter((r) => r.ok).length;
+  const totalErr = allResults.filter((r) => !r.ok).length;
+  console.log('\n──────────────────────────────────────────');
+  if (totalErr === 0) {
+    console.log(
+      `\n  ✓  Done! ${totalOk}/${allResults.length} resources created/updated successfully.\n`
+    );
+  } else {
+    console.log(`\n  ✗  Completed with errors: ${totalOk} ok, ${totalErr} failed.\n`);
+    process.exit(1);
+  }
 }
+
+if (import.meta.main) await main();
