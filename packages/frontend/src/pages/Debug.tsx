@@ -764,6 +764,11 @@ const AccordionPanel: React.FC<{
   defaultOpen?: boolean;
 }> = ({ title, content, color, defaultOpen = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  // Monaco's wrapped-line layout becomes prohibitively expensive for captured
+  // request bodies containing a very large escaped string (for example, a
+  // prompt with many embedded newlines). Preserve wrapping for normal JSON,
+  // but let exceptionally long lines scroll horizontally instead.
+  const hasVeryLongLine = content.split('\n').some((line) => line.length > 10_000);
   const [copied, setCopied] = useState(false);
   const [folded, setFolded] = useState(false);
   const editorRef = useRef<any>(null);
@@ -847,7 +852,7 @@ const AccordionPanel: React.FC<{
               fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               lineNumbers: 'on',
               folding: true,
-              wordWrap: 'on',
+              wordWrap: hasVeryLongLine ? 'off' : 'on',
               padding: { top: 10, bottom: 10 },
             }}
           />
