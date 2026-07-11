@@ -65,6 +65,10 @@ function buildGeminiFunctionCallPart(
     },
   };
 
+  if (state.id) {
+    functionCallPart.functionCall.id = state.id;
+  }
+
   if (state.thoughtSignature) {
     functionCallPart.thoughtSignature = state.thoughtSignature;
   }
@@ -242,6 +246,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
           const sig =
             tc.thinking?.signature ||
             tc.thought_signature ||
+            tc.extra_content?.google?.thought_signature ||
             chunk.delta?.thinking?.signature ||
             chunk.delta?.thought_signature;
           if (sig) {

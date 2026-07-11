@@ -242,6 +242,77 @@ describe('formatGeminiStream', () => {
     ).toBe('STOP');
   });
 
+  test('should emit functionCall id and thoughtSignature from real Google OpenAI-compat chunks', async () => {
+    // Modeled on a captured gemini-3.5-flash stream via the OpenAI-compat
+    // endpoint: tool calls have no `index`, carry an `id`, complete args per
+    // chunk, and thought signature under extra_content.google.
+    const inputStream = new ReadableStream({
+      start(controller) {
+        controller.enqueue({
+          id: 'resp_real',
+          model: 'gemini-3.5-flash',
+          created: Date.now(),
+          delta: {
+            role: 'assistant',
+            tool_calls: [
+              {
+                id: 'xjcm5z4x',
+                type: 'function',
+                function: { name: 'get_weather', arguments: '{"city":"Paris"}' },
+                extra_content: { google: { thought_signature: 'sig-abc' } },
+              },
+            ],
+          },
+          finish_reason: null,
+        });
+        controller.enqueue({
+          id: 'resp_real',
+          model: 'gemini-3.5-flash',
+          created: Date.now(),
+          delta: {
+            role: 'assistant',
+            tool_calls: [
+              {
+                id: 'pc5lscvl',
+                type: 'function',
+                function: { name: 'get_weather', arguments: '{"city":"Tokyo"}' },
+              },
+            ],
+          },
+          finish_reason: null,
+        });
+        controller.enqueue({
+          id: 'resp_real',
+          model: 'gemini-3.5-flash',
+          created: Date.now(),
+          delta: { role: 'assistant' },
+          finish_reason: 'stop',
+        });
+        controller.close();
+      },
+    });
+
+    const sseChunks = await readAllChunks(formatGeminiStream(inputStream));
+    const functionCallParts = sseChunks.flatMap(
+      (chunk) =>
+        chunk.data.candidates?.[0]?.content?.parts?.filter((part: any) => part.functionCall) ?? []
+    );
+
+    expect(functionCallParts).toHaveLength(2);
+    expect(functionCallParts[0].functionCall).toEqual({
+      name: 'get_weather',
+      args: { city: 'Paris' },
+      id: 'xjcm5z4x',
+    });
+    expect(functionCallParts[0].thoughtSignature).toBe('sig-abc');
+    expect(functionCallParts[1].functionCall).toEqual({
+      name: 'get_weather',
+      args: { city: 'Tokyo' },
+      id: 'pc5lscvl',
+    });
+    expect(functionCallParts[1].thoughtSignature).toBeUndefined();
+  });
+
   test('should emit done event when stream ends with done chunk', async () => {
     const inputStream = new ReadableStream({
       start(controller) {
