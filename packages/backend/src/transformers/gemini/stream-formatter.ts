@@ -1,6 +1,81 @@
 import { Part } from '@google/genai';
 import { encode } from 'eventsource-encoder';
 
+type PendingGeminiToolCall = {
+  index?: number;
+  id?: string;
+  name?: string;
+  argumentsText: string;
+  structuredArguments?: unknown;
+  thoughtSignature?: string;
+  emitted: boolean;
+};
+
+function getToolCallKeys(toolCall: any, fallbackKey: string): string[] {
+  const keys: string[] = [];
+
+  if (typeof toolCall.index === 'number') {
+    keys.push(`index:${toolCall.index}`);
+  }
+
+  if (typeof toolCall.id === 'string' && toolCall.id.trim().length > 0) {
+    keys.push(`id:${toolCall.id}`);
+  }
+
+  if (keys.length === 0) {
+    keys.push(fallbackKey);
+  }
+
+  return keys;
+}
+
+function resolveToolCallArguments(
+  state: PendingGeminiToolCall,
+  allowEmptyObject = false
+): unknown | undefined {
+  if (state.structuredArguments !== undefined) {
+    return state.structuredArguments;
+  }
+
+  const rawArguments = state.argumentsText.trim();
+  if (rawArguments.length === 0) {
+    return allowEmptyObject ? {} : undefined;
+  }
+
+  try {
+    return JSON.parse(rawArguments);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildGeminiFunctionCallPart(
+  state: PendingGeminiToolCall,
+  allowEmptyObject = false
+): Part | null {
+  if (!state.name) return null;
+
+  const args = resolveToolCallArguments(state, allowEmptyObject);
+  if (args === undefined) return null;
+
+  const functionCallPart: any = {
+    functionCall: {
+      name: state.name,
+      args,
+    },
+  };
+
+  if (state.id) {
+    functionCallPart.functionCall.id = state.id;
+  }
+
+  if (state.thoughtSignature) {
+    functionCallPart.thoughtSignature = state.thoughtSignature;
+  }
+
+  return functionCallPart;
+}
+
 /**
  * Formats unified chunks back into Gemini's SSE format.
  *
@@ -13,6 +88,7 @@ import { encode } from 'eventsource-encoder';
  */
 export function formatGeminiStream(stream: ReadableStream): ReadableStream {
   const encoder = new TextEncoder();
+  const toolCallStates = new Map<string, PendingGeminiToolCall>();
 
   const transformer = new TransformStream({
     transform(chunk: any, controller) {
@@ -116,6 +192,7 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
 
       // Handle regular content chunks (non-event)
       const parts: Part[] = [];
+      const completedToolCallParts: Part[] = [];
 
       if (chunk.delta?.content) parts.push({ text: chunk.delta.content });
       if (chunk.delta?.reasoning_content)
@@ -123,41 +200,81 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
           text: chunk.delta.reasoning_content,
           thought: true,
         } as any);
-      if (chunk.delta?.tool_calls) {
-        chunk.delta.tool_calls.forEach((tc: any) => {
-          let parsedArgs: Record<string, unknown> = {};
-          const rawArgs = tc.function?.arguments;
 
-          if (typeof rawArgs === 'string' && rawArgs.trim().length > 0) {
-            try {
-              parsedArgs = JSON.parse(rawArgs);
-            } catch {
-              // Tool arguments can arrive as partial JSON during streaming.
-              parsedArgs = {};
+      if (chunk.delta?.tool_calls) {
+        chunk.delta.tool_calls.forEach((tc: any, callPosition: number) => {
+          const fallbackKey = `anon:${callPosition}`;
+          const keys = getToolCallKeys(tc, fallbackKey);
+
+          let state: PendingGeminiToolCall | undefined;
+          for (const key of keys) {
+            const existing = toolCallStates.get(key);
+            if (existing) {
+              state = existing;
+              break;
             }
-          } else if (rawArgs && typeof rawArgs === 'object') {
-            parsedArgs = rawArgs;
           }
 
-          const functionCallPart: any = {
-            functionCall: {
-              name: tc.function.name,
-              args: parsedArgs,
-            },
-          };
+          if (!state) {
+            state = {
+              argumentsText: '',
+              emitted: false,
+            };
+          }
 
-          // Check for signature in the tool call itself (preferred) or fall back to global thinking signature in the chunk
+          for (const key of keys) {
+            toolCallStates.set(key, state);
+          }
+
+          if (typeof tc.index === 'number') {
+            state.index = tc.index;
+          }
+          if (typeof tc.id === 'string' && tc.id.trim().length > 0) {
+            state.id = tc.id;
+          }
+          if (typeof tc.function?.name === 'string' && tc.function.name.trim().length > 0) {
+            state.name = tc.function.name;
+          }
+
+          const rawArgs = tc.function?.arguments;
+          if (typeof rawArgs === 'string') {
+            state.argumentsText += rawArgs;
+          } else if (rawArgs !== undefined) {
+            state.structuredArguments = rawArgs;
+          }
+
           const sig =
             tc.thinking?.signature ||
             tc.thought_signature ||
+            tc.extra_content?.google?.thought_signature ||
             chunk.delta?.thinking?.signature ||
             chunk.delta?.thought_signature;
           if (sig) {
-            functionCallPart.thoughtSignature = sig;
+            state.thoughtSignature = sig;
           }
 
-          parts.push(functionCallPart);
+          const functionCallPart = buildGeminiFunctionCallPart(state);
+          if (functionCallPart && !state.emitted) {
+            state.emitted = true;
+            completedToolCallParts.push(functionCallPart);
+          }
         });
+      }
+
+      if (chunk.finish_reason) {
+        for (const state of new Set(toolCallStates.values())) {
+          if (state.emitted) continue;
+
+          const functionCallPart = buildGeminiFunctionCallPart(state, true);
+          if (functionCallPart) {
+            state.emitted = true;
+            completedToolCallParts.push(functionCallPart);
+          }
+        }
+      }
+
+      if (completedToolCallParts.length > 0) {
+        parts.push(...completedToolCallParts);
       }
 
       // Map OpenAI-style finish_reason to valid Gemini values
@@ -166,6 +283,11 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
       if (geminiFinishReason === 'TOOL_CALLS') {
         geminiFinishReason = 'STOP';
       }
+
+      if (parts.length === 0 && !geminiFinishReason) {
+        return;
+      }
+
       const geminiChunk: any = {
         candidates: [
           {

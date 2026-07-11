@@ -54,7 +54,7 @@ describe('OAuth -> Gemini stream error regression', () => {
     expect(chunk?.delta?.content).toBe('upstream quota exceeded');
   });
 
-  test('formatGeminiStream does not throw when tool call args are partial JSON', async () => {
+  test('formatGeminiStream suppresses partial tool call args until completion', async () => {
     const stream = createUnifiedChunkStream([
       {
         id: 'oauth-1',
@@ -89,8 +89,7 @@ describe('OAuth -> Gemini stream error regression', () => {
     const formatted = formatGeminiStream(stream);
     const output = await readUtf8(formatted as ReadableStream<Uint8Array>);
 
-    expect(output).toContain('functionCall');
-    expect(output).toContain('"args":{}');
+    expect(output).not.toContain('functionCall');
     expect(output).toContain('"finishReason":"STOP"');
   });
 });
