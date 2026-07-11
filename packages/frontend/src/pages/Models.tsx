@@ -124,8 +124,8 @@ export const Models = () => {
         selectedProviderFilters,
         sortField,
         sortDirection
-      )
-    [aliases, providers, search, selectedProviderFilters, sortField, sortDirection]
+      ),
+    [aliases, providers, selectedProviderFilters, sortField, sortDirection]
   );
 
   const handleSort = (field: ModelListSortField) => {

@@ -90,7 +90,7 @@ export const sortAliasesForModelsPage = (
     const primary = leftKey.localeCompare(rightKey);
     if (primary !== 0) return primary * multiplier;
 
-    return left.id.localeCompare(right.id) * multiplier;
+    return left.id.localeCompare(right.id);
   });
 };
 

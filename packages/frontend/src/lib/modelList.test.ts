@@ -89,7 +89,7 @@ describe('model list helpers', () => {
       filterAndSortAliasesForModelsPage(aliases, providers, '', [], 'provider', 'asc').map(
         (alias) => alias.id
       )
-    ).toEqual(['gamma', 'beta', 'alpha']);
+    ).toEqual(['gamma', 'alpha', 'beta']);
 
     expect(
       filterAndSortAliasesForModelsPage(aliases, providers, '', [], 'targets', 'desc').map(
