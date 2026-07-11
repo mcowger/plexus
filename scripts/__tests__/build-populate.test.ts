@@ -25,9 +25,11 @@ describe('buildPopulate', () => {
           headers: {
             Authorization: 'Bearer live-header-secret',
             'x-custom-auth': 'another-live-header-secret',
+            'x-structured-auth': { value: 'structured-live-header-secret' },
           },
           extraBody: {
             nested: { clientSecret: 'nested-live-secret', id_token: 'live-id-token' },
+            credentials: { value: 'opaque-live-credential', expiresAt: 12345 },
             estimateTokens: true,
           },
           quota_checker: {
@@ -47,15 +49,19 @@ describe('buildPopulate', () => {
     expect(JSON.stringify(result)).not.toContain('live-header-secret');
     expect(JSON.stringify(result)).not.toContain('nested-live-secret');
     expect(JSON.stringify(result)).not.toContain('live-id-token');
+    expect(JSON.stringify(result)).not.toContain('structured-live-header-secret');
+    expect(JSON.stringify(result)).not.toContain('opaque-live-credential');
     expect(result.providers.example.headers).toEqual({
       Authorization: 'mock-authorization-value',
       'x-custom-auth': 'mock-x-custom-auth-value',
+      'x-structured-auth': { value: 'mock-value-value' },
     });
     expect(result.providers.example.extraBody).toMatchObject({
       nested: {
         clientSecret: 'mock-clientsecret-value',
         id_token: 'mock-id-token-value',
       },
+      credentials: { value: 'mock-value-value', expiresAt: 0 },
       estimateTokens: true,
     });
     expect(result.providers.example.api_base_url.chat).toBe('http://localhost:4010/v1');
@@ -76,6 +82,23 @@ describe('buildPopulate', () => {
     expect(urls.length).toBeGreaterThan(0);
     for (const value of urls) {
       expect(new URL(value).hostname).toBe('localhost');
+    }
+  });
+
+  it('only grants keys access to routable model names', () => {
+    const fixturePath = fileURLToPath(new URL('../default-populate.json', import.meta.url));
+    const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+    const routableModels = new Set(Object.keys(fixture.aliases));
+    for (const alias of Object.values(fixture.aliases) as any[]) {
+      for (const additionalAlias of alias.additional_aliases ?? []) {
+        routableModels.add(additionalAlias);
+      }
+    }
+
+    for (const key of Object.values(fixture.keys) as any[]) {
+      for (const allowedModel of key.allowedModels ?? []) {
+        expect(routableModels.has(allowedModel), allowedModel).toBe(true);
+      }
     }
   });
 });

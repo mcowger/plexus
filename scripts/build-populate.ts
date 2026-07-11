@@ -95,20 +95,36 @@ function isSensitiveField(name: string): boolean {
   ]).has(finalSegment ?? '');
 }
 
-export function redactSensitiveValues(value: unknown, parentKey?: string): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => redactSensitiveValues(item, parentKey));
+function redactPrimitive(value: unknown, fieldName: string): unknown {
+  if (typeof value === 'string') {
+    return `mock-${fieldName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-value`;
   }
-  if (!value || typeof value !== 'object') return value;
+  if (typeof value === 'number') return 0;
+  if (typeof value === 'boolean') return false;
+  return value;
+}
 
-  const redactAllChildren = parentKey?.toLowerCase() === 'headers';
+export function redactSensitiveValues(
+  value: unknown,
+  parentKey?: string,
+  redactEntireSubtree = false
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitiveValues(item, parentKey, redactEntireSubtree));
+  }
+  if (!value || typeof value !== 'object') {
+    return redactEntireSubtree ? redactPrimitive(value, parentKey ?? 'secret') : value;
+  }
+
+  const redactAllChildren =
+    redactEntireSubtree ||
+    parentKey?.toLowerCase() === 'headers' ||
+    isSensitiveField(parentKey ?? '');
   return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => {
-      if ((redactAllChildren || isSensitiveField(key)) && typeof child !== 'object') {
-        return [key, `mock-${key.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-value`];
-      }
-      return [key, redactSensitiveValues(child, key)];
-    })
+    Object.entries(value).map(([key, child]) => [
+      key,
+      redactSensitiveValues(child, key, redactAllChildren || isSensitiveField(key)),
+    ])
   );
 }
 
@@ -140,8 +156,20 @@ export function buildPopulate(stagingData: any) {
 
   // 4. Map Keys and replace every source secret with a deterministic dev-only value.
   const keys = cleanNulls(stagingData.keys || {});
+  const routableModels = new Set(Object.keys(aliases));
+  for (const alias of Object.values(aliases) as Record<string, any>[]) {
+    for (const additionalAlias of alias.additional_aliases ?? []) {
+      routableModels.add(additionalAlias);
+    }
+  }
   for (const [name, config] of Object.entries(keys)) {
-    (config as Record<string, unknown>).secret = generateMockInferenceKey(name);
+    const keyConfig = config as Record<string, any>;
+    keyConfig.secret = generateMockInferenceKey(name);
+    if (Array.isArray(keyConfig.allowedModels)) {
+      keyConfig.allowedModels = keyConfig.allowedModels.filter((model: string) =>
+        routableModels.has(model)
+      );
+    }
   }
 
   return { providers, quotas, aliases, keys };
