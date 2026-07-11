@@ -1,24 +1,13 @@
 ---
 name: frontend-testing
 description: >-
-  See, screenshot, or confirm the behavior of any Plexus admin-UI screen in the actually
-  running app. This skill boots the worktree-safe dev stack (`bun run dev:full`), auto-logs
-  into the admin panel, and drives it with a real browser — the port, credentials, and
-  auto-login that raw browser automation doesn't know how to do on its own. Reach for it
-  whenever you need eyes on the running Plexus frontend: after you edit anything under
-  `packages/frontend/src` (React `.tsx`/`.jsx`, routes, forms, buttons, tables, modals,
-  Tailwind/CSS, layout, the login page, dashboards) and want to confirm it renders and
-  behaves before calling the work done, OR whenever the user asks to look at or verify a
-  screen — e.g. "screenshot the dashboard", "does the new tab show up in the sidebar", "did
-  my routing change work", "confirm clicking delete removes the row", "make sure the page
-  renders instead of a blank/white screen", "check the sidebar still collapses in the running
-  app", "verify the UI change", "does the button actually work", or a reported visual or
-  interaction bug to reproduce. Prefer actually rendering and clicking the page over reading
-  the component source to guess whether it works — if the user changed a component or route
-  and "hasn't looked at it yet", boot the app and look. Prefer this skill over the generic
-  agent-browser skill for anything targeting the local Plexus frontend, since only this one
-  knows the dev-stack port, credentials, and auto-login. Don't hand frontend work back
-  unverified and don't ask the user to check for you — you can verify it yourself.
+  Verify any Plexus admin-UI screen or component in the actually running app. Boots the worktree-safe
+  dev stack (`bun run dev:agent`), auto-logs in, and drives a real browser (agent-browser) using the correct
+  port/credentials. Use whenever you edit anything under `packages/frontend/src` (React, routes, forms,
+  buttons, tables, modals, Tailwind/CSS, layout, dashboards) or when asked to look at or verify a screen
+  (e.g., "screenshot the dashboard", "does the new tab show up", "verify UI", "does the button work",
+  "test web app", "reproduce visual bug"). Prefer this over the generic agent-browser skill for local Plexus
+  frontend because it knows port, credentials, and auto-login. Don't hand UI work back unverified.
 ---
 
 # Frontend testing (verify your own UI work)

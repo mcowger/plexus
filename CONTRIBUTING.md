@@ -185,12 +185,12 @@ existing resources are replaced rather than duplicated.
 
 | Category | Count | Notes |
 |---|---|---|
-| Providers | 7 | Local (Ollama, LM Studio, llama.cpp) + mock cloud (OpenAI, Anthropic, Gemini, OpenRouter) |
-| Quotas | 7 | Rolling, daily, weekly windows; requests and token limits |
-| Model aliases | 16 | chat, embeddings, speech, transcriptions, image types; multi-target failover aliases |
-| API keys | 14 | Unrestricted, quota-enforced, provider-restricted, model-restricted |
+| Providers | 11 | Frontier cloud providers (Kilocode, Wisgate, Neuralwatt, OpenRouter, Google, OpenAI, Anthropic, CC, CC-Sigma, OpenLimits, Ozore) |
+| Quotas | 2 | Daily, weekly budgets and limits |
+| Model aliases | 19 | Frontier model architectures (gpt-5.x, claude-4.5/5, gemini-3.5, deepseek-v4) for chat, embeddings, speech, transcriptions |
+| API keys | 4 | Default, OWUI, GithubKey, GHAKey |
 
-All provider URLs point at `localhost` — no real API keys are needed by default.
+All provider URLs are mapped to their real production API gateways, but with safe, redacted mock keys by default. No real secrets are checked into the codebase.
 
 #### Adding your own data
 
