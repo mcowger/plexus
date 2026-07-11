@@ -63,20 +63,26 @@ type UsageStreamClient = {
 
 export class UsageEventsBroadcaster {
   private readonly clients = new Set<UsageStreamClient>();
+  private listening = false;
   private readonly startedListener = (record: any) => this.broadcast('started', record);
   private readonly updatedListener = (record: any) => this.broadcast('updated', record);
   private readonly completedListener = (record: any) => this.broadcast('completed', record);
   private readonly createdListener = (record: any) => this.broadcast('completed', record);
 
-  constructor(readonly usageStorage: UsageStorageService) {
-    this.usageStorage.on('started', this.startedListener);
-    this.usageStorage.on('updated', this.updatedListener);
-    this.usageStorage.on('completed', this.completedListener);
-    // Also listen for 'created' for backward compatibility
-    this.usageStorage.on('created', this.createdListener);
-  }
+  constructor(readonly usageStorage: UsageStorageService) {}
 
   subscribe(client: UsageStreamClient): () => void {
+    // Attach storage listeners lazily so constructing the broadcaster has no
+    // side effects until the first SSE client connects.
+    if (!this.listening) {
+      this.listening = true;
+      this.usageStorage.on('started', this.startedListener);
+      this.usageStorage.on('updated', this.updatedListener);
+      this.usageStorage.on('completed', this.completedListener);
+      // Also listen for 'created' for backward compatibility
+      this.usageStorage.on('created', this.createdListener);
+    }
+
     this.clients.add(client);
 
     return () => {
@@ -85,10 +91,13 @@ export class UsageEventsBroadcaster {
   }
 
   dispose(): void {
-    this.usageStorage.off('started', this.startedListener);
-    this.usageStorage.off('updated', this.updatedListener);
-    this.usageStorage.off('completed', this.completedListener);
-    this.usageStorage.off('created', this.createdListener);
+    if (this.listening) {
+      this.listening = false;
+      this.usageStorage.off('started', this.startedListener);
+      this.usageStorage.off('updated', this.updatedListener);
+      this.usageStorage.off('completed', this.completedListener);
+      this.usageStorage.off('created', this.createdListener);
+    }
     this.clients.clear();
   }
 
@@ -100,26 +109,14 @@ export class UsageEventsBroadcaster {
   }
 }
 
-let usageEventsBroadcaster: UsageEventsBroadcaster | null = null;
-
-function getUsageEventsBroadcaster(usageStorage: UsageStorageService): UsageEventsBroadcaster {
-  if (!usageEventsBroadcaster || usageEventsBroadcaster.usageStorage !== usageStorage) {
-    usageEventsBroadcaster?.dispose();
-    usageEventsBroadcaster = new UsageEventsBroadcaster(usageStorage);
-  }
-
-  return usageEventsBroadcaster;
-}
-
 export async function registerUsageRoutes(
   fastify: FastifyInstance,
   usageStorage: UsageStorageService
 ) {
+  const usageEventsBroadcaster = new UsageEventsBroadcaster(usageStorage);
+
   fastify.addHook('onClose', async () => {
-    if (usageEventsBroadcaster?.usageStorage === usageStorage) {
-      usageEventsBroadcaster.dispose();
-      usageEventsBroadcaster = null;
-    }
+    usageEventsBroadcaster.dispose();
   });
 
   const sortableFields = new Set<UsageSortField>([
@@ -488,8 +485,6 @@ export async function registerUsageRoutes(
       'Access-Control-Allow-Origin': '*',
     });
 
-    const broadcaster = getUsageEventsBroadcaster(usageStorage);
-
     // Limited users must only observe activity for their own key. Admins
     // (scopeKey === null) continue to receive every event.
     const scopeKey = scopedKeyName(request);
@@ -535,7 +530,7 @@ export async function registerUsageRoutes(
     // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
     // and as a fallback for other disconnect scenarios.
     let cleanedUp = false;
-    const unsubscribe = broadcaster.subscribe({
+    const unsubscribe = usageEventsBroadcaster.subscribe({
       scopeKey,
       send: sendEvent,
     });
