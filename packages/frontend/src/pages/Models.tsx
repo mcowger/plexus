@@ -120,11 +120,11 @@ export const Models = () => {
       filterAndSortAliasesForModelsPage(
         aliases,
         providers,
-        search,
+        '',
         selectedProviderFilters,
         sortField,
         sortDirection
-      ),
+      )
     [aliases, providers, search, selectedProviderFilters, sortField, sortDirection]
   );
 
