@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Alias } from '../lib/api';
 import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
@@ -14,11 +14,29 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
+import { TagSelect } from '../components/ui/TagSelect';
 import { Disclosure } from '../components/ui/Disclosure';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
-import { Plus, Trash2, Zap, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  filterAndSortAliasesForModelsPage,
+  getDefaultModelListSortDirection,
+  getModelListProviderOptions,
+  type ModelListSortDirection,
+  type ModelListSortField,
+} from '../lib/modelList';
+import {
+  Plus,
+  Trash2,
+  Zap,
+  Download,
+  ChevronDown,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from 'lucide-react';
 
 // Model alias types grouped into accordions on the Models page. Order
 // follows rough frequency of use.
@@ -40,6 +58,7 @@ export const Models = () => {
   const toast = useToast();
   const {
     aliases,
+    allAliases,
     providers,
     availableModels,
     cooldowns,
@@ -87,6 +106,42 @@ export const Models = () => {
   // Auto Add Modal State
   const [isAutoAddModalOpen, setIsAutoAddModalOpen] = useState(false);
   const [isAliasesOpen, setIsAliasesOpen] = useState(false);
+  const [selectedProviderFilters, setSelectedProviderFilters] = useState<string[]>([]);
+  const [sortField, setSortField] = useState<ModelListSortField>('alias');
+  const [sortDirection, setSortDirection] = useState<ModelListSortDirection>('asc');
+
+  const providerOptions = useMemo(
+    () => getModelListProviderOptions(allAliases, providers),
+    [allAliases, providers]
+  );
+
+  const visibleAliases = useMemo(
+    () =>
+      filterAndSortAliasesForModelsPage(
+        aliases,
+        providers,
+        '',
+        selectedProviderFilters,
+        sortField,
+        sortDirection
+      ),
+    [aliases, providers, selectedProviderFilters, sortField, sortDirection]
+  );
+
+  const handleSort = (field: ModelListSortField) => {
+    if (sortField === field) {
+      setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+
+    setSortField(field);
+    setSortDirection(getDefaultModelListSortDirection(field));
+  };
+
+  const getSortAriaLabel = (field: ModelListSortField) => {
+    if (sortField !== field) return 'none';
+    return sortDirection === 'asc' ? 'ascending' : 'descending';
+  };
 
   // Edit modal accordion toggles — architecture & metadata manage their own
   // in child components, but behaviors has no parent-provided toggle.
@@ -152,13 +207,18 @@ export const Models = () => {
     [setEditingAlias]
   );
 
-  const sortedAliases = [...aliases].sort((a, b) => a.id.localeCompare(b.id));
-
-  // Bucket the (already search-filtered) aliases into the ordered type groups.
   const aliasesByType = MODEL_TYPE_GROUPS.map((group) => ({
     group,
-    aliases: sortedAliases.filter((a) => (a.type ?? 'text') === group.type),
+    aliases: visibleAliases.filter((a) => (a.type ?? 'text') === group.type),
   }));
+
+  const hasActiveFilters = search.trim().length > 0 || selectedProviderFilters.length > 0;
+  const emptyStateMessage =
+    allAliases.length === 0
+      ? 'No aliases configured'
+      : hasActiveFilters
+        ? 'No aliases match your current search or provider filter'
+        : 'No aliases found';
 
   return (
     <div className="flex flex-col min-h-full">
@@ -172,7 +232,7 @@ export const Models = () => {
               size="sm"
               leftIcon={<Trash2 size={14} />}
               onClick={() => setIsDeleteAllModalOpen(true)}
-              disabled={aliases.length === 0}
+              disabled={allAliases.length === 0}
             >
               Delete All
             </Button>
@@ -190,7 +250,7 @@ export const Models = () => {
           </>
         }
       >
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
           <div className="w-full sm:w-72">
             <SearchInput
               placeholder="Search by alias, upstream id, tag…"
@@ -198,14 +258,35 @@ export const Models = () => {
               onChange={setSearch}
             />
           </div>
-          <VisionFallthroughSelector aliases={aliases} />
+          <div className="w-full sm:w-80">
+            <TagSelect
+              label="Filter by provider"
+              placeholder="All providers"
+              options={providerOptions}
+              selected={selectedProviderFilters}
+              onChange={setSelectedProviderFilters}
+            />
+          </div>
+          {selectedProviderFilters.length > 0 && (
+            <div className="flex items-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedProviderFilters([])}
+                className="whitespace-nowrap"
+              >
+                Clear providers
+              </Button>
+            </div>
+          )}
+          <VisionFallthroughSelector aliases={allAliases} />
         </div>
       </PageHeader>
 
       <PageContainer>
-        {sortedAliases.length === 0 ? (
+        {visibleAliases.length === 0 ? (
           <Card className="mb-6">
-            <div className="py-10 text-center text-sm text-text-muted">No aliases found</div>
+            <div className="py-10 text-center text-sm text-text-muted">{emptyStateMessage}</div>
           </Card>
         ) : (
           <div className="flex flex-col gap-3 mb-6">
@@ -246,16 +327,72 @@ export const Models = () => {
                     <thead>
                       <tr>
                         <th
+                          scope="col"
+                          aria-sort={getSortAriaLabel('alias')}
                           className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                           style={{ paddingLeft: '24px' }}
                         >
-                          Alias
+                          <button
+                            type="button"
+                            onClick={() => handleSort('alias')}
+                            className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                          >
+                            <span>Alias</span>
+                            {sortField === 'alias' ? (
+                              sortDirection === 'asc' ? (
+                                <ArrowUp size={12} aria-hidden="true" />
+                              ) : (
+                                <ArrowDown size={12} aria-hidden="true" />
+                              )
+                            ) : (
+                              <ArrowUpDown size={12} className="opacity-40" aria-hidden="true" />
+                            )}
+                          </button>
                         </th>
                         <th
+                          scope="col"
+                          aria-sort={getSortAriaLabel('provider')}
+                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleSort('provider')}
+                            className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                          >
+                            <span>Provider</span>
+                            {sortField === 'provider' ? (
+                              sortDirection === 'asc' ? (
+                                <ArrowUp size={12} aria-hidden="true" />
+                              ) : (
+                                <ArrowDown size={12} aria-hidden="true" />
+                              )
+                            ) : (
+                              <ArrowUpDown size={12} className="opacity-40" aria-hidden="true" />
+                            )}
+                          </button>
+                        </th>
+                        <th
+                          scope="col"
+                          aria-sort={getSortAriaLabel('targets')}
                           className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
                           style={{ paddingRight: '24px' }}
                         >
-                          Targets
+                          <button
+                            type="button"
+                            onClick={() => handleSort('targets')}
+                            className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                          >
+                            <span>Targets</span>
+                            {sortField === 'targets' ? (
+                              sortDirection === 'asc' ? (
+                                <ArrowUp size={12} aria-hidden="true" />
+                              ) : (
+                                <ArrowDown size={12} aria-hidden="true" />
+                              )
+                            ) : (
+                              <ArrowUpDown size={12} className="opacity-40" aria-hidden="true" />
+                            )}
+                          </button>
                         </th>
                       </tr>
                     </thead>
@@ -509,8 +646,8 @@ export const Models = () => {
           title="Delete All Models"
           message={
             <>
-              This will permanently remove <strong>{aliases.length}</strong> model alias
-              {aliases.length !== 1 ? 'es' : ''} from the configuration.
+              This will permanently remove <strong>{allAliases.length}</strong> model alias
+              {allAliases.length !== 1 ? 'es' : ''} from the configuration.
             </>
           }
           confirmLabel="Delete All"

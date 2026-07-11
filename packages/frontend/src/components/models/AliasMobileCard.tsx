@@ -1,10 +1,12 @@
 import React from 'react';
 import { Trash2, Loader2, CheckCircle, AlertTriangle, Play } from 'lucide-react';
 import { CopyButton } from '../ui/CopyButton';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
 import { ModelTypeBadge } from './ModelTypeBadge';
 import type { Alias, Provider, Cooldown } from '../../lib/api';
+import { getAliasProviderLabels, getAliasTargetCount } from '../../lib/modelList';
 
 interface Props {
   alias: Alias;
@@ -40,6 +42,10 @@ export const AliasMobileCard: React.FC<Props> = ({
   onTestTarget,
   onDismissTestMessage,
 }) => {
+  const providerLabels = getAliasProviderLabels(alias, providers);
+  const targetCount = getAliasTargetCount(alias);
+  const firstTargetGroup = alias.target_groups[0];
+
   return (
     <article key={alias.id} className="rounded-md border border-border-glass bg-bg-subtle p-3">
       <div className="flex items-start justify-between gap-3">
@@ -77,6 +83,23 @@ export const AliasMobileCard: React.FC<Props> = ({
           </div>
         </div>
         <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-text-muted">Providers</div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {providerLabels.length > 0 ? (
+              providerLabels.map((providerLabel) => (
+                <Badge key={providerLabel} status="neutral" noDot>
+                  {providerLabel}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-text-muted">No providers</span>
+            )}
+          </div>
+          <div className="mt-1 text-[11px] text-text-muted">
+            {targetCount} target{targetCount === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
           <div className="text-[10px] uppercase tracking-wider text-text-muted">Aliases</div>
           <div className="flex flex-wrap gap-1 font-medium text-text-secondary">
             {alias.aliases?.length
@@ -89,131 +112,134 @@ export const AliasMobileCard: React.FC<Props> = ({
               : '-'}
           </div>
         </div>
-      </div>
-
-      <div className="mt-3">
-        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-          <span>Targets</span>
-          {alias.target_groups[0] && (
-            <>
-              <span className="opacity-40 normal-case">
-                direct/{alias.id}/{alias.target_groups[0].name}
-              </span>
-              <CopyButton value={`direct/${alias.id}/${alias.target_groups[0].name}`} size="sm" />
-            </>
-          )}
-        </div>
-        {alias.target_groups.length === 0 || alias.target_groups[0].targets.length === 0 ? (
-          <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">
-            No targets configured
+        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            <span>Targets</span>
+            {firstTargetGroup && (
+              <>
+                <span className="opacity-40 normal-case">
+                  direct/{alias.id}/{firstTargetGroup.name}
+                </span>
+                <CopyButton value={`direct/${alias.id}/${firstTargetGroup.name}`} size="sm" />
+              </>
+            )}
           </div>
-        ) : (
-          <div className="space-y-2">
-            {alias.target_groups[0].targets.map((t, i) => {
-              const provider = providers.find((p) => p.id === t.provider);
-              const isProviderDisabled = provider?.enabled === false;
-              const isTargetDisabled = t.enabled === false;
-              const isDisabled = isProviderDisabled || isTargetDisabled;
-              const testKey = `${alias.id}-${i}`;
-              const testState = testStates[testKey];
-              const cooldown = cooldowns.find(
-                (c) => c.provider === t.provider && c.model === t.model && !c.accountId
-              );
-              const cooldownMinutes = cooldown ? Math.ceil(cooldown.timeRemainingMs / 60000) : 0;
+          {alias.target_groups.length === 0 ||
+          !firstTargetGroup ||
+          firstTargetGroup.targets.length === 0 ? (
+            <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">
+              No targets configured
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {firstTargetGroup.targets.map((t, i) => {
+                const provider = providers.find((p) => p.id === t.provider);
+                const isProviderDisabled = provider?.enabled === false;
+                const isTargetDisabled = t.enabled === false;
+                const isDisabled = isProviderDisabled || isTargetDisabled;
+                const testKey = `${alias.id}-${i}`;
+                const testState = testStates[testKey];
+                const cooldown = cooldowns.find(
+                  (c) => c.provider === t.provider && c.model === t.model && !c.accountId
+                );
+                const cooldownMinutes = cooldown ? Math.ceil(cooldown.timeRemainingMs / 60000) : 0;
 
-              return (
-                <div
-                  key={`${t.provider}-${t.model}-${i}`}
-                  className={`rounded border border-border-glass bg-bg-glass px-2 py-2 ${
-                    isDisabled ? 'opacity-70' : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={`truncate text-xs font-medium ${
-                          isDisabled ? 'text-danger line-through' : 'text-text-secondary'
-                        }`}
-                      >
-                        {t.provider || 'No provider'} <span className="text-text-muted">-&gt;</span>{' '}
-                        {t.model || 'No model'}
-                      </div>
-                      {isProviderDisabled && (
-                        <div className="mt-1 text-[11px] text-danger">Provider disabled</div>
-                      )}
-                      {cooldown && (
-                        <div className="mt-1 text-[11px] font-medium text-warning">
-                          Cooldown {cooldownMinutes}m
-                        </div>
-                      )}
-                      {testState?.showResult && testState.message && (
+                return (
+                  <div
+                    key={`${t.provider}-${t.model}-${i}`}
+                    className={`rounded border border-border-glass bg-bg-glass px-2 py-2 ${
+                      isDisabled ? 'opacity-70' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <div
-                          className={`mt-1 text-[11px] italic ${
-                            testState.result === 'success' ? 'text-success' : 'text-danger'
+                          className={`truncate text-xs font-medium ${
+                            isDisabled ? 'text-danger line-through' : 'text-text-secondary'
                           }`}
                         >
-                          {testState.message}
+                          {t.provider || 'No provider'}{' '}
+                          <span className="text-text-muted">-&gt;</span> {t.model || 'No model'}
+                        </div>
+                        {isProviderDisabled && (
+                          <div className="mt-1 text-[11px] text-danger">Provider disabled</div>
+                        )}
+                        {cooldown && (
+                          <div className="mt-1 text-[11px] font-medium text-warning">
+                            Cooldown {cooldownMinutes}m
+                          </div>
+                        )}
+                        {testState?.showResult && testState.message && (
+                          <div
+                            className={`mt-1 text-[11px] italic ${
+                              testState.result === 'success' ? 'text-success' : 'text-danger'
+                            }`}
+                          >
+                            {testState.message}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isDisabled) return;
+                            let testApiTypes: string[] = ['chat'];
+                            if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
+                            else if (alias.type === 'image') testApiTypes = ['images'];
+
+                            onTestTarget(
+                              alias.id,
+                              `${alias.id}-mobile-${i}`,
+                              t.provider,
+                              t.model,
+                              testApiTypes
+                            );
+                          }}
+                          disabled={isDisabled}
+                          className="flex h-7 w-7 items-center justify-center rounded text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Test ${alias.id} target ${i + 1}`}
+                        >
+                          {testState?.loading ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : testState?.showResult && testState.result === 'success' ? (
+                            <CheckCircle size={14} className="text-success" />
+                          ) : testState?.showResult && testState.result === 'error' ? (
+                            <AlertTriangle size={14} className="text-danger" />
+                          ) : (
+                            <Play size={14} />
+                          )}
+                        </button>
+                        <Switch
+                          checked={t.enabled !== false}
+                          onChange={(val) => onToggleTarget(alias, 0, i, val)}
+                          size="sm"
+                          disabled={isProviderDisabled}
+                        />
+                      </div>
+                    </div>
+                    {testState?.showMessage &&
+                      testState.result === 'error' &&
+                      testState.message && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDismissTestMessage(testKey);
+                          }}
+                          className="mt-2 cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
+                          title="Click to dismiss"
+                        >
+                          <span className="text-[11px] italic text-danger">
+                            {testState.message} [×]
+                          </span>
                         </div>
                       )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isDisabled) return;
-                          let testApiTypes: string[] = ['chat'];
-                          if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
-                          else if (alias.type === 'image') testApiTypes = ['images'];
-
-                          onTestTarget(
-                            alias.id,
-                            `${alias.id}-mobile-${i}`,
-                            t.provider,
-                            t.model,
-                            testApiTypes
-                          );
-                        }}
-                        disabled={isDisabled}
-                        className="flex h-7 w-7 items-center justify-center rounded text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Test ${alias.id} target ${i + 1}`}
-                      >
-                        {testState?.loading ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : testState?.showResult && testState.result === 'success' ? (
-                          <CheckCircle size={14} className="text-success" />
-                        ) : testState?.showResult && testState.result === 'error' ? (
-                          <AlertTriangle size={14} className="text-danger" />
-                        ) : (
-                          <Play size={14} />
-                        )}
-                      </button>
-                      <Switch
-                        checked={t.enabled !== false}
-                        onChange={(val) => onToggleTarget(alias, 0, i, val)}
-                        size="sm"
-                        disabled={isProviderDisabled}
-                      />
-                    </div>
                   </div>
-                  {testState?.showMessage && testState.result === 'error' && testState.message && (
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDismissTestMessage(testKey);
-                      }}
-                      className="mt-2 cursor-pointer rounded border border-danger/30 bg-danger/10 px-2 py-1"
-                      title="Click to dismiss"
-                    >
-                      <span className="text-[11px] italic text-danger">
-                        {testState.message} [×]
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );

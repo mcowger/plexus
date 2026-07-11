@@ -1,10 +1,12 @@
 import React from 'react';
 import { Edit2, Trash2, Clock, Play, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { CopyButton } from '../ui/CopyButton';
+import { Badge } from '../ui/Badge';
 import { Switch } from '../ui/Switch';
 import { Alias, Provider, Cooldown } from '../../lib/api';
 import { formatMsToMinSec } from '@plexus/shared';
 import { SELECTOR_LABELS } from '../../lib/selectors';
+import { getAliasProviderLabels, getAliasTargetCount } from '../../lib/modelList';
 
 interface AliasTableRowProps {
   alias: Alias;
@@ -40,6 +42,9 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
   onTestTarget,
   onDismissTestMessage,
 }) => {
+  const providerLabels = getAliasProviderLabels(alias, providers);
+  const targetCount = getAliasTargetCount(alias);
+
   return (
     <tr className="hover:bg-bg-hover">
       <td
@@ -102,6 +107,25 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             ))}
           </div>
         )}
+      </td>
+
+      <td className="px-4 py-1.5 text-left border-b border-border-glass text-text">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            {providerLabels.length > 0 ? (
+              providerLabels.map((providerLabel) => (
+                <Badge key={providerLabel} status="neutral" noDot>
+                  {providerLabel}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-[11px] text-text-muted">No providers</span>
+            )}
+          </div>
+          <div className="text-[11px] text-text-muted">
+            {targetCount} target{targetCount === 1 ? '' : 's'}
+          </div>
+        </div>
       </td>
 
       <td className="px-4 py-1.5 text-left border-b border-border-glass text-text pr-6">
