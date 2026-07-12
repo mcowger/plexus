@@ -52,6 +52,7 @@ import { OAuthAuthManager } from './services/oauth-auth-manager';
 import { requestLogger } from './middleware/log';
 import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
+import { registerRawPassthroughRoutes } from './routes/raw-passthrough';
 import { registerMcpRoutes } from './routes/mcp';
 import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { QuotaEnforcer } from './services/quota/quota-enforcer';
@@ -97,7 +98,7 @@ const fastify = Fastify({
 // Enable CORS for all origins to support dashboard and external client access
 fastify.register(cors, {
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
@@ -106,7 +107,17 @@ fastify.register(cors, {
     'x-goog-api-key',
     'x-client-request-id',
   ],
-  exposedHeaders: ['Content-Type', 'x-request-id', 'x-client-request-id'],
+  exposedHeaders: [
+    'Content-Type',
+    'x-request-id',
+    'x-client-request-id',
+    'x-plexus-request-id',
+    'x-plexus-quota',
+    'x-plexus-quota-limit',
+    'x-plexus-quota-remaining',
+    'x-plexus-quota-reset',
+    'x-plexus-quota-warning',
+  ],
 });
 
 // Enable multipart/form-data support for file uploads (audio transcriptions)
@@ -271,6 +282,9 @@ fastify.setErrorHandler((error, request, reply) => {
 
 // --- Routes: v1 (Inference API) ---
 await registerInferenceRoutes(fastify, dispatcher, usageStorage, quotaEnforcer);
+
+// --- Raw Provider Proxy ---
+await registerRawPassthroughRoutes(fastify, usageStorage, quotaEnforcer);
 
 // --- Routes: MCP Proxy ---
 await registerMcpRoutes(fastify, mcpUsageStorage);

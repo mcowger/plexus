@@ -18,6 +18,80 @@ import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/pr
 import { DEFAULT_MODEL, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import { recordQuotaUsage } from '../quota/quota-middleware';
 
+export interface ExtractedObservedUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+}
+
+export function extractUsageFromReconstructed(
+  reconstructed: any,
+  apiType: string
+): ExtractedObservedUsage | null {
+  if (!reconstructed) return null;
+
+  switch (apiType) {
+    case 'chat': {
+      if (!reconstructed.usage) return null;
+      const usage = normalizeOpenAIChatUsage(reconstructed.usage);
+      return {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cachedTokens: usage.cached_tokens,
+        cacheWriteTokens: usage.cache_creation_tokens,
+        reasoningTokens: usage.reasoning_tokens,
+      };
+    }
+    case 'responses': {
+      if (!reconstructed.usage) return null;
+      const usage = normalizeOpenAIResponsesUsage(reconstructed.usage);
+      return {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cachedTokens: usage.cached_tokens,
+        cacheWriteTokens: usage.cache_creation_tokens,
+        reasoningTokens: usage.reasoning_tokens,
+      };
+    }
+    case 'messages': {
+      if (!reconstructed.usage) return null;
+      const usage = normalizeAnthropicUsage(reconstructed.usage);
+      return {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cachedTokens: usage.cached_tokens,
+        cacheWriteTokens: usage.cache_creation_tokens,
+        reasoningTokens: usage.reasoning_tokens,
+      };
+    }
+    case 'gemini': {
+      if (!reconstructed.usageMetadata) return null;
+      const usage = normalizeGeminiUsage(reconstructed.usageMetadata);
+      return {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cachedTokens: usage.cached_tokens,
+        cacheWriteTokens: usage.cache_creation_tokens,
+        reasoningTokens: usage.reasoning_tokens,
+      };
+    }
+    case 'oauth':
+      return reconstructed.usage
+        ? {
+            inputTokens: reconstructed.usage.input_tokens || 0,
+            outputTokens: reconstructed.usage.output_tokens || 0,
+            cachedTokens: reconstructed.usage.cached_tokens || 0,
+            cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
+            reasoningTokens: reconstructed.usage.reasoning_tokens || 0,
+          }
+        : null;
+    default:
+      return null;
+  }
+}
+
 export class UsageInspector extends PassThrough {
   private usageStorage: UsageStorageService;
   private usageRecord: Partial<UsageRecord>;
@@ -92,7 +166,7 @@ export class UsageInspector extends PassThrough {
       const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
 
       if (reconstructed) {
-        const usage = this.extractUsageFromReconstructed(reconstructed, this.apiType);
+        const usage = extractUsageFromReconstructed(reconstructed, this.apiType);
         if (usage) {
           stats.inputTokens = usage.inputTokens || 0;
           stats.outputTokens = usage.outputTokens || 0;
@@ -276,7 +350,7 @@ export class UsageInspector extends PassThrough {
       const debugManager = DebugManager.getInstance();
       const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
       if (reconstructed) {
-        const usage = this.extractUsageFromReconstructed(reconstructed, this.apiType);
+        const usage = extractUsageFromReconstructed(reconstructed, this.apiType);
         if (usage) {
           this.usageRecord.tokensInput = usage.inputTokens || null;
           this.usageRecord.tokensOutput = usage.outputTokens || null;
@@ -300,73 +374,6 @@ export class UsageInspector extends PassThrough {
     }
 
     callback(err);
-  }
-
-  private extractUsageFromReconstructed(reconstructed: any, apiType: string): any {
-    if (!reconstructed) return null;
-
-    switch (apiType) {
-      case 'chat':
-        if (!reconstructed.usage) return null;
-        {
-          const usage = normalizeOpenAIChatUsage(reconstructed.usage);
-          return {
-            inputTokens: usage.input_tokens,
-            outputTokens: usage.output_tokens,
-            cachedTokens: usage.cached_tokens,
-            cacheWriteTokens: usage.cache_creation_tokens,
-            reasoningTokens: usage.reasoning_tokens,
-          };
-        }
-      case 'responses':
-        if (!reconstructed.usage) return null;
-        {
-          const usage = normalizeOpenAIResponsesUsage(reconstructed.usage);
-          return {
-            inputTokens: usage.input_tokens,
-            outputTokens: usage.output_tokens,
-            cachedTokens: usage.cached_tokens,
-            cacheWriteTokens: usage.cache_creation_tokens,
-            reasoningTokens: usage.reasoning_tokens,
-          };
-        }
-      case 'messages':
-        if (!reconstructed.usage) return null;
-        {
-          const usage = normalizeAnthropicUsage(reconstructed.usage);
-          return {
-            inputTokens: usage.input_tokens,
-            outputTokens: usage.output_tokens,
-            cachedTokens: usage.cached_tokens,
-            cacheWriteTokens: usage.cache_creation_tokens,
-            reasoningTokens: usage.reasoning_tokens,
-          };
-        }
-      case 'gemini':
-        if (!reconstructed.usageMetadata) return null;
-        {
-          const usage = normalizeGeminiUsage(reconstructed.usageMetadata);
-          return {
-            inputTokens: usage.input_tokens,
-            outputTokens: usage.output_tokens,
-            cachedTokens: usage.cached_tokens,
-            cacheWriteTokens: usage.cache_creation_tokens,
-            reasoningTokens: usage.reasoning_tokens,
-          };
-        }
-      case 'oauth':
-        return reconstructed.usage
-          ? {
-              inputTokens: reconstructed.usage.input_tokens || 0,
-              outputTokens: reconstructed.usage.output_tokens || 0,
-              cachedTokens: reconstructed.usage.cached_tokens || 0,
-              cacheWriteTokens: reconstructed.usage.cache_creation_tokens || 0,
-              reasoningTokens: reconstructed.usage.reasoning_tokens || 0,
-            }
-          : null;
-      default:
-        return null;
-    }
   }
 
   private extractResponseMetadataFromReconstructed(

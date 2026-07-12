@@ -245,17 +245,24 @@ properties:
   isPassthrough:
     type: boolean
     description: Whether the request was a direct passthrough (no transformation).
+  isRaw:
+    type: boolean
+    description: Whether the request used the provider-wide raw proxy.
+  requestMethod:
+    type:
+      - string
+      - 'null'
+    description: Original HTTP method for raw requests.
+  requestPath:
+    type:
+      - string
+      - 'null'
+    description: Raw provider path suffix and query string.
   responseStatus:
     type: string
-    enum:
-      - success
-      - error
-      - pending
-      - cancelled
-      - timeout
-      - stall
     description: >
-      Outcome of the request.
+      Outcome of the request. Raw upstream failures may be represented as
+      `HTTP <status>` so the provider's exact status remains visible.
 
       - **success** — Upstream returned a successful response.
       - **error** — Upstream returned an error or the request failed.

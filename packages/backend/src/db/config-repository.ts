@@ -390,6 +390,7 @@ export class ConfigRepository {
       timeoutMs: config.timeoutMs ?? null,
       maxConcurrency: config.maxConcurrency ?? null,
       piAiProvider: config.pi_ai_provider ?? null,
+      rawPassthrough: config.raw_passthrough ? toJson(config.raw_passthrough) : null,
       // Per-provider stall detection overrides
       stallTtfbMs: config.stallTtfbMs ?? null,
       stallTtfbBytes: config.stallTtfbBytes ?? null,
@@ -683,6 +684,7 @@ export class ConfigRepository {
       ...(row.stallGracePeriodMs != null ? { stallGracePeriodMs: row.stallGracePeriodMs } : {}),
       ...(row.maxConcurrency != null ? { maxConcurrency: row.maxConcurrency } : {}),
       ...(row.piAiProvider != null ? { pi_ai_provider: row.piAiProvider } : {}),
+      ...(row.rawPassthrough ? { raw_passthrough: parseJson(row.rawPassthrough) } : {}),
     };
 
     return result as ProviderConfig;
@@ -1056,6 +1058,7 @@ export class ConfigRepository {
         ...(allowedProviders ? { allowedProviders } : {}),
         ...(excludedModels ? { excludedModels } : {}),
         ...(excludedProviders ? { excludedProviders } : {}),
+        allowRawPassthrough: toBool(row.allowRawPassthrough),
         ...(allowedIps ? { allowedIps } : {}),
       };
     }
@@ -1110,6 +1113,7 @@ export class ConfigRepository {
         ...(allowedProviders ? { allowedProviders } : {}),
         ...(excludedModels ? { excludedModels } : {}),
         ...(excludedProviders ? { excludedProviders } : {}),
+        allowRawPassthrough: toBool(row.allowRawPassthrough),
         ...(allowedIps ? { allowedIps } : {}),
       },
     };
@@ -1135,6 +1139,7 @@ export class ConfigRepository {
       allowedProviders: stringifyStringArray(config.allowedProviders),
       excludedModels: stringifyStringArray(config.excludedModels),
       excludedProviders: stringifyStringArray(config.excludedProviders),
+      allowRawPassthrough: fromBool(config.allowRawPassthrough === true),
       allowedIps: stringifyStringArray(config.allowedIps),
       generation: null,
       updatedAt: timestamp,

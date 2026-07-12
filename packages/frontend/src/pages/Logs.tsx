@@ -55,6 +55,7 @@ import {
   ChevronDown,
   Image as ImageIcon,
   ShieldCheck,
+  Braces,
   RotateCcw,
   PencilLine,
   Plane,
@@ -924,7 +925,9 @@ export const Logs = () => {
                         <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
                           <div className="flex items-center gap-1 text-text">
                             <div className="flex w-4 shrink-0 justify-center">
-                              {log.incomingApiType === 'embeddings' ? (
+                              {log.incomingApiType === 'raw' ? (
+                                <Braces size={16} className="text-cyan-400" />
+                              ) : log.incomingApiType === 'embeddings' ? (
                                 <Variable size={14} className="text-green-500" />
                               ) : log.incomingApiType === 'transcriptions' ? (
                                 <AudioLines size={14} className="text-purple-500" />
@@ -948,7 +951,9 @@ export const Logs = () => {
                             </div>
                             <span className="text-[10px] text-text-muted">→</span>
                             <div className="flex w-4 shrink-0 justify-center">
-                              {log.outgoingApiType === 'embeddings' ? (
+                              {log.outgoingApiType === 'raw' ? (
+                                <Braces size={16} className="text-cyan-400" />
+                              ) : log.outgoingApiType === 'embeddings' ? (
                                 <Variable size={14} className="text-green-500" />
                               ) : log.outgoingApiType === 'transcriptions' ? (
                                 <AudioLines size={14} className="text-purple-500" />
@@ -1149,7 +1154,7 @@ export const Logs = () => {
                       </td>
                       <td
                         className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
-                        title={`Incoming: ${formatApiTypeLabel(log.incomingApiType)} → Outgoing: ${formatApiTypeLabel(log.outgoingApiType)} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
+                        title={`Incoming: ${formatApiTypeLabel(log.incomingApiType)} → Outgoing: ${formatApiTypeLabel(log.outgoingApiType)} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isRaw ? `Raw ${log.requestMethod || ''} ${log.requestPath || ''}` : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
                         style={{ cursor: 'help' }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -1229,8 +1234,10 @@ export const Logs = () => {
                             <div
                               style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
                             >
-                              {log.outgoingApiType &&
-                              PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
+                              {log.isRaw ? (
+                                <Braces size={12} className="text-cyan-400" />
+                              ) : log.outgoingApiType &&
+                                PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
                                 <Pi size={12} className="text-emerald-400" />
                               ) : log.isPassthrough ? (
                                 <MoveHorizontal size={12} className="text-yellow-500" />

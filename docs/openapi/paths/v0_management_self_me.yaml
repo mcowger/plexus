@@ -64,6 +64,9 @@ get:
                     type: array
                     items:
                       type: string
+                  allowRawPassthrough:
+                    type: boolean
+                    description: Whether this key has privileged raw provider access.
                   allowedModels:
                     type: array
                     items:

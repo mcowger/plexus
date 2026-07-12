@@ -57,6 +57,30 @@ properties:
     default: true
     description: >
       When false, this provider is excluded from all routing decisions.
+  raw_passthrough:
+    type: object
+    description: >
+      Enables a provider-wide raw proxy at `/raw/{provider}/*`. Supported only
+      for static API-key providers. Raw requests bypass routing, failover,
+      adapters, and transformation.
+    required:
+      - enabled
+      - base_url
+    properties:
+      enabled:
+        type: boolean
+      base_url:
+        type: string
+        format: uri
+        description: HTTP(S) base URL prepended to the untouched raw path suffix.
+      auth:
+        type: string
+        enum:
+          - bearer
+          - x-api-key
+          - x-goog-api-key
+        default: bearer
+        description: Header style used to inject the provider's configured API key.
   disable_cooldown:
     type: boolean
     default: false

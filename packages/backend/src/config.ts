@@ -33,7 +33,11 @@ const PricingRangeSchema = z.object({
   //   ## In the above case, if the number of input tokens is between 1001 and 5000, the pricing will be 0.008 per million input tokens and 0.018 per million output tokens
   //.  # If the upper bound is Infinity, the pricing will apply to all token counts above the lower bound
   lower_bound: z.number().min(0).default(0),
-  upper_bound: z.number().default(Infinity),
+  upper_bound: z
+    .number()
+    .nullable()
+    .default(Infinity)
+    .transform((value) => value ?? Infinity),
   input_per_m: z.number().min(0),
   output_per_m: z.number().min(0),
   cached_per_m: z.number().min(0).optional(),
@@ -619,6 +623,23 @@ export const CompactionOverrideSchema = z.object({
 export const CompactionConfigSchema = CompactionOverrideSchema;
 export type CompactionSettingsConfig = z.infer<typeof CompactionOverrideSchema>;
 
+const RawPassthroughConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  base_url: z
+    .string()
+    .url()
+    .refine(
+      (value) => {
+        const url = new URL(value);
+        return (url.protocol === 'https:' || url.protocol === 'http:') && !url.search && !url.hash;
+      },
+      {
+        message: 'raw_passthrough.base_url must be HTTP(S) without a query or fragment',
+      }
+    ),
+  auth: z.enum(['bearer', 'x-api-key', 'x-goog-api-key']).default('bearer'),
+});
+
 export const ProviderConfigSchema = z
   .object({
     display_name: z.string().optional(),
@@ -665,6 +686,7 @@ export const ProviderConfigSchema = z
     stallGracePeriodMs: z.number().int().min(0).max(120000).nullable().optional(),
     pi_ai_provider: z.string().optional(),
     compaction: CompactionOverrideSchema.optional(),
+    raw_passthrough: RawPassthroughConfigSchema.optional(),
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",
@@ -674,6 +696,9 @@ export const ProviderConfigSchema = z
   })
   .refine((data) => !isOAuthProviderConfig(data) || !!data.oauth_account, {
     message: "'oauth_account' must be specified when using oauth://",
+  })
+  .refine((data) => data.raw_passthrough?.enabled !== true || !isOAuthProviderConfig(data), {
+    message: 'raw_passthrough currently supports static API-key providers only',
   });
 
 const ModelTargetSchema = z.object({
@@ -943,6 +968,7 @@ export const KeyConfigSchema = z.object({
   allowedProviders: z.array(z.string().min(1)).optional(),
   excludedModels: z.array(z.string().min(1)).optional(),
   excludedProviders: z.array(z.string().min(1)).optional(),
+  allowRawPassthrough: z.boolean().optional(),
   allowedIps: z
     .array(
       z.string().min(1).refine(isValidIpRule, {

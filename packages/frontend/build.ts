@@ -73,6 +73,10 @@ const runBuild = async () => {
   const result = await build({
     entrypoints: ['./src/main.tsx'],
     outdir: './dist',
+    // index.html loads main.js as a classic script. Keep bundle-local symbols
+    // scoped so dependency identifiers (for example a parser named `Element`)
+    // cannot overwrite browser globals used by Monaco and DOMPurify.
+    format: 'iife',
     publicPath: '/ui/',
     minify: process.env.NODE_ENV === 'production',
     define: {

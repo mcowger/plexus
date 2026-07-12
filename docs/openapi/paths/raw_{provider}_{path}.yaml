@@ -1,0 +1,85 @@
+parameters:
+  - in: path
+    name: provider
+    required: true
+    schema:
+      type: string
+    description: Raw-enabled provider slug.
+  - in: path
+    name: path
+    required: true
+    schema:
+      type: string
+    description: >
+      Remaining upstream path. This parameter is greedy at runtime and may
+      contain additional `/` segments. The original query string is preserved.
+get:
+  tags: [Raw Provider Proxy]
+  summary: Raw GET to a provider
+  description: &rawDescription >
+    Relays the method, path, query, non-authentication headers, and body to the
+    selected provider without model routing or application-level transformation.
+    Requires both provider `raw_passthrough.enabled` and key
+    `allowRawPassthrough`; the key's provider allow/deny policy also applies.
+    Plexus authentication headers are replaced with provider authentication.
+    Upstream status, headers, and body are returned unchanged, with Plexus
+    request/quota metadata added as response headers.
+    Recognized LLM request/response formats are observationally parsed for
+    model, token, cache/reasoning, and cost metadata without altering traffic.
+  security: &rawSecurity
+    - PlexusApiKey: []
+  responses: &rawResponses
+    '401':
+      description: Missing or invalid Plexus inference key.
+    '403':
+      description: Key lacks raw access or provider policy access.
+    '404':
+      description: Provider is absent, disabled, or not raw-enabled.
+    default:
+      description: Unmodified upstream response, including non-2xx statuses.
+  operationId: rawProviderGet
+head:
+  tags: [Raw Provider Proxy]
+  summary: Raw HEAD to a provider
+  description: *rawDescription
+  security: *rawSecurity
+  responses: *rawResponses
+  operationId: rawProviderHead
+post:
+  tags: [Raw Provider Proxy]
+  summary: Raw POST to a provider
+  description: *rawDescription
+  security: *rawSecurity
+  requestBody: &rawRequestBody
+    required: false
+    content:
+      '*/*':
+        schema:
+          type: string
+          format: binary
+  responses: *rawResponses
+  operationId: rawProviderPost
+put:
+  tags: [Raw Provider Proxy]
+  summary: Raw PUT to a provider
+  description: *rawDescription
+  security: *rawSecurity
+  requestBody: *rawRequestBody
+  responses: *rawResponses
+  operationId: rawProviderPut
+patch:
+  tags: [Raw Provider Proxy]
+  summary: Raw PATCH to a provider
+  description: *rawDescription
+  security: *rawSecurity
+  requestBody: *rawRequestBody
+  responses: *rawResponses
+  operationId: rawProviderPatch
+delete:
+  tags: [Raw Provider Proxy]
+  summary: Raw DELETE to a provider
+  description: *rawDescription
+  security: *rawSecurity
+  requestBody: *rawRequestBody
+  responses: *rawResponses
+  operationId: rawProviderDelete

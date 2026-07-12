@@ -976,6 +976,68 @@ export function ProviderAdvancedEditor({
             )}
           </div>
 
+          <div className="flex flex-col gap-2">
+            <label className="flex items-start gap-2 py-1 cursor-pointer">
+              <Switch
+                checked={editingProvider.rawPassthrough?.enabled === true}
+                onChange={(enabled) =>
+                  setEditingProvider({
+                    ...editingProvider,
+                    rawPassthrough: {
+                      enabled,
+                      baseUrl: editingProvider.rawPassthrough?.baseUrl || '',
+                      auth: editingProvider.rawPassthrough?.auth || 'bearer',
+                    },
+                  })
+                }
+              />
+              <div>
+                <div className="font-body text-[12px] text-text">Enable Raw Passthrough</div>
+                <div className="font-body text-[11px] text-text-muted" style={{ lineHeight: 1.35 }}>
+                  Exposes this provider at <code>/raw/{editingProvider.id || 'provider'}/*</code> to
+                  explicitly authorized keys. Requests bypass routing and all transformations.
+                </div>
+              </div>
+            </label>
+            {editingProvider.rawPassthrough?.enabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-3 pl-6">
+                <DebouncedInput
+                  label="Raw Upstream Base URL"
+                  value={editingProvider.rawPassthrough.baseUrl}
+                  placeholder="https://openrouter.ai/api"
+                  onChange={(baseUrl) =>
+                    setEditingProvider({
+                      ...editingProvider,
+                      rawPassthrough: { ...editingProvider.rawPassthrough!, baseUrl },
+                    })
+                  }
+                />
+                <div className="flex flex-col gap-1">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Provider Authentication
+                  </label>
+                  <select
+                    className="w-full py-2 px-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={editingProvider.rawPassthrough.auth}
+                    onChange={(e) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        rawPassthrough: {
+                          ...editingProvider.rawPassthrough!,
+                          auth: e.target.value as 'bearer' | 'x-api-key' | 'x-goog-api-key',
+                        },
+                      })
+                    }
+                  >
+                    <option value="bearer">Authorization: Bearer</option>
+                    <option value="x-api-key">x-api-key</option>
+                    <option value="x-goog-api-key">x-goog-api-key</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Compact settings card — toggles left, value inputs right */}
           <div className="border border-border-glass rounded-md p-2 bg-bg-subtle">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>

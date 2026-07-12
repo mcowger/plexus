@@ -32,6 +32,13 @@ Use `PLEXUS_BASE_URL` as the instance root, for example `https://plexus.example.
 
 Useful usage query params include `limit`, `offset`, `sortBy`, `sortDir`, `startDate`, `endDate`, `apiKey`, `attribution`, `incomingApiType`, `provider`, `incomingModelAlias`, `selectedModelName`, `outgoingApiType`, `responseStatus`, `minDurationMs`, `maxDurationMs`, and `fields`.
 
+Raw provider records have `isRaw: true`, `incomingApiType: "raw"`, and include
+`requestMethod` plus the upstream `requestPath`. `isPassthrough` describes a
+different transformed-inference optimization and remains false for raw calls.
+For recognized Chat Completions, Messages, Responses, and Gemini paths, usage
+records also include any model, token, cache/reasoning, and provider cost data
+that Plexus can observe without changing the raw traffic.
+
 ## Debug Tracing
 
 | Action | Method | Path |
@@ -83,6 +90,16 @@ Minimal provider body:
 
 Provider quota checkers are configured in the provider's `quota_checker` field. Discover supported checker types with `/v0/management/quota-checker-types` or `/v0/management/quota-checkers` before writing config.
 
+Raw provider configuration:
+
+```json
+{"raw_passthrough":{"enabled":true,"base_url":"https://openrouter.ai/api","auth":"bearer"}}
+```
+
+This exposes `/raw/{provider}/*` for static API-key providers. It bypasses model
+routing, failover, adapters, and payload transformation. Inspect key access before
+enabling it; callers need `allowRawPassthrough: true` and provider policy access.
+
 ## Model Aliases
 
 | Action | Method | Path |
@@ -120,7 +137,11 @@ Selectors include `random`, `in_order`, `cost`, `latency`, `usage`, `performance
 | Create or replace key | `PUT` | `/v0/management/keys/{name}` |
 | Delete key | `DELETE` | `/v0/management/keys/{name}` |
 
-Key bodies require `secret`. Optional fields include `comment`, `allowedProviders`, `excludedProviders`, `allowedModels`, `excludedModels`, `allowedIps`, and `quota`.
+Key bodies require `secret`. Optional fields include `comment`, `allowedProviders`, `excludedProviders`, `allowedModels`, `excludedModels`, `allowedIps`, `allowRawPassthrough`, and `quota`.
+
+`allowRawPassthrough: true` grants provider-wide access to each raw-enabled
+provider permitted by the key's provider allow/deny lists. Model restrictions do
+not apply to raw traffic.
 
 For no quota, omit the `quota` field. Do not send `quota: null` to create/update key endpoints; the current write schema accepts only strings when `quota` is present.
 

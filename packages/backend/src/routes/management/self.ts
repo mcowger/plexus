@@ -71,6 +71,7 @@ export async function registerSelfRoutes(fastify: FastifyInstance, quotaEnforcer
       allowedModels: principal.allowedModels,
       excludedProviders: principal.excludedProviders,
       excludedModels: principal.excludedModels,
+      allowRawPassthrough: keyRow?.allowRawPassthrough === true,
       quotaNames: principal.quotaNames,
       quotaName: principal.quotaName ?? null,
       comment: keyRow?.comment ?? principal.comment ?? null,

@@ -12,6 +12,9 @@ export const apiKeys = sqliteTable('api_keys', {
   allowedProviders: text('allowed_providers'),
   excludedModels: text('excluded_models'),
   excludedProviders: text('excluded_providers'),
+  allowRawPassthrough: integer('allow_raw_passthrough', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   allowedIps: text('allowed_ips'),
   beta: integer('beta', { mode: 'boolean' }).notNull().default(false),
   generation: text('generation'), // JSON: { reasoning?, maxTokens?, verbosity?, serviceTier? }

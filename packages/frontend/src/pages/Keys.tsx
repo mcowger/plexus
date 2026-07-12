@@ -1155,6 +1155,22 @@ export const Keys = () => {
               Optional allowlist. If set, routing is limited to these provider IDs.
             </p>
 
+            <label className="flex items-start gap-2 py-1 cursor-pointer">
+              <Switch
+                checked={editingKey.allowRawPassthrough === true}
+                onChange={(allowRawPassthrough) =>
+                  setEditingKey({ ...editingKey, allowRawPassthrough })
+                }
+              />
+              <div>
+                <div className="font-body text-[13px] text-text">Allow Raw Provider Access</div>
+                <div className="text-xs text-text-muted" style={{ lineHeight: 1.35 }}>
+                  Privileged capability. This key may call any endpoint on raw-enabled providers
+                  permitted by its provider allow/deny lists. Model restrictions do not apply.
+                </div>
+              </div>
+            </label>
+
             <TagSelect
               label="Allowed IPs"
               placeholder="e.g. 192.168.1.10  10.0.0.0/8  10.1.0.10-20"

@@ -19,9 +19,10 @@ export type NewProviderPerformance = InferInsertModel<typeof schema.providerPerf
 export type NewMcpRequestUsage = InferInsertModel<typeof schema.mcpRequestUsage>;
 export type NewMcpDebugLog = InferInsertModel<typeof schema.mcpDebugLogs>;
 
-export type UsageRecord = Omit<RequestUsage, 'isStreamed' | 'isPassthrough'> & {
+export type UsageRecord = Omit<RequestUsage, 'isStreamed' | 'isPassthrough' | 'isRaw'> & {
   isStreamed: boolean;
   isPassthrough: boolean;
+  isRaw: boolean;
   hasDebug?: boolean;
   hasError?: boolean;
 };
