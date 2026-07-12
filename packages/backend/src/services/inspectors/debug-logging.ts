@@ -83,6 +83,8 @@ export class DebugLoggingInspector extends BaseInspector {
           case 'oauth':
             reconstructed = this.reconstructOAuth(rawBody);
             break;
+          case 'unknown':
+            break;
           default:
             logger.warn(`Unknown providerApiType: ${providerApiType}`);
         }

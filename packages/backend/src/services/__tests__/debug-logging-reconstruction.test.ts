@@ -1,15 +1,41 @@
+import { once } from 'node:events';
 import { describe, expect, test, beforeEach } from 'vitest';
+import { registerSpy } from '../../../test/test-utils';
 import { DebugLoggingInspector } from '../inspectors/debug-logging';
 import { DebugManager } from '../debug-manager';
+import { logger } from '../../utils/logger';
 
 describe('DebugLoggingInspector Reconstruction', () => {
   const requestId = 'test-reconstruction-id';
 
   beforeEach(() => {
     const dm = DebugManager.getInstance();
+    dm.resetForTesting();
     dm.setEnabled(true);
-    // @ts-ignore - access private for testing
-    dm.pendingLogs.clear();
+  });
+
+  test('does not warn for non-inference responses', async () => {
+    const warnSpy = registerSpy(logger, 'warn');
+    warnSpy.mockClear();
+    const stream = new DebugLoggingInspector(requestId, 'raw').createInspector('unknown');
+    const ended = once(stream, 'end');
+
+    stream.end(Buffer.from('{}'));
+    await ended;
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  test('warns for unsupported provider API types', async () => {
+    const warnSpy = registerSpy(logger, 'warn');
+    warnSpy.mockClear();
+    const stream = new DebugLoggingInspector(requestId, 'raw').createInspector('unsupported');
+    const ended = once(stream, 'end');
+
+    stream.end(Buffer.from('{}'));
+    await ended;
+
+    expect(warnSpy).toHaveBeenCalledWith('Unknown providerApiType: unsupported');
   });
 
   test('reconstructChatCompletions handles non-streaming JSON', async () => {
