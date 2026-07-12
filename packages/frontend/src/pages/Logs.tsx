@@ -87,6 +87,8 @@ import geminiLogo from '../assets/gemini.svg';
 // @ts-ignore
 import responsesLogo from '../assets/responses.svg';
 
+const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
+
 interface RetryAttemptDetail {
   index: number;
   provider: string;
@@ -380,10 +382,24 @@ export const Logs = () => {
     //   false — connection-level error (transient; safe to retry)
     //   null  — permanent server error (4xx); stop retrying
     const connectOnce = async (): Promise<boolean | null> => {
+      const connectionController = new AbortController();
+      const abortConnection = () => connectionController.abort();
+      controller.signal.addEventListener('abort', abortConnection, { once: true });
+      let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
+      let heartbeatTimedOut = false;
+
+      const resetHeartbeatTimer = () => {
+        clearTimeout(heartbeatTimer);
+        heartbeatTimer = setTimeout(() => {
+          heartbeatTimedOut = true;
+          connectionController.abort();
+        }, SSE_HEARTBEAT_TIMEOUT_MS);
+      };
+
       try {
         const response = await fetch('/v0/management/events', {
           headers: { 'x-admin-key': adminKey },
-          signal: controller.signal,
+          signal: connectionController.signal,
         });
 
         if (!response.ok) {
@@ -401,6 +417,7 @@ export const Logs = () => {
 
         sseConnected.current = true;
         setSseStatus('connected');
+        resetHeartbeatTimer();
 
         const decoder = new TextDecoder();
         let buffer = '';
@@ -412,6 +429,8 @@ export const Logs = () => {
             break;
           }
 
+          // Any bytes prove the stream is alive; the server sends a ping every 10 seconds.
+          resetHeartbeatTimer();
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n\n'); // SSE messages are separated by double newline
           buffer = lines.pop() || '';
@@ -513,11 +532,20 @@ export const Logs = () => {
       } catch (err: any) {
         handleDisconnect();
         if (err.name === 'AbortError') {
-          // Intentional teardown — do not retry.
-          throw err;
+          if (controller.signal.aborted) {
+            // Intentional teardown — do not retry.
+            throw err;
+          }
+          if (heartbeatTimedOut) {
+            console.warn('SSE heartbeat timed out — reconnecting');
+            return true;
+          }
         }
         console.error('Log stream error:', err);
         return false;
+      } finally {
+        clearTimeout(heartbeatTimer);
+        controller.signal.removeEventListener('abort', abortConnection);
       }
     };
 

@@ -25,6 +25,9 @@ const LEVEL_CLASS: Record<string, string> = {
   silly: 'text-text-muted',
 };
 
+const INITIAL_RECONNECT_DELAY_MS = 1_000;
+const MAX_RECONNECT_DELAY_MS = 30_000;
+
 export const SystemLogs: React.FC = () => {
   const toast = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -85,61 +88,85 @@ export const SystemLogs: React.FC = () => {
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 
-    try {
-      const response = await fetch('/v0/system/logs/stream', {
-        headers: { 'x-admin-key': adminKey },
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`Failed to connect: ${response.statusText}`);
-
-      const reader = response.body?.getReader();
-      if (!reader) return;
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const block of lines) {
-          const blockLines = block.split('\n');
-          let eventData = '';
-          let isSyslogEvent = false;
-
-          for (const line of blockLines) {
-            if (line.startsWith('event: syslog')) {
-              isSyslogEvent = true;
-            } else if (line.startsWith('event: ping')) {
-              isSyslogEvent = false;
-            } else if (line.startsWith('data: ')) {
-              eventData = line.slice(6);
-            } else if (line.startsWith('data:')) {
-              eventData = line.slice(5);
-            }
+    while (!controller.signal.aborted) {
+      try {
+        const response = await fetch('/v0/system/logs/stream', {
+          headers: { 'x-admin-key': adminKey },
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          if (response.status >= 400 && response.status < 500) {
+            console.error(`Log stream permanent error ${response.status} — stopping reconnect`);
+            return;
           }
+          throw new Error(`Failed to connect: ${response.statusText}`);
+        }
 
-          if (isSyslogEvent && eventData) {
-            try {
-              const data = JSON.parse(eventData);
-              if (!isPausedRef.current) {
-                setLogs((prev) => [...prev.slice(-999), data]);
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('Log stream response has no body');
+
+        reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (!controller.signal.aborted) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+
+          for (const block of lines) {
+            const blockLines = block.split('\n');
+            let eventData = '';
+            let isSyslogEvent = false;
+
+            for (const line of blockLines) {
+              if (line.startsWith('event: syslog')) {
+                isSyslogEvent = true;
+              } else if (line.startsWith('event: ping')) {
+                isSyslogEvent = false;
+              } else if (line.startsWith('data: ')) {
+                eventData = line.slice(6);
+              } else if (line.startsWith('data:')) {
+                eventData = line.slice(5);
               }
-            } catch {
-              // ignore
+            }
+
+            if (isSyslogEvent && eventData) {
+              try {
+                const data = JSON.parse(eventData);
+                if (!isPausedRef.current) {
+                  setLogs((prev) => [...prev.slice(-999), data]);
+                }
+              } catch {
+                // ignore
+              }
             }
           }
         }
-      }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
+      } catch (err: any) {
+        if (controller.signal.aborted || err.name === 'AbortError') return;
         console.error('Log stream error:', err);
       }
+
+      if (controller.signal.aborted) return;
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, reconnectDelay);
+        controller.signal.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          { once: true }
+        );
+      });
+      reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
     }
   };
 
