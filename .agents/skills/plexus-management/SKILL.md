@@ -2,7 +2,7 @@
 name: plexus-management
 description: >-
   Use this skill to inspect or administer a running Plexus instance via the management API, or debug
-  failures touching Plexus-proxied traffic (oauth, routing, model targets, inference keys, MCP gateway)
+  failures touching Plexus-proxied traffic (oauth, routing, model targets, raw provider passthrough, inference keys, MCP gateway)
   rather than searching the local codebase. Covers request logs, debug traces (lookup by UUID), enabling/disabling
   debug capture, providers, model targets, balances, quotas, aliases, target groups, keys, MCP logs, and
   runtime settings (failover, cooldowns, timeouts, backup/restore). Prefer this for any Plexus admin, operational,
@@ -125,6 +125,8 @@ curl -fsS "$PLEXUS_STAGING_URL/v0/management/aliases" \
 - Delete provider: `DELETE /v0/management/providers/{slug}`. Use `?cascade=true` only when the user wants alias targets referencing that provider removed too.
 - Fetch upstream models for setup: `POST /v0/management/providers/fetch-models` with `{"url":"https://.../v1/models","apiKey":"..."}`.
 - Check provider quota checker status and balances with `GET /v0/management/quota-checkers`, `GET /v0/management/quotas`, and `GET /v0/management/quotas/{checkerId}`.
+- Raw provider access is configured with `raw_passthrough: { enabled, base_url, auth }`, where `auth` is `bearer`, `x-api-key`, or `x-goog-api-key`. It is supported for static API-key providers and exposes `/raw/{provider}/*` without model routing, failover, adapters, or payload transformation.
+- Treat raw enablement as high-impact: inspect the provider and relevant key policies first. A caller also needs `allowRawPassthrough: true`, and its provider allow/deny lists still apply.
 
 ### Manage Model Aliases And Targets
 
@@ -138,9 +140,10 @@ curl -fsS "$PLEXUS_STAGING_URL/v0/management/aliases" \
 ### Manage Inference Keys
 
 - List keys: `GET /v0/management/keys`, redacted by default.
-- Create or replace key: `PUT /v0/management/keys/{name}` with `secret` and optional `comment`, `allowedProviders`, `excludedProviders`, `allowedModels`, `excludedModels`, `allowedIps`, and `quota`.
+- Create or replace key: `PUT /v0/management/keys/{name}` with `secret` and optional `comment`, `allowedProviders`, `excludedProviders`, `allowedModels`, `excludedModels`, `allowedIps`, `allowRawPassthrough`, and `quota`.
 - Omit `quota` for unrestricted keys; do not send `quota: null` because the current write schema accepts only strings when the field is present.
 - Network restrictions are managed per inference key with `allowedIps` CIDR/IP entries, not through a separate network endpoint.
+- `allowRawPassthrough: true` is provider-wide for every raw-enabled provider permitted by the key's provider policy. Model allow/deny lists do not constrain raw requests.
 - Delete key: `DELETE /v0/management/keys/{name}`. Usage history remains attached to the key name, but future requests with that key fail.
 
 ### Manage User Quotas Applied To Inference Keys

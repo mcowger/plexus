@@ -12,6 +12,7 @@ export const apiKeys = pgTable('api_keys', {
   allowedProviders: text('allowed_providers'),
   excludedModels: text('excluded_models'),
   excludedProviders: text('excluded_providers'),
+  allowRawPassthrough: boolean('allow_raw_passthrough').notNull().default(false),
   allowedIps: text('allowed_ips'),
   beta: boolean('beta').notNull().default(false),
   generation: jsonb('generation'), // { reasoning?, maxTokens?, verbosity?, serviceTier? }

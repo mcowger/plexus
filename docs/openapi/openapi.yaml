@@ -32,7 +32,12 @@ info:
        API key (limited access, scoped to that key's own data). Endpoints
        marked with the `AdminOnly` note reject limited principals with 403.
 
-    3. **MCP Proxy** (`/mcp/:name`) — Proxies JSON-RPC and SSE traffic to
+    3. **Raw Provider Proxy** (`/raw/{provider}/*`) — Relays provider-native
+       HTTP traffic without model routing or payload transformation. Requires
+       explicit provider and inference-key opt-in.
+
+
+    4. **MCP Proxy** (`/mcp/:name`) — Proxies JSON-RPC and SSE traffic to
        database-registered MCP servers. Plus unauthenticated MCP OAuth
        discovery under `/.well-known/*` and `POST /register`.
 
@@ -384,6 +389,8 @@ paths:
     $ref: paths/v1_metadata_search.yaml
   /v1/metadata/lookup:
     $ref: paths/v1_metadata_lookup.yaml
+  /raw/{provider}/{path}:
+    $ref: paths/raw_{provider}_{path}.yaml
   /v0/management/auth/verify:
     $ref: paths/v0_management_auth_verify.yaml
   /v0/management/self/me:

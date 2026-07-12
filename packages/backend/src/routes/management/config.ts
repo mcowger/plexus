@@ -8,6 +8,7 @@ import {
   CompactionConfigSchema,
   normalizeKeyConfig,
 } from '../../config';
+import { validateRawProviderSlug } from '../../services/raw-passthrough';
 import { ConfigService } from '../../services/config-service';
 import { DebugManager } from '../../services/debug-manager';
 import { isValidIpRule } from '../../utils/ip-match';
@@ -174,6 +175,11 @@ export async function registerConfigRoutes(
     if (!result.success) {
       return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
+    if (result.data.raw_passthrough?.enabled && !validateRawProviderSlug(slug)) {
+      return reply.code(400).send({
+        error: 'Raw passthrough requires a single slug-safe provider ID',
+      });
+    }
     try {
       await configService.saveProvider(slug, result.data);
       logger.debug(`Provider '${slug}' saved via API (PUT)`);
@@ -201,6 +207,11 @@ export async function registerConfigRoutes(
       const result = ProviderConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
+      }
+      if (result.data.raw_passthrough?.enabled && !validateRawProviderSlug(slug)) {
+        return reply.code(400).send({
+          error: 'Raw passthrough requires a single slug-safe provider ID',
+        });
       }
       await configService.saveProvider(slug, result.data);
       logger.debug(`Provider '${slug}' updated via API (PATCH)`);

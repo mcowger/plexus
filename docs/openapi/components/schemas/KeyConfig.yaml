@@ -42,6 +42,12 @@ properties:
     description: >
       Restrict this key to specific model aliases only. If empty, the
       key can be used with any model.
+  allowRawPassthrough:
+    type: boolean
+    default: false
+    description: >
+      Privileged provider-wide raw access. Existing provider allow/deny lists
+      still apply; model restrictions do not apply to raw requests.
   quota:
     type:
       - string

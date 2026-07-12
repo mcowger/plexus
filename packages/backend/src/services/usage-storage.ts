@@ -129,6 +129,7 @@ export class UsageStorageService extends EventEmitter {
             ? 1
             : 0
           : record.isPassthrough;
+      const isRawValue = typeof record.isRaw === 'boolean' ? (record.isRaw ? 1 : 0) : record.isRaw;
       const parallelToolCallsValue =
         typeof record.parallelToolCallsEnabled === 'boolean'
           ? record.parallelToolCallsEnabled
@@ -154,6 +155,7 @@ export class UsageStorageService extends EventEmitter {
         ...record,
         isStreamed: isStreamedValue,
         isPassthrough: isPassthroughValue,
+        isRaw: isRawValue,
         parallelToolCallsEnabled: parallelToolCallsValue,
         isVisionFallthrough: isVisionFallthroughValue,
         isDescriptorRequest: isDescriptorRequestValue,
@@ -221,6 +223,9 @@ export class UsageStorageService extends EventEmitter {
           responseStatus: 'pending',
           isStreamed: record.isStreamed ? 1 : 0,
           isPassthrough: record.isPassthrough ? 1 : 0,
+          isRaw: record.isRaw ? 1 : 0,
+          requestMethod: record.requestMethod || null,
+          requestPath: record.requestPath || null,
           createdAt: Date.now(),
         });
     } catch (error) {
@@ -633,6 +638,9 @@ export class UsageStorageService extends EventEmitter {
           tokensPerSec: schema.requestUsage.tokensPerSec,
           isStreamed: schema.requestUsage.isStreamed,
           isPassthrough: schema.requestUsage.isPassthrough,
+          isRaw: schema.requestUsage.isRaw,
+          requestMethod: schema.requestUsage.requestMethod,
+          requestPath: schema.requestUsage.requestPath,
           responseStatus: schema.requestUsage.responseStatus,
           toolsDefined: schema.requestUsage.toolsDefined,
           messageCount: schema.requestUsage.messageCount,
@@ -692,6 +700,9 @@ export class UsageStorageService extends EventEmitter {
         hasDebug: !!row.hasDebug,
         hasError: !!row.hasError,
         isPassthrough: !!row.isPassthrough,
+        isRaw: !!row.isRaw,
+        requestMethod: row.requestMethod,
+        requestPath: row.requestPath,
         toolsDefined: row.toolsDefined,
         messageCount: row.messageCount,
         parallelToolCallsEnabled: !!row.parallelToolCallsEnabled,

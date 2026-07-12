@@ -205,6 +205,42 @@ You can also enable compatibility only for selected models:
 `auto_compat`. Prefer `auto_compat` for registry-backed models, and revisit existing
 custom rewrites before running both surfaces in parallel.
 
+### Raw Provider Passthrough
+
+Static API-key providers can expose an opt-in raw endpoint that bypasses model routing,
+failover, adapters, and request/response transformation:
+
+```json
+PUT /v0/management/providers/openrouter
+{
+  "api_base_url": "https://openrouter.ai/api/v1",
+  "api_key": "sk-or-...",
+  "raw_passthrough": {
+    "enabled": true,
+    "base_url": "https://openrouter.ai/api",
+    "auth": "bearer"
+  }
+}
+```
+
+`POST /raw/openrouter/v1/responses?trace=true` is sent to
+`https://openrouter.ai/api/v1/responses?trace=true`. The method, query string, request body,
+upstream status, response headers, and response body are relayed without application-level
+transformation. Plexus client credentials are removed and the request `Host` is selected from the
+configured upstream URL; other client headers are preserved. The provider's configured API key is
+inserted using `bearer`, `x-api-key`, or `x-goog-api-key` authentication. Responses preserve
+upstream headers and add `x-request-id`, `x-plexus-request-id`, and applicable quota metadata.
+For recognized Chat Completions, Messages, Responses, and Gemini paths, Plexus also feeds the
+unmodified response through its existing debug reconstruction and usage normalization pipeline to
+record the requested model, tokens, reasoning/cache usage, and provider-reported costs when present.
+This observation does not alter bytes sent in either direction.
+
+Raw access is default-deny and requires `allowRawPassthrough: true` on the calling key. The
+key's existing provider allow/deny lists still apply, but model allow/deny lists do not: raw
+access is a privileged provider-wide capability. Request-count quotas can be enforced by
+provider; model-scoped and token/cost enforcement cannot be guaranteed for opaque traffic.
+OAuth providers are not supported by the raw endpoint.
+
 ### Provider Adapters
 
 Adapters rewrite request payloads outbound to a provider and raw response payloads inbound, fixing provider-specific field-name incompatibilities without modifying the core transformer pipeline.

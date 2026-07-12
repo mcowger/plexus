@@ -84,6 +84,15 @@ put:
               api_base_url: http://localhost:11434/v1
               api_key: ollama
               disable_cooldown: true
+          openrouter_raw:
+            summary: OpenRouter with privileged raw access enabled
+            value:
+              api_base_url: https://openrouter.ai/api/v1
+              api_key: sk-or-your-key
+              raw_passthrough:
+                enabled: true
+                base_url: https://openrouter.ai/api
+                auth: bearer
           with_gpu_profile:
             summary: Local provider with GPU energy profile
             value:

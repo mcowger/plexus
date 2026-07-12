@@ -37,6 +37,9 @@ export interface UsageRecord {
   hasDebug?: boolean;
   hasError?: boolean;
   isPassthrough?: boolean;
+  isRaw?: boolean;
+  requestMethod?: string | null;
+  requestPath?: string | null;
   tokensEstimated?: number; // 0 = actual usage from provider, 1 = estimated
   createdAt?: number;
   // Request metadata

@@ -21,6 +21,7 @@ interface SelfInfo {
   keyName?: string;
   allowedProviders?: string[];
   allowedModels?: string[];
+  allowRawPassthrough?: boolean;
   quotaNames?: string[];
   quotaName?: string | null;
   comment?: string | null;
@@ -176,6 +177,8 @@ export const MyKey: React.FC = () => {
               <dd className="text-text break-words">
                 {allowedModels.length > 0 ? allowedModels.join(', ') : 'Any (unrestricted)'}
               </dd>
+              <dt className="text-text-muted">Raw provider access</dt>
+              <dd className="text-text">{info.allowRawPassthrough ? 'Enabled' : 'Disabled'}</dd>
             </dl>
           </Card>
 

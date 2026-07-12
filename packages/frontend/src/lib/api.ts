@@ -254,6 +254,11 @@ export interface Provider {
   stallGracePeriodMs?: number | null;
   pi_ai_provider?: string;
   compaction?: CompactionSettings;
+  rawPassthrough?: {
+    enabled: boolean;
+    baseUrl: string;
+    auth: 'bearer' | 'x-api-key' | 'x-goog-api-key';
+  };
 }
 
 export type McpServer = RemoteMcpServer | LocalMcpServer;
@@ -541,6 +546,9 @@ export interface UsageRecord {
   hasDebug?: boolean;
   hasError?: boolean;
   isPassthrough?: boolean;
+  isRaw?: boolean;
+  requestMethod?: string | null;
+  requestPath?: string | null;
   // Request metadata
   toolsDefined?: number;
   messageCount?: number;
@@ -951,6 +959,9 @@ const fetchConfigCached = async (): Promise<any> => {
   return promise;
 };
 
+const encodePathPreservingSlashes = (value: string): string =>
+  value.split('/').map(encodeURIComponent).join('/');
+
 export interface KeyConfig {
   key: string; // The user-facing alias/name for the key (e.g. 'my-app')
   secret: string; // The actual sk-uuid
@@ -964,6 +975,7 @@ export interface KeyConfig {
   allowedProviders?: string[];
   excludedModels?: string[];
   excludedProviders?: string[];
+  allowRawPassthrough?: boolean;
   allowedIps?: string[];
 }
 
@@ -1769,6 +1781,7 @@ export const api = {
           allowedProviders?: string[];
           excludedModels?: string[];
           excludedProviders?: string[];
+          allowRawPassthrough?: boolean;
           allowedIps?: string[];
         }
       >;
@@ -1782,6 +1795,7 @@ export const api = {
         allowedProviders: val.allowedProviders,
         excludedModels: val.excludedModels,
         excludedProviders: val.excludedProviders,
+        allowRawPassthrough: val.allowRawPassthrough === true,
         allowedIps: val.allowedIps,
       }));
     } catch (e) {
@@ -1804,6 +1818,7 @@ export const api = {
           allowedProviders: keyConfig.allowedProviders ?? [],
           excludedModels: keyConfig.excludedModels ?? [],
           excludedProviders: keyConfig.excludedProviders ?? [],
+          allowRawPassthrough: keyConfig.allowRawPassthrough === true,
           allowedIps: keyConfig.allowedIps ?? [],
         }),
       }
@@ -1891,6 +1906,13 @@ export const api = {
           stallWindowMs: val.stallWindowMs ?? undefined,
           stallGracePeriodMs: val.stallGracePeriodMs ?? undefined,
           pi_ai_provider: val.pi_ai_provider ?? undefined,
+          rawPassthrough: val.raw_passthrough
+            ? {
+                enabled: val.raw_passthrough.enabled === true,
+                baseUrl: val.raw_passthrough.base_url || '',
+                auth: val.raw_passthrough.auth || 'bearer',
+              }
+            : undefined,
         };
       });
     } catch (e) {
@@ -1949,13 +1971,23 @@ export const api = {
       ...(provider.stallGracePeriodMs != null
         ? { stallGracePeriodMs: provider.stallGracePeriodMs }
         : {}),
+      ...(provider.rawPassthrough?.baseUrl
+        ? {
+            raw_passthrough: {
+              enabled: provider.rawPassthrough.enabled,
+              base_url: provider.rawPassthrough.baseUrl,
+              auth: provider.rawPassthrough.auth,
+            },
+          }
+        : {}),
       ...(provider.pi_ai_provider ? { pi_ai_provider: provider.pi_ai_provider } : {}),
     };
 
+    const isExistingProvider = oldId === provider.id;
     const res = await fetchWithAuth(
-      `${API_BASE}/v0/management/providers/${encodeURIComponent(provider.id)}`,
+      `${API_BASE}/v0/management/providers/${encodePathPreservingSlashes(provider.id)}`,
       {
-        method: 'PUT',
+        method: isExistingProvider ? 'PATCH' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }
@@ -2004,7 +2036,7 @@ export const api = {
     affectedAliases?: string[];
   }> => {
     try {
-      const url = `/v0/management/providers/${encodeURIComponent(providerId)}${cascade ? '?cascade=true' : ''}`;
+      const url = `/v0/management/providers/${encodePathPreservingSlashes(providerId)}${cascade ? '?cascade=true' : ''}`;
 
       const response = await fetchWithAuth(url, {
         method: 'DELETE',
@@ -3155,6 +3187,7 @@ export const api = {
     keyName?: string;
     allowedProviders?: string[];
     allowedModels?: string[];
+    allowRawPassthrough?: boolean;
     quotaNames?: string[];
     quotaName?: string | null;
     comment?: string | null;

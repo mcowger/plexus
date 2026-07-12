@@ -89,15 +89,11 @@ export class DebugLoggingInspector extends BaseInspector {
         // Always save to memory for usage extraction/estimation
         this.saveReconstructedResponse(reconstructed);
 
-        // Only persist raw data to DB if debug mode is enabled
-        if (this.debugManager.isEnabled()) {
-          this.saveRawResponse(rawBody);
-        }
+        // DebugManager applies global/key/alias/provider capture policy.
+        this.saveRawResponse(rawBody);
       } catch (err) {
         logger.error(`[Inspector:${this.mode}] Reconstruction failed: ${err}`);
-        if (this.debugManager.isEnabled()) {
-          this.saveRawResponse(rawBody);
-        }
+        this.saveRawResponse(rawBody);
       }
     });
 
