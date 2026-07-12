@@ -17,5 +17,7 @@
 - Keep OpenCode session sharing disabled so repository context is not published externally.
 - Preserve the collaborator and bot filters on the interactive workflow to prevent untrusted
   code-changing runs and comment loops.
-- `release.yml` uses OpenCode to generate release notes from `release-data.json`. Keep its tools
-  restricted to reading the release prompt/data and writing `release-notes.md`.
+- `release.yml` uses OpenCode to generate release notes from `.git/release-data.json`. Keep its tools
+  restricted to reading the release prompt/data and writing `.git/release-notes.md`. These scratch
+  files must remain under `.git/` so the OpenCode action does not treat them as worktree changes and
+  automatically commit and push them.
