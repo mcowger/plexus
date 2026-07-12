@@ -89,8 +89,8 @@ Both workflows require these existing Actions settings:
 OpenCode uses the built-in `GITHUB_TOKEN`; no OpenCode GitHub App or additional GitHub token is
 required. Session sharing is disabled. After migration, the `PR_AGENT_MODEL_ID` repository
 variable can be retired manually. Do not remove `LLM_API_KEY`, `LLM_API_HOST`, or `LLM_MODEL_ID`:
-they remain in use, including by release-note automation. The `/pi` assistant no longer exists,
-but `mcowger/pi-action` remains in `.github/workflows/release.yml` solely to generate release notes.
+they remain in use, including by the OpenCode release-note automation in
+`.github/workflows/release.yml`.
 
 ## Code Style
 

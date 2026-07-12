@@ -17,8 +17,5 @@
 - Keep OpenCode session sharing disabled so repository context is not published externally.
 - Preserve the collaborator and bot filters on the interactive workflow to prevent untrusted
   code-changing runs and comment loops.
-
-## Remaining Pi action use
-
-`release.yml` still uses `mcowger/pi-action` to generate release notes. That is unrelated release
-pipeline automation and must not be removed as part of changes to the GitHub assistant.
+- `release.yml` uses OpenCode to generate release notes from `release-data.json`. Keep its tools
+  restricted to reading the release prompt/data and writing `release-notes.md`.
