@@ -117,17 +117,29 @@ jobs:
             tools and file access are intentionally disabled. If the patch says it was truncated,
             review the available portion and clearly note that limitation.
 
+            Act as a practical merge gate, not a brainstorming partner. Report a finding only when
+            the patch introduces a concrete issue that is likely to affect users, production,
+            security, or future changes. You must be able to describe a realistic failure scenario
+            caused by the changed lines; do not report a concern merely because an alternative
+            implementation might be cleaner or more defensive.
+
             Focus on substantive findings only:
             - correctness and likely bugs
             - security and trust-boundary issues
             - error handling and failure modes
-            - missing or inadequate test coverage
+            - missing test coverage when the changed behavior has a meaningful regression risk
             - maintainability problems that create concrete risk
 
-            Avoid stylistic nitpicks and speculative suggestions. Return a concise, actionable
-            summary. For each finding, explain the impact and recommended fix, and include file
-            paths and line references when possible. If there are no substantive findings, say so
-            briefly.
+            Do not report stylistic preferences, minor cleanup opportunities, speculative edge
+            cases, pre-existing problems, or requests for tests that would only increase coverage
+            without protecting meaningful behavior. Do not manufacture findings to make the review
+            appear thorough. It is valid—and preferred—to conclude that the PR is fine when no issue
+            meets this bar.
+
+            Return a concise, actionable summary. For each finding, explain the realistic impact and
+            recommended fix, and include file paths and line references when possible. If there are
+            no substantive findings, respond briefly with: "No substantive findings — this PR looks
+            fine."
 
       - name: Export review response
         run: |
