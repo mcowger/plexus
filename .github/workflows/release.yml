@@ -124,7 +124,7 @@ jobs:
       LLM_API_HOST: ${{ secrets.LLM_API_HOST }}
       OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
       OPENCODE_CONFIG_CONTENT: >-
-        {"permission":{"*":"deny","read":{"*":"deny",".github/prompts/release-notes.md":"allow",".git/release-data.json":"allow"},"edit":{"*":"deny",".git/release-notes.md":"allow"}},"provider":{"openai":{"options":{"baseURL":"{env:LLM_API_HOST}","apiKey":"{env:OPENAI_API_KEY}"},"models":{"${{ vars.LLM_MODEL_ID }}":{}}}}}
+        {"permission":{"*":"deny","read":{"*":"deny",".github/prompts/release-notes.md":"allow",".git/opencode-release/release-data.json":"allow"},"edit":{"*":"deny",".git/opencode-release/release-notes.md":"allow"}},"provider":{"openai":{"options":{"baseURL":"{env:LLM_API_HOST}","apiKey":"{env:OPENAI_API_KEY}"},"models":{"${{ vars.LLM_MODEL_ID }}":{}}}}}
     outputs:
       notes: ${{ steps.read_notes.outputs.notes }}
     steps:
@@ -144,6 +144,10 @@ jobs:
             const currentTag = '${{ needs.setup.outputs.tag }}';
             const calVerRegex = /^\d{4}\.\d{2}\.\d{2}\.\d+$/;
             const fs = require('fs');
+            const releaseScratchDir = '.git/opencode-release';
+
+            fs.rmSync(releaseScratchDir, { recursive: true, force: true });
+            fs.mkdirSync(releaseScratchDir, { recursive: true });
 
             async function getTagDate(tag) {
               const ref = await github.rest.git.getRef({
@@ -252,8 +256,8 @@ jobs:
               commits: relevantCommits,
             };
 
-            fs.writeFileSync('.git/release-data.json', JSON.stringify(releaseData, null, 2));
-            core.info('Wrote .git/release-data.json');
+            fs.writeFileSync(`${releaseScratchDir}/release-data.json`, JSON.stringify(releaseData, null, 2));
+            core.info(`Wrote ${releaseScratchDir}/release-data.json`);
 
       - name: Run release notes agent
         uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a # github-v1.2.19
@@ -286,16 +290,16 @@ jobs:
         id: read_notes
         if: always()
         run: |
-          if [ -f .git/release-notes.md ]; then
+          if [ -f .git/opencode-release/release-notes.md ]; then
             # Ensure the file ends with a newline to prevent delimiter parser issues
-            [[ -n "$(tail -c1 .git/release-notes.md)" ]] && echo "" >> .git/release-notes.md
+            [[ -n "$(tail -c1 .git/opencode-release/release-notes.md)" ]] && echo "" >> .git/opencode-release/release-notes.md
             {
               echo 'notes<<RELEASE_NOTES_EOF'
-              cat .git/release-notes.md
+              cat .git/opencode-release/release-notes.md
               echo 'RELEASE_NOTES_EOF'
             } >> "$GITHUB_OUTPUT"
           else
-            echo '::warning::Agent did not write .git/release-notes.md — release will have no body'
+            echo '::warning::Agent did not write .git/opencode-release/release-notes.md — release will have no body'
             echo 'notes=' >> "$GITHUB_OUTPUT"
           fi
 

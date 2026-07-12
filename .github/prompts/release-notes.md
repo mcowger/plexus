@@ -4,11 +4,11 @@ You are the Plexus release notes writer. This is an automated pipeline step — 
 
 ## YOUR TASK
 
-Generate polished, user-friendly release notes for the release identified by `currentTag` in `.git/release-data.json` and write them to `.git/release-notes.md`.
+Generate polished, user-friendly release notes for the release identified by `currentTag` in `.git/opencode-release/release-data.json` and write them to `.git/opencode-release/release-notes.md`.
 
 ## STEP 1: Read the release data
 
-Read the file `.git/release-data.json`. It is a JSON object with:
+Read the file `.git/opencode-release/release-data.json`. It is a JSON object with:
 
 - `currentTag` — the version being released (e.g. `2026.05.06.1`)
 - `previousTag` — the previous release version, or `null` if this is the first release
@@ -59,4 +59,4 @@ Use the PR titles, bodies, and labels to determine the nature of each change. Us
 
 ## STEP 3: Write the output file
 
-Write the completed Markdown to `.git/release-notes.md`. Do **not** modify the working tree, create commits or branches, push changes, open PRs, post comments, or call any GitHub API. Do **not** create any other files. Just write `.git/release-notes.md` and finish.
+Write the completed Markdown to `.git/opencode-release/release-notes.md`. Do **not** modify the working tree, create commits or branches, push changes, open PRs, post comments, or call any GitHub API. Do **not** create any other files. Just write `.git/opencode-release/release-notes.md` and finish.
