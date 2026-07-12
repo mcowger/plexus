@@ -15,6 +15,22 @@ export function validateRawProviderSlug(slug: string): boolean {
   return /^[a-z0-9][a-z0-9._-]{0,62}$/.test(slug);
 }
 
+function containsEncodedDotSegment(pathname: string): boolean {
+  return pathname.split('/').some((segment) => {
+    let decoded = segment;
+    for (let depth = 0; depth < 3; depth++) {
+      try {
+        const next = decodeURIComponent(decoded);
+        if (next === decoded) break;
+        decoded = next;
+      } catch {
+        break;
+      }
+    }
+    return decoded === '.' || decoded === '..';
+  });
+}
+
 export function buildRawUpstreamUrl(baseUrl: string, rawSuffix: string): URL {
   const base = new URL(baseUrl);
   if (!['http:', 'https:'].includes(base.protocol) || base.search || base.hash) {
@@ -22,7 +38,27 @@ export function buildRawUpstreamUrl(baseUrl: string, rawSuffix: string): URL {
   }
 
   const suffix = rawSuffix.startsWith('/') ? rawSuffix : `/${rawSuffix}`;
-  return new URL(`${baseUrl.replace(/\/$/, '')}${suffix}`);
+  const suffixPathname = suffix.split('?')[0] ?? suffix;
+  if (containsEncodedDotSegment(suffixPathname)) {
+    throw new Error('Raw passthrough path cannot contain dot segments');
+  }
+
+  const target = new URL(`${baseUrl.replace(/\/$/, '')}${suffix}`);
+  if (target.origin !== base.origin) {
+    throw new Error('Raw passthrough path cannot change the configured upstream origin');
+  }
+
+  const basePathname = base.pathname.replace(/\/$/, '');
+  if (
+    basePathname &&
+    basePathname !== '/' &&
+    target.pathname !== basePathname &&
+    !target.pathname.startsWith(`${basePathname}/`)
+  ) {
+    throw new Error('Raw passthrough path cannot escape the configured upstream base path');
+  }
+
+  return target;
 }
 
 export function buildRawUpstreamHeaders(

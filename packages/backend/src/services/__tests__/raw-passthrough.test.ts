@@ -64,9 +64,23 @@ describe('raw passthrough transport helpers', () => {
     });
   });
 
-  test('allows the raw suffix to traverse the configured base path', () => {
-    expect(buildRawUpstreamUrl('https://provider.example/api', '/../admin').href).toBe(
-      'https://provider.example/admin'
+  test.each([
+    '/../admin',
+    '/%2e%2e/admin',
+    '/.%2e/admin',
+    '/%252e%252e/admin',
+  ])('rejects base-path traversal through %s', (suffix) => {
+    expect(() => buildRawUpstreamUrl('https://provider.example/api', suffix)).toThrow(
+      'cannot contain dot segments'
     );
+  });
+
+  test('keeps normal raw paths under the configured base path', () => {
+    expect(
+      buildRawUpstreamUrl(
+        'https://provider.example/api',
+        '/v1/responses?redirect=https%3A%2F%2Fother.example'
+      ).href
+    ).toBe('https://provider.example/api/v1/responses?redirect=https%3A%2F%2Fother.example');
   });
 });

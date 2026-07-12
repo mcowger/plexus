@@ -286,6 +286,25 @@ export async function registerRawPassthroughRoutes(
         );
         debugManager.addTransformedRequest(requestId, debugRequest);
 
+        let upstreamUrl: URL;
+        try {
+          upstreamUrl = buildRawUpstreamUrl(provider.raw_passthrough.base_url, rawSuffix);
+        } catch (error: any) {
+          usageRecord.responseStatus = 'error';
+          usageRecord.durationMs = Date.now() - startTime;
+          usageStorage.saveRequest(usageRecord as UsageRecord);
+          usageStorage.saveError(
+            requestId,
+            error,
+            { apiType: 'raw', provider: providerSlug, path: rawSuffix, statusCode: 400 },
+            (request as any).keyName
+          );
+          debugManager.flush(requestId);
+          return reply.code(400).send({
+            error: { message: error.message, type: 'invalid_request_error' },
+          });
+        }
+
         if (quotaEnforcer) {
           const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);
           if (!quotaCheck.ok) {
@@ -330,7 +349,6 @@ export async function registerRawPassthroughRoutes(
         timeout.unref?.();
 
         try {
-          const upstreamUrl = buildRawUpstreamUrl(provider.raw_passthrough.base_url, rawSuffix);
           const upstreamHeaders = buildRawUpstreamHeaders(
             request.headers,
             provider,

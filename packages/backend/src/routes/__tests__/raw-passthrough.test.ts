@@ -236,6 +236,23 @@ describe('raw passthrough routes', () => {
     expect(captured.url).toBeUndefined();
   });
 
+  test('rejects encoded base-path traversal before upstream dispatch', async () => {
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/raw/openrouter/%252e%252e/admin',
+      headers: { authorization: 'Bearer plexus-secret' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: {
+        message: 'Raw passthrough path cannot contain dot segments',
+        type: 'invalid_request_error',
+      },
+    });
+    expect(captured.url).toBeUndefined();
+  });
+
   test('accepts x-api-key authentication without forwarding the Plexus credential', async () => {
     const response = await fastify.inject({
       method: 'GET',
