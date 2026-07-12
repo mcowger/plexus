@@ -107,7 +107,6 @@ export const SystemLogs: React.FC = () => {
         const reader = response.body?.getReader();
         if (!reader) throw new Error('Log stream response has no body');
 
-        reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
         const decoder = new TextDecoder();
         let buffer = '';
 
@@ -118,6 +117,7 @@ export const SystemLogs: React.FC = () => {
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n\n');
           buffer = lines.pop() || '';
+          if (lines.length > 0) reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
 
           for (const block of lines) {
             const blockLines = block.split('\n');

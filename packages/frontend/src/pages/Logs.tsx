@@ -387,6 +387,7 @@ export const Logs = () => {
       controller.signal.addEventListener('abort', abortConnection, { once: true });
       let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
       let heartbeatTimedOut = false;
+      let streamConnected = false;
 
       const resetHeartbeatTimer = () => {
         clearTimeout(heartbeatTimer);
@@ -395,6 +396,8 @@ export const Logs = () => {
           connectionController.abort();
         }, SSE_HEARTBEAT_TIMEOUT_MS);
       };
+
+      resetHeartbeatTimer();
 
       try {
         const response = await fetch('/v0/management/events', {
@@ -415,6 +418,7 @@ export const Logs = () => {
         const reader = response.body?.getReader();
         if (!reader) return false;
 
+        streamConnected = true;
         sseConnected.current = true;
         setSseStatus('connected');
         resetHeartbeatTimer();
@@ -538,7 +542,7 @@ export const Logs = () => {
           }
           if (heartbeatTimedOut) {
             console.warn('SSE heartbeat timed out — reconnecting');
-            return true;
+            return streamConnected;
           }
         }
         console.error('Log stream error:', err);
