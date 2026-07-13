@@ -1,0 +1,73 @@
+post:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Recompute a quota bucket from request usage (admin only)
+  description: |
+    Repairs a quota bucket by recomputing its usage from successful request
+    usage records instead of trusting the stored counter. The quota must be
+    attached to the key, directly or through the configured default quotas.
+
+    Rolling requests and rolling tokens quotas are rejected because their
+    decay history cannot be reconstructed exactly from request usage records.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - key
+            - quota
+          properties:
+            key:
+              type: string
+              description: API key name whose quota bucket should be repaired.
+            quota:
+              type: string
+              description: Attached quota definition name to recompute.
+        examples:
+          recompute:
+            value:
+              key: production-key
+              quota: monthly-tokens
+  responses:
+    '200':
+      description: Quota usage was recomputed.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - success
+              - key
+              - quota
+              - usage
+              - windowStartMs
+              - message
+            properties:
+              success:
+                type: boolean
+                const: true
+              key:
+                type: string
+              quota:
+                type: string
+              usage:
+                type: number
+              windowStartMs:
+                type: integer
+              message:
+                type: string
+    '400':
+      description: Missing fields, unattached quota, or unsupported quota type.
+    '401':
+      description: Authentication required or invalid credentials.
+    '404':
+      description: API key not found.
+    '500':
+      description: Internal server error.
+  operationId: postV0ManagementQuotaRecompute

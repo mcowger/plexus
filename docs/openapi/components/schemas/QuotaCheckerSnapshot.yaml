@@ -1,4 +1,12 @@
 type: object
+description: >
+  Latest quota snapshot for a single provider checker, returned by
+  `GET /v0/management/quotas` and `GET /v0/management/quotas/{checkerId}`.
+
+
+  A checker reports its current readings as an array of `Meter` objects (one
+  per quota dimension). When the last check failed, `success` is false,
+  `meters` is empty, and `error` carries the failure message.
 properties:
   checkerId:
     type: string
@@ -8,21 +16,11 @@ properties:
   checkerType:
     type: string
     description: >
-      Provider identifier (e.g. `naga`, `moonshot`, `openai-codex`). Maps to
-      provider config slug.
-  checkerCategory:
+      Checker type identifier (e.g. `naga`, `moonshot`, `openai-codex`). Maps
+      to the provider quota-checker definition.
+  provider:
     type: string
-    enum:
-      - balance
-      - rate-limit
-    description: >
-      Whether the checker tracks a prepaid account balance or a time-windowed
-      rate limit.
-
-      - **balance** — Tracks a prepaid subscription balance (unit: `dollars`).
-        Renders as a wallet icon in the UI.
-      - **rate-limit** — Tracks a time-windowed rate limit (unit: `requests`,
-        `tokens`, or `percentage`). Renders as a progress bar in the UI.
+    description: Provider identifier at capture time.
   oauthAccountId:
     type: string
     description: >
@@ -34,11 +32,16 @@ properties:
     description: >
       OAuth provider identifier (e.g. `openai-codex`, `anthropic-claude-code`).
       Present when credentials are stored via OAuth flow.
-  latest:
+  success:
+    type: boolean
+    description: Whether the most recent quota check succeeded.
+  error:
+    type: string
+    description: Error message when the most recent check failed. Omitted on success.
+  meters:
     type: array
     items:
-      $ref: ./QuotaSample.yaml
+      $ref: ./Meter.yaml
     description: >
-      Most recent quota samples for each window type. The array contains
-      samples for the primary windows (subscription, daily, etc.) that the
-      provider reports.
+      Current meter readings for this checker (one `Meter` per quota
+      dimension). Empty when the last check failed.

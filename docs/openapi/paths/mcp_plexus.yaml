@@ -1,0 +1,134 @@
+post:
+  tags:
+    - MCP Proxy
+  summary: Plexus Management MCP (JSON-RPC, admin only)
+  description: |
+    The Plexus Management MCP server is an in-process Model Context Protocol
+    server exposing compact domain tools for managing Plexus.
+
+    ## Authentication
+
+    Requires the `x-admin-key` header. Bearer inference keys are rejected.
+
+    ## MCP disabled
+
+    When `mcpEnabled` is `false`, requests return HTTP 418
+    (`mcp_disabled`) before authentication. Enable it via
+    `PATCH /v0/management/config/mcp-enabled` or the MCP Servers UI.
+
+    ## Transport
+
+    Uses the Streamable HTTP transport with JSON responses. Each request
+    creates a stateless per-request MCP server instance.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          description: JSON-RPC 2.0 request envelope.
+          properties:
+            jsonrpc:
+              type: string
+              const: '2.0'
+            id:
+              oneOf:
+                - type: string
+                - type: number
+            method:
+              type: string
+              description: JSON-RPC method, for example `tools/list` or `tools/call`.
+            params:
+              type: object
+              description: Method-specific parameters.
+        examples:
+          listTools:
+            summary: List available tools
+            value:
+              jsonrpc: '2.0'
+              id: '1'
+              method: tools/list
+          callTool:
+            summary: Call a tool
+            value:
+              jsonrpc: '2.0'
+              id: '2'
+              method: tools/call
+              params:
+                name: plexus_provider
+                arguments:
+                  operation: list
+  responses:
+    '200':
+      description: JSON-RPC response. Content is JSON or a stream depending on the request.
+      content:
+        application/json:
+          schema:
+            type: object
+            description: JSON-RPC 2.0 response envelope.
+        text/event-stream:
+          schema:
+            type: string
+    '400':
+      description: Malformed JSON-RPC request.
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals are rejected; this endpoint is admin-only.
+    '418':
+      description: 'Plexus Management MCP is disabled (`mcpEnabled: false`).'
+  operationId: postMcpPlexus
+get:
+  tags:
+    - MCP Proxy
+  summary: Plexus Management MCP (SSE stream, admin only)
+  description: |
+    GET endpoint for the Plexus Management MCP server, supporting
+    server-sent-event MCP transport. It has the same authentication,
+    disabled-check, and tool surface as `POST /mcp/plexus`.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: SSE stream or JSON-RPC response.
+      content:
+        text/event-stream:
+          schema:
+            type: string
+        application/json:
+          schema:
+            type: object
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals are rejected; this endpoint is admin-only.
+    '418':
+      description: 'Plexus Management MCP is disabled (`mcpEnabled: false`).'
+  operationId: getMcpPlexus
+delete:
+  tags:
+    - MCP Proxy
+  summary: Plexus Management MCP (session close, admin only)
+  description: |
+    DELETE closes an MCP session. The current stateless per-request transport
+    returns immediately.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Session closed or no-op for stateless transport.
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Limited principals are rejected; this endpoint is admin-only.
+    '418':
+      description: 'Plexus Management MCP is disabled (`mcpEnabled: false`).'
+  operationId: deleteMcpPlexus

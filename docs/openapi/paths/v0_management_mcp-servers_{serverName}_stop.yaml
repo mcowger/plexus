@@ -1,0 +1,31 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+    description: Registered MCP server name.
+post:
+  tags:
+    - Management — Config
+  summary: Stop a local MCP server process (admin only)
+  description: |
+    Stops the child process for a local MCP server by sending `SIGTERM`,
+    then waits up to 3 seconds for graceful exit.
+
+    Returns the updated runtime status. It is safe to call when no process is
+    running; the route does not require a stored server configuration.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Process stopped (or was not running).
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LocalMcpRuntimeStatus.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: postV0ManagementMcpServersByServerNameStop

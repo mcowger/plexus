@@ -1,0 +1,70 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get context compaction settings (admin only)
+  description: |
+    Returns the global context compaction settings. The response may be an
+    empty object when no global overrides have been configured.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Current compaction settings.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/CompactionSettings.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Internal server error.
+  operationId: getV0ManagementConfigCompaction
+patch:
+  tags:
+    - Management — Config
+  summary: Update context compaction settings (admin only)
+  description: |
+    Merges the supplied fields into the global context compaction settings,
+    then validates the resulting configuration. Omitted fields retain their
+    current values; nested `native` and `headroom` objects are also merged.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CompactionSettings.yaml
+        examples:
+          native:
+            value:
+              enabled: true
+              strategy: native
+              triggerRatio: 0.8
+              minTokens: 2000
+              protectRecent: 4
+          headroom:
+            value:
+              strategy: headroom
+              headroom:
+                baseUrl: https://headroom.example.com
+                targetRatio: 0.7
+                timeoutMs: 5000
+  responses:
+    '200':
+      description: Updated compaction settings.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/CompactionSettings.yaml
+    '400':
+      description: Invalid request body or compaction configuration.
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Internal server error.
+  operationId: patchV0ManagementConfigCompaction

@@ -12,13 +12,15 @@ get:
     - Management — Quotas (Provider)
   summary: Historical quota samples (admin only)
   description: |
-    Returns historical quota measurements for a specific checker.
+    Returns historical quota-snapshot rows for a specific checker, one row per
+    meter per check, sorted by `checkedAt` descending (most recent first).
 
     ## Query parameters
 
-    - **windowType** — Filter by time window. Options: `subscription`,
-      `hourly`, `five_hour`, `daily`, `weekly`, `monthly`, `custom`.
-      When omitted, returns all window types.
+    - **meterKey** — Filter to a single meter (e.g. `balance`, `five_hour`,
+      `daily`). When omitted, returns rows for all meters the checker reports.
+      Meter keys are provider-specific; discover them from the `meters[].key`
+      field of a snapshot.
 
     - **since** — Start of the time range. Supports two formats:
       - **Absolute**: ISO 8601 timestamp, e.g. `2026-01-01T00:00:00Z`
@@ -27,9 +29,9 @@ get:
     ## Response structure
 
     - `checkerId` — The checker this history is for
-    - `windowType` — The window type filter used (null if no filter)
-    - `since` — The timestamp of the earliest sample
-    - `history` — Array of `QuotaSample` objects sorted by `checkedAt` ascending
+    - `meterKey` — The meter filter used (null if no filter)
+    - `since` — The timestamp of the earliest sample (null if no `since` filter)
+    - `history` — Array of `QuotaSample` snapshot rows
 
     ## Retention
 
@@ -42,19 +44,12 @@ get:
     - AdminKey: []
   parameters:
     - in: query
-      name: windowType
+      name: meterKey
       schema:
         type: string
-        enum:
-          - subscription
-          - hourly
-          - five_hour
-          - daily
-          - weekly
-          - monthly
-          - custom
       description: >
-        Filter by time window type. Returns all window types when omitted.
+        Filter to a single meter (e.g. `balance`, `five_hour`, `daily`).
+        Returns rows for all meters when omitted.
     - in: query
       name: since
       schema:
@@ -72,7 +67,7 @@ get:
             properties:
               checkerId:
                 type: string
-              windowType:
+              meterKey:
                 type:
                   - string
                   - 'null'

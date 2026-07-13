@@ -1,0 +1,41 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+    description: Registered MCP server name.
+get:
+  tags:
+    - Management — Config
+  summary: Get local MCP process runtime status (admin only)
+  description: |
+    Returns the runtime status of a local (`local_http`) MCP server process
+    managed by Plexus. This reflects the child process lifecycle, not the
+    MCP server's configuration.
+
+    The `status` field is one of `stopped`, `starting`, `running`, or
+    `failed`. When the process is running, `pid` and `url` are populated.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Process runtime status.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LocalMcpRuntimeStatus.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+    '404':
+      description: MCP server not found.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+  operationId: getV0ManagementMcpServersByServerNameStatus

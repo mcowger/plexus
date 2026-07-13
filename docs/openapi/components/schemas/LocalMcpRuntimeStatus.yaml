@@ -1,0 +1,42 @@
+type: object
+required:
+  - serverName
+  - status
+  - pid
+  - url
+  - lastError
+  - startedAt
+  - exitedAt
+properties:
+  serverName:
+    type: string
+  status:
+    type: string
+    enum:
+      - stopped
+      - starting
+      - running
+      - failed
+  pid:
+    type:
+      - integer
+      - 'null'
+  url:
+    type:
+      - string
+      - 'null'
+    format: uri
+  lastError:
+    type:
+      - string
+      - 'null'
+  startedAt:
+    type:
+      - string
+      - 'null'
+    format: date-time
+  exitedAt:
+    type:
+      - string
+      - 'null'
+    format: date-time

@@ -1,0 +1,83 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get trusted proxy rules (admin only)
+  description: |
+    Returns the IP addresses, CIDR ranges, and address ranges whose forwarding
+    headers are trusted when determining the original client address.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Trusted proxy rules.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - trustedProxies
+            properties:
+              trustedProxies:
+                type: array
+                items:
+                  type: string
+                description: IPv4/IPv6 addresses, CIDR ranges, or address ranges.
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Internal server error.
+  operationId: getV0ManagementConfigTrustedProxies
+patch:
+  tags:
+    - Management — Config
+  summary: Replace trusted proxy rules (admin only)
+  description: |
+    Replaces the trusted proxy allowlist. Entries may be IPv4/IPv6 addresses,
+    CIDR ranges, or supported address ranges. Empty strings are discarded.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - trustedProxies
+          properties:
+            trustedProxies:
+              type: array
+              items:
+                type: string
+              description: IPv4/IPv6 addresses, CIDR ranges, or address ranges.
+        examples:
+          local_networks:
+            value:
+              trustedProxies:
+                - 127.0.0.1
+                - 10.0.0.0/8
+  responses:
+    '200':
+      description: Updated trusted proxy rules.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - trustedProxies
+            properties:
+              trustedProxies:
+                type: array
+                items:
+                  type: string
+    '400':
+      description: Invalid body or IP rule.
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Internal server error.
+  operationId: patchV0ManagementConfigTrustedProxies

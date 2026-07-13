@@ -65,7 +65,7 @@ get:
                     meters:
                       type: array
                       items:
-                        type: object
+                        $ref: ../components/schemas/Meter.yaml
                     success:
                       type: boolean
                     error:

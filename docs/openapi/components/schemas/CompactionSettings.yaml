@@ -1,0 +1,52 @@
+type: object
+description: Context compaction settings. All fields are optional overrides.
+properties:
+  enabled:
+    type: boolean
+  strategy:
+    type: string
+    enum:
+      - native
+      - headroom
+  triggerRatio:
+    type: number
+    minimum: 0
+    maximum: 1
+  absoluteTriggerTokens:
+    type:
+      - integer
+      - 'null'
+    minimum: 1
+  minTokens:
+    type: integer
+    minimum: 0
+  protectRecent:
+    type: integer
+    minimum: 0
+  native:
+    type: object
+    properties:
+      maxArrayItems:
+        type: integer
+        minimum: 1
+      maxStringChars:
+        type: integer
+        minimum: 1
+  headroom:
+    type: object
+    properties:
+      baseUrl:
+        type: string
+        format: uri
+      apiKey:
+        type: string
+      targetRatio:
+        type:
+          - number
+          - 'null'
+        minimum: 0
+        maximum: 1
+      timeoutMs:
+        type: integer
+        minimum: 100
+        maximum: 60000

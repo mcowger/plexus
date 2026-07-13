@@ -1,0 +1,129 @@
+type: object
+description: >
+  A single quota meter reading for one provider checker, as returned in the
+  `meters` array of a quota snapshot. Mirrors the `Meter` type in
+  `packages/backend/src/types/meter.ts`.
+
+
+  A checker reports one meter per quota dimension it tracks (e.g. a balance
+  meter and/or one or more time-windowed allowance meters). Meters are
+  identified by `key`, not by a fixed window-type enum.
+required:
+  - key
+  - label
+  - kind
+  - unit
+  - utilizationPercent
+  - status
+properties:
+  key:
+    type: string
+    description: >
+      Stable identifier for this meter within the checker. Examples:
+      `balance`, `five_hour`, `daily`. Provider-specific; there is no fixed
+      global enum. Used as the `meterKey` filter on the history endpoint.
+  label:
+    type: string
+    description: Human-readable label for the meter (e.g. `Five-hour window`).
+  group:
+    type: string
+    description: Optional grouping label for multi-tenant or sub-account setups.
+  scope:
+    type: string
+    description: Optional scope qualifier for the meter.
+  kind:
+    type: string
+    enum:
+      - balance
+      - allowance
+    description: >
+      What the meter tracks.
+
+      - **balance** — A prepaid account balance (unit typically `usd`).
+        Renders as a wallet in the UI.
+      - **allowance** — A time-windowed rate limit (unit `requests`, `tokens`,
+        or `percentage`). Renders as a progress bar in the UI.
+  unit:
+    type: string
+    description: >
+      Unit of measurement. Common values: `usd`, `requests`, `tokens`,
+      `percentage`; providers may define additional units.
+  limit:
+    type:
+      - number
+      - 'null'
+    description: Maximum allowed value for this meter. Null when unbounded/unknown.
+  used:
+    type:
+      - number
+      - 'null'
+    description: Amount consumed so far. Null when unbounded/unknown.
+  remaining:
+    type:
+      - number
+      - 'null'
+    description: Calculated as `limit - used`. May be negative. Null when unbounded/unknown.
+  utilizationPercent:
+    oneOf:
+      - type: number
+      - type: string
+        enum:
+          - unknown
+          - not_applicable
+    description: >
+      Utilisation of the meter. Either a numeric percentage, or a sentinel:
+
+      - **unknown** — The provider did not report enough information to compute utilisation.
+      - **not_applicable** — Utilisation is not meaningful for this meter (e.g. a balance with no limit).
+  status:
+    $ref: ./MeterStatus.yaml
+  periodValue:
+    type:
+      - integer
+      - 'null'
+    description: >
+      Length of the allowance window (only for `kind: allowance`). e.g. `1`
+      for a 1-hour window. Null for `kind: balance`.
+  periodUnit:
+    type:
+      - string
+      - 'null'
+    enum:
+      - minute
+      - hour
+      - day
+      - week
+      - month
+      - null
+    description: >
+      Unit for `periodValue` (only for `kind: allowance`). Null for
+      `kind: balance`.
+  periodCycle:
+    type:
+      - string
+      - 'null'
+    enum:
+      - fixed
+      - rolling
+      - null
+    description: >
+      How the allowance window resets (only for `kind: allowance`).
+
+      - **fixed** — Resets at a calendar boundary (e.g. midnight).
+      - **rolling** — Sliding window from first use.
+      Null for `kind: balance`.
+  resetsAt:
+    type:
+      - string
+      - 'null'
+    format: date-time
+    description: >
+      ISO-8601 timestamp when the meter window resets. Null for rolling windows
+      or balances without a defined reset time.
+  exhaustionThreshold:
+    type:
+      - number
+      - 'null'
+    description: >
+      Optional utilisation percentage at which the checker gates the provider
+      onto cooldown.

@@ -1,0 +1,13 @@
+type: string
+enum:
+  - ok
+  - warning
+  - critical
+  - exhausted
+description: >
+  Utilisation severity level for a quota meter.
+
+  - **ok** — 0–75% utilisation. Healthy, plenty of quota remaining.
+  - **warning** — 75–90% utilisation. Approaching exhaustion.
+  - **critical** — 90–100% utilisation. Near exhaustion, take action soon.
+  - **exhausted** — 100% utilisation. Quota fully consumed, requests will fail.

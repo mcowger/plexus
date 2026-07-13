@@ -256,19 +256,11 @@ tags:
       Upstream provider quota checkers (`checkerId`-based).
 
       Each checker periodically polls an upstream provider for its current
-      quota utilisation and stores a `QuotaSample` snapshot.
-
-      ### Window types
-
-      | Window Type | Description |
-      |---|---|
-      | `subscription` | Monthly/billing-cycle quota or prepaid balance. |
-      | `hourly` | Hourly rolling window. |
-      | `five_hour` | 5-hour rolling window (common across multiple providers). |
-      | `daily` | Daily reset quota. |
-      | `weekly` | 7-day rolling window (common across multiple providers). |
-      | `monthly` | Calendar month quota. |
-      | `custom` | Provider-specific window. |
+      quota utilisation and persists a `Meter` snapshot (one row per meter).
+      Each meter is identified by a provider-specific `meterKey` (e.g.
+      `balance`, `five_hour`, `daily`) rather than a fixed window-type enum.
+      Use `GET /quotas/{checkerId}/history?meterKey=...` for historical rows,
+      and `GET /quotas/{checkerId}` for the latest meter readings.
 
       ### Status thresholds
 
@@ -425,6 +417,14 @@ paths:
     $ref: paths/v0_management_config_exploration-rate.yaml
   /v0/management/config/failover:
     $ref: paths/v0_management_config_failover.yaml
+  /v0/management/config/capture-trace-on-error:
+    $ref: paths/v0_management_config_capture-trace-on-error.yaml
+  /v0/management/config/trusted-proxies:
+    $ref: paths/v0_management_config_trusted-proxies.yaml
+  /v0/management/config/compaction:
+    $ref: paths/v0_management_config_compaction.yaml
+  /v0/management/config/mcp-enabled:
+    $ref: paths/v0_management_config_mcp-enabled.yaml
   /v0/management/system-settings:
     $ref: paths/v0_management_system-settings.yaml
   /v0/management/providers:
@@ -461,6 +461,16 @@ paths:
     $ref: paths/v0_management_mcp-servers.yaml
   /v0/management/mcp-servers/{serverName}:
     $ref: paths/v0_management_mcp-servers_{serverName}.yaml
+  /v0/management/mcp-servers/{serverName}/status:
+    $ref: paths/v0_management_mcp-servers_{serverName}_status.yaml
+  /v0/management/mcp-servers/{serverName}/start:
+    $ref: paths/v0_management_mcp-servers_{serverName}_start.yaml
+  /v0/management/mcp-servers/{serverName}/stop:
+    $ref: paths/v0_management_mcp-servers_{serverName}_stop.yaml
+  /v0/management/mcp-servers/{serverName}/restart:
+    $ref: paths/v0_management_mcp-servers_{serverName}_restart.yaml
+  /v0/management/mcp-servers/{serverName}/process-logs:
+    $ref: paths/v0_management_mcp-servers_{serverName}_process-logs.yaml
   /v0/management/quota-checker-types:
     $ref: paths/v0_management_quota-checker-types.yaml
   /v0/management/quota-checkers:
@@ -531,6 +541,8 @@ paths:
     $ref: paths/v0_management_user-quotas_{name}.yaml
   /v0/management/quota/clear:
     $ref: paths/v0_management_quota_clear.yaml
+  /v0/management/quota/recompute:
+    $ref: paths/v0_management_quota_recompute.yaml
   /v0/management/quota/status/{key}:
     $ref: paths/v0_management_quota_status_{key}.yaml
   /v0/management/test:
@@ -551,6 +563,8 @@ paths:
     $ref: paths/v0_system_logs_recent.yaml
   /mcp/{name}:
     $ref: paths/mcp_{name}.yaml
+  /mcp/plexus:
+    $ref: paths/mcp_plexus.yaml
   /.well-known/oauth-authorization-server:
     $ref: paths/.well-known_oauth-authorization-server.yaml
   /.well-known/oauth-protected-resource:

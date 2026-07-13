@@ -1,0 +1,53 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+    description: Registered MCP server name.
+post:
+  tags:
+    - Management — Config
+  summary: Start a local MCP server process (admin only)
+  description: |
+    Spawns (or reuses) the child process for a local (`local_http`) MCP
+    server. Plexus waits for the process to become ready before returning.
+
+    If the server configuration fingerprint has changed since the last start,
+    the existing process is restarted with the new configuration.
+
+    Returns the updated runtime status.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Process started (or already running).
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/LocalMcpRuntimeStatus.yaml
+    '400':
+      description: Server is not `local_http` mode.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    '401':
+      description: Authentication required or invalid credentials.
+    '404':
+      description: MCP server not found.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    '500':
+      description: Process failed to start or become ready.
+  operationId: postV0ManagementMcpServersByServerNameStart

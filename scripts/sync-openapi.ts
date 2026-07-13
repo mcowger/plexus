@@ -76,6 +76,23 @@ interface SyncReport {
 
 // ─── Route Parser ────────────────────────────────────────────────────
 
+function extractRouteMethods(expression: string, content: string): HttpMethod[] {
+  const directMethods = [
+    ...expression.matchAll(/['"\x60](get|post|put|patch|delete|options|head)['"\x60]/gi),
+  ].map((match) => match[1].toLowerCase() as HttpMethod);
+  if (directMethods.length > 0) return [...new Set(directMethods)];
+
+  const spread = expression.match(/\.\.\.([a-zA-Z_][a-zA-Z0-9_]*)/);
+  if (!spread) return [];
+  const definition = content.match(
+    new RegExp('(?:const|let)\\s+' + spread[1] + '\\s*=\\s*\\[([^\\]]*)\\]', 's')
+  );
+  if (!definition) return [];
+  return [
+    ...definition[1].matchAll(/['"\x60](get|post|put|patch|delete|options|head)['"\x60]/gi),
+  ].map((match) => match[1].toLowerCase() as HttpMethod);
+}
+
 /**
  * Parse a TypeScript file to extract Fastify route registrations.
  * Uses regex-based parsing (simpler than AST for this use case).
@@ -115,6 +132,27 @@ async function parseRoutesFromFile(filePath: string): Promise<RouteInfo[]> {
           file: filePath,
           line: i + 1,
           handler: line.trim().substring(0, 100),
+        });
+      }
+    }
+
+    // Handle object-style registrations such as:
+    // rawRoutes.route({ method: [...RAW_METHODS], url: '/raw/:provider/*', ... })
+    const routeObjectRegex =
+      /[a-zA-Z_][a-zA-Z0-9_]*\.route\s*\(\s*\{[\s\S]*?method:\s*(\[[\s\S]*?\])[\s\S]*?url:\s*['\x60]([^'\x60]+)['\x60]/g;
+    let routeObjectMatch;
+    while ((routeObjectMatch = routeObjectRegex.exec(content)) !== null) {
+      const methods = extractRouteMethods(routeObjectMatch[1], content);
+      const path = routeObjectMatch[2];
+      if (methods.length === 0 || path.startsWith('/__') || path.includes('__')) continue;
+      const lineNumber = content.substring(0, routeObjectMatch.index).split('\n').length;
+      for (const method of methods) {
+        routes.push({
+          path,
+          method,
+          file: filePath,
+          line: lineNumber,
+          handler: 'Route object ' + method.toUpperCase() + ' ' + path,
         });
       }
     }
@@ -362,10 +400,10 @@ async function generateSyncReport(): Promise<SyncReport> {
       // Check if this is a wildcard route that exists in OpenAPI with named parameters
       // e.g., code has /providers/{wildcard} but OpenAPI has /providers/{slug}
       if (normalizedPath.includes('{wildcard}')) {
-        // Look for similar paths in OpenAPI
-        const basePattern = normalizedPath.replace(/{wildcard}/g, '');
+        // Compare full templates so a nested path cannot hide a different route.
+        const wildcardTemplate = normalizedPath.replace(/\{[^}]+\}/g, '{}');
         const hasSimilarPath = Array.from(openApiByPath.keys()).some(
-          (key) => key.includes(basePattern) && key.match(/{[a-zA-Z_][a-zA-Z0-9_]*}/)
+          (key) => key.replace(/\{[^}]+\}/g, '{}') === wildcardTemplate
         );
         if (hasSimilarPath) {
           // Skip - this wildcard route is documented with named parameters
@@ -392,10 +430,11 @@ async function generateSyncReport(): Promise<SyncReport> {
   const missingFromRoutes: OpenApiPathInfo[] = [];
   for (const [path, openApiInfo] of openApiByPath) {
     if (!routesByPath.has(path)) {
-      // Skip if this is a wildcard route that exists with different param naming
-      // e.g., OpenAPI has {slug} but code uses * (wildcard)
-      const hasWildcardVersion = routesByPath.has(
-        path.replace(/{[a-zA-Z_][a-zA-Z0-9_]*}/g, '{wildcard}')
+      // Match OpenAPI named parameters against code wildcards using the same
+      // full-template comparison as the forward reconciliation above.
+      const wildcardTemplate = path.replace(/\{[^}]+\}/g, '{}');
+      const hasWildcardVersion = Array.from(routesByPath.keys()).some(
+        (key) => key.replace(/\{[^}]+\}/g, '{}') === wildcardTemplate
       );
       if (hasWildcardVersion) {
         continue;

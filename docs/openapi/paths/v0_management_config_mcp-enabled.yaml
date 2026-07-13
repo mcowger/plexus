@@ -1,0 +1,71 @@
+get:
+  tags:
+    - Management — Config
+  summary: Get MCP enabled state (admin only)
+  description: |
+    Returns whether the MCP gateway is enabled.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Current MCP enabled state.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - enabled
+            properties:
+              enabled:
+                type: boolean
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Internal server error.
+  operationId: getV0ManagementConfigMcpEnabled
+patch:
+  tags:
+    - Management — Config
+  summary: Update MCP enabled state (admin only)
+  description: |
+    Enables or disables the MCP gateway.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - enabled
+          properties:
+            enabled:
+              type: boolean
+        examples:
+          enabled:
+            value:
+              enabled: true
+  responses:
+    '200':
+      description: Updated MCP enabled state.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - enabled
+            properties:
+              enabled:
+                type: boolean
+    '400':
+      description: Object body is required and `enabled` must be a boolean.
+    '401':
+      description: Authentication required or invalid credentials.
+    '500':
+      description: Internal server error.
+  operationId: patchV0ManagementConfigMcpEnabled

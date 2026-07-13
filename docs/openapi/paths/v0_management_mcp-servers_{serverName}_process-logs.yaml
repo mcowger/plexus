@@ -1,0 +1,37 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+    description: Registered MCP server name.
+get:
+  tags:
+    - Management — Config
+  summary: Get local MCP process logs (admin only)
+  description: |
+    Returns the captured stdout/stderr log lines for a local MCP server
+    process. Logs are accumulated from process spawn through exit and are
+    capped at a maximum number of lines, with the oldest lines trimmed.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Captured process log lines.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+            properties:
+              data:
+                type: array
+                items:
+                  type: string
+                description: Timestamped log lines, oldest first.
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementMcpServersByServerNameProcessLogs
