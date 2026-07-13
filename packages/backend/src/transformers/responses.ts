@@ -97,6 +97,14 @@ export class ResponsesTransformer implements Transformer {
   name = 'responses';
   defaultEndpoint = '/responses';
 
+  // Codex CLI extensions (namespace tools, custom/freeform tools) are
+  // per-request state: providers only understand flat function tools, so we
+  // flatten on the way in and split/re-wrap on the way out. Populated during
+  // parseRequest/convertToolsForUnified and consulted by
+  // convertChatResponseToOutputItems/formatStream on the same instance.
+  private namespaceMap = new Map<string, { namespace: string; name: string }>();
+  private customToolNames = new Set<string>();
+
   /**
    * Parses incoming Responses API request into unified format
    */
@@ -109,8 +117,28 @@ export class ResponsesTransformer implements Transformer {
       throw new Error('Missing required field: input');
     }
 
+    this.namespaceMap.clear();
+    this.customToolNames.clear();
+
     // Normalize input to array format
     const normalizedInput = this.normalizeInput(input.input);
+
+    // Codex CLI "lite" mode sends turn-local tool definitions as an
+    // `additional_tools` input item instead of the top-level `tools` array.
+    // Lift those into the tool list before flattening so the model actually
+    // sees them — otherwise the request goes upstream with no tools and the
+    // model hallucinates tool calls as plain text.
+    const liftedTools = normalizedInput
+      .filter((item) => item?.type === 'additional_tools' && Array.isArray(item.tools))
+      .flatMap((item) => item.tools);
+
+    // Convert tools first — built-in server-side tools (web search etc.) are
+    // passed through so provider adapters can coerce them; function tools are
+    // reformatted; Codex CLI namespace/custom tools are flattened/registered.
+    // This must run before converting input items, since namespace-qualified
+    // function_call items and custom_tool_call items are resolved against the
+    // namespaceMap/customToolNames populated here.
+    const tools = this.convertToolsForUnified([...(input.tools || []), ...liftedTools]);
 
     // Convert input items to Chat Completions messages
     const messages = this.convertInputItemsToMessages(normalizedInput);
@@ -122,10 +150,6 @@ export class ResponsesTransformer implements Transformer {
         content: input.instructions,
       });
     }
-
-    // Convert tools — built-in server-side tools (web search etc.) are passed through
-    // so provider adapters can coerce them; only function tools are reformatted.
-    const tools = this.convertToolsForUnified(input.tools || []);
 
     return {
       requestId: input.requestId,
@@ -369,6 +393,34 @@ export class ResponsesTransformer implements Transformer {
         : reasoningItem?.summary;
       const reasoning_content = reasoningParts?.map((part: any) => part.text).join('\n') || null;
 
+      // Extract tool calls from function_call/custom_tool_call output items.
+      // This transformer instance is the PROVIDER-side transformer (a
+      // different instance than the client-side one that ran parseRequest),
+      // so it has no namespaceMap/customToolNames of its own — it just flattens
+      // to the same flat name convention used when sending tools out
+      // (${namespace}__${name}) so the client-side transformer's
+      // namespaceMap/customToolNames (built from the original request) can
+      // split/unwrap them again in formatResponse/formatStream.
+      // custom_tool_call's raw string `input` is re-wrapped as JSON
+      // `{input}` function-call arguments so it round-trips through the
+      // unified layer identically to a normal function call.
+      const toolCalls = response.output
+        ?.filter((item: any) => item.type === 'function_call' || item.type === 'custom_tool_call')
+        .map((item: any) => {
+          const flatName = item.namespace ? `${item.namespace}__${item.name}` : item.name;
+          return {
+            id: item.call_id,
+            type: 'function' as const,
+            function: {
+              name: flatName,
+              arguments:
+                item.type === 'custom_tool_call'
+                  ? this.customToolArgumentsForModel(item.input)
+                  : item.arguments,
+            },
+          };
+        });
+
       return {
         id: response.id,
         model: response.model,
@@ -376,7 +428,7 @@ export class ResponsesTransformer implements Transformer {
         content,
         reasoning_content,
         annotations: annotations.length > 0 ? annotations : undefined,
-        tool_calls: undefined, // TODO: Extract from function_call output items if needed
+        tool_calls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
         usage,
       };
     } else {
@@ -471,8 +523,32 @@ export class ResponsesTransformer implements Transformer {
           });
           break;
 
-        case 'function_call':
-          // Add assistant message with tool call
+        case 'function_call': {
+          // Codex CLI namespace extension: join namespace-qualified calls
+          // back to the flat name providers were given in convertToolsForUnified.
+          const flatName = item.namespace ? `${item.namespace}__${item.name}` : item.name;
+          messages.push({
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: item.call_id,
+                type: 'function',
+                function: {
+                  name: flatName,
+                  arguments: item.arguments,
+                },
+              },
+            ],
+          });
+          break;
+        }
+
+        case 'custom_tool_call': {
+          // Codex CLI custom (freeform) tool, e.g. apply_patch. Wrap the raw
+          // string input as JSON function-call arguments so the model sees a
+          // normal function tool, matching customToolArgumentsForModel.
+          this.customToolNames.add(item.name);
           messages.push({
             role: 'assistant',
             content: null,
@@ -482,14 +558,16 @@ export class ResponsesTransformer implements Transformer {
                 type: 'function',
                 function: {
                   name: item.name,
-                  arguments: item.arguments,
+                  arguments: this.customToolArgumentsForModel(item.input),
                 },
               },
             ],
           });
           break;
+        }
 
         case 'function_call_output':
+        case 'custom_tool_call_output': {
           // Add tool message with result
           const outputContent =
             typeof item.output === 'string'
@@ -502,6 +580,7 @@ export class ResponsesTransformer implements Transformer {
             content: outputContent,
           });
           break;
+        }
 
         case 'reasoning':
           // Convert reasoning to assistant message (limited support)
@@ -513,6 +592,11 @@ export class ResponsesTransformer implements Transformer {
             });
           }
           break;
+
+        case 'additional_tools':
+          // Already lifted into the tool list in parseRequest; not a message.
+          break;
+
         default:
           if (item.role) {
             messages.push({
@@ -607,11 +691,67 @@ export class ResponsesTransformer implements Transformer {
    * Function tools are reformatted; non-function tools (built-in server-side
    * tools like web_search, web_search_20250305, openrouter:web_search) are
    * passed through as-is so provider adapters can coerce them.
+   *
+   * Codex CLI extensions:
+   * - `type: "namespace"` tools group sub-tools; most providers only
+   *   understand flat function tools, so each sub-tool is flattened to
+   *   `${namespace}__${name}` and recorded in namespaceMap for split-back
+   *   in convertChatResponseToOutputItems/formatStream.
+   * - `type: "custom"` tools (e.g. apply_patch) take raw string input rather
+   *   than JSON-schema arguments; they're exposed to the model as a function
+   *   tool with a single `input: string` argument, matching the wire shape
+   *   codex-ollama-proxy's `customToolArgumentsForModel` sends
+   *   (`JSON.stringify({ input })`). The name is recorded in
+   *   customToolNames so the response side can convert back to
+   *   custom_tool_call and unwrap the argument via customToolInput().
    */
   private convertToolsForUnified(tools: any[]): any[] {
-    return tools.map((tool) => {
-      if (tool.type !== 'function') return tool;
-      return {
+    const result: any[] = [];
+    for (const tool of tools) {
+      if (tool.type === 'namespace') {
+        for (const subTool of tool.tools || []) {
+          const flatName = `${tool.name}__${subTool.name}`;
+          this.namespaceMap.set(flatName, { namespace: tool.name, name: subTool.name });
+          result.push({
+            type: 'function',
+            function: {
+              name: flatName,
+              description: subTool.description || '',
+              parameters: subTool.parameters || {
+                type: 'object',
+                properties: {},
+                additionalProperties: false,
+              },
+              strict: subTool.strict,
+            },
+          });
+        }
+        continue;
+      }
+
+      if (tool.type === 'custom') {
+        this.customToolNames.add(tool.name);
+        result.push({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description || '',
+            parameters: {
+              type: 'object',
+              properties: { input: { type: 'string' } },
+              required: ['input'],
+            },
+          },
+        });
+        continue;
+      }
+
+      if (tool.type !== 'function') {
+        result.push(tool);
+        continue;
+      }
+
+      result.push({
         type: 'function',
         function: {
           name: tool.name,
@@ -619,8 +759,68 @@ export class ResponsesTransformer implements Transformer {
           parameters: tool.parameters,
           strict: tool.strict,
         },
-      };
-    });
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Wraps a custom tool's raw string input into the JSON arguments shape a
+   * function-calling model expects, matching codex-ollama-proxy's
+   * `customToolArgumentsForModel`.
+   */
+  private customToolArgumentsForModel(input: any): string {
+    return JSON.stringify({ input: typeof input === 'string' ? input : JSON.stringify(input) });
+  }
+
+  /**
+   * Unwraps a model-generated function_call's JSON arguments back into the
+   * raw string input a custom_tool_call expects, matching
+   * codex-ollama-proxy's `customToolInput`. Handles:
+   * - a plain string that already looks like a patch/raw input
+   * - `{ input: string }` (the shape we ask the model to produce)
+   * - `{ command: [..., patchBody] }` tuple form some models emit
+   * - any other object: falls back to the first string-valued property
+   */
+  private customToolInput(rawArguments: string): string {
+    if (typeof rawArguments !== 'string') {
+      return rawArguments == null ? '' : String(rawArguments);
+    }
+
+    const trimmed = rawArguments.trim();
+    if (trimmed.startsWith('*** Begin Patch')) {
+      return rawArguments;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawArguments);
+    } catch {
+      return rawArguments;
+    }
+
+    if (typeof parsed === 'string') {
+      return parsed;
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.input === 'string') {
+        return parsed.input;
+      }
+      if (Array.isArray(parsed.command)) {
+        const last = parsed.command[parsed.command.length - 1];
+        if (typeof last === 'string') {
+          return last;
+        }
+      }
+      for (const value of Object.values(parsed)) {
+        if (typeof value === 'string') {
+          return value;
+        }
+      }
+    }
+
+    return rawArguments;
   }
 
   /**
@@ -667,14 +867,7 @@ export class ResponsesTransformer implements Transformer {
     // Add tool calls if present
     if (response.tool_calls && response.tool_calls.length > 0) {
       for (const toolCall of response.tool_calls) {
-        items.push({
-          type: 'function_call',
-          id: this.generateItemId('fc'),
-          status: 'completed',
-          call_id: toolCall.id,
-          name: toolCall.function.name,
-          arguments: toolCall.function.arguments,
-        });
+        items.push(this.buildToolOutputItem(toolCall));
       }
     }
 
@@ -694,6 +887,52 @@ export class ResponsesTransformer implements Transformer {
     });
 
     return items;
+  }
+
+  /**
+   * Converts a single Chat-Completions-style tool call back into a Responses
+   * API output item, splitting namespace-flattened names back to
+   * `{namespace, name}` and converting custom tool calls back to
+   * custom_tool_call with unwrapped string input (customToolInput).
+   */
+  private buildToolOutputItem(toolCall: {
+    id: string;
+    function: { name: string; arguments: string };
+  }): ResponsesOutputItem {
+    const flatName = toolCall.function.name;
+
+    if (this.customToolNames.has(flatName)) {
+      return {
+        type: 'custom_tool_call',
+        id: this.generateItemId('fc'),
+        status: 'completed',
+        call_id: toolCall.id,
+        name: flatName,
+        input: this.customToolInput(toolCall.function.arguments),
+      };
+    }
+
+    const namespaced = this.namespaceMap.get(flatName);
+    if (namespaced) {
+      return {
+        type: 'function_call',
+        id: this.generateItemId('fc'),
+        status: 'completed',
+        call_id: toolCall.id,
+        name: namespaced.name,
+        namespace: namespaced.namespace,
+        arguments: toolCall.function.arguments,
+      };
+    }
+
+    return {
+      type: 'function_call',
+      id: this.generateItemId('fc'),
+      status: 'completed',
+      call_id: toolCall.id,
+      name: flatName,
+      arguments: toolCall.function.arguments,
+    };
   }
 
   transformStream(stream: ReadableStream): ReadableStream {
@@ -860,6 +1099,11 @@ export class ResponsesTransformer implements Transformer {
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     const reader = stream.getReader();
+    // `start(controller) {}` below uses method shorthand, so `this` inside it
+    // is the stream's underlying source, not this transformer instance.
+    // Capture the Codex CLI namespace/custom-tool state as locals for use
+    // inside that scope.
+    const customToolNames = this.customToolNames;
 
     let hasSentCreated = false;
     let hasSentInProgress = false;
@@ -1026,11 +1270,33 @@ export class ResponsesTransformer implements Transformer {
       const outputIndex = reserveOutputIndex();
       const callId = toolCall?.id || this.generateItemId('call');
       const itemId = this.generateItemId('fc');
+      const flatName = toolCall?.function?.name || toolCall?.name || '';
       toolOutputIndexMap.set(toolIndex, outputIndex);
       toolCallIdMap.set(toolIndex, callId);
       toolItemIdMap.set(toolIndex, itemId);
       toolArgsMap.set(toolIndex, '');
-      toolNameMap.set(toolIndex, toolCall?.function?.name || toolCall?.name || '');
+      toolNameMap.set(toolIndex, flatName);
+
+      // Codex CLI namespace/custom tool split-back for the streamed "added"
+      // event; the resolved shape is recomputed at finalization once full
+      // arguments are known.
+      if (this.customToolNames.has(flatName)) {
+        sendEvent(controller, {
+          type: 'response.output_item.added',
+          output_index: outputIndex,
+          item: {
+            id: itemId,
+            type: 'custom_tool_call',
+            status: 'in_progress',
+            call_id: callId,
+            name: flatName,
+            input: '',
+          },
+        });
+        return;
+      }
+
+      const namespaced = this.namespaceMap.get(flatName);
       sendEvent(controller, {
         type: 'response.output_item.added',
         output_index: outputIndex,
@@ -1039,7 +1305,8 @@ export class ResponsesTransformer implements Transformer {
           type: 'function_call',
           status: 'in_progress',
           call_id: callId,
-          name: toolCall?.function?.name || toolCall?.name || '',
+          name: namespaced ? namespaced.name : flatName,
+          ...(namespaced ? { namespace: namespaced.namespace } : {}),
           arguments: '',
         },
       });
@@ -1153,15 +1420,30 @@ export class ResponsesTransformer implements Transformer {
         const itemId = toolItemIdMap.get(toolIndex);
         const callId = toolCallIdMap.get(toolIndex);
         const args = toolArgsMap.get(toolIndex) || '';
-        const name = toolNameMap.get(toolIndex) || '';
-        const toolItem = {
-          id: itemId,
-          type: 'function_call',
-          status: 'completed',
-          call_id: callId,
-          name,
-          arguments: args,
-        };
+        const flatName = toolNameMap.get(toolIndex) || '';
+
+        let toolItem: any;
+        if (this.customToolNames.has(flatName)) {
+          toolItem = {
+            id: itemId,
+            type: 'custom_tool_call',
+            status: 'completed',
+            call_id: callId,
+            name: flatName,
+            input: this.customToolInput(args),
+          };
+        } else {
+          const namespaced = this.namespaceMap.get(flatName);
+          toolItem = {
+            id: itemId,
+            type: 'function_call',
+            status: 'completed',
+            call_id: callId,
+            name: namespaced ? namespaced.name : flatName,
+            ...(namespaced ? { namespace: namespaced.namespace } : {}),
+            arguments: args,
+          };
+        }
         sendEvent(controller, {
           type: 'response.output_item.done',
           output_index: outputIndex,
@@ -1293,12 +1575,20 @@ export class ResponsesTransformer implements Transformer {
                     toolIndex,
                     normalizeToolArgs(prevArgs, toolCall.function.arguments)
                   );
-                  sendEvent(controller, {
-                    type: 'response.function_call_arguments.delta',
-                    output_index: outputIndex,
-                    item_id: itemId,
-                    delta: toolCall.function.arguments,
-                  });
+                  // Custom tool call input can't be correctly unwrapped from
+                  // partial JSON (customToolInput needs the full buffered
+                  // arguments), so only stream deltas for ordinary function
+                  // calls; custom tool input is emitted once, complete, in
+                  // finalizeOutputItems's output_item.done.
+                  const flatName = toolNameMap.get(toolIndex) || '';
+                  if (!customToolNames.has(flatName)) {
+                    sendEvent(controller, {
+                      type: 'response.function_call_arguments.delta',
+                      output_index: outputIndex,
+                      item_id: itemId,
+                      delta: toolCall.function.arguments,
+                    });
+                  }
                 }
               }
             }

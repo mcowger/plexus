@@ -8,7 +8,13 @@
 // ============================================================================
 
 export interface ResponsesInputItem {
-  type: 'message' | 'function_call' | 'function_call_output' | 'reasoning';
+  type:
+    | 'message'
+    | 'function_call'
+    | 'function_call_output'
+    | 'reasoning'
+    | 'custom_tool_call'
+    | 'custom_tool_call_output';
   id?: string;
 }
 
@@ -67,10 +73,32 @@ export interface ResponsesFunctionCallItem extends ResponsesInputItem {
   name: string;
   arguments: string;
   status?: 'in_progress' | 'completed' | 'failed';
+  // Codex CLI namespaced-tool extension: present when the tool was declared
+  // under a `type: "namespace"` tool grouping and must be flattened/split
+  // back to `${namespace}__${name}` for providers that only understand flat
+  // function tools.
+  namespace?: string;
 }
 
 export interface ResponsesFunctionCallOutputItem extends ResponsesInputItem {
   type: 'function_call_output';
+  call_id: string;
+  output: any;
+  status?: 'completed' | 'failed';
+}
+
+// Codex CLI extension: a freeform ("custom") tool call, e.g. apply_patch.
+// Unlike function_call, `input` is a raw string rather than JSON arguments.
+export interface ResponsesCustomToolCallItem extends ResponsesInputItem {
+  type: 'custom_tool_call';
+  call_id: string;
+  name: string;
+  input: string;
+  status?: 'in_progress' | 'completed' | 'failed';
+}
+
+export interface ResponsesCustomToolCallOutputItem extends ResponsesInputItem {
+  type: 'custom_tool_call_output';
   call_id: string;
   output: any;
   status?: 'completed' | 'failed';
@@ -146,6 +174,23 @@ export interface ResponsesMCPTool {
   require_approval?: 'never' | 'always' | 'once';
 }
 
+// Codex CLI extension: groups sub-tools under a namespace. Models that only
+// understand flat function tools need these flattened to `${name}__${sub}`.
+export interface ResponsesNamespaceTool {
+  type: 'namespace';
+  name: string;
+  tools: ResponsesFunctionTool[];
+}
+
+// Codex CLI extension: a freeform tool (e.g. apply_patch) that takes raw
+// string input rather than JSON-schema-validated arguments.
+export interface ResponsesCustomTool {
+  type: 'custom';
+  name: string;
+  description?: string;
+  format?: { type: string; [key: string]: any };
+}
+
 export type ResponsesTool =
   | ResponsesFunctionTool
   | ResponsesWebSearchTool
@@ -153,7 +198,9 @@ export type ResponsesTool =
   | ResponsesCodeInterpreterTool
   | ResponsesComputerUseTool
   | ResponsesImageGenerationTool
-  | ResponsesMCPTool;
+  | ResponsesMCPTool
+  | ResponsesNamespaceTool
+  | ResponsesCustomTool;
 
 // ============================================================================
 // Request Type
@@ -297,7 +344,8 @@ export type ResponsesOutputItem =
   | ResponsesFunctionCallItem
   | ResponsesFunctionCallOutputItem
   | ResponsesReasoningItem
-  | ResponsesBuiltInToolCallItem;
+  | ResponsesBuiltInToolCallItem
+  | ResponsesCustomToolCallItem;
 
 export interface ResponsesBuiltInToolCallItem {
   type:
