@@ -463,6 +463,11 @@ export function piAiEventToChunk(
         },
       };
     case 'toolcall_start': {
+      // Codex Chat streams need the tool identity as a separate delta. Other OAuth
+      // formatters historically consume identity from the argument event, and Gemini
+      // rejects the empty arguments emitted by a start chunk.
+      if (provider !== 'openai-codex') return null;
+
       const toolCall = event.partial?.content?.[event.contentIndex];
       if (!toolCall || toolCall.type !== 'toolCall') return null;
 

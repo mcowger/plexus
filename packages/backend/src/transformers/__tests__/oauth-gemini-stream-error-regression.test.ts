@@ -28,6 +28,29 @@ async function readUtf8(stream: ReadableStream<Uint8Array>): Promise<string> {
 }
 
 describe('OAuth -> Gemini stream error regression', () => {
+  test('piAiEventToChunk ignores tool call starts for non-Codex OAuth providers', () => {
+    const chunk = piAiEventToChunk(
+      {
+        type: 'toolcall_start',
+        contentIndex: 0,
+        partial: {
+          content: [
+            {
+              type: 'toolCall',
+              id: 'call_1',
+              name: 'manage_todo_list',
+              arguments: {},
+            },
+          ],
+        },
+      } as any,
+      'gemini-3-flash-preview',
+      'google-gemini-cli'
+    );
+
+    expect(chunk).toBeNull();
+  });
+
   test('piAiEventToChunk maps oauth error message into chunk content', () => {
     const chunk = piAiEventToChunk(
       {
