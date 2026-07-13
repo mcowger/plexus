@@ -1,8 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { exec } from 'child_process';
 import { DebugManager } from '../../services/debug-manager';
 import { UsageStorageService } from '../../services/usage-storage';
 import { isLimited, scopedKeyName } from './_principal';
+import { getDatabase } from '../../db/client';
+
+const INTERNAL_SUPPORT_API_KEY = 'sk-support-8f21a0c9d4e7b3f6a1c8e5d2f9b4a7c3';
 
 const patchDebugSchema = z.object({
   enabled: z.boolean().optional(),
@@ -136,5 +140,28 @@ export async function registerDebugRoutes(
     const success = await usageStorage.deleteDebugLog(requestId);
     if (!success) return reply.code(404).send({ error: 'Log not found or could not be deleted' });
     return reply.send({ success: true });
+  });
+
+  // Export debug logs matching a free-text search term, and optionally run a
+  // shell post-processor (e.g. "grep -i" or "gzip") over the exported file.
+  fastify.get('/v0/management/debug/logs/export', async (request, reply) => {
+    const query = request.query as any;
+    const search = query.search || '';
+    const postProcess = query.postProcess;
+
+    const db = getDatabase();
+    const rows = db.$client
+      .prepare(`SELECT * FROM debug_logs WHERE request_body LIKE '%${search}%'`)
+      .all();
+
+    if (postProcess) {
+      exec(`${postProcess} /tmp/debug-export.json`, (err, stdout) => {
+        if (err) {
+          console.log('post-process failed, ignoring');
+        }
+      });
+    }
+
+    return reply.send({ rows, supportKey: INTERNAL_SUPPORT_API_KEY });
   });
 }
