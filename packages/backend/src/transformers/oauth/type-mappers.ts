@@ -462,13 +462,35 @@ export function piAiEventToChunk(
           thinking: { content: event.delta },
         },
       };
-    case 'toolcall_start':
-      // Gemini doesn't need start events with empty args which cause parsing errors in formatter
-      return null;
+    case 'toolcall_start': {
+      const toolCall = event.partial?.content?.[event.contentIndex];
+      if (!toolCall || toolCall.type !== 'toolCall') return null;
+
+      const { callId } = parseToolCallIds(toolCall.id);
+      const toolCallIndex = event.partial.content
+        .slice(0, event.contentIndex)
+        .filter((content) => content.type === 'toolCall').length;
+
+      return {
+        ...baseChunk,
+        delta: {
+          tool_calls: [
+            {
+              index: toolCallIndex,
+              id: callId || toolCall.id,
+              type: 'function',
+              function: {
+                name: normalizeToolName(toolCall.name),
+                arguments: '',
+              },
+            },
+          ],
+        },
+      };
+    }
     case 'toolcall_delta': {
       const toolCall = event.partial?.content?.[event.contentIndex];
       if (toolCall && toolCall.type === 'toolCall') {
-        const { callId } = parseToolCallIds((toolCall as any).id);
         const thoughtSignature = (toolCall as any).thoughtSignature;
 
         // Calculate the correct tool_call index for OpenAI format.
@@ -484,10 +506,7 @@ export function piAiEventToChunk(
             tool_calls: [
               {
                 index: toolCallIndex,
-                id: callId || (toolCall as any).id,
-                type: 'function',
                 function: {
-                  name: normalizeToolName((toolCall as any).name),
                   arguments: event.delta,
                 },
               },

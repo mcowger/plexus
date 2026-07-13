@@ -121,6 +121,61 @@ describe('OAuth -> Anthropic stream regression', () => {
     expect(chunk).toBeNull();
   });
 
+  test('piAiEventToChunk emits tool identity once before argument deltas', () => {
+    const partial = {
+      content: [
+        { type: 'thinking', thinking: 'I should run a command' },
+        {
+          type: 'toolCall',
+          id: 'call_1|fc_1',
+          name: 'execute',
+          arguments: {},
+        },
+      ],
+    };
+
+    const startChunk = piAiEventToChunk(
+      { type: 'toolcall_start', contentIndex: 1, partial } as any,
+      'gpt-5.6-sol',
+      'openai-codex'
+    );
+    const firstDelta = piAiEventToChunk(
+      {
+        type: 'toolcall_delta',
+        contentIndex: 1,
+        delta: '{\"command\":',
+        partial,
+      } as any,
+      'gpt-5.6-sol',
+      'openai-codex'
+    );
+    const secondDelta = piAiEventToChunk(
+      {
+        type: 'toolcall_delta',
+        contentIndex: 1,
+        delta: '\"printf hello\"}',
+        partial,
+      } as any,
+      'gpt-5.6-sol',
+      'openai-codex'
+    );
+
+    expect(startChunk?.delta.tool_calls?.[0]).toEqual({
+      index: 0,
+      id: 'call_1',
+      type: 'function',
+      function: { name: 'execute', arguments: '' },
+    });
+    expect(firstDelta?.delta.tool_calls?.[0]).toEqual({
+      index: 0,
+      function: { arguments: '{\"command\":' },
+    });
+    expect(secondDelta?.delta.tool_calls?.[0]).toEqual({
+      index: 0,
+      function: { arguments: '\"printf hello\"}' },
+    });
+  });
+
   test('piAiEventToChunk uses 0-based sequential indices for tool calls when thinking is present', () => {
     // Simulate a partial message state from pi-ai where:
     // Index 0: thinking block
@@ -148,6 +203,7 @@ describe('OAuth -> Anthropic stream regression', () => {
     }
 
     expect(toolCalls[0]!.index).toBe(0); // MUST be 0 for OpenAI compatibility, even if it's block 1 in Anthropic
-    expect(toolCalls[0]!.id).toBe('toolu_123');
+    expect(toolCalls[0]!.id).toBeUndefined();
+    expect(toolCalls[0]!.function?.name).toBeUndefined();
   });
 });
