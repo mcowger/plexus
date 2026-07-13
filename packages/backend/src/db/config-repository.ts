@@ -1054,11 +1054,7 @@ export class ConfigRepository {
         secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
         ...(row.expiresAt != null ? { expiresAt: row.expiresAt } : {}),
-        ...(row.disabledAt != null
-          ? { disabledAt: row.disabledAt }
-          : row.expiresAt != null && row.expiresAt <= now()
-            ? { disabledAt: row.expiresAt }
-            : {}),
+        ...(row.disabledAt != null ? { disabledAt: row.disabledAt } : {}),
         ...(quotas !== undefined ? { quotas } : {}),
         ...(allowedModels ? { allowedModels } : {}),
         ...(allowedProviders ? { allowedProviders } : {}),
@@ -1115,11 +1111,7 @@ export class ConfigRepository {
         secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
         ...(row.expiresAt != null ? { expiresAt: row.expiresAt } : {}),
-        ...(row.disabledAt != null
-          ? { disabledAt: row.disabledAt }
-          : row.expiresAt != null && row.expiresAt <= now()
-            ? { disabledAt: row.expiresAt }
-            : {}),
+        ...(row.disabledAt != null ? { disabledAt: row.disabledAt } : {}),
         ...(quotas !== undefined ? { quotas } : {}),
         ...(allowedModels ? { allowedModels } : {}),
         ...(allowedProviders ? { allowedProviders } : {}),

@@ -85,6 +85,24 @@ describe('config-repository multi-quota round-trips', () => {
     expect(found?.config.quotas).toEqual(['legacy-only']);
   });
 
+  it('does not synthesize a durable disable timestamp for an expired key', async () => {
+    await db.insert(schema.apiKeys).values({
+      name: 'expired-key',
+      secret: 'sk-expired',
+      secretHash: 'hash-expired',
+      expiresAt: Date.now() - 60_000,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    const keys = await repo.getAllKeys();
+    const found = await repo.getKeyBySecret('sk-expired');
+
+    expect(keys['expired-key']).toMatchObject({ expiresAt: expect.any(Number) });
+    expect(keys['expired-key']?.disabledAt).toBeUndefined();
+    expect(found?.config.disabledAt).toBeUndefined();
+  });
+
   it('saveKey writes quota_names only and never touches quota_name', async () => {
     const config: KeyConfig = { secret: 'sk-new', quotas: ['q1', 'q2'] };
     await repo.saveKey('new-key', config);
