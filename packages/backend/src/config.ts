@@ -957,6 +957,11 @@ export type MetadataOverrides = z.infer<typeof MetadataOverridesSchema>;
 export const KeyConfigSchema = z.object({
   secret: z.string(),
   comment: z.string().optional(),
+  // Accepted only when creating a key. The repository derives and persists an
+  // immutable absolute expiry timestamp from this duration.
+  expiresInMinutes: z.number().int().positive().optional(),
+  expiresAt: z.number().int().positive().optional(),
+  disabledAt: z.number().int().positive().optional(),
   // Deprecated: single quota-definition reference. Still accepted on input
   // (indefinitely) for backward compat. Not auto-normalized by this schema —
   // callers must run parsed/merged data through `normalizeKeyConfig` (see
@@ -1114,6 +1119,10 @@ export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type ModelProviderConfig = z.infer<typeof ModelProviderConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type KeyConfig = z.infer<typeof KeyConfigSchema>;
+
+export function isKeyDisabled(key: Pick<KeyConfig, 'expiresAt' | 'disabledAt'>, at = Date.now()) {
+  return key.disabledAt !== undefined || (key.expiresAt !== undefined && key.expiresAt <= at);
+}
 export type ModelTarget = z.infer<typeof ModelTargetSchema>;
 export type ModelTargetGroup = z.infer<typeof ModelTargetGroupSchema>;
 export type SelectorType = z.infer<typeof SelectorTypeSchema>;

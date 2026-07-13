@@ -382,7 +382,21 @@ export async function registerConfigRoutes(
         .code(400)
         .send({ error: "Key name cannot contain '*' (reserved for the shared-quota bucket)" });
     }
-    const result = KeyConfigSchema.safeParse(request.body);
+    const body = request.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.code(400).send({ error: 'Object body is required' });
+    }
+    const existing = await configService.getRepository().getAllKeys();
+    if (
+      existing[name] &&
+      ('expiresInMinutes' in body || 'expiresAt' in body || 'disabledAt' in body)
+    ) {
+      return reply.code(400).send({ error: 'Key expiry cannot be changed after creation' });
+    }
+    if ('expiresAt' in body || 'disabledAt' in body) {
+      return reply.code(400).send({ error: 'Expiry timestamps are managed by Plexus' });
+    }
+    const result = KeyConfigSchema.safeParse(body);
     if (!result.success) {
       return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
@@ -401,6 +415,9 @@ export async function registerConfigRoutes(
     const body = request.body as Record<string, unknown> | null;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return reply.code(400).send({ error: 'Object body is required' });
+    }
+    if ('expiresInMinutes' in body || 'expiresAt' in body || 'disabledAt' in body) {
+      return reply.code(400).send({ error: 'Key expiry cannot be changed after creation' });
     }
 
     try {
@@ -435,6 +452,21 @@ export async function registerConfigRoutes(
       return reply.send({ success: true });
     } catch (e: any) {
       logger.error(`Failed to delete API key '${name}'`, e);
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+  });
+
+  fastify.post('/v0/management/keys/:name/disable', async (request, reply) => {
+    const { name } = request.params as { name: string };
+    try {
+      const disabled = await configService.disableTimeBoundKey(name);
+      if (!disabled) {
+        return reply.code(400).send({ error: 'Only time-bound keys can be disabled' });
+      }
+      logger.debug(`Time-bound API key '${name}' disabled via API`);
+      return reply.send({ success: true, name });
+    } catch (e: any) {
+      logger.error(`Failed to disable API key '${name}'`, e);
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });

@@ -62,6 +62,7 @@ const DESTRUCTIVE_OPERATIONS = new Set([
   'quota_clear',
   'delete_log',
   'delete_all_logs',
+  'disable',
   'restore',
   'restart',
   'rotate',
@@ -830,6 +831,15 @@ async function handleKeyTool(
           `/v0/management/keys/${encodeURIComponent(requireId(input, 'key'))}`
         )
       );
+    case 'disable':
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'POST',
+          `/v0/management/keys/${encodeURIComponent(requireId(input, 'key'))}/disable`
+        )
+      );
     default:
       throw unsupportedOperation(input.operation, [
         'list',
@@ -838,6 +848,7 @@ async function handleKeyTool(
         'create',
         'update',
         'delete',
+        'disable',
       ]);
   }
 }

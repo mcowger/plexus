@@ -7,6 +7,12 @@ const serviceState = vi.hoisted(() => {
     saveKey: vi.fn(async (name: string, config: any) => {
       state.keys[name] = config;
     }),
+    disableTimeBoundKey: vi.fn(async (name: string) => {
+      const key = state.keys[name];
+      if (!key?.expiresAt) return false;
+      state.keys[name] = { ...key, disabledAt: Date.now() };
+      return true;
+    }),
   };
   return state;
 });
@@ -15,6 +21,7 @@ vi.mock('../../../services/config-service', () => ({
   ConfigService: {
     getInstance: vi.fn(() => ({
       saveKey: serviceState.saveKey,
+      disableTimeBoundKey: serviceState.disableTimeBoundKey,
       getRepository: vi.fn(() => ({
         getAllKeys: vi.fn(async () => serviceState.keys),
       })),
@@ -30,6 +37,7 @@ describe('key routes — multi-quota compat', () => {
   beforeEach(async () => {
     serviceState.keys = {};
     serviceState.saveKey.mockClear();
+    serviceState.disableTimeBoundKey.mockClear();
 
     fastify = Fastify();
     await registerConfigRoutes(fastify);
@@ -107,6 +115,33 @@ describe('key routes — multi-quota compat', () => {
       expect(serviceState.saveKey).toHaveBeenCalledWith('normal-key', expect.any(Object));
     });
 
+    it('accepts a positive whole-minute expiry when creating a key', async () => {
+      const res = await fastify.inject({
+        method: 'PUT',
+        url: '/v0/management/keys/time-bound-key',
+        payload: { secret: 'sk-test', expiresInMinutes: 60 },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(serviceState.keys['time-bound-key']?.expiresInMinutes).toBe(60);
+    });
+
+    it('rejects expiry changes for an existing key', async () => {
+      serviceState.keys['existing-expiry-key'] = {
+        secret: 'sk-existing',
+        expiresAt: Date.now() + 60_000,
+      };
+
+      const res = await fastify.inject({
+        method: 'PUT',
+        url: '/v0/management/keys/existing-expiry-key',
+        payload: { secret: 'sk-existing', expiresInMinutes: 60 },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(serviceState.saveKey).not.toHaveBeenCalled();
+    });
+
     it('normalizes a legacy `quota` body field to `quotas` on save', async () => {
       const res = await fastify.inject({
         method: 'PUT',
@@ -177,6 +212,46 @@ describe('key routes — multi-quota compat', () => {
       });
 
       expect(res.statusCode).toBe(404);
+    });
+
+    it('rejects expiry changes through PATCH', async () => {
+      serviceState.keys['existing-expiry-key'] = {
+        secret: 'sk-existing',
+        expiresAt: Date.now() + 60_000,
+      };
+
+      const res = await fastify.inject({
+        method: 'PATCH',
+        url: '/v0/management/keys/existing-expiry-key',
+        payload: { expiresInMinutes: 60 },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  describe('POST /v0/management/keys/:name/disable', () => {
+    it('disables a time-bound key', async () => {
+      serviceState.keys['time-bound-key'] = { secret: 'sk-test', expiresAt: Date.now() + 60_000 };
+
+      const res = await fastify.inject({
+        method: 'POST',
+        url: '/v0/management/keys/time-bound-key/disable',
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(serviceState.disableTimeBoundKey).toHaveBeenCalledWith('time-bound-key');
+    });
+
+    it('rejects disabling a non-expiring key', async () => {
+      serviceState.keys['permanent-key'] = { secret: 'sk-test' };
+
+      const res = await fastify.inject({
+        method: 'POST',
+        url: '/v0/management/keys/permanent-key/disable',
+      });
+
+      expect(res.statusCode).toBe(400);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, isNotNull } from 'drizzle-orm';
 import { getDatabase, getSchema, getCurrentDialect } from './client';
 import { logger } from '../utils/logger';
 import {
@@ -1053,6 +1053,12 @@ export class ConfigRepository {
       result[row.name] = {
         secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
+        ...(row.expiresAt != null ? { expiresAt: row.expiresAt } : {}),
+        ...(row.disabledAt != null
+          ? { disabledAt: row.disabledAt }
+          : row.expiresAt != null && row.expiresAt <= now()
+            ? { disabledAt: row.expiresAt }
+            : {}),
         ...(quotas !== undefined ? { quotas } : {}),
         ...(allowedModels ? { allowedModels } : {}),
         ...(allowedProviders ? { allowedProviders } : {}),
@@ -1108,6 +1114,12 @@ export class ConfigRepository {
       config: {
         secret: decrypt(row.secret),
         ...(row.comment ? { comment: row.comment } : {}),
+        ...(row.expiresAt != null ? { expiresAt: row.expiresAt } : {}),
+        ...(row.disabledAt != null
+          ? { disabledAt: row.disabledAt }
+          : row.expiresAt != null && row.expiresAt <= now()
+            ? { disabledAt: row.expiresAt }
+            : {}),
         ...(quotas !== undefined ? { quotas } : {}),
         ...(allowedModels ? { allowedModels } : {}),
         ...(allowedProviders ? { allowedProviders } : {}),
@@ -1124,6 +1136,13 @@ export class ConfigRepository {
     const timestamp = now();
     const encryptedSecret = encrypt(config.secret);
     const secretHash = hashSecret(config.secret);
+
+    const existing = await this.db()
+      .select()
+      .from(schema.apiKeys)
+      .where(eq(schema.apiKeys.name, name))
+      .limit(1);
+    const existingKey = existing[0];
 
     const keyData = {
       name,
@@ -1142,14 +1161,14 @@ export class ConfigRepository {
       allowRawPassthrough: fromBool(config.allowRawPassthrough === true),
       allowedIps: stringifyStringArray(config.allowedIps),
       generation: null,
+      expiresAt: existingKey
+        ? existingKey.expiresAt
+        : config.expiresInMinutes
+          ? timestamp + config.expiresInMinutes * 60_000
+          : null,
+      disabledAt: existingKey?.disabledAt ?? null,
       updatedAt: timestamp,
     };
-
-    const existing = await this.db()
-      .select()
-      .from(schema.apiKeys)
-      .where(eq(schema.apiKeys.name, name))
-      .limit(1);
 
     if (existing.length > 0) {
       await this.db().update(schema.apiKeys).set(keyData).where(eq(schema.apiKeys.name, name));
@@ -1163,6 +1182,18 @@ export class ConfigRepository {
   async deleteKey(name: string): Promise<void> {
     const schema = this.schema();
     await this.db().delete(schema.apiKeys).where(eq(schema.apiKeys.name, name));
+  }
+
+  async disableTimeBoundKey(name: string): Promise<boolean> {
+    const schema = this.schema();
+    const timestamp = now();
+    const result = await this.db()
+      .update(schema.apiKeys)
+      .set({ disabledAt: timestamp, updatedAt: timestamp })
+      .where(and(eq(schema.apiKeys.name, name), isNotNull(schema.apiKeys.expiresAt)));
+    const affected =
+      (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0;
+    return Number(affected) > 0;
   }
 
   // ─── User Quotas ────────────────────────────────────────────────

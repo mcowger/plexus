@@ -977,6 +977,9 @@ export interface KeyConfig {
   excludedProviders?: string[];
   allowRawPassthrough?: boolean;
   allowedIps?: string[];
+  expiresInMinutes?: number;
+  expiresAt?: number;
+  disabledAt?: number;
 }
 
 export type UsageSortField =
@@ -1783,6 +1786,8 @@ export const api = {
           excludedProviders?: string[];
           allowRawPassthrough?: boolean;
           allowedIps?: string[];
+          expiresAt?: number;
+          disabledAt?: number;
         }
       >;
 
@@ -1797,6 +1802,8 @@ export const api = {
         excludedProviders: val.excludedProviders,
         allowRawPassthrough: val.allowRawPassthrough === true,
         allowedIps: val.allowedIps,
+        expiresAt: val.expiresAt,
+        disabledAt: val.disabledAt,
       }));
     } catch (e) {
       console.error('API Error getKeys', e);
@@ -1820,6 +1827,7 @@ export const api = {
           excludedProviders: keyConfig.excludedProviders ?? [],
           allowRawPassthrough: keyConfig.allowRawPassthrough === true,
           allowedIps: keyConfig.allowedIps ?? [],
+          ...(keyConfig.expiresInMinutes ? { expiresInMinutes: keyConfig.expiresInMinutes } : {}),
         }),
       }
     );
@@ -1833,6 +1841,17 @@ export const api = {
     // Delete old key only after new one is saved successfully
     if (oldKeyName && oldKeyName !== keyConfig.key) {
       await api.deleteKey(oldKeyName);
+    }
+  },
+
+  disableKey: async (keyName: string): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/keys/${encodeURIComponent(keyName)}/disable`,
+      { method: 'POST' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to disable key');
     }
   },
 

@@ -16,6 +16,8 @@ export const apiKeys = pgTable('api_keys', {
   allowedIps: text('allowed_ips'),
   beta: boolean('beta').notNull().default(false),
   generation: jsonb('generation'), // { reasoning?, maxTokens?, verbosity?, serviceTier? }
+  expiresAt: bigint('expires_at', { mode: 'number' }),
+  disabledAt: bigint('disabled_at', { mode: 'number' }),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

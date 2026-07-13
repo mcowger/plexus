@@ -15,7 +15,23 @@ properties:
   comment:
     type: string
     description: >
-      Freeform description or notes about this key. Max 500 characters.
+       Freeform description or notes about this key. Max 500 characters.
+  expiresInMinutes:
+    type: integer
+    minimum: 1
+    description: >
+      Optional lifetime for a new key, expressed as positive whole minutes.
+      This value is accepted only when creating the key and cannot be changed.
+  expiresAt:
+    type: integer
+    format: int64
+    readOnly: true
+    description: Absolute expiry time as Unix epoch milliseconds.
+  disabledAt:
+    type: integer
+    format: int64
+    readOnly: true
+    description: Time the key was disabled as Unix epoch milliseconds.
   allowedProviders:
     type: array
     items:

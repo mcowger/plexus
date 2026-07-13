@@ -455,6 +455,8 @@ paths:
     $ref: paths/v0_management_keys.yaml
   /v0/management/keys/{name}:
     $ref: paths/v0_management_keys_{name}.yaml
+  /v0/management/keys/{name}/disable:
+    $ref: paths/v0_management_keys_{name}_disable.yaml
   /v0/management/mcp-servers:
     $ref: paths/v0_management_mcp-servers.yaml
   /v0/management/mcp-servers/{serverName}:

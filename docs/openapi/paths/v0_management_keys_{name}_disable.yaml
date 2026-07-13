@@ -1,0 +1,32 @@
+parameters:
+  - in: path
+    name: name
+    required: true
+    schema:
+      type: string
+    description: Time-bound API key name.
+post:
+  tags:
+    - Management — Config
+  summary: Irrevocably disable a time-bound API key
+  description: >
+    Immediately disables a key created with an expiry. The key remains in the
+    audit history and cannot be re-enabled.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Disabled.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              name:
+                type: string
+    '400':
+      description: The key does not exist or is not time-bound.
+  operationId: postV0ManagementKeysBynameDisable

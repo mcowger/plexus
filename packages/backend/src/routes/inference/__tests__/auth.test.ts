@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
-import { setConfigForTesting } from '../../../config';
+import { getConfig, setConfigForTesting } from '../../../config';
 import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatcher';
 import { UsageStorageService } from '../../../services/usage-storage';
@@ -182,6 +182,29 @@ describe('Auth Middleware', () => {
         messages: [],
       },
     });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('should reject a disabled key', async () => {
+    const config = getConfig();
+    setConfigForTesting({
+      ...config,
+      keys: {
+        ...config.keys,
+        'disabled-key': { secret: 'sk-disabled-key', disabledAt: Date.now() },
+      },
+    });
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      headers: {
+        authorization: 'Bearer sk-disabled-key',
+        'content-type': 'application/json',
+      },
+      payload: { model: 'gpt-4', messages: [] },
+    });
+
     expect(response.statusCode).toBe(401);
   });
 

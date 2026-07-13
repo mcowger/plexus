@@ -18,6 +18,8 @@ export const apiKeys = sqliteTable('api_keys', {
   allowedIps: text('allowed_ips'),
   beta: integer('beta', { mode: 'boolean' }).notNull().default(false),
   generation: text('generation'), // JSON: { reasoning?, maxTokens?, verbosity?, serviceTier? }
+  expiresAt: integer('expires_at'),
+  disabledAt: integer('disabled_at'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

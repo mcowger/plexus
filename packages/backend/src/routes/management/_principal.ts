@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
 import { logger } from '../../utils/logger';
-import { getConfig } from '../../config';
+import { getConfig, isKeyDisabled } from '../../config';
 import { isRequestIpAllowed } from '../../utils/auth';
 
 /**
@@ -104,7 +104,13 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
       quotas?: string[];
       comment?: string | null;
       allowedIps?: string[];
+      expiresAt?: number;
+      disabledAt?: number;
     };
+    if (isKeyDisabled(cfg)) {
+      logger.silly(`Rejected disabled limited key ${matched.name}`);
+      return null;
+    }
     // Enforce the key's IP allowlist for the management API too, so a wrong-IP
     // key can neither call inference nor administer.
     if (!isRequestIpAllowed(request, cfg.allowedIps, config.trustedProxies)) {

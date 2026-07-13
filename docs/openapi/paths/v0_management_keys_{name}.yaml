@@ -53,6 +53,8 @@ put:
     - `allowedModels` — Array of model aliases to restrict this key to
     - `allowRawPassthrough` — Privileged provider-wide raw proxy capability
     - `quota` — Name of a user quota definition to assign
+    - `expiresInMinutes` — Positive whole-minute lifetime for a new key. This
+      becomes immutable after creation.
 
     ## Secret encryption
 

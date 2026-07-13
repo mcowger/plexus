@@ -182,6 +182,15 @@ export class ConfigService {
     this.rebuildCache();
   }
 
+  async disableTimeBoundKey(name: string): Promise<boolean> {
+    const disabled = await this.repo.disableTimeBoundKey(name);
+    if (disabled) {
+      this.pendingWrites++;
+      this.rebuildCache();
+    }
+    return disabled;
+  }
+
   // ─── User Quota CRUD ─────────────────────────────────────────────
 
   async saveUserQuota(name: string, quota: QuotaDefinition): Promise<void> {

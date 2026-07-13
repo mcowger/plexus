@@ -23,6 +23,8 @@ import {
   AlertCircle,
   BarChart3,
   Users,
+  ChevronDown,
+  Ban,
 } from 'lucide-react';
 import { formatNumber, formatCost } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
@@ -85,6 +87,9 @@ export const Keys = () => {
   const [editingKey, setEditingKey] = useState<KeyConfig>(EMPTY_KEY);
   const [originalKeyName, setOriginalKeyName] = useState<string | null>(null);
   const [isSavingKey, setIsSavingKey] = useState(false);
+  const [expiryAmount, setExpiryAmount] = useState('');
+  const [expiryUnit, setExpiryUnit] = useState<'minutes' | 'hours' | 'days'>('days');
+  const [showDisabledKeys, setShowDisabledKeys] = useState(false);
 
   // Quota Modal State
   const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
@@ -167,6 +172,7 @@ export const Keys = () => {
   const handleEditKey = (key: KeyConfig) => {
     setOriginalKeyName(key.key);
     setEditingKey({ ...key });
+    setExpiryAmount('');
     setIsKeyModalOpen(true);
   };
 
@@ -176,15 +182,27 @@ export const Keys = () => {
     // all IPv6, so both are needed for "allow all". Existing keys are loaded
     // as-stored, so an empty allowlist stays empty.
     setEditingKey({ ...EMPTY_KEY, allowedIps: ['0.0.0.0/0', '::/0'] });
+    setExpiryAmount('');
+    setExpiryUnit('days');
     setIsKeyModalOpen(true);
   };
 
   const handleSaveKey = async () => {
     if (!editingKey.key || !editingKey.secret) return;
 
+    const amount = Number(expiryAmount);
+    if (!originalKeyName && expiryAmount && (!Number.isInteger(amount) || amount <= 0)) {
+      toast.error('Expiry must be a positive whole number');
+      return;
+    }
+    const minutesPerUnit = { minutes: 1, hours: 60, days: 1_440 };
+    const keyToSave =
+      !originalKeyName && expiryAmount
+        ? { ...editingKey, expiresInMinutes: amount * minutesPerUnit[expiryUnit] }
+        : editingKey;
     setIsSavingKey(true);
     try {
-      await api.saveKey(editingKey, originalKeyName || undefined);
+      await api.saveKey(keyToSave, originalKeyName || undefined);
       await loadData();
       setIsKeyModalOpen(false);
     } catch (e) {
@@ -192,6 +210,23 @@ export const Keys = () => {
       toast.error(e instanceof Error ? e.message : 'Failed to save key');
     } finally {
       setIsSavingKey(false);
+    }
+  };
+
+  const handleDisableKey = async (key: KeyConfig) => {
+    const confirmed = await toast.confirm({
+      title: 'Disable key?',
+      message: `Disable '${key.key}' immediately? This cannot be undone.`,
+      confirmLabel: 'Disable',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      await api.disableKey(key.key);
+      await loadData();
+      toast.success(`Key '${key.key}' disabled`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to disable key');
     }
   };
 
@@ -384,6 +419,11 @@ export const Keys = () => {
       k.excludedModels?.some((model) => model.toLowerCase().includes(search.toLowerCase())) ||
       k.excludedProviders?.some((provider) => provider.toLowerCase().includes(search.toLowerCase()))
   );
+  const isDisabled = (key: KeyConfig) =>
+    key.disabledAt !== undefined || (key.expiresAt !== undefined && key.expiresAt <= Date.now());
+  const activeKeys = filteredKeys.filter((key) => !isDisabled(key));
+  const disabledKeys = filteredKeys.filter(isDisabled);
+  const formatExpiry = (timestamp: number) => new Date(timestamp).toLocaleString();
 
   const filteredQuotas = Object.entries(quotas).filter(([name]) =>
     name.toLowerCase().includes(search.toLowerCase())
@@ -416,7 +456,7 @@ export const Keys = () => {
           value={activeTab}
           onChange={(v) => setActiveTab(v as 'keys' | 'quotas')}
           items={[
-            { value: 'keys', label: `API Keys (${keys.length})` },
+            { value: 'keys', label: `API Keys (${keys.filter((key) => !isDisabled(key)).length})` },
             { value: 'quotas', label: `Quotas (${Object.keys(quotas).length})` },
           ]}
         />
@@ -434,7 +474,7 @@ export const Keys = () => {
               }`}
               onClick={() => setActiveTab('keys')}
             >
-              API Keys ({keys.length})
+              API Keys ({keys.filter((key) => !isDisabled(key)).length})
             </button>
             <button
               className={`px-4 py-2 font-body text-sm font-medium transition-colors ${
@@ -473,190 +513,13 @@ export const Keys = () => {
 
         {/* Keys Tab */}
         {activeTab === 'keys' && (
-          <Card title="Active Keys" className="mb-6">
-            <div className="space-y-3 md:hidden">
-              {filteredKeys.length === 0 ? (
-                <div className="py-10 text-center text-sm text-text-muted">No keys found</div>
-              ) : (
-                filteredKeys.map((key) => {
-                  const status = quotaStatuses[key.key];
-                  const primary = status ? mostConstrained(status.quotas) : null;
-                  const usagePercent = primary ? quotaUsagePercent(primary) : 0;
-                  const quotaNames = key.quotas && key.quotas.length > 0 ? key.quotas : null;
-                  const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
-
-                  return (
-                    <article
-                      key={key.key}
-                      className="rounded-md border border-border-glass bg-bg-subtle p-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleEditKey(key)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="truncate font-heading text-sm font-semibold text-text">
-                              {key.key}
-                            </div>
-                          </div>
-                          {key.comment && (
-                            <div className="mt-1 truncate text-xs text-text-muted">
-                              {key.comment}
-                            </div>
-                          )}
-                        </button>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditKey(key)}
-                            aria-label={`Edit ${key.key}`}
-                          >
-                            <Edit2 size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteKey(key.key)}
-                            className="text-danger"
-                            aria-label={`Delete ${key.key}`}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Secret
-                          </div>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="min-w-0 truncate font-mono text-text">
-                              {key.secret.substring(0, 5)}...
-                            </span>
-                            <button
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-primary"
-                              onClick={() => handleCopy(key.secret, key.key)}
-                              title="Copy secret"
-                              type="button"
-                            >
-                              {copiedKey === key.key ? <Check size={14} /> : <Copy size={14} />}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                          <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                            Quota
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
-                            {quotaNames ? (
-                              quotaNames.map((n) => <QuotaChip key={n}>{n}</QuotaChip>)
-                            ) : usingDefaults ? (
-                              <>
-                                {defaultQuotaNames.map((n) => (
-                                  <QuotaChip key={n} tone="muted">
-                                    {n}
-                                  </QuotaChip>
-                                ))}
-                                <QuotaChip tone="muted">default</QuotaChip>
-                              </>
-                            ) : (
-                              <span className="text-text-secondary">-</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-2">
-                        {primary ? (
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between gap-2 text-xs">
-                              <span className="text-text-muted truncate">{primary.name}</span>
-                              <span className="font-medium text-text">
-                                {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
-                                {formatQuotaValue(primary.limit, primary.limitType)}
-                              </span>
-                            </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${usagePercent}%`,
-                                  backgroundColor: getQuotaStatusColor(usagePercent),
-                                }}
-                              />
-                            </div>
-                            {status && status.quotas.length > 1 && (
-                              <p className="text-[11px] text-text-muted">
-                                +{status.quotas.length - 1} more quota
-                                {status.quotas.length - 1 !== 1 ? 's' : ''}
-                              </p>
-                            )}
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewQuotaStatus(key.key)}
-                                leftIcon={<BarChart3 size={14} />}
-                              >
-                                Details
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleClearQuota(key.key)}
-                                leftIcon={<RefreshCw size={14} />}
-                              >
-                                Reset
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-text-muted">
-                            {quotaNames || usingDefaults
-                              ? 'Loading quota status...'
-                              : 'No quota assigned'}
-                          </div>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full border-collapse font-body text-[13px]">
-                <thead>
-                  <tr>
-                    <th
-                      className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                      style={{ paddingLeft: '24px' }}
-                    >
-                      Key Name
-                    </th>
-                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Secret
-                    </th>
-                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Quota
-                    </th>
-                    <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th
-                      className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                      style={{ paddingRight: '24px', textAlign: 'right' }}
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredKeys.map((key) => {
+          <>
+            <Card title="Active Keys" className="mb-6">
+              <div className="space-y-3 md:hidden">
+                {activeKeys.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-text-muted">No keys found</div>
+                ) : (
+                  activeKeys.map((key) => {
                     const status = quotaStatuses[key.key];
                     const primary = status ? mostConstrained(status.quotas) : null;
                     const usagePercent = primary ? quotaUsagePercent(primary) : 0;
@@ -664,146 +527,402 @@ export const Keys = () => {
                     const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
 
                     return (
-                      <tr key={key.key} className="hover:bg-bg-hover">
-                        <td
-                          className="px-4 py-3 text-left border-b border-border-glass text-text"
-                          style={{ fontWeight: 600, paddingLeft: '24px' }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>{key.key}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span
-                              style={{
-                                fontFamily: 'monospace',
-                                fontSize: '12px',
-                                backgroundColor: 'var(--color-bg-subtle)',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                              }}
+                      <article
+                        key={key.key}
+                        className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleEditKey(key)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="truncate font-heading text-sm font-semibold text-text">
+                                {key.key}
+                              </div>
+                            </div>
+                            {key.comment && (
+                              <div className="mt-1 truncate text-xs text-text-muted">
+                                {key.comment}
+                              </div>
+                            )}
+                          </button>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditKey(key)}
+                              aria-label={`Edit ${key.key}`}
                             >
-                              {key.secret.substring(0, 5)}...
-                            </span>
-                            <button
-                              className="bg-transparent border-0 text-text-muted p-1.5 rounded-sm cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-bg-hover hover:text-primary active:scale-95"
-                              onClick={() => handleCopy(key.secret, key.key)}
-                              title="Copy Secret"
-                              style={copiedKey === key.key ? { color: 'var(--color-success)' } : {}}
-                            >
-                              {copiedKey === key.key ? <Check size={14} /> : <Copy size={14} />}
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          {quotaNames ? (
-                            <div className="flex flex-wrap items-center gap-1">
-                              {quotaNames.map((n) => (
-                                <span
-                                  key={n}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary"
-                                >
-                                  <Shield size={12} />
-                                  {n}
-                                </span>
-                              ))}
-                            </div>
-                          ) : usingDefaults ? (
-                            <div className="flex flex-wrap items-center gap-1">
-                              {defaultQuotaNames.map((n) => (
-                                <QuotaChip key={n} tone="muted">
-                                  {n}
-                                </QuotaChip>
-                              ))}
-                              <QuotaChip tone="muted">default</QuotaChip>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-                              -
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          {primary ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div
-                                style={{
-                                  width: '8px',
-                                  height: '8px',
-                                  borderRadius: '50%',
-                                  backgroundColor: getQuotaStatusColor(usagePercent),
-                                }}
-                              />
-                              <span style={{ fontSize: '12px' }}>
-                                {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
-                                {formatQuotaValue(primary.limit, primary.limitType)}
-                              </span>
-                              {status && status.quotas.length > 1 && (
-                                <span className="text-[11px] text-text-muted">
-                                  (+{status.quotas.length - 1})
-                                </span>
-                              )}
-                              <button
-                                className="bg-transparent border-0 text-text-muted p-1 rounded-sm cursor-pointer hover:text-primary"
-                                onClick={() => handleViewQuotaStatus(key.key)}
-                                title="View details"
-                              >
-                                <BarChart3 size={14} />
-                              </button>
-                            </div>
-                          ) : quotaNames || usingDefaults ? (
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-                              Loading...
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-                              -
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          className="px-4 py-3 text-left border-b border-border-glass text-text"
-                          style={{ paddingRight: '24px', textAlign: 'right' }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                            <Button variant="ghost" size="sm" onClick={() => handleEditKey(key)}>
                               <Edit2 size={14} />
                             </Button>
-                            {(quotaNames || usingDefaults) && (
+                            {key.expiresAt && (
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                onClick={() => handleClearQuota(key.key)}
-                                title="Reset quota"
+                                size="icon"
+                                onClick={() => handleDisableKey(key)}
+                                className="text-danger"
+                                aria-label={`Disable ${key.key}`}
+                                title="Disable key"
                               >
-                                <RefreshCw size={14} />
+                                <Ban size={14} />
                               </Button>
                             )}
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               onClick={() => handleDeleteKey(key.key)}
-                              style={{ color: 'var(--color-danger)' }}
+                              className="text-danger"
+                              aria-label={`Delete ${key.key}`}
                             >
                               <Trash2 size={14} />
                             </Button>
                           </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                          <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                              Secret
+                            </div>
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className="min-w-0 truncate font-mono text-text">
+                                {key.secret.substring(0, 5)}...
+                              </span>
+                              <button
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-primary"
+                                onClick={() => handleCopy(key.secret, key.key)}
+                                title="Copy secret"
+                                type="button"
+                              >
+                                {copiedKey === key.key ? <Check size={14} /> : <Copy size={14} />}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                              Quota
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              {quotaNames ? (
+                                quotaNames.map((n) => <QuotaChip key={n}>{n}</QuotaChip>)
+                              ) : usingDefaults ? (
+                                <>
+                                  {defaultQuotaNames.map((n) => (
+                                    <QuotaChip key={n} tone="muted">
+                                      {n}
+                                    </QuotaChip>
+                                  ))}
+                                  <QuotaChip tone="muted">default</QuotaChip>
+                                </>
+                              ) : (
+                                <span className="text-text-secondary">-</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-2">
+                          {primary ? (
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center justify-between gap-2 text-xs">
+                                <span className="text-text-muted truncate">{primary.name}</span>
+                                <span className="font-medium text-text">
+                                  {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
+                                  {formatQuotaValue(primary.limit, primary.limitType)}
+                                </span>
+                              </div>
+                              <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{
+                                    width: `${usagePercent}%`,
+                                    backgroundColor: getQuotaStatusColor(usagePercent),
+                                  }}
+                                />
+                              </div>
+                              {status && status.quotas.length > 1 && (
+                                <p className="text-[11px] text-text-muted">
+                                  +{status.quotas.length - 1} more quota
+                                  {status.quotas.length - 1 !== 1 ? 's' : ''}
+                                </p>
+                              )}
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewQuotaStatus(key.key)}
+                                  leftIcon={<BarChart3 size={14} />}
+                                >
+                                  Details
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleClearQuota(key.key)}
+                                  leftIcon={<RefreshCw size={14} />}
+                                >
+                                  Reset
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-text-muted">
+                              {quotaNames || usingDefaults
+                                ? 'Loading quota status...'
+                                : 'No quota assigned'}
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full border-collapse font-body text-[13px]">
+                  <thead>
+                    <tr>
+                      <th
+                        className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                        style={{ paddingLeft: '24px' }}
+                      >
+                        Key Name
+                      </th>
+                      <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Secret
+                      </th>
+                      <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Quota
+                      </th>
+                      <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                        style={{ paddingRight: '24px', textAlign: 'right' }}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeKeys.map((key) => {
+                      const status = quotaStatuses[key.key];
+                      const primary = status ? mostConstrained(status.quotas) : null;
+                      const usagePercent = primary ? quotaUsagePercent(primary) : 0;
+                      const quotaNames = key.quotas && key.quotas.length > 0 ? key.quotas : null;
+                      const usingDefaults = !quotaNames && defaultQuotaNames.length > 0;
+
+                      return (
+                        <tr key={key.key} className="hover:bg-bg-hover">
+                          <td
+                            className="px-4 py-3 text-left border-b border-border-glass text-text"
+                            style={{ fontWeight: 600, paddingLeft: '24px' }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{key.key}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span
+                                style={{
+                                  fontFamily: 'monospace',
+                                  fontSize: '12px',
+                                  backgroundColor: 'var(--color-bg-subtle)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                }}
+                              >
+                                {key.secret.substring(0, 5)}...
+                              </span>
+                              <button
+                                className="bg-transparent border-0 text-text-muted p-1.5 rounded-sm cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-bg-hover hover:text-primary active:scale-95"
+                                onClick={() => handleCopy(key.secret, key.key)}
+                                title="Copy Secret"
+                                style={
+                                  copiedKey === key.key ? { color: 'var(--color-success)' } : {}
+                                }
+                              >
+                                {copiedKey === key.key ? <Check size={14} /> : <Copy size={14} />}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                            {quotaNames ? (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {quotaNames.map((n) => (
+                                  <span
+                                    key={n}
+                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary"
+                                  >
+                                    <Shield size={12} />
+                                    {n}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : usingDefaults ? (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {defaultQuotaNames.map((n) => (
+                                  <QuotaChip key={n} tone="muted">
+                                    {n}
+                                  </QuotaChip>
+                                ))}
+                                <QuotaChip tone="muted">default</QuotaChip>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                                -
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                            {primary ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div
+                                  style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: getQuotaStatusColor(usagePercent),
+                                  }}
+                                />
+                                <span style={{ fontSize: '12px' }}>
+                                  {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
+                                  {formatQuotaValue(primary.limit, primary.limitType)}
+                                </span>
+                                {status && status.quotas.length > 1 && (
+                                  <span className="text-[11px] text-text-muted">
+                                    (+{status.quotas.length - 1})
+                                  </span>
+                                )}
+                                <button
+                                  className="bg-transparent border-0 text-text-muted p-1 rounded-sm cursor-pointer hover:text-primary"
+                                  onClick={() => handleViewQuotaStatus(key.key)}
+                                  title="View details"
+                                >
+                                  <BarChart3 size={14} />
+                                </button>
+                              </div>
+                            ) : quotaNames || usingDefaults ? (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                                Loading...
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                                -
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className="px-4 py-3 text-left border-b border-border-glass text-text"
+                            style={{ paddingRight: '24px', textAlign: 'right' }}
+                          >
+                            <div
+                              style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}
+                            >
+                              <Button variant="ghost" size="sm" onClick={() => handleEditKey(key)}>
+                                <Edit2 size={14} />
+                              </Button>
+                              {key.expiresAt && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDisableKey(key)}
+                                  title="Disable key"
+                                  style={{ color: 'var(--color-danger)' }}
+                                >
+                                  <Ban size={14} />
+                                </Button>
+                              )}
+                              {(quotaNames || usingDefaults) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleClearQuota(key.key)}
+                                  title="Reset quota"
+                                >
+                                  <RefreshCw size={14} />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteKey(key.key)}
+                                style={{ color: 'var(--color-danger)' }}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {activeKeys.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center text-text-muted p-12">
+                          No keys found
                         </td>
                       </tr>
-                    );
-                  })}
-                  {filteredKeys.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center text-text-muted p-12">
-                        No keys found
-                      </td>
-                    </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+            <Card className="mb-6">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-left"
+                onClick={() => setShowDisabledKeys(!showDisabledKeys)}
+                aria-expanded={showDisabledKeys}
+              >
+                <span className="font-heading text-sm font-semibold text-text">
+                  Disabled Keys ({disabledKeys.length})
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`text-text-muted transition-transform ${showDisabledKeys ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {showDisabledKeys && (
+                <div className="mt-4 overflow-x-auto">
+                  {disabledKeys.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-text-muted">
+                      No disabled keys found
+                    </div>
+                  ) : (
+                    <table className="w-full border-collapse font-body text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border-glass text-left text-[11px] uppercase tracking-wider text-text-secondary">
+                          <th className="px-3 py-2">Key Name</th>
+                          <th className="px-3 py-2">Expiration</th>
+                          <th className="px-3 py-2">Disabled</th>
+                          <th className="px-3 py-2">Comment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {disabledKeys.map((key) => (
+                          <tr key={key.key} className="border-b border-border-glass text-text">
+                            <td className="px-3 py-3 font-medium">{key.key}</td>
+                            <td className="px-3 py-3">
+                              {key.expiresAt ? formatExpiry(key.expiresAt) : '-'}
+                            </td>
+                            <td className="px-3 py-3">
+                              {key.disabledAt ? formatExpiry(key.disabledAt) : 'Expired'}
+                            </td>
+                            <td className="px-3 py-3 text-text-muted">{key.comment || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                </div>
+              )}
+            </Card>
+          </>
         )}
 
         {/* Quotas Tab */}
@@ -1090,6 +1209,45 @@ export const Keys = () => {
               onChange={(e) => setEditingKey({ ...editingKey, comment: e.target.value })}
               placeholder="Optional description..."
             />
+
+            {originalKeyName ? (
+              editingKey.expiresAt && (
+                <div className="rounded-md border border-border-glass bg-bg-subtle p-3 text-sm text-text-secondary">
+                  <div>Expires: {formatExpiry(editingKey.expiresAt)}</div>
+                  <p className="mt-1 text-xs text-text-muted">
+                    Expiry cannot be changed after creation.
+                  </p>
+                </div>
+              )
+            ) : (
+              <div className="flex flex-col gap-2">
+                <label className="font-body text-[13px] font-medium text-text-secondary">
+                  Expiry (optional)
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={expiryAmount}
+                    onChange={(event) => setExpiryAmount(event.target.value)}
+                    placeholder="Never expires"
+                  />
+                  <select
+                    className="rounded-md border border-border-glass bg-bg-subtle px-3 text-sm text-text"
+                    value={expiryUnit}
+                    onChange={(event) => setExpiryUnit(event.target.value as typeof expiryUnit)}
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                <p className="text-xs text-text-muted">
+                  Once set, a time-bound key cannot be extended or re-enabled.
+                </p>
+              </div>
+            )}
 
             <TagSelect
               label="Excluded Model Aliases"
