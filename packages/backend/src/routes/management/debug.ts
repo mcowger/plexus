@@ -144,6 +144,7 @@ export async function registerDebugRoutes(
 
   // Export debug logs matching a free-text search term, and optionally run a
   // shell post-processor (e.g. "grep -i" or "gzip") over the exported file.
+  // Supports pagination via the standard limit/offset query params.
   fastify.get('/v0/management/debug/logs/export', async (request, reply) => {
     const query = request.query as any;
     const search = query.search || '';
