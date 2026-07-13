@@ -61,6 +61,11 @@ jobs:
 
             core.setOutput('number', String(pullNumber));
 
+      - name: Checkout trusted base revision
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
       # The GitHub MCP server is enabled only for this Action run via OPENCODE_CONFIG_CONTENT.
       # It is never written to a checked-in opencode.json/opencode.jsonc/.opencode config, so the
       # interactive OpenCode configuration is unaffected. All tools are disabled by default; only
