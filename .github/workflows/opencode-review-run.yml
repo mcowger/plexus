@@ -96,14 +96,13 @@ jobs:
               },
               "mcp": {
                 "github": {
-                  "type": "remote",
-                  "url": "https://api.githubcopilot.com/mcp/",
-                  "enabled": true,
-                  "oauth": false,
-                  "headers": {
-                    "Authorization": "Bearer {env:GITHUB_TOKEN}",
-                    "X-MCP-Toolsets": "repos,pull_requests"
-                  }
+                  "type": "local",
+                  "command": ["docker", "run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "-e", "GITHUB_TOOLSETS", "ghcr.io/github/github-mcp-server:v1.5.0"],
+                  "environment": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_TOKEN}",
+                    "GITHUB_TOOLSETS": "repos,pull_requests"
+                  },
+                  "enabled": true
                 }
               },
               "tools": {
