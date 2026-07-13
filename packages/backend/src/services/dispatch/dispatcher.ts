@@ -10,11 +10,8 @@ import {
   UnifiedImageEditRequest,
   UnifiedImageEditResponse,
 } from '../../types/unified';
-import { Router } from '../routing/router';
-import { applyKeyAccessPolicy } from '../routing/key-access-policy';
 import { QuotaEnforcer } from '../quota/quota-enforcer';
 import { buildQuotaExceededError } from '../quota/quota-middleware';
-import { TransformerFactory } from './transformer-factory';
 import { logger } from '../../utils/logger';
 import { QUOTA_ERROR_PATTERNS } from '../../utils/constants';
 import { CooldownManager } from '../runtime/cooldown-manager';
@@ -23,25 +20,30 @@ import { RouteResult } from '../routing/router';
 import { DebugManager } from '../observability/debug-manager';
 import { UsageStorageService } from '../observability/usage-storage';
 import { getConfig } from '../../config';
-import { applyModelBehaviors } from '../models/model-behaviors';
-import { resolveAdapters } from './adapter-resolver';
 import type { ResolvedAdapter } from '../../types/provider-adapter';
 import type { StallConfig } from '../inspectors/stall-inspector';
-import { getGlobalStallConfig, resolveStallConfig } from '../../utils/stall';
-import { VisionDescriptorService } from '../vision/vision-descriptor-service';
-import { ModelMetadataManager } from '../models/model-metadata-manager';
-import { enforceContextLimit } from '../models/enforce-limits';
-import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../../utils/constants';
-import { UsageRecord } from '../../types/usage';
-import { calculateCosts } from '../../utils/calculate-costs';
-import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
-import type { GpuParams, ModelParams } from '@plexus/shared';
-import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import { getApiBaseType } from '../../utils/api-format';
-import { applyRegistryAutoCompat, hasCodexResponsesExtensions } from './dispatcher-auto-compat';
 import type { RetryAttemptRecord } from './dispatcher-types';
 import { MediaDispatcher } from './media-dispatcher';
+import { RequestManager, type RequestManagerHost } from './request-manager';
+import {
+  appendFailureAttempt,
+  appendSkippedAttempt,
+  appendSuccessAttempt,
+  attachAttemptMetadata,
+  buildAllTargetsFailedError,
+} from './attempt-history';
+import {
+  isRetryableNetworkError,
+  isRetryableOAuthError,
+  isRetryableStatus,
+} from './failover-policy';
+import { buildRequestPayload } from './request-payload-builder';
+import {
+  createAttemptTimeout,
+  executeUpstreamRequest,
+  probeStreamingStart,
+} from './upstream-execution';
 import {
   isClaudeMaskingApiKeyRoute,
   isOAuthRoute,
@@ -55,7 +57,6 @@ import {
   resolveProviderBaseUrl,
   selectTargetApiType,
 } from '../providers/provider-api-selection';
-import { probeStreamingStart } from '../probes/stream-probe';
 import {
   parseCooldownDurationForProvider,
   resolveCooldownProviderType,
@@ -78,6 +79,46 @@ export class Dispatcher {
   private usageStorage?: UsageStorageService;
   private mediaDispatcher?: MediaDispatcher;
   private oauthDispatcher?: OAuthDispatcher;
+  private requestManager?: RequestManager;
+
+  private getRequestManager(): RequestManager {
+    if (!this.requestManager) {
+      const host: RequestManagerHost = {
+        appendFailureAttempt: this.appendFailureAttempt.bind(this),
+        appendSkippedAttempt: this.appendSkippedAttempt.bind(this),
+        appendSuccessAttempt: this.appendSuccessAttempt.bind(this),
+        attachAttemptMetadata: this.attachAttemptMetadata.bind(this),
+        buildAllTargetsFailedError: this.buildAllTargetsFailedError.bind(this),
+        buildCancelledError: this.buildCancelledError.bind(this),
+        buildRequestUrl: this.buildRequestUrl.bind(this),
+        buildTimeoutError: this.buildTimeoutError.bind(this),
+        createAttemptTimeout: this.createAttemptTimeout.bind(this),
+        dispatchOAuthRequest: this.dispatchOAuthRequest.bind(this),
+        emitRoutingUpdate: this.emitRoutingUpdate.bind(this),
+        executeProviderRequest: this.executeProviderRequest.bind(this),
+        formatFailureReason: this.formatFailureReason.bind(this),
+        getUsageStorage: this.getUsageStorage.bind(this),
+        handleNonStreamingResponse: this.handleNonStreamingResponse.bind(this),
+        handleProviderError: this.handleProviderError.bind(this),
+        handleStreamingResponse: this.handleStreamingResponse.bind(this),
+        isPiAiRoute: this.isPiAiRoute.bind(this),
+        isRetryableNetworkError: this.isRetryableNetworkError.bind(this),
+        isRetryableOAuthError: this.isRetryableOAuthError.bind(this),
+        isRetryableStatus: this.isRetryableStatus.bind(this),
+        markOAuthProviderFailure: this.markOAuthProviderFailure.bind(this),
+        probeStreamingStart: this.probeStreamingStart.bind(this),
+        recordAttemptMetric: this.recordAttemptMetric.bind(this),
+        recordStickySession: this.recordStickySession.bind(this),
+        saveIntermediateError: this.saveIntermediateError.bind(this),
+        selectTargetApiType: this.selectTargetApiType.bind(this),
+        setupHeaders: this.setupHeaders.bind(this),
+        transformRequestPayload: this.transformRequestPayload.bind(this),
+      };
+      this.requestManager = new RequestManager(host);
+    }
+
+    return this.requestManager;
+  }
 
   private getOAuthDispatcher(): OAuthDispatcher {
     if (!this.oauthDispatcher) {
@@ -262,6 +303,10 @@ export class Dispatcher {
     this.usageStorage = storage;
   }
 
+  getUsageStorage(): UsageStorageService | undefined {
+    return this.usageStorage;
+  }
+
   private saveIntermediateError(requestId: string | undefined, apiType: string, error: any): void {
     if (!this.usageStorage || !requestId) return;
     this.usageStorage.saveError(requestId, error, {
@@ -321,826 +366,19 @@ export class Dispatcher {
       stallGracePeriodMs?: number | null;
     }) => void
   ): Promise<UnifiedChatResponse> {
-    const config = getConfig();
-    const failover = config.failover;
-    const failoverEnabled = failover?.enabled !== false;
-
-    // 1. Route (ordered candidates)
-    const sessionKey = StickySessionManager.computeSessionKey(request);
-    let candidates = await Router.resolveCandidates(
-      request.model,
-      request.incomingApiType,
-      sessionKey
-    );
-
-    // Fallback for direct/provider/model syntax and legacy single-route behavior
-    if (candidates.length === 0) {
-      const singleRoute = await Router.resolve(request.model, request.incomingApiType);
-      candidates = [singleRoute];
-    }
-
-    if (candidates.length === 0) {
-      throw new Error(`No route candidates found for model '${request.model}'`);
-    }
-
-    candidates = applyKeyAccessPolicy(request, candidates, request.incomingApiType || 'chat');
-
-    const retryHistory: RetryAttemptRecord[] = [];
-    candidates = this.applyQuotaFilter(
-      request,
-      candidates,
-      retryHistory,
-      request.incomingApiType || 'chat'
-    );
-
-    const targets = failoverEnabled ? candidates : [candidates[0]!];
-    const attemptedProviders: string[] = [];
-    let lastError: any = null;
-
-    // Check if this is already a vision descriptor request to prevent recursion
-    const isVisionDescriptorRequest = (request as any)._isVisionDescriptorRequest === true;
-
-    for (let i = 0; i < targets.length; i++) {
-      if (signal?.aborted) throw this.buildCancelledError(signal);
-      let currentRequest = { ...request };
-      const route = targets[i]!;
-      const apiSelection = this.selectTargetApiType(route, currentRequest.incomingApiType);
-      if (!apiSelection.targetApiType) {
-        const reason = apiSelection.selectionReason;
-        logger.info(`Skipping ${route.provider}/${route.model} - ${reason}`);
-        lastError = new Error(reason);
-        this.appendSkippedAttempt(retryHistory, route, reason, currentRequest.incomingApiType);
-        continue;
-      }
-      const { targetApiType, selectionReason } = apiSelection;
-      const attemptTimeout = this.createAttemptTimeout(
-        signal,
-        route.config.timeoutMs,
-        resolveTimeoutMs
-      );
-
-      // Vision Fallthrough (Image-to-Text Preprocessing)
-      // Check if:
-      // 1. Opt-in is enabled for this alias
-      // 2. We're not already in a descriptor call (recursion guard)
-      // 3. Request contains images
-      // Look up use_image_fallthrough from the alias configuration (not provider's model config)
-      const aliasConfig = route.canonicalModel ? config.models?.[route.canonicalModel] : undefined;
-      const hasImages = VisionDescriptorService.hasImages(currentRequest.messages);
-      logger.debug(
-        `Checking: canonicalModel='${route.canonicalModel}', use_image_fallthrough='${aliasConfig?.use_image_fallthrough}', hasImages='${hasImages}', isVisionDescriptorRequest='${isVisionDescriptorRequest}'`
-      );
-      if (!isVisionDescriptorRequest && aliasConfig?.use_image_fallthrough && hasImages) {
-        const vfConfig = config.vision_fallthrough;
-        if (vfConfig?.descriptor_model) {
-          try {
-            logger.debug(
-              `Before process: ${JSON.stringify(currentRequest.messages.map((m) => ({ role: m.role, contentCount: Array.isArray(m.content) ? m.content.length : 'string' })))}`
-            );
-            currentRequest = await VisionDescriptorService.process(
-              currentRequest,
-              vfConfig.descriptor_model,
-              vfConfig.default_prompt || DEFAULT_VISION_DESCRIPTION_PROMPT,
-              this.usageStorage // Pass usage storage to record descriptor call
-            );
-            logger.debug(
-              `After process: ${JSON.stringify(currentRequest.messages.map((m) => ({ role: m.role, contentCount: Array.isArray(m.content) ? m.content.length : 'string' })))}`
-            );
-
-            // Verify if images are actually gone in the modified request
-            const stillHasImages = VisionDescriptorService.hasImages(currentRequest.messages);
-            if (stillHasImages) {
-              logger.error(
-                `CRITICAL: VisionDescriptorService.process returned a request that STILL contains images!`
-              );
-            }
-
-            // Tag the request as having undergone fallthrough
-            (currentRequest as any)._hasVisionFallthrough = true;
-            (currentRequest as any)._visionFallthroughModel = vfConfig.descriptor_model;
-            logger.debug(`Successfully preprocessed images for ${route.provider}/${route.model}`);
-          } catch (vfError) {
-            logger.error(`Error in descriptor service:`, vfError);
-          }
-        } else {
-          logger.warn(
-            `Feature enabled for alias '${request.model}' but 'vision_fallthrough.descriptor_model' not configured globally.`
-          );
-        }
-      }
-
-      // Re-check cooldown status before attempting this target
-      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
-        route.provider,
-        route.model
-      );
-      if (!isHealthy) {
-        attemptTimeout.cleanup();
-        logger.warn(`Skipping ${route.provider}/${route.model} - provider is on cooldown`);
-        lastError = new Error(`Provider ${route.provider}/${route.model} is on cooldown`);
-        this.appendSkippedAttempt(
-          retryHistory,
-          route,
-          `Provider ${route.provider}/${route.model} is on cooldown`
-        );
-        continue;
-      }
-
-      // Pre-dispatch context limit enforcement (opt-in per alias). Runs on
-      // the finalized per-target request — after any vision fallthrough has
-      // expanded the prompt and after cooldown has selected a live target —
-      // so we reject oversized prompts locally with a 400 instead of
-      // burning an upstream round trip on a guaranteed failure. Checked
-      // BEFORE acquiring a concurrency slot so that a thrown
-      // ContextLengthExceededError (a client-side problem; failing over to
-      // another target won't help) never leaks an acquired slot.
-      if (aliasConfig?.enforce_limits && route.canonicalModel) {
-        enforceContextLimit(currentRequest, aliasConfig, route.canonicalModel);
-      }
-
-      // Acquire concurrency slot before upstream request
-      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
-      if (!acquired) {
-        attemptTimeout.cleanup();
-        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
-        lastError = new Error(
-          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
-        );
-        this.appendSkippedAttempt(
-          retryHistory,
-          route,
-          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
-        );
-        continue;
-      }
-
-      attemptedProviders.push(`${route.provider}/${route.model}`);
-
-      let released = false;
-      const doRelease = () => {
-        if (!released) {
-          released = true;
-          ConcurrencyTracker.getInstance().release(route.provider, route.model);
-        }
-      };
-
-      this.emitRoutingUpdate(currentRequest.requestId, route);
-
-      try {
-        // Determine Target API Type
-        logger.info(
-          `Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`
-        );
-
-        // 2. Get Transformer
-        const transformerType = this.isPiAiRoute(route, targetApiType) ? 'oauth' : targetApiType;
-        const transformer = TransformerFactory.getTransformer(transformerType);
-
-        // 3. Transform Request
-        const requestWithTargetModel = { ...currentRequest, model: route.model };
-
-        // Resolve adapters for this specific provider+model combination
-        const adapters = resolveAdapters(route);
-
-        const { payload: providerPayload, bypassTransformation } =
-          await this.transformRequestPayload(
-            requestWithTargetModel,
-            route,
-            transformer,
-            targetApiType,
-            adapters
-          );
-
-        // Capture transformed request
-        if (currentRequest.requestId) {
-          DebugManager.getInstance().addTransformedRequest(
-            currentRequest.requestId,
-            providerPayload
-          );
-        }
-
-        // Wire per-provider stall detection overrides. Always call addStallConfig
-        // so the StallInspector is reset on each failover iteration — even when
-        // the current provider has no overrides, this clears a previous provider's
-        // overrides from the inspector.
-        if (addStallConfig) {
-          const providerStallOverrides: Parameters<typeof addStallConfig>[0] = {};
-          if (route.config.stallTtfbMs !== undefined)
-            providerStallOverrides.stallTtfbMs = route.config.stallTtfbMs;
-          if (route.config.stallTtfbBytes !== undefined)
-            providerStallOverrides.stallTtfbBytes = route.config.stallTtfbBytes;
-          if (route.config.stallMinBps !== undefined)
-            providerStallOverrides.stallMinBps = route.config.stallMinBps;
-          if (route.config.stallWindowMs !== undefined)
-            providerStallOverrides.stallWindowMs = route.config.stallWindowMs;
-          if (route.config.stallGracePeriodMs !== undefined)
-            providerStallOverrides.stallGracePeriodMs = route.config.stallGracePeriodMs;
-          logger.debug(
-            `Dispatcher: provider stall overrides for ${route.provider}: ${JSON.stringify(providerStallOverrides)}, ` +
-              `route.config stall fields: stallTtfbMs=${route.config.stallTtfbMs}, stallMinBps=${route.config.stallMinBps}`
-          );
-          addStallConfig(providerStallOverrides);
-        }
-
-        // Resolve stall config BEFORE the dispatch so we can wrap fetch+probe
-        // in a TTFB timeout. This is critical because fetch() itself may block
-        // for a long time waiting for HTTP response headers — the TTFB timeout
-        // must cover this "headers phase" too, not just the body reading.
-        // This applies to BOTH OAuth and non-OAuth routes.
-        let effectiveStallConfig = resolveStallConfig(getGlobalStallConfig(), {
-          stallTtfbMs: route.config.stallTtfbMs,
-          stallTtfbBytes: route.config.stallTtfbBytes,
-          stallMinBps: route.config.stallMinBps,
-          stallWindowMs: route.config.stallWindowMs,
-          stallGracePeriodMs: route.config.stallGracePeriodMs,
-        });
-
-        logger.debug(
-          `Dispatcher: effectiveStallConfig for ${route.provider}: ${JSON.stringify(effectiveStallConfig)}, ` +
-            `route.config.stallTtfbMs=${route.config.stallTtfbMs}, route.config.stallMinBps=${route.config.stallMinBps}`
-        );
-
-        if (this.isPiAiRoute(route, targetApiType)) {
-          try {
-            const oauthResponse = await this.dispatchOAuthRequest(
-              providerPayload,
-              currentRequest,
-              route,
-              targetApiType,
-              transformer,
-              attemptTimeout.signal,
-              effectiveStallConfig
-            );
-            attemptTimeout.cleanup();
-            await this.recordAttemptMetric(route, currentRequest.requestId, true, {
-              isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-              isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-              visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-            });
-            this.appendSuccessAttempt(retryHistory, route, targetApiType);
-            this.attachAttemptMetadata(
-              oauthResponse,
-              attemptedProviders,
-              retryHistory,
-              route,
-              targetApiType
-            );
-            try {
-              CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
-              this.recordStickySession(sessionKey, route, currentRequest);
-              return oauthResponse;
-            } finally {
-              doRelease();
-            }
-          } catch (oauthError: any) {
-            const effectiveOAuthError = attemptTimeout.isTimedOut()
-              ? this.buildTimeoutError()
-              : oauthError;
-            if (signal?.aborted) throw this.buildCancelledError(signal);
-            lastError = effectiveOAuthError;
-
-            // Handle TTFB stall errors with failover support
-            const isStallError = (effectiveOAuthError as any).isStallError === true;
-            if (isStallError) {
-              const canRetryStall = failoverEnabled && i < targets.length - 1;
-              this.appendFailureAttempt(
-                retryHistory,
-                route,
-                effectiveOAuthError,
-                targetApiType,
-                canRetryStall
-              );
-
-              if (canRetryStall) {
-                attemptTimeout.cleanup();
-                await this.recordAttemptMetric(route, currentRequest.requestId, false, {
-                  isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-                  isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-                  visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-                });
-                CooldownManager.getInstance().markProviderStallFailure(
-                  route.provider,
-                  route.model,
-                  this.formatFailureReason(effectiveOAuthError)
-                );
-                this.saveIntermediateError(
-                  currentRequest.requestId,
-                  targetApiType || 'chat',
-                  effectiveOAuthError
-                );
-                logger.info(
-                  `TTFB stall: OAuth request timed out for ${route.provider}/${route.model}, retrying`
-                );
-                doRelease();
-                continue;
-              }
-
-              doRelease();
-
-              // Mark stall failure for cooldown tracking even on the last target
-              CooldownManager.getInstance().markProviderStallFailure(
-                route.provider,
-                route.model,
-                this.formatFailureReason(effectiveOAuthError)
-              );
-              throw effectiveOAuthError;
-            }
-
-            const canRetry =
-              failoverEnabled &&
-              i < targets.length - 1 &&
-              (attemptTimeout.isTimedOut() || this.isRetryableOAuthError(effectiveOAuthError));
-
-            this.appendFailureAttempt(
-              retryHistory,
-              route,
-              effectiveOAuthError,
-              targetApiType,
-              canRetry
-            );
-
-            if (canRetry) {
-              attemptTimeout.cleanup();
-              await this.recordAttemptMetric(route, currentRequest.requestId, false, {
-                isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-                isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-                visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-              });
-              await this.markOAuthProviderFailure(route, effectiveOAuthError);
-              this.saveIntermediateError(
-                currentRequest.requestId,
-                targetApiType || 'chat',
-                effectiveOAuthError
-              );
-              logger.warn(
-                `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${effectiveOAuthError.message}`
-              );
-              doRelease();
-              continue;
-            }
-
-            attemptTimeout.cleanup();
-            await this.markOAuthProviderFailure(route, effectiveOAuthError);
-            doRelease();
-            throw effectiveOAuthError;
-          }
-        }
-
-        // 4. Execute Request (non-OAuth)
-        const incomingApi = currentRequest.incomingApiType || 'unknown';
-        const url = this.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
-        const headers = this.setupHeaders(route, targetApiType, requestWithTargetModel);
-
-        logger.info(
-          `Dispatching ${currentRequest.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
-        );
-
-        logger.silly('Upstream Request Payload', providerPayload);
-
-        // When TTFB stall detection is configured for streaming requests, wrap
-        // the fetch + probe in a single timeout that covers the entire TTFB
-        // window (from request dispatch to receiving ttfbBytes of body data).
-        // This handles the case where fetch() itself blocks for a long time
-        // waiting for HTTP response headers from a slow provider.
-        let response: Response;
-        let stallAbortController: AbortController | undefined;
-        let ttfbTimerId: ReturnType<typeof setTimeout> | undefined;
-        const dispatchStartTime = Date.now();
-
-        if (currentRequest.stream && effectiveStallConfig?.ttfbMs != null) {
-          // Create a separate AbortController for the TTFB stall timeout.
-          // We don't use the route's abortController because an abort there
-          // means the client disconnected — we need a distinct signal for
-          // "provider is too slow to start responding".
-          stallAbortController = new AbortController();
-          const combinedSignal = AbortSignal.any([
-            attemptTimeout.signal,
-            stallAbortController.signal,
-          ]);
-
-          const ttfbMs = effectiveStallConfig.ttfbMs!;
-          ttfbTimerId = setTimeout(() => {
-            stallAbortController!.abort(
-              new DOMException(
-                `Stream stalled: TTFB timeout — no response within ${ttfbMs}ms`,
-                'TimeoutError'
-              )
-            );
-          }, ttfbMs);
-          ttfbTimerId.unref?.();
-
-          try {
-            response = await this.executeProviderRequest(
-              url,
-              headers,
-              providerPayload,
-              combinedSignal
-            );
-          } catch (fetchError: any) {
-            // Client disconnected takes priority over stall detection —
-            // if the client is gone, no point retrying.
-            if (signal?.aborted) {
-              clearTimeout(ttfbTimerId);
-              throw this.buildCancelledError(signal);
-            }
-
-            // If the error was caused by our TTFB stall timeout, synthesize
-            // a stall result instead of treating it as a generic network error.
-            if (stallAbortController.signal.aborted) {
-              clearTimeout(ttfbTimerId);
-              const stallError = new Error(
-                `Stream stalled: TTFB timeout — no response within ${ttfbMs}ms`
-              );
-              lastError = stallError;
-
-              const canRetryStall =
-                failoverEnabled &&
-                i < targets.length - 1 &&
-                (this.isRetryableNetworkError(stallError, failover?.retryableErrors || []) ||
-                  stallError.message?.includes('stalled'));
-
-              if (canRetryStall) {
-                attemptTimeout.cleanup();
-                await this.recordAttemptMetric(route, currentRequest.requestId, false, {
-                  isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-                  isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-                  visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-                });
-                this.appendFailureAttempt(retryHistory, route, stallError, targetApiType, true);
-                CooldownManager.getInstance().markProviderStallFailure(
-                  route.provider,
-                  route.model,
-                  this.formatFailureReason(stallError)
-                );
-                this.saveIntermediateError(
-                  currentRequest.requestId,
-                  targetApiType || 'chat',
-                  stallError
-                );
-                logger.info(
-                  `TTFB stall: fetch timed out after ${ttfbMs}ms for ${route.provider}/${route.model}, retrying with next provider`
-                );
-                doRelease();
-                continue;
-              }
-              doRelease();
-              throw stallError;
-            }
-            throw fetchError;
-          }
-
-          // Fetch returned — clear the TTFB timer (we beat the timeout)
-          clearTimeout(ttfbTimerId);
-          ttfbTimerId = undefined;
-
-          // Adjust the stall config's ttfbMs for the probe — subtract the time
-          // already spent waiting for fetch() to return. The probe only needs
-          // to cover the remaining time until the byte threshold is met.
-          const fetchElapsed = Date.now() - dispatchStartTime;
-          const remainingTtfbMs = Math.max(0, ttfbMs - fetchElapsed);
-          if (remainingTtfbMs <= 0 && effectiveStallConfig) {
-            // Fetch returned just barely within the TTFB window — no time left
-            // for the probe. Skip the probe and let the pipeline handle it.
-            effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: null };
-          } else if (effectiveStallConfig) {
-            effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: remainingTtfbMs };
-          }
-        } else {
-          response = await this.executeProviderRequest(
-            url,
-            headers,
-            providerPayload,
-            attemptTimeout.signal
-          );
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          const canRetry =
-            failoverEnabled &&
-            i < targets.length - 1 &&
-            this.isRetryableStatus(response.status, failover?.retryableStatusCodes || []);
-
-          try {
-            await this.handleProviderError(
-              response,
-              route,
-              errorText,
-              url,
-              headers,
-              targetApiType,
-              currentRequest.requestId
-            );
-          } catch (e: any) {
-            if (signal?.aborted) throw this.buildCancelledError(signal);
-            lastError = e;
-            this.appendFailureAttempt(retryHistory, route, e, targetApiType, canRetry);
-
-            if (canRetry) {
-              attemptTimeout.cleanup();
-              doRelease();
-              await this.recordAttemptMetric(route, currentRequest.requestId, false, {
-                isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-                isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-                visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-              });
-              // Only mark as failed if the error actually triggered a cooldown (i.e., it's not a caller error like validation)
-              // Caller errors (400 validation errors, 413, 422) should not cause cooldown
-              if (e?.routingContext?.cooldownTriggered) {
-                CooldownManager.getInstance().markProviderFailure(
-                  route.provider,
-                  route.model,
-                  undefined,
-                  this.formatFailureReason(e, true)
-                );
-              }
-              this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', e);
-              logger.warn(
-                `Failover: retrying after HTTP ${response.status} from ${route.provider}/${route.model}`
-              );
-              continue;
-            }
-
-            doRelease();
-            throw e;
-          }
-        }
-
-        // 5. Handle Response
-        if (currentRequest.stream) {
-          // effectiveStallConfig was already computed before the fetch above.
-          // If TTFB stall is still active (fetch returned within TTFB but body
-          // hasn't met the byte threshold yet), the probe will continue checking.
-          const streamProbe = await this.probeStreamingStart(response, effectiveStallConfig);
-
-          if (!streamProbe.ok) {
-            const error = streamProbe.error;
-            lastError = error;
-
-            const canRetry =
-              failoverEnabled &&
-              i < targets.length - 1 &&
-              !streamProbe.streamStarted &&
-              (this.isRetryableNetworkError(error, failover?.retryableErrors || []) ||
-                error.message?.includes('stalled'));
-
-            if (canRetry) {
-              attemptTimeout.cleanup();
-              await this.recordAttemptMetric(route, currentRequest.requestId, false, {
-                isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-                isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-                visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-              });
-              this.appendFailureAttempt(retryHistory, route, error, targetApiType, true);
-              if (error.message?.includes('stalled')) {
-                CooldownManager.getInstance().markProviderStallFailure(
-                  route.provider,
-                  route.model,
-                  this.formatFailureReason(error)
-                );
-              } else {
-                CooldownManager.getInstance().markProviderFailure(
-                  route.provider,
-                  route.model,
-                  undefined,
-                  this.formatFailureReason(error)
-                );
-              }
-              this.saveIntermediateError(currentRequest.requestId, targetApiType || 'chat', error);
-              logger.warn(
-                `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
-              );
-              doRelease();
-              continue;
-            }
-
-            doRelease();
-            throw error;
-          }
-
-          const streamResponse = this.handleStreamingResponse(
-            streamProbe.response,
-            currentRequest,
-            route,
-            targetApiType,
-            bypassTransformation,
-            adapters
-          );
-
-          // Wrap the stream to release the concurrency slot when the stream
-          // is fully consumed, cancelled, or errors out. Without this, the
-          // slot would never be released for streaming responses.
-          if (streamResponse.stream) {
-            const originalStream = streamResponse.stream;
-            const reader = originalStream.getReader();
-            let released = false;
-            const release = () => {
-              if (!released) {
-                released = true;
-                reader.releaseLock();
-                doRelease();
-              }
-            };
-            streamResponse.stream = new ReadableStream({
-              async pull(controller) {
-                try {
-                  const { done, value } = await reader.read();
-                  if (done) {
-                    controller.close();
-                    release();
-                  } else {
-                    controller.enqueue(value);
-                  }
-                } catch (e) {
-                  controller.error(e);
-                  release();
-                }
-              },
-              cancel(reason) {
-                release();
-                return originalStream.cancel(reason);
-              },
-            });
-          }
-
-          await this.recordAttemptMetric(route, currentRequest.requestId, true, {
-            isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-            isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-            visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-          });
-          CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
-          this.recordStickySession(sessionKey, route, currentRequest);
-          this.appendSuccessAttempt(retryHistory, route, targetApiType);
-          this.attachAttemptMetadata(
-            streamResponse,
-            attemptedProviders,
-            retryHistory,
-            route,
-            targetApiType
-          );
-          attemptTimeout.cleanup();
-          return streamResponse;
-        }
-
-        const nonStreamingResponse = await this.handleNonStreamingResponse(
-          response,
-          currentRequest,
-          route,
-          targetApiType,
-          transformer,
-          bypassTransformation,
-          adapters
-        );
-        await this.recordAttemptMetric(route, currentRequest.requestId, true, {
-          isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-          isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-          visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-        });
-
-        if ((currentRequest as any)._isVisionDescriptorRequest && this.usageStorage) {
-          // ... (this part is fine)
-        }
-
-        CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
-        this.recordStickySession(sessionKey, route, currentRequest);
-        this.appendSuccessAttempt(retryHistory, route, targetApiType);
-        this.attachAttemptMetadata(
-          nonStreamingResponse,
-          attemptedProviders,
-          retryHistory,
-          route,
-          targetApiType
-        );
-        doRelease();
-        attemptTimeout.cleanup();
-        return nonStreamingResponse;
-      } catch (error: any) {
-        const effectiveError = attemptTimeout.isTimedOut() ? this.buildTimeoutError() : error;
-        lastError = effectiveError;
-        attemptTimeout.cleanup();
-        doRelease();
-
-        // If the client disconnected (abort signal), don't treat this as a
-        // retryable error — throw a proper client_disconnected error so the
-        // route handler records it as cancelled, not as an inference error.
-        if (signal?.aborted) throw this.buildCancelledError(signal);
-
-        // If the error came from handleProviderError, it already called markProviderFailure.
-        // Only call it here for network/transport errors that have no HTTP status code.
-        const isHttpError = effectiveError?.routingContext?.statusCode !== undefined;
-        const isUpstreamTimeout = effectiveError?.routingContext?.code === 'upstream_timeout';
-
-        if (!isHttpError || isUpstreamTimeout) {
-          // Pure network/transport error — mark the provider as failed
-          if (effectiveError.message?.includes('stalled')) {
-            CooldownManager.getInstance().markProviderStallFailure(
-              route.provider,
-              route.model,
-              this.formatFailureReason(effectiveError)
-            );
-          } else {
-            CooldownManager.getInstance().markProviderFailure(
-              route.provider,
-              route.model,
-              undefined,
-              this.formatFailureReason(effectiveError)
-            );
-          }
-        }
-        await this.recordAttemptMetric(route, currentRequest.requestId, false, {
-          isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
-          isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
-          visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
-        });
-
-        const canRetryNetwork =
-          failoverEnabled &&
-          i < targets.length - 1 &&
-          (isUpstreamTimeout ||
-            this.isRetryableNetworkError(effectiveError, failover?.retryableErrors || []) ||
-            effectiveError.message?.includes('stalled'));
-
-        this.appendFailureAttempt(retryHistory, route, effectiveError, undefined, canRetryNetwork);
-
-        if (canRetryNetwork) {
-          this.saveIntermediateError(
-            currentRequest.requestId,
-            effectiveError?.routingContext?.targetApiType || 'chat',
-            effectiveError
-          );
-          logger.warn(
-            `Failover: retrying after network/transport error from ${route.provider}/${route.model}: ${effectiveError.message}`
-          );
-          continue;
-        }
-
-        throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
-      }
-    }
-
-    throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+    return this.getRequestManager().dispatch(request, signal, resolveTimeoutMs, addStallConfig);
   }
 
   private isRetryableStatus(statusCode: number, retryableStatusCodes: number[]): boolean {
-    return retryableStatusCodes.includes(statusCode);
+    return isRetryableStatus(statusCode, retryableStatusCodes);
   }
 
-  /**
-   * Determines if an OAuth error is retryable.
-   * Retryable errors include network issues, rate limiting, and transient failures.
-   */
   private isRetryableOAuthError(error: any): boolean {
-    if (!error) return false;
-
-    const errorMessage = error.message?.toLowerCase() || '';
-    const statusCode = error.status || error.statusCode;
-
-    // Retry on network errors (no status code means network failure)
-    if (!statusCode) {
-      return true;
-    }
-
-    // Retry on 5xx server errors
-    if (statusCode >= 500 && statusCode < 600) {
-      return true;
-    }
-
-    // Retry on 429 rate limiting
-    if (statusCode === 429) {
-      return true;
-    }
-
-    // Retry on specific transient error messages
-    const retryablePatterns = [
-      'timeout',
-      'econnrefused',
-      'ECONNREFUSED',
-      'etimedout',
-      'ETIMEDOUT',
-      'network',
-      'socket',
-      'temporary',
-      'unavailable',
-      'service unavailable',
-    ];
-
-    for (const pattern of retryablePatterns) {
-      if (errorMessage.includes(pattern)) {
-        return true;
-      }
-    }
-
-    return false;
+    return isRetryableOAuthError(error);
   }
 
   private isRetryableNetworkError(error: any, retryableErrors: string[]): boolean {
-    if (!error) return false;
-    const code = String(error.code || '').toUpperCase();
-    const message = String(error.message || '').toUpperCase();
-    return retryableErrors.some((token) => {
-      const normalized = token.toUpperCase();
-      return code.includes(normalized) || message.includes(normalized);
-    });
+    return isRetryableNetworkError(error, retryableErrors);
   }
 
   private async probeStreamingStart(
@@ -1159,39 +397,7 @@ export class Dispatcher {
     finalRoute: RouteResult,
     apiType: string
   ): void {
-    const responseApiType = response?.plexus?.apiType;
-
-    response.plexus = {
-      ...(response.plexus || {}),
-      attemptCount: attemptedProviders.length,
-      finalAttemptProvider: finalRoute.provider,
-      finalAttemptModel: finalRoute.model,
-      allAttemptedProviders: JSON.stringify(attemptedProviders),
-      retryHistory: JSON.stringify(retryHistory),
-      canonicalModel: finalRoute.canonicalModel,
-      provider: finalRoute.provider,
-      model: finalRoute.model,
-      // Preserve the response-declared API type (e.g. oauth) so downstream
-      // stream transformation uses the correct transformer.
-      apiType: responseApiType || apiType,
-      pricing: finalRoute.modelConfig?.pricing,
-      providerDiscount: finalRoute.config.discount,
-      config: {
-        estimateTokens: finalRoute.config.estimateTokens,
-      },
-      // GPU params — read directly from the resolved numeric fields.
-      // The frontend (or config hydration) resolves named profiles to concrete
-      // values before they reach this point. Fall back to H100 only if no GPU
-      // fields are set at all (i.e. no GPU profile was configured).
-      gpuParams: {
-        ram_gb: finalRoute.config.gpu_ram_gb ?? DEFAULT_GPU_PARAMS.ram_gb,
-        bandwidth_tb_s: finalRoute.config.gpu_bandwidth_tb_s ?? DEFAULT_GPU_PARAMS.bandwidth_tb_s,
-        flops_tflop: finalRoute.config.gpu_flops_tflop ?? DEFAULT_GPU_PARAMS.flops_tflop,
-        power_draw_watts:
-          finalRoute.config.gpu_power_draw_watts ?? DEFAULT_GPU_PARAMS.power_draw_watts,
-      },
-      modelParams: resolveModelParams(finalRoute.modelArchitecture),
-    } as any;
+    attachAttemptMetadata(response, attemptedProviders, retryHistory, finalRoute, apiType);
   }
 
   private appendSkippedAttempt(
@@ -1200,15 +406,7 @@ export class Dispatcher {
     reason: string,
     apiType?: string
   ): void {
-    retryHistory.push({
-      index: retryHistory.length + 1,
-      provider: route.provider,
-      model: route.model,
-      apiType,
-      status: 'skipped',
-      reason,
-      retryable: false,
-    });
+    appendSkippedAttempt(retryHistory, route, reason, apiType);
   }
 
   /**
@@ -1265,15 +463,7 @@ export class Dispatcher {
     route: RouteResult,
     apiType?: string
   ): void {
-    retryHistory.push({
-      index: retryHistory.length + 1,
-      provider: route.provider,
-      model: route.model,
-      apiType,
-      status: 'success',
-      reason: 'Request completed successfully',
-      retryable: false,
-    });
+    appendSuccessAttempt(retryHistory, route, apiType);
   }
 
   private appendFailureAttempt(
@@ -1283,20 +473,14 @@ export class Dispatcher {
     apiType?: string,
     retryable?: boolean
   ): void {
-    const statusCode = error?.routingContext?.statusCode ?? error?.status ?? error?.statusCode;
-    const reason = this.formatFailureReason(error);
-
-    retryHistory.push({
-      index: retryHistory.length + 1,
-      provider: route.provider,
-      model: route.model,
+    appendFailureAttempt(
+      retryHistory,
+      route,
+      error,
+      this.formatFailureReason.bind(this),
       apiType,
-      status: 'failed',
-      reason,
-      statusCode: typeof statusCode === 'number' ? statusCode : undefined,
-      retryable,
-      providerResponseHeaders: error?.routingContext?.providerResponseHeaders,
-    });
+      retryable
+    );
   }
 
   private buildAllTargetsFailedError(
@@ -1304,22 +488,13 @@ export class Dispatcher {
     attemptedProviders: string[],
     retryHistory: RetryAttemptRecord[] = []
   ): Error {
-    const summary = attemptedProviders.length > 0 ? attemptedProviders.join(', ') : 'none';
-    const baseMessage = this.compactProviderErrorSummary(
-      this.formatFailureReason(lastError) || lastError?.message || 'Unknown provider error'
+    return buildAllTargetsFailedError(
+      lastError,
+      attemptedProviders,
+      retryHistory,
+      this.formatFailureReason.bind(this),
+      this.compactProviderErrorSummary.bind(this)
     );
-    const enriched = new Error(`All targets failed: ${summary}. Last error: ${baseMessage}`) as any;
-
-    enriched.cause = lastError;
-    enriched.routingContext = {
-      ...(lastError?.routingContext || {}),
-      allAttemptedProviders: attemptedProviders,
-      attemptCount: attemptedProviders.length,
-      retryHistory: JSON.stringify(retryHistory),
-      statusCode: lastError?.routingContext?.statusCode || 500,
-    };
-
-    return enriched;
   }
 
   private async parseJsonResponseBody(
@@ -1443,23 +618,8 @@ export class Dispatcher {
     signal: AbortSignal | undefined,
     providerTimeoutMs: number | null | undefined,
     resolveTimeoutMs?: ResolveTimeoutMs
-  ): { signal: AbortSignal; isTimedOut: () => boolean; cleanup: () => void } {
-    const timeoutMs = resolveTimeoutMs
-      ? resolveTimeoutMs(providerTimeoutMs ?? null)
-      : (providerTimeoutMs ?? (getConfig().timeout?.defaultSeconds ?? 300) * 1000);
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(() => {
-      timeoutController.abort(new DOMException('Upstream request timed out', 'TimeoutError'));
-    }, timeoutMs);
-    timeoutId.unref?.();
-
-    return {
-      signal: signal
-        ? AbortSignal.any([signal, timeoutController.signal])
-        : timeoutController.signal,
-      isTimedOut: () => timeoutController.signal.aborted,
-      cleanup: () => clearTimeout(timeoutId),
-    };
+  ) {
+    return createAttemptTimeout(signal, providerTimeoutMs, resolveTimeoutMs);
   }
 
   private buildTimeoutError(): Error {
@@ -1481,54 +641,6 @@ export class Dispatcher {
     return err;
   }
 
-  /**
-   * Determines if pass-through optimization should be used
-   */
-  private shouldUsePassThrough(
-    request: UnifiedChatRequest,
-    targetApiType: string,
-    route: RouteResult
-  ): boolean {
-    // If vision fallthrough was applied, we must use the translated pathway
-    // to ensure the modified messages (text instead of images) are sent.
-    if ((request as any)._hasVisionFallthrough) {
-      return false;
-    }
-
-    // pi-ai routes (OAuth + Claude-masking) require pi-ai Context format built by
-    // the OAuth transformer's transformRequest. Pass-through would hand the raw
-    // client body straight to pi-ai, and its transformMessages() would crash on
-    // string-valued assistant content (issue #162).
-    if (this.isPiAiRoute(route, targetApiType)) {
-      return false;
-    }
-
-    // Codex CLI Responses API extensions (namespace tools, custom/freeform
-    // tools) aren't understood by most Responses-API-compatible upstream
-    // providers. Pass-through forwards the raw client body byte-for-byte and
-    // returns the raw provider response byte-for-byte, so there's no point in
-    // the pipeline to flatten namespace tools / normalize custom tool calls
-    // on the way out or split/unwrap them on the way back. Force the full
-    // transform pipeline (ResponsesTransformer.parseRequest/transformRequest/
-    // transformResponse/formatResponse/formatStream) instead.
-    if (
-      getApiBaseType(targetApiType) === 'responses' &&
-      hasCodexResponsesExtensions(request.originalBody)
-    ) {
-      return false;
-    }
-
-    const isCompatible =
-      !!request.incomingApiType?.toLowerCase() &&
-      request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase();
-
-    return isCompatible && !!request.originalBody;
-  }
-
-  /**
-   * Transforms the request payload or uses pass-through optimization
-   * @returns Transformed payload and bypass flag
-   */
   private async transformRequestPayload(
     request: UnifiedChatRequest,
     route: RouteResult,
@@ -1536,99 +648,7 @@ export class Dispatcher {
     targetApiType: string,
     adapters: ResolvedAdapter[] = []
   ): Promise<{ payload: any; bypassTransformation: boolean }> {
-    let providerPayload: any;
-    let bypassTransformation = false;
-
-    if (this.shouldUsePassThrough(request, targetApiType, route)) {
-      logger.debug(
-        `Pass-through optimization active: ${request.incomingApiType} -> ${targetApiType}` +
-          (adapters.length > 0 ? ` (with ${adapters.length} adapter(s))` : '')
-      );
-      providerPayload = JSON.parse(JSON.stringify(request.originalBody));
-      providerPayload.model = route.model;
-
-      // Add metadata from request
-      if (request.metadata) {
-        const apiMetadata = this.getApiMetadata(request.metadata);
-        if (Object.keys(apiMetadata).length > 0) {
-          providerPayload.metadata = apiMetadata;
-        }
-      }
-
-      bypassTransformation = true;
-    } else {
-      // Inject OAuth provider into metadata so transformers can set provider/model
-      // on assistant messages for thought-signature replay (required by Gemini 3).
-      const oauthProvider = this.isClaudeMaskingApiKeyRoute(route, targetApiType)
-        ? 'anthropic'
-        : route.config.oauth_provider || route.provider;
-      if (oauthProvider) {
-        request = {
-          ...request,
-          metadata: {
-            ...(request.metadata || {}),
-            plexus_metadata: {
-              ...((request.metadata as any)?.plexus_metadata || {}),
-              oauthProvider,
-            },
-          },
-        };
-      }
-      providerPayload = await transformer.transformRequest(request);
-    }
-
-    // Convert reasoning field to thinkingConfig for Gemini API
-    providerPayload = this.applyGeminiThinkingConfig(route, targetApiType, providerPayload);
-
-    providerPayload = this.applyRegistryAutoCompat(providerPayload, request, route, targetApiType);
-
-    // Merge provider-level extraBody first
-    if (route.config.extraBody) {
-      providerPayload = { ...providerPayload, ...route.config.extraBody };
-    }
-
-    // Then merge model-level extraBody (overrides provider-level)
-    if (route.modelConfig?.extraBody) {
-      providerPayload = { ...providerPayload, ...route.modelConfig.extraBody };
-    }
-
-    // Apply alias-level advanced behaviors (e.g. strip_adaptive_thinking)
-    // Also merge alias-level extraBody (overrides both provider and model level)
-    if (route.canonicalModel) {
-      const aliasConfig = getConfig().models?.[route.canonicalModel];
-      if (aliasConfig?.extraBody) {
-        providerPayload = { ...providerPayload, ...aliasConfig.extraBody };
-      }
-      if (aliasConfig?.advanced) {
-        providerPayload = applyModelBehaviors(providerPayload, aliasConfig.advanced, {
-          incomingApiType: request.incomingApiType ?? '',
-          canonicalModel: route.canonicalModel,
-        });
-      }
-    }
-
-    // Apply provider/model adapters (preDispatch) in configured order
-    for (const { adapter, options } of adapters) {
-      providerPayload = adapter.preDispatch(providerPayload, options);
-    }
-
-    if (adapters.length > 0) {
-      logger.debug(
-        `Adapters applied (preDispatch): [${adapters.map((a) => a.adapter.name).join(', ')}] ` +
-          `for ${route.provider}/${route.model}`
-      );
-    }
-
-    return { payload: providerPayload, bypassTransformation };
-  }
-
-  private applyRegistryAutoCompat(
-    providerPayload: any,
-    request: UnifiedChatRequest,
-    route: RouteResult,
-    targetApiType: string
-  ): any {
-    return applyRegistryAutoCompat(providerPayload, request, route, targetApiType);
+    return buildRequestPayload(request, route, transformer, targetApiType, adapters);
   }
 
   /**
@@ -1656,12 +676,7 @@ export class Dispatcher {
     payload: any,
     signal?: AbortSignal
   ): Promise<Response> {
-    return await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal,
-    });
+    return executeUpstreamRequest(url, headers, payload, signal);
   }
 
   /**
