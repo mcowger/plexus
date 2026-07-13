@@ -1,0 +1,3374 @@
+[
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": "",
+          "role": "assistant",
+          "reasoning": null,
+          "reasoning_details": [
+            {
+              "type": "reasoning.encrypted",
+              "data": "gAAAAABqVI8wU1epfkDlb46-vbypMmuDBbaHyaE_-kZz_sYhiwneqtK19W-qDRGja5-vDfFF7WsuKmRJirL_gcG99FzbQq8sDoT1GVDsHUZ0v1Vkoq8IVhy4QBOuHTmJf3NUhQt2c8BqZrn5Ofki-B-oUGzDOUFV8WQupcms1u1sFPZ83_DeSBnN1EsMBhpgvNE-aGoqMOdtUHVqdwRcLn7cLU2X7d4z7Fh-234pg83wg1CzYILpNyXj5XXSbVyGYvR-F5SN4cW8RqOLO5hNJoVzme0UVwTdSac3ZqTZbnqy2_UZ6jrYb7iMNjNPLMZ1F4blj1qJoxQb3Z9zeYMN0lqgcwP6II5-MgwSp1-pUennove-vCopdz6VWvLR7YGzkZ2bq-0Sxf0aMBfmkM5BxZ80YRJ7E0in2ohevFNMWEE9wp3D5Uftl7O96hmiLsmNgb_G86yicLCuRWVjaGIWII5VBy9frpJfdBaMSL1gaG2nK7blVCM22Ajspsx_O4yactBom8GHFF7JOBh4Voe0HlpmYrQ0mL45DFnqyXg-Y-IIs_SPrb4xwflSSbz8QVjpMMDCGY-KbsqL8bUILGOYLP4V2L4Difi7Jr9oUYhkOlCqys3-CBOFMgveFgbYSwk-UulyuHexzL8kkbYRhHbpSm597wbEcleOEzykjhUwEFPwjsWWhtklr0JqdeSYBPCDUmZm8J696kwjOfeA30Qv8Z2dPMy38CCF4J1tUJrkmCYmnyax3jIvaRkz2AWuZAcY6PjQthpBLFD7o-6fZ82-w7xOW9qkrxalPPtIus16FMxPCM-332BMCkjFARyS8CG6mj-xM5C9e8axNoT00itfdNSnEfWcJtRTlTzMjSey8Cma0c1YVY2z4gOJRsUWkOGLOABCGsGgaLsYKP1Prh64bOmwX671RMN0vislcI1haWzy8eGQpJ0-K0UK-7b2o_d1nVX99x6WrchnfbWu253l-V1rOJkIigmuICaRLMoMrx3l1XISeyo3AS_D0k5EtX6Fskh4CAPqYbzVJny34fzQ0fVeNtAddOxVypcu-fxmoSb20BP10d5Jtb_ATPVv_-5gQAN7XmBpNC1OAdBXrj5n7rFIzPdE6LM0mnp6eLLlBmiBvxLT9HbhhVD70OlQhnvaAmdimHRRpGbRXEbpdYdlExoU82beglxicUafUzIyMyw2a4u0HBnBriQcDYhsqmSrYpexWWuca9Hu2rGbBrO5CgCHlfuqQE5FWMHz3XKK3FTR4orQ-wqS0E_QZRKCAkVd7Q5_FQWNDMfIq_iIBbSUCoWuSx3ZXIQVlyBVEapXOoNwwiQjzec-QxBDU5u77YJ5aUGg1QCLT_1hvbsdLv8YxA3DzwyTIVbKEJ4htLg0trVfkJqBorzQMrzyD9AxfYBE-7fP_OPAezmjhtFGtj8g5bC2CB365pyk-WXk-VCjv5OAsT5Wpl_3VOtM7eDmq9W0_ZWwvV_EHxMCoW3Q9fSfZvt_PWOpOctd7Ap_gDu2ZmebSiC23USj68oInwRPGdQVQupxdeEUR0KItaFKp1N0J57doWVDOXK6n7gDq1m8-4mq5uGvWOV36w099_nY3ukK3GwXxRIPte8MRVjBWUsCV2AfGVHy4az6FKx7JLNrNkV3-vlPRb6ZJLSSUuc1gjR_xSk0_dIUvKc1A6E8oq4GSXjtCgJVXHy_9YHslJtGc59IxzxsMOI3mI3gjYeMgg8S80QDj6q1E6A2JETlCCZUdJHFK0RRrFQZ3uztXa26exIypHzyK3Kq35No4_Jm5Csx1w0Y9Mzn48yLKhFHrUinN08QwR1Q8wclukEAzqjUIePbMj-TGXWUHJgHsUKihswfhxjFiO5OQtuvm3e8tipO5giUkBpsRC2bbJXSuNA7UMXfCpxkEhnCJu4q-WA5OUTKmcujBVromMkb",
+              "format": "azure-openai-responses-v1",
+              "id": "rs_05d9927bdd56b683016a548f2efbf481969aa77e9ee610aa25",
+              "index": 0
+            }
+          ]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [
+            {
+              "index": 0,
+              "id": "call_x1iAotVivK6LxSOhrkT9PeQ0",
+              "type": "function",
+              "function": { "name": "exec", "arguments": "" }
+            }
+          ]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "{\"" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "input" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "\":\"" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "const" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " r" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " =" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " await" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " tools" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".exec" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "_command" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "({" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "cmd" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ":\\\"" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "nl" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ba" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " packages" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "plex" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "us" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "-model" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "s" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/src" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "convert" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".ts" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " |" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " sed" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "n" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " '" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "315" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "370" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "';" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " nl" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ba" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " packages" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "plex" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "us" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "-op" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "encode" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/src" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/config" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "-store" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".ts" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " |" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " sed" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "n" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " '" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "1" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "155" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "';" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " nl" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ba" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " packages" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "plex" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "us" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "-p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "i" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/src" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/config" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".ts" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " |" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " sed" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "n" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " '" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "1" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "175" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "';" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " nl" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ba" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " ." } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "github" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/work" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "flows" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ublish" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".yaml" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " |" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " sed" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "n" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " '" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "1" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "120" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "';" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " nl" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ba" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " scripts" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/re" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "lease" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".ts" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " |" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " sed" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "n" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " '" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "1" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "240" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "';" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " nl" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ba" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " package" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".json" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " |" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " sed" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " -" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "n" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " '" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "1" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "100" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "p" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "'" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "\\\"," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "work" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "dir" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ":\\\"" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "home" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/m" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "att" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".c" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ow" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "ger" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/work" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "space" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "/" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "plex" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "us" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "-agent" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "-" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "plugins" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "\\\"," } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "yield" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "_time" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "_ms" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ":" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "100" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "00" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ",max" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "_output" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "_tokens" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ":" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "160" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "00" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "});" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": " text" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "(r" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ".output" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": ");" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": {
+          "content": null,
+          "role": "assistant",
+          "tool_calls": [{ "index": 0, "function": { "arguments": "\"}" } }]
+        },
+        "finish_reason": null,
+        "native_finish_reason": null
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "choices": [
+      {
+        "index": 0,
+        "delta": { "content": "", "role": "assistant", "reasoning": null },
+        "finish_reason": "tool_calls",
+        "native_finish_reason": "completed"
+      }
+    ]
+  },
+  {
+    "id": "gen-1783926573-wicgKWV7iA1jvtRKvEnt",
+    "object": "chat.completion.chunk",
+    "created": 1783926573,
+    "model": "openai/gpt-5.6-luna",
+    "provider": "Azure",
+    "service_tier": "default",
+    "choices": [
+      {
+        "index": 0,
+        "delta": { "content": "", "role": "assistant" },
+        "finish_reason": "tool_calls",
+        "native_finish_reason": "completed"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 61356,
+      "completion_tokens": 326,
+      "total_tokens": 61682,
+      "cost": 0.0100896,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 59136,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.0100896,
+        "upstream_inference_prompt_cost": 0.0081336,
+        "upstream_inference_completions_cost": 0.001956
+      },
+      "completion_tokens_details": { "reasoning_tokens": 141, "image_tokens": 0, "audio_tokens": 0 }
+    }
+  }
+]
