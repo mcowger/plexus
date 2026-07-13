@@ -29,9 +29,10 @@ Always edit the correct dialect subdirectory. When adding a new table, **update 
 ### The Only Correct Workflow
 
 1. Edit schema `.ts` files in `postgres/` or `sqlite/`.
-2. Validate locally (optional): `bun run generate-migrations` — verify the SQL looks right, then **discard the output** (do not commit). **Never run `drizzle-kit generate` directly.**
-3. Commit only the schema `.ts` changes. The pre-commit hook blocks migration artifacts.
-4. After the PR merges to `main`, CI auto-generates and commits the migrations.
+2. Validate locally (optional): `bun run generate-migrations` — verify the SQL looks right.  DO NOT *delete* generated files.  It is desired to leavse them in place without committing them.
+3.  **Never run `drizzle-kit generate` directly.**
+4. Commit only the schema `.ts` changes. The pre-commit hook blocks migration artifacts.
+5. After the PR merges to `main`, CI auto-generates and commits the migrations.
 
 ### Migration Naming
 
@@ -60,7 +61,7 @@ This produces files like `0044_add_quota_checkers.sql` or `0044_auto_issue_424.s
 - [ ] Export the new table from `drizzle/schema/index.ts`.
 - [ ] If Postgres, add any new enum values to `postgres/enums.ts` (e.g. `quotaCheckerTypeEnum`).
 - [ ] Validate with `bun run generate-migrations --name <descriptive-name>` locally if desired — discard output.
-- [ ] Commit only `.ts` schema files.
+- [ ] Commit only `.ts` schema files.  DO NOT DELETE GENERATED MIGRATIONS even if you do not commit them.
 
 ## Type Definitions
 
