@@ -89,27 +89,44 @@ function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function stripUnsupportedResponsesCustomToolCallNamespaces(payload: any): any {
-  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.input)) {
-    return payload;
+/**
+ * Detects Codex CLI Responses API extensions (namespace tools, custom/freeform
+ * tools, and their corresponding input items) that most Responses-API-compatible
+ * upstream providers don't understand. When present, the raw body cannot be
+ * forwarded as-is (pass-through) — it must go through ResponsesTransformer's
+ * namespace-flattening/custom-tool-normalization so the upstream provider only
+ * ever sees plain function tools.
+ */
+function hasCodexResponsesExtensions(body: any): boolean {
+  if (!body || typeof body !== 'object') {
+    return false;
   }
 
-  let changed = false;
-  const input = payload.input.map((item: any) => {
-    if (
-      item &&
-      typeof item === 'object' &&
-      item.type === 'custom_tool_call' &&
-      hasOwn(item, 'namespace')
-    ) {
-      const { namespace: _namespace, ...rest } = item;
-      changed = true;
-      return rest;
-    }
-    return item;
-  });
+  if (
+    Array.isArray(body.tools) &&
+    body.tools.some((t: any) => t?.type === 'namespace' || t?.type === 'custom')
+  ) {
+    return true;
+  }
 
-  return changed ? { ...payload, input } : payload;
+  if (
+    Array.isArray(body.input) &&
+    body.input.some(
+      (item: any) =>
+        item &&
+        typeof item === 'object' &&
+        (item.type === 'custom_tool_call' ||
+          item.type === 'custom_tool_call_output' ||
+          (item.type === 'additional_tools' &&
+            Array.isArray(item.tools) &&
+            item.tools.length > 0) ||
+          (item.type === 'function_call' && typeof item.namespace === 'string'))
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeReasoningFromUnified(
@@ -2007,9 +2024,22 @@ export class Dispatcher {
         targetApiType = match;
         selectionReason = `matched incoming request type '${incoming}'`;
       } else if (isApiSubtype(incoming)) {
-        return {
-          selectionReason: `incoming API subtype '${incoming}' is not supported by this target`,
-        };
+        // No exact subtype match (e.g. "responses:lite"): Plexus fully
+        // translates the subtype's wire extensions via the transform
+        // pipeline, so a target advertising only the base type (e.g.
+        // "responses") is still usable as a fallback. If the target
+        // doesn't even support the base type, fall through to the
+        // default (first available) type — the transform pipeline
+        // handles cross-format translation (e.g. to chat completions)
+        // the same way it would for any other incoming type.
+        const baseType = getApiBaseType(incoming);
+        const baseMatch = availableTypes.find((t: string) => t.toLowerCase() === baseType);
+        if (baseMatch) {
+          targetApiType = baseMatch;
+          selectionReason = `incoming API subtype '${incoming}' not directly supported, fell back to base type '${baseType}'`;
+        } else {
+          selectionReason = `incoming API subtype '${incoming}' not supported, defaulted to '${targetApiType}'`;
+        }
       } else {
         selectionReason = `incoming type '${incoming}' not supported, defaulted to '${targetApiType}'`;
       }
@@ -3082,6 +3112,21 @@ export class Dispatcher {
       return false;
     }
 
+    // Codex CLI Responses API extensions (namespace tools, custom/freeform
+    // tools) aren't understood by most Responses-API-compatible upstream
+    // providers. Pass-through forwards the raw client body byte-for-byte and
+    // returns the raw provider response byte-for-byte, so there's no point in
+    // the pipeline to flatten namespace tools / normalize custom tool calls
+    // on the way out or split/unwrap them on the way back. Force the full
+    // transform pipeline (ResponsesTransformer.parseRequest/transformRequest/
+    // transformResponse/formatResponse/formatStream) instead.
+    if (
+      getApiBaseType(targetApiType) === 'responses' &&
+      hasCodexResponsesExtensions(request.originalBody)
+    ) {
+      return false;
+    }
+
     const isCompatible =
       !!request.incomingApiType?.toLowerCase() &&
       request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase();
@@ -3110,10 +3155,6 @@ export class Dispatcher {
       );
       providerPayload = JSON.parse(JSON.stringify(request.originalBody));
       providerPayload.model = route.model;
-
-      if (getApiBaseType(targetApiType) === 'responses') {
-        providerPayload = stripUnsupportedResponsesCustomToolCallNamespaces(providerPayload);
-      }
 
       // Add metadata from request
       if (request.metadata) {

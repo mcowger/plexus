@@ -15,7 +15,7 @@ import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
 import { StickySessionManager } from './sticky-session-manager';
 import type { ModelArchitecture } from '@plexus/shared';
-import { isApiSubtype, normalizeApiAccessList } from '../utils/api-format';
+import { getApiBaseType, isApiSubtype, normalizeApiAccessList } from '../utils/api-format';
 
 export interface RouteResult {
   provider: string;
@@ -218,21 +218,40 @@ async function filterGroupTargets(
 
   // 4. API match filter
   //
-  // API subtypes are strict wire contracts. A target that only advertises the
-  // base API type (e.g. "responses") must not participate in selection for a
-  // subtype request (e.g. "responses:lite"), regardless of alias priority.
-  // Filtering here keeps selector and sticky-session ordering from pinning an
-  // incompatible target ahead of a compatible one.
+  // Subtype requests (e.g. "responses:lite") prefer targets that advertise
+  // the exact subtype, then targets advertising the base API type (e.g.
+  // "responses") — Plexus fully translates the subtype's wire extensions
+  // (Codex CLI's namespace/custom tools, `additional_tools` input items)
+  // via the transform pipeline, so neither is strictly required. If no
+  // target advertises either, fall back to all healthy targets rather than
+  // excluding the alias entirely; the dispatcher's own per-target API type
+  // selection (and full transform pipeline) still handles cross-format
+  // translation from there (e.g. to a chat-completions-only target).
   if (incomingApiType && isApiSubtype(incomingApiType)) {
-    const compatibleTargets = findApiCompatibleTargets(healthyTargets, incomingApiType);
+    const exactTargets = findApiCompatibleTargets(healthyTargets, incomingApiType);
+    const baseTargets =
+      exactTargets.length > 0
+        ? []
+        : findApiCompatibleTargets(healthyTargets, getApiBaseType(incomingApiType));
+    const compatibleTargets =
+      exactTargets.length > 0 ? exactTargets : baseTargets.length > 0 ? baseTargets : null;
 
-    if (logModelName) {
+    if (compatibleTargets) {
+      if (logModelName) {
+        logger.info(
+          `Router: Incoming API subtype '${incomingApiType}' narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} compatible targets` +
+            (exactTargets.length === 0
+              ? ` (fell back to base type '${getApiBaseType(incomingApiType)}')`
+              : '') +
+            '.'
+        );
+      }
+      healthyTargets = compatibleTargets;
+    } else if (logModelName) {
       logger.info(
-        `Router: Incoming API subtype '${incomingApiType}' narrowed ${healthyTargets.length} healthy targets to ${compatibleTargets.length} compatible targets.`
+        `Router: Incoming API subtype '${incomingApiType}' has no directly compatible targets. Falling back to all healthy targets for cross-format translation.`
       );
     }
-
-    healthyTargets = compatibleTargets;
   } else if (alias.priority === 'api_match' && incomingApiType) {
     const compatibleTargets = findApiCompatibleTargets(healthyTargets, incomingApiType);
 
