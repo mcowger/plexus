@@ -463,10 +463,13 @@ export function piAiEventToChunk(
         },
       };
     case 'toolcall_start': {
-      // Codex Chat streams need the tool identity as a separate delta. Other OAuth
-      // formatters historically consume identity from the argument event, and Gemini
-      // rejects the empty arguments emitted by a start chunk.
-      if (provider !== 'openai-codex') return null;
+      // Emit the one-and-only identity chunk (id + name, empty args) for 'start'
+      // providers (Codex, Anthropic); suppress it for 'delta' providers (Gemini),
+      // whose formatter reads identity from the argument deltas and would choke on
+      // an empty-args start chunk. See toolCallIdentityChannel() below for the full
+      // rationale and the failure mode per formatter — do not change this gate
+      // without reading it.
+      if (toolCallIdentityChannel(provider) !== 'start') return null;
 
       const toolCall = event.partial?.content?.[event.contentIndex];
       if (!toolCall || toolCall.type !== 'toolCall') return null;
@@ -505,15 +508,37 @@ export function piAiEventToChunk(
           .slice(0, event.contentIndex)
           .filter((c: any) => c.type === 'toolCall').length;
 
+        // Include identity (id + name) on the delta only for 'delta' providers
+        // (Gemini), which never received a start chunk and would otherwise drop the
+        // tool call for lack of a name. 'start' providers (Codex, Anthropic) get
+        // args-only deltas here — repeating the name per chunk is the exact bug
+        // (#719) that made Codex reject over-length accumulated names. See
+        // toolCallIdentityChannel() below.
+        const includeIdentity = toolCallIdentityChannel(provider) === 'delta';
+        const { callId } = includeIdentity
+          ? parseToolCallIds((toolCall as any).id)
+          : { callId: undefined };
+
         return {
           ...baseChunk,
           delta: {
             tool_calls: [
               {
                 index: toolCallIndex,
-                function: {
-                  arguments: event.delta,
-                },
+                ...(includeIdentity
+                  ? {
+                      id: callId || (toolCall as any).id,
+                      type: 'function' as const,
+                      function: {
+                        name: normalizeToolName((toolCall as any).name),
+                        arguments: event.delta,
+                      },
+                    }
+                  : {
+                      function: {
+                        arguments: event.delta,
+                      },
+                    }),
               },
             ],
             ...(thoughtSignature
@@ -614,6 +639,61 @@ function mapStopReason(reason: string): string {
     default:
       return 'stop';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Streamed tool-call identity routing (LOAD-BEARING — read before editing)
+// ---------------------------------------------------------------------------
+// When pi-ai streams a tool call it emits `toolcall_start` (identity: id + name,
+// no args yet) followed by N `toolcall_delta` events (argument fragments). This
+// mapper turns those into OpenAI-shaped `tool_calls` chunks. The *identity*
+// (id + function name) must appear exactly once, but WHERE it must appear
+// differs per downstream OAuth formatter, so this decision is centralized here.
+//
+// Two channels:
+//   'start' — emit identity once on the toolcall_start chunk; deltas are
+//             args-only. Used by Codex and Anthropic.
+//   'delta' — suppress the start chunk (return null); carry identity on every
+//             argument delta. Used by Gemini.
+//
+// Why each formatter needs what it needs (with the failure mode if you get it
+// wrong — all three have bitten us before):
+//
+//   * openai-codex — The OpenAI Chat streaming contract puts identity in the
+//     first chunk and args-only after. Repeating id+name on every delta made
+//     clients re-accumulate the function name into an ever-growing string that
+//     Codex rejected for exceeding its name-length limit. That is the bug this
+//     whole mechanism fixes (issue #719, "emit tool name once").
+//
+//   * anthropic — anthropic/stream-formatter.ts opens a tool_use block only when
+//     a chunk carries a truthy `tc.id` (`if (!toolCallId) continue;`). If NO
+//     chunk ever carries the id (e.g. start suppressed AND deltas stripped of
+//     identity), the block never opens and the entire tool call is silently
+//     dropped. So Anthropic must get identity on the start chunk. It tolerates
+//     args-only deltas because it de-dupes the block by id.
+//
+//   * google-gemini-cli — Gemini gets NO start chunk. Historically (commit
+//     082d33f8, "Gemini compatibility") the Gemini formatter emitted a
+//     functionCall part per chunk immediately, so an empty-args start chunk
+//     produced a premature/malformed functionCall with `args:{}` before the real
+//     args arrived. The fix then was to suppress the start event entirely. The
+//     formatter was later rewritten to accumulate state and defer emission
+//     (gemini/stream-formatter.ts), but it now reads the function *name* only
+//     from the delta stream (`state.name = tc.function.name`) and drops any call
+//     whose name never arrives (`if (!state.name) return null;`). So for Gemini
+//     the identity MUST ride on the deltas — suppressing the start chunk is
+//     still correct, but stripping id+name from the deltas (as the first cut of
+//     #719 did for all providers) makes every Gemini tool call vanish.
+//
+// Net: 'start' for everyone except Gemini. A new OAuth backend that needs
+// delta-carried identity is a one-line addition here — do NOT re-fork the
+// switch cases in piAiEventToChunk. Regression coverage lives in
+// __tests__/oauth-anthropic-stream-regression.test.ts and
+// __tests__/oauth-gemini-stream-error-regression.test.ts.
+type ToolCallIdentityChannel = 'start' | 'delta';
+
+function toolCallIdentityChannel(provider?: string): ToolCallIdentityChannel {
+  return provider === 'google-gemini-cli' ? 'delta' : 'start';
 }
 
 function parseToolCallIds(rawId?: string): { callId?: string; functionCallId?: string } {

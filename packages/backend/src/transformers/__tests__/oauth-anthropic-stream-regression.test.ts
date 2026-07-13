@@ -121,6 +121,13 @@ describe('OAuth -> Anthropic stream regression', () => {
     expect(chunk).toBeNull();
   });
 
+  // Regression for issue #719 (Codex). pi-ai emits a `toolcall_start` (identity)
+  // then N `toolcall_delta`s (arg fragments). The OpenAI/Codex streaming contract
+  // requires the id + function name to appear EXACTLY ONCE, on the first chunk;
+  // repeating them on every delta made clients re-accumulate the name into an
+  // over-length string that Codex rejected. This asserts identity lands on the
+  // start chunk and every delta is args-only. See toolCallIdentityChannel() in
+  // ../oauth/type-mappers.ts for the full cross-provider rationale.
   test('piAiEventToChunk emits tool identity once before argument deltas', () => {
     const partial = {
       content: [
@@ -176,6 +183,46 @@ describe('OAuth -> Anthropic stream regression', () => {
     });
   });
 
+  // Anthropic uses the SAME 'start' channel as Codex — this is the row that a
+  // naive #719 fix broke. anthropic/stream-formatter.ts opens a tool_use block
+  // only on a chunk carrying a truthy `tc.id` (`if (!toolCallId) continue;`); if
+  // identity never arrives on any chunk, the whole tool call is silently dropped.
+  // So Anthropic must get identity on the start chunk (NOT stripped from deltas
+  // with nothing to replace it). This guards against regressing back to that.
+  test('piAiEventToChunk emits Anthropic tool identity on the start event, args-only on deltas', () => {
+    const partial = {
+      content: [
+        { type: 'thinking', thinking: 'I should list files' },
+        { type: 'toolCall', id: 'toolu_123', name: 'bash', arguments: {} },
+      ],
+    };
+
+    const startChunk = piAiEventToChunk(
+      { type: 'toolcall_start', contentIndex: 1, partial } as any,
+      'claude-sonnet-4-6',
+      'anthropic'
+    );
+    const delta = piAiEventToChunk(
+      { type: 'toolcall_delta', contentIndex: 1, delta: '{"cmd": "ls"}', partial } as any,
+      'claude-sonnet-4-6',
+      'anthropic'
+    );
+
+    // Identity travels on the start chunk so the Anthropic formatter can open the
+    // tool_use block (it drops tool calls whose id is missing).
+    expect(startChunk?.delta.tool_calls?.[0]).toEqual({
+      index: 0,
+      id: 'toolu_123',
+      type: 'function',
+      function: { name: 'bash', arguments: '' },
+    });
+    // Deltas are args-only so the name is not re-accumulated per chunk.
+    expect(delta?.delta.tool_calls?.[0]).toEqual({
+      index: 0,
+      function: { arguments: '{"cmd": "ls"}' },
+    });
+  });
+
   test('piAiEventToChunk uses 0-based sequential indices for tool calls when thinking is present', () => {
     // Simulate a partial message state from pi-ai where:
     // Index 0: thinking block
@@ -203,6 +250,11 @@ describe('OAuth -> Anthropic stream regression', () => {
     }
 
     expect(toolCalls[0]!.index).toBe(0); // MUST be 0 for OpenAI compatibility, even if it's block 1 in Anthropic
+    // id and name are intentionally absent on Anthropic DELTAS — they were emitted
+    // once on the toolcall_start chunk (see the "start event" test above). This is
+    // the 'start' channel contract, NOT a bug: repeating them here would re-trigger
+    // the #719 name-accumulation problem. For Gemini the opposite holds (identity
+    // lives on the delta); that is covered in oauth-gemini-stream-error-regression.
     expect(toolCalls[0]!.id).toBeUndefined();
     expect(toolCalls[0]!.function?.name).toBeUndefined();
   });
