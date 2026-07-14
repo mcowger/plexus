@@ -9,9 +9,9 @@ enable_pr_type = false                 # suppress the "PR Type" section
 enable_pr_diagram = false               # suppress the "Diagram Walkthrough" section
 
 [pr_reviewer]
-# Suppress the "PR Reviewer Guide" comment when there are no findings to report,
-# so we don't post a noise comment saying "No major issues detected" etc.
-publish_output_no_suggestions = false
+# Publish the review comment even when there are no findings/suggestions to report.
+publish_output_no_suggestions = true
+extra_instructions = "If the PR looks good, is safe, and has no major issues, begin the review summary with a prominent and clear 'LGTM'. Keep the output short and clean."
 
 [pr_code_suggestions]
 num_code_suggestions_per_chunk = 5
