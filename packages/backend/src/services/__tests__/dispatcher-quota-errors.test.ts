@@ -332,10 +332,11 @@ describe('Dispatcher Quota Error Detection', () => {
     expect(cooldowns[0]?.lastError).not.toContain('"retryHistory"');
   });
 
-  // NOMOV3 M2: Codex is now native (no pi-ai executor), so this guards the
-  // pi-ai OAuth executor's stream-error -> cooldown mechanism via a provider
-  // that STILL uses it (github-copilot). Native Codex quota is covered by the
-  // native path + staging.
+  // NOMOV3 M2b: all real OAuth providers (Anthropic, Codex, Copilot) are now
+  // native, so none route through the pi-ai OAuth executor. This still guards
+  // the executor's stream-error -> cooldown mechanism (dormant until the M4 IR
+  // cleanup removes it) via a SYNTHETIC oauth provider that is not on the native
+  // list, so `usePiAiExecutor` (isPiAiRoute && !nativeOAuth) stays true.
   test('streaming pi-ai oauth executor usage limit triggers cooldown and failover', async () => {
     const piAiStreamError = {
       type: 'error',
@@ -411,10 +412,10 @@ describe('Dispatcher Quota Error Detection', () => {
     Router.resolveCandidates = (async () => [
       {
         provider: 'p1',
-        model: 'gpt-5.4',
+        model: 'claude-sonnet-4',
         config: {
-          api_base_url: 'oauth://github-copilot',
-          oauth_provider: 'github-copilot',
+          api_base_url: 'oauth://legacy-pi-oauth',
+          oauth_provider: 'legacy-pi-oauth',
           oauth_account: 'acct-1',
         },
         modelConfig: {},
@@ -434,10 +435,10 @@ describe('Dispatcher Quota Error Detection', () => {
 
     Router.resolve = (async () => ({
       provider: 'p1',
-      model: 'gpt-5.4',
+      model: 'claude-sonnet-4',
       config: {
-        api_base_url: 'oauth://github-copilot',
-        oauth_provider: 'github-copilot',
+        api_base_url: 'oauth://legacy-pi-oauth',
+        oauth_provider: 'legacy-pi-oauth',
         oauth_account: 'acct-1',
       },
       modelConfig: {},
@@ -460,7 +461,10 @@ describe('Dispatcher Quota Error Detection', () => {
       expect(cooldowns[0]?.lastError).toContain('Try again in ~45 min');
       expect(cooldowns[0]?.lastError).not.toContain('JSON Parse error');
 
-      const isHealthy = await CooldownManager.getInstance().isProviderHealthy('p1', 'gpt-5.4');
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(
+        'p1',
+        'claude-sonnet-4'
+      );
       expect(isHealthy).toBe(false);
     } finally {
       TransformerFactory.getTransformer = originalGetTransformer;

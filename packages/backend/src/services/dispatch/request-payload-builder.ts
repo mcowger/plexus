@@ -96,12 +96,17 @@ export async function buildRequestPayload(
     ? 'anthropic'
     : route.config.oauth_provider || route.provider;
   const codexNative = nativeOAuth && oauthProviderForNative === 'openai-codex';
+  const copilotNative = nativeOAuth && oauthProviderForNative === 'github-copilot';
   const codexCliPassthrough = codexNative && isCodexCliShapedBody(request.originalBody);
 
   let bypassTransformation: boolean;
   if (codexNative) {
     bypassTransformation = codexCliPassthrough;
   } else {
+    // Anthropic and Copilot: standard same-format pass-through detection. For
+    // Copilot this is authoritative (multi-API: a client may send a format the
+    // target model's wire API doesn't match, requiring response translation);
+    // Anthropic clients are always same-format in practice.
     bypassTransformation = shouldUsePassThrough(request, targetApiType, route);
   }
   let payload: any;
@@ -185,12 +190,21 @@ export async function buildRequestPayload(
       oauthAccountId: route.config.oauth_account?.trim(),
       maskingApiKey: maskingApiKeyRoute ? (route.config.api_key ?? '') : null,
       codexPassthrough: codexCliPassthrough,
+      // `targetApiType` here is the resolved wire type (effectiveApiType) that
+      // request-manager passes for native OAuth routes — Copilot needs it to
+      // pick the right endpoint (chat/messages/responses).
+      apiType: targetApiType,
     });
     (route as any)[NATIVE_OAUTH_STASH] = prepared;
     logger.debug(
       `Native OAuth payload prepared for ${provider}/${route.model} (url=${prepared.url})`
     );
-    return { payload: prepared.body, bypassTransformation: true };
+    // Anthropic/Codex always raw-passthrough their response (their clients are
+    // same-format by construction). Copilot is multi-API: honor the computed
+    // same-format decision so cross-format requests get their response
+    // translated by the standard pipeline.
+    const nativeBypass = copilotNative ? bypassTransformation : true;
+    return { payload: prepared.body, bypassTransformation: nativeBypass };
   }
 
   return { payload, bypassTransformation };

@@ -373,15 +373,163 @@ function prepareCodexOAuthRequest(
   };
 }
 
+// ─── GitHub Copilot (multi-API: chat / responses / messages) ───────────────
+//
+// Copilot needs NO masking and NO tool-name renames (simpler than Anthropic /
+// Codex). Per request it needs: the OAuth token as `Bearer`, the static Copilot
+// editor headers, the dynamic headers pi-ai sends (`X-Initiator`, `Openai-Intent`,
+// and `Copilot-Vision-Request` for image input), and a baseURL derived from the
+// token's `proxy-ep` claim. The wire API type is model-specific (see
+// copilotWireApiType) and the endpoint follows from it. Responses are returned
+// raw — the standard dispatch pipeline handles any cross-format translation
+// (bypassTransformation is set false for cross-format Copilot requests).
+
+/** Static Copilot editor fingerprint headers (mirrors the pi-ai model headers). */
+const COPILOT_STATIC_HEADERS: Record<string, string> = {
+  'User-Agent': 'GitHubCopilotChat/0.35.0',
+  'Editor-Version': 'vscode/1.107.0',
+  'Editor-Plugin-Version': 'copilot-chat/0.35.0',
+  'Copilot-Integration-Id': 'vscode-chat',
+};
+
+/** Endpoint path for a Copilot wire API type. */
+function copilotEndpoint(apiType: string): string {
+  switch (apiType) {
+    case 'messages':
+      return '/v1/messages';
+    case 'responses':
+      return '/responses';
+    default:
+      return '/chat/completions';
+  }
+}
+
+/**
+ * Resolve the Copilot API base URL from the OAuth token's `proxy-ep` claim
+ * (mirrors pi-ai's getGitHubCopilotBaseUrl). Business accounts route through
+ * `proxy.business.githubcopilot.com`, which only serves NES/autocomplete — chat
+ * must use the standard `api.githubcopilot.com` endpoint (the same fix the old
+ * pi-ai executor path applied). Falls back to the individual endpoint.
+ */
+function resolveCopilotBaseUrl(token: string): string {
+  const match = token.match(/proxy-ep=([^;]+)/);
+  if (match) {
+    const proxyHost = match[1]!;
+    if (proxyHost === 'proxy.business.githubcopilot.com') {
+      return 'https://api.githubcopilot.com';
+    }
+    return `https://${proxyHost.replace(/^proxy\./, 'api.')}`;
+  }
+  return 'https://api.individual.githubcopilot.com';
+}
+
+/**
+ * Copilot `X-Initiator`: 'agent' when the last turn wasn't user-authored
+ * (follow-up after assistant/tool output), else 'user'. Tolerant of both the
+ * `messages` array (chat/anthropic) and the `input` array (responses); responses
+ * tool-output items carry no `role` and are treated as agent turns.
+ */
+function inferCopilotInitiator(body: any): 'user' | 'agent' {
+  const items = Array.isArray(body?.messages)
+    ? body.messages
+    : Array.isArray(body?.input)
+      ? body.input
+      : [];
+  const last = items[items.length - 1];
+  if (!last || typeof last !== 'object') return 'user';
+  if (typeof last.role !== 'string') return 'agent';
+  return last.role === 'user' ? 'user' : 'agent';
+}
+
+/** Copilot requires `Copilot-Vision-Request` when any input carries an image. */
+function hasCopilotVisionInput(body: any): boolean {
+  const hasImagePart = (content: any): boolean =>
+    Array.isArray(content) &&
+    content.some(
+      (part: any) =>
+        part &&
+        typeof part === 'object' &&
+        (part.type === 'image' || part.type === 'image_url' || part.type === 'input_image')
+    );
+  const items = Array.isArray(body?.messages)
+    ? body.messages
+    : Array.isArray(body?.input)
+      ? body.input
+      : [];
+  return items.some((it: any) => it && typeof it === 'object' && hasImagePart(it.content));
+}
+
+function buildCopilotDynamicHeaders(body: any): Record<string, string> {
+  const headers: Record<string, string> = {
+    'X-Initiator': inferCopilotInitiator(body),
+    'Openai-Intent': 'conversation-edits',
+  };
+  if (hasCopilotVisionInput(body)) headers['Copilot-Vision-Request'] = 'true';
+  return headers;
+}
+
+/**
+ * Ensure usage is emitted for streaming Copilot chat/completions responses.
+ * pi-ai's buildParams sets `stream_options.include_usage`; without it the
+ * OpenAI-completions stream omits the final usage chunk and token accounting
+ * breaks. Applied only to the chat wire type when streaming, and never clobbers
+ * a client-provided value. Responses/messages carry usage natively.
+ */
+function adornCopilotBody(body: any, apiType: string, streaming: boolean): any {
+  if (apiType !== 'chat' || !streaming) return body;
+  const next: any = { ...(body ?? {}) };
+  const existing =
+    next.stream_options && typeof next.stream_options === 'object' ? next.stream_options : {};
+  next.stream_options = { ...existing, include_usage: existing.include_usage ?? true };
+  return next;
+}
+
+/**
+ * Prepare a native GitHub Copilot OAuth request. Adds the Copilot fingerprint +
+ * dynamic headers, resolves the per-account baseURL from the token, and targets
+ * the endpoint for the model's wire API type. No masking, no tool renames.
+ */
+function prepareCopilotOAuthRequest(
+  token: string,
+  nativeBody: any,
+  streaming: boolean,
+  apiType: string
+): PreparedOAuthRequest {
+  const body = adornCopilotBody(nativeBody, apiType, streaming);
+  const baseUrl = resolveCopilotBaseUrl(token).replace(/\/$/, '');
+  const url = `${baseUrl}${copilotEndpoint(apiType)}`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: streaming ? 'text/event-stream' : 'application/json',
+    Authorization: `Bearer ${token}`,
+    ...COPILOT_STATIC_HEADERS,
+    ...buildCopilotDynamicHeaders(body),
+  };
+  // The anthropic-messages wire type needs the Anthropic version header.
+  if (apiType === 'messages') {
+    headers['anthropic-version'] = '2023-06-01';
+  }
+
+  return {
+    url,
+    headers,
+    body,
+    // Copilot applies no request-side tool renames, so nothing to reverse.
+    reverseResponseFrame: (frame) => frame,
+  };
+}
+
 /**
  * Prepare a native OAuth request for the standard dispatch path.
  *
- * @param provider  OAuth provider id (`anthropic` or `openai-codex`).
+ * @param provider  OAuth provider id (`anthropic`, `openai-codex`, or `github-copilot`).
  * @param modelId   Upstream model id.
  * @param auth      Resolved OAuth access token / masking API key.
  * @param nativeBody The provider-native wire body from the entry transformer.
  * @param streaming Whether the client asked for a stream.
  * @param options.codexPassthrough  Codex only: send the body verbatim (CLI-shaped).
+ * @param options.apiType  Copilot only: the resolved wire API type (chat/messages/responses).
  */
 export function prepareOAuthNativeRequest(
   provider: OAuthProvider,
@@ -389,7 +537,7 @@ export function prepareOAuthNativeRequest(
   auth: NativeAnthropicAuth,
   nativeBody: any,
   streaming: boolean,
-  options?: { codexPassthrough?: boolean }
+  options?: { codexPassthrough?: boolean; apiType?: string }
 ): PreparedOAuthRequest {
   if (provider === 'anthropic') {
     return prepareAnthropicOAuthRequest(modelId, auth, nativeBody, streaming);
@@ -406,19 +554,28 @@ export function prepareOAuthNativeRequest(
       options?.codexPassthrough === true
     );
   }
-  // Other providers (Copilot, …) are not yet ported to the native path.
-  // The caller gates on this; reaching here is a programming error.
+  if (provider === 'github-copilot') {
+    if (auth.mode !== 'oauth') {
+      throw new Error('Copilot native OAuth requires an OAuth token (apiKey mode unsupported).');
+    }
+    return prepareCopilotOAuthRequest(
+      auth.token,
+      nativeBody,
+      streaming,
+      options?.apiType ?? 'chat'
+    );
+  }
+  // The caller gates on isNativeOAuthProvider; reaching here is a programming error.
   logger.error(`OAuth native path not implemented for provider '${provider}'`);
   throw new Error(`OAuth native request preparation not implemented for provider '${provider}'`);
 }
 
 /**
  * Whether an OAuth provider is served by the native (non-pi-ai-executor) path.
- * Currently only Anthropic; Codex/Copilot/etc. still use the pi-ai executor
- * until ported (per-provider rollout, see docs/NOMOV3.md).
+ * All ported providers: Anthropic (M1), Codex (M2), and GitHub Copilot (M3).
  */
 export function isNativeOAuthProvider(provider: string | undefined): boolean {
-  return provider === 'anthropic' || provider === 'openai-codex';
+  return provider === 'anthropic' || provider === 'openai-codex' || provider === 'github-copilot';
 }
 
 /**
@@ -426,16 +583,45 @@ export function isNativeOAuthProvider(provider: string | undefined): boolean {
  * URL makes `getProviderTypes()` report the synthetic `oauth` type, which would
  * (a) select pi-ai's `oauth` IR transformer and (b) defeat same-format
  * pass-through. Native OAuth instead flows through the STANDARD path using the
- * real upstream API type: Anthropic OAuth speaks the Messages API. Returns
- * undefined for providers not served by the native path (they keep `oauth`).
+ * real upstream API type: Anthropic OAuth speaks the Messages API; Codex the
+ * Responses API. GitHub Copilot is MULTI-API — each model picks its own wire
+ * API (chat/messages/responses) — so its type is resolved per-model from the
+ * pi-ai registry (see copilotWireApiType). Returns undefined for providers not
+ * served by the native path (they keep `oauth`).
  */
 const NATIVE_OAUTH_API_TYPES: Record<string, string> = {
   anthropic: 'messages',
   'openai-codex': 'responses',
 };
 
-export function nativeOAuthApiType(provider: string | undefined): string | undefined {
-  return provider ? NATIVE_OAUTH_API_TYPES[provider] : undefined;
+/** Map a pi-ai model `api` field to the plexus transformer/api-type name. */
+const PIAI_API_TO_PLEXUS: Record<string, string> = {
+  'anthropic-messages': 'messages',
+  'openai-completions': 'chat',
+  'openai-responses': 'responses',
+};
+
+export function nativeOAuthApiType(
+  provider: string | undefined,
+  modelId?: string
+): string | undefined {
+  if (!provider) return undefined;
+  if (provider === 'github-copilot') return copilotWireApiType(modelId);
+  return NATIVE_OAUTH_API_TYPES[provider];
+}
+
+/**
+ * Resolve a Copilot model's plexus wire API type via the pi-ai registry.
+ * Unknown/custom model ids default to OpenAI chat completions (the most common
+ * Copilot surface); cross-format response translation still applies downstream.
+ */
+export function copilotWireApiType(modelId: string | undefined): string {
+  if (modelId) {
+    const model = getBuiltinModel('github-copilot' as any, modelId);
+    const api = (model as any)?.api as string | undefined;
+    if (api && PIAI_API_TO_PLEXUS[api]) return PIAI_API_TO_PLEXUS[api];
+  }
+  return 'chat';
 }
 
 /**
@@ -454,6 +640,8 @@ export async function prepareNativeOAuthDispatch(params: {
   maskingApiKey?: string | null;
   /** Codex only: send the body verbatim (CLI-shaped request). */
   codexPassthrough?: boolean;
+  /** Copilot only: the resolved wire API type (chat/messages/responses). */
+  apiType?: string;
 }): Promise<PreparedOAuthRequest> {
   const { provider, modelId, nativeBody, streaming, oauthAccountId, maskingApiKey } = params;
 
@@ -474,5 +662,6 @@ export async function prepareNativeOAuthDispatch(params: {
 
   return prepareOAuthNativeRequest(provider, modelId, auth, nativeBody, streaming, {
     codexPassthrough: params.codexPassthrough === true,
+    apiType: params.apiType,
   });
 }

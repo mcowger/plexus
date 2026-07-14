@@ -160,7 +160,8 @@ export class RequestManager {
         // same-format requests use pass-through; CC masking is layered on in
         // buildRequestPayload. Codex/Copilot still use the pi-ai executor ('oauth').
         const effectiveApiType = nativeOAuth
-          ? (nativeOAuthApiType(route.config.oauth_provider || route.provider) ?? 'messages')
+          ? (nativeOAuthApiType(route.config.oauth_provider || route.provider, route.model) ??
+            'messages')
           : targetApiType;
         const transformerType = usePiAiExecutor ? 'oauth' : effectiveApiType;
         const transformer = TransformerFactory.getTransformer(transformerType);

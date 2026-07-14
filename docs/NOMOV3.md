@@ -201,9 +201,12 @@ pass-through). Response tool-name renames are reversed on the raw SSE frames; no
 Failover, cooldown, concurrency-slot release, raw-byte TTFB stall probe, and HTTP-error
 handling all come from `executeStandardAttempt` — no OAuth-specific reimplementation.
 
-### Still on the pi-ai executor (per-provider rollout)
-Codex/Copilot remain on `executeOAuthAttempt` until M2 ports them the same way
-(`isNativeOAuthProvider` returns true only for `anthropic`). Per-provider rollback intact.
+### pi-ai executor rollout status
+**LANDED for all providers.** `isNativeOAuthProvider` now returns true for `anthropic`
+(M1), `openai-codex` (M2), and `github-copilot` (M2b). No real OAuth provider routes
+through `executeOAuthAttempt` anymore — the pi-ai OAuth executor is dormant (kept alive
+only as dead-but-referenced code until M4 deletes the IR). Per-provider rollback intact
+(flip a provider off `isNativeOAuthProvider` to fall back to the executor).
 
 ---
 
@@ -485,6 +488,84 @@ clients are the primary case (CLI always streams). Non-streaming Codex client su
   Staging is the gate.
 - Path-2 adornment must reproduce enough of `buildRequestBody` for the backend to accept a
   non-CLI body; verify on staging with the OpenAI-JS-SDK shape.
+
+---
+
+## Milestone 2b — GitHub Copilot OAuth pass-through
+
+Status: **LANDED.** Copilot is the last OAuth provider retired from the pi-ai executor.
+
+### What makes Copilot different
+Unlike Anthropic (always `messages`) and Codex (always `responses`), **Copilot is
+multi-API**: each model picks its own wire API. So the wire type — and therefore the
+transformer, endpoint, and same-format pass-through decision — is resolved **per model**,
+not per provider:
+- `gpt-4.1`, `gpt-5-mini`, … → `openai-completions` → plexus `chat` → `/chat/completions`
+- `claude-*`                → `anthropic-messages`  → plexus `messages` → `/v1/messages`
+- `gpt-5.4` (and similar)   → `openai-responses`    → plexus `responses` → `/responses`
+
+`nativeOAuthApiType(provider, modelId)` is now model-aware; for Copilot it delegates to
+`copilotWireApiType(modelId)`, which reads the pi-ai registry model's `api` field and maps
+it to the plexus type (`anthropic-messages→messages`, `openai-completions→chat`,
+`openai-responses→responses`; unknown ids default to `chat`).
+
+### What Copilot needs (much simpler than Anthropic/Codex)
+NO masking, NO tool-name renames, NO body adornment beyond usage wiring. Per request:
+- **Auth:** the OAuth access token as `Authorization: Bearer` (resolved via
+  `OAuthAuthManager.getApiKey('github-copilot', account)`).
+- **Static headers:** the Copilot editor fingerprint (`User-Agent: GitHubCopilotChat/…`,
+  `Editor-Version`, `Editor-Plugin-Version`, `Copilot-Integration-Id: vscode-chat`).
+- **Dynamic headers** (mirrors pi-ai's `buildCopilotDynamicHeaders`): `X-Initiator`
+  (`agent` when the last turn isn't user-authored, else `user`), `Openai-Intent:
+  conversation-edits`, and `Copilot-Vision-Request: true` when any input carries an image.
+- **baseURL:** derived from the token's `proxy-ep` claim (`proxy.` → `api.`). Business
+  accounts (`proxy.business.githubcopilot.com`) are forced to the standard
+  `api.githubcopilot.com` (their `api.business.*` endpoint only serves NES/autocomplete —
+  the same fix the old executor path applied).
+- **Body:** only the `chat` wire type gets `stream_options.include_usage` forced on when
+  streaming (pi-ai's `buildParams` does this; without it the completions stream omits the
+  final usage chunk and token accounting breaks). Responses/messages carry usage natively.
+
+### Cross-format correctness (the multi-API subtlety)
+Anthropic/Codex hardcode `bypassTransformation: true` (their clients are same-format by
+construction). Copilot **cannot** — a client may send `chat` to a Copilot Claude model
+(`messages` wire), which requires the response to be translated back. So the native
+Copilot return honors the standard same-format decision (`shouldUsePassThrough`): raw
+pass-through only when `incomingApiType == the model's wire type`, otherwise
+`bypassTransformation:false` so the standard pipeline translates the response
+(`providerApiType` = the resolved wire type). Response bytes are otherwise passed through
+unchanged (no tool-rename reversal needed).
+
+### Code
+- `oauth-native-request.ts`: `isNativeOAuthProvider += github-copilot`; model-aware
+  `nativeOAuthApiType` + `copilotWireApiType`; `prepareCopilotOAuthRequest` (endpoint,
+  headers, proxy-ep baseURL, business fix, `stream_options` adornment).
+- `request-payload-builder.ts`: `copilotNative` branch threads `apiType` (the resolved
+  wire type) into `prepareNativeOAuthDispatch` and returns the computed same-format
+  `bypassTransformation` (not hardcoded `true`).
+- `request-manager.ts`: `nativeOAuthApiType(provider, route.model)` (model-aware).
+
+### Tests
+- `dispatcher-copilot-native.test.ts`: `copilotWireApiType` mapping + fallback; chat model
+  posts `/chat/completions` with fingerprint + Bearer + `stream_options`; raw completions
+  SSE byte-preserved; vision adds `Copilot-Vision-Request`; claude model is cross-format
+  (`/v1/messages`, `anthropic-version`, `bypassTransformation:false`); responses model
+  posts `/responses`; Business token forces `api.githubcopilot.com`.
+- `dispatcher-quota-errors.test.ts`: the pi-ai-executor stream-error→cooldown guard now
+  uses a SYNTHETIC non-native oauth provider (`legacy-pi-oauth`) since no real provider
+  rides the executor anymore.
+- `vitest.setup.ts`: `mockGetModel` is Copilot-aware (per-model `api`) so the three wire
+  types are exercisable; Copilot-only registry `baseUrl` fallback.
+
+### Live status (reported by the project owner)
+Project owner reported a Copilot provider + `gpt-4.1` (free tier, `openai-completions`)
+working. NOT independently re-verified against staging in this change. The
+`messages`/`responses` wire types rest on unit tests only (no live access).
+
+### Risk
+- `messages`/`responses` Copilot wire types are covered by unit tests only. If Copilot's
+  `/v1/messages` or `/responses` surface diverges from the standard SDK path pi-ai used,
+  it surfaces the first time such a model is exercised live.
 
 ---
 

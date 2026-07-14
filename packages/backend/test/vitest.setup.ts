@@ -163,13 +163,31 @@ const mockGetModels = (provider: string) => {
   ];
 };
 
-const mockGetModel = (provider: string, modelId: string) => ({
-  id: modelId,
-  name: modelId,
-  contextWindow: 200000,
-  provider,
-  api: provider === 'openai-codex' ? 'openai-codex-responses' : 'anthropic-messages',
-});
+const mockGetModel = (provider: string, modelId: string) => {
+  let api = 'anthropic-messages';
+  if (provider === 'openai-codex') {
+    api = 'openai-codex-responses';
+  } else if (provider === 'github-copilot') {
+    // Copilot is multi-API: resolve the wire API per model id so
+    // copilotWireApiType() can map chat/messages/responses in tests.
+    if (modelId.includes('claude')) api = 'anthropic-messages';
+    else if (modelId === 'gpt-5.4' || modelId.includes('responses')) api = 'openai-responses';
+    else api = 'openai-completions';
+  }
+  return {
+    id: modelId,
+    name: modelId,
+    contextWindow: 200000,
+    provider,
+    api,
+    // Copilot resolves its real baseURL from the token proxy-ep at request time;
+    // the registry baseUrl is only a fallback. Other providers keep none here so
+    // their own resolvers/defaults apply (e.g. Codex → chatgpt.com backend).
+    ...(provider === 'github-copilot'
+      ? { baseUrl: 'https://api.individual.githubcopilot.com' }
+      : {}),
+  };
+};
 
 const mockGetProviders = () => ['anthropic', 'openai-codex', 'openai', 'google'];
 
