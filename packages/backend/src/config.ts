@@ -210,7 +210,7 @@ const ModelProviderConfigSchema = z.object({
   pi_ai_model_id: z.string().optional(),
 });
 
-// Gemini CLI / Antigravity OAuth were removed (docs/NOMOV3.md M3/M4). Their enum
+// Gemini CLI / Antigravity OAuth were removed. Their enum
 // values are gone, so new configs referencing them are rejected on write; any
 // persisted rows are purged at startup by
 // ConfigService.dropRetiredOAuthProviders() (which loads from DB columns, not

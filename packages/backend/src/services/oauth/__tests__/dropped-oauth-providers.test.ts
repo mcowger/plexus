@@ -5,7 +5,7 @@ import { ConfigRepository } from '../../../db/config-repository';
 import { ConfigService } from '../../configuration/config-service';
 import { ProviderConfigSchema } from '../../../config';
 
-// docs/NOMOV3.md M3/M4 — Gemini CLI / Antigravity OAuth were removed. The removal
+// Gemini CLI / Antigravity OAuth were removed. The removal
 // is now COMPLETE (no retained-but-inert enum values):
 //   1. The config schema rejects these provider ids on write.
 //   2. Any persisted provider/credential rows are purged on startup by

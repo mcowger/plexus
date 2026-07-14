@@ -3,7 +3,7 @@
  * through the *normal* dispatch execution (real fetch + raw-bytes pass-through)
  * instead of pi-ai's `Context` IR + `piAiModels.stream` executor.
  *
- * See docs/NOMOV3.md. The design principle (per the project owner): reuse the
+ * The design principle (per the project owner): reuse the
  * pieces that already exist and are tested —
  *
  *   - Outbound wire body: the native `AnthropicTransformer` /
@@ -202,7 +202,7 @@ function buildFrameReverser(
 //
 // Codex is NOT Anthropic: no masking / identity spoof. The ChatGPT backend wants
 // a specific Responses body (store:false, encrypted-content include, instructions,
-// etc.) and Codex fingerprint headers. Two paths (see docs/NOMOV3.md M2):
+// etc.) and Codex fingerprint headers. Two paths:
 //   - CLI-shaped body  → send verbatim (auth only). Codex CLI produced it and the
 //     backend always accepts the Codex request shape.
 //   - Not CLI-shaped   → adorn a normalized Responses body with the required

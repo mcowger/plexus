@@ -23,7 +23,7 @@ export const OAUTH_PROVIDERS = [
   { value: 'github-copilot', label: 'GitHub Copilot' },
   { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' },
 ];
-// Gemini CLI / Antigravity OAuth were dropped (see docs/NOMOV3.md M3); they are no
+// Gemini CLI / Antigravity OAuth were dropped; they are no
 // longer offered as new-provider options.
 
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {

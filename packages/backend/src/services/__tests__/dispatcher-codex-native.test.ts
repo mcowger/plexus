@@ -5,10 +5,10 @@ import { isCodexCliShapedBody } from '../oauth/oauth-native-request';
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// NOMOV3 M2 — native Codex OAuth pass-through.
+// Native Codex OAuth pass-through.
 //
 // Codex is NOT Anthropic: no masking. The ChatGPT backend wants a specific
-// Responses body. Two paths (docs/NOMOV3.md M2):
+// Responses body. Two paths:
 //   1. CLI-shaped body  → sent VERBATIM (auth only), extensions preserved.
 //   2. Not CLI-shaped   → normalized via ResponsesTransformer + adorned.
 // Both stream RAW backend Responses SSE to the client (no IR re-serialization).
@@ -179,7 +179,7 @@ describe('isCodexCliShapedBody', () => {
   });
 });
 
-describe('Native Codex OAuth pass-through (NOMOV3 M2)', () => {
+describe('Native Codex OAuth pass-through', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {

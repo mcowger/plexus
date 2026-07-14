@@ -190,7 +190,7 @@ try {
   await configService.migrateModelTypes();
 
   // One-time cleanup: drop any persisted Gemini CLI / Antigravity OAuth
-  // providers + credentials (those providers were removed; see NOMOV3 M3/M4).
+  // providers + credentials (those providers were removed).
   await configService.dropRetiredOAuthProviders();
 
   // Eagerly initialize OAuth auth manager so auth.json schema migration

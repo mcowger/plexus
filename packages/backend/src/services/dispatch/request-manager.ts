@@ -145,7 +145,7 @@ export class RequestManager {
 
         // 2. Get Transformer
         // ALL OAuth routes now run through the STANDARD path via the native
-        // OAuth builders (NOMOV3 M1/M2/M2b) — there is no pi-ai `oauth` executor
+        // OAuth builders — there is no pi-ai `oauth` executor
         // anymore. A native OAuth route's wire API is its real upstream protocol
         // (e.g. Anthropic 'messages', Codex 'responses', Copilot per-model), NOT
         // the synthetic 'oauth' type getProviderTypes() reports for an `oauth://`

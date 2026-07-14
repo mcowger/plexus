@@ -9,7 +9,7 @@ import type { UnifiedChatRequest } from '../../types/unified';
 //   throw, on the second turn.
 //
 // Original root cause was in the (now removed) pi-ai OAuth executor's IR
-// conversion. Post-NOMOV3 M1/M4 there is no executor: Anthropic OAuth runs
+// conversion. There is now no executor: Anthropic OAuth runs
 // natively through the standard path (native masked Messages body + raw-byte
 // response). This test guards that the native path handles a multi-turn OAuth
 // request end-to-end without error.
@@ -82,7 +82,7 @@ describe('Dispatcher OAuth pass-through regression (issue #162)', () => {
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
       'sk-ant-oat-fake-token-for-test'
     );
-    // Native OAuth (NOMOV3 M1) runs through the standard fetch path — mock the
+    // Native OAuth runs through the standard fetch path — mock the
     // upstream so no real network call is made. A minimal Anthropic Messages
     // non-streaming response body is enough to exercise the native path.
     fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(

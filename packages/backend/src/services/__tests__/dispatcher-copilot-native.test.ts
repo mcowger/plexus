@@ -5,7 +5,7 @@ import { copilotWireApiType, isNativeOAuthProvider } from '../oauth/oauth-native
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// NOMOV3 M2b — native GitHub Copilot OAuth.
+// Native GitHub Copilot OAuth.
 //
 // Copilot is the last OAuth provider retired from the pi-ai executor. Unlike
 // Anthropic/Codex it is MULTI-API: each model picks its own wire API, so the
@@ -109,7 +109,7 @@ describe('copilotWireApiType', () => {
   });
 });
 
-describe('Native GitHub Copilot OAuth (NOMOV3 M2b)', () => {
+describe('Native GitHub Copilot OAuth', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {

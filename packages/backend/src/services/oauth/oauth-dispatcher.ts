@@ -3,7 +3,7 @@ import type { RouteResult } from '../routing/router';
 /**
  * OAuth route predicates.
  *
- * NOMOV3 M4: the pi-ai `Context` IR + `OAuthDispatcher` executor were removed.
+ * The pi-ai `Context` IR + `OAuthDispatcher` executor were removed.
  * ALL OAuth providers (Anthropic, Codex, Copilot) now run through the standard
  * dispatch path via the native OAuth builders (see `oauth-native-request.ts`).
  * What remains here are the pure routing predicates used to (a) recognize an

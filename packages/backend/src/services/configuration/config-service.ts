@@ -18,9 +18,9 @@ import { QuotaScheduler } from '../quota/quota-scheduler';
 import { ModelAutosyncScheduler } from '../models/model-autosync-scheduler';
 
 /**
- * OAuth provider ids that were removed from Plexus (Gemini CLI / Antigravity,
- * see docs/NOMOV3.md M3/M4). `dropRetiredOAuthProviders()` purges any persisted
- * provider/credential rows that still reference them on startup.
+ * OAuth provider ids that were removed from Plexus (Gemini CLI / Antigravity).
+ * `dropRetiredOAuthProviders()` purges any persisted provider/credential rows
+ * that still reference them on startup.
  */
 const RETIRED_OAUTH_PROVIDERS = ['google-gemini-cli', 'google-antigravity'] as const;
 
@@ -123,8 +123,8 @@ export class ConfigService {
   }
 
   /**
-   * One-time startup cleanup: Gemini CLI / Antigravity OAuth were removed
-   * (docs/NOMOV3.md M3/M4). Any persisted provider that still references them is
+   * One-time startup cleanup: Gemini CLI / Antigravity OAuth were removed.
+   * Any persisted provider that still references them is
    * dead, unroutable config. Drop those provider records (cascade) and delete
    * their stored OAuth credentials so the runtime never carries a provider the
    * codebase can no longer serve. Idempotent and non-fatal — on a clean install

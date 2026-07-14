@@ -85,7 +85,7 @@ export async function buildRequestPayload(
 ): Promise<RequestPayload> {
   const nativeOAuth = isNativeOAuthRoute(route, targetApiType);
 
-  // Codex two-path decision (see docs/NOMOV3.md M2). A genuine Codex CLI body
+  // Codex two-path decision. A genuine Codex CLI body
   // is sent to the ChatGPT backend VERBATIM (pass-through), including its native
   // custom/namespace tool extensions — so we override the
   // `hasCodexResponsesExtensions` flattening that `shouldUsePassThrough` applies
@@ -175,7 +175,7 @@ export async function buildRequestPayload(
   // cross-format transform to it). Layer the CC masking/fingerprint + OAuth
   // token resolution on top, and stash the resolved URL/headers/reverse-frame
   // for the standard dispatch seams. No pi-ai Context IR, no piAiModels.stream.
-  // See NOMOV3 M1. This is the ONLY OAuth-specific step — one path, masking
+  // This is the ONLY OAuth-specific step — one path, masking
   // applied when the selected target is an OAuth target.
   if (nativeOAuth) {
     const maskingApiKeyRoute = isClaudeMaskingApiKeyRoute(route, targetApiType);

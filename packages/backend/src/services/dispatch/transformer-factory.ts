@@ -16,7 +16,7 @@ import { getApiBaseType } from '../../utils/api-format';
  *
  * The synthetic 'oauth' type is gone: all OAuth providers now resolve to their
  * real wire API type (messages/responses/chat) via nativeOAuthApiType and run
- * through the standard path (NOMOV3 M4 — pi-ai OAuth executor removed).
+ * through the standard path (pi-ai OAuth executor removed).
  */
 export class TransformerFactory {
   static getTransformer(providerType: string): Transformer {

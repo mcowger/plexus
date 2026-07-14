@@ -91,7 +91,7 @@ describe('Dispatcher Claude Masking routing', () => {
   });
 
   test('useClaudeMasking:true routes through the NATIVE path (real fetch, x-api-key, masked body, no pi-ai)', async () => {
-    // NOMOV3: the Claude-masking API-key route no longer uses the pi-ai
+    // The Claude-masking API-key route no longer uses the pi-ai
     // executor. It builds the native Anthropic body, applies CC masking, and
     // POSTs with x-api-key (the real Anthropic key) — same as OAuth, minus the
     // Bearer token.

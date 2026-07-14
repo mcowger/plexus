@@ -513,7 +513,7 @@ export class Dispatcher {
     request: UnifiedChatRequest
   ): Record<string, string> {
     // Native OAuth routes carry fully-built wire headers (Bearer token + CC
-    // fingerprint headers) stashed during payload preparation. See NOMOV3 M1.
+    // fingerprint headers) stashed during payload preparation.
     const nativeOAuth = (route as any)[NATIVE_OAUTH_STASH];
     if (nativeOAuth?.headers) {
       return { ...nativeOAuth.headers };
@@ -591,7 +591,7 @@ export class Dispatcher {
     targetApiType: string
   ): string {
     // Native OAuth routes carry a fully-resolved upstream URL stashed during
-    // payload preparation (real provider endpoint, not oauth://). See NOMOV3 M1.
+    // payload preparation (real provider endpoint, not oauth://).
     const nativeOAuth = (route as any)[NATIVE_OAUTH_STASH];
     if (nativeOAuth?.url) {
       return nativeOAuth.url;
@@ -792,7 +792,6 @@ export class Dispatcher {
 
     // Native OAuth: reverse request-side tool-name renames on the raw upstream
     // SSE bytes (no IR, no event translation) before they reach the client.
-    // See NOMOV3 M1.
     const nativeOAuth = (route as any)[NATIVE_OAUTH_STASH];
     if (nativeOAuth?.reverseResponseFrame) {
       rawStream = rawStream.pipeThrough(

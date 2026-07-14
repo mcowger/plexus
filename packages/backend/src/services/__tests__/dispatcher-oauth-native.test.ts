@@ -4,7 +4,7 @@ import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// NOMOV3 M1 — native Anthropic OAuth streaming pass-through.
+// Native Anthropic OAuth streaming pass-through.
 //
 // The whole point of the native path: the upstream Anthropic SSE bytes reach
 // the client verbatim (only tool-name renames reversed), with NO pi-ai event
@@ -169,7 +169,7 @@ async function drain(stream: ReadableStream): Promise<string> {
   return out;
 }
 
-describe('Native OAuth pass-through (NOMOV3 M1)', () => {
+describe('Native OAuth pass-through', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {

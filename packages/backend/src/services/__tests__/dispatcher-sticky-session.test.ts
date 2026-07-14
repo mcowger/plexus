@@ -244,7 +244,7 @@ describe('Dispatcher sticky_session write-back', () => {
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
       'sk-ant-oat-fake-token-for-test'
     );
-    // Native OAuth (NOMOV3 M1) runs through the standard fetch path; return a
+    // Native OAuth runs through the standard fetch path; return a
     // minimal Anthropic Messages response.
     fetchMock.mockResolvedValueOnce(
       new Response(
