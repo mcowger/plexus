@@ -121,15 +121,12 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     env:
-      LLM_API_HOST: ${{ secrets.LLM_API_HOST }}
-      OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
-      OPENCODE_CONFIG_CONTENT: >-
-        {"permission":{"*":"deny","read":{"*":"deny",".github/prompts/release-notes.md":"allow",".git/opencode-release/release-data.json":"allow"},"edit":{"*":"deny",".git/opencode-release/release-notes.md":"allow"}},"provider":{"openai":{"options":{"baseURL":"{env:LLM_API_HOST}","apiKey":"{env:OPENAI_API_KEY}"},"models":{"${{ vars.LLM_MODEL_ID }}":{}}}}}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
     outputs:
       notes: ${{ steps.read_notes.outputs.notes }}
     steps:
       - name: Mask API key
-        run: echo "::add-mask::$OPENAI_API_KEY"
+        run: echo "::add-mask::$LLM_API_KEY"
 
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -144,10 +141,6 @@ jobs:
             const currentTag = '${{ needs.setup.outputs.tag }}';
             const calVerRegex = /^\d{4}\.\d{2}\.\d{2}\.\d+$/;
             const fs = require('fs');
-            const releaseScratchDir = '.git/opencode-release';
-
-            fs.rmSync(releaseScratchDir, { recursive: true, force: true });
-            fs.mkdirSync(releaseScratchDir, { recursive: true });
 
             async function getTagDate(tag) {
               const ref = await github.rest.git.getRef({
@@ -256,59 +249,49 @@ jobs:
               commits: relevantCommits,
             };
 
-            fs.writeFileSync(`${releaseScratchDir}/release-data.json`, JSON.stringify(releaseData, null, 2));
-            core.info(`Wrote ${releaseScratchDir}/release-data.json`);
+            fs.writeFileSync('release-data.json', JSON.stringify(releaseData, null, 2));
+            core.info('Wrote release-data.json');
 
       - name: Run release notes agent
-        uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a # github-v1.2.19
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: release_notes_agent
+        uses: mcowger/pi-action@main
         with:
-          model: openai/${{ vars.LLM_MODEL_ID }}
-          share: false
-          use_github_token: true
-          prompt: >-
-            Read `.github/prompts/release-notes.md` and follow its instructions exactly.
-
-      - name: Export OpenCode session
-        if: always()
-        run: |
-          if ! command -v opencode >/dev/null 2>&1; then
-            echo '::warning::OpenCode CLI is unavailable — no session will be uploaded'
-            exit 0
-          fi
-
-          session_id=$(opencode session list --format json --max-count 1 | jq -r '.[0].id // empty')
-          if [ -z "$session_id" ]; then
-            echo '::warning::OpenCode did not create a release notes session'
-            exit 0
-          fi
-
-          opencode export "$session_id" > opencode-session.json
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          provider: openrouter
+          model: ${{ vars.LLM_MODEL_ID }}
+          token: ${{ env.LLM_API_KEY }}
+          base_url: ${{ secrets.LLM_API_HOST }}
+          trigger: generate-release-notes
+          load_builtin_extensions: true
+          suppress_final_comment: true
+          export_session_html: true
+          prompt_file: .github/prompts/release-notes.md
+        env:
+          RELEASE_TAG: ${{ needs.setup.outputs.tag }}
 
       - name: Read agent-generated notes
         id: read_notes
         if: always()
         run: |
-          if [ -f .git/opencode-release/release-notes.md ]; then
+          if [ -f release-notes.md ]; then
             # Ensure the file ends with a newline to prevent delimiter parser issues
-            [[ -n "$(tail -c1 .git/opencode-release/release-notes.md)" ]] && echo "" >> .git/opencode-release/release-notes.md
+            [[ -n "$(tail -c1 release-notes.md)" ]] && echo "" >> release-notes.md
             {
               echo 'notes<<RELEASE_NOTES_EOF'
-              cat .git/opencode-release/release-notes.md
+              cat release-notes.md
               echo 'RELEASE_NOTES_EOF'
             } >> "$GITHUB_OUTPUT"
           else
-            echo '::warning::Agent did not write .git/opencode-release/release-notes.md — release will have no body'
+            echo '::warning::Agent did not write release-notes.md — release will have no body'
             echo 'notes=' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload OpenCode session
+      - name: Upload agent session
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: release-notes-session
-          path: opencode-session.json
+          path: ${{ steps.release_notes_agent.outputs.session_html_path }}
           retention-days: 7
           if-no-files-found: ignore
           archive: false

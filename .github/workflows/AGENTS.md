@@ -1,23 +1,73 @@
 # GitHub Actions Notes for AI Agents
 
-## OpenCode workflows
+## `workflows: write` Permission Issue
 
-- `opencode-review.yml` is a minimal `pull_request_target` dispatcher. It must never check out or
-  inspect pull-request content; it may only pass the PR number and immutable head SHA to the
-  default branch's `opencode-review-run.yml` via `workflow_dispatch`.
-- `opencode-review-run.yml` fetches fork content as inert data before model secrets enter the
-  environment. OpenCode can read only the generated patch and has shell, edit, web, subagent, and
-  general repository access denied. Never execute, install, build, or test pull-request files.
-- The review response may only be treated as comment text; never execute it or interpolate it into
-  shell. Keep both review workflows least-privileged and preserve this trust separation.
-- `opencode-assistant.yml` handles trusted collaborator requests from issue and PR comments.
-  It needs `contents: write` because explicit requests may change code and push it to a PR branch.
-- Both workflows use the repository's existing `LLM_API_KEY`, `LLM_API_HOST`, and
-  `LLM_MODEL_ID` configuration through an OpenAI-compatible OpenCode provider.
-- Keep OpenCode session sharing disabled so repository context is not published externally.
-- Preserve the collaborator and bot filters on the interactive workflow to prevent untrusted
-  code-changing runs and comment loops.
-- `release.yml` uses OpenCode to generate release notes under `.git/opencode-release/`. Keep its
-  tools restricted to reading the release prompt/data and writing the notes file. The workflow must
-  reset this scratch directory before generation to prevent stale output, and it must remain under
-  `.git/` so the OpenCode action does not automatically commit and push the files.
+### Problem
+Adding `workflows: write` to the workflow permissions block causes the workflow to **fail validation** and prevents it from triggering on `issue_comment` events.
+
+### Error
+```
+Invalid workflow file: .github/workflows/pi-assistant.yml#L1
+(Line: 18, Col: 7): Unexpected value 'workflows'
+```
+
+### Root Cause
+The `workflows` permission is **only valid at the job level**, not at the workflow level. However, even when placed correctly at the job level, it can cause issues with workflow triggering.
+
+### What We Tried
+
+1. **Job-level permissions** - Added to the `pi-agent` job:
+   ```yaml
+   jobs:
+     pi-agent:
+       permissions:
+         contents: write
+         issues: write
+         pull-requests: write
+         workflows: write  # Invalid at job level for this use case
+   ```
+
+2. **Workflow-level permissions** - Moved to top level:
+   ```yaml
+   permissions:
+     contents: write
+     issues: write
+     pull-requests: write
+     workflows: write  # Invalid at workflow level
+   ```
+
+Both approaches caused the workflow to fail validation and not trigger.
+
+### Impact
+Without `workflows: write`, the Pi Assistant action **cannot create branches or pull requests** when the repository contains workflow files. The action will receive:
+```
+refusing to allow a GitHub App to create or update workflow '.github/workflows/pi-assistant.yml' without 'workflows' permission
+```
+
+### Current Workaround
+The workflow runs without `workflows: write`, meaning:
+- The agent can respond to comments
+- The agent can read files and provide analysis
+- The agent **cannot** push branches or create PRs
+
+### Future Solutions
+To enable branch/PR creation, consider:
+1. Using a GitHub App with explicit `workflows` permission instead of `GITHUB_TOKEN`
+2. Creating a separate workflow that handles PR creation with elevated permissions
+3. Moving the Pi Assistant to a repository without workflow files
+
+---
+
+## Workflow Design Patterns
+
+### Communication Protocol
+The Pi Assistant uses the following guidance for consistent interaction:
+
+1. **Single progress comment**: Post one comment with acknowledgment + checklist, update via `update_issue_comment`
+2. **Checkbox syntax**: Use `- [ ]` / `- [x]` format, never strikethrough
+3. **PR creation**: When code changes are made, create a branch/PR and update the progress comment with the PR link
+
+### Permissions Required
+- `contents: write` - for reading repo contents
+- `issues: write` - for posting/updating comments
+- `pull-requests: write` - for creating PRs (if `workflows` permission issue is resolved)

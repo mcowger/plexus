@@ -57,40 +57,12 @@ The project uses separate Drizzle ORM config files for each database dialect:
 
 When running Drizzle Kit commands, specify the appropriate config file with `--config`.
 
-## OpenCode GitHub automation
+## Pi Assistant & PR Agent Review
 
-OpenCode provides automatic PR reviews and an interactive assistant:
+Plexus uses **Pi Assistant** and **PR Agent** for automated coding assistance and code reviews:
 
-- `.github/workflows/opencode-review.yml` reviews non-draft PRs, including PRs from forks, when
-  they are opened, updated, reopened, or marked ready for review. Reviews are read-only and focus
-  on correctness, bugs, security, error handling, tests, and maintainability. A minimal trusted
-  dispatcher forwards only the PR number and immutable head SHA to an isolated default-branch run.
-  That run generates an inert patch before model secrets are exposed. OpenCode can read only that
-  patch and cannot run commands, edit files, access the network, or inspect the runner environment.
-- On an issue, PR conversation, or inline PR comment, include `@opencode`, `/opencode`, or `/oc`
-  to ask a question, request an explanation, or explicitly request a code change. OpenCode reads
-  the full thread; inline comments also include file, line, and diff context.
-- For code changes requested on an issue, OpenCode creates a branch and PR. For requests on an
-  existing same-repository PR, it commits to that PR's branch rather than opening another PR.
-  Questions that do not require changes receive a comment only.
-
-Interactive runs are restricted to trusted collaborators, and OpenCode's GitHub integration
-currently requires the caller to have `write` or `admin` repository permission. Automatic review
-skips draft PRs. Fork PRs are reviewed without executing or directly exposing secrets to their
-code. Interactive code changes still cannot be pushed to fork-owned PR branches with the
-repository `GITHUB_TOKEN`.
-
-Both workflows require these existing Actions settings:
-
-- Secret `LLM_API_KEY`: API credential for the OpenAI-compatible model endpoint.
-- Secret `LLM_API_HOST`: base URL for that endpoint.
-- Variable `LLM_MODEL_ID`: model ID used by OpenCode.
-
-OpenCode uses the built-in `GITHUB_TOKEN`; no OpenCode GitHub App or additional GitHub token is
-required. Session sharing is disabled. After migration, the `PR_AGENT_MODEL_ID` repository
-variable can be retired manually. Do not remove `LLM_API_KEY`, `LLM_API_HOST`, or `LLM_MODEL_ID`:
-they remain in use, including by the OpenCode release-note automation in
-`.github/workflows/release.yml`.
+- **Pi Assistant** (`.github/workflows/pi-assistant-issue.yml` and `.github/workflows/pi-assistant-pr.yml`): Triggered by commenting `/pi` on an issue or PR. It uses the `mcowger/pi-action` action to run an AI-agent-driven coding session directly in the repository context to address requested changes. System prompts live in `.github/prompts/pi-assistant-issue.md` and `.github/prompts/pi-assistant-pr.md`.
+- **PR Agent Review** (`.github/workflows/pr-agent-review.yml`): Triggered automatically when non-draft pull requests are opened/reopened/ready for review, or when comments are made. It performs thorough automated code reviews using the `the-pr-agent/pr-agent` action, configured via `.pr_agent.toml`.
 
 ## Code Style
 

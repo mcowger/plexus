@@ -1,0 +1,112 @@
+name: PR Agent Review
+run-name: "PR Agent: ${{ github.event.pull_request.title || github.event.issue.title || format('PR #{0}', github.event.issue.number) }}"
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr-agent:
+    runs-on: ubuntu-latest
+    env:
+      PR_AGENT_LLM_API_KEY: ${{ secrets.LLM_API_KEY }}:${{ github.repository }}|${{ github.workflow }}|${{ github.job }}
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Mask API key
+        run: echo "::add-mask::$PR_AGENT_LLM_API_KEY"
+
+      - name: Check whether PR Agent should run
+        id: preflight
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const trustedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+            const trustedPermissions = new Set(['admin', 'maintain', 'write']);
+
+            // Load trusted community contributors from repo file
+            const trustedUsers = new Set();
+            try {
+              const { data } = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: '.github/workflows/trusted-contributors',
+              });
+              const content = Buffer.from(data.content, 'base64').toString('utf8');
+              for (const line of content.split('\n')) {
+                const username = line.trim();
+                if (username) trustedUsers.add(username);
+              }
+            } catch {
+              // File not found or unreadable — treat as empty list
+            }
+
+            let shouldRun = false;
+            let reason = 'Unsupported event';
+
+            if (context.eventName === 'pull_request_target') {
+              const pull = context.payload.pull_request;
+
+              if (pull.draft) {
+                reason = 'Skipping draft PR until it is marked ready for review';
+              } else if (pull.user.login === 'github-actions[bot]') {
+                shouldRun = true;
+                reason = 'Trusted PR author: github-actions[bot]';
+              } else if (trustedAssociations.has(pull.author_association)) {
+                shouldRun = true;
+                reason = `Trusted PR author association: ${pull.author_association}`;
+              } else if (trustedUsers.has(pull.user.login)) {
+                shouldRun = true;
+                reason = `Trusted community member: ${pull.user.login}`;
+              } else {
+                reason = `Skipping automatic run for external PR author association: ${pull.author_association}. A trusted maintainer can trigger PR-Agent with a PR comment.`;
+              }
+            } else if (context.eventName === 'issue_comment') {
+              if (!context.payload.issue.pull_request) {
+                reason = 'Skipping issue comment because it is not on a pull request';
+              } else if (trustedAssociations.has(context.payload.comment.author_association)) {
+                shouldRun = true;
+                reason = `Trusted commenter association: ${context.payload.comment.author_association}`;
+              } else {
+                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: context.payload.comment.user.login,
+                });
+
+                if (trustedPermissions.has(permission.permission)) {
+                  shouldRun = true;
+                  reason = `Trusted commenter permission: ${permission.permission}`;
+                } else {
+                  reason = `Skipping comment from untrusted user ${context.payload.comment.user.login} with permission: ${permission.permission}`;
+                }
+              }
+            }
+
+            core.info(reason);
+            core.setOutput('should_run', String(shouldRun));
+            core.setOutput('reason', reason);
+
+      - name: Run PR Agent
+        if: steps.preflight.outputs.should_run == 'true'
+        uses: the-pr-agent/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ env.PR_AGENT_LLM_API_KEY }}
+          OPENAI.KEY: ${{ env.PR_AGENT_LLM_API_KEY }}
+          OPENAI.API_BASE: ${{ secrets.LLM_API_HOST }}
+          config.model: openai/${{ vars.PR_AGENT_MODEL_ID }}
+          config.fallback_models: "[]"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+
+      - name: Log skipped PR Agent run
+        if: steps.preflight.outputs.should_run != 'true'
+        run: echo "${{ steps.preflight.outputs.reason }}"
