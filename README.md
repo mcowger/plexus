@@ -141,6 +141,7 @@ ENCRYPTION_KEY="<current-key>" NEW_ENCRYPTION_KEY="<new-key>" ./plexus rekey
 
 ```bash
 bun run setup:hooks
+bun run typecheck
 bun run test
 ```
 
