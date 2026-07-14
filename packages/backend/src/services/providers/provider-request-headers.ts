@@ -44,7 +44,10 @@ export function setupProviderHeaders(
   // different backend server, causing cache misses.
   if (request.cacheRoutingHeaders) {
     if (request.cacheRoutingHeaders.session_id) {
-      headers['session_id'] = request.cacheRoutingHeaders.session_id;
+      // OpenAI's Codex backend deprecated the underscored header in favor of
+      // the hyphenated form (more proxy-compatible); the old name is now
+      // silently ignored upstream, so send the current one.
+      headers['session-id'] = request.cacheRoutingHeaders.session_id;
     }
     if (request.cacheRoutingHeaders['x-client-request-id']) {
       headers['x-client-request-id'] = request.cacheRoutingHeaders['x-client-request-id'];
