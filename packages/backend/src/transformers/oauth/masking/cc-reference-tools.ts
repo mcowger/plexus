@@ -23,8 +23,8 @@
  * below is left alone regardless of client (opencode, MCP, or otherwise) —
  * there's no CC tool it could be confused with.
  *
- * SOURCE: a genuine on-the-wire Claude Code request capture (rawrequest.json,
- * cc_version=2.1.200.048) — the full `tools[]` array and each tool's
+ * SOURCE: a genuine on-the-wire Claude Code 2.1.207 request capture — the
+ * full `tools[]` array and each tool's
  * `input_schema.required`.
  * TO UPDATE: capture a real Claude Code session's request body and diff its
  * `tools[].name` / `tools[].input_schema.required` against this table.
@@ -46,7 +46,7 @@ export const CC_TOOL_REFERENCE: Readonly<Record<string, readonly string[]>> = {
   NotebookEdit: ['notebook_path', 'new_source'],
   Read: ['file_path'],
   ReportFindings: ['findings'],
-  ScheduleWakeup: ['delaySeconds', 'reason', 'prompt'],
+  ScheduleWakeup: [],
   SendMessage: ['to', 'message'],
   Skill: ['skill'],
   TaskCreate: ['subject', 'description'],
@@ -77,8 +77,10 @@ export function matchesReferenceShape(
 ): boolean {
   const reference = CC_TOOL_REFERENCE[ccName];
   if (!reference) return false;
-  if (!requiredParams) return false;
   const a = sortedUnique(reference);
-  const b = sortedUnique(requiredParams);
+  // JSON Schema omits `required` when every parameter is optional. That is
+  // semantically equivalent to an empty required list, as current Claude
+  // Code does for several of its tools.
+  const b = sortedUnique(requiredParams ?? []);
   return a.length === b.length && a.every((name, i) => name === b[i]);
 }

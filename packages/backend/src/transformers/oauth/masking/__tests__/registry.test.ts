@@ -22,6 +22,17 @@ describe('buildToolRenamePairs', () => {
     expect(buildToolRenamePairs(tools)).toEqual([]);
   });
 
+  it('does not rename current Claude Code tools whose all-optional schemas omit required', () => {
+    // Captured from claude-cli/2.1.207. JSON Schema represents an
+    // all-optional input object by omitting `required`, rather than `[]`.
+    const tools: ToolDescriptor[] = ['EnterWorktree', 'ScheduleWakeup', 'Workflow'].map((name) => ({
+      name,
+      parameters: { type: 'object', properties: {} },
+    }));
+
+    expect(buildToolRenamePairs(tools)).toEqual([]);
+  });
+
   it('does not rename tools with no name collision against any real Claude Code tool', () => {
     // None of these names appear in the CC reference table at all (case-
     // sensitive exact match), regardless of which client sent them.

@@ -30,7 +30,7 @@
  * inspect a genuine Claude Code session's `user-agent` header
  * (`claude-cli/<version> (external, cli)`).
  */
-export const CC_VERSION = '2.1.200';
+export const CC_VERSION = '2.1.207';
 
 /**
  * Billing fingerprint salt + character-index selection, used to compute the

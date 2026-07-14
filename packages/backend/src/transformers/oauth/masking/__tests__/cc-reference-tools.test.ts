@@ -43,14 +43,13 @@ describe('matchesReferenceShape', () => {
     expect(matchesReferenceShape('BASH', ['command'])).toBe(false);
   });
 
-  it('does not match when requiredParams is undefined, even against a zero-required reference tool', () => {
-    // A caller schema with no `required` field at all is indistinguishable
-    // here from "unknown shape" — matchesReferenceShape treats that as a
-    // mismatch rather than assuming it's compatible, even for reference
-    // tools whose own required list is empty (TaskList, Workflow, ...).
-    // cc-collision-shape.ts callers should be aware this means such a tool
-    // gets flagged for rename.
-    expect(matchesReferenceShape('TaskList', undefined)).toBe(false);
+  it('treats an absent required field as an empty required list', () => {
+    // Current Claude Code omits JSON Schema's optional `required` key for
+    // tools whose parameters are all optional.
+    expect(matchesReferenceShape('TaskList', undefined)).toBe(true);
+    expect(matchesReferenceShape('EnterWorktree', undefined)).toBe(true);
+    expect(matchesReferenceShape('ScheduleWakeup', undefined)).toBe(true);
+    expect(matchesReferenceShape('Workflow', undefined)).toBe(true);
     expect(matchesReferenceShape('Bash', undefined)).toBe(false);
   });
 
