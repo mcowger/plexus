@@ -46,7 +46,9 @@ describe('dropRetiredOAuthProviders — startup purge of persisted rows', () => 
     const schema = getSchema();
     const db = getDatabase();
     await db.delete(schema.providers);
+    await db.delete(schema.apiKeys);
     await db.delete(schema.oauthCredentials);
+    await db.delete(schema.mcpServers);
     repo = new ConfigRepository();
     service = new ConfigService(repo);
   });
