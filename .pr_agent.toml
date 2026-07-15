@@ -1,22 +1,53 @@
 [config]
 output_relevant_configurations = false
-ai_timeout = 300
+ai_timeout = 180
 custom_model_max_tokens = 256000
 
 [pr_description]
 enable_semantic_files_types = false  # suppress the File Walkthrough section
 enable_pr_type = false                 # suppress the "PR Type" section
 enable_pr_diagram = false               # suppress the "Diagram Walkthrough" section
+add_original_user_description = true
+generate_ai_title = false
+use_bullet_points = false
+publish_description_as_comment = true
+publish_labels = true
 
 [pr_reviewer]
 # Publish the review comment even when there are no findings/suggestions to report.
 publish_output_no_suggestions = true
-enable_auto_approval = true
-maximal_review_effort = 1
-extra_instructions = "If there are no security concerns, please write 'No security concerns. LGTM!' for the security_concerns field instead of just 'No'. If there are no major issues or findings, explicitly and prominently write 'LGTM' in any of the feedback fields."
+require_security_review = true
+require_tests_review = false
+require_estimate_effort_to_review = false
+require_ticket_analysis_review = false
+require_score_review = true
+require_can_be_split_review = true
+require_estimate_contribution_time_cost = false
+require_todo_scan = true
+num_max_findings = 5
+persistent_comment = true
+final_update_message = false
+enable_intro_text = false
+enable_help_text = false
+enable_review_labels_security = true
+enable_review_labels_effort = false
+require_all_thresholds_for_incremental_review = false
+minimal_commits_for_incremental_review = 1
+minimal_minutes_for_incremental_review = 0
 
 [pr_code_suggestions]
-num_code_suggestions_per_chunk = 5
+num_code_suggestions_per_chunk = 3
 suggestions_score_threshold = 6
 publish_output_no_suggestions = false
 commitable_code_suggestions = true
+focus_only_on_problems = false
+persistent_comment = true
+auto_extended_mode = true
+max_number_of_calls = 4
+parallel_calls = true
+dual_publishing_score_threshold = -1
+demand_code_suggestions_self_review = false
+approve_pr_on_self_review = false
+apply_suggestions_checkbox = true
+enable_help_text = false
+enable_chat_text = true
