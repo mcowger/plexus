@@ -3,7 +3,7 @@ run-name: "PR Agent: ${{ github.event.pull_request.title || github.event.issue.t
 
 on:
   pull_request_target:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
   issue_comment:
     types: [created]
 
@@ -103,9 +103,13 @@ jobs:
           config.model: openai/${{ vars.PR_AGENT_MODEL_ID }}
           config.fallback_models: "[]"
           github_action_config.auto_review: "true"
-          github_action_config.auto_describe: "true"
+          github_action_config.auto_describe: "false"
           github_action_config.auto_improve: "true"
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review"]'
+          github_action_config.handle_push_trigger: "true"
+          github_action_config.push_trigger_ignore_bot_commits: "true"
+          github_action_config.push_trigger_ignore_merge_commits: "true"
+          github_action_config.push_commands: '["/review", "/improve"]'
 
       - name: Log skipped PR Agent run
         if: steps.preflight.outputs.should_run != 'true'
