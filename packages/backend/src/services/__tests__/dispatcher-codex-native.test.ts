@@ -11,7 +11,7 @@ import type { UnifiedChatRequest } from '../../types/unified';
 // Responses body. Two paths:
 //   1. CLI-shaped body  → sent VERBATIM (auth only), extensions preserved.
 //   2. Not CLI-shaped   → normalized via ResponsesTransformer + adorned.
-// Both stream RAW backend Responses SSE to the client (no IR re-serialization).
+// Responses clients stream RAW backend SSE; cross-format clients get translated.
 
 const { Dispatcher } = await import('../dispatch/dispatcher');
 
@@ -143,6 +143,38 @@ function plainResponsesRequest(): UnifiedChatRequest {
   } as any;
 }
 
+function chatRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'codex-alias',
+    stream: true,
+    messages: [{ role: 'user', content: 'hi' }],
+  };
+  return {
+    model: 'codex-alias',
+    messages: body.messages,
+    stream: true,
+    incomingApiType: 'chat',
+    originalBody: body,
+  } as any;
+}
+
+function messagesRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'codex-alias',
+    max_tokens: 256,
+    stream: true,
+    messages: [{ role: 'user', content: 'hi' }],
+  };
+  return {
+    model: 'codex-alias',
+    messages: body.messages,
+    max_tokens: 256,
+    stream: true,
+    incomingApiType: 'messages',
+    originalBody: body,
+  } as any;
+}
+
 async function drain(stream: ReadableStream): Promise<string> {
   const reader = stream.getReader();
   const dec = new TextDecoder();
@@ -185,7 +217,7 @@ describe('Native Codex OAuth pass-through', () => {
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(CODEX_TOKEN);
-    fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    fetchSpy = registerSpy(global, 'fetch').mockResolvedValue(
       new Response(UPSTREAM_SSE, {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
@@ -225,9 +257,10 @@ describe('Native Codex OAuth pass-through', () => {
 
   test('PATH 2 (non-CLI): normalizes + adorns the body for the backend', async () => {
     setConfigForTesting(codexOAuthConfig());
-    await new Dispatcher().dispatch(plainResponsesRequest());
+    const response = await new Dispatcher().dispatch(plainResponsesRequest());
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(response.bypassTransformation).toBe(true);
     const [url, init] = fetchSpy.mock.calls[0] as any[];
     expect(url).toBe('https://chatgpt.com/backend-api/codex/responses');
 
@@ -266,5 +299,25 @@ describe('Native Codex OAuth pass-through', () => {
     expect((fetchSpy.mock.calls[0] as any[])[0]).toBe(
       'https://chatgpt.com/backend-api/codex/responses'
     );
+  });
+
+  test('marks backend Responses SSE for translation to a Chat Completions client', async () => {
+    setConfigForTesting(codexOAuthConfig());
+    const response = await new Dispatcher().dispatch(chatRequest());
+
+    expect(response.bypassTransformation).toBe(false);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.input).toBeDefined();
+    expect(sent.messages).toBeUndefined();
+  });
+
+  test('marks backend Responses SSE for translation to a Messages client', async () => {
+    setConfigForTesting(codexOAuthConfig());
+    const response = await new Dispatcher().dispatch(messagesRequest());
+
+    expect(response.bypassTransformation).toBe(false);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.input).toBeDefined();
+    expect(sent.messages).toBeUndefined();
   });
 });

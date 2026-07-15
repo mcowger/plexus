@@ -199,11 +199,17 @@ export async function buildRequestPayload(
     logger.debug(
       `Native OAuth payload prepared for ${provider}/${route.model} (url=${prepared.url})`
     );
-    // Anthropic/Codex always raw-passthrough their response (their clients are
-    // same-format by construction). Copilot is multi-API: honor the computed
-    // same-format decision so cross-format requests get their response
-    // translated by the standard pipeline.
-    const nativeBypass = copilotNative ? bypassTransformation : true;
+    // Codex CLI and Responses clients receive the native Responses stream.
+    // Cross-format Codex requests must translate the response back to the
+    // incoming client format. Anthropic remains raw pass-through, while
+    // Copilot honors its computed same-format decision.
+    const incomingIsResponses =
+      getApiBaseType(request.incomingApiType?.toLowerCase() ?? '') === 'responses';
+    const nativeBypass = codexNative
+      ? codexCliPassthrough || incomingIsResponses
+      : copilotNative
+        ? bypassTransformation
+        : true;
     return { payload: prepared.body, bypassTransformation: nativeBypass };
   }
 
