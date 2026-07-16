@@ -305,6 +305,9 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
     let refreshed = 0;
     await Promise.all(
       models.getProviders().map(async (provider) => {
+        // Self-refreshing providers manage their own catalog lifecycle
+        // (own store, own cadence) — don't drive their refresh here.
+        if (SELF_REFRESHING_PROVIDERS.has(provider.id)) return;
         if (typeof provider.refreshModels !== 'function') return;
         const scoped: ProviderModelsStore = {
           read: () => store.read(provider.id),

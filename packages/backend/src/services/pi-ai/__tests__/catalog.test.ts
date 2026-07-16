@@ -192,6 +192,24 @@ describe('createModelCatalog', () => {
     expect(catalog.getModels('unknown')).toEqual([]);
   });
 
+  it('does not drive refresh for self-refreshing providers', async () => {
+    const radiusRefresh = vi.fn(async () => {});
+    const radius = {
+      ...makeProvider('radius', []),
+      refreshModels: radiusRefresh,
+    } as unknown as Provider;
+    const fetchImpl = vi.fn(async () => jsonResponse({ m1: { id: 'm1' } }));
+    const catalog = createModelCatalog({
+      models: makeModels(radius, makeProvider('anthropic', [BASELINE_MODEL])),
+      store: new MapStore(),
+      fetchImpl: fetchImpl as any,
+    });
+
+    await catalog.refresh();
+    expect(radiusRefresh).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('refreshes in the background when init allows network', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
     const catalog = makeCatalog({ fetchImpl });
