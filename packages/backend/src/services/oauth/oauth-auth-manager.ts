@@ -1,10 +1,7 @@
 import { logger } from '../../utils/logger';
-import {
-  getOAuthApiKey,
-  type OAuthProvider,
-  type OAuthCredentials,
-} from '@earendil-works/pi-ai/oauth';
+import type { OAuthCredential, OAuthCredentials } from '@earendil-works/pi-ai';
 import { ConfigService } from '../configuration/config-service';
+import { getOAuthProviderAuth, type OAuthProvider } from './oauth-providers';
 
 const LEGACY_ACCOUNT_ID = 'legacy';
 
@@ -173,35 +170,36 @@ export class OAuthAuthManager {
       );
     }
 
-    const result = await getOAuthApiKey(provider, {
-      [provider]: credentials,
-    });
-
-    if (!result) {
-      throw new Error(
-        `OAuth: Not authenticated for provider '${provider}' and account '${resolvedAccountId}'. ` +
-          `Please run OAuth login for this account.`
-      );
+    const descriptor = getOAuthProviderAuth(provider);
+    if (!descriptor) {
+      throw new Error(`OAuth: provider '${provider}' does not support OAuth login.`);
     }
 
-    if (result.newCredentials) {
-      const wasRefreshed =
-        result.newCredentials.access !== credentials.access ||
-        result.newCredentials.expires !== credentials.expires;
+    // Refresh expired tokens and persist the rotated credentials.
+    let current = credentials;
+    if (current.expires <= Date.now()) {
+      const refreshed = await descriptor.oauth.refresh({ ...current, type: 'oauth' });
       logger.debug(
-        `OAuth: getApiKey for ${provider}/${resolvedAccountId} — ` +
-          `token ${wasRefreshed ? 'WAS refreshed' : 'was NOT refreshed (not expired)'}. ` +
-          `new_refresh=${result.newCredentials.refresh ? `present(${result.newCredentials.refresh.length} chars)` : 'MISSING'}`
+        `OAuth: getApiKey for ${provider}/${resolvedAccountId} — token WAS refreshed. ` +
+          `new_refresh=${refreshed.refresh ? `present(${refreshed.refresh.length} chars)` : 'MISSING'}`
       );
-      providerRecord.accounts[resolvedAccountId] = {
-        type: 'oauth',
-        ...result.newCredentials,
-      } as OAuthCredentials;
-      // Save refreshed credentials to database
-      await this.saveToDatabase(provider, resolvedAccountId, result.newCredentials);
+      current = { ...refreshed };
+      providerRecord.accounts[resolvedAccountId] = current;
+      await this.saveToDatabase(provider, resolvedAccountId, current);
+    } else {
+      logger.debug(
+        `OAuth: getApiKey for ${provider}/${resolvedAccountId} — token was NOT refreshed (not expired).`
+      );
     }
 
-    return result.apiKey;
+    const auth = await descriptor.oauth.toAuth({ ...current, type: 'oauth' } as OAuthCredential);
+    if (!auth.apiKey) {
+      throw new Error(
+        `OAuth: could not derive an API key for provider '${provider}' and account '${resolvedAccountId}'.`
+      );
+    }
+
+    return auth.apiKey;
   }
 
   getCredentials(provider: OAuthProvider, accountId?: string | null): OAuthCredentials | null {

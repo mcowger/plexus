@@ -209,13 +209,20 @@ const mockGetProviders = () => ['anthropic', 'openai-codex', 'openai', 'google']
 //     dispatches on model.api and crashes with \"No API provider registered\"
 //     if it is missing.
 // ---------------------------------------------------------------------------
-vi.mock('@earendil-works/pi-ai', () => ({
-  complete: mockModels.complete,
-  stream: mockModels.stream,
-  calculateCost: vi.fn(() => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 })),
-  clampThinkingLevel: (_m: any, l: string) => l,
-  getSupportedThinkingLevels: () => ['off', 'low', 'medium', 'high'],
-}));
+vi.mock('@earendil-works/pi-ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@earendil-works/pi-ai')>();
+  return {
+    complete: mockModels.complete,
+    stream: mockModels.stream,
+    calculateCost: vi.fn(() => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 })),
+    clampThinkingLevel: (_m: any, l: string) => l,
+    getSupportedThinkingLevels: () => ['off', 'low', 'medium', 'high'],
+    // The model catalog overlay delegates merge/restore/persist to pi-ai's
+    // real createProvider — keep it real so catalog tests exercise genuine
+    // library semantics.
+    createProvider: actual.createProvider,
+  };
+});
 
 vi.mock('@earendil-works/pi-ai/providers/all', () => ({
   builtinModels: () => mockModels,

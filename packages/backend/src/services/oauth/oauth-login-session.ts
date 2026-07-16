@@ -1,13 +1,11 @@
-import { getOAuthProvider, getOAuthProviders } from '@earendil-works/pi-ai/oauth';
-import type {
-  OAuthAuthInfo,
-  OAuthCredentials,
-  OAuthLoginCallbacks,
-  OAuthPrompt,
-  OAuthProviderId,
-  OAuthProviderInterface,
-} from '@earendil-works/pi-ai/oauth';
+import type { AuthInteraction, OAuthCredentials } from '@earendil-works/pi-ai';
 import { OAuthAuthManager } from './oauth-auth-manager';
+import {
+  getOAuthProviderAuth,
+  listOAuthProviders,
+  type OAuthProviderDescriptor,
+  type OAuthProviderId,
+} from './oauth-providers';
 
 export type OAuthSessionStatus =
   | 'in_progress'
@@ -17,6 +15,17 @@ export type OAuthSessionStatus =
   | 'success'
   | 'error'
   | 'cancelled';
+
+export type OAuthAuthInfo = {
+  url: string;
+  instructions?: string;
+};
+
+export type OAuthPrompt = {
+  message: string;
+  placeholder?: string;
+  allowEmpty?: boolean;
+};
 
 export type OAuthSession = {
   id: string;
@@ -41,7 +50,7 @@ type SessionInternal = OAuthSession & {
   expiresAt: number;
 };
 
-type ProviderResolver = (id: OAuthProviderId) => OAuthProviderInterface | undefined;
+type ProviderResolver = (id: OAuthProviderId) => OAuthProviderDescriptor | undefined;
 
 const DEFAULT_SESSION_TTL_MS = 20 * 60 * 1000;
 
@@ -67,7 +76,7 @@ export class OAuthLoginSessionManager {
   private providerResolver: ProviderResolver;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(providerResolver: ProviderResolver = getOAuthProvider) {
+  constructor(providerResolver: ProviderResolver = getOAuthProviderAuth) {
     this.providerResolver = providerResolver;
     this.startCleanup();
   }
@@ -89,8 +98,8 @@ export class OAuthLoginSessionManager {
     this.sessions.clear();
   }
 
-  listProviders(): OAuthProviderInterface[] {
-    return getOAuthProviders();
+  listProviders(): OAuthProviderDescriptor[] {
+    return listOAuthProviders();
   }
 
   getSession(sessionId: string): OAuthSession | undefined {
@@ -210,56 +219,76 @@ export class OAuthLoginSessionManager {
   }
 
   private async runLogin(
-    provider: OAuthProviderInterface,
+    provider: OAuthProviderDescriptor,
     session: SessionInternal
   ): Promise<void> {
     const authManager = OAuthAuthManager.getInstance();
 
-    const callbacks: OAuthLoginCallbacks = {
-      onAuth: (info) => {
-        session.authInfo = info;
-        session.status = 'awaiting_auth';
-        this.touch(session);
-      },
-      onDeviceCode: (info) => {
-        session.authInfo = {
-          url: info.verificationUri,
-          instructions: `Enter code: ${info.userCode}`,
-        };
-        session.status = 'awaiting_auth';
-        this.touch(session);
-      },
-      onPrompt: async (prompt) => {
-        session.prompt = prompt;
-        session.status = 'awaiting_prompt';
-        this.touch(session);
-        const deferred = createDeferred();
+    const awaitUserInput = (manual: boolean, message: string, placeholder?: string) => {
+      // Manual-code entry renders as the UI's dedicated redirect-URL input
+      // (driven by the awaiting_manual_code status), not the generic prompt
+      // input — keep session.prompt unset so only one input is shown.
+      //
+      // allowEmpty: pi-ai 0.80.9's AuthPrompt dropped the old allowEmpty
+      // flag; blank input is passed through and each provider validates it
+      // (e.g. Copilot treats a blank GHE domain as github.com), so the UI
+      // must not block empty submission.
+      session.prompt = manual ? undefined : { message, placeholder, allowEmpty: true };
+      session.status = manual ? 'awaiting_manual_code' : 'awaiting_prompt';
+      this.touch(session);
+      const deferred = createDeferred();
+      if (manual) {
+        session.resolveManualCode = deferred.resolve;
+        session.rejectManualCode = deferred.reject;
+      } else {
         session.resolvePrompt = deferred.resolve;
         session.rejectPrompt = deferred.reject;
-        return deferred.promise;
-      },
-      onProgress: (message) => {
-        session.progress.push(message);
-        if (session.progress.length > 100) {
-          session.progress.shift();
+      }
+      return deferred.promise;
+    };
+
+    const interaction: AuthInteraction = {
+      signal: session.abortController.signal,
+      notify: (event) => {
+        switch (event.type) {
+          case 'auth_url':
+            session.authInfo = { url: event.url, instructions: event.instructions };
+            session.status = 'awaiting_auth';
+            break;
+          case 'device_code':
+            session.authInfo = {
+              url: event.verificationUri,
+              instructions: `Enter code: ${event.userCode}`,
+            };
+            session.status = 'awaiting_auth';
+            break;
+          case 'progress':
+          case 'info':
+            session.progress.push(event.message);
+            if (session.progress.length > 100) {
+              session.progress.shift();
+            }
+            break;
         }
         this.touch(session);
       },
-      onManualCodeInput: async () => {
-        session.status = 'awaiting_manual_code';
-        this.touch(session);
-        const deferred = createDeferred();
-        session.resolveManualCode = deferred.resolve;
-        session.rejectManualCode = deferred.reject;
-        return deferred.promise;
+      prompt: (prompt) => {
+        // Select prompts (e.g. Codex login-method chooser) keep the previous
+        // behaviour: auto-pick the first option.
+        if (prompt.type === 'select') {
+          const selected = prompt.options[0]?.id;
+          if (selected === undefined) {
+            return Promise.reject(new Error('Login cancelled: no options to select'));
+          }
+          return Promise.resolve(selected);
+        }
+        return awaitUserInput(prompt.type === 'manual_code', prompt.message, prompt.placeholder);
       },
-      onSelect: async (prompt) => prompt.options[0]?.id,
-      signal: session.abortController.signal,
     };
 
     try {
-      const credentials: OAuthCredentials = await provider.login(callbacks);
-      authManager.setCredentials(provider.id, session.accountId, credentials);
+      const credentials: OAuthCredentials = await provider.oauth.login(interaction);
+      authManager.setCredentials(session.providerId, session.accountId, credentials);
       session.status = 'success';
       session.error = undefined;
       session.prompt = undefined;

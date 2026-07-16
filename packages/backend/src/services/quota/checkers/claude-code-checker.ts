@@ -1,7 +1,7 @@
 import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
-import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
+import type { OAuthProvider } from '../../oauth/oauth-providers';
 import { logger } from '../../../utils/logger';
 
 interface UsageWindow {

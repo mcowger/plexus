@@ -1,4 +1,4 @@
-import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
+import { getCatalogModels } from '../pi-ai/catalog';
 import { getProviderTypes, type ProviderConfig } from '../../config';
 import { logger } from '../../utils/logger';
 
@@ -119,7 +119,7 @@ export async function fetchModelsFromUrl(
 }
 
 export function getOAuthProviderModels(providerId: string): DiscoveredModel[] {
-  return getBuiltinModels(providerId as any).map((model) => ({
+  return getCatalogModels(providerId).map((model) => ({
     id: model.id,
     name: model.name,
     context_length: model.contextWindow,

@@ -24,8 +24,8 @@
  * translation.
  */
 
-import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
-import type { OAuthProvider } from '@earendil-works/pi-ai/oauth';
+import { getCatalogModel } from '../pi-ai/catalog';
+import type { OAuthProvider } from './oauth-providers';
 import { logger } from '../../utils/logger';
 import { OAuthAuthManager } from './oauth-auth-manager';
 import {
@@ -81,7 +81,7 @@ const OAUTH_PROVIDER_BASE_URLS: Record<string, string> = {
  * or not-yet-registered model ids still resolve. Trailing slash stripped.
  */
 function resolveOAuthBaseUrl(provider: OAuthProvider, modelId: string): string {
-  const model = getBuiltinModel(provider as any, modelId);
+  const model = getCatalogModel(provider, modelId);
   const baseUrl = (model as any)?.baseUrl || OAUTH_PROVIDER_BASE_URLS[provider];
   if (!baseUrl) {
     throw new Error(
@@ -617,7 +617,7 @@ export function nativeOAuthApiType(
  */
 export function copilotWireApiType(modelId: string | undefined): string {
   if (modelId) {
-    const model = getBuiltinModel('github-copilot' as any, modelId);
+    const model = getCatalogModel('github-copilot', modelId);
     const api = (model as any)?.api as string | undefined;
     if (api && PIAI_API_TO_PLEXUS[api]) return PIAI_API_TO_PLEXUS[api];
   }

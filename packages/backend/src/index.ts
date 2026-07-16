@@ -55,6 +55,7 @@ import { registerRawPassthroughRoutes } from './routes/raw-passthrough';
 import { registerMcpRoutes } from './routes/mcp';
 import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { QuotaEnforcer } from './services/quota/quota-enforcer';
+import { initModelCatalog } from './services/pi-ai/catalog';
 import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
@@ -167,6 +168,17 @@ if (!isEncryptionEnabled()) {
   logger.warn(
     'ENCRYPTION_KEY not set — sensitive data will be stored in plaintext. Set ENCRYPTION_KEY for encryption at rest.'
   );
+}
+
+// --- Model Catalog Initialization ---
+// Restore the persisted pi.dev catalog overlay (offline, fast) so config
+// validation and dispatch see models released between pi-ai versions, then
+// refresh from pi.dev in the background. Non-fatal: the static built-in
+// catalog is the fallback.
+try {
+  await initModelCatalog();
+} catch (e) {
+  logger.error('Failed to initialize model catalog', e);
 }
 
 // --- Configuration Initialization ---

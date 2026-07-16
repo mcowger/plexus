@@ -4,7 +4,7 @@ import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
 import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
 import type { ModelArchitecture } from '@plexus/shared';
-import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
+import { getCatalogModel } from './services/pi-ai/catalog';
 
 // --- Zod Schemas ---
 
@@ -1232,18 +1232,11 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
 
   // Startup registry validation: warn (non-fatally) for any configured
   // (pi_ai_provider, pi_ai_model_id) pair that does not resolve via the
-  // built-in pi-ai registry. getModel() returns undefined for unknown pairs;
-  // this is a warning (not fatal) so renamed registry entries do not prevent
-  // Plexus from starting.
-  // getModel may return undefined (pi-ai 0.79.x) or throw (older versions /
-  // mocked) for unknown pairs — treat both as "not found".
-  const registryHas = (provider: string, modelId: string): boolean => {
-    try {
-      return getBuiltinModel(provider as any, modelId as any) != null;
-    } catch {
-      return false;
-    }
-  };
+  // pi-ai model catalog (built-in baseline + pi.dev overlay). The catalog
+  // returns null for unknown pairs; this is a warning (not fatal) so renamed
+  // registry entries do not prevent Plexus from starting.
+  const registryHas = (provider: string, modelId: string): boolean =>
+    getCatalogModel(provider, modelId) != null;
   const piPairResolves = (provider: string, modelId: string): boolean =>
     registryHas(provider, modelId);
   for (const [providerId, providerConfig] of Object.entries(resolvedProviders)) {
