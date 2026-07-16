@@ -13,7 +13,7 @@ import { getConfig } from '../config';
 import { logger } from './logger';
 import { StallInspector, type StallConfig } from '../services/inspectors/stall-inspector';
 
-const DEFAULT_STALL_CONFIG: StallConfig = {
+export const DEFAULT_STALL_CONFIG: StallConfig = {
   ttfbMs: null,
   ttfbBytes: 100,
   minBytesPerSecond: null,

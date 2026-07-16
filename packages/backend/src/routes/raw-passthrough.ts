@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { finished } from 'node:stream/promises';
+import { finished, pipeline } from 'node:stream/promises';
 import bearerAuth from '@fastify/bearer-auth';
 import { getConfig } from '../config';
 import { createAuthHook } from '../utils/auth';
@@ -20,7 +20,12 @@ import {
 } from '../services/quota/quota-middleware';
 import { ConcurrencyTracker } from '../services/runtime/concurrency-tracker';
 import { wireEarlyDisconnectDetection } from '../utils/timeout';
-import { DebugLoggingInspector, extractUsageFromReconstructed } from '../services/inspectors';
+import { DEFAULT_STALL_CONFIG } from '../utils/stall';
+import {
+  DebugLoggingInspector,
+  extractUsageFromReconstructed,
+  StallInspector,
+} from '../services/inspectors';
 import { calculateCosts } from '../utils/calculate-costs';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../utils/provider-cost';
 import { extractUsageCostDetails } from '../utils/usage-normalizer';
@@ -415,16 +420,36 @@ export async function registerRawPassthroughRoutes(
           };
           reply.raw.once('close', onClose);
 
+          // Track in-flight byte counts so the Logs page shows live KB received
+          // and KB/sec for pending raw requests. The default (disabled) stall
+          // config means the inspector only counts bytes — it never aborts.
+          const stallInspector = new StallInspector(
+            requestId,
+            DEFAULT_STALL_CONFIG,
+            abortController
+          );
+          usageStorage.registerInFlight(
+            requestId,
+            stallInspector,
+            (request as any).keyName ?? null
+          );
+          // pipeline() (not .pipe()) so an upstream error destroys the inspector
+          // too and the for-await below terminates instead of hanging.
+          const streamDone = pipeline(upstream, stallInspector);
+
           try {
-            for await (const chunk of upstream) {
+            for await (const chunk of stallInspector) {
               const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
               rawResponseInspector.write(buffer);
               transformedResponseInspector.write(buffer);
               if (captureErrorBody) errorResponseChunks.push(buffer);
               if (!reply.raw.write(buffer)) await waitForDrainOrClose(reply);
             }
+            await streamDone;
           } finally {
             reply.raw.removeListener('close', onClose);
+            stallInspector.destroy();
+            await streamDone.catch(() => {});
           }
 
           rawResponseInspector.end();
@@ -498,6 +523,7 @@ export async function registerRawPassthroughRoutes(
           }
           if (!reply.raw.writableEnded) reply.raw.end();
         } finally {
+          usageStorage.deregisterInFlight(requestId);
           if (quotaEnforcer) {
             await recordQuotaUsage(
               (request as any).keyName,

@@ -7,6 +7,7 @@ import type { UsageStorageService } from '../../services/observability/usage-sto
 import { ConcurrencyTracker } from '../../services/runtime/concurrency-tracker';
 import { DebugManager } from '../../services/observability/debug-manager';
 import type { QuotaEnforcer } from '../../services/quota/quota-enforcer';
+import { StallInspector } from '../../services/inspectors/stall-inspector';
 
 interface CapturedRequest {
   method?: string;
@@ -93,6 +94,8 @@ describe('raw passthrough routes', () => {
       saveRequest: vi.fn().mockResolvedValue(undefined),
       saveError: vi.fn().mockResolvedValue(undefined),
       saveDebugLog: vi.fn().mockResolvedValue(undefined),
+      registerInFlight: vi.fn(),
+      deregisterInFlight: vi.fn(),
     } as unknown as UsageStorageService;
     quotaEnforcer = {
       loadQuotaContext: vi.fn().mockResolvedValue(null),
@@ -420,6 +423,67 @@ describe('raw passthrough routes', () => {
         transformedResponseSnapshot: expect.objectContaining({ usage: expect.any(Object) }),
       })
     );
+  });
+
+  test('tracks in-flight byte progress for live Logs display and deregisters on completion', async () => {
+    upstreamResponseBody = Buffer.alloc(4096, 'x');
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/raw/openrouter/v1/large-response',
+      headers: { authorization: 'Bearer plexus-secret' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const requestId = response.headers['x-plexus-request-id'];
+    expect(usageStorage.registerInFlight).toHaveBeenCalledWith(
+      requestId,
+      expect.any(StallInspector),
+      'allowed'
+    );
+    const inspector = (usageStorage.registerInFlight as any).mock.calls[0][1] as StallInspector;
+    expect(inspector.getStats().bytesReceived).toBe(upstreamResponseBody.byteLength);
+    expect(usageStorage.deregisterInFlight).toHaveBeenCalledWith(requestId);
+  });
+
+  test('deregisters in-flight progress tracking when the upstream request fails', async () => {
+    upstreamShouldHang = true;
+    setConfigForTesting({
+      providers: {
+        openrouter: {
+          api_base_url: 'https://unused.example/v1',
+          api_key: 'provider-secret',
+          enabled: true,
+          disable_cooldown: false,
+          stall_cooldown: false,
+          estimateTokens: false,
+          useClaudeMasking: false,
+          timeoutMs: 20,
+          raw_passthrough: {
+            enabled: true,
+            base_url: upstreamBaseUrl,
+            auth: 'bearer',
+          },
+        },
+      },
+      models: {},
+      keys: {
+        allowed: { secret: 'plexus-secret', allowRawPassthrough: true },
+      },
+      failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    });
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/raw/openrouter/v1/responses',
+      headers: { authorization: 'Bearer plexus-secret', 'content-type': 'application/json' },
+      payload: '{}',
+    });
+
+    expect(response.statusCode).toBe(504);
+    const savedRecord = (usageStorage.saveRequest as any).mock.calls[0][0];
+    expect(usageStorage.deregisterInFlight).toHaveBeenCalledWith(savedRecord.requestId);
   });
 
   test('uses the existing debug inspector capture limit', async () => {
