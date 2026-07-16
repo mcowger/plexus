@@ -188,12 +188,18 @@ export class FileModelsStore implements ModelsStore {
   }
 
   private persist(): Promise<void> {
-    this.writing = this.writing.then(async () => {
-      await mkdir(path.dirname(this.filePath), { recursive: true });
-      const tmp = `${this.filePath}.tmp`;
-      await Bun.write(tmp, JSON.stringify(this.entries));
-      await rename(tmp, this.filePath);
-    });
+    // Recover the chain from a previous rejection: without the catch, one
+    // transient failure would leave this.writing rejected and every later
+    // write/delete would silently skip its persistence callback. Each caller
+    // still receives their own rejection via the returned promise.
+    this.writing = this.writing
+      .catch(() => undefined)
+      .then(async () => {
+        await mkdir(path.dirname(this.filePath), { recursive: true });
+        const tmp = `${this.filePath}.tmp`;
+        await Bun.write(tmp, JSON.stringify(this.entries));
+        await rename(tmp, this.filePath);
+      });
     return this.writing;
   }
 }
@@ -232,6 +238,8 @@ export interface ModelCatalogDeps {
   fetchImpl?: typeof fetch;
   catalogBaseUrl?: string;
   now?: () => number;
+  /** Periodic re-refresh cadence. Defaults to the 4h throttle interval. */
+  refreshIntervalMs?: number;
 }
 
 export interface CatalogRefreshResult {
@@ -245,9 +253,12 @@ export interface ModelCatalog {
   /**
    * Wrap static providers with the remote overlay and restore the persisted
    * catalog from the store. When allowNetwork is not false, also kicks off a
-   * background pi.dev refresh (errors are logged, never thrown).
+   * background pi.dev refresh and schedules periodic re-refreshes (errors
+   * are logged, never thrown).
    */
   init(options?: { allowNetwork?: boolean }): Promise<void>;
+  /** Stop the periodic re-refresh scheduled by init. */
+  dispose(): void;
   /**
    * Restore every provider's persisted overlay, then fetch stale providers
    * from pi.dev (throttled to REMOTE_CATALOG_REFRESH_INTERVAL_MS unless
@@ -268,6 +279,7 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
   const { models, store } = deps;
   const now = deps.now ?? Date.now;
   let wrapped = false;
+  let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
   function wrapProviders(): void {
     if (wrapped) return;
@@ -326,27 +338,44 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
     return { refreshed, errors };
   }
 
+  function logRefreshOutcome(promise: Promise<CatalogRefreshResult>): void {
+    void promise
+      .then((result) => {
+        const errorCount = Object.keys(result.errors).length;
+        if (errorCount > 0) {
+          logger.warn(
+            `Model catalog refresh completed with ${errorCount} provider error(s): ` +
+              Object.entries(result.errors)
+                .map(([id, message]) => `${id}: ${message}`)
+                .join('; ')
+          );
+        } else {
+          logger.debug(`Model catalog refresh completed (${result.refreshed} providers)`);
+        }
+      })
+      .catch((error) => logger.warn(`Model catalog refresh failed: ${error}`));
+  }
+
   return {
     async init(options: { allowNetwork?: boolean } = {}) {
       wrapProviders();
       // Restore the persisted overlay before serving reads (no network).
       await refresh({ allowNetwork: false });
       if (options.allowNetwork ?? true) {
-        void refresh()
-          .then((result) => {
-            const errorCount = Object.keys(result.errors).length;
-            if (errorCount > 0) {
-              logger.warn(
-                `Model catalog refresh completed with ${errorCount} provider error(s): ` +
-                  Object.entries(result.errors)
-                    .map(([id, message]) => `${id}: ${message}`)
-                    .join('; ')
-              );
-            } else {
-              logger.debug(`Model catalog refresh completed (${result.refreshed} providers)`);
-            }
-          })
-          .catch((error) => logger.warn(`Model catalog refresh failed: ${error}`));
+        logRefreshOutcome(refresh());
+        // Long-running instances re-check pi.dev on the throttle cadence;
+        // models published after startup would otherwise need a restart.
+        refreshTimer ??= setInterval(
+          () => logRefreshOutcome(refresh()),
+          deps.refreshIntervalMs ?? REMOTE_CATALOG_REFRESH_INTERVAL_MS
+        );
+        refreshTimer.unref?.();
+      }
+    },
+    dispose(): void {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = undefined;
       }
     },
     refresh,
@@ -380,6 +409,7 @@ export function getModelCatalog(): ModelCatalog {
 }
 
 export function resetModelCatalogForTesting(): void {
+  singleton?.dispose();
   singleton = undefined;
 }
 

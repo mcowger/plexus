@@ -201,6 +201,28 @@ describe('createModelCatalog', () => {
       expect(catalog.getModel('anthropic', 'claude-new')?.id).toBe('claude-new')
     );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    catalog.dispose();
+  });
+
+  it('periodically re-refreshes after init and stops on dispose', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
+    const catalog = createModelCatalog({
+      models: makeModels(makeProvider('anthropic', [BASELINE_MODEL])),
+      store: new MapStore(),
+      fetchImpl: fetchImpl as any,
+      // Always stale, so every interval tick performs a real fetch.
+      now: () => Date.now() + REMOTE_CATALOG_REFRESH_INTERVAL_MS,
+      refreshIntervalMs: 25,
+    });
+
+    await catalog.init({ allowNetwork: true });
+    await vi.waitFor(() => expect(fetchImpl.mock.calls.length).toBeGreaterThanOrEqual(2));
+
+    catalog.dispose();
+    const callsAtDispose = fetchImpl.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // A refresh already in flight may complete; no new ones may start.
+    expect(fetchImpl.mock.calls.length).toBeLessThanOrEqual(callsAtDispose + 1);
   });
 });
 
@@ -227,6 +249,31 @@ describe('FileModelsStore', () => {
       await writeFile(file, 'not json{');
       const store = new FileModelsStore(file);
       expect(await store.read('anthropic')).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers the write chain after a failed persist', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'plexus-catalog-'));
+    try {
+      // Block persistence: the store's parent path is a file, not a directory.
+      const blocker = path.join(dir, 'blocked');
+      await writeFile(blocker, 'occupied');
+      const file = path.join(blocker, 'models-store.json');
+      const store = new FileModelsStore(file);
+
+      await expect(
+        store.write('anthropic', { models: [{ id: 'm' } as any], checkedAt: 1 })
+      ).rejects.toThrow();
+
+      // Unblock: the next write must actually persist, not vanish into a
+      // permanently rejected serialization chain.
+      await rm(blocker);
+      await store.write('anthropic', { models: [{ id: 'm' } as any], checkedAt: 2 });
+
+      const fresh = new FileModelsStore(file);
+      expect(await fresh.read('anthropic')).toEqual({ models: [{ id: 'm' }], checkedAt: 2 });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
