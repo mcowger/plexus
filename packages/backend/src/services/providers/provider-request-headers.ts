@@ -52,6 +52,23 @@ export function setupProviderHeaders(
     if (request.cacheRoutingHeaders['x-client-request-id']) {
       headers['x-client-request-id'] = request.cacheRoutingHeaders['x-client-request-id'];
     }
+    if (request.cacheRoutingHeaders['x-session-affinity']) {
+      headers['x-session-affinity'] = request.cacheRoutingHeaders['x-session-affinity'];
+    }
+    if (request.cacheRoutingHeaders['x-session-id']) {
+      headers['x-session-id'] = request.cacheRoutingHeaders['x-session-id'];
+    }
+    if (request.cacheRoutingHeaders['x-prompt-cache-isolation-key']) {
+      headers['x-prompt-cache-isolation-key'] =
+        request.cacheRoutingHeaders['x-prompt-cache-isolation-key'];
+    }
+    if (request.cacheRoutingHeaders['x-multi-turn-session-id']) {
+      headers['x-multi-turn-session-id'] = request.cacheRoutingHeaders['x-multi-turn-session-id'];
+    }
+  }
+
+  if (getApiBaseType(apiType) === 'messages' && request.anthropicBeta) {
+    headers['anthropic-beta'] = request.anthropicBeta;
   }
 
   if (apiType.toLowerCase() === 'responses:lite') {

@@ -20,6 +20,7 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/t
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getCacheRoutingHeaders } from '../../utils/cache-routing-headers';
 
 export function detectResponsesApiType(
   headers: Record<string, unknown>,
@@ -184,16 +185,10 @@ export async function registerResponsesRoute(
         unifiedRequest.previousResponseId = body.previous_response_id;
       }
 
-      // Forward cache routing headers for prompt caching support.
-      // These headers enable server-side cache routing at the upstream provider.
-      const sessionId = request.headers['session_id'] as string | undefined;
-      const clientRequestId = request.headers['x-client-request-id'] as string | undefined;
-      if (sessionId || clientRequestId || body.prompt_cache_key) {
-        unifiedRequest.cacheRoutingHeaders = {
-          session_id: sessionId || body.prompt_cache_key,
-          'x-client-request-id': clientRequestId || body.prompt_cache_key,
-        };
-      }
+      unifiedRequest.cacheRoutingHeaders = getCacheRoutingHeaders(
+        request.headers,
+        body.prompt_cache_key
+      );
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])
         ? request.headers['x-app'][0]
