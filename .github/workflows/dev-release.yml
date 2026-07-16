@@ -1,23 +1,12 @@
 name: Dev Release
 
+# Automatic dev releases are disabled. Keep manual dispatch available in case
+# an old development build needs to be reproduced.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'packages/**/*.ts'
-      - 'packages/**/*.tsx'
-      - 'packages/**/*.lock'
-      - 'packages/**/*.json'
-      - '*.yaml'
-      - '*.yml'
-      # Schema changes are handled by generate-migrations.yml, which triggers
-      # this workflow via workflow_dispatch after migrations are committed.
-      - '!packages/backend/drizzle/schema/**'
   workflow_dispatch:
     inputs:
       sha:
-        description: 'Commit SHA to build (used when triggered after migration generation)'
+        description: 'Commit SHA to build'
         required: false
         type: string
 
@@ -25,7 +14,6 @@ jobs:
   dev-release:
     name: Dev Release
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
       packages: write
