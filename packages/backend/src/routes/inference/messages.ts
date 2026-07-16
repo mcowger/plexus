@@ -15,6 +15,7 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/t
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getCacheRoutingHeaders, getHeaderValue } from '../../utils/cache-routing-headers';
 
 export async function registerMessagesRoute(
   fastify: FastifyInstance,
@@ -69,6 +70,8 @@ export async function registerMessagesRoute(
       unifiedRequest.incomingApiType = 'messages';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      unifiedRequest.cacheRoutingHeaders = getCacheRoutingHeaders(request.headers);
+      unifiedRequest.anthropicBeta = getHeaderValue(request.headers, 'anthropic-beta');
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])
         ? request.headers['x-app'][0]

@@ -143,13 +143,20 @@ export interface UnifiedChatRequest {
     type: 'text' | 'json_object' | 'json_schema';
     json_schema?: any;
   };
-  cacheRoutingHeaders?: {
-    session_id?: string;
-    'x-client-request-id'?: string;
-  };
+  cacheRoutingHeaders?: CacheRoutingHeaders;
+  anthropicBeta?: string;
   incomingApiType?: string;
   originalBody?: any;
   metadata?: Record<string, any> & { plexus_metadata?: PlexusMetadata };
+}
+
+export interface CacheRoutingHeaders {
+  session_id?: string;
+  'x-client-request-id'?: string;
+  'x-session-affinity'?: string;
+  'x-session-id'?: string;
+  'x-prompt-cache-isolation-key'?: string;
+  'x-multi-turn-session-id'?: string;
 }
 
 // Unified Response
