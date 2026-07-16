@@ -117,6 +117,54 @@ curl -fsS "$PLEXUS_STAGING_URL/v0/management/aliases" \
 - List captures with `GET /v0/management/debug/logs?limit=50`.
 - Fetch a full trace with `GET /v0/management/debug/logs/{requestId}`.
 
+The list response is a newest-first JSON array containing only `requestId`, `createdAt`, and `responseStatus`. Use its request ID to fetch the detail:
+
+```bash
+REQUEST_ID=$(
+  curl -fsS "$PLEXUS_STAGING_URL/v0/management/debug/logs?limit=1" \
+    -H "x-admin-key: $PLEXUS_STAGING_ADMIN_KEY" | jq -r '.[0].requestId'
+)
+
+curl -fsS "$PLEXUS_STAGING_URL/v0/management/debug/logs/$REQUEST_ID" \
+  -H "x-admin-key: $PLEXUS_STAGING_ADMIN_KEY" | jq .
+```
+
+#### Annotated Debug Trace Example
+
+The detail endpoint returns payloads and headers as JSON-encoded strings, not nested JSON values. This illustrative Chat Completions trace has the exact outer response shape:
+
+```json
+{
+  "requestId": "018f2f89-6f43-7f4d-a714-93d35e35b8a1",
+  "createdAt": 1784217600123,
+  "rawRequest": "{\"model\":\"support\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":true}",
+  "transformedRequest": "{\"model\":\"gpt-4.1-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":true}",
+  "rawResponse": "data: {\"id\":\"chatcmpl_upstream\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}\n\ndata: {\"id\":\"chatcmpl_upstream\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":1,\"total_tokens\":9}}\n\ndata: [DONE]\n\n",
+  "transformedResponse": "data: {\"id\":\"chatcmpl_upstream\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"}}]}\n\ndata: {\"id\":\"chatcmpl_upstream\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":1,\"total_tokens\":9}}\n\ndata: [DONE]\n\n",
+  "rawResponseSnapshot": "{\"id\":\"chatcmpl_upstream\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":1,\"total_tokens\":9}}",
+  "transformedResponseSnapshot": "{\"id\":\"chatcmpl_upstream\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hi\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":1,\"total_tokens\":9}}",
+  "requestHeaders": "{\"authorization\":\"Bearer sk-v...-key\",\"content-type\":\"application/json\"}",
+  "responseHeaders": "{\"content-type\":\"text/event-stream\",\"x-request-id\":\"upstream-request-id\"}",
+  "responseStatus": 200
+}
+```
+
+- `createdAt` is Unix epoch milliseconds; render it with `jq -r '.createdAt / 1000 | todateiso8601'`.
+- `rawRequest` is the client-facing request body. `transformedRequest` is the provider-facing body after alias resolution and adapters, so compare these first when debugging request transformation.
+- `rawResponse` is the exact captured upstream body. `transformedResponse` is the exact body returned after Plexus transformation. Streaming bodies remain SSE text and may end with `[DONE]`.
+- `rawResponseSnapshot` and `transformedResponseSnapshot` are best-effort reconstructed final objects used for inspection and usage extraction. Prefer the corresponding exact response field when ordering, malformed chunks, comments, or wire formatting matter.
+- Any unavailable stage is `null`. Response capture is capped at 10 MiB and appends `[DEBUG OUTPUT TRUNCATED - Exceeded 10MB limit]` when exceeded.
+- The detail response does not expose the captured key, provider, or model alias. Correlate by `requestId` with `GET /v0/management/usage?requestId=...` when those routing fields matter.
+- Sensitive request headers are masked before capture, but request/response bodies and nonstandard headers can still contain customer data or secrets. Do not paste a full trace into chat; extract and redact only the fields needed.
+
+Decode JSON-valued strings while leaving SSE/plain-text bodies unchanged:
+
+```bash
+curl -fsS "$PLEXUS_STAGING_URL/v0/management/debug/logs/$REQUEST_ID" \
+  -H "x-admin-key: $PLEXUS_STAGING_ADMIN_KEY" \
+  | jq 'reduce ["rawRequest", "transformedRequest", "rawResponse", "transformedResponse", "rawResponseSnapshot", "transformedResponseSnapshot", "requestHeaders", "responseHeaders"][] as $field (.; .[$field] |= (. as $value | try fromjson catch $value))'
+```
+
 ### Manage Providers And Model Targets
 
 - List providers: `GET /v0/management/providers`.
