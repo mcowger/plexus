@@ -1,4 +1,7 @@
-import { logger } from '../../utils/logger';
+import {
+  ModelMetadataManager,
+  type NormalizedModelMetadata,
+} from '../models/model-metadata-manager';
 
 interface OpenRouterPricing {
   prompt: string;
@@ -11,19 +14,16 @@ interface OpenRouterPricing {
   input_cache_write?: string;
 }
 
-interface OpenRouterModel {
-  id: string;
-  pricing: OpenRouterPricing;
-}
-
-interface OpenRouterResponse {
-  data: OpenRouterModel[];
-}
-
+/**
+ * Pricing-focused read facade over the shared model metadata catalog.
+ *
+ * Stateless: all reads delegate to ModelMetadataManager's OpenRouter map, which
+ * is loaded at startup and refreshed on a schedule (plus manual refresh via
+ * POST /v0/management/models/metadata/refresh). Pricing consumers therefore
+ * see catalog updates without a restart.
+ */
 export class PricingManager {
   private static instance: PricingManager;
-  private pricingMap: Map<string, OpenRouterPricing> = new Map();
-  private initialized = false;
 
   private constructor() {}
 
@@ -34,52 +34,24 @@ export class PricingManager {
     return PricingManager.instance;
   }
 
-  public async loadPricing(source: string = 'https://openrouter.ai/api/v1/models'): Promise<void> {
-    try {
-      logger.debug(`Loading pricing data from ${source}`);
-      let data: OpenRouterResponse;
-
-      if (source.startsWith('http')) {
-        const response = await fetch(source);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch pricing data: ${response.statusText}`);
-        }
-        data = (await response.json()) as OpenRouterResponse;
-      } else {
-        // Assume file path for testing
-        const file = Bun.file(source);
-        if (!(await file.exists())) {
-          throw new Error(`Pricing file not found at ${source}`);
-        }
-        data = (await file.json()) as OpenRouterResponse;
-      }
-
-      this.pricingMap.clear();
-      if (data && Array.isArray(data.data)) {
-        for (const model of data.data) {
-          this.pricingMap.set(model.id, model.pricing);
-        }
-        logger.debug(`Loaded pricing for ${this.pricingMap.size} models`);
-        this.initialized = true;
-      } else {
-        logger.warn('Invalid pricing data format');
-      }
-    } catch (error) {
-      logger.error('Error loading pricing data', error);
-      // Don't throw, just log error so app can continue without openrouter pricing
-    }
+  private get metadataManager(): ModelMetadataManager {
+    return ModelMetadataManager.getInstance();
   }
 
   public getPricing(slug: string): OpenRouterPricing | undefined {
-    return this.pricingMap.get(slug);
+    const pricing: NormalizedModelMetadata['pricing'] = this.metadataManager.getMetadata(
+      'openrouter',
+      slug
+    )?.pricing;
+    return pricing as OpenRouterPricing | undefined;
   }
 
   public isInitialized(): boolean {
-    return this.initialized;
+    return this.metadataManager.isInitialized('openrouter');
   }
 
   public getAllModelSlugs(): string[] {
-    return Array.from(this.pricingMap.keys());
+    return this.metadataManager.getAllIds('openrouter');
   }
 
   public searchModelSlugs(query: string): string[] {
@@ -87,7 +59,7 @@ export class PricingManager {
       return this.getAllModelSlugs();
     }
     const lowerQuery = query.toLowerCase();
-    return Array.from(this.pricingMap.keys())
+    return this.getAllModelSlugs()
       .filter((slug) => slug.toLowerCase().includes(lowerQuery))
       .sort((a, b) => {
         // Prioritize matches that start with the query

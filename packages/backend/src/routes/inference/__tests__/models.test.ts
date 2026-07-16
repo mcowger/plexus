@@ -7,6 +7,7 @@ import { ModelMetadataManager } from '../../../services/models/model-metadata-ma
 
 const FIXTURES = path.join(__dirname, '../../../utils/__tests__/fixtures');
 const openrouterMetadataFixture = path.join(FIXTURES, 'openrouter-metadata-sample.json');
+const openrouterPricingFixture = path.join(FIXTURES, 'openrouter-models.json');
 
 afterEach(() => {
   ModelMetadataManager.resetForTesting();
@@ -655,5 +656,80 @@ describe('GET /v1/metadata/lookup', () => {
     expect(meta.architecture.input_modalities).toContain('image');
     expect(meta.supported_parameters).toContain('tools');
     expect(meta.top_provider.max_completion_tokens).toBe(8192);
+  });
+});
+
+// ─── GET /v1/openrouter/models ──────────────────────────────
+
+describe('GET /v1/openrouter/models', () => {
+  it('should return 503 when the catalog is not yet initialized', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v1/openrouter/models',
+    });
+    expect(response.statusCode).toBe(503);
+  });
+
+  it('should return slugs from the shared metadata catalog, filtered by q', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterPricingFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    const all = await fastify.inject({ method: 'GET', url: '/v1/openrouter/models' });
+    expect(all.statusCode).toBe(200);
+    expect(all.json().count).toBe(mgr.getAllIds('openrouter').length);
+
+    const filtered = await fastify.inject({
+      method: 'GET',
+      url: '/v1/openrouter/models?q=claude',
+    });
+    expect(filtered.statusCode).toBe(200);
+    const slugs = filtered.json().data;
+    expect(slugs.length).toBeGreaterThan(0);
+    expect(slugs.every((slug: string) => slug.toLowerCase().includes('claude'))).toBe(true);
+  });
+
+  it('should reflect catalog refreshes without a restart', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterPricingFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    // gpt-4.1-nano only exists in the metadata-sample fixture
+    const before = await fastify.inject({
+      method: 'GET',
+      url: '/v1/openrouter/models?q=gpt-4.1-nano',
+    });
+    expect(before.json().data).toEqual([]);
+
+    // Simulate a scheduled/manual catalog refresh swapping in new data
+    await mgr.loadAll({
+      openrouter: openrouterMetadataFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const after = await fastify.inject({
+      method: 'GET',
+      url: '/v1/openrouter/models?q=gpt-4.1-nano',
+    });
+    expect(after.json().data).toEqual(['openai/gpt-4.1-nano']);
   });
 });

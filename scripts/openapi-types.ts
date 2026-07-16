@@ -355,11 +355,11 @@ export interface paths {
     };
     /**
      * OpenRouter model slugs known to Plexus (public)
-     * @description Returns all model slugs from the OpenRouter pricing catalog.
+     * @description Returns all model slugs from the OpenRouter catalog.
      *
-     *     **Requires startup-loaded catalog:** The OpenRouter catalog must have been
-     *     loaded when Plexus started. This happens automatically if `openrouter` is
-     *     configured as a provider. Returns 503 if the catalog hasn't been loaded.
+     *     The catalog is loaded at startup and refreshed periodically (see
+     *     `/v0/management/models/metadata/refresh` for a manual refresh). Returns 503
+     *     if the catalog hasn't been loaded yet.
      */
     get: operations['getV1OpenrouterModels'];
     put?: never;
@@ -409,6 +409,51 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/raw/{provider}/{path}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * Raw GET to a provider
+     * @description Relays the method, path, query, non-authentication headers, and body to the selected provider without model routing or application-level transformation. Requires both provider `raw_passthrough.enabled` and key `allowRawPassthrough`; the key's provider allow/deny policy also applies. Plexus authentication headers are replaced with provider authentication. Upstream status, headers, and body are returned unchanged, with Plexus request/quota metadata added as response headers. Recognized LLM request/response formats are observationally parsed for model, token, cache/reasoning, and cost metadata without altering traffic.
+     */
+    get: operations['rawProviderGet'];
+    /**
+     * Raw PUT to a provider
+     * @description Relays the method, path, query, non-authentication headers, and body to the selected provider without model routing or application-level transformation. Requires both provider `raw_passthrough.enabled` and key `allowRawPassthrough`; the key's provider allow/deny policy also applies. Plexus authentication headers are replaced with provider authentication. Upstream status, headers, and body are returned unchanged, with Plexus request/quota metadata added as response headers. Recognized LLM request/response formats are observationally parsed for model, token, cache/reasoning, and cost metadata without altering traffic.
+     */
+    put: operations['rawProviderPut'];
+    /**
+     * Raw POST to a provider
+     * @description Relays the method, path, query, non-authentication headers, and body to the selected provider without model routing or application-level transformation. Requires both provider `raw_passthrough.enabled` and key `allowRawPassthrough`; the key's provider allow/deny policy also applies. Plexus authentication headers are replaced with provider authentication. Upstream status, headers, and body are returned unchanged, with Plexus request/quota metadata added as response headers. Recognized LLM request/response formats are observationally parsed for model, token, cache/reasoning, and cost metadata without altering traffic.
+     */
+    post: operations['rawProviderPost'];
+    /**
+     * Raw DELETE to a provider
+     * @description Relays the method, path, query, non-authentication headers, and body to the selected provider without model routing or application-level transformation. Requires both provider `raw_passthrough.enabled` and key `allowRawPassthrough`; the key's provider allow/deny policy also applies. Plexus authentication headers are replaced with provider authentication. Upstream status, headers, and body are returned unchanged, with Plexus request/quota metadata added as response headers. Recognized LLM request/response formats are observationally parsed for model, token, cache/reasoning, and cost metadata without altering traffic.
+     */
+    delete: operations['rawProviderDelete'];
+    options?: never;
+    /**
+     * Raw HEAD to a provider
+     * @description Relays the method, path, query, non-authentication headers, and body to the selected provider without model routing or application-level transformation. Requires both provider `raw_passthrough.enabled` and key `allowRawPassthrough`; the key's provider allow/deny policy also applies. Plexus authentication headers are replaced with provider authentication. Upstream status, headers, and body are returned unchanged, with Plexus request/quota metadata added as response headers. Recognized LLM request/response formats are observationally parsed for model, token, cache/reasoning, and cost metadata without altering traffic.
+     */
+    head: operations['rawProviderHead'];
+    /**
+     * Raw PATCH to a provider
+     * @description Relays the method, path, query, non-authentication headers, and body to the selected provider without model routing or application-level transformation. Requires both provider `raw_passthrough.enabled` and key `allowRawPassthrough`; the key's provider allow/deny policy also applies. Plexus authentication headers are replaced with provider authentication. Upstream status, headers, and body are returned unchanged, with Plexus request/quota metadata added as response headers. Recognized LLM request/response formats are observationally parsed for model, token, cache/reasoning, and cost metadata without altering traffic.
+     */
+    patch: operations['rawProviderPatch'];
     trace?: never;
   };
   '/v0/management/auth/verify': {
@@ -1137,6 +1182,125 @@ export interface paths {
     patch: operations['patchV0ManagementConfigFailover'];
     trace?: never;
   };
+  '/v0/management/config/capture-trace-on-error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get capture-trace-on-error setting (admin only)
+     * @description Returns whether Plexus captures and persists debug traces for inference
+     *     errors even when regular debug capture is disabled.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementConfigCaptureTraceOnError'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update capture-trace-on-error setting (admin only)
+     * @description Enables or disables capture of debug traces for inference errors when
+     *     regular debug capture is disabled.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    patch: operations['patchV0ManagementConfigCaptureTraceOnError'];
+    trace?: never;
+  };
+  '/v0/management/config/trusted-proxies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get trusted proxy rules (admin only)
+     * @description Returns the IP addresses, CIDR ranges, and address ranges whose forwarding
+     *     headers are trusted when determining the original client address.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementConfigTrustedProxies'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Replace trusted proxy rules (admin only)
+     * @description Replaces the trusted proxy allowlist. Entries may be IPv4/IPv6 addresses,
+     *     CIDR ranges, or supported address ranges. Empty strings are discarded.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    patch: operations['patchV0ManagementConfigTrustedProxies'];
+    trace?: never;
+  };
+  '/v0/management/config/compaction': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get context compaction settings (admin only)
+     * @description Returns the global context compaction settings. The response may be an
+     *     empty object when no global overrides have been configured.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementConfigCompaction'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update context compaction settings (admin only)
+     * @description Merges the supplied fields into the global context compaction settings,
+     *     then validates the resulting configuration. Omitted fields retain their
+     *     current values; nested `native` and `headroom` objects are also merged.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    patch: operations['patchV0ManagementConfigCompaction'];
+    trace?: never;
+  };
+  '/v0/management/config/mcp-enabled': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get MCP enabled state (admin only)
+     * @description Returns whether the MCP gateway is enabled.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementConfigMcpEnabled'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update MCP enabled state (admin only)
+     * @description Enables or disables the MCP gateway.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    patch: operations['patchV0ManagementConfigMcpEnabled'];
+    trace?: never;
+  };
   '/v0/management/system-settings': {
     parameters: {
       query?: never;
@@ -1728,7 +1892,10 @@ export interface paths {
      *     - `comment` — Freeform description (max 500 chars)
      *     - `allowedProviders` — Array of provider slugs to restrict this key to
      *     - `allowedModels` — Array of model aliases to restrict this key to
+     *     - `allowRawPassthrough` — Privileged provider-wide raw proxy capability
      *     - `quota` — Name of a user quota definition to assign
+     *     - `expiresInMinutes` — Positive whole-minute lifetime for a new key. This
+     *       becomes immutable after creation.
      *
      *     ## Secret encryption
      *
@@ -1765,6 +1932,29 @@ export interface paths {
      *     **Admin only** — limited principals receive 403.
      */
     patch: operations['patchV0ManagementKeysByname'];
+    trace?: never;
+  };
+  '/v0/management/keys/{name}/disable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Time-bound API key name. */
+        name: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Irrevocably disable a time-bound API key
+     * @description Immediately disables a key created with an expiry. The key remains in the audit history and cannot be re-enabled.
+     */
+    post: operations['postV0ManagementKeysBynameDisable'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/v0/management/mcp-servers': {
@@ -1862,6 +2052,149 @@ export interface paths {
      *     **Admin only** — limited principals receive 403.
      */
     patch: operations['patchV0ManagementMcpserversByserverName'];
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * Get local MCP process runtime status (admin only)
+     * @description Returns the runtime status of a local (`local_http`) MCP server process
+     *     managed by Plexus. This reflects the child process lifecycle, not the
+     *     MCP server's configuration.
+     *
+     *     The `status` field is one of `stopped`, `starting`, `running`, or
+     *     `failed`. When the process is running, `pid` and `url` are populated.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementMcpServersByServerNameStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/start': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start a local MCP server process (admin only)
+     * @description Spawns (or reuses) the child process for a local (`local_http`) MCP
+     *     server. Plexus waits for the process to become ready before returning.
+     *
+     *     If the server configuration fingerprint has changed since the last start,
+     *     the existing process is restarted with the new configuration.
+     *
+     *     Returns the updated runtime status.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    post: operations['postV0ManagementMcpServersByServerNameStart'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/stop': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Stop a local MCP server process (admin only)
+     * @description Stops the child process for a local MCP server by sending `SIGTERM`,
+     *     then waits up to 3 seconds for graceful exit.
+     *
+     *     Returns the updated runtime status. It is safe to call when no process is
+     *     running; the route does not require a stored server configuration.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    post: operations['postV0ManagementMcpServersByServerNameStop'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/restart': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Restart a local MCP server process (admin only)
+     * @description Stops then starts the child process for a local (`local_http`) MCP
+     *     server. Returns the updated runtime status after the new process is ready.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    post: operations['postV0ManagementMcpServersByServerNameRestart'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/process-logs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * Get local MCP process logs (admin only)
+     * @description Returns the captured stdout/stderr log lines for a local MCP server
+     *     process. Logs are accumulated from process spawn through exit and are
+     *     capped at a maximum number of lines, with the oldest lines trimmed.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementMcpServersByServerNameProcessLogs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/v0/management/quota-checker-types': {
@@ -3191,9 +3524,9 @@ export interface paths {
      *     ## What this returns
      *
      *     A snapshot per provider, containing:
-     *     - Checker metadata (ID, type, category)
+     *     - Checker metadata (ID, type)
      *     - OAuth account info (if using OAuth)
-     *     - Array of `QuotaSample` for each window the provider reports
+     *     - Array of `Meter` readings, one per quota dimension the provider reports
      *
      *     ## Which providers contribute data
      *
@@ -3203,7 +3536,7 @@ export interface paths {
      *     ## Polling cadence
      *
      *     Quota checkers run on a scheduler (typically every 1–5 minutes). The
-     *     `latest` array shows the most recent sample for each window type. To
+     *     `meters` array shows the most recent reading for each meter. To
      *     see historical data, use `/quotas/{checkerId}/history`.
      *
      *     **Admin only** — limited principals receive 403.
@@ -3266,13 +3599,15 @@ export interface paths {
     };
     /**
      * Historical quota samples (admin only)
-     * @description Returns historical quota measurements for a specific checker.
+     * @description Returns historical quota-snapshot rows for a specific checker, one row per
+     *     meter per check, sorted by `checkedAt` descending (most recent first).
      *
      *     ## Query parameters
      *
-     *     - **windowType** — Filter by time window. Options: `subscription`,
-     *       `hourly`, `five_hour`, `daily`, `weekly`, `monthly`, `custom`.
-     *       When omitted, returns all window types.
+     *     - **meterKey** — Filter to a single meter (e.g. `balance`, `five_hour`,
+     *       `daily`). When omitted, returns rows for all meters the checker reports.
+     *       Meter keys are provider-specific; discover them from the `meters[].key`
+     *       field of a snapshot.
      *
      *     - **since** — Start of the time range. Supports two formats:
      *       - **Absolute**: ISO 8601 timestamp, e.g. `2026-01-01T00:00:00Z`
@@ -3281,9 +3616,9 @@ export interface paths {
      *     ## Response structure
      *
      *     - `checkerId` — The checker this history is for
-     *     - `windowType` — The window type filter used (null if no filter)
-     *     - `since` — The timestamp of the earliest sample
-     *     - `history` — Array of `QuotaSample` objects sorted by `checkedAt` ascending
+     *     - `meterKey` — The meter filter used (null if no filter)
+     *     - `since` — The timestamp of the earliest sample (null if no `since` filter)
+     *     - `history` — Array of `QuotaSample` snapshot rows
      *
      *     ## Retention
      *
@@ -3493,6 +3828,33 @@ export interface paths {
      *     **Admin only** — limited principals receive 403.
      */
     post: operations['postV0ManagementQuotaClear'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/quota/recompute': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Recompute a quota bucket from request usage (admin only)
+     * @description Repairs a quota bucket by recomputing its usage from successful request
+     *     usage records instead of trusting the stored counter. The quota must be
+     *     attached to the key, directly or through the configured default quotas.
+     *
+     *     Rolling requests and rolling tokens quotas are rejected because their
+     *     decay history cannot be reconstructed exactly from request usage records.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    post: operations['postV0ManagementQuotaRecompute'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3963,6 +4325,59 @@ export interface paths {
      *     **No auth** — MCP proxy endpoints are unauthenticated.
      */
     delete: operations['deleteMcpByname'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/mcp/plexus': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Plexus Management MCP (SSE stream, admin only)
+     * @description GET endpoint for the Plexus Management MCP server, supporting
+     *     server-sent-event MCP transport. It has the same authentication,
+     *     disabled-check, and tool surface as `POST /mcp/plexus`.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getMcpPlexus'];
+    put?: never;
+    /**
+     * Plexus Management MCP (JSON-RPC, admin only)
+     * @description The Plexus Management MCP server is an in-process Model Context Protocol
+     *     server exposing compact domain tools for managing Plexus.
+     *
+     *     ## Authentication
+     *
+     *     Requires the `x-admin-key` header. Bearer inference keys are rejected.
+     *
+     *     ## MCP disabled
+     *
+     *     When `mcpEnabled` is `false`, requests return HTTP 418
+     *     (`mcp_disabled`) before authentication. Enable it via
+     *     `PATCH /v0/management/config/mcp-enabled` or the MCP Servers UI.
+     *
+     *     ## Transport
+     *
+     *     Uses the Streamable HTTP transport with JSON responses. Each request
+     *     creates a stateless per-request MCP server instance.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    post: operations['postMcpPlexus'];
+    /**
+     * Plexus Management MCP (session close, admin only)
+     * @description DELETE closes an MCP session. The current stateless per-request transport
+     *     returns immediately.
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    delete: operations['deleteMcpPlexus'];
     options?: never;
     head?: never;
     patch?: never;
@@ -4654,7 +5069,7 @@ export interface components {
       /** @description API key for the provider. Can be a literal string or `$env:VARIABLE_NAME` to reference an environment variable. Required unless `api_base_url` is an `oauth://` URI. */
       api_key?: string;
       /**
-       * @description OAuth provider identifier. Required when `api_base_url` uses an `oauth://` URI. Determines which OAuth flow is used to obtain credentials.
+       * @description OAuth provider identifier. Required when `api_base_url` uses an `oauth://` URI. Determines which OAuth flow is used to obtain credentials. Note: `google-gemini-cli` and `google-antigravity` are deprecated and no longer supported — they remain accepted for backward compatibility but are rejected at request routing.
        * @enum {string}
        */
       oauth_provider?:
@@ -4670,6 +5085,21 @@ export interface components {
        * @default true
        */
       enabled: boolean;
+      /** @description Enables a provider-wide raw proxy at `/raw/{provider}/*`. Supported only for static API-key providers. Raw requests bypass routing, failover, adapters, and transformation. */
+      raw_passthrough?: {
+        enabled: boolean;
+        /**
+         * Format: uri
+         * @description HTTP(S) base URL prepended to the untouched raw path suffix.
+         */
+        base_url: string;
+        /**
+         * @description Header style used to inject the provider's configured API key.
+         * @default bearer
+         * @enum {string}
+         */
+        auth: 'bearer' | 'x-api-key' | 'x-goog-api-key';
+      };
       /**
        * @description When true, disables automatic cooldown for this provider. Failed requests won't trigger exponential backoff. Use with caution.
        * @default false
@@ -5076,6 +5506,18 @@ export interface components {
       secret: string;
       /** @description Freeform description or notes about this key. Max 500 characters. */
       comment?: string;
+      /** @description Optional lifetime for a new key, expressed as positive whole minutes. This value is accepted only when creating the key and cannot be changed. */
+      expiresInMinutes?: number;
+      /**
+       * Format: int64
+       * @description Absolute expiry time as Unix epoch milliseconds.
+       */
+      readonly expiresAt?: number;
+      /**
+       * Format: int64
+       * @description Time the key was disabled as Unix epoch milliseconds.
+       */
+      readonly disabledAt?: number;
       /** @description Restrict this key to specific providers only. If empty, the key can be used with any provider. */
       allowedProviders?: string[];
       /** @description Optional denylist. If set, routing will not use these provider IDs. */
@@ -5084,6 +5526,11 @@ export interface components {
       excludedModels?: string[];
       /** @description Restrict this key to specific model aliases only. If empty, the key can be used with any model. */
       allowedModels?: string[];
+      /**
+       * @description Privileged provider-wide raw access. Existing provider allow/deny lists still apply; model restrictions do not apply to raw requests.
+       * @default false
+       */
+      allowRawPassthrough: boolean;
       /** @description Name of a user quota definition to enforce. If null, no quota is enforced for this key. */
       quota?: string | null;
     } & {
@@ -5163,6 +5610,27 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** @description Context compaction settings. All fields are optional overrides. */
+    CompactionSettings: {
+      enabled?: boolean;
+      /** @enum {string} */
+      strategy?: 'native' | 'headroom';
+      triggerRatio?: number;
+      absoluteTriggerTokens?: number | null;
+      minTokens?: number;
+      protectRecent?: number;
+      native?: {
+        maxArrayItems?: number;
+        maxStringChars?: number;
+      };
+      headroom?: {
+        /** Format: uri */
+        baseUrl?: string;
+        apiKey?: string;
+        targetRatio?: number | null;
+        timeoutMs?: number;
+      };
+    };
     SaveSlugResult: {
       /** @constant */
       success: true;
@@ -5203,6 +5671,83 @@ export interface components {
     SuccessTrue: {
       /** @constant */
       success: true;
+    };
+    LocalMcpRuntimeStatus: {
+      serverName: string;
+      /** @enum {string} */
+      status: 'stopped' | 'starting' | 'running' | 'failed';
+      pid: number | null;
+      /** Format: uri */
+      url: string | null;
+      lastError: string | null;
+      /** Format: date-time */
+      startedAt: string | null;
+      /** Format: date-time */
+      exitedAt: string | null;
+    };
+    /**
+     * @description Utilisation severity level for a quota meter.
+     *     - **ok** — 0–75% utilisation. Healthy, plenty of quota remaining. - **warning** — 75–90% utilisation. Approaching exhaustion. - **critical** — 90–100% utilisation. Near exhaustion, take action soon. - **exhausted** — 100% utilisation. Quota fully consumed, requests will fail.
+     * @enum {string}
+     */
+    MeterStatus: 'ok' | 'warning' | 'critical' | 'exhausted';
+    /**
+     * @description A single quota meter reading for one provider checker, as returned in the `meters` array of a quota snapshot. Mirrors the `Meter` type in `packages/backend/src/types/meter.ts`.
+     *
+     *     A checker reports one meter per quota dimension it tracks (e.g. a balance meter and/or one or more time-windowed allowance meters). Meters are identified by `key`, not by a fixed window-type enum.
+     */
+    Meter: {
+      /** @description Stable identifier for this meter within the checker. Examples: `balance`, `five_hour`, `daily`. Provider-specific; there is no fixed global enum. Used as the `meterKey` filter on the history endpoint. */
+      key: string;
+      /** @description Human-readable label for the meter (e.g. `Five-hour window`). */
+      label: string;
+      /** @description Optional grouping label for multi-tenant or sub-account setups. */
+      group?: string;
+      /** @description Optional scope qualifier for the meter. */
+      scope?: string;
+      /**
+       * @description What the meter tracks.
+       *     - **balance** — A prepaid account balance (unit typically `usd`).
+       *       Renders as a wallet in the UI.
+       *     - **allowance** — A time-windowed rate limit (unit `requests`, `tokens`,
+       *       or `percentage`). Renders as a progress bar in the UI.
+       * @enum {string}
+       */
+      kind: 'balance' | 'allowance';
+      /** @description Unit of measurement. Common values: `usd`, `requests`, `tokens`, `percentage`; providers may define additional units. */
+      unit: string;
+      /** @description Maximum allowed value for this meter. Null when unbounded/unknown. */
+      limit?: number | null;
+      /** @description Amount consumed so far. Null when unbounded/unknown. */
+      used?: number | null;
+      /** @description Calculated as `limit - used`. May be negative. Null when unbounded/unknown. */
+      remaining?: number | null;
+      /**
+       * @description Utilisation of the meter. Either a numeric percentage, or a sentinel:
+       *     - **unknown** — The provider did not report enough information to compute utilisation. - **not_applicable** — Utilisation is not meaningful for this meter (e.g. a balance with no limit).
+       */
+      utilizationPercent: number | ('unknown' | 'not_applicable');
+      status: components['schemas']['MeterStatus'];
+      /** @description Length of the allowance window (only for `kind: allowance`). e.g. `1` for a 1-hour window. Null for `kind: balance`. */
+      periodValue?: number | null;
+      /**
+       * @description Unit for `periodValue` (only for `kind: allowance`). Null for `kind: balance`.
+       * @enum {string|null}
+       */
+      periodUnit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | null;
+      /**
+       * @description How the allowance window resets (only for `kind: allowance`).
+       *     - **fixed** — Resets at a calendar boundary (e.g. midnight). - **rolling** — Sliding window from first use. Null for `kind: balance`.
+       * @enum {string|null}
+       */
+      periodCycle?: 'fixed' | 'rolling' | null;
+      /**
+       * Format: date-time
+       * @description ISO-8601 timestamp when the meter window resets. Null for rolling windows or balances without a defined reset time.
+       */
+      resetsAt?: string | null;
+      /** @description Optional utilisation percentage at which the checker gates the provider onto cooldown. */
+      exhaustionThreshold?: number | null;
     };
     /** @description Per-request usage record stored in `request_usage`. Populated after each inference request completes (or errors). Fields may be null on error paths. */
     UsageRecord: {
@@ -5308,12 +5853,17 @@ export interface components {
       isStreamed?: boolean;
       /** @description Whether the request was a direct passthrough (no transformation). */
       isPassthrough?: boolean;
+      /** @description Whether the request used the provider-wide raw proxy. */
+      isRaw?: boolean;
+      /** @description Original HTTP method for raw requests. */
+      requestMethod?: string | null;
+      /** @description Raw provider path suffix and query string. */
+      requestPath?: string | null;
       /**
-       * @description Outcome of the request.
+       * @description Outcome of the request. Raw upstream failures may be represented as `HTTP <status>` so the provider's exact status remains visible.
        *     - **success** — Upstream returned a successful response. - **error** — Upstream returned an error or the request failed. - **pending** — Request is in-flight (used for async tracking). - **cancelled** — The downstream client disconnected and Plexus cancelled the upstream request. - **timeout** — Plexus aborted the upstream request because it exceeded the configured timeout. - **stall** — Plexus aborted the request because stream stall detection fired.
-       * @enum {string}
        */
-      responseStatus?: 'success' | 'error' | 'pending' | 'cancelled' | 'timeout' | 'stall';
+      responseStatus?: string;
       /** @description Number of tools/function definitions in the request. */
       toolsDefined?: number | null;
       /** @description Number of messages in the conversation (including system). */
@@ -5593,85 +6143,104 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** @description Individual quota measurement at a point in time. */
-    QuotaSample: {
-      /** @description Database record ID for this sample. */
-      id?: number;
-      /** @description Provider identifier (e.g. `naga`, `moonshot`). */
-      provider?: string;
-      /** @description Foreign key to the checker this sample belongs to. Matches `QuotaCheckerSnapshot.checkerId`. */
-      checkerId?: string;
-      /** @description Optional grouping identifier. For multi-tenant or sub-account setups. Null when not applicable. */
-      groupId?: string | null;
-      /**
-       * @description Time window that the quota measurement covers.
-       *     - **subscription** — Monthly/billing-cycle quota or prepaid balance. - **hourly** — Hourly rolling window. - **five_hour** — 5-hour rolling window (common across multiple providers). - **daily** — Daily reset quota. - **weekly** — 7-day rolling window (common across multiple providers). - **monthly** — Calendar month quota. - **custom** — Provider-specific window.
-       * @enum {string}
-       */
-      windowType?:
-        | 'subscription'
-        | 'hourly'
-        | 'five_hour'
-        | 'daily'
-        | 'weekly'
-        | 'monthly'
-        | 'custom';
-      /**
-       * Format: date-time
-       * @description Timestamp when this sample was captured.
-       */
-      checkedAt?: string;
-      /** @description Maximum allowed value for this window. For `balance` category checkers, this is the prepaid balance in dollars. For `rate-limit` category, this is the request/token limit for the window. */
-      limit?: number;
-      /** @description Amount consumed so far in this window. For `balance` category, this is dollars spent. For `rate-limit` category, this is requests or tokens used. */
-      used?: number;
-      /** @description Calculated as `limit - used`. The remaining quota available in this window. May be negative if over-consumption occurred. */
-      remaining?: number;
-      /** @description Percentage of quota consumed, calculated as `(used / limit) * 100`. Use this to drive UI progress bars and status warnings. */
-      utilizationPercent?: number;
-      /** @description Unit of measurement. Common values: `dollars` (prepaid balances), `requests` (request count limits), `tokens` (token count limits), `percentage` (percentage-based limits). */
-      unit?: string;
-      /**
-       * Format: date-time
-       * @description Timestamp when this quota window resets. Null for rolling windows or subscription balances without a defined reset time.
-       */
-      resetsAt?: string | null;
-      /**
-       * @description Utilisation severity level.
-       *     - **ok** — 0–75% utilisation. Healthy, plenty of quota remaining. - **warning** — 75–90% utilisation. Approaching exhaustion. - **critical** — 90–100% utilisation. Near exhaustion, take action soon. - **exhausted** — 100% utilisation. Quota fully consumed, requests will fail.
-       * @enum {string}
-       */
-      status?: 'ok' | 'warning' | 'critical' | 'exhausted';
-      /** @description Whether the quota query to the provider succeeded. False if the provider API is unreachable or returned an error. */
-      success?: boolean;
-      /** @description Error message when `success` is false. Contains the provider's error response or a network error description. */
-      errorMessage?: string | null;
-      /**
-       * Format: date-time
-       * @description Timestamp when this record was created. Usually matches `checkedAt` but may differ due to batch processing.
-       */
-      createdAt?: string | null;
-    };
+    /**
+     * @description Latest quota snapshot for a single provider checker, returned by `GET /v0/management/quotas` and `GET /v0/management/quotas/{checkerId}`.
+     *
+     *     A checker reports its current readings as an array of `Meter` objects (one per quota dimension). When the last check failed, `success` is false, `meters` is empty, and `error` carries the failure message.
+     */
     QuotaCheckerSnapshot: {
       /** @description Unique identifier for this quota checker. Format: `{provider}:{account}`, e.g. `naga:default`, `moonshot:work`. */
       checkerId?: string;
-      /** @description Provider identifier (e.g. `naga`, `moonshot`, `openai-codex`). Maps to provider config slug. */
+      /** @description Checker type identifier (e.g. `naga`, `moonshot`, `openai-codex`). Maps to the provider quota-checker definition. */
       checkerType?: string;
-      /**
-       * @description Whether the checker tracks a prepaid account balance or a time-windowed rate limit.
-       *     - **balance** — Tracks a prepaid subscription balance (unit: `dollars`).
-       *       Renders as a wallet icon in the UI.
-       *     - **rate-limit** — Tracks a time-windowed rate limit (unit: `requests`,
-       *       `tokens`, or `percentage`). Renders as a progress bar in the UI.
-       * @enum {string}
-       */
-      checkerCategory?: 'balance' | 'rate-limit';
+      /** @description Provider identifier at capture time. */
+      provider?: string;
       /** @description OAuth account identifier. Present when the provider uses OAuth authentication. Used to distinguish multiple accounts for the same provider. */
       oauthAccountId?: string;
       /** @description OAuth provider identifier (e.g. `openai-codex`, `anthropic-claude-code`). Present when credentials are stored via OAuth flow. */
       oauthProvider?: string;
-      /** @description Most recent quota samples for each window type. The array contains samples for the primary windows (subscription, daily, etc.) that the provider reports. */
-      latest?: components['schemas']['QuotaSample'][];
+      /** @description Whether the most recent quota check succeeded. */
+      success?: boolean;
+      /** @description Error message when the most recent check failed. Omitted on success. */
+      error?: string;
+      /** @description Current meter readings for this checker (one `Meter` per quota dimension). Empty when the last check failed. */
+      meters?: components['schemas']['Meter'][];
+    };
+    /**
+     * @description A single persisted quota-snapshot row, as returned in the `history` array of `GET /v0/management/quotas/{checkerId}/history`.
+     *
+     *     These are raw rows from the `meter_snapshots` table (one row per meter per check), so field names follow the stored column shape (camelCased by the ORM). For the current/latest reading of a meter, see the `Meter` schema — `getLatestQuota` maps these rows into the friendlier `Meter` shape. There is no `windowType` field; a meter is identified by `meterKey`.
+     */
+    QuotaSample: {
+      /** @description Database record ID for this snapshot row. */
+      id?: number;
+      /** @description Foreign key to the checker this snapshot belongs to. Matches `QuotaCheckerSnapshot.checkerId`. */
+      checkerId?: string;
+      /** @description Checker type identifier at capture time. */
+      checkerType?: string;
+      /** @description Provider identifier at capture time (e.g. `naga`, `moonshot`). */
+      provider?: string;
+      /** @description Stable identifier for the meter this row captures (e.g. `balance`, `five_hour`, `daily`). Provider-specific; used as the `meterKey` query filter on the history endpoint. */
+      meterKey?: string;
+      /**
+       * @description Whether this meter tracks a prepaid balance or a time-windowed allowance.
+       * @enum {string}
+       */
+      kind?: 'balance' | 'allowance';
+      /** @description Unit of measurement. Common values: `usd`, `requests`, `tokens`, `percentage`; providers may define additional units. */
+      unit?: string;
+      /** @description Human-readable label for the meter. */
+      label?: string;
+      /** @description Optional grouping label for multi-tenant or sub-account setups. */
+      group?: string | null;
+      /** @description Optional scope qualifier. */
+      scope?: string | null;
+      /** @description Maximum allowed value for this meter. For `balance` kind, the prepaid balance in dollars. For `allowance` kind, the request/token limit. */
+      limit?: number | null;
+      /** @description Amount consumed so far. Null when unbounded/unknown. */
+      used?: number | null;
+      /** @description Calculated as `limit - used`. May be negative. */
+      remaining?: number | null;
+      /**
+       * @description Whether a meaningful utilisation was reported for this row.
+       *     - **reported** — `utilizationPercent` holds a numeric percentage. - **unknown** — The provider did not report enough to compute utilisation. - **not_applicable** — Utilisation is not meaningful for this meter.
+       * @enum {string}
+       */
+      utilizationState?: 'reported' | 'unknown' | 'not_applicable';
+      /** @description Percentage of quota consumed (`(used / limit) * 100`). Only meaningful when `utilizationState` is `reported`; null otherwise. */
+      utilizationPercent?: number | null;
+      status?: components['schemas']['MeterStatus'];
+      /** @description Length of the allowance window. Null for `balance` kind. */
+      periodValue?: number | null;
+      /**
+       * @description Unit for `periodValue`. Null for `balance` kind.
+       * @enum {string|null}
+       */
+      periodUnit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | null;
+      /**
+       * @description How the allowance window resets. Null for `balance` kind.
+       * @enum {string|null}
+       */
+      periodCycle?: 'fixed' | 'rolling' | null;
+      /**
+       * Format: date-time
+       * @description ISO-8601 timestamp when the meter window resets. Null for rolling windows or balances without a defined reset time.
+       */
+      resetsAt?: string | null;
+      /** @description Whether the quota query to the provider succeeded. False if the provider API was unreachable or returned an error. */
+      success?: boolean;
+      /** @description Error message when `success` is false. */
+      errorMessage?: string | null;
+      /**
+       * Format: date-time
+       * @description Timestamp when this snapshot was captured.
+       */
+      checkedAt?: string;
+      /**
+       * Format: date-time
+       * @description Timestamp when this record was persisted. Usually matches `checkedAt`.
+       */
+      createdAt?: string | null;
     };
     /** @description Quota enforcement status for an API key. Returned by the status check endpoint; used by the quota middleware to decide whether to allow or block requests. */
     QuotaStatus: {
@@ -6602,6 +7171,286 @@ export interface operations {
       };
     };
   };
+  rawProviderGet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Missing or invalid Plexus inference key. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Key lacks raw access or provider policy access. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Provider is absent, disabled, or not raw-enabled. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unmodified upstream response, including non-2xx statuses. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  rawProviderPut: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        '*/*': string;
+      };
+    };
+    responses: {
+      /** @description Missing or invalid Plexus inference key. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Key lacks raw access or provider policy access. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Provider is absent, disabled, or not raw-enabled. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unmodified upstream response, including non-2xx statuses. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  rawProviderPost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        '*/*': string;
+      };
+    };
+    responses: {
+      /** @description Missing or invalid Plexus inference key. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Key lacks raw access or provider policy access. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Provider is absent, disabled, or not raw-enabled. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unmodified upstream response, including non-2xx statuses. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  rawProviderDelete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        '*/*': string;
+      };
+    };
+    responses: {
+      /** @description Missing or invalid Plexus inference key. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Key lacks raw access or provider policy access. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Provider is absent, disabled, or not raw-enabled. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unmodified upstream response, including non-2xx statuses. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  rawProviderHead: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Missing or invalid Plexus inference key. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Key lacks raw access or provider policy access. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Provider is absent, disabled, or not raw-enabled. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unmodified upstream response, including non-2xx statuses. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  rawProviderPatch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Raw-enabled provider slug. */
+        provider: string;
+        /** @description Remaining upstream path. This parameter is greedy at runtime and may contain additional `/` segments. The original query string is preserved. */
+        path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        '*/*': string;
+      };
+    };
+    responses: {
+      /** @description Missing or invalid Plexus inference key. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Key lacks raw access or provider policy access. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Provider is absent, disabled, or not raw-enabled. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unmodified upstream response, including non-2xx statuses. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getV0ManagementAuthVerify: {
     parameters: {
       query?: never;
@@ -6668,6 +7517,8 @@ export interface operations {
                 role: 'limited';
                 keyName: string;
                 allowedProviders?: string[];
+                /** @description Whether this key has privileged raw provider access. */
+                allowRawPassthrough?: boolean;
                 allowedModels?: string[];
                 quotaName?: string | null;
                 comment?: string | null;
@@ -7531,6 +8382,342 @@ export interface operations {
       };
       /** @description Authentication required or invalid credentials. */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementConfigCaptureTraceOnError: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current setting. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            enabled: boolean;
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patchV0ManagementConfigCaptureTraceOnError: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          enabled: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Updated setting. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            enabled: boolean;
+          };
+        };
+      };
+      /** @description Object body is required and `enabled` must be a boolean. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementConfigTrustedProxies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Trusted proxy rules. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @description IPv4/IPv6 addresses, CIDR ranges, or address ranges. */
+            trustedProxies: string[];
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patchV0ManagementConfigTrustedProxies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @description IPv4/IPv6 addresses, CIDR ranges, or address ranges. */
+          trustedProxies: string[];
+        };
+      };
+    };
+    responses: {
+      /** @description Updated trusted proxy rules. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            trustedProxies: string[];
+          };
+        };
+      };
+      /** @description Invalid body or IP rule. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementConfigCompaction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current compaction settings. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CompactionSettings'];
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patchV0ManagementConfigCompaction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CompactionSettings'];
+      };
+    };
+    responses: {
+      /** @description Updated compaction settings. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CompactionSettings'];
+        };
+      };
+      /** @description Invalid request body or compaction configuration. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementConfigMcpEnabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current MCP enabled state. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            enabled: boolean;
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patchV0ManagementConfigMcpEnabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          enabled: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Updated MCP enabled state. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            enabled: boolean;
+          };
+        };
+      };
+      /** @description Object body is required and `enabled` must be a boolean. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -8435,6 +9622,40 @@ export interface operations {
       };
     };
   };
+  postV0ManagementKeysBynameDisable: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Time-bound API key name. */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Disabled. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @constant */
+            success?: true;
+            name?: string;
+          };
+        };
+      };
+      /** @description The key does not exist or is not time-bound. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getV0ManagementMcpservers: {
     parameters: {
       query?: never;
@@ -8620,6 +9841,228 @@ export interface operations {
       };
     };
   };
+  getV0ManagementMcpServersByServerNameStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Process runtime status. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LocalMcpRuntimeStatus'];
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP server not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error?: string;
+          };
+        };
+      };
+    };
+  };
+  postV0ManagementMcpServersByServerNameStart: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Process started (or already running). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LocalMcpRuntimeStatus'];
+        };
+      };
+      /** @description Server is not `local_http` mode. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error?: string;
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP server not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error?: string;
+          };
+        };
+      };
+      /** @description Process failed to start or become ready. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementMcpServersByServerNameStop: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Process stopped (or was not running). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LocalMcpRuntimeStatus'];
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementMcpServersByServerNameRestart: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Process restarted. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LocalMcpRuntimeStatus'];
+        };
+      };
+      /** @description Server is not `local_http` mode. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error?: string;
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP server not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error?: string;
+          };
+        };
+      };
+      /** @description Process failed to start or become ready. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementMcpServersByServerNameProcessLogs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Registered MCP server name. */
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Captured process log lines. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @description Timestamped log lines, oldest first. */
+            data: string[];
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getV0ManagementQuotacheckertypes: {
     parameters: {
       query?: never;
@@ -8695,7 +10138,7 @@ export interface operations {
               checkerType?: string;
               displayName?: string;
               pending?: boolean;
-              meters?: Record<string, never>[];
+              meters?: components['schemas']['Meter'][];
               success?: boolean;
               error?: string;
               oauthAccountId?: string;
@@ -10058,15 +11501,8 @@ export interface operations {
   getV0ManagementQuotasBycheckerIdHistory: {
     parameters: {
       query?: {
-        /** @description Filter by time window type. Returns all window types when omitted. */
-        windowType?:
-          | 'subscription'
-          | 'hourly'
-          | 'five_hour'
-          | 'daily'
-          | 'weekly'
-          | 'monthly'
-          | 'custom';
+        /** @description Filter to a single meter (e.g. `balance`, `five_hour`, `daily`). Returns rows for all meters when omitted. */
+        meterKey?: string;
         /** @description Start of the time range. Supports ISO timestamp (e.g. `2026-01-01T00:00:00Z`) or relative format like `7d`, `30d`. */
         since?: string;
       };
@@ -10087,7 +11523,7 @@ export interface operations {
         content: {
           'application/json': {
             checkerId?: string;
-            windowType?: string | null;
+            meterKey?: string | null;
             /** Format: date-time */
             since?: string | null;
             history?: components['schemas']['QuotaSample'][];
@@ -10405,6 +11841,71 @@ export interface operations {
       };
       /** @description Authentication required or invalid credentials. */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementQuotaRecompute: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @description API key name whose quota bucket should be repaired. */
+          key: string;
+          /** @description Attached quota definition name to recompute. */
+          quota: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Quota usage was recomputed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @constant */
+            success: true;
+            key: string;
+            quota: string;
+            usage: number;
+            windowStartMs: number;
+            message: string;
+          };
+        };
+      };
+      /** @description Missing fields, unattached quota, or unsupported quota type. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description API key not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Internal server error. */
+      500: {
         headers: {
           [name: string]: unknown;
         };
@@ -10911,6 +12412,148 @@ export interface operations {
       };
       /** @description Authentication required or invalid credentials. */
       401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getMcpPlexus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description SSE stream or JSON-RPC response. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/event-stream': string;
+          'application/json': Record<string, never>;
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Limited principals are rejected; this endpoint is admin-only. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Plexus Management MCP is disabled (`mcpEnabled: false`). */
+      418: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postMcpPlexus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          /** @constant */
+          jsonrpc?: '2.0';
+          id?: string | number;
+          /** @description JSON-RPC method, for example `tools/list` or `tools/call`. */
+          method?: string;
+          /** @description Method-specific parameters. */
+          params?: Record<string, never>;
+        };
+      };
+    };
+    responses: {
+      /** @description JSON-RPC response. Content is JSON or a stream depending on the request. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': Record<string, never>;
+          'text/event-stream': string;
+        };
+      };
+      /** @description Malformed JSON-RPC request. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Limited principals are rejected; this endpoint is admin-only. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Plexus Management MCP is disabled (`mcpEnabled: false`). */
+      418: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  deleteMcpPlexus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Session closed or no-op for stateless transport. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Limited principals are rejected; this endpoint is admin-only. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Plexus Management MCP is disabled (`mcpEnabled: false`). */
+      418: {
         headers: {
           [name: string]: unknown;
         };

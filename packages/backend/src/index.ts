@@ -42,7 +42,6 @@ import { ProbeService } from './services/probes/probe-service';
 import { BackgroundExplorer } from './services/routing/background-explorer';
 import { CooldownManager } from './services/runtime/cooldown-manager';
 import { DebugManager } from './services/observability/debug-manager';
-import { PricingManager } from './services/observability/pricing-manager';
 import { ModelMetadataManager } from './services/models/model-metadata-manager';
 import { CodexVersionService } from './services/oauth/codex-version-service';
 import { SelectorFactory } from './services/routing/selectors/factory';
@@ -196,7 +195,6 @@ try {
   // Eagerly initialize OAuth auth manager so auth.json schema migration
   // runs during startup (instead of waiting for first OAuth request).
   await OAuthAuthManager.getInstance().initialize();
-  await PricingManager.getInstance().loadPricing();
   // Load model metadata from all configured sources (non-fatal on failure)
   const modelMetadataManager = ModelMetadataManager.getInstance();
   modelMetadataManager.startAutoRefresh(60);
@@ -209,7 +207,7 @@ try {
       logger.error('Failed to fetch codex version', e);
     });
 } catch (e) {
-  logger.error('Failed to load config or pricing', e);
+  logger.error('Failed to load config', e);
   process.exit(1);
 }
 

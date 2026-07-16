@@ -1,18 +1,27 @@
-import { describe, expect, test, beforeAll } from 'vitest';
+import { describe, expect, test, beforeEach } from 'vitest';
 import { PricingManager } from '../observability/pricing-manager';
+import { ModelMetadataManager } from '../models/model-metadata-manager';
 import path from 'path';
+
+const FIXTURES = path.join(__dirname, '../../utils/__tests__/fixtures');
+const pricingFixture = path.join(FIXTURES, 'openrouter-models.json');
+const metadataFixture = path.join(FIXTURES, 'openrouter-metadata-sample.json');
+
+async function loadCatalog(openrouterSource: string): Promise<void> {
+  await ModelMetadataManager.getInstance().loadAll({
+    openrouter: openrouterSource,
+    modelsDev: '/nonexistent',
+    catwalk: '/nonexistent',
+  });
+}
 
 describe('PricingManager - Model Search', () => {
   let pricingManager: PricingManager;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    ModelMetadataManager.resetForTesting();
     pricingManager = PricingManager.getInstance();
-    // Load test pricing data
-    const testDataPath = path.join(
-      __dirname,
-      '../../utils/__tests__/fixtures/openrouter-models.json'
-    );
-    await pricingManager.loadPricing(testDataPath);
+    await loadCatalog(pricingFixture);
   });
 
   test('should return all model slugs when no query provided', () => {
@@ -67,5 +76,44 @@ describe('PricingManager - Model Search', () => {
     const slugs = pricingManager.searchModelSlugs('claude-3.5');
     // Should not throw and should return results if matching models exist
     expect(Array.isArray(slugs)).toBe(true);
+  });
+});
+
+describe('PricingManager - Shared Catalog', () => {
+  beforeEach(async () => {
+    ModelMetadataManager.resetForTesting();
+    await loadCatalog(pricingFixture);
+  });
+
+  test('isInitialized reflects the metadata catalog state', () => {
+    expect(PricingManager.getInstance().isInitialized()).toBe(true);
+
+    ModelMetadataManager.resetForTesting();
+    expect(PricingManager.getInstance().isInitialized()).toBe(false);
+  });
+
+  test('getPricing reads from the metadata catalog', () => {
+    const pricing = PricingManager.getInstance().getPricing('anthropic/claude-3.5-sonnet');
+    expect(pricing).toBeDefined();
+    expect(pricing?.prompt).toBe('0.000003');
+    expect(pricing?.completion).toBe('0.000015');
+  });
+
+  test('getPricing returns undefined for unknown slugs', () => {
+    expect(PricingManager.getInstance().getPricing('nonexistent/model')).toBeUndefined();
+  });
+
+  test('catalog refreshes are visible without reloading the PricingManager', async () => {
+    const pricingManager = PricingManager.getInstance();
+
+    // gpt-4.1-nano only exists in the metadata-sample fixture, not the pricing fixture
+    expect(pricingManager.getPricing('openai/gpt-4.1-nano')).toBeUndefined();
+    expect(pricingManager.searchModelSlugs('gpt-4.1-nano')).toEqual([]);
+
+    // Simulate a scheduled/manual catalog refresh swapping in new data
+    await loadCatalog(metadataFixture);
+
+    expect(pricingManager.getPricing('openai/gpt-4.1-nano')).toBeDefined();
+    expect(pricingManager.searchModelSlugs('gpt-4.1-nano')).toEqual(['openai/gpt-4.1-nano']);
   });
 });

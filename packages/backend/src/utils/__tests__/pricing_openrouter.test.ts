@@ -1,11 +1,11 @@
-import { describe, expect, test, vi, beforeAll } from 'vitest';
+import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { handleResponse } from '../../services/responses/response-handler';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { Transformer } from '../../types/transformer';
 import { UnifiedChatResponse } from '../../types/unified';
 import { UsageRecord } from '../../types/usage';
-import { PricingManager } from '../../services/observability/pricing-manager';
+import { ModelMetadataManager } from '../../services/models/model-metadata-manager';
 import path from 'path';
 
 describe('handleResponse - OpenRouter Pricing', () => {
@@ -47,8 +47,13 @@ describe('handleResponse - OpenRouter Pricing', () => {
 
   const testDataPath = path.join(__dirname, 'fixtures/openrouter-models.json');
 
-  beforeAll(async () => {
-    await PricingManager.getInstance().loadPricing(testDataPath);
+  beforeEach(async () => {
+    ModelMetadataManager.resetForTesting();
+    await ModelMetadataManager.getInstance().loadAll({
+      openrouter: testDataPath,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
   });
 
   test("should calculate costs for 'openrouter' pricing strategy (GPT-3.5 Turbo)", async () => {
