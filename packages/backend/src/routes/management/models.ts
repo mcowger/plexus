@@ -8,11 +8,8 @@ import {
   resolvePreferredApi,
 } from '../../services/models/model-metadata-manager';
 import { getConfig, ModelConfigSchema } from '../../config';
-import {
-  getBuiltinModel,
-  getBuiltinModels,
-  getBuiltinProviders,
-} from '@earendil-works/pi-ai/providers/all';
+import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
+import { getCatalogModel, getCatalogModels } from '../../services/pi-ai/catalog';
 
 interface FetchModelRequest {
   Params: {
@@ -47,13 +44,9 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
     );
     let piModel: { provider: string; model_id: string; name: string } | null = null;
     if (identity.provider) {
-      try {
-        const match = getBuiltinModel(identity.provider as any, identity.model as any);
-        if (match) {
-          piModel = { provider: identity.provider, model_id: identity.model, name: match.name };
-        }
-      } catch {
-        // A catalog match can exist without a corresponding Pi registry entry.
+      const match = getCatalogModel(identity.provider, identity.model);
+      if (match) {
+        piModel = { provider: identity.provider, model_id: identity.model, name: match.name };
       }
     }
 
@@ -152,15 +145,8 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: `Missing 'provider' parameter` });
     }
 
-    // Built-in registry models for this provider.
-    let builtin: ReturnType<typeof getBuiltinModels> = [];
-    try {
-      builtin = getBuiltinModels(query.provider as any) ?? [];
-    } catch {
-      builtin = [];
-    }
-
-    const merged = builtin.map((m) => ({
+    // Catalog models for this provider (built-in baseline + pi.dev overlay).
+    const merged = getCatalogModels(query.provider).map((m) => ({
       id: m.id,
       name: m.name,
       api: m.api as string,

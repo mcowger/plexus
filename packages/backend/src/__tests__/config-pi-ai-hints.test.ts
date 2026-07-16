@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { validateConfig } from '../config';
 import { logger } from '../utils/logger';
+import { resetModelCatalogForTesting } from '../services/pi-ai/catalog';
+import { registerSpy } from '../../test/test-utils';
 
 // pi-ai and logger are globally mocked in test/vitest.setup.ts
 
@@ -89,15 +91,21 @@ describe('config schema: pi_ai_provider and pi_ai_model_id', () => {
 });
 
 describe('hydrateConfig: startup registry validation', () => {
+  afterEach(() => {
+    // Drop any catalog singleton built from a test-specific builtinModels
+    // spy so the rest of the worker gets the standard mock back.
+    resetModelCatalogForTesting();
+  });
+
   it('warns (non-fatally) when pi_ai_model_id is not in the pi-ai registry', async () => {
-    // Import the pi-ai module — in tests it's globally mocked as a factory.
-    // We can spy on the mocked object's getModel using vi.spyOn on the module
-    // to temporarily make it throw.
+    // Config validation reads the model catalog, which caches the (globally
+    // mocked) builtinModels() collection in a singleton. Point it at a fake
+    // collection that rejects the bogus pair, then reset the singleton so it
+    // is rebuilt from the fake.
     const piAiProvidersModule = await import('@earendil-works/pi-ai/providers/all');
 
-    const getModelSpy = vi
-      .spyOn(piAiProvidersModule, 'getBuiltinModel')
-      .mockImplementationOnce((provider: string, modelId: string) => {
+    registerSpy(piAiProvidersModule, 'builtinModels').mockReturnValue({
+      getModel: (provider: string, modelId: string) => {
         if (provider === 'anthropic' && modelId === 'bogus-model-xyz') {
           throw new Error('Unknown model');
         }
@@ -109,9 +117,13 @@ describe('hydrateConfig: startup registry validation', () => {
           api: 'anthropic-messages',
           baseUrl: '',
         } as any;
-      });
+      },
+      getModels: () => [],
+      getProviders: () => [],
+    } as any);
+    resetModelCatalogForTesting();
 
-    const warnSpy = vi.spyOn(logger, 'warn');
+    const warnSpy = registerSpy(logger, 'warn');
 
     // Should not throw
     expect(() =>
@@ -143,13 +155,10 @@ describe('hydrateConfig: startup registry validation', () => {
     const firstWarning = piAiWarnings[0];
     expect(firstWarning).toBeDefined();
     expect(String(firstWarning![0])).toContain('bogus-model-xyz');
-
-    warnSpy.mockRestore();
-    getModelSpy.mockRestore();
   });
 
   it('does not warn when pi_ai_model_id is not configured', () => {
-    const warnSpy = vi.spyOn(logger, 'warn');
+    const warnSpy = registerSpy(logger, 'warn');
 
     validateConfig(
       JSON.stringify({
@@ -169,7 +178,5 @@ describe('hydrateConfig: startup registry validation', () => {
       return typeof msg === 'string' && msg.includes('pi-ai registry');
     });
     expect(piAiWarnings).toHaveLength(0);
-
-    warnSpy.mockRestore();
   });
 });

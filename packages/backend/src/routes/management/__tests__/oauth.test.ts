@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
-import type { OAuthProviderInterface } from '@earendil-works/pi-ai/oauth';
+import type { OAuthProviderDescriptor } from '../../../services/oauth/oauth-providers';
 import { registerOAuthRoutes } from '../oauth';
 import { OAuthLoginSessionManager } from '../../../services/oauth/oauth-login-session';
 import { OAuthAuthManager } from '../../../services/oauth/oauth-auth-manager';
@@ -35,26 +35,35 @@ describe('OAuth management routes', () => {
   beforeEach(async () => {
     OAuthAuthManager.resetForTesting();
 
-    const provider: OAuthProviderInterface = {
+    const provider: OAuthProviderDescriptor = {
       id: 'test-provider',
       name: 'Test Provider',
-      async login(callbacks) {
-        callbacks.onAuth({ url: 'https://example.com/auth', instructions: 'Test instructions' });
-        const code = await callbacks.onPrompt({ message: 'Enter code' });
-        if (code !== 'test-code') {
-          throw new Error('Invalid code');
-        }
-        return {
-          access: 'access-token',
-          refresh: 'refresh-token',
-          expires: Date.now() + 60_000,
-        };
-      },
-      async refreshToken(credentials) {
-        return credentials;
-      },
-      getApiKey(credentials) {
-        return credentials.access;
+      usesCallbackServer: false,
+      oauth: {
+        name: 'Test Provider',
+        async login(interaction) {
+          interaction.notify({
+            type: 'auth_url',
+            url: 'https://example.com/auth',
+            instructions: 'Test instructions',
+          });
+          const code = await interaction.prompt({ type: 'text', message: 'Enter code' });
+          if (code !== 'test-code') {
+            throw new Error('Invalid code');
+          }
+          return {
+            type: 'oauth',
+            access: 'access-token',
+            refresh: 'refresh-token',
+            expires: Date.now() + 60_000,
+          };
+        },
+        async refresh(credential) {
+          return credential;
+        },
+        async toAuth(credential) {
+          return { apiKey: credential.access };
+        },
       },
     };
 
@@ -77,7 +86,14 @@ describe('OAuth management routes', () => {
     });
     const session = response.json() as { data: { id: string } };
 
-    await waitForStatus(fastify, session.data.id, 'awaiting_prompt');
+    const awaiting = await waitForStatus(fastify, session.data.id, 'awaiting_prompt');
+    // Text prompts surface through the generic prompt input, and blank
+    // submission stays enabled (providers validate blank semantics, e.g.
+    // Copilot's blank-for-github.com domain).
+    const prompt = (awaiting.data as { prompt?: { message?: string; allowEmpty?: boolean } })
+      ?.prompt;
+    expect(prompt?.message).toBe('Enter code');
+    expect(prompt?.allowEmpty).toBe(true);
 
     await fastify.inject({
       method: 'POST',
@@ -106,27 +122,34 @@ describe('OAuth management routes', () => {
 
   it('accepts manual code input for callback flows', async () => {
     const accountId = 'personal';
-    const manualProvider: OAuthProviderInterface = {
+    const manualProvider: OAuthProviderDescriptor = {
       id: 'manual-provider',
       name: 'Manual Provider',
       usesCallbackServer: true,
-      async login(callbacks) {
-        callbacks.onAuth({ url: 'https://example.com/callback' });
-        const manual = await callbacks.onManualCodeInput?.();
-        if (manual !== 'manual-code') {
-          throw new Error('Invalid manual code');
-        }
-        return {
-          access: 'manual-access',
-          refresh: 'manual-refresh',
-          expires: Date.now() + 60_000,
-        };
-      },
-      async refreshToken(credentials) {
-        return credentials;
-      },
-      getApiKey(credentials) {
-        return credentials.access;
+      oauth: {
+        name: 'Manual Provider',
+        async login(interaction) {
+          interaction.notify({ type: 'auth_url', url: 'https://example.com/callback' });
+          const manual = await interaction.prompt({
+            type: 'manual_code',
+            message: 'Enter the code from the browser',
+          });
+          if (manual !== 'manual-code') {
+            throw new Error('Invalid manual code');
+          }
+          return {
+            type: 'oauth',
+            access: 'manual-access',
+            refresh: 'manual-refresh',
+            expires: Date.now() + 60_000,
+          };
+        },
+        async refresh(credential) {
+          return credential;
+        },
+        async toAuth(credential) {
+          return { apiKey: credential.access };
+        },
       },
     };
 
@@ -144,7 +167,10 @@ describe('OAuth management routes', () => {
     });
     const session = response.json() as { data: { id: string } };
 
-    await waitForStatus(fastify, session.data.id, 'awaiting_manual_code');
+    const awaiting = await waitForStatus(fastify, session.data.id, 'awaiting_manual_code');
+    // Manual-code entry uses the dedicated redirect-URL input only — the
+    // generic prompt object must stay unset so the UI renders one input.
+    expect((awaiting.data as { prompt?: unknown })?.prompt).toBeUndefined();
 
     await fastify.inject({
       method: 'POST',

@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { OAuthLoginSessionManager } from '../../services/oauth/oauth-login-session';
 import { OAuthAuthManager } from '../../services/oauth/oauth-auth-manager';
-import type { OAuthProvider, OAuthProviderId } from '@earendil-works/pi-ai/oauth';
+import type { OAuthProvider, OAuthProviderId } from '../../services/oauth/oauth-providers';
 import { getOAuthProviderModels } from '../../services/providers/provider-model-discovery';
 
 const startSessionSchema = z.object({

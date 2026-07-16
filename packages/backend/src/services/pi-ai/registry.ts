@@ -7,16 +7,15 @@
  *    base-URL stripping rules, keyed off the upstream pi-ai API.
  *  - buildReasoningOptionsForModel / buildGenerationOptions: capability-aware
  *    egress reasoning + generation options from the pi-ai Model record.
- *  - resolvePiAiModel: resolve a builtin pi-ai Model for a (provider, model) pair.
+ *  - resolvePiAiModel: resolve a pi-ai Model for a (provider, model) pair.
  *  - isPlaceholderThinkingSignature: guard against pi-ai's field-name placeholder
  *    thinking signatures.
  */
 
 import { clampThinkingLevel, getSupportedThinkingLevels } from '@earendil-works/pi-ai';
-import { getBuiltinModel, builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type { Model as PiAiModel, ModelThinkingLevel } from '@earendil-works/pi-ai';
 
-export const piAiModels = builtinModels();
+import { getCatalogModel } from './catalog';
 
 import type { RouteResult } from '../routing/router';
 import type { ReasoningEffort, ReasoningIntent } from './reasoning';
@@ -329,23 +328,11 @@ function isOpenAiFamily(api: string | undefined): boolean {
 }
 
 /**
- * getModel may return undefined (pi-ai 0.79.x) or throw (older versions /
- * mocked) for unknown pairs — normalise both to null.
- */
-function safeGetModel(provider: string, modelId: string): PiAiModel<any> | null {
-  try {
-    return getBuiltinModel(provider as any, modelId as any) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve a builtin pi-ai Model for a (provider, modelId) pair.
- * Returns null when unresolved.
+ * Resolve a pi-ai Model for a (provider, modelId) pair from the dynamic
+ * catalog (built-in baseline + pi.dev overlay). Returns null when unresolved.
  */
 export function resolvePiAiModel(piAiProvider: string, piAiModelId: string): PiAiModel<any> | null {
-  return safeGetModel(piAiProvider, piAiModelId);
+  return getCatalogModel(piAiProvider, piAiModelId);
 }
 
 // ─── Thinking signature validation ───────────────────────────────────────────

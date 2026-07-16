@@ -7,7 +7,7 @@ import {
   resolveModelMetadata,
   resolvePreferredApi,
 } from '../../services/models/model-metadata-manager';
-import { getBuiltinModel } from '@earendil-works/pi-ai/providers/all';
+import { getCatalogModel } from '../../services/pi-ai/catalog';
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
   /**
@@ -40,32 +40,18 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       // Look up pi compat options if a pi model reference is configured.
       let piOptions: Record<string, unknown> | undefined;
       if (!piModelConfig && automaticIdentity.provider) {
-        try {
-          const inferred = getBuiltinModel(
-            automaticIdentity.provider as any,
-            automaticIdentity.model as any
-          );
-          if (inferred) {
-            piModelConfig = {
-              provider: automaticIdentity.provider,
-              model_id: automaticIdentity.model,
-            };
-          }
-        } catch {
-          // No Pi registry match — metadata and preferred API inference still apply.
+        const inferred = getCatalogModel(automaticIdentity.provider, automaticIdentity.model);
+        if (inferred) {
+          piModelConfig = {
+            provider: automaticIdentity.provider,
+            model_id: automaticIdentity.model,
+          };
         }
       }
       if (piModelConfig) {
-        try {
-          const piModel = getBuiltinModel(
-            piModelConfig.provider as any,
-            piModelConfig.model_id as any
-          );
-          if (piModel?.compat && Object.keys(piModel.compat).length > 0) {
-            piOptions = piModel.compat as Record<string, unknown>;
-          }
-        } catch {
-          // Unknown provider or model — skip silently.
+        const piModel = getCatalogModel(piModelConfig.provider, piModelConfig.model_id);
+        if (piModel?.compat && Object.keys(piModel.compat).length > 0) {
+          piOptions = piModel.compat as Record<string, unknown>;
         }
       }
 
