@@ -286,6 +286,10 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
     wrapped = true;
     for (const provider of models.getProviders()) {
       if (SELF_REFRESHING_PROVIDERS.has(provider.id)) continue;
+      // createProvider() only exposes refreshModels when the provider was
+      // built with its own fetchModels — i.e. it already has a dynamic
+      // catalog source. Wrapping it would silently replace its native
+      // refresh with ours, so leave already-dynamic providers alone.
       if (typeof provider.refreshModels === 'function') continue;
       if (typeof provider.getModels !== 'function') continue;
       models.setProvider(withRemoteCatalog(provider, deps));
