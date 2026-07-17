@@ -30,6 +30,21 @@ const UPSTREAM_SSE = [
   '',
 ].join('\n');
 
+// The real Codex backend can leave response.completed.response.output empty;
+// the completed output item is carried by response.output_item.done instead.
+const UPSTREAM_SSE_EMPTY_COMPLETION_OUTPUT = [
+  'event: response.created',
+  'data: {"type":"response.created","response":{"id":"resp_abc","object":"response","status":"in_progress","model":"gpt-5-codex","output":[]}}',
+  '',
+  'event: response.output_item.done',
+  'data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_abc","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"NATIVE"}]}}',
+  '',
+  'event: response.completed',
+  'data: {"type":"response.completed","response":{"id":"resp_abc","object":"response","status":"completed","model":"gpt-5-codex","output":[],"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}',
+  '',
+  '',
+].join('\n');
+
 // A fake Codex OAuth token: JWT whose payload carries the chatgpt_account_id
 // claim the wire header is derived from.
 const ACCOUNT_ID = 'acc_test_12345';
@@ -153,6 +168,21 @@ function chatRequest(): UnifiedChatRequest {
     model: 'codex-alias',
     messages: body.messages,
     stream: true,
+    incomingApiType: 'chat',
+    originalBody: body,
+  } as any;
+}
+
+function nonStreamingChatRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'codex-alias',
+    stream: false,
+    messages: [{ role: 'user', content: 'hi' }],
+  };
+  return {
+    model: 'codex-alias',
+    messages: body.messages,
+    stream: false,
     incomingApiType: 'chat',
     originalBody: body,
   } as any;
@@ -309,6 +339,25 @@ describe('Native Codex OAuth pass-through', () => {
     const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
     expect(sent.input).toBeDefined();
     expect(sent.messages).toBeUndefined();
+  });
+
+  test('aggregates backend Responses SSE for a non-streaming Chat Completions client', async () => {
+    setConfigForTesting(codexOAuthConfig());
+    // The ChatGPT backend can return its forced SSE body with a JSON content
+    // type when the original client requested a non-streaming response.
+    fetchSpy.mockResolvedValueOnce(
+      new Response(UPSTREAM_SSE_EMPTY_COMPLETION_OUTPUT, {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const response = await new Dispatcher().dispatch(nonStreamingChatRequest());
+
+    expect(response.stream).toBeUndefined();
+    expect(response.content).toBe('NATIVE');
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.stream).toBe(true);
   });
 
   test('marks backend Responses SSE for translation to a Messages client', async () => {

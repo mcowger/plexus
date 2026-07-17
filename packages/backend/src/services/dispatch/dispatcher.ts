@@ -1,3 +1,4 @@
+import { createParser } from 'eventsource-parser';
 import {
   UnifiedChatRequest,
   UnifiedChatResponse,
@@ -477,6 +478,47 @@ export class Dispatcher {
     try {
       return JSON.parse(responseText);
     } catch (cause) {
+      const isEventStream =
+        response.headers.get('content-type')?.includes('text/event-stream') ||
+        /^\s*(?:event|data):/m.test(responseText);
+      if (isEventStream) {
+        let completedResponse: any;
+        const completedOutputItems = new Map<number, any>();
+        const parser = createParser({
+          onEvent: (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              if (payload.type === 'response.output_item.done' && payload.item) {
+                const index =
+                  typeof payload.output_index === 'number'
+                    ? payload.output_index
+                    : completedOutputItems.size;
+                completedOutputItems.set(index, payload.item);
+              }
+              if (payload.type === 'response.completed' && payload.response) {
+                const streamedOutput = [...completedOutputItems.entries()]
+                  .sort(([left], [right]) => left - right)
+                  .map(([, item]) => item);
+                completedResponse = {
+                  ...payload.response,
+                  output:
+                    Array.isArray(payload.response.output) && payload.response.output.length > 0
+                      ? payload.response.output
+                      : streamedOutput,
+                };
+              }
+            } catch {
+              // Ignore malformed intermediate events. If there is no valid
+              // completion event, preserve the normal parse failure below.
+            }
+          },
+        });
+        parser.feed(responseText);
+        if (completedResponse) {
+          return completedResponse;
+        }
+      }
+
       if (requestId) {
         DebugManager.getInstance().addRawResponse(requestId, responseText);
         DebugManager.getInstance().addReconstructedRawResponse(requestId, {
