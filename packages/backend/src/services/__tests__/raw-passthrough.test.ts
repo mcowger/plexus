@@ -64,16 +64,14 @@ describe('raw passthrough transport helpers', () => {
     });
   });
 
-  test.each([
-    '/../admin',
-    '/%2e%2e/admin',
-    '/.%2e/admin',
-    '/%252e%252e/admin',
-  ])('rejects base-path traversal through %s', (suffix) => {
-    expect(() => buildRawUpstreamUrl('https://provider.example/api', suffix)).toThrow(
-      'cannot contain dot segments'
-    );
-  });
+  test.each(['/../admin', '/%2e%2e/admin', '/.%2e/admin', '/%252e%252e/admin'])(
+    'rejects base-path traversal through %s',
+    (suffix) => {
+      expect(() => buildRawUpstreamUrl('https://provider.example/api', suffix)).toThrow(
+        'cannot contain dot segments'
+      );
+    }
+  );
 
   test('keeps normal raw paths under the configured base path', () => {
     expect(
