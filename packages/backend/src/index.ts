@@ -27,6 +27,7 @@ if (subcommand === 'backup') {
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import { registerBunOAuthFlows } from '@earendil-works/pi-ai/bun-oauth';
 import path from 'path';
 import indexHtmlPath from '../../frontend/dist/index.html' with { type: 'file' };
 import mainJsPath from '../../frontend/dist/main.js' with { type: 'file' };
@@ -61,6 +62,8 @@ import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
 import { isEncryptionEnabled } from './utils/encryption';
 import { mcpProcessManager } from './services/mcp-local/mcp-process-manager';
+
+registerBunOAuthFlows();
 
 /**
  * Plexus Backend Server
