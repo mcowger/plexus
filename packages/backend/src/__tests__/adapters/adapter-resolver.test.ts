@@ -26,6 +26,46 @@ describe('resolveAdapters', () => {
     expect(resolveAdapters(route)).toHaveLength(0);
   });
 
+  it('auto-injects the tool-search strip adapter when pi_ai_provider is openrouter', () => {
+    const route: RouteResult = {
+      ...makeRoute(undefined, undefined),
+      config: {
+        ...makeRoute().config,
+        pi_ai_provider: 'openrouter',
+      },
+    };
+    const resolved = resolveAdapters(route);
+    expect(resolved.map((r) => r.adapter.name)).toEqual(['strip_unsupported_tool_search']);
+  });
+
+  it('does not auto-inject anything for non-openrouter pi_ai_provider', () => {
+    const route: RouteResult = {
+      ...makeRoute(undefined, undefined),
+      config: {
+        ...makeRoute().config,
+        pi_ai_provider: 'anthropic',
+      },
+    };
+    expect(resolveAdapters(route)).toHaveLength(0);
+  });
+
+  it('does not auto-inject anything when pi_ai_provider is unset', () => {
+    expect(resolveAdapters(makeRoute(undefined, undefined))).toHaveLength(0);
+  });
+
+  it('runs the implicit adapter before user-configured adapters', () => {
+    const base = makeRoute([{ name: 'reasoning_content', options: {} }]);
+    const route: RouteResult = {
+      ...base,
+      config: { ...base.config, pi_ai_provider: 'openrouter' },
+    };
+    const resolved = resolveAdapters(route);
+    expect(resolved.map((r) => r.adapter.name)).toEqual([
+      'strip_unsupported_tool_search',
+      'reasoning_content',
+    ]);
+  });
+
   it('resolves a provider-level adapter entry', () => {
     const route = makeRoute([{ name: 'reasoning_content', options: {} }]);
     const resolved = resolveAdapters(route);

@@ -4,6 +4,7 @@ import { suppressDeveloperRoleAdapter } from './suppress-developer-role.adapter'
 import { modelOverrideAdapter } from './model-override.adapter';
 import { reasoningRewriteAdapter } from './reasoning-rewrite.adapter';
 import { webSearchCoercionAdapter } from './web-search-coercion.adapter';
+import { stripUnsupportedToolSearchAdapter } from './strip-unsupported-tool-search.adapter';
 
 /**
  * Registry of all built-in provider adapters.
@@ -15,4 +16,5 @@ export const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   [modelOverrideAdapter.name]: modelOverrideAdapter,
   [reasoningRewriteAdapter.name]: reasoningRewriteAdapter,
   [webSearchCoercionAdapter.name]: webSearchCoercionAdapter,
+  [stripUnsupportedToolSearchAdapter.name]: stripUnsupportedToolSearchAdapter,
 };
