@@ -1,41 +1,32 @@
 /**
- * deploy-staging.ts
- *
- * Builds and deploys Plexus to a staging Docker host using a named Docker context.
- * No registry, no compose, no SSH keys to manage — everything goes through the Docker context.
- *
- * Usage:
- *   bun run deploy:staging
+ * Builds and deploys Plexus to a staging Docker host using Docker Compose.
+ * The image is built by the remote Docker daemon; Compose is invoked on the
+ * host so it can read its local Compose file.
  *
  * Required environment variables:
- *   PLEXUS_STAGING_DOCKER_CONTEXT   Docker context name pointing at staging host (e.g. "dolphin")
- *   PLEXUS_STAGING_URL              Base URL of the staging instance (e.g. "http://staging.example.com:4000")
- *   PLEXUS_STAGING_ADMIN_KEY        Admin API key for the staging instance
+ *   PLEXUS_STAGING_DOCKER_CONTEXT   Docker context for the staging host
+ *   PLEXUS_STAGING_URL              Public staging URL
+ *   PLEXUS_STAGING_ADMIN_KEY        Admin API key for backups
  *
  * Optional environment variables:
- *   PLEXUS_STAGING_CONTAINER_NAME   Container to replace (default: "plexus")
- *   PLEXUS_STAGING_BACKUP_RETAIN    Number of local backup files to keep (default: 3)
- *   PLEXUS_STAGING_IMAGE_RETAIN     Number of staging images to keep on host (default: 3)
- *   PLEXUS_STAGING_BACKUP_DIR       Local directory for backup files (default: ".staging-backups")
- *   PLEXUS_STAGING_HEALTH_TIMEOUT   Seconds to wait for health check (default: 60)
- *   PLEXUS_TARGETPLATFORM           Docker target platform (default: "linux/amd64")
+ *   PLEXUS_STAGING_BACKUP_RETAIN    Number of local backups to keep (3)
+ *   PLEXUS_STAGING_IMAGE_RETAIN     Number of timestamped images to keep (3)
+ *   PLEXUS_STAGING_BACKUP_DIR       Local backup directory (.staging-backups)
+ *   PLEXUS_STAGING_HEALTH_TIMEOUT   Health-check timeout in seconds (60)
+ *   PLEXUS_TARGETPLATFORM           Docker target platform (linux/amd64)
  */
 
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
 function requireEnv(name: string): string {
-  const val = process.env[name];
-  if (!val) {
+  const value = process.env[name];
+  if (!value) {
     console.error(`\n❌ Required environment variable ${name} is not set.\n`);
     process.exit(1);
   }
-  return val;
+  return value;
 }
 
 function optionalEnv(name: string, defaultValue: string): string {
@@ -50,317 +41,181 @@ const IMAGE_RETAIN = parseInt(optionalEnv('PLEXUS_STAGING_IMAGE_RETAIN', '3'), 1
 const BACKUP_DIR = optionalEnv('PLEXUS_STAGING_BACKUP_DIR', '.staging-backups');
 const HEALTH_TIMEOUT = parseInt(optionalEnv('PLEXUS_STAGING_HEALTH_TIMEOUT', '60'), 10);
 const TARGETPLATFORM = optionalEnv('PLEXUS_TARGETPLATFORM', 'linux/amd64');
-
-function resolveContainerName(): string {
-  const envName = process.env.PLEXUS_STAGING_CONTAINER_NAME;
-  if (envName) return envName;
-
-  const detectResult = spawnSync(
-    'docker',
-    [
-      '--context',
-      CTX,
-      'ps',
-      '-a',
-      '--filter',
-      'ancestor=plexus:staging-latest',
-      '--format',
-      '{{.Names}}',
-    ],
-    { encoding: 'utf-8' }
-  );
-  const detected = detectResult.stdout?.trim();
-  if (detected) {
-    const names = detected
-      .split('\n')
-      .map((n) => n.trim())
-      .filter(Boolean);
-    if (names.length === 1) return names[0]!;
-    if (names.length > 1) {
-      console.warn(`  ⚠️  Multiple containers match (plexus:staging-latest): ${names.join(', ')}`);
-      console.warn(`     Using first: ${names[0]}`);
-      return names[0]!;
-    }
-  }
-
-  const fallbackResult = spawnSync(
-    'docker',
-    ['--context', CTX, 'ps', '-a', '--format', '{{.Names}}\t{{.Image}}'],
-    { encoding: 'utf-8' }
-  );
-  const lines = (fallbackResult.stdout ?? '').trim().split('\n').filter(Boolean);
-  // Watchtower's --no-pull only swaps a container when a newer image exists at
-  // the SAME ref the container runs. If the running container is on a
-  // non-staging image (e.g. a published ghcr.io/mcowger/plexus:<ver>), the
-  // build phase's plexus:staging-<ts> tag won't match that ref and Watchtower
-  // becomes a no-op — silently recreating the container with the *same* old
-  // image. We warn loudly here so that situation is visible. The build phase
-  // later tags the new build as the container's current ref to fix it.
-  for (const line of lines) {
-    const [name, image] = line.split('\t');
-    if (name && image?.startsWith('plexus:')) {
-      if (!image.startsWith('plexus:staging-')) {
-        console.warn(
-          `  ⚠️  Running container \`${name}\` is on image \`${image}\`, not a plexus:staging-* image.`
-        );
-        console.warn(
-          `     Watchtower --no-pull only swaps a container when a newer image exists at the SAME ref`
-        );
-        console.warn(
-          `     the container runs. Phase 3.5 will tag the new build as \`${image}\` so the swap takes effect.`
-        );
-        console.warn(
-          `     (If you intentionally run staging off a published image, this is the expected path — no action needed.)`
-        );
-      }
-      return name;
-    }
-  }
-
-  console.warn(
-    `  ⚠️  No container matching plexus:staging-latest or any plexus:* image found; defaulting to \`${'Plexus'}\`.`
-  );
-  console.warn(
-    `     Watchtower --no-pull only swaps a container when a newer image exists at the SAME ref`
-  );
-  console.warn(`     the container runs — Phase 4b verifies the swap actually changed the image.`);
-
-  return 'Plexus';
-}
-
-const CONTAINER_NAME = resolveContainerName();
-
-// Timestamp-based tag — works for uncommitted work, always sortable
-const now = new Date();
-const TIMESTAMP = [
-  now.getFullYear(),
-  String(now.getMonth() + 1).padStart(2, '0'),
-  String(now.getDate()).padStart(2, '0'),
-  '-',
-  String(now.getHours()).padStart(2, '0'),
-  String(now.getMinutes()).padStart(2, '0'),
-  String(now.getSeconds()).padStart(2, '0'),
-].join('');
-
-const NEW_TAG = `plexus:staging-${TIMESTAMP}`;
+const SERVICE = 'plexus';
 const LATEST_TAG = 'plexus:staging-latest';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+type CommandResult = { success: boolean; stdout: string; stderr: string };
+
+function run(
+  command: string,
+  args: string[],
+  options: { fatal?: boolean; stream?: boolean } = {}
+): CommandResult {
+  const printable = [command, ...args].join(' ');
+  console.log(`  $ ${printable}`);
+  if (options.stream) {
+    const result = spawnSync(command, args, { stdio: 'inherit' });
+    if (result.status !== 0 && options.fatal !== false) {
+      console.error(`\n❌ Command failed: ${printable}\n`);
+      process.exit(1);
+    }
+    return { success: result.status === 0, stdout: '', stderr: '' };
+  }
+
+  const result = spawnSync(command, args, { encoding: 'utf-8' });
+  const stdout = result.stdout?.trim() ?? '';
+  const stderr = result.stderr?.trim() ?? '';
+  if (result.status !== 0 && options.fatal !== false) {
+    if (stderr) console.error(`  ${stderr}`);
+    console.error(`\n❌ Command failed: ${printable}\n`);
+    process.exit(1);
+  }
+  return { success: result.status === 0, stdout, stderr };
+}
+
+function docker(args: string[], options: { fatal?: boolean; stream?: boolean } = {}) {
+  return run('docker', ['--context', CTX, ...args], options);
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function step(number: number | string, label: string) {
+  console.log(`\n── Phase ${number}: ${label} ${'─'.repeat(Math.max(0, 50 - label.length))}`);
+}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
-}
-
-function step(n: number | string, label: string) {
-  console.log(`\n── Phase ${n}: ${label} ${'─'.repeat(Math.max(0, 50 - label.length))}`);
-}
-
-/**
- * Run a docker command via the configured context.
- * Returns { success, stdout, stderr }.
- * On failure: if fatal=true, prints stderr and exits. Otherwise returns the result.
- * Pass stream=true to inherit stdio directly (e.g. for build output).
- */
-function docker(
-  args: string[],
-  opts: { fatal?: boolean; silent?: boolean; stream?: boolean; env?: Record<string, string> } = {}
-): { success: boolean; stdout: string; stderr: string } {
-  const cmd = ['docker', '--context', CTX, ...args];
-  if (!opts.silent) {
-    console.log(`  $ ${cmd.join(' ')}`);
-  }
-
-  const env = opts.env ? { ...process.env, ...opts.env } : undefined;
-
-  if (opts.stream) {
-    const result = spawnSync(cmd[0]!, cmd.slice(1), { stdio: 'inherit', env });
-    const success = result.status === 0;
-    if (!success && opts.fatal !== false) {
-      console.error(`\n❌ Command failed: ${cmd.join(' ')}\n`);
-      process.exit(1);
-    }
-    return { success, stdout: '', stderr: '' };
-  }
-
-  const result = spawnSync(cmd[0]!, cmd.slice(1), { encoding: 'utf-8', env });
-  const stdout = result.stdout?.trim() ?? '';
-  const stderr = result.stderr?.trim() ?? '';
-  const success = result.status === 0;
-
-  if (!success && opts.fatal !== false) {
-    if (stderr) console.error(`  ${stderr}`);
-    console.error(`\n❌ Command failed: ${cmd.join(' ')}\n`);
-    process.exit(1);
-  }
-  return { success, stdout, stderr };
+  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${parseFloat((bytes / 1024 ** index).toFixed(1))} ${['B', 'KB', 'MB', 'GB'][index]}`;
 }
 
 async function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ---------------------------------------------------------------------------
-// Phase 0: Announce
-// ---------------------------------------------------------------------------
+function inspectContainer(name: string): any | null {
+  const result = docker(['inspect', '--format', '{{json .}}', name], { fatal: false });
+  if (!result.success || !result.stdout) return null;
+  try {
+    return JSON.parse(result.stdout);
+  } catch {
+    return null;
+  }
+}
+
+function findComposeContainer(service: string): string {
+  const result = docker(
+    [
+      'ps',
+      '-a',
+      '--filter',
+      `label=com.docker.compose.service=${service}`,
+      '--format',
+      '{{.Names}}',
+    ],
+    { fatal: false }
+  );
+  const names = result.stdout
+    .split('\n')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (names.length !== 1) {
+    console.error(
+      `\n❌ Expected exactly one Compose container for service "${service}", found ${names.length}.\n`
+    );
+    process.exit(1);
+  }
+  return names[0]!;
+}
+
+function dockerContextSshHost(): string {
+  const result = run('docker', [
+    'context',
+    'inspect',
+    '--format',
+    '{{.Endpoints.docker.Host}}',
+    CTX,
+  ]);
+  const endpoint = result.stdout.replace(/^ssh:\/\//, '').split('/')[0];
+  if (!endpoint) {
+    console.error(`\n❌ Docker context ${CTX} does not use an SSH endpoint.\n`);
+    process.exit(1);
+  }
+  return endpoint;
+}
+
+const now = new Date();
+const TIMESTAMP = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+const NEW_TAG = `plexus:staging-${TIMESTAMP}`;
+const SSH_HOST = dockerContextSshHost();
 
 console.log('╔══════════════════════════════════════════════════════╗');
 console.log('║            Plexus Staging Deploy Script              ║');
 console.log('╚══════════════════════════════════════════════════════╝');
-console.log();
-console.log(`  Docker context:  ${CTX}`);
+console.log(`\n  Docker context:  ${CTX}`);
+console.log(`  SSH host:        ${SSH_HOST}`);
 console.log(`  Staging URL:     ${STAGING_URL}`);
-console.log(
-  `  Container:       ${CONTAINER_NAME}${process.env.PLEXUS_STAGING_CONTAINER_NAME ? '' : ' (auto-detected)'}`
-);
-console.log(`  Target platform: ${TARGETPLATFORM}`);
 console.log(`  New image tag:   ${NEW_TAG}`);
-console.log();
 
-// ---------------------------------------------------------------------------
-// Phase 1: Backup
-// ---------------------------------------------------------------------------
+step(1, 'Inspect Compose container');
+const containerName = findComposeContainer(SERVICE);
+const before = inspectContainer(containerName);
+if (!before) {
+  console.error(`\n❌ Compose-managed container "${containerName}" was not found.\n`);
+  process.exit(1);
+}
 
-step(1, 'Backup');
+const labels = before.Config?.Labels ?? {};
+const project = labels['com.docker.compose.project'];
+const workingDir = labels['com.docker.compose.project.working_dir'];
+if (!project || !workingDir) {
+  console.error('\n❌ Existing container is missing Compose project metadata.\n');
+  process.exit(1);
+}
 
+const beforeId = before.Id;
+const beforeImage = before.Image;
+const previousImageRef = before.Config?.Image ?? LATEST_TAG;
+console.log(`  Project:         ${project}`);
+console.log(`  Working dir:     ${workingDir}`);
+console.log(`  Container ID:    ${beforeId}`);
+console.log(`  Image ID:        ${beforeImage}`);
+console.log(`  Running:         ${before.State?.Running ? 'yes' : 'no'}`);
+
+step(2, 'Backup');
 let backupFile: string | null = null;
-
 try {
-  if (!existsSync(BACKUP_DIR)) {
-    mkdirSync(BACKUP_DIR, { recursive: true });
-  }
-
-  const backupTimestamp = TIMESTAMP;
-  const backupPath = join(BACKUP_DIR, `backup-${backupTimestamp}.tar.gz`);
-
-  console.log(`  Downloading full backup from ${STAGING_URL}...`);
-
-  const res = await fetch(`${STAGING_URL}/v0/management/backup?full=true`, {
+  if (!existsSync(BACKUP_DIR)) mkdirSync(BACKUP_DIR, { recursive: true });
+  const backupPath = join(BACKUP_DIR, `backup-${TIMESTAMP}.tar.gz`);
+  const response = await fetch(`${STAGING_URL}/v0/management/backup?full=true`, {
     headers: { 'x-admin-key': STAGING_ADMIN_KEY },
   });
-
-  if (!res.ok || !res.body) {
-    throw new Error(`Backup request failed: ${res.status} ${res.statusText}`);
-  }
-
-  const data = await res.arrayBuffer();
+  if (!response.ok || !response.body)
+    throw new Error(`Backup request failed: ${response.status} ${response.statusText}`);
+  const data = await response.arrayBuffer();
   await Bun.write(backupPath, data);
   backupFile = backupPath;
-
   console.log(`  ✓ Saved ${formatBytes(data.byteLength)} → ${backupPath}`);
-
-  // Prune old backups
-  const allBackups = readdirSync(BACKUP_DIR)
-    .filter((f) => f.startsWith('backup-') && f.endsWith('.tar.gz'))
-    .map((f) => ({
-      name: f,
-      path: join(BACKUP_DIR, f),
-      mtime: statSync(join(BACKUP_DIR, f)).mtimeMs,
-    }))
+  const backups = readdirSync(BACKUP_DIR)
+    .filter((file) => file.startsWith('backup-') && file.endsWith('.tar.gz'))
+    .map((file) => ({ file, mtime: statSync(join(BACKUP_DIR, file)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime);
-
-  const toDelete = allBackups.slice(BACKUP_RETAIN);
-  for (const f of toDelete) {
-    unlinkSync(f.path);
-    console.log(`  ✓ Pruned old backup: ${f.name}`);
+  for (const old of backups.slice(BACKUP_RETAIN)) {
+    unlinkSync(join(BACKUP_DIR, old.file));
+    console.log(`  ✓ Pruned old backup: ${old.file}`);
   }
-} catch (err: any) {
-  console.warn(`  ⚠️  Backup failed (continuing): ${err.message}`);
+} catch (error) {
+  console.warn(`  ⚠️  Backup failed (continuing): ${(error as Error).message}`);
 }
-
-// ---------------------------------------------------------------------------
-// Phase 2: Capture previous image + print rollback command
-// ---------------------------------------------------------------------------
-
-step(2, 'Inspect running container');
-
-const inspectResult = docker(['inspect', '--format', '{{json .}}', CONTAINER_NAME], {
-  fatal: false,
-  silent: true,
-});
-
-let previousImage: string | null = null;
-let rollbackCommand: string | null = null;
-
-if (inspectResult.success && inspectResult.stdout) {
-  let info: any;
-  try {
-    info = JSON.parse(inspectResult.stdout);
-  } catch {
-    console.warn('  ⚠️  Could not parse docker inspect output');
-  }
-
-  if (info) {
-    previousImage = info.Config?.Image ?? null;
-
-    const parts: string[] = [`docker --context ${CTX} run -d`];
-    parts.push(`  --name ${CONTAINER_NAME}`);
-
-    const restartPolicy = info.HostConfig?.RestartPolicy?.Name;
-    if (restartPolicy && restartPolicy !== 'no') {
-      const maxRetries = info.HostConfig.RestartPolicy.MaximumRetryCount;
-      const policyStr =
-        restartPolicy === 'on-failure' && maxRetries ? `on-failure:${maxRetries}` : restartPolicy;
-      parts.push(`  --restart ${policyStr}`);
-    }
-
-    const portBindings = info.HostConfig?.PortBindings ?? {};
-    for (const [containerPort, bindings] of Object.entries(portBindings)) {
-      for (const binding of (bindings as any[]) ?? []) {
-        const hostPart = binding.HostIp
-          ? `${binding.HostIp}:${binding.HostPort}`
-          : binding.HostPort;
-        parts.push(`  -p ${hostPart}:${containerPort.replace('/tcp', '').replace('/udp', '')}`);
-      }
-    }
-
-    const mounts = info.Mounts ?? [];
-    for (const m of mounts) {
-      if (m.Type === 'bind') {
-        const ro = m.RW === false ? ':ro' : '';
-        parts.push(`  -v ${m.Source}:${m.Destination}${ro}`);
-      } else if (m.Type === 'volume') {
-        const ro = m.RW === false ? ':ro' : '';
-        parts.push(`  -v ${m.Name}:${m.Destination}${ro}`);
-      }
-    }
-
-    const skipEnvPrefixes = ['PATH=', 'HOSTNAME=', 'HOME='];
-    const envVars: string[] = info.Config?.Env ?? [];
-    for (const e of envVars) {
-      if (!skipEnvPrefixes.some((p) => e.startsWith(p))) {
-        parts.push(`  -e "${e}"`);
-      }
-    }
-
-    parts.push(`  ${previousImage}`);
-    rollbackCommand = parts.join(' ');
-
-    console.log(`  Previous image: ${previousImage}`);
-    console.log();
-    console.log('  ⚠️  Rollback command (save this before continuing):');
-    console.log(`    ${rollbackCommand}`);
-    console.log();
-  }
-} else {
-  console.log(`  Container "${CONTAINER_NAME}" not currently running — clean deploy.`);
-}
-
-// ---------------------------------------------------------------------------
-// Phase 3: Build on staging host
-// ---------------------------------------------------------------------------
 
 step(3, 'Build on staging host');
-
-console.log(`  Building ${NEW_TAG} on context "${CTX}"...`);
 docker(
   [
     'build',
+    '--platform',
+    TARGETPLATFORM,
     '--build-arg',
     `APP_VERSION=${TIMESTAMP}`,
     '--build-arg',
@@ -371,271 +226,75 @@ docker(
     LATEST_TAG,
     '.',
   ],
-  {
-    fatal: true,
-    stream: true,
-    // DOCKER_BUILDKIT=1 enables BuildKit on the remote daemon so it
-    // injects TARGETPLATFORM natively (in addition to our --build-arg).
-    // The build still runs on the remote host via the Docker context.
-    env: { DOCKER_BUILDKIT: '1' },
-  }
+  { stream: true }
 );
-console.log(`  ✓ Built ${NEW_TAG}`);
+console.log(`  ✓ Built ${NEW_TAG} and ${LATEST_TAG}`);
 
-// ---------------------------------------------------------------------------
-// Phase 3.5: Re-tag the new build as the running container's current image ref
-// ---------------------------------------------------------------------------
-// Watchtower's --run-once --no-pull only swaps a container when a newer image
-// exists at the SAME image ref the container currently runs. If the running
-// container uses, say, ghcr.io/mcowger/plexus:2026.06.18.2 while we just
-// built plexus:staging-<ts>, the refs don't match and Watchtower is a silent
-// no-op — it recreates the container with the *same* old image and the new
-// bundle never reaches staging. To make the swap actually take effect, we
-// re-tag the freshly built image as the running container's current ref
-// (captured in `previousImage` during Phase 2). Now the local image at that
-// ref is the new build, and Watchtower will see "the image at this ref has a
-// newer digest than the container's running image" and swap it.
-//
-// We also record the container's current image digest here so Phase 4b can
-// verify the swap actually changed it (catching a no-op Watchtower run).
+step(4, 'Recreate service with Compose');
+const composeCommand = `cd -- ${shellQuote(workingDir)} && docker compose --project-name ${shellQuote(project)} up --detach --force-recreate ${shellQuote(SERVICE)}`;
+run('ssh', [SSH_HOST, composeCommand]);
 
-step('3.5', 'Re-tag new build as running container image ref');
-
-// Capture the container's current image digest (before the swap) for the
-// Phase 4b verification. `docker inspect ... .Image` returns the image ID
-// (a sha256:... digest) the container is currently running.
-let previousImageDigest: string | null = null;
-if (previousImage) {
-  const digestResult = docker(['inspect', '--format', '{{.Image}}', CONTAINER_NAME], {
-    fatal: false,
-    silent: true,
-  });
-  if (digestResult.success && digestResult.stdout) {
-    previousImageDigest = digestResult.stdout;
-    console.log(`  Current container image digest: ${previousImageDigest}`);
-  }
+step(5, 'Verify replacement');
+const after = inspectContainer(containerName);
+if (!after || after.Id === beforeId || after.Image === beforeImage) {
+  console.error('\n❌ Compose did not replace the container with a new image.');
+  console.error(`  Before: ${beforeId} ${beforeImage}`);
+  console.error(`  After:  ${after ? `${after.Id} ${after.Image}` : '(inspect failed)'}`);
+  process.exit(1);
 }
+console.log(`  ✓ Container changed: ${beforeId} → ${after.Id}`);
+console.log(`  ✓ Image changed:    ${beforeImage} → ${after.Image}`);
 
-if (previousImage) {
-  console.log(`  Tagging ${NEW_TAG} as ${previousImage} (the ref the container runs)`);
-  const tagResult = docker(['tag', NEW_TAG, previousImage], { fatal: false });
-  if (tagResult.success) {
-    console.log(
-      `  ✓ ${NEW_TAG} now also tagged as ${previousImage}; Watchtower --no-pull will see a newer image at this ref`
-    );
-  } else {
-    console.warn(`  ⚠️  Failed to tag ${NEW_TAG} as ${previousImage} (continuing).`);
-    console.warn(
-      `     If the running container uses a different ref than plexus:staging-*, Watchtower will be a no-op`
-    );
-    console.warn(`     and the new build will NOT reach staging. See Phase 4b verification.`);
-  }
-} else {
-  console.log(
-    `  No previous image detected (clean deploy); skipping re-tag. Watchtower will swap to ${NEW_TAG}.`
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Phase 4: Deploy via Watchtower --run-once --no-pull
-// ---------------------------------------------------------------------------
-
-step(4, 'Deploy via Watchtower --run-once --no-pull');
-
-docker(
-  [
-    'run',
-    '--rm',
-    '-v',
-    '/var/run/docker.sock:/var/run/docker.sock',
-    '-e',
-    'DOCKER_API_VERSION=1.40',
-    'containrrr/watchtower',
-    '--run-once',
-    '--no-pull',
-    CONTAINER_NAME,
-  ],
-  { fatal: true }
-);
-console.log(`  ✓ Watchtower restarted ${CONTAINER_NAME} with new image`);
-
-// ---------------------------------------------------------------------------
-// Phase 4b: Verify the swap actually changed the running image
-// ---------------------------------------------------------------------------
-// Watchtower's --run-once --no-pull is a silent no-op when no newer image
-// exists at the SAME ref the container runs (e.g. the container is on
-// ghcr.io/mcowger/plexus:<ver> but we only built plexus:staging-<ts>). It
-// recreates the container with the *same* old image, health check passes
-// instantly, and the deploy reports success while nothing actually shipped.
-// Phase 3.5 closes that gap by re-tagging the new build as the container's
-// current ref; this phase verifies the swap took effect by comparing the
-// container's image digest before (Phase 3.5) and after the Watchtower run.
-// If the digest is unchanged, the deploy did NOT reach staging — fail loudly
-// with an actionable message instead of reporting a false success.
-
-step('4b', 'Verify swap changed the running image');
-
-if (previousImageDigest) {
-  const afterResult = docker(['inspect', '--format', '{{.Image}}', CONTAINER_NAME], {
-    fatal: false,
-    silent: true,
-  });
-  const afterDigest = afterResult.success ? afterResult.stdout : null;
-
-  if (afterDigest && afterDigest !== previousImageDigest) {
-    console.log(`  ✓ Container image digest changed by the swap:`);
-    console.log(`      before: ${previousImageDigest}`);
-    console.log(`      after:  ${afterDigest}`);
-  } else {
-    console.error(`\n❌ Deploy did NOT reach staging — Watchtower was a no-op.`);
-    console.error(`     Container ${CONTAINER_NAME} image digest is unchanged after the swap:`);
-    console.error(`       before: ${previousImageDigest}`);
-    console.error(`       after:   ${afterDigest ?? '(inspect failed)'}`);
-    console.error(``);
-    console.error(`     This means the running container's image ref does not match what the`);
-    console.error(`     build phase produced, so Watchtower recreated the container with the SAME`);
-    console.error(`     old image. The new bundle is NOT live.`);
-    console.error(``);
-    console.error(`     Most likely cause: the running container uses an image ref different from`);
-    console.error(
-      `     plexus:staging-<ts> (e.g. a published ghcr.io/mcowger/plexus:<ver>), and the`
-    );
-    console.error(`     Phase 3.5 re-tag to that ref failed or was skipped.`);
-    console.error(``);
-    console.error(
-      `     To fix: re-run after confirming PLEXUS_STAGING_CONTAINER_NAME and that the`
-    );
-    console.error(`     Phase 3.5 \`docker tag ${NEW_TAG} <previousImage>\` step succeeded.`);
-    console.error(`     Previous image ref was: ${previousImage ?? '(unknown)'}`);
-    if (rollbackCommand) {
-      console.error(
-        `\n  Rollback command (container was not changed, so rollback is to the same image):`
-      );
-      console.error(
-        `    docker --context ${CTX} stop ${CONTAINER_NAME} && docker --context ${CTX} rm ${CONTAINER_NAME}`
-      );
-      console.error(`    Then: ${rollbackCommand}`);
-    }
-    process.exit(1);
-  }
-} else {
-  console.log(
-    `  Skipping digest verification (no previous image captured — clean deploy or inspect failed).`
-  );
-  console.warn(
-    `  ⚠️  Without verification, a Watchtower no-op would report as a successful deploy.`
-  );
-  console.warn(
-    `     Confirm the new image is actually running via \`docker ps\` on the host if unsure.`
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Phase 5: Prune old images on host
-// ---------------------------------------------------------------------------
-
-step(5, 'Prune old staging images on host');
-
-const imagesResult = docker(['images', 'plexus', '--format', '{{.Tag}}\t{{.CreatedAt}}'], {
+step(6, 'Prune old staging images');
+const images = docker(['images', 'plexus', '--format', '{{.Tag}}\t{{.CreatedAt}}'], {
   fatal: false,
-  silent: true,
 });
-
-if (imagesResult.success && imagesResult.stdout) {
-  const stagingImages = imagesResult.stdout
+if (images.success && images.stdout) {
+  const stagingImages = images.stdout
     .split('\n')
     .map((line) => {
-      const [tag, ...rest] = line.split('\t');
-      return { tag: tag!, createdAt: rest.join('\t') };
+      const [tag, ...created] = line.split('\t');
+      return { tag: tag!, createdAt: created.join('\t') };
     })
     .filter(({ tag }) => tag.startsWith('staging-') && tag !== 'staging-latest')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  const toRemove = stagingImages.slice(IMAGE_RETAIN);
-  if (toRemove.length > 0) {
-    for (const img of toRemove) {
-      const rmResult = docker(['rmi', `plexus:${img.tag}`], { fatal: false });
-      if (rmResult.success) {
-        console.log(`  ✓ Removed plexus:${img.tag}`);
-      } else {
-        console.warn(`  ⚠️  Could not remove plexus:${img.tag} (may be in use)`);
-      }
-    }
-  } else {
-    console.log(`  ✓ No images to prune (${stagingImages.length} staging image(s) on host)`);
+  for (const image of stagingImages.slice(IMAGE_RETAIN)) {
+    const removed = docker(['rmi', `plexus:${image.tag}`], { fatal: false });
+    if (removed.success) console.log(`  ✓ Removed plexus:${image.tag}`);
   }
 }
 
-// ---------------------------------------------------------------------------
-// Phase 6: Health check
-// ---------------------------------------------------------------------------
-
-step(6, 'Health check');
-
-console.log(`  Polling ${STAGING_URL}/health (timeout: ${HEALTH_TIMEOUT}s)...`);
-
+step(7, 'Health check');
+console.log(`  Polling ${STAGING_URL}/healthz (timeout: ${HEALTH_TIMEOUT}s)...`);
 let healthy = false;
 let elapsed = 0;
-
-for (let i = 0; i < HEALTH_TIMEOUT; i++) {
+for (let attempt = 0; attempt < HEALTH_TIMEOUT; attempt++) {
   await sleep(1000);
-  elapsed = i + 1;
+  elapsed = attempt + 1;
   try {
-    const res = await fetch(`${STAGING_URL}/health`, { signal: AbortSignal.timeout(5000) });
-    const body = await res.text();
-    if (res.ok && body.trim() === 'OK') {
+    const response = await fetch(`${STAGING_URL}/healthz`, { signal: AbortSignal.timeout(5000) });
+    const body = await response.json();
+    if (response.ok && body?.ok === true) {
       healthy = true;
       break;
     }
   } catch {
-    // not ready yet
+    // The service may still be starting.
   }
-  if (i % 10 === 9) {
-    console.log(`  ... still waiting (${elapsed}s)`);
-  }
+  if (attempt % 10 === 9) console.log(`  ... still waiting (${elapsed}s)`);
 }
-
 if (!healthy) {
   console.error(`\n❌ Health check failed after ${HEALTH_TIMEOUT}s\n`);
-  console.error('  Last container logs:');
-  const logsResult = docker(['logs', '--tail', '50', CONTAINER_NAME], {
-    fatal: false,
-    silent: true,
-  });
-  const logLines = (logsResult.stdout + logsResult.stderr).split('\n');
-  for (const line of logLines) console.error(`    ${line}`);
-
-  if (rollbackCommand) {
-    console.error('\n  Manual rollback command:');
-    console.error(
-      `    docker --context ${CTX} stop ${CONTAINER_NAME} && docker --context ${CTX} rm ${CONTAINER_NAME}`
-    );
-    console.error(`    Then: ${rollbackCommand}`);
-  }
+  const logs = docker(['logs', '--tail', '50', containerName], { fatal: false });
+  for (const line of `${logs.stdout}\n${logs.stderr}`.split('\n')) console.error(`    ${line}`);
+  console.error(`\n  Rollback: docker --context ${CTX} tag ${previousImageRef} ${LATEST_TAG}`);
   process.exit(1);
 }
-
-console.log(`  ✓ Healthy (${elapsed}s)`);
-
-// ---------------------------------------------------------------------------
-// Phase 7: Summary
-// ---------------------------------------------------------------------------
 
 console.log('\n╔══════════════════════════════════════════════════════╗');
 console.log('║                 ✅ Deploy Complete                   ║');
 console.log('╚══════════════════════════════════════════════════════╝\n');
-console.log(`  Previous:   ${previousImage ?? '(none)'}`);
-console.log(`  Now live:   ${NEW_TAG}`);
-console.log(`  Backup:     ${backupFile ?? '(skipped)'}`);
-console.log(`  Health:     OK (${elapsed}s)`);
-console.log(`  URL:        ${STAGING_URL}`);
-
-if (rollbackCommand) {
-  console.log('\n  Rollback if needed:');
-  console.log(
-    `    docker --context ${CTX} stop ${CONTAINER_NAME} && docker --context ${CTX} rm ${CONTAINER_NAME}`
-  );
-  console.log(`    Then: ${rollbackCommand}`);
-}
-
-console.log();
+console.log(`  Previous image: ${previousImageRef}`);
+console.log(`  Now live:       ${NEW_TAG}`);
+console.log(`  Backup:         ${backupFile ?? '(skipped)'}`);
+console.log(`  Health:         OK (${elapsed}s)`);

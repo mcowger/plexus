@@ -324,6 +324,7 @@ await registerManagementRoutes(
 
 // Health check endpoint for container orchestration
 fastify.get('/health', (request, reply) => reply.send('OK'));
+fastify.get('/healthz', (request, reply) => reply.send({ ok: true }));
 
 // --- Static File Serving ---
 // `indexHtmlPath` is a string path — the filesystem path in dev, or a $bunfs/ path in a
