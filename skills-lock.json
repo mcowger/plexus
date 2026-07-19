@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "beautify-github-readme": {
+      "source": "oil-oil/beautify-github-readme",
+      "sourceType": "github",
+      "skillPath": "skills/beautify-github-readme/SKILL.md",
+      "computedHash": "9bc8ff7556eec6cb8b40b980ab9018f2b6beb4048b07ec753855fc4ad36d06ab"
+    }
+  }
+}
