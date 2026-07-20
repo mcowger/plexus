@@ -94,6 +94,7 @@ const ModelOverrideOptionsSchema = z.object({
 const AdapterEntrySchema = z.object({
   name: z.string().min(1),
   options: z.record(z.string(), z.any()).default({}),
+  enabled: z.boolean().default(true),
 });
 
 /**
@@ -109,10 +110,10 @@ const AdapterConfigSchema = z.preprocess((val) => {
   const arr = Array.isArray(val) ? val : [val];
   return arr.map((entry: any) => {
     if (typeof entry === 'string') {
-      return { name: entry, options: {} };
+      return { name: entry, options: {}, enabled: true };
     }
     if (entry && typeof entry === 'object' && 'name' in entry) {
-      return { name: entry.name, options: entry.options ?? {} };
+      return { name: entry.name, options: entry.options ?? {}, enabled: entry.enabled ?? true };
     }
     return entry; // Let Zod produce a clear validation error
   });

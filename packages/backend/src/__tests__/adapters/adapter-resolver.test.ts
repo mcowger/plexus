@@ -38,6 +38,37 @@ describe('resolveAdapters', () => {
     expect(resolved.map((r) => r.adapter.name)).toEqual(['strip_unsupported_tool_search']);
   });
 
+  it('auto-injects unsupported-option suppression for GPT-5 family models', () => {
+    const route: RouteResult = { ...makeRoute(), model: 'gpt-5.2' };
+    expect(resolveAdapters(route).map((r) => r.adapter.name)).toEqual([
+      'suppress_unsupported_gpt5_options',
+    ]);
+  });
+
+  it('does not auto-inject GPT-5 suppression for other model families', () => {
+    const route: RouteResult = { ...makeRoute(), model: 'gpt-4.1' };
+    expect(resolveAdapters(route)).toHaveLength(0);
+  });
+
+  it('allows a model adapter entry to disable GPT-5 suppression', () => {
+    const route = makeRoute(undefined, [
+      { name: 'suppress_unsupported_gpt5_options', enabled: false },
+    ]);
+    route.model = 'gpt-5.2';
+    expect(resolveAdapters(route)).toHaveLength(0);
+  });
+
+  it('allows a model adapter entry to restore an adapter disabled by its provider', () => {
+    const route = makeRoute(
+      [{ name: 'suppress_unsupported_gpt5_options', enabled: false }],
+      [{ name: 'suppress_unsupported_gpt5_options', enabled: true }]
+    );
+    route.model = 'gpt-5.2';
+    expect(resolveAdapters(route).map((r) => r.adapter.name)).toEqual([
+      'suppress_unsupported_gpt5_options',
+    ]);
+  });
+
   it('does not auto-inject anything for non-openrouter pi_ai_provider', () => {
     const route: RouteResult = {
       ...makeRoute(undefined, undefined),
@@ -61,6 +92,20 @@ describe('resolveAdapters', () => {
     };
     const resolved = resolveAdapters(route);
     expect(resolved.map((r) => r.adapter.name)).toEqual([
+      'strip_unsupported_tool_search',
+      'reasoning_content',
+    ]);
+  });
+
+  it('runs GPT-5 suppression before other implicit and configured adapters', () => {
+    const base = makeRoute([{ name: 'reasoning_content', options: {} }]);
+    const route: RouteResult = {
+      ...base,
+      model: 'gpt-5-codex',
+      config: { ...base.config, pi_ai_provider: 'openrouter' },
+    };
+    expect(resolveAdapters(route).map((r) => r.adapter.name)).toEqual([
+      'suppress_unsupported_gpt5_options',
       'strip_unsupported_tool_search',
       'reasoning_content',
     ]);

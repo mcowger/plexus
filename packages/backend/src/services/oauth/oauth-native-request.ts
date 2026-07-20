@@ -40,6 +40,7 @@ import {
 } from '../../transformers/oauth/masking';
 import type { RenamePair } from '../../transformers/oauth/masking/types';
 import { CodexVersionService } from './codex-version-service';
+import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 
 /**
  * Auth for a native Anthropic request. Two modes, mirroring the old executor:
@@ -270,42 +271,12 @@ function extractChatgptAccountId(token: string): string | undefined {
 }
 
 /**
- * Parameters that NO Codex model supports — the ChatGPT Codex backend rejects
- * them (e.g. `400 Unsupported parameter: temperature` /
- * `Unsupported parameter: max_completion_tokens`). Stripped on BOTH paths
- * (verbatim CLI and adorned): even a passed-through body must not carry them,
- * and `ResponsesTransformer` in particular defaults `temperature` to `1.0` and
- * emits `max_output_tokens`. The backend accepts NO max-tokens field, so both
- * the Responses (`max_output_tokens`) and Chat (`max_completion_tokens`) names
- * are stripped (pi-ai likewise never forwards a token cap).
- */
-const CODEX_UNSUPPORTED_PARAMS = [
-  'temperature',
-  'top_p',
-  'logprobs',
-  'top_logprobs',
-  'frequency_penalty',
-  'presence_penalty',
-  'logit_bias',
-  'truncation',
-  'max_output_tokens',
-  'max_completion_tokens',
-] as const;
-
-function stripUnsupportedCodexParams(body: any): any {
-  if (!body || typeof body !== 'object') return body;
-  const next: any = { ...body };
-  for (const key of CODEX_UNSUPPORTED_PARAMS) delete next[key];
-  return next;
-}
-
-/**
  * Adorn a normalized (non-CLI) Responses body with the fields the ChatGPT Codex
  * backend requires, reproducing pi-ai's `buildRequestBody` forcings: `store:false`,
  * `stream:true`, encrypted-content `include`, an `instructions` fallback, a
  * `text.verbosity` fallback, and `tool_choice`/`parallel_tool_calls` defaults.
  * Client-provided values are preserved where present; the always-unsupported
- * sampling params are removed separately by `stripUnsupportedCodexParams`.
+ * unsupported options are removed separately by `stripUnsupportedGpt5Options`.
  */
 function adornCodexResponsesBody(body: any): any {
   const next: any = { ...(body ?? {}) };
@@ -319,7 +290,7 @@ function adornCodexResponsesBody(body: any): any {
   next.text = { ...(next.text ?? {}), verbosity: next.text?.verbosity ?? 'low' };
   if (next.tool_choice == null) next.tool_choice = 'auto';
   if (next.parallel_tool_calls == null) next.parallel_tool_calls = true;
-  // Token-cap fields are removed by stripUnsupportedCodexParams (the backend
+  // Token-cap fields are removed by stripUnsupportedGpt5Options (the backend
   // accepts none).
   return next;
 }
@@ -335,9 +306,10 @@ function prepareCodexOAuthRequest(
   streaming: boolean,
   passthrough: boolean
 ): PreparedOAuthRequest {
-  // Strip the always-unsupported sampling params on BOTH paths (even verbatim
-  // CLI), then adorn only the non-CLI path.
-  const body = stripUnsupportedCodexParams(
+  // Preserve final-path suppression for native CLI pass-through, whose body may
+  // be mutated after adapter resolution. All GPT-5 routes receive the same
+  // suppression through the implicit model adapter.
+  const body = stripUnsupportedGpt5Options(
     passthrough ? nativeBody : adornCodexResponsesBody(nativeBody)
   );
 

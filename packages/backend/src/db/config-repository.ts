@@ -51,18 +51,18 @@ function toJson(value: unknown): string | unknown {
 }
 
 /**
- * Normalize adapter entries from DB storage to the canonical { name, options } form.
+ * Normalize adapter entries from DB storage to the canonical { name, options, enabled } form.
  *
  * Legacy rows stored adapter entries as bare strings (e.g. ["reasoning_content"]).
  * This function converts them to the uniform object form:
- * [{ name: "reasoning_content", options: {} }]
+ * [{ name: "reasoning_content", options: {}, enabled: true }]
  *
  * Rows are self-healing: on next save through the API, the normalized form
  * is persisted back to the DB.
  */
 function normalizeAdapterEntries(
   raw: unknown
-): Array<{ name: string; options: Record<string, any> }> | null {
+): Array<{ name: string; options: Record<string, any>; enabled: boolean }> | null {
   if (raw === null || raw === undefined) return null;
   const arr = Array.isArray(raw) ? raw : [raw];
   if (arr.length === 0) return null;
@@ -71,20 +71,23 @@ function normalizeAdapterEntries(
     .map((entry) => {
       if (typeof entry === 'string') {
         // Legacy bare-string form
-        return { name: entry, options: {} };
+        return { name: entry, options: {}, enabled: true };
       }
       if (entry && typeof entry === 'object' && 'name' in entry) {
         // Already in object form
         return {
           name: (entry as any).name,
           options: (entry as any).options ?? {},
+          enabled: (entry as any).enabled ?? true,
         };
       }
       // Malformed entry — skip with a warning (don't crash)
       logger.warn(`Skipping malformed adapter entry: ${JSON.stringify(entry)}`);
       return null;
     })
-    .filter((e): e is { name: string; options: Record<string, any> } => e !== null);
+    .filter(
+      (e): e is { name: string; options: Record<string, any>; enabled: boolean } => e !== null
+    );
 }
 
 /**

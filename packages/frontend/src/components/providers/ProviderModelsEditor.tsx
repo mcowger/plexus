@@ -32,6 +32,12 @@ const API_ACCESS_OPTIONS = [
   { type: 'ollama', label: 'ollama' },
 ] as const;
 
+const GPT5_SUPPRESSION_ADAPTER = 'suppress_unsupported_gpt5_options';
+
+function isGpt5Model(modelId: string): boolean {
+  return /^gpt-5(?:[.-]|$)/i.test(modelId);
+}
+
 const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
   switch (apiType.toLowerCase()) {
     case 'messages':
@@ -940,6 +946,75 @@ export function ProviderModelsEditor({
                               background: 'var(--color-bg-subtle)',
                             }}
                           >
+                            {isGpt5Model(mId) &&
+                              (() => {
+                                const modelAdapters: any[] = mCfg.adapter
+                                  ? Array.isArray(mCfg.adapter)
+                                    ? mCfg.adapter
+                                    : [mCfg.adapter]
+                                  : [];
+                                const suppressionDisabled = modelAdapters.some(
+                                  (entry: any) =>
+                                    typeof entry !== 'string' &&
+                                    entry.name === GPT5_SUPPRESSION_ADAPTER &&
+                                    entry.enabled === false
+                                );
+                                return (
+                                  <label
+                                    style={{
+                                      gridColumn: '1 / -1',
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: '8px',
+                                      cursor: 'pointer',
+                                      padding: '4px 8px',
+                                      borderRadius: 'var(--radius-sm)',
+                                      border: '1px solid var(--color-border-glass)',
+                                      background: suppressionDisabled
+                                        ? 'var(--color-bg-glass)'
+                                        : 'var(--color-bg-hover)',
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={!suppressionDisabled}
+                                      style={{ marginTop: '2px', flexShrink: 0 }}
+                                      onChange={() => {
+                                        const withoutSuppression = modelAdapters.filter(
+                                          (entry: any) =>
+                                            (typeof entry === 'string' ? entry : entry.name) !==
+                                            GPT5_SUPPRESSION_ADAPTER
+                                        );
+                                        const next = suppressionDisabled
+                                          ? withoutSuppression
+                                          : [
+                                              ...withoutSuppression,
+                                              {
+                                                name: GPT5_SUPPRESSION_ADAPTER,
+                                                options: {},
+                                                enabled: false,
+                                              },
+                                            ];
+                                        updateModelConfig(mId, {
+                                          adapter: next.length > 0 ? next : undefined,
+                                        });
+                                      }}
+                                    />
+                                    <div>
+                                      <div className="font-body text-[12px] font-medium text-text">
+                                        Suppress Unsupported GPT-5 Options
+                                      </div>
+                                      <div
+                                        className="font-body text-[11px] text-text-secondary"
+                                        style={{ lineHeight: 1.35 }}
+                                      >
+                                        Enabled by default. Removes generation options GPT-5 does
+                                        not accept.
+                                      </div>
+                                    </div>
+                                  </label>
+                                );
+                              })()}
                             {KNOWN_ADAPTERS.map((a) => {
                               const modelAdapters: any[] = mCfg.adapter
                                 ? Array.isArray(mCfg.adapter)

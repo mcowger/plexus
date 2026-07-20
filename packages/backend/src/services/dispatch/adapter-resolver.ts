@@ -3,6 +3,7 @@ import type { RouteResult } from '../routing/router';
 import type { AdapterEntry } from '../../config';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
 import { stripUnsupportedToolSearchAdapter } from '../../transformers/adapters/strip-unsupported-tool-search.adapter';
+import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import { logger } from '../../utils/logger';
 
 /**
@@ -15,6 +16,9 @@ import { logger } from '../../utils/logger';
  *      cleaned-up payload if they inspect it.
  *   2. Provider-level `adapter` (applies to all models under the provider)
  *   3. Model-level `adapter`   (appended after provider-level adapters)
+ *
+ * An `{ name, enabled: false }` entry removes earlier instances of that adapter,
+ * including implicit defaults. A later enabled entry restores it.
  *
  * Each entry is an { name, options } object. Unknown adapter names are logged
  * as warnings and skipped (rather than throwing) so that a misconfigured
@@ -31,8 +35,12 @@ export function resolveAdapters(route: RouteResult): ResolvedAdapter[] {
 
   if (entries.length === 0) return [];
 
-  const resolved: ResolvedAdapter[] = [];
+  let resolved: ResolvedAdapter[] = [];
   for (const entry of entries) {
+    if (entry.enabled === false) {
+      resolved = resolved.filter((resolvedEntry) => resolvedEntry.adapter.name !== entry.name);
+      continue;
+    }
     const adapter = ADAPTER_REGISTRY[entry.name];
     if (!adapter) {
       logger.warn(
@@ -63,8 +71,16 @@ export function resolveAdapters(route: RouteResult): ResolvedAdapter[] {
  * silently no-op.
  */
 function resolveImplicitAdapters(route: RouteResult): AdapterEntry[] {
-  if (route.config.pi_ai_provider === 'openrouter') {
-    return [{ name: stripUnsupportedToolSearchAdapter.name, options: {} }];
+  const adapters: AdapterEntry[] = [];
+  if (isGpt5Model(route.model)) {
+    adapters.push({ name: suppressUnsupportedGpt5OptionsAdapter.name, options: {}, enabled: true });
   }
-  return [];
+  if (route.config.pi_ai_provider === 'openrouter') {
+    adapters.push({ name: stripUnsupportedToolSearchAdapter.name, options: {}, enabled: true });
+  }
+  return adapters;
+}
+
+function isGpt5Model(model: string): boolean {
+  return /^gpt-5(?:[.-]|$)/i.test(model);
 }
