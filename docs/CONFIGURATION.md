@@ -1,8 +1,10 @@
 # Configuration
 
+> **Plexus does not support file-based application configuration.** It does not load providers, models, keys, quotas, or settings from YAML, JSON, TOML, or other configuration files. Code examples in this document show request payload shapes only; apply them through the Admin UI or Management API.
+
 Plexus stores all configuration in the database and manages it via the **Admin UI** (recommended) or **Management API**.
 
-**Environment variables** control server-level settings. Everything else (providers, models, keys, quotas) is stored in the database.
+**Environment variables** control server-level settings. Everything else (providers, models, keys, quotas, and settings) is stored in the database.
 
 ---
 
@@ -243,7 +245,7 @@ OAuth providers are not supported by the raw endpoint.
 
 Adapters rewrite request payloads outbound to a provider and raw response payloads inbound, fixing provider-specific field-name incompatibilities without modifying the core transformer pipeline.
 
-Adapters can be set at **provider level** (applied to every model under the provider) or at **model level** (appended after provider-level adapters for a specific model). Both accept a single name or a list.
+Adapters can be set at **provider level** (applied to every model under the provider) or at **model level** (appended after provider-level adapters for a specific model). Both accept a single name or a list. Use `{ "name": "...", "enabled": false }` at model level to disable an inherited or automatic adapter; a later enabled entry restores it.
 
 | Adapter | Description |
 |---------|-------------|
@@ -252,6 +254,7 @@ Adapters can be set at **provider level** (applied to every model under the prov
 | `model_override` | Conditionally rewrites the provider model name based on request payload fields. Used for providers that expose reasoning variants as separate model names rather than respecting reasoning-related fields in the request body. See [Model Override Adapter](#model-override-adapter) below. |
 | `reasoning_rewrite` | Manually rewrites reasoning/thinking request fields for providers with bespoke compatibility requirements. Prefer `auto_compat` for models linked to the pi-ai builtin registry; this adapter is now best treated as an escape hatch. |
 | `web_search_coercion` | Translates server-side web search tool entries to the format expected by the target provider. Clients can use any web search format; Plexus rewrites it transparently. See [Web Search Coercion Adapter](#web-search-coercion-adapter) below. |
+| `suppress_unsupported_gpt5_options` | Removes generation options unsupported by GPT-5 models. Enabled automatically for the GPT-5 family; set `enabled: false` for a model to opt out. |
 
 **Example — provider-level:**
 ```json
