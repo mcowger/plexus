@@ -23,6 +23,7 @@ import {
   formatMs,
   formatSlices,
   formatTPS,
+  getEstimatedBytesPerToken,
 } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import { formatApiTypeLabel, getApiBaseType } from '../lib/apiFormats';
@@ -1552,6 +1553,20 @@ export const Logs = () => {
                               ? e2eOutputTokens / (log.durationMs / 1000)
                               : null;
                           if (progress) {
+                            const bytesPerToken = getEstimatedBytesPerToken(log);
+                            const effectiveBytesPerSec =
+                              progress.bytesPerSec != null && progress.bytesPerSec > 0
+                                ? progress.bytesPerSec
+                                : progress.elapsedMs > 0 && progress.bytesReceived > 0
+                                  ? (progress.bytesReceived / progress.elapsedMs) * 1000
+                                  : null;
+                            const estTokensPerSec =
+                              effectiveBytesPerSec != null &&
+                              Number.isFinite(effectiveBytesPerSec) &&
+                              effectiveBytesPerSec > 0
+                                ? effectiveBytesPerSec / bytesPerToken
+                                : null;
+
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span>Duration: {liveDuration}</span>
@@ -1579,6 +1594,21 @@ export const Logs = () => {
                                   >
                                     <Gauge size={12} className="text-text-secondary" />
                                     {formatBytes(progress.bytesPerSec)}/s
+                                  </span>
+                                )}
+                                {estTokensPerSec != null && (
+                                  <span
+                                    style={{
+                                      color: 'var(--color-text-secondary)',
+                                      fontSize: '0.85em',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                    title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token accounting for SSE + JSON framing)`}
+                                  >
+                                    <Zap size={12} className="text-amber-400" />
+                                    <span>~{formatTPS(estTokensPerSec)} tok/s</span>
                                   </span>
                                 )}
                               </div>
