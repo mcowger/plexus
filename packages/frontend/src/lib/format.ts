@@ -228,3 +228,45 @@ export function toTitleCase(str: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
+
+/**
+ * Estimate average wire bytes per token for an API response stream.
+ * In live SSE streams, each token chunk is wrapped in SSE event headers and JSON schema
+ * structures (`data: {"id":...,"choices":[{"delta":...}]}`). This protocol framing
+ * dominates wire payload size compared to plain text (~4 bytes/token).
+ */
+export function getEstimatedBytesPerToken(options: {
+  incomingApiType?: string | null;
+  outgoingApiType?: string | null;
+  isStreamed?: boolean | null;
+}): number {
+  if (options.isStreamed === false) {
+    // Non-streamed response: single bulk JSON payload (~4.5 bytes per token)
+    return 4.5;
+  }
+
+  const apiType = (options.incomingApiType || options.outgoingApiType || '').toLowerCase();
+
+  if (apiType.includes('anthropic') || apiType.includes('messages') || apiType === 'oauth') {
+    // Anthropic SSE: `event: content_block_delta\ndata: {"type":...}\n\n` (~115 B/token)
+    return 115;
+  }
+
+  if (
+    apiType.includes('openai') ||
+    apiType.includes('chat') ||
+    apiType.includes('responses') ||
+    apiType.includes('antigravity')
+  ) {
+    // OpenAI SSE: `data: {"id":...,"object":"chat.completion.chunk",...}\n\n` (~160 B/token)
+    return 160;
+  }
+
+  if (apiType.includes('gemini') || apiType.includes('google')) {
+    // Gemini SSE streaming: (~140 B/token)
+    return 140;
+  }
+
+  // Default SSE stream overhead fallback
+  return 140;
+}
