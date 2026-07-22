@@ -54,6 +54,13 @@ type ProviderResolver = (id: OAuthProviderId) => OAuthProviderDescriptor | undef
 
 const DEFAULT_SESSION_TTL_MS = 20 * 60 * 1000;
 
+const ACTIVE_STATUSES: ReadonlySet<OAuthSessionStatus> = new Set([
+  'in_progress',
+  'awaiting_auth',
+  'awaiting_prompt',
+  'awaiting_manual_code',
+]);
+
 const createSessionId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -95,6 +102,9 @@ export class OAuthLoginSessionManager {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
     }
+    for (const session of this.sessions.values()) {
+      this.releaseSession(session, 'Login manager disposed');
+    }
     this.sessions.clear();
   }
 
@@ -117,6 +127,22 @@ export class OAuthLoginSessionManager {
     const provider = this.providerResolver(providerId);
     if (!provider) {
       throw new Error(`Unknown OAuth provider: ${providerId}`);
+    }
+
+    // Callback-server providers bind a fixed local port during login, so only
+    // one login per provider can be in flight at a time. A prior session may be
+    // orphaned (its id lost to a reload, or the browser is on another machine),
+    // leaving no way to cancel it — so supersede it here: cancel the stale login
+    // and wait for its callback server to release the port before continuing.
+    if (provider.usesCallbackServer) {
+      const active = this.findActiveSession(providerId);
+      if (active) {
+        active.status = 'cancelled';
+        active.error = 'Superseded by a new login';
+        this.releaseSession(active, 'Superseded by a new login');
+        this.touch(active);
+        await active.completion;
+      }
     }
 
     const now = Date.now();
@@ -179,15 +205,35 @@ export class OAuthLoginSessionManager {
     }
     session.status = 'cancelled';
     session.error = 'Login cancelled';
+    this.releaseSession(session, 'Login cancelled');
+    this.touch(session);
+    return this.stripInternal(session);
+  }
+
+  /**
+   * Abort the underlying login and reject any pending prompt. Rejecting the
+   * prompt is what makes pi-ai's login promise settle and close its callback
+   * server (which binds a fixed local port, e.g. Anthropic's 53692). Aborting
+   * the signal alone does not, so callers that drop a session (cancel, expiry,
+   * dispose) must go through here to avoid leaking the port.
+   */
+  private releaseSession(session: SessionInternal, reason: string): void {
     session.abortController.abort();
-    session.rejectPrompt?.(new Error('Login cancelled'));
-    session.rejectManualCode?.(new Error('Login cancelled'));
+    session.rejectPrompt?.(new Error(reason));
+    session.rejectManualCode?.(new Error(reason));
     session.resolvePrompt = undefined;
     session.rejectPrompt = undefined;
     session.resolveManualCode = undefined;
     session.rejectManualCode = undefined;
-    this.touch(session);
-    return this.stripInternal(session);
+  }
+
+  private findActiveSession(providerId: OAuthProviderId): SessionInternal | undefined {
+    for (const session of this.sessions.values()) {
+      if (session.providerId === providerId && ACTIVE_STATUSES.has(session.status)) {
+        return session;
+      }
+    }
+    return undefined;
   }
 
   private getInternal(sessionId: string): SessionInternal {
@@ -315,7 +361,7 @@ export class OAuthLoginSessionManager {
     const now = Date.now();
     for (const [id, session] of this.sessions.entries()) {
       if (session.expiresAt <= now) {
-        session.abortController.abort();
+        this.releaseSession(session, 'OAuth login session expired');
         this.sessions.delete(id);
       }
     }
