@@ -20,16 +20,13 @@ import { basename, join } from 'path';
 import { tmpdir } from 'os';
 import { openSync, existsSync, readFileSync } from 'fs';
 import { spawn } from 'child_process';
+import { deriveDevPort } from './dev-port-allocator';
 
 const dirName = basename(process.cwd());
 
 function derivePort(): string {
   if (process.env.PORT) return process.env.PORT;
-  let hash = 5381;
-  for (let i = 0; i < dirName.length; i++) {
-    hash = (hash * 33) ^ dirName.charCodeAt(i);
-  }
-  return String(10000 + (Math.abs(hash) % 10000));
+  return deriveDevPort();
 }
 
 const PORT = derivePort();

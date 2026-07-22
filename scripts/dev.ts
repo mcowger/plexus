@@ -3,6 +3,7 @@ import { tmpdir } from 'os';
 import { createServer } from 'net';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process';
+import { deriveDevPort } from './dev-port-allocator';
 
 // --- Dev defaults (only applied when not already set in environment) ---
 
@@ -85,11 +86,7 @@ for (let i = 2; i < process.argv.length; i++) {
 // Two worktrees running simultaneously will land on different ports automatically.
 // Override with: PORT=4000 bun run dev
 if (!process.env.PORT) {
-  let hash = 5381;
-  for (let i = 0; i < dirName.length; i++) {
-    hash = (hash * 33) ^ dirName.charCodeAt(i);
-  }
-  process.env.PORT = String(10000 + (Math.abs(hash) % 10000));
+  process.env.PORT = deriveDevPort();
 }
 
 // Per-worktree database — persists across restarts, isolated per branch.

@@ -33,21 +33,11 @@ import { basename, join } from 'path';
 import { pipeline } from 'stream/promises';
 import readline from 'readline';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { deriveDevPort } from './dev-port-allocator';
 
 // ---------------------------------------------------------------------------
 // Config from environment
 // ---------------------------------------------------------------------------
-
-// Mirrors the stable port derivation in scripts/dev.ts so this script targets
-// the correct worktree instance without any configuration.
-function deriveDevPort(): string {
-  const dirName = basename(process.cwd());
-  let hash = 5381;
-  for (let i = 0; i < dirName.length; i++) {
-    hash = (hash * 33) ^ dirName.charCodeAt(i);
-  }
-  return String(10000 + (Math.abs(hash) % 10000));
-}
 
 // Parse command line arguments
 const args = process.argv.slice(2);
