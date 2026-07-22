@@ -1,7 +1,11 @@
 {
   "worktree": {
     "setup": ["bun run scripts/init_worktree.ts"],
-    "teardown": "bun run dev:stop"
+    "teardown": "bun run dev:stop",
+    "servicePorts": {
+      "portScript": "scripts/dev-port-allocator.ts",
+      "range": "10000-19999"
+    }
   },
   "scripts": {
     "dev": {

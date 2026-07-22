@@ -20,23 +20,15 @@
 
 import { join, basename } from 'path';
 import type { components } from './openapi-types';
+import { deriveDevPort } from './dev-port-allocator';
+
+export { deriveDevPort };
 
 // ---------------------------------------------------------------------------
 // Config from environment
 // ---------------------------------------------------------------------------
 
 const ADMIN_KEY = process.env.PLEXUS_ADMIN_KEY ?? 'password';
-
-// Mirrors the stable port derivation in scripts/dev.ts so this script targets
-// the correct worktree instance without any configuration.
-export function deriveDevPort(cwd = process.cwd()): string {
-  const dirName = basename(cwd);
-  let hash = 5381;
-  for (let i = 0; i < dirName.length; i++) {
-    hash = (hash * 33) ^ dirName.charCodeAt(i);
-  }
-  return String(10000 + (Math.abs(hash) % 10000));
-}
 
 export function resolveApiRoot(
   env: Pick<NodeJS.ProcessEnv, 'PLEXUS_URL' | 'PLEXUS_PORT'> = process.env,

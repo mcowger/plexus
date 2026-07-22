@@ -9,17 +9,14 @@
 
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
+import { deriveDevPort } from './dev-port-allocator';
 
 const dirName = basename(process.cwd());
 
 // --- Port (same logic as dev.ts) ---
 function getPort(): string {
   if (process.env.PORT) return process.env.PORT;
-  let hash = 5381;
-  for (let i = 0; i < dirName.length; i++) {
-    hash = (hash * 33) ^ dirName.charCodeAt(i);
-  }
-  return String(10000 + (Math.abs(hash) % 10000));
+  return deriveDevPort();
 }
 
 // --- DB path (same logic as dev.ts) ---
