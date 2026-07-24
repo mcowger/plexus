@@ -177,12 +177,19 @@ export async function handleResponse(
   if (!unifiedResponse.stream && unifiedResponse.clientError) {
     const clientError = unifiedResponse.clientError;
     const responseBody = formatClientError(apiType, clientError);
-    usageRecord.responseStatus = 'error';
-    usageRecord.finishReason = clientError.code;
-    usageRecord.durationMs = Date.now() - startTime;
     DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
     DebugManager.getInstance().flush(usageRecord.requestId!);
-    usageStorage.saveRequest(usageRecord as UsageRecord);
+    await finalizeUsage(
+      usageRecord,
+      unifiedResponse,
+      usageStorage,
+      startTime,
+      pricing,
+      providerDiscount,
+      quotaEnforcer,
+      keyName,
+      { responseStatus: 'error', updatePerformanceMetrics: false }
+    );
     usageStorage.saveError(
       usageRecord.requestId!,
       new Error(clientError.message),
@@ -617,7 +624,8 @@ async function finalizeUsage(
   pricing: any,
   providerDiscount: any,
   quotaEnforcer?: QuotaEnforcer,
-  keyName?: string
+  keyName?: string,
+  options: { responseStatus?: 'success' | 'error'; updatePerformanceMetrics?: boolean } = {}
 ) {
   // Capture token usage if available in the response
   if (unifiedResponse.usage) {
@@ -630,7 +638,8 @@ async function finalizeUsage(
 
   // Capture response metadata
   usageRecord.toolCallsCount = unifiedResponse.tool_calls?.length ?? null;
-  usageRecord.finishReason = unifiedResponse.finishReason ?? null;
+  usageRecord.finishReason =
+    unifiedResponse.clientError?.code ?? unifiedResponse.finishReason ?? null;
 
   // Finalize costs and duration
   calculateCosts(usageRecord, pricing, providerDiscount);
@@ -659,7 +668,7 @@ async function finalizeUsage(
       applyUsageCostDetails(usageRecord, usageCostDetails);
     }
   }
-  usageRecord.responseStatus = 'success';
+  usageRecord.responseStatus = options.responseStatus ?? 'success';
   usageRecord.durationMs = Date.now() - startTime;
 
   // Populate performance metrics
@@ -694,7 +703,11 @@ async function finalizeUsage(
   await usageStorage.saveRequest(usageRecord as UsageRecord);
 
   // Update the performance sliding window for future routing decisions
-  if (usageRecord.provider && usageRecord.selectedModelName) {
+  if (
+    options.updatePerformanceMetrics !== false &&
+    usageRecord.provider &&
+    usageRecord.selectedModelName
+  ) {
     await usageStorage.updatePerformanceMetrics(
       usageRecord.provider,
       usageRecord.selectedModelName,
