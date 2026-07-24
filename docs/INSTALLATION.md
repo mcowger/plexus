@@ -27,7 +27,7 @@ docker run -p 4000:4000 \
 
 -   Mount a volume to `/app/data` to persist usage logs, configuration, and other data.
 -   `ADMIN_KEY` is required — set it to a secure password for accessing the admin dashboard and management API.
--   `DATABASE_URL` is required — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string.
+-   `DATABASE_URL` is optional (defaults to SQLite at `./data/plexus.db` when unset) — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string when connecting to PostgreSQL or custom locations.
 -   Set `LOG_LEVEL` to control verbosity.
 -   The Docker image includes `bunx` and `uvx` so Plexus can run configured Local HTTP MCP servers inside the container.
 
@@ -118,7 +118,7 @@ When running Plexus, you can use the following environment variables to control 
 
 - **`ADMIN_KEY`** (**Required**): Password for the admin dashboard and management API.
     - Must be set before starting the server. Server will refuse to start without it.
-- **`DATABASE_URL`** (**Required**): Database connection string.
+- **`DATABASE_URL`** (Optional): Database connection string (defaults to SQLite at `./data/plexus.db`).
     - SQLite: `sqlite:///app/data/plexus.db` or `sqlite://./data/plexus.db`
     - PostgreSQL: `postgres://user:password@host:5432/dbname`
 - **`ENCRYPTION_KEY`** (Optional): Encryption key for sensitive data at rest (API keys, OAuth tokens, provider credentials).
@@ -130,7 +130,7 @@ When running Plexus, you can use the following environment variables to control 
     - Default: `info`.
     - Note: `silly` logs all request/response/transformations.
     - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
-- **`PORT`** (Optional): HTTP server port. Default: `4000`
+- **`PORT`** (Optional): HTTP server port. Default: `4000` (Note: When running `bun run dev` locally, the port is automatically derived from the git worktree directory name).
 - **`HOST`** (Optional): Address to bind to. Default: `0.0.0.0`
 - **`DATA_DIR`** (Optional): Directory for SQLite database. Default: `./data`
 

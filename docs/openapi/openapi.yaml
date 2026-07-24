@@ -573,6 +573,12 @@ paths:
     $ref: paths/.well-known_openid-configuration.yaml
   /register:
     $ref: paths/register.yaml
+  /v1/completions:
+    $ref: paths/v1_completions.yaml
+  /completions:
+    $ref: paths/completions.yaml
+  /healthz:
+    $ref: paths/healthz.yaml
 components:
   schemas:
     WebSearchCoercionAdapterOptions:
