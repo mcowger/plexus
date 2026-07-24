@@ -85,9 +85,9 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
       title={onClick ? 'Click to view history' : undefined}
     >
       <div className="flex items-center justify-between gap-1 min-w-0">
-        <span className="text-xs text-text-secondary truncate">{meter.label}</span>
+        <span className="text-xs text-text-secondary truncate min-w-0 flex-1">{meter.label}</span>
         {meter.scope && (
-          <span className="text-[10px] text-text-muted px-1 bg-bg-subtle border border-border-glass/40 rounded uppercase tracking-wider font-mono">
+          <span className="text-[10px] text-text-muted px-1 bg-bg-subtle border border-border-glass/40 rounded uppercase tracking-wider font-mono shrink-0">
             {meter.scope}
           </span>
         )}
