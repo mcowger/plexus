@@ -17,7 +17,7 @@ Plexus stores all configuration in the database and manages it via the **Admin U
 | `ENCRYPTION_KEY` | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32` | No |
 | `DATA_DIR` | Directory for SQLite database. | No |
 | `LOG_LEVEL` | Verbosity: `error`, `warn`, `info`, `debug`, `silly` | No |
-| `PORT` | HTTP server port. | No |
+| `PORT` | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`). | No |
 | `HOST` | Address to bind to. | No |
 
 ### Quick Start
@@ -70,7 +70,7 @@ For programmatic configuration, use the Management API (`/v0/management/*`). All
 | `GET /v0/management/config/export` | Export full config as JSON |
 | `PUT /v0/management/config` | Import config (replace all) |
 
-See the [API Reference](/docs/openapi/openapi.yaml) for complete endpoint documentation.
+See the [API Reference](openapi/openapi.yaml) for complete endpoint documentation.
 
 ### Debug Trace Capture
 
@@ -427,7 +427,7 @@ Quota checkers monitor upstream provider rate limits and prevent routing to exha
 - `intervalMinutes`: Polling frequency (minimum 1)
 - `maxUtilizationPercent`: Treat provider as exhausted when any window reaches this % (default 99)
 
-Quota data is available via the Management API — see [API Reference: Quota Management](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1quotas).
+Quota data is available via the Management API — see [API Reference: Quota Management](openapi/openapi.yaml#/paths/~1v0~1management~1quotas).
 
 ### Provider Timeout Overrides
 
@@ -765,7 +765,7 @@ Set `disable_cooldown: true` on a provider to exclude it from the cooldown syste
 - `DELETE /v0/management/cooldowns` — clear all
 - `DELETE /v0/management/cooldowns/:provider?model=:model` — clear specific
 
-See [API Reference: Cooldown Management](/docs/openapi/openapi.yaml#/paths/~1v0~1management~1cooldowns).
+See [API Reference: Cooldown Management](openapi/openapi.yaml#/paths/~1v0~1management~1cooldowns).
 
 ---
 

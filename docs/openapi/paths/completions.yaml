@@ -1,0 +1,18 @@
+post:
+  tags:
+    - Management
+  summary: TODO - Add summary for POST /completions
+  description: |
+    TODO - Add detailed description.
+    
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Successful response.
+    '401':
+      description: Authentication required or invalid credentials.
+    '404':
+      description: Resource not found.
+  operationId: postV0completions
