@@ -89,9 +89,12 @@ function buildGeminiFunctionCallPart(
 export function formatGeminiStream(stream: ReadableStream): ReadableStream {
   const encoder = new TextEncoder();
   const toolCallStates = new Map<string, PendingGeminiToolCall>();
+  let hasSentError = false;
 
   const transformer = new TransformStream({
     transform(chunk: any, controller) {
+      if (hasSentError) return;
+
       // Handle block lifecycle events
       if (chunk.event) {
         const eventName = chunk.event;
@@ -177,6 +180,13 @@ export function formatGeminiStream(stream: ReadableStream): ReadableStream {
                 },
               }
             : undefined;
+        } else if (eventName === 'error') {
+          hasSentError = true;
+          eventData.error = {
+            code: chunk.error?.statusCode || 503,
+            status: 'UNAVAILABLE',
+            message: chunk.error?.message,
+          };
         } else if (eventName === 'done') {
           eventData.type = 'done';
         }

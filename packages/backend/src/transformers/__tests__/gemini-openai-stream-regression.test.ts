@@ -103,6 +103,38 @@ describe('Gemini -> OpenAI stream regression', () => {
     expect(chunks.at(-1)).toBe('[DONE]');
   });
 
+  test('formats MALFORMED_FUNCTION_CALL as a retryable OpenAI stream error', async () => {
+    const geminiStream = createGeminiSSEStream([
+      JSON.stringify({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'Formattingcall:default_api:bash{command:bun run format}' }],
+            },
+            finishReason: 'MALFORMED_FUNCTION_CALL',
+            index: 0,
+          },
+        ],
+        responseId: 'resp_malformed',
+        modelVersion: 'gemini-3.6-flash',
+      }),
+      '[DONE]',
+    ]);
+
+    const unifiedStream = transformGeminiStream(geminiStream as ReadableStream);
+    const formattedStream = new OpenAITransformer().formatStream(unifiedStream);
+    const chunks = await readOpenAISSEChunks(formattedStream as ReadableStream<Uint8Array>);
+    const errorChunk = chunks.find((chunk) => chunk !== '[DONE]' && chunk.error);
+
+    expect(errorChunk.error).toEqual({
+      message: expect.stringContaining('please retry your request'),
+      type: 'server_error',
+      code: 'upstream_malformed_function_call',
+    });
+    expect(chunks).not.toContain('[DONE]');
+  });
+
   test('preserves upstream function call ids when Gemini provides them', async () => {
     const geminiStream = createGeminiSSEStream([
       JSON.stringify({

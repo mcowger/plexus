@@ -254,6 +254,87 @@ describe('handleResponse', () => {
     expect(usageRecord.provider).toBe('provider-2');
   });
 
+  test('signals unary transient client errors without formatting a successful response', async () => {
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-malformed',
+      model: 'gemini-3.6-flash',
+      content: null,
+      plexus: {
+        provider: 'google',
+        model: 'gemini-3.6-flash',
+        apiType: 'gemini',
+      },
+      usage: {
+        input_tokens: 100,
+        output_tokens: 12,
+        total_tokens: 112,
+        reasoning_tokens: 2,
+        cached_tokens: 0,
+        cache_creation_tokens: 0,
+      },
+      clientError: {
+        statusCode: 503,
+        code: 'MALFORMED_FUNCTION_CALL',
+        message:
+          'Upstream Gemini returned MALFORMED_FUNCTION_CALL — please retry your request. [503]',
+      },
+    };
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-malformed' };
+    const quotaEnforcer = {
+      recordUsage: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await handleResponse(
+      mockRequest,
+      mockReply,
+      unifiedResponse,
+      mockTransformer,
+      usageRecord,
+      mockStorage,
+      Date.now(),
+      'gemini',
+      false,
+      undefined,
+      quotaEnforcer as any,
+      'test-key'
+    );
+
+    expect(mockReply.code).toHaveBeenCalledWith(503);
+    expect(mockReply.send).toHaveBeenCalledWith({
+      error: {
+        code: 503,
+        status: 'UNAVAILABLE',
+        message: expect.stringContaining('please retry your request'),
+      },
+    });
+    expect(mockTransformer.formatResponse).not.toHaveBeenCalled();
+    expect(usageRecord).toEqual(
+      expect.objectContaining({
+        responseStatus: 'error',
+        finishReason: 'MALFORMED_FUNCTION_CALL',
+        tokensInput: 100,
+        tokensOutput: 12,
+        tokensReasoning: 2,
+      })
+    );
+    expect(quotaEnforcer.recordUsage).toHaveBeenCalledWith(
+      'test-key',
+      'google',
+      'gemini-3.6-flash',
+      expect.objectContaining({ tokensInput: 100, tokensOutput: 12, tokensReasoning: 2 })
+    );
+    expect(mockStorage.updatePerformanceMetrics).not.toHaveBeenCalled();
+    expect(mockStorage.saveError).toHaveBeenCalledWith(
+      'req-malformed',
+      expect.any(Error),
+      expect.objectContaining({
+        code: 'MALFORMED_FUNCTION_CALL',
+        clientSignaled: true,
+      }),
+      'test-key'
+    );
+  });
+
   describe('Usage Mapping Regression Tests', () => {
     test('should correctly map all usage fields in non-streaming response', async () => {
       const unifiedResponse: UnifiedChatResponse = {

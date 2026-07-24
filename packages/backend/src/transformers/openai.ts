@@ -246,6 +246,7 @@ export class OpenAITransformer implements Transformer {
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     const reader = stream.getReader();
+    let hasSentError = false;
 
     return new ReadableStream({
       async start(controller) {
@@ -253,8 +254,30 @@ export class OpenAITransformer implements Transformer {
           while (true) {
             const { done, value: unifiedChunk } = await reader.read();
             if (done) {
-              controller.enqueue(encoder.encode(encode({ data: '[DONE]' })));
+              if (!hasSentError) {
+                controller.enqueue(encoder.encode(encode({ data: '[DONE]' })));
+              }
               break;
+            }
+
+            if (hasSentError) continue;
+
+            if (unifiedChunk.event === 'error') {
+              controller.enqueue(
+                encoder.encode(
+                  encode({
+                    data: JSON.stringify({
+                      error: {
+                        message: unifiedChunk.error?.message,
+                        type: 'server_error',
+                        code: 'upstream_malformed_function_call',
+                      },
+                    }),
+                  })
+                )
+              );
+              hasSentError = true;
+              continue;
             }
 
             const choice: any = {

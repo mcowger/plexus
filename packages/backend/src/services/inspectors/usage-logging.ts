@@ -287,7 +287,11 @@ export class UsageInspector extends PassThrough {
         });
       }
 
-      if (this.usageRecord.provider && this.usageRecord.selectedModelName) {
+      if (
+        this.usageRecord.responseStatus === 'success' &&
+        this.usageRecord.provider &&
+        this.usageRecord.selectedModelName
+      ) {
         // Fire-and-forget: updatePerformanceMetrics is async but _flush is synchronous
         // Attach error handler to prevent unhandled promise rejections
         this.usageStorage
