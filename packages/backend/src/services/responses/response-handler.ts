@@ -42,7 +42,7 @@ function shouldIncludePlaygroundRouting(request: FastifyRequest): boolean {
 }
 
 function formatClientError(
-  apiType: 'chat' | 'messages' | 'gemini' | 'responses',
+  apiType: 'chat' | 'messages' | 'gemini' | 'responses' | 'completions',
   error: NonNullable<UnifiedChatResponse['clientError']>
 ): Record<string, unknown> {
   if (apiType === 'gemini') {
