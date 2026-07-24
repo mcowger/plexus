@@ -254,6 +254,57 @@ describe('handleResponse', () => {
     expect(usageRecord.provider).toBe('provider-2');
   });
 
+  test('signals unary transient client errors without formatting a successful response', async () => {
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-malformed',
+      model: 'gemini-3.6-flash',
+      content: null,
+      plexus: {
+        provider: 'google',
+        model: 'gemini-3.6-flash',
+        apiType: 'gemini',
+      },
+      clientError: {
+        statusCode: 503,
+        code: 'MALFORMED_FUNCTION_CALL',
+        message:
+          'Upstream Gemini returned MALFORMED_FUNCTION_CALL — please retry your request. [503]',
+      },
+    };
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-malformed' };
+
+    await handleResponse(
+      mockRequest,
+      mockReply,
+      unifiedResponse,
+      mockTransformer,
+      usageRecord,
+      mockStorage,
+      Date.now(),
+      'gemini'
+    );
+
+    expect(mockReply.code).toHaveBeenCalledWith(503);
+    expect(mockReply.send).toHaveBeenCalledWith({
+      error: {
+        code: 503,
+        status: 'UNAVAILABLE',
+        message: expect.stringContaining('please retry your request'),
+      },
+    });
+    expect(mockTransformer.formatResponse).not.toHaveBeenCalled();
+    expect(usageRecord.responseStatus).toBe('error');
+    expect(mockStorage.saveError).toHaveBeenCalledWith(
+      'req-malformed',
+      expect.any(Error),
+      expect.objectContaining({
+        code: 'MALFORMED_FUNCTION_CALL',
+        clientSignaled: true,
+      }),
+      undefined
+    );
+  });
+
   describe('Usage Mapping Regression Tests', () => {
     test('should correctly map all usage fields in non-streaming response', async () => {
       const unifiedResponse: UnifiedChatResponse = {

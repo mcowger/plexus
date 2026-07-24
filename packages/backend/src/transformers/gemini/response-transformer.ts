@@ -2,6 +2,7 @@ import { UnifiedChatResponse } from '../../types/unified';
 import { logger } from '../../utils/logger';
 import { isValidThoughtSignature } from './utils';
 import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
+import { detectGeminiMalformedFunctionCall } from '../../utils/gemini-malformed-function-call';
 
 /**
  * Transforms a Gemini API response into unified format.
@@ -15,6 +16,13 @@ import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
 export async function transformGeminiResponse(response: any): Promise<UnifiedChatResponse> {
   const candidate = response.candidates?.[0];
   const parts = candidate?.content?.parts || [];
+  const malformedFunctionCall = detectGeminiMalformedFunctionCall(response);
+
+  if (malformedFunctionCall) {
+    logger.warn(
+      `[gemini] ${malformedFunctionCall.code} detected in unary response (textLeakDetected=${malformedFunctionCall.textLeakDetected})`
+    );
+  }
 
   let content = '';
   let reasoning_content = '';
@@ -66,5 +74,12 @@ export async function transformGeminiResponse(response: any): Promise<UnifiedCha
     tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
     finishReason,
     usage,
+    clientError: malformedFunctionCall
+      ? {
+          statusCode: malformedFunctionCall.statusCode,
+          code: malformedFunctionCall.code,
+          message: malformedFunctionCall.message,
+        }
+      : undefined,
   };
 }

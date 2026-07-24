@@ -581,4 +581,46 @@ describe('transformAnthropicStream tool call index remapping', () => {
     );
     expect(argChunksForBlock2[0].delta.tool_calls[0].index).toBe(1);
   });
+
+  test('formats transient upstream failures as terminal Anthropic error events', async () => {
+    const transformer = new AnthropicTransformer();
+    const stream = new ReadableStream<UnifiedChatStreamChunk>({
+      start(controller) {
+        controller.enqueue({
+          id: 'msg_error',
+          model: 'gemini-3.6-flash',
+          created: Date.now(),
+          event: 'error',
+          delta: {},
+          error: {
+            statusCode: 503,
+            code: 'MALFORMED_FUNCTION_CALL',
+            message:
+              'Upstream Gemini returned MALFORMED_FUNCTION_CALL — please retry your request. [503]',
+          },
+        });
+        controller.enqueue({
+          id: 'msg_error',
+          model: 'gemini-3.6-flash',
+          created: Date.now(),
+          event: 'done',
+          delta: {},
+        });
+        controller.close();
+      },
+    });
+
+    const reader = transformer.formatStream(stream).getReader();
+    const decoder = new TextDecoder();
+    let output = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value);
+    }
+
+    expect(output).toContain('event: error');
+    expect(output).toContain('please retry your request');
+    expect(output).not.toContain('event: message_stop');
+  });
 });

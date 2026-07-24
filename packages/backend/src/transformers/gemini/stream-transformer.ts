@@ -2,6 +2,7 @@ import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { logger } from '../../utils/logger';
 import type { StreamBlockEventType } from '../../types/unified';
 import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
+import { detectGeminiMalformedFunctionCall } from '../../utils/gemini-malformed-function-call';
 
 /**
  * Transforms a Gemini stream (Server-Sent Events) into unified stream format.
@@ -90,6 +91,7 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
 
             if (!candidate) return;
 
+            const malformedFunctionCall = detectGeminiMalformedFunctionCall(data);
             const parts = candidate.content?.parts || [];
 
             // Emit message_start on first valid candidate (even if parts is empty)
@@ -250,6 +252,24 @@ export function transformGeminiStream(stream: ReadableStream): ReadableStream {
                 );
                 controller.enqueue(endEvent);
                 activeBlockType = null;
+              }
+
+              if (malformedFunctionCall) {
+                controller.enqueue({
+                  id: data.responseId,
+                  model: data.modelVersion,
+                  created: Date.now(),
+                  event: 'error' as StreamBlockEventType,
+                  delta: {},
+                  error: {
+                    statusCode: malformedFunctionCall.statusCode,
+                    code: malformedFunctionCall.code,
+                    message: malformedFunctionCall.message,
+                  },
+                });
+                messageHasFunctionCalls = false;
+                streamedToolCallCount = 0;
+                return;
               }
 
               // Determine finish reason: if there are function calls, use the OpenAI-compatible

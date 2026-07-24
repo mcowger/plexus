@@ -235,6 +235,13 @@ export interface UnifiedChatResponse {
   rawResponse?: any;
   rawStream?: ReadableStream;
   finishReason?: string | null;
+  clientError?: UnifiedClientError;
+}
+
+export interface UnifiedClientError {
+  statusCode: number;
+  code: string;
+  message: string;
 }
 
 /**
@@ -255,6 +262,7 @@ export type StreamBlockEventType =
   | 'message_delta'
   | 'message_end'
   | 'usage'
+  | 'error'
   | 'done';
 
 export interface UnifiedChatStreamChunk {
@@ -284,6 +292,7 @@ export interface UnifiedChatStreamChunk {
   };
   finish_reason?: string | null;
   usage?: UnifiedUsage;
+  error?: UnifiedClientError;
 }
 
 // Unified Embeddings Request

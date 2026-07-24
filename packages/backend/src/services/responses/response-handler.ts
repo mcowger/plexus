@@ -21,6 +21,7 @@ import { recordQuotaUsage, buildQuotaHeaders } from '../quota/quota-middleware';
 import { CooldownManager } from '../runtime/cooldown-manager';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { getApiBaseType } from '../../utils/api-format';
+import { rewriteGeminiMalformedFunctionCallStream } from '../../utils/gemini-malformed-function-call';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];
@@ -38,6 +39,36 @@ function hasValidAdminKey(request: FastifyRequest): boolean {
 
 function shouldIncludePlaygroundRouting(request: FastifyRequest): boolean {
   return getHeaderValue(request, 'x-plexus-playground') === 'true' && hasValidAdminKey(request);
+}
+
+function formatClientError(
+  apiType: 'chat' | 'messages' | 'gemini' | 'responses',
+  error: NonNullable<UnifiedChatResponse['clientError']>
+): Record<string, unknown> {
+  if (apiType === 'gemini') {
+    return {
+      error: {
+        code: error.statusCode,
+        status: 'UNAVAILABLE',
+        message: error.message,
+      },
+    };
+  }
+
+  if (apiType === 'messages') {
+    return {
+      type: 'error',
+      error: { type: 'api_error', message: error.message },
+    };
+  }
+
+  return {
+    error: {
+      message: error.message,
+      type: 'server_error',
+      code: 'upstream_malformed_function_call',
+    },
+  };
 }
 /**
  * handleResponse
@@ -143,10 +174,37 @@ export async function handleResponse(
     }
   }
 
+  if (!unifiedResponse.stream && unifiedResponse.clientError) {
+    const clientError = unifiedResponse.clientError;
+    const responseBody = formatClientError(apiType, clientError);
+    usageRecord.responseStatus = 'error';
+    usageRecord.finishReason = clientError.code;
+    usageRecord.durationMs = Date.now() - startTime;
+    DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
+    DebugManager.getInstance().flush(usageRecord.requestId!);
+    usageStorage.saveRequest(usageRecord as UsageRecord);
+    usageStorage.saveError(
+      usageRecord.requestId!,
+      new Error(clientError.message),
+      {
+        apiType,
+        provider: usageRecord.provider,
+        targetModel: usageRecord.selectedModelName,
+        statusCode: clientError.statusCode,
+        code: clientError.code,
+        clientSignaled: true,
+      },
+      keyName
+    );
+    if (shouldEstimateTokens && !wasDebugEnabled) debugManager.setEnabled(false);
+    return reply.code(clientError.statusCode).send(responseBody);
+  }
+
   // --- Scenario A: Streaming Response ---
   if (unifiedResponse.stream) {
     let finalClientStream: ReadableStream;
     let rawStream = unifiedResponse.stream;
+    let hasSignaledGeminiMalformedFunctionCall = false;
 
     // TAP THE RAW STREAM for debugging/usage extraction
     // We always capture the stream BEFORE any transformation to enable usage extraction,
@@ -168,9 +226,36 @@ export async function handleResponse(
 
     rawStream = rawStream.pipeThrough(tapStream);
 
+    if (providerApiType === 'gemini') {
+      rawStream = rawStream.pipeThrough(
+        rewriteGeminiMalformedFunctionCallStream((defect) => {
+          if (hasSignaledGeminiMalformedFunctionCall) return;
+          hasSignaledGeminiMalformedFunctionCall = true;
+          usageRecord.responseStatus = 'error';
+          usageRecord.finishReason = defect.code;
+          usageStorage.saveError(
+            usageRecord.requestId!,
+            new Error(defect.message),
+            {
+              apiType,
+              provider: usageRecord.provider,
+              targetModel: usageRecord.selectedModelName,
+              statusCode: defect.statusCode,
+              code: defect.code,
+              clientSignaled: true,
+            },
+            keyName
+          );
+          logger.warn(
+            `[gemini] ${defect.code} detected in stream (textLeakDetected=${defect.textLeakDetected}); signaling client without failover or cooldown`
+          );
+        })
+      );
+    }
+
     if (unifiedResponse.bypassTransformation) {
-      // Direct pass-through: No changes to the provider's raw bytes
-      // Maximize performance and accuracy by avoiding unnecessary transformations
+      // Direct pass-through, except for retryable reclassification of Gemini's
+      // MALFORMED_FUNCTION_CALL terminal frame.
       finalClientStream = rawStream;
     } else {
       /**

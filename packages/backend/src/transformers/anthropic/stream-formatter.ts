@@ -41,6 +41,20 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
         safeEnqueue(encode({ event, data: JSON.stringify(data) }));
       };
 
+      if (hasSentFinish) return;
+
+      if (chunk.event === 'error') {
+        sendEvent('error', {
+          type: 'error',
+          error: {
+            type: 'api_error',
+            message: chunk.error?.message,
+          },
+        });
+        hasSentFinish = true;
+        return;
+      }
+
       // Accumulate Usage
       if (chunk.usage) {
         lastUsage = chunk.usage;
