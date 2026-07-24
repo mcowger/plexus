@@ -27,6 +27,7 @@ import { ExeDevQuotaConfig } from '../quota/ExeDevQuotaConfig';
 import { HyperQuotaConfig } from '../quota/HyperQuotaConfig';
 import { SakanaQuotaConfig } from '../quota/SakanaQuotaConfig';
 import { ClineQuotaConfig } from '../quota/ClineQuotaConfig';
+import { ClaudeCodeQuotaConfig } from '../quota/ClaudeCodeQuotaConfig';
 
 interface Props {
   editingProvider: Provider;
@@ -73,6 +74,7 @@ const QUOTA_CONFIG_MAP: Record<
   hyper: HyperQuotaConfig,
   sakana: SakanaQuotaConfig,
   cline: ClineQuotaConfig,
+  'claude-code': ClaudeCodeQuotaConfig,
 };
 
 export function ProviderQuotaEditor({
