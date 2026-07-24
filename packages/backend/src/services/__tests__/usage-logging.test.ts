@@ -396,6 +396,37 @@ describe('UsageInspector', () => {
       expect(capturedRecord!.tokensInput).toBeGreaterThan(0);
       expect(capturedRecord!.tokensEstimated).toBe(1);
     });
+
+    it('does not update performance metrics for errored streams', async () => {
+      const requestId = 'test-error-performance-metrics';
+      const inspector = new UsageInspector(
+        requestId,
+        mockStorage,
+        {
+          requestId,
+          provider: 'google',
+          selectedModelName: 'gemini-3.6-flash',
+          responseStatus: 'error',
+        } as Partial<UsageRecord>,
+        mockPricing,
+        undefined,
+        Date.now() - 100,
+        false,
+        'gemini',
+        undefined,
+        undefined,
+        DEFAULT_GPU_PARAMS,
+        DEFAULT_MODEL
+      );
+
+      const source = new PassThrough();
+      source.pipe(inspector);
+      source.end();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockStorage.saveRequest).toHaveBeenCalled();
+      expect(mockStorage.updatePerformanceMetrics).not.toHaveBeenCalled();
+    });
   });
 
   describe('_destroy() — client disconnect handling', () => {

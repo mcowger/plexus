@@ -62,6 +62,11 @@ describe('Gemini MALFORMED_FUNCTION_CALL detection', () => {
     expect(await rewrite(input)).toBe(input);
   });
 
+  test('preserves ordinary CRLF bypass stream bytes exactly', async () => {
+    const input = 'data: {"candidates":[{"finishReason":"STOP"}]}\r\n\r\ndata: [DONE]\r\n\r\n';
+    expect(await rewrite(input)).toBe(input);
+  });
+
   test('rewrites only the malformed terminal frame with a retryable message', async () => {
     const onDetected = vi.fn();
     const payload = {
