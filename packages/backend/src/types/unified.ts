@@ -143,6 +143,16 @@ export interface UnifiedChatRequest {
     type: 'text' | 'json_object' | 'json_schema';
     json_schema?: any;
   };
+  prompt?: string | string[];
+  suffix?: string | null;
+  echo?: boolean;
+  logprobs?: number | null;
+  best_of?: number;
+  stop?: string | string[];
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  seed?: number;
+  user?: string;
   cacheRoutingHeaders?: CacheRoutingHeaders;
   anthropicBeta?: string;
   incomingApiType?: string;

@@ -26,6 +26,7 @@ import { apiAccessToKey, hasApiAccess, toggleApiAccess } from '../../lib/apiForm
 
 const API_ACCESS_OPTIONS = [
   { type: 'chat', label: 'chat' },
+  { type: 'completions', label: 'completions' },
   { type: 'messages', label: 'messages' },
   { type: 'gemini', label: 'gemini' },
   { type: 'responses', label: 'responses' },
@@ -44,6 +45,8 @@ const getApiBadgeStyle = (apiType: string): React.CSSProperties => {
       return { backgroundColor: '#D97757', color: 'white', border: 'none' };
     case 'chat':
       return { backgroundColor: '#ebebeb', color: '#333', border: 'none' };
+    case 'completions':
+      return { backgroundColor: '#3b82f6', color: 'white', border: 'none' };
     case 'gemini':
       return { backgroundColor: '#5084ff', color: 'white', border: 'none' };
     case 'embeddings':

@@ -56,7 +56,7 @@ export async function handleResponse(
   usageRecord: Partial<UsageRecord>,
   usageStorage: UsageStorageService,
   startTime: number,
-  apiType: 'chat' | 'messages' | 'gemini' | 'responses',
+  apiType: 'chat' | 'messages' | 'gemini' | 'responses' | 'completions',
   shouldEstimateTokens: boolean = false,
   originalRequest?: any,
   quotaEnforcer?: QuotaEnforcer,
