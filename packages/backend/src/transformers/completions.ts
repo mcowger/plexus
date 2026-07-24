@@ -14,6 +14,7 @@ import { getApiBaseType } from '../utils/api-format';
 export class OpenAICompletionTransformer implements Transformer {
   name = 'completions';
   defaultEndpoint = '/completions';
+  private echoPrompt: string | null = null;
 
   async parseRequest(input: any): Promise<UnifiedChatRequest> {
     const rawPrompt = input.prompt;
@@ -26,6 +27,7 @@ export class OpenAICompletionTransformer implements Transformer {
           : '';
 
     const suffixText = typeof input.suffix === 'string' ? input.suffix : null;
+    this.echoPrompt = input.echo === true ? promptText : null;
 
     // Build fallback messages for chat-based providers
     const systemPrompt = suffixText
@@ -133,7 +135,7 @@ export class OpenAICompletionTransformer implements Transformer {
       model: response.model,
       choices: [
         {
-          text: response.content || '',
+          text: `${this.echoPrompt ?? ''}${response.content || ''}`,
           index: 0,
           logprobs: null,
           finish_reason: response.finishReason || 'stop',
@@ -206,6 +208,7 @@ export class OpenAICompletionTransformer implements Transformer {
   formatStream(stream: ReadableStream): ReadableStream {
     const encoder = new TextEncoder();
     const reader = stream.getReader();
+    let echoPrompt = this.echoPrompt;
 
     return new ReadableStream({
       async start(controller) {
@@ -217,8 +220,11 @@ export class OpenAICompletionTransformer implements Transformer {
               break;
             }
 
+            const text = `${echoPrompt ?? ''}${unifiedChunk.delta?.content || ''}`;
+            echoPrompt = null;
+
             const choice: any = {
-              text: unifiedChunk.delta?.content || '',
+              text,
               index: 0,
               logprobs: null,
               finish_reason: unifiedChunk.finish_reason || null,

@@ -1,8 +1,12 @@
-import { describe, test, expect } from 'vitest';
+import { beforeEach, describe, test, expect } from 'vitest';
 import { OpenAICompletionTransformer } from '../completions';
 
 describe('OpenAICompletionTransformer', () => {
-  const transformer = new OpenAICompletionTransformer();
+  let transformer: OpenAICompletionTransformer;
+
+  beforeEach(() => {
+    transformer = new OpenAICompletionTransformer();
+  });
 
   describe('parseRequest', () => {
     test('should parse simple text prompt and create fallback chat messages', async () => {
@@ -94,6 +98,22 @@ describe('OpenAICompletionTransformer', () => {
         total_tokens: 16,
       });
     });
+
+    test('should prepend the prompt when echo is enabled', async () => {
+      await transformer.parseRequest({
+        model: 'chat-model',
+        prompt: 'function add(a, b) {',
+        echo: true,
+      });
+
+      const formatted = await transformer.formatResponse({
+        id: 'cmpl-echo',
+        model: 'chat-model',
+        content: '\n  return a + b;\n}',
+      });
+
+      expect(formatted.choices[0].text).toBe('function add(a, b) {\n  return a + b;\n}');
+    });
   });
 
   describe('formatStream', () => {
@@ -138,6 +158,35 @@ describe('OpenAICompletionTransformer', () => {
       expect(outputText).toContain('return ');
       expect(outputText).toContain('a + b;');
       expect(outputText).toContain('[DONE]');
+    });
+
+    test('should prepend the prompt to the first chunk when echo is enabled', async () => {
+      await transformer.parseRequest({
+        model: 'chat-model',
+        prompt: 'const answer = ',
+        echo: true,
+        stream: true,
+      });
+
+      const inputStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            id: 'cmpl-stream-echo',
+            created: 1700000000,
+            model: 'chat-model',
+            delta: { content: '42' },
+            finish_reason: 'stop',
+          });
+          controller.close();
+        },
+      });
+
+      const reader = transformer.formatStream(inputStream).getReader();
+      const decoder = new TextDecoder();
+      const { value } = await reader.read();
+      const event = decoder.decode(value);
+
+      expect(event).toContain('const answer = 42');
     });
   });
 });
