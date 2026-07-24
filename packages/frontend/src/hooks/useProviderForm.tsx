@@ -8,6 +8,7 @@ import { useToast } from '../contexts/ToastContext';
 
 const KNOWN_APIS = [
   'chat',
+  'completions',
   'messages',
   'gemini',
   'embeddings',

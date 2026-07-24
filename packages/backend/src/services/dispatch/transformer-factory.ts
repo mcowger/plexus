@@ -3,6 +3,7 @@ import {
   AnthropicTransformer,
   OpenAITransformer,
   GeminiTransformer,
+  OpenAICompletionTransformer,
 } from '../../transformers/index';
 import { ResponsesTransformer } from '../../transformers/responses';
 import { OllamaTransformer } from '../../transformers/ollama';
@@ -27,13 +28,15 @@ export class TransformerFactory {
         return new GeminiTransformer();
       case 'chat':
         return new OpenAITransformer();
+      case 'completions':
+        return new OpenAICompletionTransformer();
       case 'responses':
         return new ResponsesTransformer();
       case 'ollama':
         return new OllamaTransformer();
       default:
         throw new Error(
-          `Unsupported provider type: ${providerType}. Only 'messages', 'gemini', 'chat', 'responses', and 'ollama' are allowed.`
+          `Unsupported provider type: ${providerType}. Only 'messages', 'gemini', 'chat', 'completions', 'responses', and 'ollama' are allowed.`
         );
     }
   }

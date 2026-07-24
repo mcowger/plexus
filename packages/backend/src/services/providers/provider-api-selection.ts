@@ -9,6 +9,7 @@ import type { RouteResult } from '../routing/router';
  * which provider-level URL keys to try when no exact or default URL is configured.
  */
 const API_TYPE_ALIASES: Record<string, string[]> = {
+  completions: ['completions', 'chat', 'gemini'],
   embeddings: ['chat', 'gemini'],
   transcriptions: ['chat', 'gemini'],
   speech: ['chat', 'gemini'],

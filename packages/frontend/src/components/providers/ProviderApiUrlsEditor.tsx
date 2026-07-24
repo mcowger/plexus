@@ -6,6 +6,7 @@ import type { Provider } from '../../lib/api';
 
 const KNOWN_APIS = [
   'chat',
+  'completions',
   'messages',
   'gemini',
   'embeddings',
@@ -92,6 +93,10 @@ export function ProviderApiUrlsEditor({
           <li>
             <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints, including
             Ollama&apos;s <code className="text-primary">/v1</code> API
+          </li>
+          <li>
+            <span style={{ fontWeight: 600 }}>completions</span> — OpenAI text/code completion
+            endpoints (e.g. <code className="text-primary">/v1/completions</code> or FIM models)
           </li>
           <li>
             <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the root URL

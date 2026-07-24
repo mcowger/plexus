@@ -13,6 +13,7 @@ import { registerTranscriptionsRoute } from './transcriptions';
 import { registerSpeechRoute } from './speech';
 import { registerImagesRoute } from './images';
 import { registerResponsesRoute } from './responses';
+import { registerCompletionsRoute } from './completions';
 
 export async function registerInferenceRoutes(
   fastify: FastifyInstance,
@@ -35,6 +36,7 @@ export async function registerInferenceRoutes(
     await registerMessagesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
     await registerGeminiRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
     await registerResponsesRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
+    await registerCompletionsRoute(protectedRoutes, dispatcher, usageStorage, quotaEnforcer);
     await registerEmbeddingsRoute(protectedRoutes, dispatcher, usageStorage);
     await registerTranscriptionsRoute(protectedRoutes, dispatcher, usageStorage);
     await registerSpeechRoute(protectedRoutes, dispatcher, usageStorage);
