@@ -64,5 +64,8 @@
   "type": "module",
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.82.1"
+  }
 }

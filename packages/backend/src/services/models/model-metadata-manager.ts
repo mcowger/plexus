@@ -356,6 +356,7 @@ export class ModelMetadataManager {
   private autoRefreshIntervalMinutes = 60;
   private autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
   private inFlightRefresh: Promise<ModelMetadataRefreshResult> | null = null;
+  private fetchCache = new Map<string, { etag: string; data: unknown }>();
 
   private constructor() {}
 
@@ -645,11 +646,30 @@ export class ModelMetadataManager {
 
   private async fetchOrReadJson<T>(source: string): Promise<T> {
     if (source.startsWith('http://') || source.startsWith('https://')) {
-      const response = await fetch(source);
+      const headers: Record<string, string> = {};
+      const cached = this.fetchCache.get(source);
+      if (cached) {
+        headers['If-None-Match'] = cached.etag;
+      }
+
+      const response = await fetch(source, { headers });
+
+      if (response.status === 304 && cached) {
+        logger.debug(`Metadata source ${source} unchanged (304 Not Modified)`);
+        return cached.data as T;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      return response.json() as Promise<T>;
+
+      const data = await response.json();
+      const etag = response.headers.get('etag');
+      if (etag) {
+        this.fetchCache.set(source, { etag, data });
+      }
+
+      return data as T;
     }
     // Local file path (for testing)
     const file = Bun.file(source);
