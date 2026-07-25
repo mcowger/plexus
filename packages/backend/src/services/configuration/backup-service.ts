@@ -17,7 +17,7 @@
 
 import { getDatabase, getSchema, getCurrentDialect } from '../../db/client';
 import { ConfigService } from './config-service';
-import { ConfigRepository, OAuthCredentialsData } from '../../db/config-repository';
+import { ConfigRepository, McpKeyConfig, OAuthCredentialsData } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
 import { decrypt, encrypt } from '../../utils/encryption';
 import { gzipSync, gunzipSync } from 'node:zlib';
@@ -47,6 +47,7 @@ export interface ConfigBackupData {
   keys: Record<string, unknown>;
   user_quotas: Record<string, unknown>;
   mcp_servers: Record<string, unknown>;
+  mcp_keys?: McpKeyConfig[];
   settings: Record<string, unknown>;
   oauth_credentials: Array<{
     provider_type: string;
@@ -410,6 +411,7 @@ export class BackupService {
         keys: configData.keys as Record<string, unknown>,
         user_quotas: configData.user_quotas as Record<string, unknown>,
         mcp_servers: configData.mcp_servers as Record<string, unknown>,
+        mcp_keys: configData.mcp_keys as McpKeyConfig[],
         settings: configData.settings as Record<string, unknown>,
         oauth_credentials: oauthCredentials,
       },
@@ -536,6 +538,11 @@ export class BackupService {
       await repo.saveMcpServer(name, config);
     }
     counts['mcp_servers'] = Object.keys(mcpServers).length;
+
+    // MCP keys reference MCP servers, so restore them only after all servers exist.
+    const mcpKeys = data.data.mcp_keys ?? [];
+    await repo.batchInsertMcpKeys(mcpKeys);
+    counts['mcp_keys'] = mcpKeys.length;
 
     // System settings
     const settings = data.data.settings as Record<string, unknown>;

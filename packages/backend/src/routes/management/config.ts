@@ -17,11 +17,27 @@ import { UsageStorageService } from '../../services/observability/usage-storage'
 import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
 import { mcpProcessManager } from '../../services/mcp-local/mcp-process-manager';
 import { VisionDescriptorService } from '../../services/vision/vision-descriptor-service';
+import { decryptField } from '../../utils/encryption';
 import type { GpuParams, ModelArchitecture } from '@plexus/shared';
 import { DEFAULT_GPU_PARAMS } from '@plexus/shared';
+import { McpKeyCreateSchema } from '@plexus/shared';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function serializeMcpKey(key: {
+  id: number;
+  key: string;
+  isActive: boolean | number;
+  cooldownUntil: Date | number | null;
+}) {
+  return {
+    id: key.id,
+    key: decryptField(key.key) as string,
+    is_active: key.isActive === true || key.isActive === 1,
+    cooldown_until: key.cooldownUntil ? new Date(key.cooldownUntil).toISOString() : null,
+  };
 }
 
 function mergeCompactionPatch(
@@ -1049,6 +1065,52 @@ export async function registerConfigRoutes(
       return reply.code(500).send({ error: 'Internal server error' });
     }
   });
+
+  fastify.get('/v0/management/mcp-servers/:serverName/keys', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    const keys = await configService.getRepository().getMcpServerKeys(serverName);
+    if (!keys) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+    return reply.send({ keys: keys.map(serializeMcpKey) });
+  });
+
+  fastify.post('/v0/management/mcp-servers/:serverName/keys', async (request, reply) => {
+    const { serverName } = request.params as { serverName: string };
+    const result = McpKeyCreateSchema.safeParse(request.body);
+    if (!result.success) {
+      return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
+    }
+
+    const key = await configService
+      .getRepository()
+      .addMcpServerKey(serverName, result.data.key, result.data.is_active ?? true);
+    if (!key) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+    return reply.code(201).send(serializeMcpKey(key));
+  });
+
+  fastify.delete('/v0/management/mcp-servers/:serverName/keys/:keyId', async (request, reply) => {
+    const { serverName, keyId } = request.params as { serverName: string; keyId: string };
+    const id = Number(keyId);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      return reply.code(400).send({ error: 'keyId must be a positive integer' });
+    }
+    const deleted = await configService.getRepository().deleteMcpServerKey(serverName, id);
+    if (!deleted) return reply.code(404).send({ error: `MCP key '${keyId}' not found` });
+    return reply.send({ success: true });
+  });
+
+  fastify.post(
+    '/v0/management/mcp-servers/:serverName/keys/:keyId/clear-cooldown',
+    async (request, reply) => {
+      const { serverName, keyId } = request.params as { serverName: string; keyId: string };
+      const id = Number(keyId);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        return reply.code(400).send({ error: 'keyId must be a positive integer' });
+      }
+      const cleared = await configService.getRepository().clearMcpServerKeyCooldown(serverName, id);
+      if (!cleared) return reply.code(404).send({ error: `MCP key '${keyId}' not found` });
+      return reply.send({ success: true });
+    }
+  );
 
   fastify.put('/v0/management/mcp-servers/:serverName', async (request, reply) => {
     const { serverName } = request.params as { serverName: string };

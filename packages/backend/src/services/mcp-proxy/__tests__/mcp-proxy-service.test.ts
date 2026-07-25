@@ -9,6 +9,8 @@ import {
   extractJsonRpcMethod,
   getEffectiveUpstreamUrl,
   proxyMcpRequest,
+  selectMcpKeyRoundRobin,
+  injectMcpKeyAuth,
 } from '../mcp-proxy-service';
 import { setConfigForTesting } from '../../../config';
 
@@ -174,6 +176,28 @@ describe('MCP Proxy Service', () => {
       const merged = mergeUpstreamHeaders(clientHeaders);
 
       expect(merged['x-custom']).toBe('value');
+    });
+  });
+
+  describe('MCP key authentication', () => {
+    test('rotates keys round robin per server', () => {
+      const keys = [
+        { id: 101, key: 'first' },
+        { id: 102, key: 'second' },
+      ];
+
+      expect(selectMcpKeyRoundRobin(99, keys)?.key).toBe('first');
+      expect(selectMcpKeyRoundRobin(99, keys)?.key).toBe('second');
+      expect(selectMcpKeyRoundRobin(99, keys)?.key).toBe('first');
+    });
+
+    test('injects the selected key using the configured auth header', () => {
+      expect(
+        injectMcpKeyAuth({ 'X-Api-Key': 'old', accept: 'application/json' }, 'x-api-key', 'new')
+      ).toEqual({
+        accept: 'application/json',
+        'x-api-key': 'new',
+      });
     });
   });
 

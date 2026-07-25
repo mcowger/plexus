@@ -10,5 +10,8 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }

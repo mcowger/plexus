@@ -414,6 +414,13 @@
       "when": 1783912982289,
       "tag": "0058_add_key_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1784998659229,
+      "tag": "0059_add_mcp_keys",
+      "breakpoints": true
     }
   ]
 }

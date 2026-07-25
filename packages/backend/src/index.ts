@@ -60,6 +60,7 @@ import { initModelCatalog } from './services/pi-ai/catalog';
 import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
+import { runMcpKeyMigration } from './db/mcp-key-migration';
 import { isEncryptionEnabled } from './utils/encryption';
 import { mcpProcessManager } from './services/mcp-local/mcp-process-manager';
 
@@ -162,6 +163,7 @@ try {
   initializeDatabase();
   await runMigrations();
   await runEncryptionMigration();
+  await runMcpKeyMigration();
 } catch (e) {
   logger.error('Failed to initialize database or run migrations', e);
   process.exit(1);

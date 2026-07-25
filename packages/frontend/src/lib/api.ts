@@ -268,6 +268,9 @@ export interface RemoteMcpServer {
   upstream_url: string;
   enabled: boolean;
   headers?: Record<string, string>;
+  auth_scheme?: string | null;
+  rate_limit_cooldown_ms?: number;
+  quota_cooldown_ms?: number;
 }
 
 export interface LocalMcpServer {
@@ -281,6 +284,16 @@ export interface LocalMcpServer {
   path?: string;
   startup_timeout_ms?: number;
   headers?: Record<string, string>;
+  auth_scheme?: string | null;
+  rate_limit_cooldown_ms?: number;
+  quota_cooldown_ms?: number;
+}
+
+export interface McpServerKey {
+  id: number;
+  key: string;
+  is_active: boolean;
+  cooldown_until: string | null;
 }
 
 export interface LocalMcpRuntimeStatus {
@@ -2892,6 +2905,48 @@ export const api = {
       console.error('API Error deleteMcpServer', e);
       throw e;
     }
+  },
+
+  getMcpServerKeys: async (serverName: string): Promise<McpServerKey[]> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/keys`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) throw new Error('Failed to fetch MCP server keys');
+    const data = (await res.json()) as { keys: McpServerKey[] };
+    return data.keys;
+  },
+
+  addMcpServerKey: async (serverName: string, key: string): Promise<McpServerKey> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/keys`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      }
+    );
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || 'Failed to add MCP server key');
+    }
+    return await res.json();
+  },
+
+  deleteMcpServerKey: async (serverName: string, keyId: number): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/keys/${keyId}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error('Failed to delete MCP server key');
+  },
+
+  clearMcpServerKeyCooldown: async (serverName: string, keyId: number): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-servers/${encodeURIComponent(serverName)}/keys/${keyId}/clear-cooldown`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error('Failed to clear MCP server key cooldown');
   },
 
   getMcpServerStatus: async (serverName: string): Promise<LocalMcpRuntimeStatus> => {

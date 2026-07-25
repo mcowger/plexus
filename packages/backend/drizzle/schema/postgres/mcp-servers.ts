@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, bigint } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, boolean, bigint, integer } from 'drizzle-orm/pg-core';
 
 export const mcpServers = pgTable('mcp_servers', {
   id: serial('id').primaryKey(),
@@ -14,6 +14,9 @@ export const mcpServers = pgTable('mcp_servers', {
   port: bigint('port', { mode: 'number' }),
   path: text('path'),
   startupTimeoutMs: bigint('startup_timeout_ms', { mode: 'number' }),
+  rateLimitCooldownMs: integer('rate_limit_cooldown_ms').notNull().default(60000),
+  quotaCooldownMs: integer('quota_cooldown_ms').notNull().default(86400000),
+  authScheme: text('auth_scheme'),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

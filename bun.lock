@@ -96,6 +96,9 @@
     "packages/shared": {
       "name": "@plexus/shared",
       "version": "0.0.1",
+      "dependencies": {
+        "zod": "^4.4.3",
+      },
     },
   },
   "packages": {

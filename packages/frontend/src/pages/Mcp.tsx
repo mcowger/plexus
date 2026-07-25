@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { api, McpServer, McpLogRecord } from '../lib/api';
+import { api, McpServer, McpLogRecord, McpServerKey } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
-import { formatMs } from '../lib/format';
+import { formatMs, formatResetsIn } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import plexusAdminSkill from '../../../../.agents/skills/plexus-management/SKILL.md' with {
   type: 'text',
@@ -69,6 +69,12 @@ export const McpPage: React.FC = () => {
   const [envKey, setEnvKey] = useState('');
   const [envValue, setEnvValue] = useState('');
   const [argsInput, setArgsInput] = useState((EMPTY_LOCAL_SERVER.args || []).join(' '));
+  const [keyManagementServerName, setKeyManagementServerName] = useState<string | null>(null);
+  const [serverKeys, setServerKeys] = useState<McpServerKey[]>([]);
+  const [isLoadingKeys, setIsLoadingKeys] = useState(false);
+  const [newServerKey, setNewServerKey] = useState('');
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [, setCurrentTime] = useState(Date.now());
 
   // Logs state
   const [logs, setLogs] = useState<McpLogRecord[]>([]);
@@ -100,6 +106,12 @@ export const McpPage: React.FC = () => {
   useEffect(() => {
     loadLogs();
   }, [logsOffset]);
+
+  useEffect(() => {
+    if (!keyManagementServerName) return;
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, [keyManagementServerName]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -296,16 +308,22 @@ export const McpPage: React.FC = () => {
 
     setIsSaving(true);
     try {
+      const serverSettings = {
+        auth_scheme: editingServer.auth_scheme?.trim() || null,
+        rate_limit_cooldown_ms: editingServer.rate_limit_cooldown_ms ?? 60_000,
+        quota_cooldown_ms: editingServer.quota_cooldown_ms ?? 86_400_000,
+      };
       await api.saveMcpServer(
         nameToSave,
         editingServer.mode === 'local_http'
           ? {
               ...editingServer,
+              ...serverSettings,
               args: parseArguments(argsInput),
               headers: finalHeaders,
               env: finalEnv,
             }
-          : { ...editingServer, headers: finalHeaders }
+          : { ...editingServer, ...serverSettings, headers: finalHeaders }
       );
       await loadData();
       setIsModalOpen(false);
@@ -359,6 +377,58 @@ export const McpPage: React.FC = () => {
     } catch (e) {
       setMcpEnabled(!enabled); // revert on failure
       toast.error((e as Error).message, 'Failed to update MCP server state');
+    }
+  };
+
+  const loadServerKeys = async (serverName: string) => {
+    setIsLoadingKeys(true);
+    try {
+      setServerKeys(await api.getMcpServerKeys(serverName));
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setIsLoadingKeys(false);
+    }
+  };
+
+  const handleManageKeys = (serverName: string) => {
+    setKeyManagementServerName(serverName);
+    setNewServerKey('');
+    setServerKeys([]);
+    void loadServerKeys(serverName);
+  };
+
+  const handleAddServerKey = async () => {
+    if (!keyManagementServerName || !newServerKey.trim()) return;
+    setIsSavingKey(true);
+    try {
+      await api.addMcpServerKey(keyManagementServerName, newServerKey.trim());
+      setNewServerKey('');
+      await loadServerKeys(keyManagementServerName);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
+
+  const handleDeleteServerKey = async (keyId: number) => {
+    if (!keyManagementServerName) return;
+    try {
+      await api.deleteMcpServerKey(keyManagementServerName, keyId);
+      await loadServerKeys(keyManagementServerName);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const handleClearServerKeyCooldown = async (keyId: number) => {
+    if (!keyManagementServerName) return;
+    try {
+      await api.clearMcpServerKeyCooldown(keyManagementServerName, keyId);
+      await loadServerKeys(keyManagementServerName);
+    } catch (e) {
+      toast.error((e as Error).message);
     }
   };
 
@@ -555,6 +625,15 @@ export const McpPage: React.FC = () => {
                             </div>
                           </button>
                           <div className="flex shrink-0 items-center gap-2">
+                            {server.mode !== 'local_http' && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleManageKeys(name)}
+                              >
+                                Manage Keys
+                              </Button>
+                            )}
                             <Switch
                               checked={server.enabled !== false}
                               onChange={(val) => handleToggleEnabled(name, val)}
@@ -718,6 +797,18 @@ export const McpPage: React.FC = () => {
                               <div
                                 style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
                               >
+                                {server.mode !== 'local_http' && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleManageKeys(name);
+                                    }}
+                                  >
+                                    Manage Keys
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1319,55 +1410,202 @@ export const McpPage: React.FC = () => {
                 />
               )}
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <div className="min-w-0 flex-1">
-                  <Input
-                    label="Header Key"
-                    value={headerKey}
-                    onChange={(e) => setHeaderKey(e.target.value)}
-                    placeholder="Authorization"
-                  />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Input
+                  label="Auth Scheme"
+                  value={editingServer.auth_scheme ?? ''}
+                  onChange={(e) =>
+                    setEditingServer({ ...editingServer, auth_scheme: e.target.value || null })
+                  }
+                  placeholder="bearer"
+                />
+                <Input
+                  label="Rate Limit Cooldown (ms)"
+                  type="number"
+                  min="0"
+                  value={editingServer.rate_limit_cooldown_ms ?? 60_000}
+                  onChange={(e) =>
+                    setEditingServer({
+                      ...editingServer,
+                      rate_limit_cooldown_ms: Number(e.target.value),
+                    })
+                  }
+                />
+                <Input
+                  label="Quota Cooldown (ms)"
+                  type="number"
+                  min="0"
+                  value={editingServer.quota_cooldown_ms ?? 86_400_000}
+                  onChange={(e) =>
+                    setEditingServer({
+                      ...editingServer,
+                      quota_cooldown_ms: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+
+              <div className="mt-4 rounded-md border border-border-glass p-3">
+                <div className="mb-3">
+                  <label className="text-sm font-medium text-text-secondary">
+                    Static Headers (Optional)
+                  </label>
+                  <p className="text-xs text-text-muted mt-1">
+                    These headers are injected into every request. For load-balanced authentication
+                    keys, use the <strong>Auth Scheme</strong> above and the{' '}
+                    <strong>Manage Keys</strong> button.
+                  </p>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <Input
-                    label="Header Value"
-                    value={headerValue}
-                    onChange={(e) => setHeaderValue(e.target.value)}
-                    placeholder="Bearer token..."
-                  />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      label="Header Key"
+                      value={headerKey}
+                      onChange={(e) => setHeaderKey(e.target.value)}
+                      placeholder="X-Custom-Header"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      label="Header Value"
+                      value={headerValue}
+                      onChange={(e) => setHeaderValue(e.target.value)}
+                      placeholder="value..."
+                    />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={addHeader}
+                    className="w-full sm:w-auto"
+                  >
+                    <PlusCircle size={16} />
+                  </Button>
                 </div>
+
+                {editingServer.headers && Object.keys(editingServer.headers).length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <label className="text-sm font-medium text-text-secondary">
+                      Configured Static Headers
+                    </label>
+                    {Object.entries(editingServer.headers).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex flex-col gap-2 p-2 bg-bg-hover rounded-md sm:flex-row sm:items-center"
+                      >
+                        <span className="min-w-0 flex-1 break-all font-mono text-xs">{key}</span>
+                        <span className="flex-1 font-mono text-xs text-text-secondary truncate">
+                          {value}
+                        </span>
+                        <button
+                          onClick={() => removeHeader(key)}
+                          className="p-1 hover:bg-bg-surface rounded"
+                        >
+                          <MinusCircle size={14} className="text-danger" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Modal>
+
+          <Modal
+            isOpen={keyManagementServerName !== null}
+            onClose={() => setKeyManagementServerName(null)}
+            title={
+              keyManagementServerName ? `Manage Keys: ${keyManagementServerName}` : 'Manage Keys'
+            }
+            footer={
+              <Button variant="secondary" onClick={() => setKeyManagementServerName(null)}>
+                Close
+              </Button>
+            }
+          >
+            <div className="space-y-4">
+              <div className="rounded-md bg-bg-surface p-3 text-sm text-text-secondary border border-border-subtle">
+                <p>
+                  These keys will be load-balanced (Round Robin) and automatically rotated if a rate
+                  limit or quota is exceeded. They will be injected using the server's configured{' '}
+                  <strong>Auth Scheme</strong>:{' '}
+                  <span className="font-mono text-text bg-bg-subtle px-1 py-0.5 rounded">
+                    {keyManagementServerName && servers[keyManagementServerName]?.auth_scheme
+                      ? servers[keyManagementServerName].auth_scheme
+                      : 'None (keys will not be sent)'}
+                  </span>
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  label="New Key"
+                  value={newServerKey}
+                  onChange={(e) => setNewServerKey(e.target.value)}
+                  placeholder="Paste key value"
+                  className="flex-1"
+                />
                 <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={addHeader}
-                  className="w-full sm:w-auto"
+                  className="self-end"
+                  onClick={handleAddServerKey}
+                  disabled={isSavingKey || !newServerKey.trim()}
                 >
-                  <PlusCircle size={16} />
+                  {isSavingKey ? 'Adding...' : 'Add Key'}
                 </Button>
               </div>
 
-              {editingServer.headers && Object.keys(editingServer.headers).length > 0 && (
+              {isLoadingKeys ? (
+                <p className="text-sm text-text-secondary">Loading keys...</p>
+              ) : serverKeys.length === 0 ? (
+                <p className="text-sm text-text-secondary">No keys configured.</p>
+              ) : (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">
-                    Configured Headers
-                  </label>
-                  {Object.entries(editingServer.headers).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex flex-col gap-2 p-2 bg-bg-hover rounded-md sm:flex-row sm:items-center"
-                    >
-                      <span className="min-w-0 flex-1 break-all font-mono text-xs">{key}</span>
-                      <span className="flex-1 font-mono text-xs text-text-secondary truncate">
-                        {value}
-                      </span>
-                      <button
-                        onClick={() => removeHeader(key)}
-                        className="p-1 hover:bg-bg-surface rounded"
+                  {serverKeys.map((key) => {
+                    const isExhausted =
+                      key.cooldown_until !== null &&
+                      new Date(key.cooldown_until).getTime() > Date.now();
+                    return (
+                      <div
+                        key={key.id}
+                        className="flex flex-col gap-3 rounded-md border border-border-glass bg-bg-subtle p-3 sm:flex-row sm:items-center"
                       >
-                        <MinusCircle size={14} className="text-danger" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-mono text-sm text-text" title={key.key}>
+                            {key.key}
+                          </div>
+                          <div
+                            className={clsx(
+                              'mt-1 text-xs font-medium',
+                              !key.is_active || isExhausted ? 'text-warning' : 'text-success'
+                            )}
+                          >
+                            {!key.is_active
+                              ? 'Inactive'
+                              : isExhausted
+                                ? `Exhausted, ${formatResetsIn(key.cooldown_until)}`
+                                : 'Active'}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {isExhausted && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleClearServerKeyCooldown(key.id)}
+                            >
+                              Clear Cooldown
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleDeleteServerKey(key.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

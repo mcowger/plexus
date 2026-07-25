@@ -107,6 +107,7 @@ export function initializeDatabase(connectionString?: string) {
       apiKeys,
       userQuotaDefinitions,
       mcpServers,
+      mcpKeys,
       systemSettings,
       oauthCredentials,
     } = sqliteSchema;
@@ -127,6 +128,7 @@ export function initializeDatabase(connectionString?: string) {
         apiKeys,
         userQuotaDefinitions,
         mcpServers,
+        mcpKeys,
         systemSettings,
         oauthCredentials,
       },
@@ -148,6 +150,7 @@ export function initializeDatabase(connectionString?: string) {
       apiKeys,
       userQuotaDefinitions,
       mcpServers,
+      mcpKeys,
       systemSettings,
       oauthCredentials,
     } = pgSchema;
@@ -168,6 +171,7 @@ export function initializeDatabase(connectionString?: string) {
       apiKeys,
       userQuotaDefinitions,
       mcpServers,
+      mcpKeys,
       systemSettings,
       oauthCredentials,
     };

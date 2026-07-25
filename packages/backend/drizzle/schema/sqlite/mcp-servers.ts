@@ -14,6 +14,9 @@ export const mcpServers = sqliteTable('mcp_servers', {
   port: integer('port'),
   path: text('path'),
   startupTimeoutMs: integer('startup_timeout_ms'),
+  rateLimitCooldownMs: integer('rate_limit_cooldown_ms').notNull().default(60000),
+  quotaCooldownMs: integer('quota_cooldown_ms').notNull().default(86400000),
+  authScheme: text('auth_scheme'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

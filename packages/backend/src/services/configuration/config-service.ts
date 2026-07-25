@@ -351,6 +351,7 @@ export class ConfigService {
     const keys = await this.repo.getAllKeys();
     const userQuotas = await this.repo.getAllUserQuotas();
     const mcpServers = await this.repo.getAllMcpServers();
+    const mcpKeys = await this.repo.getAllMcpKeys();
     const settings = await this.repo.getAllSettings();
     const oauthProviders = await this.repo.getAllOAuthProviders();
 
@@ -360,6 +361,7 @@ export class ConfigService {
       keys,
       user_quotas: userQuotas,
       mcp_servers: mcpServers,
+      mcp_keys: mcpKeys,
       settings,
       oauth_providers: oauthProviders,
     };

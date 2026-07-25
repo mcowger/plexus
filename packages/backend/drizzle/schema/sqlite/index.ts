@@ -18,6 +18,7 @@ export * from './alias-metadata-overrides';
 export * from './api-keys';
 export * from './user-quota-definitions';
 export * from './mcp-servers';
+export * from './mcp-keys';
 export * from './system-settings';
 export * from './oauth-credentials';
 export * from './pi-ai-custom-providers';

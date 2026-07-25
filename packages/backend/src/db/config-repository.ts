@@ -249,6 +249,12 @@ export interface OAuthCredentialsData {
   expiresAt: number; // epoch seconds
 }
 
+export interface McpKeyConfig {
+  serverName: string;
+  key: string;
+  isActive: boolean;
+}
+
 export class ConfigRepository {
   private db() {
     return getDatabase();
@@ -268,6 +274,7 @@ export class ConfigRepository {
     await this.db().delete(schema.providers);
     await this.db().delete(schema.apiKeys);
     await this.db().delete(schema.userQuotaDefinitions);
+    await this.db().delete(schema.mcpKeys);
     await this.db().delete(schema.mcpServers);
     await this.db().delete(schema.oauthCredentials);
     await this.db().delete(schema.systemSettings);
@@ -1289,6 +1296,9 @@ export class ConfigRepository {
           headers: row.headers
             ? decryptJsonField<Record<string, string>>(row.headers) || undefined
             : undefined,
+          auth_scheme: row.authScheme,
+          rate_limit_cooldown_ms: Number(row.rateLimitCooldownMs),
+          quota_cooldown_ms: Number(row.quotaCooldownMs),
         };
         result[row.name] = localConfig;
         continue;
@@ -1300,6 +1310,9 @@ export class ConfigRepository {
         ...(row.headers
           ? { headers: decryptJsonField<Record<string, string>>(row.headers) ?? undefined }
           : {}),
+        auth_scheme: row.authScheme,
+        rate_limit_cooldown_ms: Number(row.rateLimitCooldownMs),
+        quota_cooldown_ms: Number(row.quotaCooldownMs),
       };
     }
 
@@ -1349,6 +1362,9 @@ export class ConfigRepository {
           upstreamUrl,
           enabled: fromBool(config.enabled !== false),
           headers: config.headers ? encryptJsonField(config.headers) : null,
+          authScheme: config.auth_scheme ?? null,
+          rateLimitCooldownMs: config.rate_limit_cooldown_ms ?? 60000,
+          quotaCooldownMs: config.quota_cooldown_ms ?? 86400000,
           ...localFields,
           updatedAt: timestamp,
         })
@@ -1361,6 +1377,9 @@ export class ConfigRepository {
           upstreamUrl,
           enabled: fromBool(config.enabled !== false),
           headers: config.headers ? encryptJsonField(config.headers) : null,
+          authScheme: config.auth_scheme ?? null,
+          rateLimitCooldownMs: config.rate_limit_cooldown_ms ?? 60000,
+          quotaCooldownMs: config.quota_cooldown_ms ?? 86400000,
           ...localFields,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -1371,6 +1390,136 @@ export class ConfigRepository {
   async deleteMcpServer(name: string): Promise<void> {
     const schema = this.schema();
     await this.db().delete(schema.mcpServers).where(eq(schema.mcpServers.name, name));
+  }
+
+  async getMcpServerKeys(name: string) {
+    const schema = this.schema();
+    const [server] = await this.db()
+      .select({ id: schema.mcpServers.id })
+      .from(schema.mcpServers)
+      .where(eq(schema.mcpServers.name, name))
+      .limit(1);
+    if (!server) return null;
+
+    return this.db()
+      .select({
+        id: schema.mcpKeys.id,
+        key: schema.mcpKeys.key,
+        isActive: schema.mcpKeys.isActive,
+        cooldownUntil: schema.mcpKeys.cooldownUntil,
+      })
+      .from(schema.mcpKeys)
+      .where(eq(schema.mcpKeys.mcpServerId, server.id));
+  }
+
+  async getAllMcpKeys(): Promise<McpKeyConfig[]> {
+    const schema = this.schema();
+    const rows = await this.db()
+      .select({
+        serverName: schema.mcpServers.name,
+        key: schema.mcpKeys.key,
+        isActive: schema.mcpKeys.isActive,
+      })
+      .from(schema.mcpKeys)
+      .innerJoin(schema.mcpServers, eq(schema.mcpKeys.mcpServerId, schema.mcpServers.id));
+
+    return rows.map((row: { serverName: string; key: string; isActive: boolean | number }) => ({
+      ...row,
+      key: decryptField(row.key) as string,
+      isActive: toBool(row.isActive),
+    }));
+  }
+
+  async batchInsertMcpKeys(keys: McpKeyConfig[]): Promise<void> {
+    if (keys.length === 0) return;
+
+    const schema = this.schema();
+    const servers = await this.db()
+      .select({ id: schema.mcpServers.id, name: schema.mcpServers.name })
+      .from(schema.mcpServers);
+    const serverIds = new Map(
+      servers.map((server: { name: string; id: number }) => [server.name, server.id])
+    );
+    const timestamp = new Date();
+
+    await this.db()
+      .insert(schema.mcpKeys)
+      .values(
+        keys.map((key) => {
+          const mcpServerId = serverIds.get(key.serverName);
+          if (mcpServerId === undefined) {
+            throw new Error(`Cannot restore MCP key for unknown server: ${key.serverName}`);
+          }
+          return {
+            mcpServerId,
+            key: encryptField(key.key) as string,
+            isActive: fromBool(key.isActive),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+        })
+      );
+  }
+
+  async addMcpServerKey(name: string, key: string, isActive: boolean) {
+    const schema = this.schema();
+    const [server] = await this.db()
+      .select({ id: schema.mcpServers.id })
+      .from(schema.mcpServers)
+      .where(eq(schema.mcpServers.name, name))
+      .limit(1);
+    if (!server) return null;
+
+    const timestamp = new Date();
+    const [created] = await this.db()
+      .insert(schema.mcpKeys)
+      .values({
+        mcpServerId: server.id,
+        key: encryptField(key) as string,
+        isActive: fromBool(isActive),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .returning({
+        id: schema.mcpKeys.id,
+        key: schema.mcpKeys.key,
+        isActive: schema.mcpKeys.isActive,
+        cooldownUntil: schema.mcpKeys.cooldownUntil,
+      });
+    return created!;
+  }
+
+  async deleteMcpServerKey(name: string, keyId: number): Promise<boolean> {
+    const schema = this.schema();
+    const [server] = await this.db()
+      .select({ id: schema.mcpServers.id })
+      .from(schema.mcpServers)
+      .where(eq(schema.mcpServers.name, name))
+      .limit(1);
+    if (!server) return false;
+
+    const deleted = await this.db()
+      .delete(schema.mcpKeys)
+      .where(and(eq(schema.mcpKeys.id, keyId), eq(schema.mcpKeys.mcpServerId, server.id)))
+      .returning({ id: schema.mcpKeys.id });
+    return deleted.length > 0;
+  }
+
+  async clearMcpServerKeyCooldown(name: string, keyId: number): Promise<boolean> {
+    const schema = this.schema();
+    const [server] = await this.db()
+      .select({ id: schema.mcpServers.id })
+      .from(schema.mcpServers)
+      .where(eq(schema.mcpServers.name, name))
+      .limit(1);
+    if (!server) return false;
+
+    const updated = await this.db()
+      .update(schema.mcpKeys)
+      .set({ cooldownUntil: null, updatedAt: new Date() })
+      .where(and(eq(schema.mcpKeys.id, keyId), eq(schema.mcpKeys.mcpServerId, server.id)))
+      .returning({ id: schema.mcpKeys.id });
+    return updated.length > 0;
   }
 
   // ─── System Settings ─────────────────────────────────────────────

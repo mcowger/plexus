@@ -43,6 +43,7 @@ export * from './sqlite/alias-metadata-overrides';
 export * from './sqlite/api-keys';
 export * from './sqlite/user-quota-definitions';
 export * from './sqlite/mcp-servers';
+export * from './sqlite/mcp-keys';
 export * from './sqlite/system-settings';
 export * from './sqlite/oauth-credentials';
 export * from './sqlite/pi-ai-custom-providers';
@@ -64,6 +65,7 @@ export { aliasMetadataOverrides as pgAliasMetadataOverrides } from './postgres/a
 export { apiKeys as pgApiKeys } from './postgres/api-keys';
 export { userQuotaDefinitions as pgUserQuotaDefinitions } from './postgres/user-quota-definitions';
 export { mcpServers as pgMcpServers } from './postgres/mcp-servers';
+export { mcpKeys as pgMcpKeys } from './postgres/mcp-keys';
 export { systemSettings as pgSystemSettings } from './postgres/system-settings';
 export { oauthCredentials as pgOauthCredentials } from './postgres/oauth-credentials';
 export { piAiCustomProviders as pgPiAiCustomProviders } from './postgres/pi-ai-custom-providers';

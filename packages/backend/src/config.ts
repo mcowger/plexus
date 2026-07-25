@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { McpServerConfigSchema } from '@plexus/shared';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
@@ -1011,30 +1012,7 @@ const QuotaConfigSchema = z.object({
   options: z.record(z.string(), z.any()).default({}),
 });
 
-const RemoteHttpMcpServerConfigSchema = z.object({
-  mode: z.literal('remote_http').default('remote_http').optional(),
-  upstream_url: z.string().url(),
-  enabled: z.boolean().default(true),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
-const LocalHttpMcpServerConfigSchema = z.object({
-  mode: z.literal('local_http'),
-  enabled: z.boolean().default(true),
-  launcher: z.enum(['bunx', 'uvx']),
-  package: z.string().trim().min(1),
-  args: z.array(z.string()).default([]).optional(),
-  env: z.record(z.string(), z.string()).default({}).optional(),
-  port: z.number().int().min(1).max(65535),
-  path: z.string().trim().min(1).default('/mcp').optional(),
-  startup_timeout_ms: z.number().int().min(1000).max(300000).default(30000).optional(),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
-export const McpServerConfigSchema = z.union([
-  LocalHttpMcpServerConfigSchema,
-  RemoteHttpMcpServerConfigSchema,
-]);
+export { McpServerConfigSchema } from '@plexus/shared';
 
 const CooldownPolicySchema = z.object({
   initialMinutes: z.number().min(0.1).default(2),

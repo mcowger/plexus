@@ -1,4 +1,7 @@
 import { getConfig } from '../../config';
+import { getDatabase, getSchema } from '../../db/client';
+import { and, asc, eq } from 'drizzle-orm';
+import { decryptField } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 import { McpServerConfig } from '../../types/mcp';
 import { getClientIp } from '../../utils/ip';
@@ -20,6 +23,92 @@ const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'set-cookie', 'x-a
 const CLIENT_AUTH_HEADERS = new Set(['authorization', 'x-api-key', 'proxy-authorization']);
 
 const RESERVED_SERVER_NAMES = new Set(['plexus']);
+
+const lastMcpKeyIds = new Map<number, number>();
+
+interface McpKey {
+  id: number;
+  key: string;
+}
+
+interface McpServerKeyConfig {
+  id: number;
+  authScheme: string | null;
+  rateLimitCooldownMs: number;
+  quotaCooldownMs: number;
+}
+
+export function selectMcpKeyRoundRobin(serverId: number, keys: McpKey[]): McpKey | undefined {
+  if (keys.length === 0) return undefined;
+
+  const lastKeyId = lastMcpKeyIds.get(serverId);
+  const lastIndex = keys.findIndex((key) => key.id === lastKeyId);
+  const key = keys[(lastIndex + 1) % keys.length]!;
+  lastMcpKeyIds.set(serverId, key.id);
+  return key;
+}
+
+export function injectMcpKeyAuth(
+  headers: Record<string, string>,
+  authScheme: string | null,
+  key: string | undefined
+): Record<string, string> {
+  if (!authScheme || !key) return headers;
+
+  const normalizedScheme = authScheme.toLowerCase();
+  const withoutExistingAuth = Object.fromEntries(
+    Object.entries(headers).filter(([name]) => name.toLowerCase() !== normalizedScheme)
+  );
+  return { ...withoutExistingAuth, [authScheme]: key };
+}
+
+async function getActiveMcpKeys(serverName: string): Promise<{
+  server: McpServerKeyConfig;
+  keys: McpKey[];
+} | null> {
+  const db = getDatabase();
+  const schema = getSchema();
+  const servers = await db
+    .select({
+      id: schema.mcpServers.id,
+      authScheme: schema.mcpServers.authScheme,
+      rateLimitCooldownMs: schema.mcpServers.rateLimitCooldownMs,
+      quotaCooldownMs: schema.mcpServers.quotaCooldownMs,
+    })
+    .from(schema.mcpServers)
+    .where(eq(schema.mcpServers.name, serverName))
+    .limit(1);
+  const server = servers[0];
+  if (!server) return null;
+
+  const keys: Array<McpKey & { cooldownUntil: Date | number | null }> = await db
+    .select({
+      id: schema.mcpKeys.id,
+      key: schema.mcpKeys.key,
+      cooldownUntil: schema.mcpKeys.cooldownUntil,
+    })
+    .from(schema.mcpKeys)
+    .where(and(eq(schema.mcpKeys.mcpServerId, server.id), eq(schema.mcpKeys.isActive, true)))
+    .orderBy(asc(schema.mcpKeys.id));
+  const now = Date.now();
+
+  return {
+    server,
+    keys: keys
+      .filter((key) => !key.cooldownUntil || new Date(key.cooldownUntil).getTime() <= now)
+      .map(({ id, key }) => ({ id, key: decryptField(key) as string })),
+  };
+}
+
+async function cooldownMcpKey(keyId: number, cooldownMs: number): Promise<void> {
+  const db = getDatabase();
+  const schema = getSchema();
+  const now = new Date();
+  await db
+    .update(schema.mcpKeys)
+    .set({ cooldownUntil: new Date(now.getTime() + cooldownMs), updatedAt: now })
+    .where(eq(schema.mcpKeys.id, keyId));
+}
 
 export function getMcpServerConfig(serverName: string): McpServerConfig | null {
   if (RESERVED_SERVER_NAMES.has(serverName)) {
@@ -220,8 +309,6 @@ export async function proxyMcpRequest(
 
   const upstreamHeaders = mergeUpstreamHeaders(clientAuthFiltered, staticHeaders);
 
-  logger.silly(`Upstream headers: ${JSON.stringify(upstreamHeaders)}`);
-
   let url = upstreamUrl;
 
   if (query && Object.keys(query).length > 0) {
@@ -233,27 +320,57 @@ export async function proxyMcpRequest(
   logger.silly(`Final URL: ${url}`);
 
   try {
-    const fetchOptions: RequestInit = {
-      method,
-      headers: upstreamHeaders,
-    };
-
     let requestBody = '';
     if (method === 'POST' && body) {
       requestBody = typeof body === 'string' ? body : JSON.stringify(body);
-      fetchOptions.body = requestBody;
-      if (!upstreamHeaders['content-type']) {
-        fetchOptions.headers = {
-          ...fetchOptions.headers,
-          'content-type': 'application/json',
-        };
-      }
     }
 
-    logger.silly(`Request body: ${requestBody}`);
+    const isRemote = !serverConfig.mode || serverConfig.mode === 'remote_http';
+    const keyConfig = isRemote ? await getActiveMcpKeys(serverName) : null;
+    const keys = keyConfig?.keys ?? [];
+    const attempts = Math.max(keys.length, 1);
+    let response: Response | undefined;
 
-    logger.silly(`Starting fetch to ${url} with method ${method}`);
-    const response = await fetch(url, fetchOptions);
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const key = selectMcpKeyRoundRobin(keyConfig?.server.id ?? 0, keys);
+      let requestHeaders = injectMcpKeyAuth(
+        upstreamHeaders,
+        keyConfig?.server.authScheme ?? null,
+        key?.key
+      );
+
+      const hasContentType = Object.keys(requestHeaders).some(
+        (k) => k.toLowerCase() === 'content-type'
+      );
+      if (requestBody && !hasContentType) {
+        requestHeaders = { ...requestHeaders, 'content-type': 'application/json' };
+      }
+
+      const redactedHeaders = redactSensitiveHeaders(requestHeaders);
+      if (keyConfig?.server.authScheme && key) {
+        redactedHeaders[keyConfig.server.authScheme] = '[REDACTED]';
+      }
+      logger.silly(`Upstream headers: ${JSON.stringify(redactedHeaders)}`);
+      logger.silly(`Request body: ${requestBody}`);
+      logger.silly(`Starting fetch to ${url} with method ${method}`);
+      response = await fetch(url, {
+        method,
+        headers: requestHeaders,
+        body: requestBody || undefined,
+      });
+
+      if ((response.status !== 429 && response.status !== 402) || !key || !keyConfig) break;
+
+      const cooldownMs =
+        response.status === 429
+          ? keyConfig.server.rateLimitCooldownMs
+          : keyConfig.server.quotaCooldownMs;
+      await cooldownMcpKey(key.id, cooldownMs);
+      if (attempt === attempts - 1) break;
+      await response.body?.cancel();
+    }
+
+    if (!response) throw new Error('MCP upstream request was not attempted');
     logger.info(
       '[mcp-proxy:' + serverName + '] upstream fetch completed with status ' + response.status
     );
