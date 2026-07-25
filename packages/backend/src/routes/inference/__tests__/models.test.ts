@@ -423,6 +423,47 @@ describe('GET /v1/models – with metadata', () => {
   });
 });
 
+describe('GET /v1/models - Caching', () => {
+  it('should return ETag and Last-Modified headers and support 304 Not Modified', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+
+    setConfigForTesting({
+      models: {
+        'cached-model': { targets: [] },
+      },
+    } as unknown as PlexusConfig);
+
+    // Initial request
+    const response1 = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response1.statusCode).toBe(200);
+    const etag = response1.headers.etag;
+    const lastModified = response1.headers['last-modified'];
+    expect(etag).toBeDefined();
+    expect(lastModified).toBeDefined();
+
+    // Second request with If-None-Match
+    const response2 = await fastify.inject({
+      method: 'GET',
+      url: '/v1/models',
+      headers: {
+        'if-none-match': etag as string,
+      },
+    });
+    expect(response2.statusCode).toBe(304);
+
+    // Third request with If-Modified-Since
+    const response3 = await fastify.inject({
+      method: 'GET',
+      url: '/v1/models',
+      headers: {
+        'if-modified-since': lastModified as string,
+      },
+    });
+    expect(response3.statusCode).toBe(304);
+  });
+});
+
 // ─── GET /v1/metadata/search ──────────────────────────────
 
 describe('GET /v1/metadata/search', () => {
@@ -731,5 +772,48 @@ describe('GET /v1/openrouter/models', () => {
       url: '/v1/openrouter/models?q=gpt-4.1-nano',
     });
     expect(after.json().data).toEqual(['openai/gpt-4.1-nano']);
+  });
+});
+
+describe('GET /v1/openrouter/models - Caching', () => {
+  it('should return ETag and Last-Modified headers and support 304 Not Modified', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterPricingFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({ models: {} } as unknown as PlexusConfig);
+
+    // Initial request
+    const response1 = await fastify.inject({ method: 'GET', url: '/v1/openrouter/models' });
+    expect(response1.statusCode).toBe(200);
+    const etag = response1.headers.etag;
+    const lastModified = response1.headers['last-modified'];
+    expect(etag).toBeDefined();
+    expect(lastModified).toBeDefined();
+
+    // Second request with If-None-Match
+    const response2 = await fastify.inject({
+      method: 'GET',
+      url: '/v1/openrouter/models',
+      headers: {
+        'if-none-match': etag as string,
+      },
+    });
+    expect(response2.statusCode).toBe(304);
+
+    // Third request with If-Modified-Since
+    const response3 = await fastify.inject({
+      method: 'GET',
+      url: '/v1/openrouter/models',
+      headers: {
+        'if-modified-since': lastModified as string,
+      },
+    });
+    expect(response3.statusCode).toBe(304);
   });
 });

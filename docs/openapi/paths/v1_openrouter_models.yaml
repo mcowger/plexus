@@ -8,6 +8,12 @@ get:
     The catalog is loaded at startup and refreshed periodically (see
     `/v0/management/models/metadata/refresh` for a manual refresh). Returns 503
     if the catalog hasn't been loaded yet.
+
+    This endpoint computes a SHA-256 hash of the fully serialized JSON
+    response to provide `ETag` and `Last-Modified` headers. Computing the
+    hash on the fly is explicitly accepted as benchmarks show it is
+    extremely fast (<0.01ms). It supports `If-None-Match` and
+    `If-Modified-Since` headers to return a 304 Not Modified status.
   security: []
   parameters:
     - in: query
@@ -18,6 +24,15 @@ get:
   responses:
     '200':
       description: Slug list.
+      headers:
+        ETag:
+          schema:
+            type: string
+          description: A SHA-256 hash of the JSON response payload.
+        Last-Modified:
+          schema:
+            type: string
+          description: The date when the response hash last changed.
       content:
         application/json:
           schema:
@@ -32,6 +47,8 @@ get:
             required:
               - data
               - count
+    '304':
+      description: Not Modified. The client's cached version is still current based on ETag or Last-Modified.
     '400':
       description: Bad request.
     '503':

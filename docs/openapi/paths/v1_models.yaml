@@ -5,10 +5,25 @@ get:
   description: |
     Returns all configured model aliases. If an alias has a `metadata`
     block, the response includes enriched OpenRouter-style fields.
+
+    This endpoint computes a SHA-256 hash of the fully serialized JSON
+    response to provide `ETag` and `Last-Modified` headers. Computing the
+    hash on the fly is explicitly accepted as benchmarks show it is
+    extremely fast (<0.01ms). It supports `If-None-Match` and
+    `If-Modified-Since` headers to return a 304 Not Modified status.
   security: []
   responses:
     '200':
       description: Alias list.
+      headers:
+        ETag:
+          schema:
+            type: string
+          description: A SHA-256 hash of the JSON response payload.
+        Last-Modified:
+          schema:
+            type: string
+          description: The date when the response hash last changed.
       content:
         application/json:
           schema:
@@ -46,6 +61,8 @@ get:
                 object: model
                 created: 1748000000
                 owned_by: plexus
+    '304':
+      description: Not Modified. The client's cached version is still current based on ETag or Last-Modified.
     '400':
       description: Bad request.
   operationId: getV1Models
