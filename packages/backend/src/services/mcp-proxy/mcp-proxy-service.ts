@@ -56,10 +56,15 @@ export function injectMcpKeyAuth(
   if (!authScheme || !key) return headers;
 
   const normalizedScheme = authScheme.toLowerCase();
+  const headerName = normalizedScheme === 'bearer' ? 'authorization' : normalizedScheme;
   const withoutExistingAuth = Object.fromEntries(
-    Object.entries(headers).filter(([name]) => name.toLowerCase() !== normalizedScheme)
+    Object.entries(headers).filter(([name]) => name.toLowerCase() !== headerName)
   );
-  return { ...withoutExistingAuth, [authScheme]: key };
+  return {
+    ...withoutExistingAuth,
+    [normalizedScheme === 'bearer' ? 'Authorization' : authScheme]:
+      normalizedScheme === 'bearer' ? `Bearer ${key}` : key,
+  };
 }
 
 async function getActiveMcpKeys(serverName: string): Promise<{
@@ -348,7 +353,11 @@ export async function proxyMcpRequest(
 
       const redactedHeaders = redactSensitiveHeaders(requestHeaders);
       if (keyConfig?.server.authScheme && key) {
-        redactedHeaders[keyConfig.server.authScheme] = '[REDACTED]';
+        const headerToRedact =
+          keyConfig.server.authScheme.toLowerCase() === 'bearer'
+            ? 'Authorization'
+            : keyConfig.server.authScheme;
+        redactedHeaders[headerToRedact] = '[REDACTED]';
       }
       logger.silly(`Upstream headers: ${JSON.stringify(redactedHeaders)}`);
       logger.silly(`Request body: ${requestBody}`);
