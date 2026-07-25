@@ -161,7 +161,11 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         Date.parse(ifModifiedSince) >= Date.parse(v1ModelsLastModified))
     );
 
-    if (etagMatches || lastModifiedMatches) {
+    if (ifNoneMatch) {
+      if (etagMatches) {
+        return reply.status(304).send();
+      }
+    } else if (lastModifiedMatches) {
       return reply.status(304).send();
     }
 
@@ -304,7 +308,11 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         Date.parse(ifModifiedSince) >= Date.parse(openrouterModelsLastModified))
     );
 
-    if (etagMatches || lastModifiedMatches) {
+    if (ifNoneMatch) {
+      if (etagMatches) {
+        return reply.status(304).send();
+      }
+    } else if (lastModifiedMatches) {
       return reply.status(304).send();
     }
 
