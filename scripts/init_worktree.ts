@@ -19,7 +19,6 @@ const commands: readonly Command[] = [
     cmd: ['git', 'fetch', 'origin', 'main:refs/remotes/origin/main'],
   },
   { label: 'Rebase worktree onto origin/main', cmd: ['git', 'rebase', 'origin/main'] },
-  { label: 'Rebase worktree onto origin/main', cmd: ['git', 'pull'] },
   { label: 'Trust mise configuration', cmd: ['mise', 'trust'] },
   { label: 'Install Bun dependencies', cmd: ['bun', 'install'] },
   { label: 'Build frontend', cmd: ['bun', 'run', 'build:frontend'] },
