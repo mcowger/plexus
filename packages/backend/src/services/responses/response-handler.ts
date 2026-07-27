@@ -221,10 +221,11 @@ export async function handleResponse(
     // TAP THE RAW STREAM for debugging/usage extraction
     // We always capture the stream BEFORE any transformation to enable usage extraction,
     // even with pass-through optimization. Debug mode only controls DB persistence.
-    const rawLogInspector = new DebugLoggingInspector(
-      usageRecord.requestId!,
-      'raw'
-    ).createInspector(providerApiType);
+    // The DebugLoggingInspector INSTANCE is kept (not just its tap stream):
+    // the cancellation teardown below must finalize() the capture explicitly,
+    // because a cancelled pipeline never runs the tap's flush.
+    const rawDebugLogging = new DebugLoggingInspector(usageRecord.requestId!, 'raw');
+    const rawLogInspector = rawDebugLogging.createInspector(providerApiType);
 
     const tapStream = new TransformStream({
       transform(chunk, controller) {
@@ -349,10 +350,11 @@ export async function handleResponse(
 
     // TAP THE TRANSFORMED STREAM for debugging
     // This captures what is actually sent to the client
-    const transformedLogInspector = new DebugLoggingInspector(
+    const transformedDebugLogging = new DebugLoggingInspector(
       usageRecord.requestId!,
       'transformed'
-    ).createInspector(apiType);
+    );
+    const transformedLogInspector = transformedDebugLogging.createInspector(apiType);
 
     const transformedTapStream = new TransformStream({
       transform(chunk, controller) {
@@ -542,6 +544,17 @@ export async function handleResponse(
       } else if (isTimeout) {
         usageRecord.responseStatus = 'timeout';
       }
+      // Flush both debug captures BEFORE tearing the pipeline down: a
+      // cancelled web TransformStream never runs its flush(), so the
+      // raw/transformed taps' 'end' handlers never fire on a real
+      // disconnect/timeout/stall — without this, the snapshots would never
+      // be written and UsageInspector._destroy's usage fallback would find
+      // nothing (cancelled/timeout records finalized with zero tokens).
+      // finalize() is synchronous and idempotent (a later natural 'end' is a
+      // no-op), and it must run before pipeline.destroy(), which invokes
+      // UsageInspector._destroy synchronously.
+      rawDebugLogging.finalize();
+      transformedDebugLogging.finalize();
       // Destroy without passing the error — calling .destroy(err) causes Node.js to
       // emit 'error' on the stream, which becomes an uncaught exception since
       // these streams don't have error listeners. The cancellation still works:

@@ -142,6 +142,15 @@ export interface UnifiedChatRequest {
   response_format?: {
     type: 'text' | 'json_object' | 'json_schema';
     json_schema?: any;
+    /**
+     * Structured-output descriptor fields carried from the client (Responses
+     * `text.format.name` / `description` / `strict`) so cross-format
+     * emission preserves the client-supplied values — fabricated fallbacks
+     * (`response_schema`, `strict: true`) apply only when these are absent.
+     */
+    name?: string;
+    description?: string;
+    strict?: boolean;
   };
   prompt?: string | string[];
   suffix?: string | null;
@@ -191,6 +200,24 @@ export interface UnifiedUsage {
   cache_creation_tokens: number;
 }
 
+/**
+ * A COMPLETED Responses-API `image_generation_call` output item carried typed
+ * through the unified layer (mirroring how tool_calls are carried) so
+ * same-format (responses -> responses) non-bypass routes can re-emit the
+ * native item instead of a lossy markdown rendering. The responses -> unified
+ * transforms emit BOTH this typed item (full base64 `result`, never
+ * size-capped) and the chat-format markdown rendering on the content string
+ * (size-guarded): responses-facing formatters re-emit the native item and
+ * skip the paired markdown; chat/messages-facing formatters render the
+ * content string and never read this field.
+ */
+export interface UnifiedImageGenerationCall {
+  id?: string;
+  status?: string;
+  /** Base64 image payload, byte-intact (no inline-size cap at this layer). */
+  result: string;
+}
+
 export interface UnifiedChatResponse {
   id: string;
   model: string;
@@ -229,6 +256,13 @@ export interface UnifiedChatResponse {
       arguments: string;
     };
   }>;
+  /**
+   * Completed image_generation_call output items, typed (see
+   * UnifiedImageGenerationCall). Populated alongside the markdown rendering
+   * already appended to `content` — responses-facing formatters re-emit these
+   * natively and subtract the paired markdown from the message text.
+   */
+  image_generation_calls?: UnifiedImageGenerationCall[];
   annotations?: Annotation[];
   stream?: ReadableStream | any;
   bypassTransformation?: boolean;
@@ -302,6 +336,19 @@ export interface UnifiedChatStreamChunk {
    * event, status 'incomplete') instead of a generic failure.
    */
   incomplete_details?: { reason: string };
+  /**
+   * Completed image_generation_call items carried typed (see
+   * UnifiedImageGenerationCall), paired with their chat-format markdown
+   * rendering on `delta.content` in the SAME chunk. Deliberately a CHUNK-level
+   * field (not inside `delta`, where tool_calls live): the chat-facing
+   * formatters (openai.ts, ollama.ts) forward `delta` BY REFERENCE into the
+   * client SSE chunk, so a delta-level field would leak the (possibly
+   * multi-megabyte, uncapped) base64 into chat-format wire chunks — top-level
+   * unified-chunk fields are never copied by those formatters. The
+   * responses-facing formatStream re-emits these as native output items and
+   * skips the paired markdown content delta.
+   */
+  image_generation_calls?: UnifiedImageGenerationCall[];
 }
 
 // Unified Embeddings Request

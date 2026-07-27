@@ -107,13 +107,21 @@ export class OpenAITransformer implements Transformer {
 
     if (request.response_format) {
       if (request.response_format.type === 'json_schema' && request.response_format.json_schema) {
-        // OpenAI json_schema mode requires {name, schema, strict} wrapping
+        // OpenAI json_schema mode requires {name, schema, strict} wrapping.
+        // The client-supplied descriptor (carried on the unified
+        // response_format — see types/unified.ts) wins; the fabricated
+        // `response_schema` / `strict: true` values are fallbacks ONLY for
+        // clients that omitted them (`?? `— an explicit strict: false must
+        // survive).
         out.response_format = {
           type: 'json_schema',
           json_schema: {
-            name: 'response_schema',
+            name: request.response_format.name ?? 'response_schema',
+            ...(request.response_format.description !== undefined
+              ? { description: request.response_format.description }
+              : {}),
             schema: request.response_format.json_schema,
-            strict: true,
+            strict: request.response_format.strict ?? true,
           },
         };
       } else {
@@ -301,11 +309,21 @@ export class OpenAITransformer implements Transformer {
                 // (upstream aborted, error dropped upstream of us, or zero
                 // parsable events): synthesize one so OpenAI-compatible
                 // clients never see a stream with no stop chunk.
+                //
+                // With ZERO parsable chunks there is no upstream id to echo,
+                // so synthesize one (this file has no id-generation
+                // convention of its own; `chatcmpl_` matches the OpenAI wire
+                // prefix). No `model` is synthesized in that case: this
+                // formatter's only input is the unified chunk stream itself
+                // — it has no request context — so when no chunk ever
+                // arrived the model is genuinely unknowable here, and the
+                // field is omitted (JSON drops the undefined) rather than
+                // fabricated.
                 controller.enqueue(
                   encoder.encode(
                     encode({
                       data: JSON.stringify({
-                        id: lastChunkId,
+                        id: lastChunkId ?? `chatcmpl_${crypto.randomUUID()}`,
                         object: 'chat.completion.chunk',
                         created: Math.floor(Date.now() / 1000),
                         model: lastChunkModel,

@@ -99,7 +99,12 @@ export class UsageInspector extends PassThrough {
   private providerDiscount?: number;
   private startTime: number;
   private shouldEstimateTokens: boolean;
-  private apiType: string;
+  /** API type of the UPSTREAM PROVIDER's raw response stream — keys how the
+   * raw-mode reconstruction is read (usage/metadata extraction dialect). */
+  private providerApiType: string;
+  /** API type the CLIENT is speaking (matches `request.incomingApiType`
+   * elsewhere) — keys input-token estimation over the original request and
+   * how the transformed-mode (client-facing) snapshot is read. */
   private incomingApiType: string;
   private originalRequest?: any;
   private firstChunk = true;
@@ -118,7 +123,7 @@ export class UsageInspector extends PassThrough {
     providerDiscount: number | undefined,
     startTime: number,
     shouldEstimateTokens: boolean = false,
-    apiType: string = 'chat',
+    providerApiType: string = 'chat',
     incomingApiType?: string,
     originalRequest?: any,
     gpuParams: GpuParams = DEFAULT_GPU_PARAMS,
@@ -133,8 +138,8 @@ export class UsageInspector extends PassThrough {
     this.providerDiscount = providerDiscount;
     this.startTime = startTime;
     this.shouldEstimateTokens = shouldEstimateTokens;
-    this.apiType = apiType;
-    this.incomingApiType = incomingApiType || apiType;
+    this.providerApiType = providerApiType;
+    this.incomingApiType = incomingApiType || providerApiType;
     this.originalRequest = originalRequest;
     this.gpuParams = gpuParams;
     this.modelParams = modelParams;
@@ -164,9 +169,9 @@ export class UsageInspector extends PassThrough {
     try {
       const debugManager = DebugManager.getInstance();
       const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
+      const usage = this.readObservedUsage(debugManager, reconstructed);
 
-      if (reconstructed) {
-        const usage = extractUsageFromReconstructed(reconstructed, this.apiType);
+      if (reconstructed || usage) {
         if (usage) {
           stats.inputTokens = usage.inputTokens || 0;
           stats.outputTokens = usage.outputTokens || 0;
@@ -175,27 +180,44 @@ export class UsageInspector extends PassThrough {
           stats.reasoningTokens = usage.reasoningTokens || 0;
         }
 
-        // Extract response metadata (tool calls count and finish reason)
-        const responseMetadata = this.extractResponseMetadataFromReconstructed(
-          reconstructed,
-          this.apiType
-        );
-        this.usageRecord.toolCallsCount = responseMetadata.toolCallsCount;
-        this.usageRecord.finishReason = responseMetadata.finishReason;
+        if (reconstructed) {
+          // Extract response metadata (tool calls count and finish reason) —
+          // raw-mode only: the transformed snapshot never feeds metadata.
+          const responseMetadata = this.extractResponseMetadataFromReconstructed(
+            reconstructed,
+            this.providerApiType
+          );
+          this.usageRecord.toolCallsCount = responseMetadata.toolCallsCount;
+          this.usageRecord.finishReason = responseMetadata.finishReason;
 
-        if (this.shouldEstimateTokens) {
-          logger.debug(
-            `No usage data found for ${this.usageRecord.requestId}, attempting estimation`
-          );
-          const estimated = estimateTokensFromReconstructed(reconstructed, this.apiType);
-          stats.outputTokens = estimated.output;
-          stats.reasoningTokens = estimated.reasoning;
-          this.usageRecord.tokensEstimated = 1;
-          logger.debug(
-            `Estimated tokens for ${this.usageRecord.requestId}: ` +
-              `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
-          );
-          debugManager.discardEphemeral(this.usageRecord.requestId!);
+          if (this.shouldEstimateTokens) {
+            // Estimation is a FALLBACK for responses that carried no usage at
+            // all: it must never overwrite real usage extracted from the raw
+            // reconstruction or the transformed-snapshot fallback above (for
+            // a 'responses' provider the estimator has no dialect support
+            // and returns zeros — the overwrite would zero out real counts
+            // and corrupt costs/quota).
+            if (!usage) {
+              logger.debug(
+                `No usage data found for ${this.usageRecord.requestId}, attempting estimation`
+              );
+              const estimated = estimateTokensFromReconstructed(
+                reconstructed,
+                this.providerApiType
+              );
+              stats.outputTokens = estimated.output;
+              stats.reasoningTokens = estimated.reasoning;
+              this.usageRecord.tokensEstimated = 1;
+              logger.debug(
+                `Estimated tokens for ${this.usageRecord.requestId}: ` +
+                  `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
+              );
+            }
+            // The ephemeral capture was made solely for this estimation pass —
+            // discard it whether estimation ran or real usage won, so the
+            // marker doesn't leak past this request.
+            debugManager.discardEphemeral(this.usageRecord.requestId!);
+          }
         }
 
         if (this.originalRequest && stats.inputTokens === 0) {
@@ -353,15 +375,19 @@ export class UsageInspector extends PassThrough {
 
       const debugManager = DebugManager.getInstance();
       const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
-      if (reconstructed) {
-        const usage = extractUsageFromReconstructed(reconstructed, this.apiType);
-        if (usage) {
-          this.usageRecord.tokensInput = usage.inputTokens || null;
-          this.usageRecord.tokensOutput = usage.outputTokens || null;
-          this.usageRecord.tokensCached = usage.cachedTokens || null;
-          this.usageRecord.tokensCacheWrite = usage.cacheWriteTokens || null;
-          this.usageRecord.tokensReasoning = usage.reasoningTokens || null;
-        }
+      // Same read-raw-then-fallback as _flush (readObservedUsage): a stream
+      // destroyed mid-flight can have usage only in the transformed-mode
+      // snapshot, and without the fallback the cancelled/timeout record
+      // would finalize with no tokens at all.
+      const usage = this.readObservedUsage(debugManager, reconstructed);
+      if (usage) {
+        this.usageRecord.tokensInput = usage.inputTokens || null;
+        this.usageRecord.tokensOutput = usage.outputTokens || null;
+        this.usageRecord.tokensCached = usage.cachedTokens || null;
+        this.usageRecord.tokensCacheWrite = usage.cacheWriteTokens || null;
+        this.usageRecord.tokensReasoning = usage.reasoningTokens || null;
+      }
+      if (reconstructed || usage) {
         calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
       }
 
@@ -378,6 +404,30 @@ export class UsageInspector extends PassThrough {
     }
 
     callback(err);
+  }
+
+  /**
+   * Reads observed usage for this request, shared by BOTH finalization paths
+   * (_flush for streams that end normally, _destroy for cancelled/timed-out
+   * streams). The raw-mode reconstruction is AUTHORITATIVE for usage. Only
+   * when it yields no usage at all (no reconstruction, or a reconstruction
+   * without a usage block) fall back to the transformed-mode snapshot — the
+   * client-facing stream reconstruction the transformed DebugLoggingInspector
+   * writes — mirroring the raw extraction per api type (the transformed
+   * snapshot is keyed by the CLIENT api type).
+   */
+  private readObservedUsage(
+    debugManager: DebugManager,
+    reconstructed: any
+  ): ExtractedObservedUsage | null {
+    let usage = extractUsageFromReconstructed(reconstructed, this.providerApiType);
+    if (!usage) {
+      const transformedSnapshot = debugManager.getPendingLog(
+        this.usageRecord.requestId!
+      )?.transformedResponseSnapshot;
+      usage = extractUsageFromReconstructed(transformedSnapshot, this.incomingApiType);
+    }
+    return usage;
   }
 
   private extractResponseMetadataFromReconstructed(

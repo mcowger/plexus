@@ -11,7 +11,12 @@ import {
   ResponsesReasoningTextPart,
   ResponsesSummaryTextPart,
 } from '../types/responses';
-import { UnifiedChatRequest, UnifiedChatResponse, UnifiedMessage } from '../types/unified';
+import {
+  UnifiedChatRequest,
+  UnifiedChatResponse,
+  UnifiedImageGenerationCall,
+  UnifiedMessage,
+} from '../types/unified';
 import { createParser } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
 import { logger } from '../utils/logger';
@@ -19,6 +24,89 @@ import { normalizeOpenAIChatUsage, normalizeOpenAIResponsesUsage } from '../util
 
 const OPENAI_RESPONSES_CALL_ID_MAX_LENGTH = 64;
 const OPENAI_RESPONSES_REASONING_CONTENT_MAX_ITEMS = 0;
+
+// Largest image_generation_call base64 `result` (in characters) that
+// imageGenerationCallMarkdown will inline as a data URI. Anything larger is
+// rendered as an omission placeholder instead: the markdown lands in a single
+// unified content string / SSE content delta, and a multi-megabyte data URI
+// there can blow past client/proxy message-size limits.
+const MAX_INLINE_IMAGE_BASE64_CHARS = 8 * 1024 * 1024;
+
+/**
+ * Projects a completed image_generation_call output item (with a non-empty
+ * base64 `result`) onto the typed unified carry — see
+ * UnifiedImageGenerationCall in types/unified.ts. The `result` is carried
+ * byte-intact: the inline size cap applies only to the paired markdown
+ * rendering, never to the typed item.
+ */
+function toUnifiedImageGenerationCall(item: any): UnifiedImageGenerationCall {
+  return {
+    ...(typeof item.id === 'string' ? { id: item.id } : {}),
+    ...(typeof item.status === 'string' ? { status: item.status } : {}),
+    result: item.result,
+  };
+}
+
+/**
+ * Sniffs the image mime SUBTYPE from the magic bytes at the head of a base64
+ * payload. `output_format` is a REQUEST-side image tool field — it is not
+ * present on image_generation_call output items — so the payload's own
+ * signature is the only reliable source:
+ *   - PNG:  \x89 P N G
+ *   - JPEG: \xFF \xD8
+ *   - WebP: R I F F ...(4 size bytes)... W E B P
+ *   - GIF:  G I F 8
+ * Anything unrecognized defaults to png. Only the markdown data-URI rendering
+ * needs a mime — the native typed re-emit carries raw base64 with no URI.
+ */
+function sniffImageMimeSubtype(base64Result: string): string {
+  // 24 base64 chars decode to 18 bytes — enough for every signature above
+  // (WebP needs 12).
+  const head = Buffer.from(base64Result.slice(0, 24), 'base64');
+  if (
+    head.length >= 4 &&
+    head[0] === 0x89 &&
+    head[1] === 0x50 &&
+    head[2] === 0x4e &&
+    head[3] === 0x47
+  ) {
+    return 'png';
+  }
+  if (head.length >= 2 && head[0] === 0xff && head[1] === 0xd8) {
+    return 'jpeg';
+  }
+  if (
+    head.length >= 12 &&
+    head.toString('latin1', 0, 4) === 'RIFF' &&
+    head.toString('latin1', 8, 12) === 'WEBP'
+  ) {
+    return 'webp';
+  }
+  if (head.length >= 4 && head.toString('latin1', 0, 4) === 'GIF8') {
+    return 'gif';
+  }
+  return 'png';
+}
+
+/**
+ * Removes one rendered image segment (a markdown data-URI or the oversized
+ * placeholder) from a combined unified content string, consuming the single
+ * `\n` join that transformResponse inserted between segments. Used by the
+ * responses-facing formatResponse so the native image_generation_call item is
+ * the ONLY carrier — the message text keeps just the real message segments.
+ */
+function removeRenderedImageSegment(content: string, segment: string): string {
+  const index = content.indexOf(segment);
+  if (index === -1) return content;
+  const end = index + segment.length;
+  if (end < content.length && content[end] === '\n') {
+    return content.slice(0, index) + content.slice(end + 1);
+  }
+  if (index > 0 && content[index - 1] === '\n') {
+    return content.slice(0, index - 1) + content.slice(end);
+  }
+  return content.slice(0, index) + content.slice(end);
+}
 
 // Some Responses clients have been observed replaying tool calls with composite
 // IDs like "call_...|fc_...". OpenAI-compatible providers validate call_id
@@ -151,31 +239,51 @@ export class ResponsesTransformer implements Transformer {
       });
     }
 
+    // Maybe-undefined client fields use conditional spread (not
+    // `key: input.maybeUndefined`) so an omitted client field leaves NO own
+    // property on the unified request — a phantom `key: undefined` own
+    // property survives object spreads and flips `'key' in x` /
+    // hasOwnProperty checks downstream even though JSON would drop it.
     return {
-      requestId: input.requestId,
+      ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
       model: input.model,
       messages,
-      max_tokens: input.max_output_tokens,
+      ...(input.max_output_tokens !== undefined ? { max_tokens: input.max_output_tokens } : {}),
       // Forward temperature only when the client actually sent it. GPT-5
       // reasoning models (and others) reject sampling params outright, so
       // injecting a fabricated default here would send `temperature: 1.0`
       // upstream on every request that omitted it.
-      temperature: input.temperature,
-      stream: input.stream ?? false,
-      tools: tools.length > 0 ? tools : undefined,
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.stream !== undefined ? { stream: input.stream } : {}),
+      ...(tools.length > 0 ? { tools } : {}),
       tool_choice: this.convertToolChoiceForChatCompletions(input.tool_choice),
-      reasoning: input.reasoning,
-      include: input.include,
-      prompt_cache_key: input.prompt_cache_key,
-      text: input.text,
-      parallel_tool_calls: input.parallel_tool_calls,
-      response_format: input.text?.format
+      ...(input.reasoning !== undefined ? { reasoning: input.reasoning } : {}),
+      ...(input.include !== undefined ? { include: input.include } : {}),
+      ...(input.prompt_cache_key !== undefined ? { prompt_cache_key: input.prompt_cache_key } : {}),
+      ...(input.text !== undefined ? { text: input.text } : {}),
+      ...(input.parallel_tool_calls !== undefined
+        ? { parallel_tool_calls: input.parallel_tool_calls }
+        : {}),
+      ...(input.text?.format
         ? {
-            type: input.text.format.type,
-            json_schema: input.text.format.schema,
+            response_format: {
+              type: input.text.format.type,
+              json_schema: input.text.format.schema,
+              // Carry the full structured-output descriptor: dropping
+              // name/description/strict would force the responses -> chat
+              // emission to fabricate `name: "response_schema"` /
+              // `strict: true` over the client-supplied values.
+              ...(input.text.format.name !== undefined ? { name: input.text.format.name } : {}),
+              ...(input.text.format.description !== undefined
+                ? { description: input.text.format.description }
+                : {}),
+              ...(input.text.format.strict !== undefined
+                ? { strict: input.text.format.strict }
+                : {}),
+            },
           }
-        : undefined,
-      metadata: input.metadata,
+        : {}),
+      ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
       incomingApiType: 'responses',
       originalBody: input,
     };
@@ -268,10 +376,15 @@ export class ResponsesTransformer implements Transformer {
       };
     });
 
+    // `stream` uses conditional spread for the same reason parseRequest does:
+    // when the client omitted it, the outbound payload must carry NO own
+    // `stream` property — a phantom `stream: undefined` survives object
+    // spreads and flips `'stream' in x` / hasOwnProperty checks downstream
+    // even though JSON serialization would drop it.
     const payload: any = {
       model: request.model,
       input: inputItems,
-      stream: request.stream,
+      ...(request.stream !== undefined ? { stream: request.stream } : {}),
     };
 
     if (instructions) {
@@ -367,7 +480,33 @@ export class ResponsesTransformer implements Transformer {
 
       // Find the first message output item for content
       const messageItem = response.output?.find((item: any) => item.type === 'message');
-      const content = messageItem?.content?.map((part: any) => part.text).join('\n') || null;
+      const messageText = messageItem?.content?.map((part: any) => part.text).join('\n') || null;
+
+      // Minimal image_generation_call rendering for chat-format clients:
+      // a completed item with a base64 `result` becomes a markdown data-URI
+      // image appended to the unified content, in output-item order relative
+      // to the (first) message item. Without this, an image-only Responses
+      // completion yields no content at all once transformed. When no image
+      // items are present the content is exactly the message text, as before.
+      //
+      // The same completed items are ALSO carried typed (byte-intact, no
+      // inline size cap) on `image_generation_calls` so a responses-facing
+      // formatResponse can re-emit the native item instead of the lossy
+      // markdown — see UnifiedImageGenerationCall in types/unified.ts.
+      const contentSegments: string[] = [];
+      const imageGenerationCalls: UnifiedImageGenerationCall[] = [];
+      for (const item of response.output ?? []) {
+        if (item === messageItem && messageText) {
+          contentSegments.push(messageText);
+          continue;
+        }
+        const imageMarkdown = this.imageGenerationCallMarkdown(item);
+        if (imageMarkdown) {
+          contentSegments.push(imageMarkdown);
+          imageGenerationCalls.push(toUnifiedImageGenerationCall(item));
+        }
+      }
+      const content = contentSegments.length > 0 ? contentSegments.join('\n') : messageText;
 
       // Collect url_citation annotations from all output_text content parts
       const annotations: any[] = [];
@@ -433,6 +572,9 @@ export class ResponsesTransformer implements Transformer {
         reasoning_content,
         annotations: annotations.length > 0 ? annotations : undefined,
         tool_calls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
+        ...(imageGenerationCalls.length > 0
+          ? { image_generation_calls: imageGenerationCalls }
+          : {}),
         usage,
       };
     } else {
@@ -844,6 +986,35 @@ export class ResponsesTransformer implements Transformer {
   }
 
   /**
+   * Renders a COMPLETED image_generation_call output item's base64 `result`
+   * as a markdown data-URI image for chat-format clients (minimal-scope
+   * rendering: completed items only — partial-image preview deltas are
+   * explicitly out of scope, see transformStream). Returns null when the
+   * item carries no base64 `result` payload. The mime subtype is sniffed
+   * from the decoded payload's magic bytes (see sniffImageMimeSubtype) —
+   * `output_format` is a request-tool field that never appears on output
+   * items, so it is deliberately not consulted.
+   *
+   * Results larger than MAX_INLINE_IMAGE_BASE64_CHARS are NOT inlined:
+   * a short placeholder text segment (naming the approximate decoded size)
+   * is rendered instead, so a huge image can't flood a single content
+   * string/SSE delta. Both call sites (transformResponse segments and
+   * transformStream's done/completed rendering) share this guard.
+   */
+  private imageGenerationCallMarkdown(item: any): string | null {
+    if (!item || item.type !== 'image_generation_call') return null;
+    if (typeof item.result !== 'string' || item.result.length === 0) return null;
+    if (item.result.length > MAX_INLINE_IMAGE_BASE64_CHARS) {
+      // Base64 decodes to ~3/4 of its character count; report the
+      // approximate decoded size with one decimal.
+      const approxDecodedMb = ((item.result.length * 3) / 4 / (1024 * 1024)).toFixed(1);
+      return `[generated image omitted: ${approxDecodedMb} MB exceeds inline limit]`;
+    }
+    const format = sniffImageMimeSubtype(item.result);
+    return `![generated image](data:image/${format};base64,${item.result})`;
+  }
+
+  /**
    * Converts Chat Completions response to output items array
    */
   private convertChatResponseToOutputItems(response: UnifiedChatResponse): ResponsesOutputItem[] {
@@ -875,6 +1046,31 @@ export class ResponsesTransformer implements Transformer {
       }
     }
 
+    // Re-emit typed image_generation_call items natively (full base64 — the
+    // native format has no inline-markdown size concern), and strip each
+    // item's paired chat-format rendering (recomputed via the same pure
+    // imageGenerationCallMarkdown helper: data URI, or the oversized
+    // placeholder) out of the combined content so the message text below
+    // carries only the real message segments — never the image twice, never
+    // the placeholder.
+    let messageText = response.content || '';
+    for (const imageCall of response.image_generation_calls ?? []) {
+      if (typeof imageCall.result !== 'string' || imageCall.result.length === 0) continue;
+      const markdown = this.imageGenerationCallMarkdown({
+        type: 'image_generation_call',
+        result: imageCall.result,
+      });
+      if (markdown) {
+        messageText = removeRenderedImageSegment(messageText, markdown);
+      }
+      items.push({
+        type: 'image_generation_call',
+        id: imageCall.id ?? this.generateItemId('ig'),
+        status: (imageCall.status as 'in_progress' | 'completed' | 'failed') ?? 'completed',
+        result: imageCall.result,
+      });
+    }
+
     // Add main message
     items.push({
       type: 'message',
@@ -884,7 +1080,7 @@ export class ResponsesTransformer implements Transformer {
       content: [
         {
           type: 'output_text',
-          text: response.content || '',
+          text: messageText,
           annotations: response.annotations || [],
         },
       ],
@@ -953,6 +1149,14 @@ export class ResponsesTransformer implements Transformer {
     const toolCallIndexByItemId = new Map<string, number>();
     let nextToolCallIndex = 0;
     let hasFunctionCall = false;
+    // image_generation_call items already rendered as a content delta from
+    // their response.output_item.done event, so the response.completed
+    // fallback below doesn't render them a second time.
+    const renderedImageItemIds = new Set<string>();
+    // `start(controller)` below uses method shorthand, so `this` inside it is
+    // the stream's underlying source, not this transformer instance — capture
+    // the helper as a local for use in that scope.
+    const imageGenerationCallMarkdown = (item: any) => this.imageGenerationCallMarkdown(item);
 
     const getToolCallIndex = (data: any): number => {
       const outputIndex =
@@ -1060,6 +1264,38 @@ export class ResponsesTransformer implements Transformer {
                   },
                   finish_reason: null,
                 });
+              } else if (
+                data.type === 'response.output_item.done' &&
+                data.item?.type === 'image_generation_call'
+              ) {
+                // Minimal image rendering, COMPLETED items only: a finished
+                // image_generation_call with a base64 result becomes a
+                // markdown data-URI content delta for chat-format clients,
+                // PAIRED with the chunk-level typed carry
+                // (`image_generation_calls`, full base64 — see
+                // types/unified.ts) that responses-facing formatters re-emit
+                // natively instead of the markdown. Partial-image preview
+                // events (response.image_generation_call.partial_image) are
+                // deliberately NOT handled — rendering progressive previews
+                // as chat content deltas has no sensible mapping, so they
+                // are explicitly skipped as out of scope; only the final
+                // completed image renders.
+                const imageMarkdown = imageGenerationCallMarkdown(data.item);
+                if (imageMarkdown) {
+                  if (typeof data.item.id === 'string') {
+                    renderedImageItemIds.add(data.item.id);
+                  }
+                  controller.enqueue({
+                    id: responseId,
+                    model: responseModel,
+                    created: Math.floor(Date.now() / 1000),
+                    delta: {
+                      content: imageMarkdown,
+                    },
+                    image_generation_calls: [toUnifiedImageGenerationCall(data.item)],
+                    finish_reason: null,
+                  });
+                }
               } else if (data.type === 'response.completed') {
                 // Final chunk with usage data and an OpenAI-compatible finish reason.
                 // `response.completed` includes the full output as a fallback because some
@@ -1069,6 +1305,28 @@ export class ResponsesTransformer implements Transformer {
                 const completedResponseHasFunctionCall = data.response?.output?.some(
                   (item: any) => item?.type === 'function_call'
                 );
+                // Same fallback as function calls above: render any completed
+                // image_generation_call items that only appear in the final
+                // response (skipping ones already rendered from their own
+                // response.output_item.done event) BEFORE the terminal chunk,
+                // so the content delta still reaches the client — with the
+                // same paired typed carry as the output_item.done path.
+                for (const item of data.response?.output ?? []) {
+                  if (item?.type !== 'image_generation_call') continue;
+                  if (typeof item.id === 'string' && renderedImageItemIds.has(item.id)) continue;
+                  const imageMarkdown = imageGenerationCallMarkdown(item);
+                  if (!imageMarkdown) continue;
+                  controller.enqueue({
+                    id: responseId,
+                    model: responseModel,
+                    created: Math.floor(Date.now() / 1000),
+                    delta: {
+                      content: imageMarkdown,
+                    },
+                    image_generation_calls: [toUnifiedImageGenerationCall(item)],
+                    finish_reason: null,
+                  });
+                }
                 controller.enqueue({
                   id: responseId,
                   model: responseModel,
@@ -1390,12 +1648,52 @@ export class ResponsesTransformer implements Transformer {
       });
     };
 
-    const finalizeOutputItems = (controller: ReadableStreamDefaultController): any[] => {
+    // Re-emits typed image_generation_call carries (see types/unified.ts) as
+    // native Responses output items — full base64 `result`, no inline size
+    // cap (the markdown guard exists for content strings; the native format
+    // has no such concern). Each item is registered in outputItemsByIndex so
+    // the terminal response.completed's output array includes it.
+    const emitImageGenerationCallItems = (
+      controller: ReadableStreamDefaultController,
+      imageCalls: Array<{ id?: string; status?: string; result: string }>
+    ) => {
+      for (const imageCall of imageCalls) {
+        const outputIndex = reserveOutputIndex();
+        const itemId = imageCall.id || this.generateItemId('ig');
+        const doneItem = {
+          id: itemId,
+          type: 'image_generation_call',
+          status: imageCall.status || 'completed',
+          result: imageCall.result,
+        };
+        sendEvent(controller, {
+          type: 'response.output_item.added',
+          output_index: outputIndex,
+          item: { ...doneItem, status: 'in_progress', result: null },
+        });
+        sendEvent(controller, {
+          type: 'response.output_item.done',
+          output_index: outputIndex,
+          item: doneItem,
+        });
+        outputItemsByIndex.set(outputIndex, doneItem);
+      }
+    };
+
+    // `itemStatus` is the terminal status stamped on items that were still
+    // in progress when the stream ended. The completed and failed paths keep
+    // the pre-existing 'completed' stamp; only the response.incomplete path
+    // passes 'incomplete' (matching the real Responses API, where items cut
+    // off mid-generation surface as status 'incomplete').
+    const finalizeOutputItems = (
+      controller: ReadableStreamDefaultController,
+      itemStatus: 'completed' | 'incomplete' = 'completed'
+    ): any[] => {
       if (reasoningItemSent && reasoningOutputIndex !== null) {
         const reasoningItem = {
           id: reasoningItemId,
           type: 'reasoning',
-          status: 'completed',
+          status: itemStatus,
           content: reasoningText
             ? [
                 {
@@ -1455,7 +1753,7 @@ export class ResponsesTransformer implements Transformer {
         const messageItem = {
           id: messageItemId,
           type: 'message',
-          status: 'completed',
+          status: itemStatus,
           role: 'assistant',
           content: [
             {
@@ -1505,7 +1803,7 @@ export class ResponsesTransformer implements Transformer {
           toolItem = {
             id: itemId,
             type: 'custom_tool_call',
-            status: 'completed',
+            status: itemStatus,
             call_id: callId,
             name: flatName,
             input: this.customToolInput(args),
@@ -1515,7 +1813,7 @@ export class ResponsesTransformer implements Transformer {
           toolItem = {
             id: itemId,
             type: 'function_call',
-            status: 'completed',
+            status: itemStatus,
             call_id: callId,
             name: namespaced ? namespaced.name : flatName,
             ...(namespaced ? { namespace: namespaced.namespace } : {}),
@@ -1613,7 +1911,13 @@ export class ResponsesTransformer implements Transformer {
               if (unifiedChunk.usage) {
                 lastUsage = unifiedChunk.usage;
               }
-              const outputItems = finalizeOutputItems(controller);
+              // Items still in progress on the incomplete path finalize with
+              // status 'incomplete'; the failed path keeps the pre-existing
+              // 'completed' stamp (see finalizeOutputItems).
+              const outputItems = finalizeOutputItems(
+                controller,
+                unifiedChunk.incomplete_details ? 'incomplete' : 'completed'
+              );
               const err = unifiedChunk.error || {};
 
               if (unifiedChunk.incomplete_details) {
@@ -1661,6 +1965,22 @@ export class ResponsesTransformer implements Transformer {
             const reasoningSummaryDelta =
               typeof delta.thinking?.content === 'string' ? delta.thinking.content : null;
 
+            // Typed image_generation_call carries re-emit as NATIVE output
+            // items for this Responses-format client. The same chunk's
+            // `delta.content` is the chat-format markdown rendering of these
+            // exact items (transformStream pairs them 1:1), so the content
+            // delta is skipped below — the native item is the only carrier
+            // here (a chat client would render the markdown instead).
+            const typedImageCalls = Array.isArray(unifiedChunk.image_generation_calls)
+              ? unifiedChunk.image_generation_calls.filter(
+                  (imageCall: any) =>
+                    imageCall && typeof imageCall.result === 'string' && imageCall.result.length > 0
+                )
+              : [];
+            if (typedImageCalls.length > 0) {
+              emitImageGenerationCallItems(controller, typedImageCalls);
+            }
+
             if (reasoningDelta && reasoningDelta.length > 0) {
               ensureReasoningItem(controller);
               reasoningText += reasoningDelta;
@@ -1698,7 +2018,11 @@ export class ResponsesTransformer implements Transformer {
               });
             }
 
-            if (typeof delta.content === 'string' && delta.content.length > 0) {
+            if (
+              typeof delta.content === 'string' &&
+              delta.content.length > 0 &&
+              typedImageCalls.length === 0
+            ) {
               ensureMessageItem(controller);
               messageText += delta.content;
               sendEvent(controller, {

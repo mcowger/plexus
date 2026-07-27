@@ -205,10 +205,9 @@ export async function buildRequestPayload(
     // (Messages) clients — chat/responses clients get the response
     // translated by the standard pipeline (mirrors the identical Codex fix,
     // commit 4f74c1c6). Copilot honors its computed same-format decision.
-    const incomingIsResponses =
-      getApiBaseType(request.incomingApiType?.toLowerCase() ?? '') === 'responses';
-    const incomingIsMessages =
-      getApiBaseType(request.incomingApiType?.toLowerCase() ?? '') === 'messages';
+    const incomingBaseType = getApiBaseType(request.incomingApiType?.toLowerCase() ?? '');
+    const incomingIsResponses = incomingBaseType === 'responses';
+    const incomingIsMessages = incomingBaseType === 'messages';
     const nativeBypass = codexNative
       ? codexCliPassthrough || incomingIsResponses
       : copilotNative

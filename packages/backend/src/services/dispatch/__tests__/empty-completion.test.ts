@@ -380,6 +380,69 @@ describe('createStreamVisibilityTracker / observeStreamChunk / isStreamEmpty (st
   });
 });
 
+describe('observeStreamChunk — chunk-level annotations/images branches (forward-compat contract)', () => {
+  // No current transformer streams chunk-level `annotations` or `images`,
+  // but the tracker reads both defensively so a future transformer that does
+  // is picked up without changes here. These tests pin that contract with
+  // synthetic unified chunks. Note both branches sit AFTER the `delta`
+  // presence guard, so the synthetic chunks carry an (empty) delta object.
+  it('a chunk-level annotations array marks the tracker non-empty', () => {
+    const tracker = createStreamVisibilityTracker();
+    observeStreamChunk(tracker, {
+      delta: {},
+      annotations: [
+        {
+          type: 'url_citation',
+          url_citation: { url: 'https://example.com', title: 'Example' },
+        },
+      ],
+    } as any);
+
+    expect(tracker.annotationCount).toBe(1);
+    expect(isStreamEmpty(tracker)).toBe(false);
+  });
+
+  it('a chunk-level images array marks the tracker non-empty', () => {
+    const tracker = createStreamVisibilityTracker();
+    observeStreamChunk(tracker, {
+      delta: {},
+      images: [{ data: 'base64...' }],
+    } as any);
+
+    expect(tracker.imageCount).toBe(1);
+    expect(isStreamEmpty(tracker)).toBe(false);
+  });
+
+  it('annotation and image counts accumulate across chunks', () => {
+    const tracker = createStreamVisibilityTracker();
+    observeStreamChunk(tracker, {
+      delta: {},
+      annotations: [{ type: 'url_citation' }, { type: 'url_citation' }],
+    } as any);
+    observeStreamChunk(tracker, { delta: {}, annotations: [{ type: 'url_citation' }] } as any);
+    observeStreamChunk(tracker, { delta: {}, images: [{ data: 'a' }, { data: 'b' }] } as any);
+    observeStreamChunk(tracker, { delta: {}, images: [{ data: 'c' }] } as any);
+
+    expect(tracker.annotationCount).toBe(3);
+    expect(tracker.imageCount).toBe(3);
+    expect(isStreamEmpty(tracker)).toBe(false);
+  });
+
+  it('empty annotations/images arrays (and non-array values) leave the tracker empty', () => {
+    const tracker = createStreamVisibilityTracker();
+    observeStreamChunk(tracker, { delta: {}, annotations: [], images: [] } as any);
+    observeStreamChunk(tracker, {
+      delta: {},
+      annotations: 'not-an-array',
+      images: { data: 'not-an-array' },
+    } as any);
+
+    expect(tracker.annotationCount).toBe(0);
+    expect(tracker.imageCount).toBe(0);
+    expect(isStreamEmpty(tracker)).toBe(true);
+  });
+});
+
 describe('EMPTY_COMPLETION_REASON', () => {
   it('is the exact reason string documented in the task brief', () => {
     expect(EMPTY_COMPLETION_REASON).toBe('Empty completion (no visible output)');

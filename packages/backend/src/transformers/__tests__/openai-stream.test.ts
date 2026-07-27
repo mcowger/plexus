@@ -57,6 +57,29 @@ describe('OpenAITransformer.formatStream robustness', () => {
     expect(finishChunks).toHaveLength(1);
     expect(finishChunks[0].choices[0].finish_reason).toBe('stop');
     expect(finishChunks[0].choices[0].delta).toEqual({});
+    // The flushed stop chunk echoes the id/model seen on the stream.
+    expect(finishChunks[0].id).toBe('chatcmpl_1');
+    expect(finishChunks[0].model).toBe('gpt-4o');
+  });
+
+  test('synthesizes an id on the flushed stop chunk when ZERO chunks arrived', async () => {
+    const formatted = new OpenAITransformer().formatStream(unifiedStreamFromChunks([]));
+    const chunks = await readOpenAISSEChunks(formatted as ReadableStream<Uint8Array>);
+
+    expect(chunks.at(-1)).toBe('[DONE]');
+    const payloadChunks = chunks.filter((c) => c !== '[DONE]');
+    expect(payloadChunks).toHaveLength(1);
+
+    const stopChunk = payloadChunks[0];
+    expect(stopChunk.object).toBe('chat.completion.chunk');
+    expect(stopChunk.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
+    // No upstream id ever arrived — one must be synthesized so the stop
+    // chunk is still a well-formed chat.completion.chunk.
+    expect(stopChunk.id).toMatch(/^chatcmpl_/);
+    // formatStream's only input is the unified chunk stream itself (the
+    // formatter has no request context); with zero chunks no model is
+    // reachable, so none is fabricated.
+    expect(stopChunk).not.toHaveProperty('model');
   });
 
   test('does not synthesize an extra finish chunk when one already arrived', async () => {
@@ -476,5 +499,42 @@ describe('OpenAITransformer.formatStream robustness', () => {
     expect(chunks.some((c) => c !== '[DONE]' && c.error)).toBe(false);
     expect(chunks.filter((c) => c === '[DONE]')).toHaveLength(1);
     expect(chunks.at(-1)).toBe('[DONE]');
+  });
+
+  test('a unified chunk carrying typed image_generation_calls renders ONLY the markdown content into chat SSE', async () => {
+    // responses.ts transformStream pairs each completed image item's typed
+    // carry (chunk-level `image_generation_calls`, full base64) with its
+    // chat-format markdown rendering on `delta.content`. A chat-format
+    // client must receive exactly the markdown — the typed field (which can
+    // hold multi-megabyte, uncapped base64) must never leak into the chat
+    // wire chunk.
+    const markdown = '![generated image](data:image/png;base64,aGVsbG8=)';
+    const unifiedStream = unifiedStreamFromChunks([
+      {
+        id: 'chatcmpl_img',
+        model: 'gpt-image-model',
+        created: 1234567890,
+        delta: { content: markdown },
+        image_generation_calls: [{ id: 'ig_1', status: 'completed', result: 'aGVsbG8=' }],
+        finish_reason: null,
+      },
+      {
+        id: 'chatcmpl_img',
+        model: 'gpt-image-model',
+        created: 1234567890,
+        delta: {},
+        finish_reason: 'stop',
+      },
+    ]);
+
+    const formatted = new OpenAITransformer().formatStream(unifiedStream);
+    const chunks = await readOpenAISSEChunks(formatted as ReadableStream<Uint8Array>);
+
+    const contentChunks = chunks.filter((c) => c !== '[DONE]' && c.choices?.[0]?.delta?.content);
+    expect(contentChunks).toHaveLength(1);
+    expect(contentChunks[0].choices[0].delta.content).toBe(markdown);
+    expect(
+      chunks.some((c) => c !== '[DONE]' && JSON.stringify(c).includes('image_generation_calls'))
+    ).toBe(false);
   });
 });

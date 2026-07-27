@@ -14,6 +14,7 @@ import {
   isAnthropicMessagesPayload,
   matchThinkingSignatureError,
   planThinkingSignatureStrip,
+  refundThinkingSignatureStrip,
   stripThinkingSignatureBlocks,
   MAX_THINKING_SIGNATURE_STRIP_RETRIES,
 } from '../dispatch/dispatcher-auto-compat';
@@ -236,6 +237,17 @@ describe('matchUnsupportedParameter', () => {
     ).toBe('reasoning.summary');
   });
 
+  test('extracts a bracket-notation param name, normalized to canonical dotted form', () => {
+    // The old `[\w.]+` capture stopped at the `[`, truncating
+    // `messages[0].name` to `messages` — and the paired deleteDottedPath call
+    // then deleted the ENTIRE conversation from the retry payload.
+    expect(
+      matchUnsupportedParameter(
+        '{"error":{"message":"Unsupported parameter: \'messages[0].name\'"}}'
+      )
+    ).toBe('messages.0.name');
+  });
+
   test('returns undefined when the body does not name an unsupported parameter', () => {
     expect(matchUnsupportedParameter('{"error":{"message":"Invalid request"}}')).toBeUndefined();
   });
@@ -407,6 +419,133 @@ describe('deleteDottedPath', () => {
       expect(result.payload.metadata).toBe(untouchedSibling);
     });
   });
+
+  // --- Array containers: numeric path segments must preserve Array-ness ------
+  //
+  // matchUnsupportedParameter's `[\w.]+` capture CAN name a path through an
+  // array (an upstream 400 like "Unsupported parameter: messages.0.some_field").
+  // The copy-on-write rebuild must keep every array on the path an ARRAY —
+  // an unconditional `{ ...target }` would turn `messages` into an
+  // object-shaped `{"0": {...}, "1": {...}}` and produce a malformed retry
+  // payload that every upstream rejects.
+  describe('array container preservation', () => {
+    test('deleting a field inside an array element keeps the array an array', () => {
+      const payload: Record<string, any> = {
+        model: 'gpt-5.5',
+        messages: [
+          { role: 'user', content: 'hi', some_field: 'x' },
+          { role: 'assistant', content: 'yo' },
+        ],
+      };
+      const snapshot = structuredClone(payload);
+
+      const result = deleteDottedPath(payload, 'messages.0.some_field');
+
+      expect(result.deleted).toBe(true);
+      expect(Array.isArray(result.payload.messages)).toBe(true);
+      expect(result.payload.messages).toEqual([
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'yo' },
+      ]);
+      // Copy-on-write extends to array levels: original untouched...
+      expect(payload).toEqual(snapshot);
+      expect(result.payload.messages).not.toBe(payload.messages);
+      // ...and the untouched sibling element is shared, not cloned.
+      expect(result.payload.messages[1]).toBe(payload.messages[1]);
+    });
+
+    test('an array-index leaf removes the element splice-style (no hole, no null)', () => {
+      const t0 = { type: 'function', name: 'a' };
+      const t1 = { type: 'function', name: 'b' };
+      const t2 = { type: 'function', name: 'c' };
+      const payload: Record<string, any> = { model: 'gpt-5.5', tools: [t0, t1, t2] };
+
+      const result = deleteDottedPath(payload, 'tools.2');
+
+      expect(result.deleted).toBe(true);
+      expect(Array.isArray(result.payload.tools)).toBe(true);
+      expect(result.payload.tools).toEqual([t0, t1]);
+      expect(result.payload.tools).toHaveLength(2);
+      // No hole left behind: `delete arr[2]` would keep length 3 and
+      // serialize the gap as null — every index must be an own property.
+      expect(Object.keys(result.payload.tools)).toEqual(['0', '1']);
+      // Original untouched.
+      expect(payload.tools).toHaveLength(3);
+      expect(payload.tools[2]).toBe(t2);
+    });
+
+    test('removing a MIDDLE array element shifts later elements left (no hole)', () => {
+      const payload: Record<string, any> = { tools: ['a', 'b', 'c'] };
+
+      const result = deleteDottedPath(payload, 'tools.1');
+
+      expect(result.deleted).toBe(true);
+      expect(result.payload.tools).toEqual(['a', 'c']);
+      expect(Object.keys(result.payload.tools)).toEqual(['0', '1']);
+      expect(payload.tools).toEqual(['a', 'b', 'c']);
+    });
+
+    test('preserves arrays at intermediate depths of a longer path', () => {
+      const payload: Record<string, any> = {
+        messages: [{ role: 'user', meta: { keep: 1, drop: 2 } }],
+      };
+
+      const result = deleteDottedPath(payload, 'messages.0.meta.drop');
+
+      expect(result.deleted).toBe(true);
+      expect(Array.isArray(result.payload.messages)).toBe(true);
+      expect(result.payload.messages[0].meta).toEqual({ keep: 1 });
+      expect(payload.messages[0].meta).toEqual({ keep: 1, drop: 2 });
+    });
+
+    test('does not mutate an array shared by reference with another holder', () => {
+      const sharedMessages = [{ role: 'user', content: 'hi', bad_field: 1 }];
+      const request = { messages: sharedMessages };
+      // Mirrors payload.messages = request.messages — same reference.
+      const payload: Record<string, any> = { model: 'claude-x', messages: request.messages };
+
+      const result = deleteDottedPath(payload, 'messages.0.bad_field');
+
+      expect(result.deleted).toBe(true);
+      expect(request.messages).toBe(sharedMessages);
+      expect(sharedMessages).toEqual([{ role: 'user', content: 'hi', bad_field: 1 }]);
+      expect(result.payload.messages).not.toBe(sharedMessages);
+      expect(result.payload.messages).toEqual([{ role: 'user', content: 'hi' }]);
+    });
+
+    test('returns deleted:false for an out-of-bounds array index', () => {
+      const payload: Record<string, any> = { tools: ['a'] };
+
+      const result = deleteDottedPath(payload, 'tools.5');
+
+      expect(result.deleted).toBe(false);
+      expect(result.payload).toBe(payload);
+    });
+
+    test('returns deleted:false for a non-index own property on an array (e.g. length) instead of corrupting the array', () => {
+      // Arrays have `length` as an OWN property, so hasOwnProperty alone
+      // would let "messages.length" through — and the rebuild would turn the
+      // array into an object. Only canonical in-bounds indices are valid
+      // array segments; anything else is refused untouched.
+      const payload: Record<string, any> = { messages: [{ role: 'user', content: 'hi' }] };
+
+      const result = deleteDottedPath(payload, 'messages.length');
+
+      expect(result.deleted).toBe(false);
+      expect(result.payload).toBe(payload);
+      expect(Array.isArray(payload.messages)).toBe(true);
+      expect(payload.messages).toHaveLength(1);
+    });
+
+    test('rejects a non-canonical numeric segment ("01") on an array', () => {
+      const payload: Record<string, any> = { tools: ['a', 'b'] };
+
+      const result = deleteDottedPath(payload, 'tools.01');
+
+      expect(result.deleted).toBe(false);
+      expect(result.payload).toBe(payload);
+    });
+  });
 });
 
 describe('planUnsupportedParamStrip', () => {
@@ -457,6 +596,184 @@ describe('planUnsupportedParamStrip', () => {
       planUnsupportedParamStrip('{"error":{"message":"Invalid request"}}', state)
     ).toBeUndefined();
     expect(state.attempts).toBe(0);
+  });
+
+  test('structural guard: refuses to strip the whole messages/input/model field, consuming no budget', () => {
+    // Deleting any of these wholesale guarantees a malformed request — every
+    // retry would 400 on a missing-conversation/missing-model error instead,
+    // so the plan must refuse outright (normal failover proceeds) and must
+    // NOT burn a strip attempt doing so.
+    const state = createUnsupportedParamStripState();
+    for (const field of ['messages', 'input', 'model']) {
+      expect(
+        planUnsupportedParamStrip(`{"detail":"Unsupported parameter: ${field}"}`, state)
+      ).toBeUndefined();
+    }
+    expect(state.attempts).toBe(0);
+    expect(state.strippedParams.size).toBe(0);
+  });
+
+  test('structural guard is exact-match only: sub-paths inside messages stay strippable', () => {
+    const state = createUnsupportedParamStripState();
+    expect(
+      planUnsupportedParamStrip('{"detail":"Unsupported parameter: messages.0.name"}', state)
+    ).toBe('messages.0.name');
+    expect(state.attempts).toBe(1);
+  });
+
+  describe('structural array elements (messages[N] / input[N]) are refused budget-free', () => {
+    // `Unsupported parameter: messages[0]` normalizes to `messages.0`, which
+    // dodges the exact-name guard — and the paired deleteDottedPath would
+    // splice an ENTIRE message out of the conversation. A numeric leaf
+    // directly under a structural root deletes a whole conversation item,
+    // so it gets the same budget-free refusal as the whole-field guard:
+    // normal failover proceeds, no strip attempt is consumed.
+    test('a 400 naming messages[0] (bracket form) is refused, consuming no budget', () => {
+      const state = createUnsupportedParamStripState();
+      expect(
+        planUnsupportedParamStrip(
+          '{"error":{"message":"Unsupported parameter: \'messages[0]\'"}}',
+          state
+        )
+      ).toBeUndefined();
+      expect(state.attempts).toBe(0);
+      expect(state.strippedParams.size).toBe(0);
+    });
+
+    test('a 400 naming input[2] (bracket form) is refused, consuming no budget', () => {
+      const state = createUnsupportedParamStripState();
+      expect(
+        planUnsupportedParamStrip('{"detail":"Unsupported parameter: input[2]"}', state)
+      ).toBeUndefined();
+      expect(state.attempts).toBe(0);
+      expect(state.strippedParams.size).toBe(0);
+    });
+
+    test('the already-dotted spelling (messages.0) is refused identically', () => {
+      const state = createUnsupportedParamStripState();
+      expect(
+        planUnsupportedParamStrip('{"detail":"Unsupported parameter: messages.0"}', state)
+      ).toBeUndefined();
+      expect(state.attempts).toBe(0);
+    });
+
+    test('a refusal leaves the full budget for later legitimately-strippable params', () => {
+      const state = createUnsupportedParamStripState();
+      expect(
+        planUnsupportedParamStrip('{"detail":"Unsupported parameter: messages[0]"}', state)
+      ).toBeUndefined();
+      // Both retry slots must still be available afterwards.
+      expect(
+        planUnsupportedParamStrip('{"detail":"Unsupported parameter: safety_identifier"}', state)
+      ).toBe('safety_identifier');
+      expect(
+        planUnsupportedParamStrip('{"detail":"Unsupported parameter: prompt_cache_key"}', state)
+      ).toBe('prompt_cache_key');
+      expect(state.attempts).toBe(2);
+    });
+
+    test('deeper paths under a structural element (messages.0.name) remain strippable', () => {
+      const state = createUnsupportedParamStripState();
+      const payload: Record<string, any> = {
+        model: 'gpt-4o',
+        messages: [
+          { role: 'user', content: 'hi', name: 'bob!' },
+          { role: 'assistant', content: 'yo' },
+        ],
+      };
+
+      const paramToStrip = planUnsupportedParamStrip(
+        '{"error":{"message":"Unsupported parameter: \'messages[0].name\'"}}',
+        state
+      );
+      expect(paramToStrip).toBe('messages.0.name');
+
+      const result = deleteDottedPath(payload, paramToStrip!);
+      expect(result.deleted).toBe(true);
+      expect(result.payload.messages).toEqual([
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'yo' },
+      ]);
+    });
+
+    test('numeric leaves under NON-structural arrays (tools[2]) stay splice-deletable', () => {
+      const state = createUnsupportedParamStripState();
+      const payload: Record<string, any> = {
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: 'hi' }],
+        tools: [{ name: 'a' }, { name: 'b' }, { name: 'c' }],
+      };
+
+      const paramToStrip = planUnsupportedParamStrip(
+        '{"detail":"Unsupported parameter: tools[2]"}',
+        state
+      );
+      expect(paramToStrip).toBe('tools.2');
+      expect(state.attempts).toBe(1);
+
+      const result = deleteDottedPath(payload, paramToStrip!);
+      expect(result.deleted).toBe(true);
+      expect(result.payload.tools).toEqual([{ name: 'a' }, { name: 'b' }]);
+      expect(Array.isArray(result.payload.tools)).toBe(true);
+    });
+  });
+});
+
+// The production bug this pipeline guards against: an upstream 400 naming
+// `messages[0].name` was truncated by the old `[\w.]+` matcher to `messages`,
+// so the strip-and-retry deleted the WHOLE conversation and retried a
+// guaranteed-malformed payload. Bracket segments must be captured, normalized
+// to canonical dotted form, and land on the array ELEMENT's field.
+describe('bracket-notation unsupported params (match -> plan -> delete pipeline)', () => {
+  test('a 400 naming messages[0].name deletes only that element field — the conversation array survives', () => {
+    const state = createUnsupportedParamStripState();
+    const payload: Record<string, any> = {
+      model: 'gpt-4o',
+      messages: [
+        { role: 'user', content: 'hi', name: 'bob!' },
+        { role: 'assistant', content: 'yo' },
+      ],
+    };
+
+    const paramToStrip = planUnsupportedParamStrip(
+      '{"error":{"message":"Unsupported parameter: \'messages[0].name\'"}}',
+      state
+    );
+
+    expect(paramToStrip).toBe('messages.0.name');
+
+    const result = deleteDottedPath(payload, paramToStrip!);
+    expect(result.deleted).toBe(true);
+    expect(Array.isArray(result.payload.messages)).toBe(true);
+    expect(result.payload.messages).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'yo' },
+    ]);
+  });
+
+  test('other whole top-level fields (tools) are still strippable', () => {
+    // The structural guard is a narrow deny-list (messages/input/model), not
+    // a blanket "no whole fields" rule: stripping a whole `tools` (or
+    // `safety_identifier`, etc.) leaves a well-formed request.
+    const state = createUnsupportedParamStripState();
+    const payload: Record<string, any> = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [{ type: 'function', function: { name: 'f' } }],
+    };
+
+    const paramToStrip = planUnsupportedParamStrip(
+      '{"detail":"Unsupported parameter: tools"}',
+      state
+    );
+
+    expect(paramToStrip).toBe('tools');
+    const result = deleteDottedPath(payload, paramToStrip!);
+    expect(result.deleted).toBe(true);
+    expect(result.payload).toEqual({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: 'hi' }],
+    });
   });
 });
 
@@ -598,13 +915,16 @@ describe('stripThinkingSignatureBlocks', () => {
         },
       ],
     };
+    const snapshot = structuredClone(payload);
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages).toEqual([
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages).toEqual([
       { role: 'assistant', content: [{ type: 'text', text: 'the answer' }] },
     ]);
+    // Copy-on-write: the ORIGINAL payload argument is never mutated.
+    expect(payload).toEqual(snapshot);
   });
 
   test('removes a thinking block preceding a tool_use, preserving ordering', () => {
@@ -622,14 +942,14 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages[1].content).toEqual([
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages[1].content).toEqual([
       { type: 'tool_use', id: 'tool-1', name: 'search', input: { q: 'x' } },
     ]);
     // Ordering/other messages untouched.
-    expect(payload.messages[0]).toEqual({
+    expect(result.payload.messages[0]).toEqual({
       role: 'user',
       content: [{ type: 'text', text: 'do the thing' }],
     });
@@ -649,10 +969,10 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages).toEqual([
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages).toEqual([
       { role: 'assistant', content: [{ type: 'text', text: 'the answer' }] },
     ]);
   });
@@ -671,13 +991,13 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(2);
-    expect(payload.messages[0].content).toEqual([{ type: 'text', text: 'the answer' }]);
+    expect(result.strippedCount).toBe(2);
+    expect(result.payload.messages[0].content).toEqual([{ type: 'text', text: 'the answer' }]);
   });
 
-  test('leaves non-array content (plain string messages) untouched', () => {
+  test('leaves non-array content (plain string messages) untouched and returns the SAME payload reference', () => {
     const payload: Record<string, any> = {
       messages: [
         { role: 'user', content: 'hello' },
@@ -685,22 +1005,74 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(0);
+    expect(result.strippedCount).toBe(0);
+    expect(result.payload).toBe(payload);
     expect(payload.messages).toEqual([
       { role: 'user', content: 'hello' },
       { role: 'assistant', content: 'hi there' },
     ]);
   });
 
-  test('is a no-op when the payload has no messages array', () => {
+  test('is a no-op (same payload reference) when the payload has no messages array', () => {
     const payload: Record<string, any> = { model: 'gpt-5.5', input: 'hi' };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(0);
+    expect(result.strippedCount).toBe(0);
+    expect(result.payload).toBe(payload);
     expect(payload).toEqual({ model: 'gpt-5.5', input: 'hi' });
+  });
+
+  test('no-op contract: an Anthropic-shaped payload with array content but no thinking blocks returns strippedCount 0 and the SAME reference', () => {
+    // The structural isAnthropicMessagesPayload check also matches OpenAI
+    // chat-completions payloads (they have a `messages` array too). This is
+    // the known false-positive shape the dispatch loop must NOT retry on:
+    // strippedCount 0 + identical payload reference is the signal.
+    const payload: Record<string, any> = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    };
+    const snapshot = structuredClone(payload);
+
+    const result = stripThinkingSignatureBlocks(payload);
+
+    expect(result.strippedCount).toBe(0);
+    expect(result.payload).toBe(payload);
+    expect(payload).toEqual(snapshot);
+  });
+
+  test('copy-on-write: never mutates the input payload, its messages array, or untouched message objects', () => {
+    const untouchedMessage = { role: 'user', content: [{ type: 'text', text: 'hi' }] };
+    const payload: Record<string, any> = {
+      model: 'claude-x',
+      messages: [
+        untouchedMessage,
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'stale', signature: 'sig-a' },
+            { type: 'text', text: 'answer' },
+          ],
+        },
+      ],
+    };
+    const originalMessages = payload.messages;
+    const snapshot = structuredClone(payload);
+
+    const result = stripThinkingSignatureBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    // A NEW root object with a NEW messages array is returned...
+    expect(result.payload).not.toBe(payload);
+    expect(result.payload.messages).not.toBe(originalMessages);
+    // ...while the input payload keeps its original array and full content.
+    expect(payload.messages).toBe(originalMessages);
+    expect(payload).toEqual(snapshot);
+    // Untouched messages are shared (not cloned), mirroring deleteDottedPath's
+    // "untouched sibling branches are shared" copy-on-write behavior.
+    expect(result.payload.messages[0]).toBe(untouchedMessage);
   });
 
   test('drops a thinking-only assistant message at the end of the conversation (no alternation break, nothing to orphan)', () => {
@@ -714,10 +1086,12 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages).toEqual([{ role: 'user', content: [{ type: 'text', text: 'hi' }] }]);
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+    ]);
   });
 
   test('replaces a thinking-only assistant message with a placeholder when dropping it would break user/assistant alternation', () => {
@@ -732,10 +1106,10 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages).toEqual([
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages).toEqual([
       { role: 'user', content: [{ type: 'text', text: 'first' }] },
       { role: 'assistant', content: [{ type: 'text', text: '[reasoning elided]' }] },
       { role: 'user', content: [{ type: 'text', text: 'second' }] },
@@ -763,20 +1137,23 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages[2]).toEqual({
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages[2]).toEqual({
       role: 'assistant',
       content: [{ type: 'text', text: '[reasoning elided]' }],
     });
     // Everything else is untouched.
-    expect(payload.messages[0]).toEqual({ role: 'user', content: [{ type: 'text', text: 'q' }] });
-    expect(payload.messages[1]).toEqual({
+    expect(result.payload.messages[0]).toEqual({
+      role: 'user',
+      content: [{ type: 'text', text: 'q' }],
+    });
+    expect(result.payload.messages[1]).toEqual({
       role: 'assistant',
       content: [{ type: 'text', text: 'partial answer, no tool call' }],
     });
-    expect(payload.messages[3]).toEqual({
+    expect(result.payload.messages[3]).toEqual({
       role: 'user',
       content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'result' }],
     });
@@ -802,10 +1179,10 @@ describe('stripThinkingSignatureBlocks', () => {
       ],
     };
 
-    const strippedCount = stripThinkingSignatureBlocks(payload);
+    const result = stripThinkingSignatureBlocks(payload);
 
-    expect(strippedCount).toBe(1);
-    expect(payload.messages).toEqual([
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages).toEqual([
       {
         role: 'assistant',
         content: [{ type: 'tool_use', id: 'tool-1', name: 'search', input: {} }],
@@ -858,5 +1235,30 @@ describe('planThinkingSignatureStrip', () => {
     // proceed instead of stripping again.
     expect(planThinkingSignatureStrip(signatureBody, anthropicPayload, state)).toBe(false);
     expect(state.attempts).toBe(1);
+  });
+
+  test('refundThinkingSignatureStrip returns the budget after a 0-strip plan, so a later genuine signature 400 can still strip-retry', () => {
+    // Sequence mirrors the dispatch loop's false-positive path: the plan
+    // fires (structural check matched an OpenAI-shaped payload), the strip
+    // turns out to be a no-op (0 blocks), NO retry happens — so the attempt
+    // is refunded and the one-per-target budget stays available.
+    const state = createThinkingSignatureStripState();
+
+    expect(planThinkingSignatureStrip(signatureBody, anthropicPayload, state)).toBe(true);
+    expect(state.attempts).toBe(1);
+
+    refundThinkingSignatureStrip(state);
+    expect(state.attempts).toBe(0);
+
+    // The budget is intact: a later signature 400 on the same target still
+    // gets its strip-and-retry.
+    expect(planThinkingSignatureStrip(signatureBody, anthropicPayload, state)).toBe(true);
+    expect(state.attempts).toBe(1);
+  });
+
+  test('refundThinkingSignatureStrip never drives attempts below zero', () => {
+    const state = createThinkingSignatureStripState();
+    refundThinkingSignatureStrip(state);
+    expect(state.attempts).toBe(0);
   });
 });

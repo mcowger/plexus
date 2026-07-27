@@ -3,6 +3,9 @@ import { Dispatcher } from '../dispatch/dispatcher';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { CooldownManager } from '../runtime/cooldown-manager';
+// Globally mocked in test/vitest.setup.ts — imported here only to assert on
+// the warn calls the strip-and-retry paths emit.
+import { logger } from '../../utils/logger';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
@@ -583,6 +586,17 @@ describe('Dispatcher Failover', () => {
     // retry regardless of outcome.
     const retriedBody = JSON.parse((fetchMock.mock.calls[1] as any[])[1].body as string);
     expect(retriedBody.safety_identifier).toBeUndefined();
+
+    // The strip warn is the only operator-visible trace that the outbound
+    // payload was modified mid-request — it must name both the target
+    // (provider/model) and the exact param that was removed.
+    const paramStripWarn = vi
+      .mocked(logger.warn)
+      .mock.calls.map((call) => String(call[0]))
+      .find((message) => message.includes('rejected unsupported parameter'));
+    expect(paramStripWarn).toBeDefined();
+    expect(paramStripWarn).toContain('p1/model-1');
+    expect(paramStripWarn).toContain("'safety_identifier'");
   });
 
   test('same-target retry: gives up after the retry bound and fails normally when the upstream keeps naming a NEW unsupported param', async () => {
@@ -645,6 +659,58 @@ describe('Dispatcher Failover', () => {
     expect(Object.prototype.toString).toBe(originalToString);
     expect(typeof Object.prototype.toString).toBe('function');
     expect({}.toString()).toBe('[object Object]');
+  });
+
+  test('same-target retry: refuses to strip the whole `messages` field — no strip, no retry', async () => {
+    // Deleting the entire conversation wholesale guarantees a malformed
+    // request, so the structural guard must refuse: exactly one fetch (no
+    // same-target retry with a messages-less payload), then normal failure.
+    setConfigForTesting(makeConfig({ targetCount: 1 }));
+    fetchMock.mockImplementation(async () => errorResponse(400, 'Unsupported parameter: messages'));
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+      throw new Error('expected dispatch to fail');
+    } catch (error: any) {
+      expect(error.message).toContain('All targets failed');
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('same-target retry: bracket notation (messages[0].name) strips only that element field and retries with the conversation intact', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 1 }));
+    fetchMock
+      .mockImplementationOnce(async () =>
+        errorResponse(400, "Unsupported parameter: 'messages[0].name'")
+      )
+      .mockImplementationOnce(async () => successChatResponse('model-1'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch({
+      model: 'test-alias',
+      messages: [{ role: 'user', content: 'hello' }],
+      incomingApiType: 'chat',
+      stream: false,
+      originalBody: {
+        model: 'test-alias',
+        messages: [{ role: 'user', content: 'hello', name: 'bob!' }],
+      },
+    } as any);
+    const meta = (response as any).plexus;
+
+    // Single configured target — the second fetch is a same-target retry.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(meta?.finalAttemptProvider).toBe('p1');
+
+    const retriedBody = JSON.parse((fetchMock.mock.calls[1] as any[])[1].body as string);
+    // The delete landed on the array ELEMENT's field (bracket segments
+    // normalized to canonical indices) — the old truncating matcher instead
+    // deleted `messages` wholesale from the retry payload.
+    expect(Array.isArray(retriedBody.messages)).toBe(true);
+    expect(retriedBody.messages).toEqual([{ role: 'user', content: 'hello' }]);
   });
 
   test('same-target retry: a no-op strip (named field not actually present) does not retry', async () => {
@@ -718,6 +784,18 @@ describe('Dispatcher Failover', () => {
     }
     // Non-thinking content survives the strip.
     expect(retriedBody.messages[1].content).toEqual([{ type: 'text', text: 'answer' }]);
+
+    // The strip warn is the only operator-visible trace that conversation
+    // content was modified mid-request — it must name the target
+    // (provider/model) and how many thinking blocks were stripped (the
+    // fixture carries exactly one).
+    const signatureStripWarn = vi
+      .mocked(logger.warn)
+      .mock.calls.map((call) => String(call[0]))
+      .find((message) => message.includes('stale thinking-block'));
+    expect(signatureStripWarn).toBeDefined();
+    expect(signatureStripWarn).toContain('p1/model-1');
+    expect(signatureStripWarn).toContain('stripped 1 thinking block(s)');
   });
 
   test('same-target retry: gives up after the one-shot thinking-signature retry bound and fails normally when the signature error persists', async () => {

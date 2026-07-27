@@ -1,9 +1,13 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { setConfigForTesting } from '../../config';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { registerSpy } from '../../../test/test-utils';
 import { TransformerFactory } from '../dispatch/transformer-factory';
+import { handleResponse } from '../responses/response-handler';
+import type { UsageStorageService } from '../observability/usage-storage';
 import type { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
+import type { UsageRecord } from '../../types/usage';
 
 // Regression test for issue #162 (dispatcher-level):
 //   a multi-turn conversation routed to Claude Code OAuth must succeed, not
@@ -405,5 +409,96 @@ describe('Dispatcher OAuth pass-through — cross-format Anthropic response tran
 
     const formatted = await TransformerFactory.getTransformer('chat').formatResponse(response);
     expect(formatted.choices[0].message.content).toBe('Hello from Claude');
+  });
+
+  // End-to-end lock for the scenario the manual `translatedClientBytes` tests
+  // above only approximate: drive `handleResponse` ITSELF (the code that runs
+  // in production) with the dispatcher's real cross-format result and let it
+  // resolve the REAL provider transformer (AnthropicTransformer, via the
+  // un-mocked TransformerFactory) and the REAL client transformer
+  // (OpenAITransformer). Asserts the exact bytes a chat client receives.
+  test('chat-inbound + oauth-anthropic target, streaming: END-TO-END through handleResponse yields OpenAI chunks', async () => {
+    setConfigForTesting(oauthAnthropicCrossFormatConfig());
+    const response = await new Dispatcher().dispatch(chatStreamingRequest());
+
+    // Preconditions (same dispatcher decisions the manual tests assert).
+    expect(response.plexus?.apiType).toBe('messages');
+    expect(response.bypassTransformation).toBe(false);
+    expect(response.stream).toBeDefined();
+
+    const clientTransformer = TransformerFactory.getTransformer('chat');
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-e2e-cross-format' };
+    const usageStorage = {
+      saveRequest: vi.fn(),
+      saveError: vi.fn(),
+      updatePerformanceMetrics: vi.fn(),
+    } as unknown as UsageStorageService;
+    const sentBodies: any[] = [];
+    const reply = {
+      header: vi.fn(function (this: any) {
+        return this;
+      }),
+      code: vi.fn(function (this: any) {
+        return this;
+      }),
+      send: vi.fn(function (this: any, body: any) {
+        sentBodies.push(body);
+        return this;
+      }),
+    } as unknown as FastifyReply;
+    const fastifyRequest = { id: 'req-e2e-cross-format', headers: {} } as unknown as FastifyRequest;
+
+    await handleResponse(
+      fastifyRequest,
+      reply,
+      response,
+      clientTransformer,
+      usageRecord,
+      usageStorage,
+      Date.now(),
+      'chat'
+    );
+
+    expect(reply.header).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
+
+    // handleResponse sends a Node Readable pipeline — collect the exact bytes
+    // a client would receive over the wire.
+    const pipeline = sentBodies.at(-1);
+    expect(pipeline).toBeDefined();
+    const clientBytes: string = await new Promise((resolve, reject) => {
+      let out = '';
+      pipeline.on('data', (chunk: any) => {
+        out += chunk.toString();
+      });
+      pipeline.once('end', () => resolve(out));
+      pipeline.once('error', reject);
+    });
+    // Let fire-and-forget completion work (UsageInspector flush) settle.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Structured SSE parsing: every data frame must be an OpenAI chat chunk.
+    const payloads = parseSseDataPayloads(clientBytes);
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const payload of payloads) {
+      expect(payload.object).toBe('chat.completion.chunk');
+    }
+
+    const contentChunk = payloads.find((p) => p.choices?.[0]?.delta?.content);
+    expect(contentChunk?.choices[0].delta.content).toBe('Hello from Claude');
+
+    const finishChunk = payloads.find((p) => p.choices?.[0]?.finish_reason);
+    expect(finishChunk?.choices[0].finish_reason).toBe('stop');
+
+    expect(clientBytes.trim().endsWith('data: [DONE]')).toBe(true);
+
+    // No raw Anthropic SSE frames may leak through the real pipeline.
+    expect(clientBytes).not.toMatch(/^event:/m);
+    expect(clientBytes).not.toContain('message_start');
+    expect(clientBytes).not.toContain('content_block_delta');
+
+    // Pipeline bookkeeping: the stream had visible output and was transformed.
+    expect(usageRecord.responseStatus).toBe('success');
+    expect(usageRecord.isPassthrough).toBe(false);
+    expect(usageStorage.saveRequest).toHaveBeenCalled();
   });
 });

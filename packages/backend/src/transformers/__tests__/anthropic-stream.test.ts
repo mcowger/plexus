@@ -1,4 +1,5 @@
 import { test, expect, describe } from 'vitest';
+import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { AnthropicTransformer } from '../anthropic';
 import { transformAnthropicStream } from '../anthropic/stream-transformer';
 import { OpenAITransformer } from '../openai';
@@ -611,18 +612,37 @@ describe('transformAnthropicStream tool call index remapping', () => {
       },
     });
 
+    // Parse the SSE frames structurally (same approach as
+    // openai-stream.test.ts's readOpenAISSEChunks) and assert on the parsed
+    // error object instead of raw-output substrings.
     const reader = transformer.formatStream(stream).getReader();
     const decoder = new TextDecoder();
-    let output = '';
+    const events: { event: string | undefined; data: any }[] = [];
+    const parser = createParser({
+      onEvent(event: EventSourceMessage) {
+        events.push({ event: event.event, data: JSON.parse(event.data) });
+      },
+    });
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      output += decoder.decode(value);
+      parser.feed(decoder.decode(value, { stream: true }));
     }
 
-    expect(output).toContain('event: error');
-    expect(output).toContain('please retry your request');
-    expect(output).not.toContain('event: message_stop');
+    const errorEvents = events.filter((e) => e.event === 'error');
+    expect(errorEvents).toHaveLength(1);
+    // Full parsed Anthropic error payload: `error.type` is the wire "code"
+    // and `error.message` carries the upstream message verbatim.
+    expect(errorEvents[0]?.data).toEqual({
+      type: 'error',
+      error: {
+        type: 'api_error',
+        message:
+          'Upstream Gemini returned MALFORMED_FUNCTION_CALL — please retry your request. [503]',
+      },
+    });
+    // The terminal error must not be followed by a normal stop.
+    expect(events.some((e) => e.event === 'message_stop')).toBe(false);
   });
 
   test('maps an Anthropic error event to a unified error chunk', async () => {

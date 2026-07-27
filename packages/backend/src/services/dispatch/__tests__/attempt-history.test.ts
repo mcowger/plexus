@@ -6,6 +6,7 @@ import {
   type ErrorSummaryFormatter,
   type FailureReasonFormatter,
 } from '../attempt-history';
+import { EMPTY_COMPLETION_REASON } from '../empty-completion';
 import type { RouteResult } from '../../routing/router';
 import type { RetryAttemptRecord } from '../dispatcher-types';
 
@@ -22,6 +23,15 @@ function makeRoute(provider: string, model: string): RouteResult {
 function httpError(statusCode: number, message: string) {
   const error = new Error(message) as any;
   error.routingContext = { statusCode };
+  return error;
+}
+
+// Mirrors the failed attempt the empty-completion failover records in
+// standard-attempt-request.ts: the HTTP call itself succeeded (statusCode
+// 200) but the completion carried no visible output.
+function emptyCompletionError() {
+  const error = new Error(EMPTY_COMPLETION_REASON) as any;
+  error.routingContext = { statusCode: 200, cooldownTriggered: false };
   return error;
 }
 
@@ -80,6 +90,35 @@ describe('buildAllTargetsFailedError', () => {
     );
   });
 
+  it('tags an empty-completion failover attempt as (empty), not the misleading (200)', () => {
+    // A failed attempt whose HTTP status was 200 can only mean the call
+    // succeeded but the completion was unusable — rendering the raw "(200)"
+    // next to real failure codes reads like a contradiction to clients.
+    const retryHistory: RetryAttemptRecord[] = [];
+    const emptyRoute = makeRoute('p1', 'm1');
+    const failedRoute = makeRoute('p2', 'm2');
+
+    appendFailureAttempt(
+      retryHistory,
+      emptyRoute,
+      emptyCompletionError(),
+      formatFailureReason,
+      undefined,
+      true
+    );
+    appendFailureAttempt(retryHistory, failedRoute, httpError(500, 'boom'), formatFailureReason);
+
+    const error = buildAllTargetsFailedError(
+      httpError(500, 'boom'),
+      ['p1/m1', 'p2/m2'],
+      retryHistory,
+      formatFailureReason,
+      compactErrorSummary
+    );
+
+    expect(error.message).toBe('All targets failed: p1/m1 (empty), p2/m2 (500). Last error: boom');
+  });
+
   it('tags a network/transport failure that has no status code as (network)', () => {
     const retryHistory: RetryAttemptRecord[] = [];
     const route = makeRoute('p1', 'model-1');
@@ -103,7 +142,9 @@ describe('buildAllTargetsFailedError', () => {
   it('tags a stalled attempt as (stall) instead of (network)', () => {
     const retryHistory: RetryAttemptRecord[] = [];
     const route = makeRoute('p1', 'model-1');
-    const stallError = new Error('Stream stalled: TTFB timeout - no response within 5000ms');
+    // Em-dash matches the production stall message verbatim (see
+    // standard-attempt-request.ts's "Stream stalled: TTFB timeout — ...").
+    const stallError = new Error('Stream stalled: TTFB timeout — no response within 5000ms');
 
     appendFailureAttempt(retryHistory, route, stallError, formatFailureReason, undefined, true);
 
@@ -116,7 +157,7 @@ describe('buildAllTargetsFailedError', () => {
     );
 
     expect(error.message).toBe(
-      'All targets failed: p1/model-1 (stall). Last error: Stream stalled: TTFB timeout - no response within 5000ms'
+      'All targets failed: p1/model-1 (stall). Last error: Stream stalled: TTFB timeout — no response within 5000ms'
     );
   });
 

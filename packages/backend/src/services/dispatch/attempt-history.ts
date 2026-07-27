@@ -95,17 +95,25 @@ export function attachAttemptMetadata(
 
 /**
  * Per-attempt annotation for a single `attemptedProviders` entry: an HTTP
- * status code when the failure carried one, a short reason tag when it
- * didn't (network/transport errors, mid-stream or TTFB stalls), `skipped`
- * for a target that was never actually dispatched, or `undefined` when
- * there's nothing worth surfacing (e.g. no matching retryHistory record).
+ * status code when the failure carried one, `empty` for a failed attempt
+ * recorded with HTTP 200 (the empty-completion failover — the call itself
+ * succeeded but the completion carried no visible output, so echoing the
+ * raw "(200)" next to real failure codes would read like a contradiction;
+ * a malformed/unparseable body on an HTTP 200 also lands here, since
+ * dispatcher.ts's parse-failure path stamps the attempt with statusCode
+ * 200 — same story: the call "succeeded" but yielded nothing usable),
+ * a short reason tag when there's no status code (network/transport errors,
+ * mid-stream or TTFB stalls), `skipped` for a target that was never
+ * actually dispatched, or `undefined` when there's nothing worth surfacing
+ * (e.g. no matching retryHistory record).
  */
 function describeAttemptTag(entry: RetryAttemptRecord | undefined): string | undefined {
   if (!entry) return undefined;
   if (entry.status === 'skipped') return 'skipped';
   if (entry.status !== 'failed') return undefined;
+  if (entry.statusCode === 200) return 'empty';
   if (typeof entry.statusCode === 'number') return String(entry.statusCode);
-  return /stall/i.test(entry.reason || '') ? 'stall' : 'network';
+  return /stall/i.test(entry.reason) ? 'stall' : 'network';
 }
 
 /**

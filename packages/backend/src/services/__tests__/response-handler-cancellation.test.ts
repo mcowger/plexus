@@ -16,9 +16,14 @@
  * See packages/backend/src/__tests__/disconnect-detection/ for the exploratory
  * test scripts that established these findings.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Readable } from 'node:stream';
 import { PassThrough } from 'node:stream';
+import { handleResponse } from '../responses/response-handler';
+import { OpenAITransformer } from '../../transformers/openai';
+import { DebugManager } from '../observability/debug-manager';
+import type { UnifiedChatResponse } from '../../types/unified';
+import type { UsageRecord } from '../../types/usage';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -269,5 +274,124 @@ describe('nodeStream destruction state', () => {
 
     expect(wasCancelled()).toBe(true);
     expect(nodeStream.destroyed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// End-to-end: cancellation mid-stream still records usage
+// ---------------------------------------------------------------------------
+//
+// The debug taps' snapshots (which UsageInspector's _destroy fallback reads)
+// used to be written ONLY by the taps' flush/'end' handlers — and a client
+// disconnect/timeout cancels the web TransformStreams WITHOUT running flush,
+// so production cancellations finalized with no usage at all (the earlier
+// tests pre-seeded the snapshots and never noticed). This exercises the REAL
+// path end-to-end through handleResponse: provider SSE with usage-bearing
+// chunks -> abort mid-stream (no flush anywhere) -> the saved record must
+// still carry the observed usage, via the teardown's explicit finalize.
+describe('handleResponse cancellation records usage from live captures (no pre-seeding)', () => {
+  beforeEach(() => {
+    DebugManager.getInstance().resetForTesting();
+  });
+
+  it('a client disconnect after usage-bearing chunks finalizes the record WITH usage and costs', async () => {
+    const encoder = new TextEncoder();
+    // Chat-format provider SSE: role/content chunk, then the usage-bearing
+    // final chunk — and then the stream stays OPEN (no [DONE], no close):
+    // the client disconnects first, so no flush ever runs anywhere. (In
+    // production the upstream fetch is killed by the abort signal +
+    // nodeStream.destroy(); this test asserts the usage RECORD, which is
+    // what cancellations used to lose.)
+    const providerStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'data: {"id":"chatcmpl_e2e","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}\n\n'
+          )
+        );
+        controller.enqueue(
+          encoder.encode(
+            'data: {"id":"chatcmpl_e2e","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":9,"total_tokens":59}}\n\n'
+          )
+        );
+        // Deliberately NOT closed.
+      },
+    });
+
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-cancel-e2e',
+      model: 'gpt-4o',
+      content: null,
+      stream: providerStream,
+      plexus: {
+        provider: 'test-provider',
+        model: 'gpt-4o',
+        apiType: 'chat',
+        pricing: { source: 'simple', input: 1000, output: 2000 },
+      },
+    };
+
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-cancel-e2e' };
+    const savedRecords: UsageRecord[] = [];
+    const mockStorage = {
+      saveRequest: vi.fn(async (record: UsageRecord) => {
+        savedRecords.push(record);
+      }),
+      updatePerformanceMetrics: vi.fn(async () => {}),
+      saveError: vi.fn(),
+    };
+    const reply = {
+      header: vi.fn(function (this: any) {
+        return this;
+      }),
+      send: vi.fn((pipeline: any) => pipeline),
+      code: vi.fn(function (this: any) {
+        return this;
+      }),
+    };
+    const request = { headers: {}, raw: {} };
+    const abortController = new AbortController();
+
+    await handleResponse(
+      request as any,
+      reply as any,
+      unifiedResponse,
+      new OpenAITransformer(),
+      usageRecord,
+      mockStorage as any,
+      Date.now(),
+      'chat',
+      false,
+      undefined,
+      undefined,
+      undefined,
+      abortController,
+      null
+    );
+
+    const pipeline = (reply.send as any).mock.calls.at(-1)[0];
+    pipeline.on('data', () => {});
+    pipeline.on('error', () => {});
+
+    // Let the chunks flow through the full production pipeline (provider SSE
+    // -> raw tap -> unified -> client SSE -> transformed tap), then
+    // disconnect the client mid-stream.
+    await wait(80);
+    abortController.abort();
+    // Long enough for the teardown to finish AND for the disconnect poll to
+    // observe the destroyed pipeline and clear itself.
+    await wait(300);
+
+    expect(savedRecords).toHaveLength(1);
+    const record = savedRecords[0]!;
+    expect(record.responseStatus).toBe('cancelled');
+    // The usage the provider streamed BEFORE the disconnect must be on the
+    // record — this is exactly what production cancellations lost when the
+    // snapshots were only written on flush.
+    expect(record.tokensInput).toBe(50);
+    expect(record.tokensOutput).toBe(9);
+    // 50/1M * $1000 + 9/1M * $2000 = $0.068.
+    expect(record.costSource).toBe('simple');
+    expect(record.costTotal).toBeCloseTo(0.068, 10);
   });
 });

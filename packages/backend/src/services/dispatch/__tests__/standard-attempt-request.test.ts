@@ -188,3 +188,134 @@ describe('executeStandardAttempt — per-fetch TTFB budget reset', () => {
     expect(receivedStallConfig.ttfbMs).toBe(4950);
   });
 });
+
+describe('executeStandardAttempt — thinking-signature strip-and-retry', () => {
+  const signature400Body = JSON.stringify({
+    type: 'error',
+    error: {
+      type: 'invalid_request_error',
+      message: 'messages.3.content.0: Invalid `signature` in `thinking` block',
+    },
+  });
+
+  function makeNonStreamingRequest(): UnifiedChatRequest {
+    return {
+      requestId: 'req-1',
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'hi' } as any],
+      stream: false,
+      incomingApiType: 'chat',
+    };
+  }
+
+  function makeContext(
+    host: RequestManagerHost,
+    providerPayload: any,
+    overrides: Partial<StandardAttemptContext> = {}
+  ): StandardAttemptContext {
+    const request = makeNonStreamingRequest();
+    return {
+      host,
+      providerPayload,
+      request,
+      requestWithTargetModel: request,
+      route: makeRoute(),
+      targetApiType: 'messages',
+      transformer: { name: 'test-transformer' },
+      bypassTransformation: false,
+      adapters: [],
+      stallConfig: null,
+      attemptTimeout: {
+        signal: new AbortController().signal,
+        isTimedOut: () => false,
+        cleanup: vi.fn(),
+      },
+      failoverEnabled: true,
+      hasNextTarget: true,
+      retryableStatusCodes: [500, 502, 503],
+      retryableErrors: [],
+      retryHistory: [],
+      attemptedProviders: [],
+      sessionKey: null,
+      release: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('does not retry the same target when a signature-matching 400 hits a payload with no thinking blocks (single fetch, normal failover)', async () => {
+    // Fresh Response per call: a Response body is single-read, so a shared
+    // instance would throw on a second (buggy) fetch's .text() and mask the
+    // real assertion failure.
+    const executeProviderRequest = vi.fn(
+      async () => new Response(signature400Body, { status: 400 })
+    );
+    const handleProviderError = vi.fn(async () => {
+      throw new Error('HTTP 400: invalid signature');
+    });
+    const isRetryableStatus = vi.fn(() => true);
+    const host = makeHost({ executeProviderRequest, handleProviderError, isRetryableStatus });
+
+    // The known false-positive shape: an OpenAI-chat-format payload also has
+    // a `messages` array (so the structural Anthropic-payload check matches)
+    // but carries NO thinking blocks — a strip would remove zero blocks and
+    // a retry would resend a byte-identical request.
+    const providerPayload = {
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'hi' }],
+    };
+    const snapshot = structuredClone(providerPayload);
+
+    const result = await executeStandardAttempt(makeContext(host, providerPayload));
+
+    // Normal failover proceeds (retry outcome hands control back to the
+    // caller's next-target loop)...
+    expect(result.outcome).toBe('retry');
+    // ...but the SAME target was fetched exactly once: the zero-block strip
+    // must not burn a same-target retry on an identical payload.
+    expect(executeProviderRequest).toHaveBeenCalledTimes(1);
+    // Nothing was stripped, so the payload is untouched.
+    expect(providerPayload).toEqual(snapshot);
+  });
+
+  it('strips thinking blocks copy-on-write on a genuine signature 400: original payload object never mutated, retried payload stripped', async () => {
+    const executeProviderRequest = vi
+      .fn()
+      .mockImplementationOnce(async () => new Response(signature400Body, { status: 400 }))
+      .mockImplementationOnce(async () => new Response('{"id":"msg_1"}', { status: 200 }));
+    const handleNonStreamingResponse = vi.fn(async () => ({ content: 'ok' }) as any);
+    const host = makeHost({ executeProviderRequest, handleNonStreamingResponse });
+
+    const providerPayload = {
+      model: 'model-1',
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'stale', signature: 'sig-a' },
+            { type: 'text', text: 'answer' },
+          ],
+        },
+      ],
+    };
+    const snapshot = structuredClone(providerPayload);
+
+    const result = await executeStandardAttempt(makeContext(host, providerPayload));
+
+    expect(result.outcome).toBe('success');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+
+    // First fetch sent the original payload object...
+    expect(executeProviderRequest.mock.calls[0]![2]).toBe(providerPayload);
+    // ...the same-target retry sent a NEW payload with the blocks stripped...
+    const retriedPayload = executeProviderRequest.mock.calls[1]![2];
+    expect(retriedPayload).not.toBe(providerPayload);
+    expect(retriedPayload.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'answer' }] },
+    ]);
+    // ...and the ORIGINAL payload (which can share `messages` with the
+    // long-lived request) was never mutated in place.
+    expect(providerPayload).toEqual(snapshot);
+  });
+});

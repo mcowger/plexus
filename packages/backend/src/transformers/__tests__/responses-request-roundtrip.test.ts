@@ -4,6 +4,7 @@ import {
   normalizeCompositeResponsesCallIds,
   normalizeResponsesReasoningContent,
 } from '../responses';
+import { OpenAITransformer } from '../openai';
 
 /**
  * Round-trip tests for the Responses API transformer.
@@ -212,6 +213,11 @@ describe('Responses responses -> responses round-trip preserves native fields', 
 
     const unified = await transformer.parseRequest(requestWithoutTemperature);
     expect(unified.temperature).toBeUndefined();
+    // Stronger than undefined: the unified request must carry NO own
+    // `temperature` property at all. A phantom `temperature: undefined` own
+    // property survives object spreads and flips `'temperature' in x` /
+    // hasOwnProperty checks downstream even though JSON would drop it.
+    expect('temperature' in unified).toBe(false);
 
     const built = await transformer.transformRequest({
       ...unified,
@@ -280,5 +286,232 @@ describe('Responses responses -> responses round-trip preserves native fields', 
     expect(built.store).toBeUndefined();
     expect(built.service_tier).toBeUndefined();
     expect(built.stream_options).toBeUndefined();
+  });
+});
+
+describe('parseRequest conditional-spread hygiene (omitted fields leave no own property)', () => {
+  // Same rationale as the temperature test above: a phantom
+  // `field: undefined` own property survives object spreads and flips
+  // `'field' in x` / hasOwnProperty checks downstream even though JSON
+  // serialization would drop it.
+  const MINIMAL_REQUEST = {
+    model: 'gpt-4o',
+    input: [
+      {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: 'Hello' }],
+      },
+    ],
+  };
+
+  it('omitted optional client fields leave NO own property on the unified request', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest(MINIMAL_REQUEST);
+
+    for (const field of [
+      'requestId',
+      'max_tokens',
+      'temperature',
+      'stream',
+      'reasoning',
+      'include',
+      'prompt_cache_key',
+      'text',
+      'parallel_tool_calls',
+      'metadata',
+      'tools',
+      'response_format',
+    ]) {
+      expect(field in unified, `'${field}' in unified must be false when omitted`).toBe(false);
+    }
+  });
+
+  it('present tools still forward through the computed conversion (lock one example)', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({
+      ...MINIMAL_REQUEST,
+      tools: [
+        {
+          type: 'function',
+          name: 'get_weather',
+          description: 'Get the weather',
+          parameters: { type: 'object', properties: { city: { type: 'string' } } },
+        },
+      ],
+    });
+
+    expect('tools' in unified).toBe(true);
+    expect(unified.tools).toEqual([
+      {
+        type: 'function',
+        function: {
+          name: 'get_weather',
+          description: 'Get the weather',
+          parameters: { type: 'object', properties: { city: { type: 'string' } } },
+        },
+      },
+    ]);
+  });
+
+  it('a present text.format still forwards as response_format (lock one example)', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({
+      ...MINIMAL_REQUEST,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'result',
+          schema: { type: 'object', properties: { ok: { type: 'boolean' } } },
+        },
+      },
+    });
+
+    expect('response_format' in unified).toBe(true);
+    expect(unified.response_format).toEqual({
+      type: 'json_schema',
+      json_schema: { type: 'object', properties: { ok: { type: 'boolean' } } },
+      name: 'result',
+    });
+  });
+
+  it('an explicit stream:false still forwards as a real own property', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({ ...MINIMAL_REQUEST, stream: false });
+
+    expect('stream' in unified).toBe(true);
+    expect(unified.stream).toBe(false);
+  });
+
+  describe('structured-output descriptor carry (text.format name/description/strict)', () => {
+    // The Responses `text.format` structured-output descriptor is more than
+    // the schema: clients also send `name`, `description`, and `strict`.
+    // Discarding them forces the responses -> chat emission to fabricate
+    // `name: "response_schema"` / `strict: true`, silently overriding what
+    // the client asked for (e.g. strict: false).
+    const DESCRIPTOR_REQUEST = {
+      ...MINIMAL_REQUEST,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'weather_report',
+          description: 'A structured weather report',
+          strict: false,
+          schema: { type: 'object', properties: { temp: { type: 'number' } } },
+        },
+      },
+    };
+
+    it('parseRequest carries name/description/strict on the unified response_format', async () => {
+      const unified = await new ResponsesTransformer().parseRequest(DESCRIPTOR_REQUEST);
+
+      expect(unified.response_format).toEqual({
+        type: 'json_schema',
+        json_schema: { type: 'object', properties: { temp: { type: 'number' } } },
+        name: 'weather_report',
+        description: 'A structured weather report',
+        strict: false,
+      });
+    });
+
+    it('the outbound Chat payload emits the client-supplied descriptor values (responses -> chat)', async () => {
+      const unified = await new ResponsesTransformer().parseRequest(DESCRIPTOR_REQUEST);
+      const chatPayload = await new OpenAITransformer().transformRequest(unified);
+
+      expect(chatPayload.response_format).toEqual({
+        type: 'json_schema',
+        json_schema: {
+          name: 'weather_report',
+          description: 'A structured weather report',
+          schema: { type: 'object', properties: { temp: { type: 'number' } } },
+          strict: false,
+        },
+      });
+    });
+
+    it('fallbacks apply ONLY when the client omitted the descriptor fields', async () => {
+      const unified = await new ResponsesTransformer().parseRequest({
+        ...MINIMAL_REQUEST,
+        text: {
+          format: {
+            type: 'json_schema',
+            schema: { type: 'object', properties: { ok: { type: 'boolean' } } },
+          },
+        },
+      });
+      const chatPayload = await new OpenAITransformer().transformRequest(unified);
+
+      expect(chatPayload.response_format).toEqual({
+        type: 'json_schema',
+        json_schema: {
+          name: 'response_schema',
+          schema: { type: 'object', properties: { ok: { type: 'boolean' } } },
+          strict: true,
+        },
+      });
+    });
+
+    it('strict: false survives to the outbound chat payload (must not be clobbered to true)', async () => {
+      const unified = await new ResponsesTransformer().parseRequest(DESCRIPTOR_REQUEST);
+      const chatPayload = await new OpenAITransformer().transformRequest(unified);
+
+      expect(chatPayload.response_format.json_schema.strict).toBe(false);
+    });
+  });
+
+  it('explicit values still forward (spot-check stream, max_output_tokens, metadata)', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest(RESPONSES_REQUEST);
+
+    expect(unified.stream).toBe(true);
+    expect(unified.max_tokens).toBe(1024);
+    expect(unified.metadata).toEqual({ session: 's1' });
+    expect(unified.reasoning).toEqual({ effort: 'medium' });
+    expect(unified.include).toEqual(['reasoning.encrypted_content']);
+    expect(unified.prompt_cache_key).toBe('cache-1');
+    expect(unified.parallel_tool_calls).toBe(true);
+    expect(unified.text).toEqual({ format: { type: 'text' } });
+  });
+});
+
+describe('transformRequest stream-field hygiene (no phantom `stream: undefined`)', () => {
+  // parseRequest already keeps an omitted client `stream` off the unified
+  // request (see the conditional-spread tests above) — transformRequest must
+  // not recreate it as a `stream: undefined` own property on the outbound
+  // payload, which survives object spreads and flips `'stream' in x` checks
+  // downstream even though JSON would drop it.
+  const MINIMAL_REQUEST = {
+    model: 'gpt-4o',
+    input: [
+      {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: 'Hello' }],
+      },
+    ],
+  };
+
+  it('an omitted client stream leaves NO own `stream` property on the outbound payload', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest(MINIMAL_REQUEST);
+    expect('stream' in unified).toBe(false);
+
+    const built = await transformer.transformRequest(unified);
+    expect('stream' in built).toBe(false);
+  });
+
+  it('an explicit stream:true still forwards', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({ ...MINIMAL_REQUEST, stream: true });
+    const built = await transformer.transformRequest(unified);
+    expect(built.stream).toBe(true);
+  });
+
+  it('an explicit stream:false still forwards as a real own property', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({ ...MINIMAL_REQUEST, stream: false });
+    const built = await transformer.transformRequest(unified);
+    expect('stream' in built).toBe(true);
+    expect(built.stream).toBe(false);
   });
 });

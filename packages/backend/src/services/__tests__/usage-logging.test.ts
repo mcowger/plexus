@@ -394,7 +394,13 @@ describe('UsageInspector', () => {
 
       expect(capturedRecord).not.toBeNull();
       expect(capturedRecord!.tokensInput).toBeGreaterThan(0);
-      expect(capturedRecord!.tokensEstimated).toBe(1);
+      // The provider DID report output usage (candidatesTokenCount: 12), so
+      // output estimation must NOT run (and must not overwrite the real
+      // count) — the record is not flagged as estimated; only the
+      // input-token fallback (which fires whenever the provider reports 0
+      // input tokens) filled in tokensInput above.
+      expect(capturedRecord!.tokensOutput).toBe(12);
+      expect(capturedRecord!.tokensEstimated).not.toBe(1);
     });
 
     it('does not update performance metrics for errored streams', async () => {

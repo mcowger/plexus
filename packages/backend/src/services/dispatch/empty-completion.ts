@@ -70,9 +70,10 @@ function hasVisibleText(value: string | null | undefined): boolean {
  * (rather than `UnifiedChatResponse` verbatim) so forward-compatible fields
  * not yet on the unified type — e.g. a future `images` array for multimodal
  * chat output — are picked up defensively without requiring a type change
- * here. No current transformer populates `images`; until one does, image
- * detection is a no-op (imageCount stays 0), which is why the "image-only"
- * unit test below exercises it directly rather than via a real transformer
+ * here. No current transformer populates the `images` array (the Responses
+ * transformer renders image outputs as markdown TEXT content instead — see
+ * countRawImageGenerationCalls below), so the `images`-array contribution is
+ * exercised directly by the unit tests rather than via a real transformer
  * fixture.
  */
 type VisibilityCheckableResponse = Pick<
@@ -83,16 +84,20 @@ type VisibilityCheckableResponse = Pick<
 /**
  * Counts `image_generation_call` built-in-tool-call output items
  * (types/responses.ts `ResponsesBuiltInToolCallItem`) on a raw (pre-transform)
- * Responses API body. The unified response shape has no field for image
- * outputs today — no transformer extracts `image_generation_call` items from
- * `response.output` into anything on `UnifiedChatResponse` — so an
- * image-only Responses API completion would otherwise carry zero visibility
- * signals. `rawResponse` is populated on the bypass-transformation path (see
- * dispatcher.ts's `handleNonStreamingResponse`), which is the ORIGINAL body
- * available at the empty-completion call seam; this only prevents the false
- * "empty" classification for that response — full cross-format
- * transformation of image outputs (carrying them through the unified shape
- * for every path, not just bypass) is explicitly out of scope here.
+ * Responses API body. On the transformed (non-bypass) path this count is no
+ * longer the only image signal: ResponsesTransformer.transformResponse now
+ * renders completed items with a base64 `result` as markdown text on the
+ * unified `content` (a data-URI image, or an omission placeholder above the
+ * inline size limit), so `hasText` covers image-only completions there. This
+ * raw count covers what that rendering cannot see: the bypass-transformation
+ * path (`rawResponse` is populated by dispatcher.ts's
+ * `handleNonStreamingResponse`, the ORIGINAL body available at the
+ * empty-completion call seam) and result-less items (an
+ * `image_generation_call` without a base64 `result` renders no markdown but
+ * still proves the model produced output). Full cross-format transformation
+ * of image outputs (carrying them through the unified shape as structured
+ * image fields for every path, not just bypass) is explicitly out of scope
+ * here.
  */
 function countRawImageGenerationCalls(rawResponse: unknown): number {
   const output = (rawResponse as { output?: unknown })?.output;

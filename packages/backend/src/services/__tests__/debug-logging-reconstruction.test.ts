@@ -201,6 +201,79 @@ describe('DebugLoggingInspector Reconstruction', () => {
       });
     });
 
+    test('response.failed with NO usage captures status and error, and absent usage stays absent', async () => {
+      const failedNoUsageRequestId = 'test-responses-failed-no-usage';
+      const inspector = new DebugLoggingInspector(failedNoUsageRequestId, 'raw');
+      const stream = inspector.createInspector('responses');
+
+      writeEvents(stream, [
+        {
+          type: 'response.created',
+          response: {
+            id: 'resp_nousage_1',
+            object: 'response',
+            created_at: 1700000000,
+            status: 'in_progress',
+            model: 'gpt-4o',
+            output: [],
+          },
+        },
+        {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: {
+            id: 'msg_1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: '' }],
+          },
+        },
+        {
+          type: 'response.output_text.delta',
+          output_index: 0,
+          content_index: 0,
+          delta: 'Partial answer before it broke',
+        },
+        {
+          type: 'response.failed',
+          response: {
+            id: 'resp_nousage_1',
+            object: 'response',
+            created_at: 1700000000,
+            status: 'failed',
+            model: 'gpt-4o',
+            output: [
+              {
+                id: 'msg_1',
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: 'Partial answer before it broke' }],
+              },
+            ],
+            error: { code: 'server_error', message: 'The model response failed to complete.' },
+            // No usage at all — the upstream failed before reporting any.
+          },
+        },
+      ]);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const dm = DebugManager.getInstance();
+      const snapshot = dm.getReconstructedRawResponse(failedNoUsageRequestId);
+      expect(snapshot).not.toBeNull();
+      expect(snapshot.status).toBe('failed');
+      expect(snapshot.error).toEqual({
+        code: 'server_error',
+        message: 'The model response failed to complete.',
+      });
+      // Usage was never reported anywhere in the stream: it must stay
+      // ABSENT on the snapshot (no phantom `usage` own property either),
+      // locking in the optional-usage contract downstream consumers
+      // (usage-logging) rely on.
+      expect(snapshot.usage).toBeUndefined();
+      expect(snapshot).not.toHaveProperty('usage');
+    });
+
     test('response.incomplete captures status, incomplete_details, and usage (max_output_tokens truncation)', async () => {
       const incompleteRequestId = 'test-responses-incomplete';
       const inspector = new DebugLoggingInspector(incompleteRequestId, 'raw');

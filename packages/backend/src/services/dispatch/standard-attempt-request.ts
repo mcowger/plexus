@@ -12,6 +12,7 @@ import {
   deleteDottedPath,
   planThinkingSignatureStrip,
   planUnsupportedParamStrip,
+  refundThinkingSignatureStrip,
   stripThinkingSignatureBlocks,
   MAX_THINKING_SIGNATURE_STRIP_RETRIES,
   MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
@@ -249,32 +250,47 @@ export async function executeStandardAttempt(
     if (!response.ok) {
       const errorText = await response.text();
 
-      // Reactive auto-compat: alias-level failover can replay a conversation
-      // whose `thinking`/`redacted_thinking` blocks were signed by a
-      // DIFFERENT Claude model/session than the one we're now targeting.
-      // Anthropic 400s naming the stale signature specifically — every
-      // remaining Claude target would reject the same replayed signature
-      // the same way, so strip the thinking blocks and retry the SAME
-      // target rather than failing over.
+      // Reactive auto-compat: a 400 can name a problem that failing over
+      // won't fix — every remaining target would reject the same request
+      // the same way — so both mechanisms below strip the offending content
+      // and retry the SAME target instead. Checked in order:
+      //
+      //   1. Stale thinking-block signatures: alias-level failover can
+      //      replay a conversation whose `thinking`/`redacted_thinking`
+      //      blocks were signed by a DIFFERENT Claude model/session than
+      //      the one we're now targeting, and Anthropic 400s naming the
+      //      stale signature specifically.
+      //   2. Unsupported parameters: some upstreams 400 naming one specific
+      //      client-sent field (e.g. LobeHub's gpt-5.5 traffic sending
+      //      safety_identifier / prompt_cache_key that a provider rejects).
       if (response.status === 400) {
         if (planThinkingSignatureStrip(errorText, providerPayload, thinkingStripState)) {
-          const strippedBlockCount = stripThinkingSignatureBlocks(providerPayload);
-          logger.warn(
-            `Auto-compat: ${route.provider}/${route.model} rejected a stale thinking-block ` +
-              `signature — stripped ${strippedBlockCount} thinking block(s) and retrying the ` +
-              `same target (attempt ${thinkingStripState.attempts}/${MAX_THINKING_SIGNATURE_STRIP_RETRIES})`
-          );
-          continue;
+          const stripResult = stripThinkingSignatureBlocks(providerPayload);
+          if (stripResult.strippedCount > 0) {
+            // Copy-on-write, like the unsupported-param strip below: the
+            // strip returns a NEW payload and never mutates the original
+            // (whose `messages` can be shared by reference with the
+            // long-lived request), so a successful strip reassigns the
+            // binding.
+            providerPayload = stripResult.payload;
+            logger.warn(
+              `Auto-compat: ${route.provider}/${route.model} rejected a stale thinking-block ` +
+                `signature — stripped ${stripResult.strippedCount} thinking block(s) and retrying the ` +
+                `same target (attempt ${thinkingStripState.attempts}/${MAX_THINKING_SIGNATURE_STRIP_RETRIES})`
+            );
+            continue;
+          }
+          // Zero blocks stripped — planThinkingSignatureStrip's structural
+          // `messages`-array check also matches OpenAI-format payloads,
+          // which never carry thinking blocks. Retrying would resend a
+          // byte-identical request, so fall through to the unsupported-param
+          // check / normal failover handling below instead of retrying this
+          // target — and refund the planned attempt: no retry happened, so
+          // the one-per-target budget stays available for a later genuine
+          // signature 400. Loop-safe because this branch never `continue`s.
+          refundThinkingSignatureStrip(thinkingStripState);
         }
-      }
 
-      // Reactive auto-compat: some upstreams 400 naming one specific
-      // unsupported parameter (e.g. LobeHub's gpt-5.5 traffic sending
-      // safety_identifier / prompt_cache_key that a provider rejects).
-      // Strip that field and retry the SAME target rather than falling
-      // through to normal failover, which wouldn't help — every target
-      // would reject the same client-sent field the same way.
-      if (response.status === 400) {
         const paramToStrip = planUnsupportedParamStrip(errorText, paramStripState);
         if (paramToStrip) {
           const stripResult = deleteDottedPath(providerPayload, paramToStrip);
