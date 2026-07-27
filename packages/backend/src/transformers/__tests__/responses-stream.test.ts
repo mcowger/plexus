@@ -255,6 +255,34 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
     expect(errorChunk.incomplete_details).toEqual({ reason: 'content_filter' });
   });
 
+  test('defaults incomplete_details to reason "unknown" (finish hint "length") when upstream response.incomplete carries none', async () => {
+    // Some upstreams emit response.incomplete with no incomplete_details at
+    // all. The unified chunk must still carry BOTH markers of an "ended
+    // incomplete" outcome — incomplete_details (what the responses-facing
+    // formatStream keys response.incomplete emission on) and an
+    // OpenAI-compatible finish hint ('length': the same
+    // everything-but-content_filter default as usage-logging's raw-mode
+    // incomplete mapping) — otherwise downstream renders the event as a
+    // hard failure.
+    const chunks = await transformEvents([
+      {
+        type: 'response.created',
+        response: { id: 'resp_nodetails', model: 'gpt-5', created_at: 1234567890 },
+      },
+      { type: 'response.output_text.delta', delta: 'Partial' },
+      {
+        type: 'response.incomplete',
+        response: { id: 'resp_nodetails', status: 'incomplete' },
+      },
+    ]);
+
+    const errorChunk = chunks.find((chunk) => chunk.event === 'error');
+    expect(errorChunk).toBeDefined();
+    expect(errorChunk.incomplete_details).toEqual({ reason: 'unknown' });
+    expect(errorChunk.finish_reason).toBe('length');
+    expect(errorChunk.error.code).toBe('unknown');
+  });
+
   test('propagates response.usage on response.failed into the unified error chunk', async () => {
     const chunks = await transformEvents([
       {
@@ -1391,6 +1419,79 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
     expect(incompleteEvent.response.status).toBe('incomplete');
     expect(incompleteEvent.response.incomplete_details).toEqual({ reason: 'content_filter' });
     expect(incompleteEvent.response.usage.total_tokens).toBe(15);
+  });
+
+  test('a detail-less upstream response.incomplete still reaches a Responses client as response.incomplete (reason "unknown"), not response.failed', async () => {
+    // Full pipeline (transformStream -> formatStream): when the upstream
+    // omits incomplete_details entirely, the defaulted { reason: 'unknown' }
+    // must keep the event on the incomplete path — without the default, the
+    // missing field made formatStream downgrade the outcome to a hard
+    // response.failed.
+    const unified = await transformEvents([
+      {
+        type: 'response.created',
+        response: { id: 'resp_nodetails_rt', model: 'gpt-5', created_at: 1234567890 },
+      },
+      { type: 'response.output_text.delta', delta: 'partial output' },
+      {
+        type: 'response.incomplete',
+        response: { id: 'resp_nodetails_rt', status: 'incomplete' },
+      },
+    ]);
+    const events = await collectFormatStreamEvents(unified);
+
+    expect(events.some((e) => e.type === 'response.failed')).toBe(false);
+    const incompleteEvent = events.find((e) => e.type === 'response.incomplete');
+    expect(incompleteEvent).toBeDefined();
+    expect(incompleteEvent.response.status).toBe('incomplete');
+    expect(incompleteEvent.response.incomplete_details).toEqual({ reason: 'unknown' });
+    expect(incompleteEvent.response.output?.[0]?.content?.[0]?.text).toBe('partial output');
+  });
+
+  test('a detail-less upstream response.incomplete reaches a CHAT client as a normal "length" finish, not an error payload', async () => {
+    // Full pipeline (transformStream -> OpenAI formatStream): the defaulted
+    // finish hint ('length') must make the chat-facing formatter render the
+    // detail-less incomplete as an ordinary finish — the same rendering
+    // known-reason (max_output_tokens) incompletes already get — instead of
+    // the hard-error payload it produced when finish_reason was absent.
+    const unified = await transformEvents([
+      {
+        type: 'response.created',
+        response: { id: 'resp_nodetails_chat', model: 'gpt-5', created_at: 1234567890 },
+      },
+      { type: 'response.output_text.delta', delta: 'partial output' },
+      {
+        type: 'response.incomplete',
+        response: { id: 'resp_nodetails_chat', status: 'incomplete' },
+      },
+    ]);
+
+    const reader = new OpenAITransformer()
+      .formatStream(unifiedStreamFromChunks(unified))
+      .getReader();
+    const decoder = new TextDecoder();
+    let output = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value);
+    }
+    const chunks = output
+      .split('\n\n')
+      .filter((block) => block.trim().length > 0)
+      .map((block) => {
+        const dataLine = block.split('\n').find((line) => line.startsWith('data: '));
+        const payload = (dataLine as string).replace(/^data:\s*/, '');
+        return payload === '[DONE]' ? '[DONE]' : JSON.parse(payload);
+      });
+
+    expect(chunks.some((chunk) => chunk !== '[DONE]' && chunk.error)).toBe(false);
+    const finishChunk = chunks.find(
+      (chunk) => chunk !== '[DONE]' && chunk.choices?.[0]?.finish_reason
+    );
+    expect(finishChunk).toBeDefined();
+    expect(finishChunk.choices[0].finish_reason).toBe('length');
+    expect(chunks.at(-1)).toBe('[DONE]');
   });
 
   test('marks still-in-progress output items status "incomplete" when emitting response.incomplete', async () => {

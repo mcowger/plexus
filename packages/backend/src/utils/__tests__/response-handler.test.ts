@@ -640,5 +640,133 @@ describe('handleResponse', () => {
 
       expect(usageRecord.responseStatus).toBe('error');
     });
+
+    test('stream with content then an incomplete-as-length error chunk (finish_reason present) keeps responseStatus="success"', async () => {
+      // "Ended incomplete" outcomes (Responses response.incomplete →
+      // max_output_tokens/content_filter) deliberately travel the unified
+      // error channel WITH a finish_reason and are rendered as a normal
+      // finish for chat clients — a successful-if-truncated turn, not an
+      // error. Only finish_reason-less error chunks (hard failures) may
+      // stamp the usage record 'error'.
+      const fakeTransformer = makeFakeStreamingTransformer();
+      registerSpy(TransformerFactory, 'getTransformer').mockReturnValue(fakeTransformer);
+
+      const unifiedResponse: UnifiedChatResponse = {
+        id: 'resp-incomplete-stream',
+        model: 'model-1',
+        content: null,
+        stream: makeRawChunkStream([
+          { id: 'c1', model: 'model-1', delta: { content: 'Partial' }, finish_reason: null },
+          {
+            id: 'c1',
+            model: 'model-1',
+            event: 'error',
+            delta: {},
+            finish_reason: 'length',
+            incomplete_details: { reason: 'max_output_tokens' },
+            error: {
+              statusCode: 500,
+              code: 'max_output_tokens',
+              message: 'Response ended incomplete: max_output_tokens',
+            },
+          },
+        ]),
+        plexus: {
+          provider: 'test-provider',
+          model: 'model-orig',
+          apiType: 'chat',
+        },
+      };
+
+      const usageRecord: Partial<UsageRecord> = {
+        requestId: 'req-incomplete-stream',
+        canonicalModelName: 'test-alias',
+      };
+
+      await handleResponse(
+        mockRequest,
+        mockReply,
+        unifiedResponse,
+        fakeTransformer,
+        usageRecord,
+        mockStorage,
+        Date.now(),
+        'chat'
+      );
+
+      const lastCall = (mockReply.send as any).mock.calls.at(-1);
+      await drainNodeStream(lastCall[0]);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(usageRecord.responseStatus).toBe('success');
+      expect(logger.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Empty completion (no visible output)')
+      );
+    });
+
+    test('incomplete stream with ZERO visible output is downgraded to "empty" at flush, not recorded as "error"', async () => {
+      // Locked deliberately: an incomplete-as-length chunk no longer stamps
+      // 'error' (it is a finish, not a failure), so the record still holds
+      // the baseline 'success' when the flush runs — and a stream that
+      // delivered zero visible output to the client is exactly what the
+      // flush's empty-downgrade exists to flag, regardless of WHY it ended.
+      // The truncation detail is not lost: the record's finishReason
+      // ('length'/'content_filter', via usage-logging's raw-mode incomplete
+      // mapping) still says the turn was cut off — 'empty' + that
+      // finishReason together read "truncated before any visible output".
+      const fakeTransformer = makeFakeStreamingTransformer();
+      registerSpy(TransformerFactory, 'getTransformer').mockReturnValue(fakeTransformer);
+
+      const unifiedResponse: UnifiedChatResponse = {
+        id: 'resp-incomplete-empty-stream',
+        model: 'model-1',
+        content: null,
+        stream: makeRawChunkStream([
+          {
+            id: 'c1',
+            model: 'model-1',
+            event: 'error',
+            delta: {},
+            finish_reason: 'length',
+            incomplete_details: { reason: 'max_output_tokens' },
+            error: {
+              statusCode: 500,
+              code: 'max_output_tokens',
+              message: 'Response ended incomplete: max_output_tokens',
+            },
+          },
+        ]),
+        plexus: {
+          provider: 'test-provider',
+          model: 'model-orig',
+          apiType: 'chat',
+        },
+      };
+
+      const usageRecord: Partial<UsageRecord> = {
+        requestId: 'req-incomplete-empty-stream',
+        canonicalModelName: 'test-alias',
+      };
+
+      await handleResponse(
+        mockRequest,
+        mockReply,
+        unifiedResponse,
+        fakeTransformer,
+        usageRecord,
+        mockStorage,
+        Date.now(),
+        'chat'
+      );
+
+      const lastCall = (mockReply.send as any).mock.calls.at(-1);
+      await drainNodeStream(lastCall[0]);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(usageRecord.responseStatus).toBe('empty');
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Empty completion (no visible output)')
+      );
+    });
   });
 });

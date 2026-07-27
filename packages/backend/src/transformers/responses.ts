@@ -1255,10 +1255,15 @@ export class ResponsesTransformer implements Transformer {
                 // reason AND the raw incomplete_details on the unified chunk
                 // — formatStream (both chat- and responses-facing) needs
                 // incomplete_details to tell an "ended incomplete" chunk
-                // apart from a genuine response.failed hard error. Also
-                // propagate final usage, same as response.failed above.
-                const incompleteDetails = data.response?.incomplete_details;
-                const reason = incompleteDetails?.reason || 'unknown';
+                // apart from a genuine response.failed hard error. When the
+                // upstream omits incomplete_details entirely, default to
+                // { reason: 'unknown' } so the chunk still reads as an
+                // incomplete (not a hard failure) downstream. Also propagate
+                // final usage, same as response.failed above.
+                const incompleteDetails = data.response?.incomplete_details ?? {
+                  reason: 'unknown',
+                };
+                const reason = incompleteDetails.reason || 'unknown';
                 const usage = data.response?.usage;
                 const normalizedUsage = usage ? normalizeOpenAIResponsesUsage(usage) : undefined;
                 controller.enqueue({
@@ -1267,12 +1272,13 @@ export class ResponsesTransformer implements Transformer {
                   created: Math.floor(Date.now() / 1000),
                   event: 'error',
                   delta: {},
-                  finish_reason:
-                    reason === 'max_output_tokens'
-                      ? 'length'
-                      : reason === 'content_filter'
-                        ? 'content_filter'
-                        : undefined,
+                  // 'content_filter' keeps its own finish reason; everything
+                  // else (max_output_tokens, unknown/absent reasons) maps to
+                  // 'length' — the same OpenAI-compatible default as
+                  // usage-logging's raw-mode incomplete mapping — so every
+                  // incomplete chunk carries a recognizable non-fatal finish
+                  // for the chat-facing formatters.
+                  finish_reason: reason === 'content_filter' ? 'content_filter' : 'length',
                   incomplete_details: incompleteDetails,
                   error: {
                     statusCode: 500,

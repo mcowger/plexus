@@ -309,15 +309,27 @@ export async function handleResponse(
             new TransformStream({
               transform(chunk, controller) {
                 observeStreamChunk(visibilityTracker, chunk);
-                // A unified error chunk (response.failed/response.incomplete/
-                // a mid-stream provider error — however transformStream
-                // renders it) means the completion did not finish cleanly.
-                // Mark the usage record accordingly (once) so it's never
-                // reported as a plain success, nor — via the flush's
-                // empty-downgrade below, which only ever upgrades a
+                // A unified error chunk WITHOUT a finish_reason
+                // (response.failed / a mid-stream provider error — however
+                // transformStream renders it) means the completion did not
+                // finish cleanly. Mark the usage record accordingly (once)
+                // so it's never reported as a plain success, nor — via the
+                // flush's empty-downgrade below, which only ever upgrades a
                 // 'success' into 'empty' — silently reclassified as merely
-                // "empty" once the stream ends.
-                if (chunk?.event === 'error' && usageRecord.responseStatus !== 'error') {
+                // "empty" once the stream ends. Error chunks that DO carry
+                // a finish_reason are "ended incomplete" outcomes
+                // (response.incomplete → 'length'/'content_filter'): they
+                // ride the unified error channel for routing but are
+                // rendered as a normal finish for chat clients (and as
+                // response.incomplete for Responses clients) — a
+                // successful-if-truncated turn, not an error — so they keep
+                // 'success' (or, when the truncation left zero visible
+                // output, the flush's 'empty' downgrade below).
+                if (
+                  chunk?.event === 'error' &&
+                  !chunk.finish_reason &&
+                  usageRecord.responseStatus !== 'error'
+                ) {
                   usageRecord.responseStatus = 'error';
                 }
                 controller.enqueue(chunk);
