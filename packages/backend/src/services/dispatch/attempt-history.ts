@@ -129,6 +129,13 @@ function formatAttemptedProvidersSummary(
 
   const byProviderModel = new Map<string, RetryAttemptRecord[]>();
   for (const entry of retryHistory) {
+    // Skipped targets never reach `attemptedProviders` (every skip path
+    // `continue`s before pushing to it), so they must never occupy a FIFO
+    // slot here either. Otherwise a skip that shares a provider/model key
+    // with a LATER real attempt would have its slot consumed first,
+    // rendering that real attempt's outcome as `(skipped)` instead of its
+    // actual status/tag.
+    if (entry.status === 'skipped') continue;
     const key = `${entry.provider}/${entry.model}`;
     const queue = byProviderModel.get(key);
     if (queue) {

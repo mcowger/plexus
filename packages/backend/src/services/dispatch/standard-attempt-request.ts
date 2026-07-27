@@ -22,6 +22,33 @@ export type StandardAttemptResult =
   | { outcome: 'success'; response: UnifiedChatResponse }
   | { outcome: 'retry'; error: any };
 
+/**
+ * Derives the stall config to hand the post-fetch streaming probe: the
+ * pristine (full, per-request-configured) TTFB budget minus however long
+ * fetch() itself already took to return headers. Pure function of the
+ * PRISTINE config — never of a previously-derived one — so calling it again
+ * for a later retry iteration can't compound an earlier iteration's
+ * reduction (see the reset in `executeStandardAttempt`'s retry loop).
+ *
+ * `null`/`undefined` pass through unchanged (TTFB stall detection disabled
+ * for this request). When `pristineConfig.ttfbMs` is itself `null`, the
+ * config is returned as-is too — there's no budget to subtract from.
+ */
+export function deriveProbeStallConfig(
+  pristineConfig: StallConfig | null | undefined,
+  fetchElapsedMs: number
+): StallConfig | null | undefined {
+  if (!pristineConfig || pristineConfig.ttfbMs == null) return pristineConfig;
+
+  const remainingTtfbMs = Math.max(0, pristineConfig.ttfbMs - fetchElapsedMs);
+  // Fetch returned just barely within (or beyond) the TTFB window — no time
+  // left for the probe. Signal "skip the probe" via null and let the
+  // pipeline handle it, rather than arming a probe with ~0ms to work with.
+  return remainingTtfbMs <= 0
+    ? { ...pristineConfig, ttfbMs: null }
+    : { ...pristineConfig, ttfbMs: remainingTtfbMs };
+}
+
 export interface StandardAttemptContext {
   host: RequestManagerHost;
   providerPayload: any;
@@ -74,7 +101,14 @@ export async function executeStandardAttempt(
   // rebuilds this via copy-on-write (deleteDottedPath) rather than mutating
   // in place, so a successful strip must reassign this binding.
   let providerPayload = context.providerPayload;
-  let effectiveStallConfig = initialStallConfig;
+  // Pristine snapshot taken once, outside the loop. Every retry iteration
+  // below resets `effectiveStallConfig` from THIS rather than carrying
+  // forward whatever the previous iteration's post-fetch adjustment left it
+  // as — otherwise a same-target strip-and-retry (thinking-signature or
+  // unsupported-param, below) would inherit a reduced or null ttfbMs from
+  // the failed attempt instead of the full configured budget.
+  const pristineStallConfig = initialStallConfig;
+  let effectiveStallConfig = pristineStallConfig;
 
   const incomingApi = currentRequest.incomingApiType || 'unknown';
   const url = host.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
@@ -103,6 +137,10 @@ export async function executeStandardAttempt(
   // removed, not just the original request.
   let response: Response;
   while (true) {
+    // Reset to the pristine, full TTFB budget at the start of every
+    // iteration — see the comment on `pristineStallConfig` above.
+    effectiveStallConfig = pristineStallConfig;
+
     logger.silly('Upstream Request Payload', providerPayload);
 
     let stallAbortController: AbortController | undefined;
@@ -193,16 +231,12 @@ export async function executeStandardAttempt(
 
       // Adjust the stall config's ttfbMs for the probe — subtract the time
       // already spent waiting for fetch() to return. The probe only needs
-      // to cover the remaining time until the byte threshold is met.
+      // to cover the remaining time until the byte threshold is met. Always
+      // derived from the PRISTINE snapshot (never from the possibly
+      // already-reduced `effectiveStallConfig`), so a value computed on a
+      // previous retry iteration can never compound into this one.
       const fetchElapsed = Date.now() - dispatchStartTime;
-      const remainingTtfbMs = Math.max(0, ttfbMs - fetchElapsed);
-      if (remainingTtfbMs <= 0 && effectiveStallConfig) {
-        // Fetch returned just barely within the TTFB window — no time left
-        // for the probe. Skip the probe and let the pipeline handle it.
-        effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: null };
-      } else if (effectiveStallConfig) {
-        effectiveStallConfig = { ...effectiveStallConfig, ttfbMs: remainingTtfbMs };
-      }
+      effectiveStallConfig = deriveProbeStallConfig(pristineStallConfig, fetchElapsed);
     } else {
       response = await host.executeProviderRequest(
         url,

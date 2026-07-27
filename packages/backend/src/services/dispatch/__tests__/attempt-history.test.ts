@@ -143,11 +143,15 @@ describe('buildAllTargetsFailedError', () => {
     expect(error.message).not.toContain('p1/model-1');
   });
 
-  it('renders (skipped) for a joined-list entry whose recorded attempt was a skip', () => {
+  it('renders a joined-list entry untagged when its only recorded retryHistory attempt was a skip', () => {
     // Defensive/future-proofing case from the T6 brief: today's dispatch
-    // loops never put a skipped target into attemptedProviders, but if a
-    // future caller did, the summary should label it (skipped) rather than
-    // a bogus status tag.
+    // loops never put a skipped target into attemptedProviders. Skipped
+    // retryHistory entries are excluded from the FIFO provider/model queues
+    // (see formatAttemptedProvidersSummary) precisely so a skip can never be
+    // matched up with a LATER real attempt that shares its key. If a future
+    // caller did list a skipped-only target in attemptedProviders, there is
+    // now no matching queued record to tag it with, so it renders untagged
+    // rather than mislabeled as the wrong outcome.
     const retryHistory: RetryAttemptRecord[] = [];
     const skippedRoute = makeRoute('p1', 'model-1');
     appendSkippedAttempt(retryHistory, skippedRoute, 'Provider p1/model-1 is on cooldown');
@@ -160,7 +164,35 @@ describe('buildAllTargetsFailedError', () => {
       compactErrorSummary
     );
 
-    expect(error.message).toBe('All targets failed: p1/model-1 (skipped). Last error: boom');
+    expect(error.message).toBe('All targets failed: p1/model-1. Last error: boom');
+  });
+
+  it('renders the real attempt tag, not (skipped), when a skip shares a provider/model key with a later real attempt', () => {
+    // The bug this guards: formatAttemptedProvidersSummary used to build its
+    // FIFO provider/model queues from ALL retryHistory entries, including
+    // skips. A skip recorded for a key that a LATER real attempt reuses
+    // (e.g. the same target skipped once via cooldown, then actually
+    // dispatched — and rejected — as the final failover candidate) would
+    // occupy the front of that queue, so the real attempt's `.shift()`
+    // consumed the skip entry instead and rendered `(skipped)` in place of
+    // the real HTTP status. Production only ever lists the REAL attempt in
+    // `attemptedProviders` for this key (skips never reach it), so the
+    // summary must reflect the real attempt's outcome.
+    const retryHistory: RetryAttemptRecord[] = [];
+    const route = makeRoute('p1', 'model-1');
+
+    appendSkippedAttempt(retryHistory, route, 'Provider p1/model-1 is on cooldown');
+    appendFailureAttempt(retryHistory, route, httpError(400, 'bad request'), formatFailureReason);
+
+    const error = buildAllTargetsFailedError(
+      httpError(400, 'bad request'),
+      ['p1/model-1'],
+      retryHistory,
+      formatFailureReason,
+      compactErrorSummary
+    );
+
+    expect(error.message).toBe('All targets failed: p1/model-1 (400). Last error: bad request');
   });
 
   it('keeps the "All targets failed: " prefix, ". Last error: " suffix, and the "none" fallback', () => {
