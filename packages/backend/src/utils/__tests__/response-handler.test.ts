@@ -5,6 +5,7 @@ import { UsageStorageService } from '../../services/observability/usage-storage'
 import { Transformer } from '../../types/transformer';
 import { UnifiedChatResponse } from '../../types/unified';
 import { UsageRecord } from '../../types/usage';
+import { DebugManager } from '../../services/observability/debug-manager';
 
 describe('handleResponse', () => {
   const originalAdminKey = process.env.ADMIN_KEY;
@@ -333,6 +334,46 @@ describe('handleResponse', () => {
       }),
       'test-key'
     );
+  });
+
+  test('restores global debug mode after a non-streaming response that needed token estimation', async () => {
+    const debugManager = DebugManager.getInstance();
+    debugManager.resetForTesting();
+    debugManager.setEnabled(false);
+    expect(debugManager.isEnabled()).toBe(false);
+
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-estimate',
+      model: 'model-1',
+      content: 'Hello',
+      plexus: {
+        provider: 'provider-1',
+        model: 'model-orig',
+        apiType: 'chat',
+      },
+      // No usage block — this is what triggers estimateTokens upstream.
+    };
+
+    const usageRecord: Partial<UsageRecord> = {
+      requestId: 'req-estimate',
+    };
+
+    await handleResponse(
+      mockRequest,
+      mockReply,
+      unifiedResponse,
+      mockTransformer,
+      usageRecord,
+      mockStorage,
+      Date.now(),
+      'chat',
+      /* shouldEstimateTokens */ true
+    );
+
+    // Global debug mode must be restored to its prior (disabled) state once
+    // the unary response has been handled — otherwise it stays stuck on for
+    // every subsequent request until the process restarts.
+    expect(debugManager.isEnabled()).toBe(false);
   });
 
   describe('Usage Mapping Regression Tests', () => {

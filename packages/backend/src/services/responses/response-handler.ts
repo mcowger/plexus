@@ -593,6 +593,15 @@ export async function handleResponse(
     DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
     DebugManager.getInstance().flush(usageRecord.requestId!);
 
+    // Restore debug mode after a non-streaming response. Mirrors the restore
+    // in the streaming path's pipeline 'error'/'end' handlers above — without
+    // this, the temporary global enable for token estimation (above) would
+    // never be turned back off for unary responses, leaving debug capture
+    // stuck on for every subsequent request.
+    if (shouldEstimateTokens && !wasDebugEnabled) {
+      debugManager.setEnabled(false);
+    }
+
     // Record the usage.
     finalizeUsage(
       usageRecord,
