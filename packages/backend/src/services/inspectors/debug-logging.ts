@@ -767,6 +767,29 @@ export class DebugLoggingInspector extends BaseInspector {
           Object.assign(acc, event.response);
         }
         break;
+
+      case 'response.failed':
+        // Upstream/client-facing hard failure. Same merge semantics as
+        // response.completed: absorb the final response object (status
+        // 'failed', error, and usage-if-present) so failed/truncated
+        // streams don't get stuck reporting a stale snapshot (usually
+        // 'in_progress') with zero usage.
+        if (event.response) {
+          Object.assign(acc, event.response);
+        }
+        break;
+
+      case 'response.incomplete':
+        // Upstream ended the response early (e.g. max_output_tokens or a
+        // content filter). Same merge semantics as response.completed /
+        // response.failed: absorb the final response object (status
+        // 'incomplete', incomplete_details, and usage-if-present) so
+        // truncated streams don't get stuck reporting a stale snapshot
+        // with zero usage.
+        if (event.response) {
+          Object.assign(acc, event.response);
+        }
+        break;
     }
 
     return acc;

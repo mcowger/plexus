@@ -206,6 +206,37 @@ describe('Responses responses -> responses round-trip preserves native fields', 
     expect(built.safety_identifier).toBe('si-1');
   });
 
+  it('does not inject a default temperature when the client omits it', async () => {
+    const transformer = new ResponsesTransformer();
+    const { temperature, ...requestWithoutTemperature } = RESPONSES_REQUEST;
+
+    const unified = await transformer.parseRequest(requestWithoutTemperature);
+    expect(unified.temperature).toBeUndefined();
+
+    const built = await transformer.transformRequest({
+      ...unified,
+      incomingApiType: 'responses',
+      originalBody: requestWithoutTemperature,
+    });
+
+    expect(built.temperature).toBeUndefined();
+    expect(built).not.toHaveProperty('temperature');
+  });
+
+  it('still forwards an explicit temperature the client sent', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest(RESPONSES_REQUEST);
+    expect(unified.temperature).toBe(0.7);
+
+    const built = await transformer.transformRequest({
+      ...unified,
+      incomingApiType: 'responses',
+      originalBody: RESPONSES_REQUEST,
+    });
+
+    expect(built.temperature).toBe(0.7);
+  });
+
   it('preserves sampling params top_p, top_logprobs, max_tool_calls', async () => {
     const transformer = new ResponsesTransformer();
     const unified = await transformer.parseRequest(RESPONSES_REQUEST);

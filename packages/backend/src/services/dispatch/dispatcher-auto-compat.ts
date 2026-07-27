@@ -412,3 +412,360 @@ export function applyRegistryAutoCompat(
 
   return nextPayload;
 }
+
+// ---------------------------------------------------------------------------
+// Reactive auto-compat: strip-and-retry on named unsupported params
+// ---------------------------------------------------------------------------
+//
+// Some upstreams 400 naming one *specific* parameter rather than rejecting the
+// whole request (e.g. OpenAI-compatible Responses API providers reject a
+// client-sent `safety_identifier` or `prompt_cache_key` with
+// `{"detail":"Unsupported parameter: safety_identifier"}` or
+// `{"error":{"message":"Unsupported parameter: 'foo'"}}`). Failing over to the
+// next configured target doesn't help when the *client* sent the offending
+// field — every target would reject it the same way. Instead, the dispatch
+// loop (see standard-attempt-request.ts) strips the named field from the
+// outbound payload and retries the SAME target.
+
+/**
+ * Matches both `{"detail":"Unsupported parameter: X"}` and
+ * `{"error":{"message":"Unsupported parameter: 'X'"}}` shapes. The captured
+ * group also matches dotted paths (e.g. `reasoning.summary`), since some
+ * providers name a nested field that way.
+ */
+const UNSUPPORTED_PARAMETER_PATTERN = /unsupported parameter[:\s]+['"]?([\w.]+)['"]?/i;
+
+/**
+ * Extracts the offending parameter name from an upstream error response body,
+ * or `undefined` when the body doesn't name an unsupported parameter.
+ */
+export function matchUnsupportedParameter(responseBody: string): string | undefined {
+  if (!responseBody) return undefined;
+  return UNSUPPORTED_PARAMETER_PATTERN.exec(responseBody)?.[1];
+}
+
+/** Segment names that must never be traversed — see `deleteDottedPath`. */
+const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export interface DeleteDottedPathResult {
+  /**
+   * The payload with the field removed. A NEW object (copy-on-write) when
+   * `deleted` is true: every object on the affected path, from the root down
+   * to the leaf's immediate parent, is shallow-cloned before the leaf is
+   * deleted, so nothing shared with another reference is ever mutated.
+   * Identical to the input `payload` reference when `deleted` is false
+   * (rejected path or no-op — nothing to rebuild).
+   */
+  payload: Record<string, any>;
+  /**
+   * Whether a field was actually removed. `false` for a rejected dangerous
+   * segment, an absent field, or a non-object intermediate segment — callers
+   * MUST treat `false` as "nothing changed" and skip any retry that assumes
+   * the payload is now different.
+   */
+  deleted: boolean;
+}
+
+/**
+ * Deletes a (possibly dotted, e.g. "reasoning.summary") field path from a
+ * payload object. Returns the (possibly new) payload plus whether a field
+ * was actually removed.
+ *
+ * SECURITY: `path` is attacker-influenced — it is parsed out of an upstream
+ * provider's error message (see `matchUnsupportedParameter`, whose
+ * `[\w.]+` capture matches dots AND underscores), and the upstream is not a
+ * trusted party. Two independent defenses prevent prototype pollution:
+ *   1. Any segment named `__proto__`, `constructor`, or `prototype` is
+ *      rejected outright, before any traversal. Without this, a path like
+ *      `__proto__.toString` would resolve `payload.__proto__` via the
+ *      INHERITED accessor to the real `Object.prototype` (typical payload
+ *      objects have no OWN property by that name), and the previous
+ *      in-place `delete target[leaf]` would then delete the global
+ *      `Object.prototype.toString` for the entire process, permanently,
+ *      across every subsequent request.
+ *   2. Traversal only ever follows OWN enumerable properties
+ *      (`hasOwnProperty`), never inherited ones (the previous `segment in
+ *      target` check matched inherited properties too), so even a segment
+ *      not on the deny-list can't walk onto something inherited from the
+ *      prototype chain.
+ *
+ * COPY-ON-WRITE: the input `payload`, and every nested object on the
+ * traversed path, is never mutated in place. `providerPayload` can share a
+ * nested object BY REFERENCE with the long-lived `UnifiedChatRequest` (e.g.
+ * `payload.reasoning = request.reasoning` in transformers/responses.ts) —
+ * mutating that object in place would corrupt it for every OTHER failover
+ * target built from the same request afterward. Instead, every object from
+ * the root down to the leaf's immediate parent is shallow-cloned and a NEW
+ * payload is returned; untouched sibling branches are shared, not cloned.
+ */
+export function deleteDottedPath(
+  payload: Record<string, any>,
+  path: string
+): DeleteDottedPathResult {
+  const segments = path.split('.');
+
+  if (segments.some((segment) => DANGEROUS_PATH_SEGMENTS.has(segment))) {
+    return { payload, deleted: false };
+  }
+
+  // Walk the path, recording the (object, key) pair at each level so the
+  // chain can be rebuilt with clones afterward. Bail out — no traversal
+  // beyond this point, no mutation, no clone — the instant a segment isn't
+  // an own enumerable property: an absent field or non-object intermediate
+  // means there's nothing to strip.
+  const chain: Array<{ obj: Record<string, any>; key: string }> = [];
+  let target: any = payload;
+  for (let i = 0; i < segments.length - 1; i++) {
+    const segment = segments[i]!;
+    if (
+      target == null ||
+      typeof target !== 'object' ||
+      !Object.prototype.hasOwnProperty.call(target, segment)
+    ) {
+      return { payload, deleted: false };
+    }
+    chain.push({ obj: target, key: segment });
+    target = target[segment];
+  }
+
+  const leaf = segments[segments.length - 1]!;
+  if (
+    target == null ||
+    typeof target !== 'object' ||
+    !Object.prototype.hasOwnProperty.call(target, leaf)
+  ) {
+    return { payload, deleted: false };
+  }
+
+  // Rebuild the chain bottom-up with shallow clones so nothing shared with
+  // another reference is mutated.
+  let rebuilt: Record<string, any> = { ...target };
+  delete rebuilt[leaf];
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const { obj, key } = chain[i]!;
+    rebuilt = { ...obj, [key]: rebuilt };
+  }
+
+  return { payload: rebuilt, deleted: true };
+}
+
+/** Per-target, per-request bound: at most this many strip-and-retry cycles. */
+export const MAX_UNSUPPORTED_PARAM_STRIP_RETRIES = 2;
+
+/** Tracks strip-and-retry progress for a single target within one request. */
+export interface UnsupportedParamStripState {
+  attempts: number;
+  strippedParams: Set<string>;
+}
+
+export function createUnsupportedParamStripState(): UnsupportedParamStripState {
+  return { attempts: 0, strippedParams: new Set() };
+}
+
+/**
+ * Decides whether an upstream 400 body naming an unsupported parameter should
+ * trigger another strip-and-retry cycle against the same target, recording
+ * the attempt in `state` when it does.
+ *
+ * Returns the parameter name to strip, or `undefined` when the retry should
+ * NOT happen because:
+ *   - the body doesn't name an unsupported parameter, OR
+ *   - the MAX_UNSUPPORTED_PARAM_STRIP_RETRIES bound has been reached, OR
+ *   - the named parameter was already stripped on an earlier attempt for this
+ *     target — an upstream that keeps rejecting the same field after it's
+ *     been removed can't be fixed by retrying, so stop immediately rather
+ *     than burning through the retry bound on a no-op loop.
+ */
+export function planUnsupportedParamStrip(
+  responseBody: string,
+  state: UnsupportedParamStripState
+): string | undefined {
+  if (state.attempts >= MAX_UNSUPPORTED_PARAM_STRIP_RETRIES) return undefined;
+
+  const paramName = matchUnsupportedParameter(responseBody);
+  if (!paramName || state.strippedParams.has(paramName)) return undefined;
+
+  state.attempts++;
+  state.strippedParams.add(paramName);
+  return paramName;
+}
+
+// ---------------------------------------------------------------------------
+// Reactive auto-compat: strip-and-retry on stale Anthropic thinking-block
+// signatures
+// ---------------------------------------------------------------------------
+//
+// Alias-level failover can replay a conversation containing `thinking` /
+// `redacted_thinking` blocks signed by one Claude model against a DIFFERENT
+// Claude model (e.g. cc/claude-opus-5 -> cc/claude-opus-4-8 -> cc/claude-opus-4-7).
+// Anthropic rejects a thinking-block signature produced by another
+// model/session with a 400 naming the signature specifically, e.g.:
+//   {"type":"error","error":{"type":"invalid_request_error",
+//    "message":"messages.3.content.0: Invalid `signature` in `thinking` block"}}
+// Failing over to the next target doesn't help — every remaining Claude
+// target rejects the same stale signature the same way. Instead strip the
+// thinking/redacted_thinking blocks from the outbound Anthropic Messages
+// payload and retry the SAME target once.
+
+/**
+ * Matches Anthropic's stale/invalid thinking-block-signature 400, e.g.
+ * `messages.3.content.0: Invalid \`signature\` in \`thinking\` block`.
+ * Backtick-quoting of "signature"/"thinking" is optional since not every
+ * upstream quotes them identically.
+ */
+const THINKING_SIGNATURE_ERROR_PATTERN = /invalid\s+`?signature`?\s+in\s+`?thinking`?\s+block/i;
+
+/**
+ * True when an upstream error response body names an invalid/stale
+ * thinking-block signature.
+ */
+export function matchThinkingSignatureError(responseBody: string): boolean {
+  if (!responseBody) return false;
+  return THINKING_SIGNATURE_ERROR_PATTERN.test(responseBody);
+}
+
+/**
+ * True when the outbound payload is Anthropic-Messages-API-shaped (has a
+ * `messages` array) — the only shape that can carry `thinking` /
+ * `redacted_thinking` blocks in the first place. Note this is a structural
+ * check only: an OpenAI chat-completions payload also has a `messages`
+ * array, so this alone doesn't prove the target is Anthropic. In practice
+ * that's harmless here — the paired body match
+ * (`matchThinkingSignatureError`) only fires on Anthropic's specific
+ * signature-rejection wording, which a non-Anthropic upstream won't emit.
+ */
+export function isAnthropicMessagesPayload(payload: any): boolean {
+  return !!payload && typeof payload === 'object' && Array.isArray(payload.messages);
+}
+
+function isThinkingBlock(block: any): boolean {
+  return (
+    !!block &&
+    typeof block === 'object' &&
+    (block.type === 'thinking' || block.type === 'redacted_thinking')
+  );
+}
+
+function contentHasBlockType(content: any, type: string): boolean {
+  return (
+    Array.isArray(content) &&
+    content.some((block: any) => block && typeof block === 'object' && block.type === type)
+  );
+}
+
+// A fresh array/object is allocated per call (not a shared module-level
+// constant) so multiple placeholder messages in the same payload never end
+// up aliasing the same mutable content array.
+function reasoningElidedPlaceholder(): Array<{ type: 'text'; text: string }> {
+  return [{ type: 'text', text: '[reasoning elided]' }];
+}
+
+/**
+ * Removes every `thinking` / `redacted_thinking` block from every message's
+ * `content` array, mutating `payload.messages` in place (replacing the
+ * array; individual message objects that need changes are shallow-cloned,
+ * not mutated). When a message's `content` becomes empty as a result of the
+ * strip, the message is dropped entirely UNLESS doing so would:
+ *   - break strict user/assistant role alternation — the nearest retained
+ *     message before it and the message right after it would end up with
+ *     the same role, or
+ *   - orphan a `tool_result` — the next message carries a `tool_result` but
+ *     the nearest retained message before the drop does NOT carry the
+ *     matching `tool_use`, so removing the bridge would leave that
+ *     `tool_result` without its paired call.
+ * In either case the emptied content is replaced with a
+ * `[{"type":"text","text":"[reasoning elided]"}]` placeholder instead of
+ * dropping the message, so the conversation shape stays valid.
+ *
+ * Non-array `content` (e.g. plain-string messages) is left untouched.
+ * Returns the number of thinking/redacted_thinking blocks actually removed
+ * (0 when the payload isn't Anthropic-messages-shaped, or had none to strip).
+ */
+export function stripThinkingSignatureBlocks(payload: Record<string, any>): number {
+  if (!isAnthropicMessagesPayload(payload)) return 0;
+
+  let strippedCount = 0;
+  const perMessage: Array<{ message: any; content: any; isArrayContent: boolean }> =
+    payload.messages.map((message: any) => {
+      if (!message || !Array.isArray(message.content)) {
+        return { message, content: message?.content, isArrayContent: false };
+      }
+      const kept = message.content.filter((block: any) => {
+        if (isThinkingBlock(block)) {
+          strippedCount++;
+          return false;
+        }
+        return true;
+      });
+      return { message, content: kept, isArrayContent: true };
+    });
+
+  if (strippedCount === 0) return 0;
+
+  const result: any[] = [];
+  for (let i = 0; i < perMessage.length; i++) {
+    const { message, content, isArrayContent } = perMessage[i]!;
+
+    if (!isArrayContent || content.length > 0) {
+      result.push(isArrayContent ? { ...message, content } : message);
+      continue;
+    }
+
+    // Content became empty after stripping — decide drop vs. placeholder.
+    const prevMessage = result[result.length - 1];
+    const nextMessage = perMessage[i + 1]?.message;
+
+    const wouldBreakAlternation =
+      !!prevMessage && !!nextMessage && prevMessage.role === nextMessage.role;
+    const nextHasToolResult = contentHasBlockType(nextMessage?.content, 'tool_result');
+    const prevHasToolUse = contentHasBlockType(prevMessage?.content, 'tool_use');
+    const wouldOrphanToolResult = nextHasToolResult && !prevHasToolUse;
+
+    if (wouldBreakAlternation || wouldOrphanToolResult) {
+      result.push({ ...message, content: reasoningElidedPlaceholder() });
+    }
+    // else: drop — push nothing for this message.
+  }
+
+  payload.messages = result;
+  return strippedCount;
+}
+
+/** Per-target, per-request bound: at most one signature-strip-and-retry cycle. */
+export const MAX_THINKING_SIGNATURE_STRIP_RETRIES = 1;
+
+/** Tracks signature-strip-and-retry progress for a single target within one request. */
+export interface ThinkingSignatureStripState {
+  attempts: number;
+}
+
+export function createThinkingSignatureStripState(): ThinkingSignatureStripState {
+  return { attempts: 0 };
+}
+
+/**
+ * Decides whether an upstream 400 body naming an invalid thinking-block
+ * signature should trigger a strip-and-retry cycle against the same target,
+ * recording the attempt in `state` when it does. Returns `false` when the
+ * retry should NOT happen because:
+ *   - the body doesn't name a thinking-signature error, OR
+ *   - the outbound payload isn't Anthropic-messages-shaped (no `messages`
+ *     array to strip thinking blocks from), OR
+ *   - MAX_THINKING_SIGNATURE_STRIP_RETRIES has already been used for this
+ *     target (bounded to exactly one retry — unlike the unsupported-param
+ *     strip, there's no "new param" escape hatch here: once the thinking
+ *     blocks are gone, a repeat 400 means stripping them didn't fix it, so
+ *     normal failover should proceed rather than retrying again).
+ */
+export function planThinkingSignatureStrip(
+  responseBody: string,
+  payload: any,
+  state: ThinkingSignatureStripState
+): boolean {
+  if (state.attempts >= MAX_THINKING_SIGNATURE_STRIP_RETRIES) return false;
+  if (!matchThinkingSignatureError(responseBody)) return false;
+  if (!isAnthropicMessagesPayload(payload)) return false;
+
+  state.attempts++;
+  return true;
+}

@@ -156,7 +156,11 @@ export class ResponsesTransformer implements Transformer {
       model: input.model,
       messages,
       max_tokens: input.max_output_tokens,
-      temperature: input.temperature ?? 1.0,
+      // Forward temperature only when the client actually sent it. GPT-5
+      // reasoning models (and others) reject sampling params outright, so
+      // injecting a fabricated default here would send `temperature: 1.0`
+      // upstream on every request that omitted it.
+      temperature: input.temperature,
       stream: input.stream ?? false,
       tools: tools.length > 0 ? tools : undefined,
       tool_choice: this.convertToolChoiceForChatCompletions(input.tool_choice),
@@ -1074,6 +1078,80 @@ export class ResponsesTransformer implements Transformer {
                     hasFunctionCall || completedResponseHasFunctionCall ? 'tool_calls' : 'stop',
                   usage: normalizedUsage,
                 });
+              } else if (data.type === 'response.failed') {
+                // Upstream reported a hard failure mid-stream. Surface it as
+                // a unified error chunk (same shape OpenAITransformer.formatStream
+                // already renders) instead of silently ending the stream.
+                // Propagate final usage (when the upstream included it
+                // alongside the failure) so chat-format clients still
+                // receive an accurate token count for the turn instead of
+                // silently losing it.
+                const err = data.response?.error || {};
+                const usage = data.response?.usage;
+                const normalizedUsage = usage ? normalizeOpenAIResponsesUsage(usage) : undefined;
+                controller.enqueue({
+                  id: responseId || data.response?.id || '',
+                  model: responseModel || data.response?.model || '',
+                  created: Math.floor(Date.now() / 1000),
+                  event: 'error',
+                  delta: {},
+                  error: {
+                    statusCode: 500,
+                    code: err.code || 'response_failed',
+                    message: err.message || 'The model response failed to complete.',
+                  },
+                  ...(normalizedUsage ? { usage: normalizedUsage } : {}),
+                });
+              } else if (data.type === 'response.incomplete') {
+                // Upstream ended the response early (e.g. hitting
+                // max_output_tokens, or a content_filter cutoff) rather than
+                // failing outright. Carry both the OpenAI-compatible finish
+                // reason AND the raw incomplete_details on the unified chunk
+                // — formatStream (both chat- and responses-facing) needs
+                // incomplete_details to tell an "ended incomplete" chunk
+                // apart from a genuine response.failed hard error. Also
+                // propagate final usage, same as response.failed above.
+                const incompleteDetails = data.response?.incomplete_details;
+                const reason = incompleteDetails?.reason || 'unknown';
+                const usage = data.response?.usage;
+                const normalizedUsage = usage ? normalizeOpenAIResponsesUsage(usage) : undefined;
+                controller.enqueue({
+                  id: responseId || data.response?.id || '',
+                  model: responseModel || data.response?.model || '',
+                  created: Math.floor(Date.now() / 1000),
+                  event: 'error',
+                  delta: {},
+                  finish_reason:
+                    reason === 'max_output_tokens'
+                      ? 'length'
+                      : reason === 'content_filter'
+                        ? 'content_filter'
+                        : undefined,
+                  incomplete_details: incompleteDetails,
+                  error: {
+                    statusCode: 500,
+                    code: reason,
+                    message: `Response ended incomplete: ${reason}`,
+                  },
+                  ...(normalizedUsage ? { usage: normalizedUsage } : {}),
+                });
+              } else if (data.type === 'error') {
+                // Generic Responses API stream error event (top-level, not
+                // nested under `response`) — no incomplete_details, since
+                // this is a hard stream-level error, not an "ended
+                // incomplete" signal.
+                controller.enqueue({
+                  id: responseId,
+                  model: responseModel,
+                  created: Math.floor(Date.now() / 1000),
+                  event: 'error',
+                  delta: {},
+                  error: {
+                    statusCode: 500,
+                    code: data.code || 'error',
+                    message: data.message || 'Upstream error',
+                  },
+                });
               }
             } catch (e) {
               logger.error('Error parsing Responses API streaming chunk', e);
@@ -1457,6 +1535,24 @@ export class ResponsesTransformer implements Transformer {
         .map(([, item]) => item);
     };
 
+    const buildUsagePayload = (usage: any) =>
+      usage
+        ? {
+            input_tokens:
+              (usage.input_tokens || 0) +
+              (usage.cached_tokens || 0) +
+              (usage.cache_creation_tokens || 0),
+            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
+            input_tokens_details: {
+              cached_tokens: usage.cached_tokens || 0,
+            },
+            output_tokens_details: {
+              reasoning_tokens: usage.reasoning_tokens || 0,
+            },
+          }
+        : undefined;
+
     return new ReadableStream({
       async start(controller) {
         try {
@@ -1502,6 +1598,58 @@ export class ResponsesTransformer implements Transformer {
 
             ensureCreated(controller, unifiedChunk);
             ensureInProgress(controller);
+
+            if (unifiedChunk.event === 'error') {
+              // Upstream failed, ended incomplete, or reported a stream-level
+              // error (surfaced as a unified error chunk by transformStream).
+              // Emit the matching Responses-API terminal event instead of
+              // unconditionally completing, so the client sees the actual
+              // outcome rather than a phantom success:
+              //   - incomplete_details present -> response.incomplete (the
+              //     upstream ended the turn early — max_output_tokens /
+              //     content_filter — not a hard failure).
+              //   - otherwise -> response.failed (a genuine hard error),
+              //     exactly as before.
+              if (unifiedChunk.usage) {
+                lastUsage = unifiedChunk.usage;
+              }
+              const outputItems = finalizeOutputItems(controller);
+              const err = unifiedChunk.error || {};
+
+              if (unifiedChunk.incomplete_details) {
+                sendEvent(controller, {
+                  type: 'response.incomplete',
+                  response: {
+                    id: responseId || undefined,
+                    object: 'response',
+                    created_at: responseCreatedAt || Math.floor(Date.now() / 1000),
+                    status: 'incomplete',
+                    model: responseModel,
+                    output: outputItems,
+                    incomplete_details: unifiedChunk.incomplete_details,
+                    usage: buildUsagePayload(lastUsage),
+                  },
+                });
+              } else {
+                sendEvent(controller, {
+                  type: 'response.failed',
+                  response: {
+                    id: responseId || undefined,
+                    object: 'response',
+                    created_at: responseCreatedAt || Math.floor(Date.now() / 1000),
+                    status: 'failed',
+                    model: responseModel,
+                    output: outputItems,
+                    error: {
+                      code: err.code || 'server_error',
+                      message: err.message || 'The model response failed to complete.',
+                    },
+                    usage: buildUsagePayload(lastUsage),
+                  },
+                });
+              }
+              break;
+            }
 
             if (unifiedChunk.usage) {
               lastUsage = unifiedChunk.usage;

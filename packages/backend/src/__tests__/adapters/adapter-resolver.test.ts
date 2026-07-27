@@ -45,6 +45,32 @@ describe('resolveAdapters', () => {
     ]);
   });
 
+  it('auto-injects unsupported-option suppression for a provider-prefixed GPT-5 target model', () => {
+    // Target models routed through the pi-ai registry carry a provider prefix
+    // (e.g. an OpenLimits aggregator target for gpt-5.5), which the anchored
+    // legacy regex missed entirely.
+    const route: RouteResult = { ...makeRoute(), model: 'openai/gpt-5.5' };
+    expect(resolveAdapters(route).map((r) => r.adapter.name)).toEqual([
+      'suppress_unsupported_gpt5_options',
+    ]);
+  });
+
+  it('auto-injects unsupported-option suppression for gpt-5 and gpt-5-mini', () => {
+    for (const model of ['gpt-5', 'gpt-5-mini']) {
+      const route: RouteResult = { ...makeRoute(), model };
+      expect(resolveAdapters(route).map((r) => r.adapter.name)).toEqual([
+        'suppress_unsupported_gpt5_options',
+      ]);
+    }
+  });
+
+  it('does not auto-inject GPT-5 suppression for lookalike model ids', () => {
+    for (const model of ['gpt-55', 'chatgpt-5', 'my-gpt-5x']) {
+      const route: RouteResult = { ...makeRoute(), model };
+      expect(resolveAdapters(route)).toHaveLength(0);
+    }
+  });
+
   it('does not auto-inject GPT-5 suppression for other model families', () => {
     const route: RouteResult = { ...makeRoute(), model: 'gpt-4.1' };
     expect(resolveAdapters(route)).toHaveLength(0);

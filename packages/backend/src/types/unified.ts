@@ -293,6 +293,15 @@ export interface UnifiedChatStreamChunk {
   finish_reason?: string | null;
   usage?: UnifiedUsage;
   error?: UnifiedClientError;
+  /**
+   * Present only on an `event: 'error'` chunk that represents a Responses
+   * API "ended incomplete" outcome (`response.incomplete` — e.g.
+   * max_output_tokens or content_filter cutoff) rather than a hard failure
+   * (`response.failed`). Lets a client-facing `formatStream` render the more
+   * specific incomplete semantics (e.g. Responses' own `response.incomplete`
+   * event, status 'incomplete') instead of a generic failure.
+   */
+  incomplete_details?: { reason: string };
 }
 
 // Unified Embeddings Request

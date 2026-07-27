@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { AnthropicTransformer } from '../anthropic';
 import { transformAnthropicStream } from '../anthropic/stream-transformer';
+import { OpenAITransformer } from '../openai';
 import { UnifiedChatStreamChunk } from '../../types/unified';
 
 describe('AnthropicTransformer Stream Formatting', () => {
@@ -622,5 +623,125 @@ describe('transformAnthropicStream tool call index remapping', () => {
     expect(output).toContain('event: error');
     expect(output).toContain('please retry your request');
     expect(output).not.toContain('event: message_stop');
+  });
+
+  test('maps an Anthropic error event to a unified error chunk', async () => {
+    const sseEvents = [
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: {
+            id: 'msg_err',
+            model: 'claude-sonnet-4-6',
+            role: 'assistant',
+            content: [],
+            usage: { input_tokens: 10, output_tokens: 0 },
+          },
+        },
+      },
+      {
+        event: 'error',
+        data: {
+          type: 'error',
+          error: { type: 'overloaded_error', message: 'Overloaded: please retry later.' },
+        },
+      },
+    ];
+
+    const rawStream = makeAnthropicSSE(sseEvents);
+    const unifiedStream = transformAnthropicStream(rawStream);
+    const chunks = await drainUnifiedStream(unifiedStream);
+
+    const errorChunk = chunks.find((c) => c.event === 'error');
+    expect(errorChunk).toBeDefined();
+    expect(errorChunk.error.message).toBe('Overloaded: please retry later.');
+    expect(errorChunk.error.code).toBe('overloaded_error');
+    expect(errorChunk.id).toBe('msg_err');
+    expect(errorChunk.model).toBe('claude-sonnet-4-6');
+  });
+
+  test('OpenAI client sees the Anthropic error chunk and terminates cleanly with [DONE]', async () => {
+    const sseEvents = [
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: { id: 'msg_err2', model: 'claude-sonnet-4-6', role: 'assistant', content: [] },
+        },
+      },
+      {
+        event: 'error',
+        data: { type: 'error', error: { type: 'api_error', message: 'Internal server error.' } },
+      },
+    ];
+
+    const rawStream = makeAnthropicSSE(sseEvents);
+    const unifiedStream = transformAnthropicStream(rawStream);
+    const formatted = new OpenAITransformer().formatStream(unifiedStream);
+
+    const reader = formatted.getReader();
+    const decoder = new TextDecoder();
+    let output = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value);
+    }
+
+    const dataLines = output
+      .split('\n\n')
+      .filter(Boolean)
+      .map((block) => block.replace(/^data:\s*/, ''));
+
+    const errorLine = dataLines.find((line) => line !== '[DONE]' && JSON.parse(line).error);
+    expect(errorLine).toBeDefined();
+    const errorPayload = JSON.parse(errorLine as string);
+    expect(errorPayload.error.message).toBe('Internal server error.');
+    // Propagates Anthropic's own error type as the code — not Gemini's
+    // hardcoded legacy `upstream_malformed_function_call` sentinel.
+    expect(errorPayload.error.code).toBe('api_error');
+    expect(output.trim().endsWith('data: [DONE]')).toBe(true);
+  });
+
+  test('OpenAI client still gets a final finish_reason chunk when the stream ends after message_start with no message_delta', async () => {
+    const sseEvents = [
+      {
+        event: 'message_start',
+        data: {
+          type: 'message_start',
+          message: {
+            id: 'msg_abrupt',
+            model: 'claude-sonnet-4-6',
+            role: 'assistant',
+            content: [],
+          },
+        },
+      },
+    ];
+
+    const rawStream = makeAnthropicSSE(sseEvents);
+    const unifiedStream = transformAnthropicStream(rawStream);
+    const formatted = new OpenAITransformer().formatStream(unifiedStream);
+
+    const reader = formatted.getReader();
+    const decoder = new TextDecoder();
+    let output = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value);
+    }
+
+    const dataLines = output
+      .split('\n\n')
+      .filter(Boolean)
+      .map((block) => block.replace(/^data:\s*/, ''));
+
+    const finishLine = dataLines.find(
+      (line) => line !== '[DONE]' && JSON.parse(line).choices?.[0]?.finish_reason === 'stop'
+    );
+    expect(finishLine).toBeDefined();
+    expect(dataLines.at(-1)).toBe('[DONE]');
   });
 });

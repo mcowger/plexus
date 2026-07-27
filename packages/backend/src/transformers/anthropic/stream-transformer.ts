@@ -166,6 +166,25 @@ export function transformAnthropicStream(stream: ReadableStream): ReadableStream
                     : undefined,
                 };
                 break;
+
+              case 'error':
+                // Anthropic mid-stream error event: `{"type":"error","error":{"type":"...","message":"..."}}`.
+                // Surface it as a unified error chunk (same shape
+                // OpenAITransformer.formatStream already renders) instead of
+                // silently dropping it and truncating the client stream.
+                unifiedChunk = {
+                  id: messageId,
+                  model: model,
+                  created: Math.floor(Date.now() / 1000),
+                  event: 'error',
+                  delta: {},
+                  error: {
+                    statusCode: 500,
+                    code: data.error?.type || 'error',
+                    message: data.error?.message || 'Upstream error',
+                  },
+                };
+                break;
             }
 
             if (unifiedChunk) {

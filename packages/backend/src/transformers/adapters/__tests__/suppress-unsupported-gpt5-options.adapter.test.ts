@@ -20,4 +20,37 @@ describe('suppressUnsupportedGpt5OptionsAdapter', () => {
 
     expect(payload).toEqual({ model: 'gpt-5.2', input: 'hello' });
   });
+
+  // Updated LobeHub sends safety_identifier on gpt-5.5 traffic; some
+  // configured upstreams 400 with "Unsupported parameter: safety_identifier".
+  it('removes safety_identifier and preserves other fields', () => {
+    const payload = suppressUnsupportedGpt5OptionsAdapter.preDispatch({
+      model: 'gpt-5.5',
+      input: 'hello',
+      safety_identifier: 'user-hash-abc',
+    });
+
+    expect(payload).toEqual({ model: 'gpt-5.5', input: 'hello' });
+  });
+
+  // prompt_cache_key is intentionally NOT statically stripped: the
+  // Codex-OAuth native path (oauth-native-request.ts) legitimately derives
+  // its session-id/x-client-request-id headers from this field, and no
+  // upstream has been observed rejecting it. A provider that does reject it
+  // is handled by the reactive strip-and-retry in dispatcher-auto-compat.ts
+  // instead (see planUnsupportedParamStrip / dispatcher-auto-compat.test.ts).
+  it('preserves prompt_cache_key (not statically stripped)', () => {
+    const payload = suppressUnsupportedGpt5OptionsAdapter.preDispatch({
+      model: 'gpt-5.5',
+      input: 'hello',
+      safety_identifier: 'user-hash-abc',
+      prompt_cache_key: 'cache-key-123',
+    });
+
+    expect(payload).toEqual({
+      model: 'gpt-5.5',
+      input: 'hello',
+      prompt_cache_key: 'cache-key-123',
+    });
+  });
 });

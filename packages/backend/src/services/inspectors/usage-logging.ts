@@ -448,8 +448,23 @@ export class UsageInspector extends PassThrough {
             (item: any) => item.type === 'function_call'
           ).length;
         }
-        // Responses API doesn't have a direct finish_reason, use status instead
-        const finishReason = reconstructed.status === 'completed' ? 'stop' : reconstructed.status;
+        // Responses API doesn't have a direct finish_reason, use status instead.
+        // 'failed' maps to 'error' so failed/truncated streams are recorded as
+        // errors instead of leaking the raw Responses API status string.
+        // 'incomplete' maps from incomplete_details.reason: 'content_filter'
+        // stays 'content_filter', everything else (including
+        // 'max_output_tokens' and any unknown/absent reason) defaults to
+        // 'length', matching the OpenAI-compatible finish reason vocabulary.
+        const finishReason =
+          reconstructed.status === 'completed'
+            ? 'stop'
+            : reconstructed.status === 'failed'
+              ? 'error'
+              : reconstructed.status === 'incomplete'
+                ? reconstructed.incomplete_details?.reason === 'content_filter'
+                  ? 'content_filter'
+                  : 'length'
+                : reconstructed.status;
         return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
       }
       case 'messages': {

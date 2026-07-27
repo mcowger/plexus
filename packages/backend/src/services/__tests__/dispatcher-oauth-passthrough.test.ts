@@ -2,7 +2,8 @@ import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { setConfigForTesting } from '../../config';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { registerSpy } from '../../../test/test-utils';
-import type { UnifiedChatRequest } from '../../types/unified';
+import { TransformerFactory } from '../dispatch/transformer-factory';
+import type { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
 
 // Regression test for issue #162 (dispatcher-level):
 //   a multi-turn conversation routed to Claude Code OAuth must succeed, not
@@ -123,5 +124,286 @@ describe('Dispatcher OAuth pass-through regression (issue #162)', () => {
     expect(headers.Authorization).toBe('Bearer sk-ant-oat-fake-token-for-test');
     expect(headers['anthropic-beta']).toBeTruthy();
     expect(headers['x-app']).toBe('cli');
+  });
+});
+
+// Regression coverage for the production defect where OpenAI-format clients
+// (chat/responses) routed to an OAuth-Anthropic native target received RAW
+// Anthropic SSE back (empty completions — no `choices`, no `data: [DONE]`).
+// Root cause: the native-OAuth response bypass in request-payload-builder.ts
+// was unconditional (`true`) for the Anthropic branch, regardless of the
+// incoming client's API format. Fix mirrors the identical Codex defect fixed
+// in commit 4f74c1c6 ("fix(oauth): translate cross-format Codex responses"):
+// scope the bypass to same-format (`messages`) clients only; chat/responses
+// clients must flow through the standard transform pipeline.
+
+function oauthAnthropicCrossFormatConfig() {
+  return {
+    providers: {
+      Claude: {
+        type: 'oauth',
+        api_base_url: 'oauth://anthropic',
+        oauth_provider: 'anthropic',
+        oauth_account: 'test-account',
+        models: {
+          'claude-test': {
+            pricing: { source: 'simple', input: 0, output: 0 },
+            access_via: ['chat', 'messages', 'responses'],
+          },
+        },
+      },
+    },
+    models: {
+      'test-alias': {
+        targets: [{ provider: 'Claude', model: 'claude-test' }],
+      },
+    },
+    keys: {},
+  } as any;
+}
+
+// A realistic upstream Anthropic Messages SSE stream: message_start ->
+// content_block_start/delta (text) -> content_block_stop -> message_delta
+// (stop_reason: end_turn) -> message_stop. Whitespace/shape kept exactly as
+// a real Anthropic response would send it — the messages-inbound regression
+// guard asserts byte-for-byte equality against this constant.
+const UPSTREAM_ANTHROPIC_SSE = [
+  'event: message_start',
+  'data: {"type":"message_start","message":{"id":"msg_test123","type":"message","role":"assistant","model":"claude-test","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}',
+  '',
+  'event: content_block_start',
+  'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+  '',
+  'event: content_block_delta',
+  'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello from Claude"}}',
+  '',
+  'event: content_block_stop',
+  'data: {"type":"content_block_stop","index":0}',
+  '',
+  'event: message_delta',
+  'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":4}}',
+  '',
+  'event: message_stop',
+  'data: {"type":"message_stop"}',
+  '',
+  '',
+].join('\n');
+
+function chatStreamingRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'test-alias',
+    stream: true,
+    messages: [{ role: 'user', content: 'hi' }],
+  };
+  return {
+    model: 'test-alias',
+    messages: body.messages,
+    stream: true,
+    incomingApiType: 'chat',
+    originalBody: body,
+  } as any;
+}
+
+function responsesStreamingRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'test-alias',
+    stream: true,
+    input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+  };
+  return {
+    model: 'test-alias',
+    messages: [{ role: 'user', content: 'hi' }],
+    stream: true,
+    incomingApiType: 'responses',
+    originalBody: body,
+  } as any;
+}
+
+function messagesStreamingRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'test-alias',
+    max_tokens: 256,
+    stream: true,
+    messages: [{ role: 'user', content: 'hi' }],
+  };
+  return {
+    model: 'test-alias',
+    messages: body.messages,
+    max_tokens: 256,
+    stream: true,
+    incomingApiType: 'messages',
+    originalBody: body,
+  } as any;
+}
+
+function nonStreamingChatRequest(): UnifiedChatRequest {
+  const body = {
+    model: 'test-alias',
+    stream: false,
+    messages: [{ role: 'user', content: 'hi' }],
+  };
+  return {
+    model: 'test-alias',
+    messages: body.messages,
+    stream: false,
+    incomingApiType: 'chat',
+    originalBody: body,
+  } as any;
+}
+
+async function drainBytes(stream: ReadableStream): Promise<string> {
+  const reader = stream.getReader();
+  const dec = new TextDecoder();
+  let out = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    out += typeof value === 'string' ? value : dec.decode(value);
+  }
+  return out;
+}
+
+/** Extracts every SSE frame's JSON `data:` payload, dropping the `[DONE]` sentinel. */
+function parseSseDataPayloads(text: string): any[] {
+  return text
+    .split('\n\n')
+    .map((block) => block.split('\n').find((line) => line.startsWith('data:')))
+    .filter((line): line is string => !!line)
+    .map((line) => line.replace(/^data:\s*/, ''))
+    .filter((data) => data !== '[DONE]')
+    .map((data) => JSON.parse(data));
+}
+
+describe('Dispatcher OAuth pass-through — cross-format Anthropic response translation (regression)', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    OAuthAuthManager.resetForTesting();
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
+      'sk-ant-oat-fake-token-for-test'
+    );
+    fetchSpy = registerSpy(global, 'fetch').mockResolvedValue(
+      new Response(UPSTREAM_ANTHROPIC_SSE, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    OAuthAuthManager.resetForTesting();
+  });
+
+  /**
+   * Mirrors the standard dispatch pipeline in response-handler.ts (~lines
+   * 274-284): raw provider SSE -> providerTransformer.transformStream ->
+   * unified chunks -> clientTransformer.formatStream -> client SSE bytes.
+   * The dispatcher itself never runs this pipeline (it only decides, via
+   * `bypassTransformation`, whether response-handler.ts should) so the test
+   * replicates it to prove cross-format clients actually get a well-formed,
+   * translated stream rather than just checking the boolean flag.
+   */
+  async function translatedClientBytes(
+    response: UnifiedChatResponse,
+    incomingApiType: string
+  ): Promise<string> {
+    const providerTransformer = TransformerFactory.getTransformer('messages');
+    const clientTransformer = TransformerFactory.getTransformer(incomingApiType);
+    const unifiedStream = providerTransformer.transformStream!(response.stream!);
+    const clientStream = clientTransformer.formatStream!(unifiedStream);
+    return drainBytes(clientStream);
+  }
+
+  test('chat-inbound + oauth-anthropic target, streaming: translates to OpenAI chunks, no raw Anthropic frames', async () => {
+    setConfigForTesting(oauthAnthropicCrossFormatConfig());
+    const response = await new Dispatcher().dispatch(chatStreamingRequest());
+
+    // Sanity: the upstream leg always speaks native Anthropic Messages.
+    expect(response.plexus?.apiType).toBe('messages');
+    // The actual fix: response leg must NOT bypass for a chat-inbound client.
+    expect(response.bypassTransformation).toBe(false);
+    expect(response.stream).toBeDefined();
+
+    const clientBytes = await translatedClientBytes(response, 'chat');
+    const payloads = parseSseDataPayloads(clientBytes);
+
+    const contentChunk = payloads.find((p) => p.choices?.[0]?.delta?.content);
+    expect(contentChunk?.choices[0].delta.content).toBe('Hello from Claude');
+
+    const finishChunk = payloads.find((p) => p.choices?.[0]?.finish_reason);
+    expect(finishChunk?.choices[0].finish_reason).toBe('stop');
+
+    expect(clientBytes.trim().endsWith('data: [DONE]')).toBe(true);
+    // No raw Anthropic SSE frames leaked to the client (OpenAI chunks never
+    // use a named `event:` line).
+    expect(clientBytes).not.toMatch(/^event:/m);
+    expect(clientBytes).not.toContain('message_start');
+    expect(clientBytes).not.toContain('content_block_delta');
+  });
+
+  test('responses-inbound + oauth-anthropic target, streaming: translates to Responses events, no raw Anthropic frames', async () => {
+    setConfigForTesting(oauthAnthropicCrossFormatConfig());
+    const response = await new Dispatcher().dispatch(responsesStreamingRequest());
+
+    expect(response.plexus?.apiType).toBe('messages');
+    expect(response.bypassTransformation).toBe(false);
+    expect(response.stream).toBeDefined();
+
+    const clientBytes = await translatedClientBytes(response, 'responses');
+    const payloads = parseSseDataPayloads(clientBytes);
+
+    const deltaEvent = payloads.find((p) => p.type === 'response.output_text.delta');
+    expect(deltaEvent?.delta).toBe('Hello from Claude');
+    expect(payloads.some((p) => p.type === 'response.completed')).toBe(true);
+
+    expect(clientBytes).toContain('event: response.output_text.delta');
+    expect(clientBytes).not.toContain('event: message_start');
+    expect(clientBytes).not.toContain('event: content_block_delta');
+    expect(clientBytes).not.toContain('event: message_delta');
+    expect(clientBytes).not.toContain('event: message_stop');
+  });
+
+  test('messages-inbound + oauth-anthropic target, streaming: raw Anthropic SSE passthrough unchanged (regression guard)', async () => {
+    setConfigForTesting(oauthAnthropicCrossFormatConfig());
+    const response = await new Dispatcher().dispatch(messagesStreamingRequest());
+
+    expect(response.bypassTransformation).toBe(true);
+    expect(response.stream).toBeDefined();
+
+    const clientBytes = await drainBytes(response.stream!);
+    // Byte-for-byte: Claude Code traffic depends on zero re-serialization.
+    expect(clientBytes).toBe(UPSTREAM_ANTHROPIC_SSE);
+  });
+
+  test('chat-inbound + oauth-anthropic target, non-streaming: same scoping applies (bypass disabled, JSON translated)', async () => {
+    setConfigForTesting(oauthAnthropicCrossFormatConfig());
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'msg_test123',
+          type: 'message',
+          role: 'assistant',
+          model: 'claude-test',
+          content: [{ type: 'text', text: 'Hello from Claude' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 10, output_tokens: 4 },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    const response = await new Dispatcher().dispatch(nonStreamingChatRequest());
+
+    // Non-streaming's non-bypass branch (dispatcher.ts handleNonStreamingResponse)
+    // returns transformer.transformResponse(...) as-is without stamping an
+    // explicit `bypassTransformation: false` (only the bypass=true branch stamps
+    // it). response-handler.ts only ever does a truthy check on this flag, so
+    // `undefined` and `false` are behaviorally identical — assert falsy rather
+    // than a stricter equality the surrounding code doesn't actually guarantee.
+    expect(response.bypassTransformation).toBeFalsy();
+
+    const formatted = await TransformerFactory.getTransformer('chat').formatResponse(response);
+    expect(formatted.choices[0].message.content).toBe('Hello from Claude');
   });
 });

@@ -82,5 +82,9 @@ function resolveImplicitAdapters(route: RouteResult): AdapterEntry[] {
 }
 
 function isGpt5Model(model: string): boolean {
-  return /^gpt-5(?:[.-]|$)/i.test(model);
+  // Matches bare ids ("gpt-5", "gpt-5.2", "gpt-5-mini") AND provider-prefixed
+  // target ids ("openai/gpt-5.5") used by pi-ai-registry-backed targets (e.g.
+  // an OpenLimits aggregator route). Must not match lookalikes like "gpt-55",
+  // "chatgpt-5", or "my-gpt-5x".
+  return /(?:^|\/)gpt-5(?:[.-]|$)/i.test(model);
 }

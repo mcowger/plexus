@@ -22,6 +22,11 @@ import { CooldownManager } from '../runtime/cooldown-manager';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { getApiBaseType } from '../../utils/api-format';
 import { rewriteGeminiMalformedFunctionCallStream } from '../../utils/gemini-malformed-function-call';
+import {
+  createStreamVisibilityTracker,
+  isStreamEmpty,
+  observeStreamChunk,
+} from '../dispatch/empty-completion';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];
@@ -262,7 +267,11 @@ export async function handleResponse(
 
     if (unifiedResponse.bypassTransformation) {
       // Direct pass-through, except for retryable reclassification of Gemini's
-      // MALFORMED_FUNCTION_CALL terminal frame.
+      // MALFORMED_FUNCTION_CALL terminal frame. T5 empty-completion detection
+      // (below) does not run on this path: bypass mode never produces unified
+      // chunk objects to inspect (the client receives raw provider bytes
+      // verbatim), and re-parsing every provider's raw SSE format just to
+      // detect emptiness is out of scope here.
       finalClientStream = rawStream;
     } else {
       /**
@@ -278,10 +287,64 @@ export async function handleResponse(
         ? providerTransformer.transformStream(rawStream)
         : rawStream;
 
+      // T5: empty-completion observability. Streaming can't fail over —
+      // headers are already sent by the time we'd know the completion was
+      // empty — so this is log/metadata only: tap the UNIFIED chunk stream
+      // (the actual UnifiedChatStreamChunk objects `formatStream` is about to
+      // consume, not client-encoded bytes) and count content/tool-call/
+      // reasoning presence as chunks pass through. Only counts are kept
+      // (see empty-completion.ts) — the delta text itself is never buffered,
+      // so this can't be (and isn't meant to be) used to retry/replay the
+      // response; buffering the full stream purely to support a retry is
+      // explicitly out of scope for T5.
+      //
+      // Only attached when transformStream() actually produced unified chunk
+      // objects (the same condition step 1 above already branches on) —
+      // otherwise `unifiedStream === rawStream` (raw bytes) and there is
+      // nothing chunk-shaped to inspect.
+      const visibilityTracker = createStreamVisibilityTracker();
+      const observedUnifiedStream = providerTransformer.transformStream
+        ? unifiedStream.pipeThrough(
+            new TransformStream({
+              transform(chunk, controller) {
+                observeStreamChunk(visibilityTracker, chunk);
+                // A unified error chunk (response.failed/response.incomplete/
+                // a mid-stream provider error — however transformStream
+                // renders it) means the completion did not finish cleanly.
+                // Mark the usage record accordingly (once) so it's never
+                // reported as a plain success, nor — via the flush's
+                // empty-downgrade below, which only ever upgrades a
+                // 'success' into 'empty' — silently reclassified as merely
+                // "empty" once the stream ends.
+                if (chunk?.event === 'error' && usageRecord.responseStatus !== 'error') {
+                  usageRecord.responseStatus = 'error';
+                }
+                controller.enqueue(chunk);
+              },
+              flush() {
+                // Only ever downgrade a plain 'success' into 'empty' — never
+                // clobber a more specific status (e.g. 'error', set above
+                // when a unified error chunk passed through, or 'error' from
+                // the Gemini MALFORMED_FUNCTION_CALL tap above) that may have
+                // already been set while this stream was flowing.
+                if (isStreamEmpty(visibilityTracker) && usageRecord.responseStatus === 'success') {
+                  usageRecord.responseStatus = 'empty';
+                  logger.warn(
+                    `Empty completion (no visible output) streamed to client for ` +
+                      `${usageRecord.provider ?? 'unknown'}/${usageRecord.selectedModelName ?? 'unknown'} ` +
+                      `(alias=${usageRecord.canonicalModelName ?? usageRecord.incomingModelAlias ?? 'n/a'}, ` +
+                      `requestId=${usageRecord.requestId})`
+                  );
+                }
+              },
+            })
+          )
+        : unifiedStream;
+
       // Step 2: Unified internal objects -> Client SSE format
       finalClientStream = clientTransformer.formatStream
-        ? clientTransformer.formatStream(unifiedStream)
-        : unifiedStream;
+        ? clientTransformer.formatStream(observedUnifiedStream)
+        : observedUnifiedStream;
     }
 
     // TAP THE TRANSFORMED STREAM for debugging

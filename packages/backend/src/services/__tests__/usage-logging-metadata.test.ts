@@ -194,4 +194,160 @@ describe('UsageInspector Metadata Robustness', () => {
     expect(record?.toolCallsCount).toBe(2);
     expect(record?.finishReason).toBe('something_else');
   });
+
+  describe('Responses API status → finishReason mapping', () => {
+    // Mirrors the reconstructed snapshot shape produced by
+    // DebugLoggingInspector.updateResponsesSnapshot for the same
+    // response.created -> response.output_text.delta -> response.failed
+    // stream exercised in debug-logging-reconstruction.test.ts.
+    it('should map a failed Responses API stream to finishReason "error" with non-zero usage', async () => {
+      const requestId = 'responses-failed-stream';
+      const snapshot = {
+        id: 'resp_test123',
+        object: 'response',
+        status: 'failed',
+        model: 'gpt-4o',
+        output: [
+          {
+            id: 'msg_1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'Partial answer before it broke' }],
+          },
+        ],
+        error: { code: 'server_error', message: 'The model response failed to complete.' },
+        usage: {
+          input_tokens: 42,
+          output_tokens: 8,
+          total_tokens: 50,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      };
+
+      const record = await runInspector(requestId, 'responses', snapshot);
+      expect(record?.finishReason).toBe('error');
+      expect(record?.tokensInput).toBe(42);
+      expect(record?.tokensOutput).toBe(8);
+    });
+
+    // Mirrors the reconstructed snapshot shape produced by
+    // DebugLoggingInspector.updateResponsesSnapshot for the same
+    // response.created -> response.output_text.delta -> response.incomplete
+    // stream exercised in debug-logging-reconstruction.test.ts.
+    it('should map an incomplete Responses API stream (max_output_tokens) to finishReason "length" with non-zero usage', async () => {
+      const requestId = 'responses-incomplete-max-tokens-stream';
+      const snapshot = {
+        id: 'resp_test789',
+        object: 'response',
+        status: 'incomplete',
+        model: 'gpt-4o',
+        output: [
+          {
+            id: 'msg_1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'Truncated answer that ran out of ' }],
+          },
+        ],
+        incomplete_details: { reason: 'max_output_tokens' },
+        usage: {
+          input_tokens: 30,
+          output_tokens: 16,
+          total_tokens: 46,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      };
+
+      const record = await runInspector(requestId, 'responses', snapshot);
+      expect(record?.finishReason).toBe('length');
+      expect(record?.tokensInput).toBe(30);
+      expect(record?.tokensOutput).toBe(16);
+    });
+
+    it('should map an incomplete Responses API stream (content_filter) to finishReason "content_filter"', async () => {
+      const requestId = 'responses-incomplete-content-filter-stream';
+      const snapshot = {
+        id: 'resp_test999',
+        object: 'response',
+        status: 'incomplete',
+        model: 'gpt-4o',
+        output: [
+          {
+            id: 'msg_1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'Cut off by the content filter' }],
+          },
+        ],
+        incomplete_details: { reason: 'content_filter' },
+        usage: {
+          input_tokens: 25,
+          output_tokens: 4,
+          total_tokens: 29,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      };
+
+      const record = await runInspector(requestId, 'responses', snapshot);
+      expect(record?.finishReason).toBe('content_filter');
+      expect(record?.tokensInput).toBe(25);
+      expect(record?.tokensOutput).toBe(4);
+    });
+
+    it('should default an incomplete Responses API stream with an unknown/absent reason to finishReason "length"', async () => {
+      const requestId = 'responses-incomplete-unknown-reason-stream';
+      const snapshot = {
+        id: 'resp_test000',
+        object: 'response',
+        status: 'incomplete',
+        model: 'gpt-4o',
+        output: [],
+        // No incomplete_details at all — must still default sensibly instead
+        // of leaking 'incomplete' or throwing on the optional chain.
+        usage: {
+          input_tokens: 12,
+          output_tokens: 1,
+          total_tokens: 13,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      };
+
+      const record = await runInspector(requestId, 'responses', snapshot);
+      expect(record?.finishReason).toBe('length');
+    });
+
+    it('should still map a completed Responses API stream to finishReason "stop" (regression)', async () => {
+      const requestId = 'responses-completed-stream';
+      const snapshot = {
+        id: 'resp_test456',
+        object: 'response',
+        status: 'completed',
+        model: 'gpt-4o',
+        output: [
+          {
+            id: 'msg_1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'Full answer' }],
+          },
+        ],
+        usage: {
+          input_tokens: 42,
+          output_tokens: 20,
+          total_tokens: 62,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens_details: { reasoning_tokens: 0 },
+        },
+      };
+
+      const record = await runInspector(requestId, 'responses', snapshot);
+      expect(record?.finishReason).toBe('stop');
+      expect(record?.tokensInput).toBe(42);
+      expect(record?.tokensOutput).toBe(20);
+    });
+  });
 });
