@@ -4,6 +4,7 @@ import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
 import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { getApiBaseType } from '../utils/api-format';
+import { composeContentWithImageMarkdown } from './image-rendering';
 
 const FIM_PREFIX_TOKEN = '<|fim_prefix|>';
 const FIM_SUFFIX_TOKEN = '<|fim_suffix|>';
@@ -196,7 +197,13 @@ export class OpenAICompletionTransformer implements Transformer {
   }
 
   async formatResponse(response: UnifiedChatResponse): Promise<any> {
-    const content = response.content || '';
+    // Image output renders as size-guarded markdown composed after the
+    // authored text (see transformers/image-rendering.ts) — unified
+    // `content` itself stays pure. Composed BEFORE FIM normalization so the
+    // combined text flows through the same pipeline the baked content
+    // previously did.
+    const content =
+      composeContentWithImageMarkdown(response.content, response.image_generation_calls) || '';
     const normalizedContent =
       this.fimUserPrompt === null ? content : normalizeFimResponse(content, this.fimUserPrompt);
 

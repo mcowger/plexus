@@ -4,6 +4,7 @@ import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
 import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../utils/gemini-malformed-function-call';
+import { composeContentWithImageMarkdown } from './image-rendering';
 
 /**
  * OpenAITransformer
@@ -165,7 +166,12 @@ export class OpenAITransformer implements Transformer {
     // which normalizes incoming assistant messages into pi-ai's array format.
     const message: any = {
       role: 'assistant',
-      content: response.content,
+      // Chat-format clients receive image_generation_call output as
+      // size-guarded markdown (data URI or omission placeholder) appended
+      // after the authored text — composed HERE from the typed unified
+      // carry, never baked into unified `content` (which stays pure). See
+      // transformers/image-rendering.ts.
+      content: composeContentWithImageMarkdown(response.content, response.image_generation_calls),
       reasoning_content: response.reasoning_content,
       tool_calls: response.tool_calls,
       ...(response.annotations && response.annotations.length > 0

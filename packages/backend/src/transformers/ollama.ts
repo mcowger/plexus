@@ -1,5 +1,6 @@
 import { Transformer } from '../types/transformer';
 import { UnifiedChatRequest, UnifiedChatResponse, UnifiedChatStreamChunk } from '../types/unified';
+import { composeContentWithImageMarkdown } from './image-rendering';
 
 /**
  * OllamaTransformer
@@ -154,7 +155,13 @@ export class OllamaTransformer implements Transformer {
           index: 0,
           message: {
             role: 'assistant',
-            content: response.content,
+            // Image output renders as size-guarded markdown composed after
+            // the authored text (see transformers/image-rendering.ts) —
+            // unified `content` itself stays pure.
+            content: composeContentWithImageMarkdown(
+              response.content,
+              response.image_generation_calls
+            ),
             tool_calls: response.tool_calls,
           },
           finish_reason: response.tool_calls ? 'tool_calls' : response.finishReason || 'stop',

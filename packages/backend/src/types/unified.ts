@@ -204,12 +204,20 @@ export interface UnifiedUsage {
  * A COMPLETED Responses-API `image_generation_call` output item carried typed
  * through the unified layer (mirroring how tool_calls are carried) so
  * same-format (responses -> responses) non-bypass routes can re-emit the
- * native item instead of a lossy markdown rendering. The responses -> unified
- * transforms emit BOTH this typed item (full base64 `result`, never
- * size-capped) and the chat-format markdown rendering on the content string
- * (size-guarded): responses-facing formatters re-emit the native item and
- * skip the paired markdown; chat/messages-facing formatters render the
- * content string and never read this field.
+ * native item instead of a lossy markdown rendering. The typed item always
+ * carries the full base64 `result`, never size-capped.
+ *
+ * UNARY: transformResponse carries images typed ONLY — unified `content`
+ * stays pure authored text, and chat/messages-facing formatters compose the
+ * size-guarded markdown projection themselves from this field (see
+ * transformers/image-rendering.ts) while responses-facing formatters re-emit
+ * the native item with no string surgery.
+ *
+ * STREAMING: transformStream pairs the typed chunk-level carry with the
+ * chat-format markdown rendering on the SAME chunk's `delta.content`;
+ * responses-facing formatStream re-emits the native item and structurally
+ * skips that paired content delta (keyed on the typed items being present on
+ * the chunk — never on string matching).
  */
 export interface UnifiedImageGenerationCall {
   id?: string;
@@ -258,9 +266,12 @@ export interface UnifiedChatResponse {
   }>;
   /**
    * Completed image_generation_call output items, typed (see
-   * UnifiedImageGenerationCall). Populated alongside the markdown rendering
-   * already appended to `content` — responses-facing formatters re-emit these
-   * natively and subtract the paired markdown from the message text.
+   * UnifiedImageGenerationCall). The ONLY carrier of unary image output:
+   * `content` stays pure authored text. Chat/messages-facing formatters
+   * compose their markdown projection from these (see
+   * transformers/image-rendering.ts); responses-facing formatters re-emit
+   * them natively with no string surgery on the text; empty-completion
+   * detection counts entries with a non-empty `result` as visible output.
    */
   image_generation_calls?: UnifiedImageGenerationCall[];
   annotations?: Annotation[];

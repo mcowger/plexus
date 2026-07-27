@@ -1,5 +1,6 @@
 import { Part } from '@google/genai';
 import { UnifiedChatResponse } from '../../types/unified';
+import { composeContentWithImageMarkdown } from '../image-rendering';
 
 /**
  * Formats a unified response back to Gemini's format for returning to clients.
@@ -19,7 +20,14 @@ export async function formatGeminiResponse(response: UnifiedChatResponse): Promi
     parts.push(part);
   }
 
-  if (response.content) parts.push({ text: response.content });
+  // Gemini-format clients see image_generation_call output as size-guarded
+  // markdown composed after the authored text (see
+  // transformers/image-rendering.ts) — unified `content` itself stays pure.
+  const textContent = composeContentWithImageMarkdown(
+    response.content,
+    response.image_generation_calls
+  );
+  if (textContent) parts.push({ text: textContent });
 
   if (response.tool_calls) {
     response.tool_calls.forEach((tc, index) => {

@@ -536,4 +536,37 @@ describe('Dispatcher empty-completion failover (T5)', () => {
     expect(meta?.attemptCount).toBe(1);
     expect(meta?.finalAttemptProvider).toBe('p1');
   });
+
+  test('an image_generation_call-only completion on the TRANSFORMED path (chat client -> responses provider) is not retried as empty', async () => {
+    setConfigForTesting(makeResponsesConfig({ targetCount: 2 }));
+    fetchMock
+      .mockImplementationOnce(async () => imageOnlyResponsesResponse())
+      .mockImplementationOnce(async () => {
+        throw new Error('should not be called — failing over here would be the bug');
+      });
+
+    const dispatcher = new Dispatcher();
+    // A CHAT-format client request against the responses-target alias:
+    // incoming 'chat' !== target 'responses' means NO passthrough/bypass, so
+    // the unified response is the TRANSFORMED one — PURE content (null, no
+    // baked image markdown), typed `image_generation_calls`, no rawResponse.
+    // The typed empty-completion signal is the only thing keeping this from
+    // being misclassified as empty and failed over.
+    const response = await dispatcher.dispatch({
+      model: 'responses-alias',
+      messages: [{ role: 'user', content: 'draw a cat' }],
+      incomingApiType: 'chat',
+      stream: false,
+    } as UnifiedChatRequest);
+    const meta = (response as any).plexus;
+
+    // A single fetch call proves NO failover happened.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(meta?.attemptCount).toBe(1);
+    expect(meta?.finalAttemptProvider).toBe('p1');
+    // Transformed path, not bypass: pure content + typed carry.
+    expect(response.bypassTransformation).toBeUndefined();
+    expect(response.content).toBeNull();
+    expect(response.image_generation_calls?.[0]?.result).toBe('base64-image-data');
+  });
 });

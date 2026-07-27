@@ -340,8 +340,19 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
 const TINY_IMAGE_B64 = 'aGVsbG8=';
 const TINY_IMAGE_MARKDOWN = `![generated image](data:image/png;base64,${TINY_IMAGE_B64})`;
 
-describe('ResponsesTransformer transformResponse - image_generation_call rendering', () => {
-  test('an image_generation_call with a base64 result becomes markdown data-URI unified content', async () => {
+describe('ResponsesTransformer image_generation_call rendering (pure unified content + chat composition)', () => {
+  // The chat-visible text for a unified response, exactly as a CHAT-format
+  // client receives it: OpenAITransformer.formatResponse composes the
+  // authored text + rendered image markdown from the typed carry
+  // (transformers/image-rendering.ts). The expected strings in this describe
+  // are the pre-split baked-content bytes — chat clients must keep receiving
+  // them byte-identically.
+  const chatVisibleContent = async (unified: any): Promise<string | null> => {
+    const chat = await new OpenAITransformer().formatResponse(unified);
+    return chat.choices[0].message.content;
+  };
+
+  test('an image_generation_call with a base64 result renders markdown data-URI content for chat clients', async () => {
     const unified = await new ResponsesTransformer().transformResponse({
       id: 'resp_img',
       object: 'response',
@@ -354,10 +365,16 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
       usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 },
     });
 
-    expect(unified.content).toBe(TINY_IMAGE_MARKDOWN);
+    // Unified content stays PURE — no message item, no text. The image
+    // travels typed; the markdown exists only in the chat projection.
+    expect(unified.content).toBeNull();
+    expect(unified.image_generation_calls).toEqual([
+      { id: 'ig_1', status: 'completed', result: TINY_IMAGE_B64 },
+    ]);
+    expect(await chatVisibleContent(unified)).toBe(TINY_IMAGE_MARKDOWN);
   });
 
-  test('image markdown respects output-item order relative to the message item', async () => {
+  test('chat composition appends image markdown after the authored message text', async () => {
     const unified = await new ResponsesTransformer().transformResponse({
       id: 'resp_img_order',
       object: 'response',
@@ -376,7 +393,8 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
       ],
     });
 
-    expect(unified.content).toBe(`Here is your image:\n${TINY_IMAGE_MARKDOWN}`);
+    expect(unified.content).toBe('Here is your image:');
+    expect(await chatVisibleContent(unified)).toBe(`Here is your image:\n${TINY_IMAGE_MARKDOWN}`);
   });
 
   // `output_format` is a REQUEST-side image tool field — it is not present
@@ -395,7 +413,7 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
         status: 'completed',
         output: [{ type: 'image_generation_call', id: 'ig_1', status: 'completed', result }],
       });
-      return unified.content;
+      return chatVisibleContent(unified);
     };
 
     test('PNG signature (\\x89PNG) renders image/png', async () => {
@@ -445,7 +463,7 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
       });
 
       // The payload's actual bytes ("hello" — no signature) decide: png.
-      expect(unified.content).toBe(TINY_IMAGE_MARKDOWN);
+      expect(await chatVisibleContent(unified)).toBe(TINY_IMAGE_MARKDOWN);
     });
 
     test('RIFF head WITHOUT the WEBP tag does not sniff as webp', async () => {
@@ -469,6 +487,8 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
     });
 
     expect(unified.content).toBeNull();
+    expect(unified.image_generation_calls).toBeUndefined();
+    expect(await chatVisibleContent(unified)).toBeNull();
   });
 
   test('a text-only response keeps its existing unified content shape (happy path unchanged)', async () => {
@@ -492,7 +512,7 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
     expect(unified.content).toBe('Full answer');
   });
 
-  test('a base64 result over the inline limit renders the omission placeholder, not a data URI', async () => {
+  test('a base64 result over the inline limit renders the omission placeholder for chat clients, not a data URI', async () => {
     // One char past MAX_INLINE_IMAGE_BASE64_CHARS (8 * 1024 * 1024).
     // Approximate decoded size = 8388609 * 3/4 bytes ≈ 6.0 MB.
     const oversized = 'A'.repeat(8 * 1024 * 1024 + 1);
@@ -507,7 +527,13 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
       ],
     });
 
-    expect(unified.content).toBe('[generated image omitted: 6.0 MB exceeds inline limit]');
+    // Pure unified content; the size guard applies only to the chat
+    // projection — the typed carry keeps the full payload.
+    expect(unified.content).toBeNull();
+    expect(unified.image_generation_calls?.[0]?.result).toBe(oversized);
+    expect(await chatVisibleContent(unified)).toBe(
+      '[generated image omitted: 6.0 MB exceeds inline limit]'
+    );
   });
 
   test('a base64 result exactly at the inline limit still renders as a data URI (boundary)', async () => {
@@ -521,7 +547,9 @@ describe('ResponsesTransformer transformResponse - image_generation_call renderi
       output: [{ type: 'image_generation_call', id: 'ig_1', status: 'completed', result: atLimit }],
     });
 
-    expect(unified.content).toBe(`![generated image](data:image/png;base64,${atLimit})`);
+    expect(await chatVisibleContent(unified)).toBe(
+      `![generated image](data:image/png;base64,${atLimit})`
+    );
   });
 });
 
@@ -681,14 +709,17 @@ describe('ResponsesTransformer transformStream - image_generation_call rendering
   });
 });
 
-// The markdown collapse alone is lossy for SAME-format clients: a non-bypass
-// responses -> responses route (e.g. a responses:lite subtype, adapter
-// active, vision fallthrough) would receive `message`/`output_text` markdown
-// instead of the native `image_generation_call` item — and the oversized
-// placeholder would destroy the base64 for clients that take it natively.
-// The typed chunk-level carry (UnifiedImageGenerationCall) keeps the item
+// A markdown-only collapse would be lossy for SAME-format clients: a
+// non-bypass responses -> responses route (e.g. a responses:lite subtype,
+// adapter active, vision fallthrough) would receive `message`/`output_text`
+// markdown instead of the native `image_generation_call` item — and the
+// oversized placeholder would destroy the base64 for clients that take it
+// natively. The typed carry (UnifiedImageGenerationCall) keeps the item
 // intact through the unified layer; the responses-facing formatStream /
-// formatResponse re-emit it natively.
+// formatResponse re-emit it natively. On the unary path the typed carry is
+// the ONLY image carrier (unified content stays pure); on the streaming path
+// it rides chunk-level, paired with the chat markdown delta on the same
+// chunk, which the responses-facing formatStream structurally skips.
 describe('ResponsesTransformer typed image_generation_call carry (responses -> responses)', () => {
   function unifiedStreamFromChunks(chunks: any[]): ReadableStream {
     return new ReadableStream({
@@ -972,7 +1003,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
   });
 
   describe('formatResponse (unary) re-emits typed items as native output items', () => {
-    test('transformResponse attaches the typed items alongside the markdown content', async () => {
+    test('transformResponse attaches the typed items and keeps unified content PURE', async () => {
       const unified = await new ResponsesTransformer().transformResponse({
         id: 'resp_unary_typed',
         object: 'response',
@@ -999,8 +1030,9 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
       expect(unified.image_generation_calls).toEqual([
         { id: 'ig_1', status: 'completed', result: TINY_IMAGE_B64 },
       ]);
-      // The chat-facing rendering is unchanged.
-      expect(unified.content).toBe(`Here is your image:\n${TINY_IMAGE_MARKDOWN}`);
+      // PURE authored text — the chat-format markdown projection is composed
+      // by the client-facing renderers, never baked in here.
+      expect(unified.content).toBe('Here is your image:');
     });
 
     test('a result-less image item still contributes no typed entry', async () => {
@@ -1077,9 +1109,11 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
         ],
       });
 
-      // The unified content still carries the markdown, so the
-      // empty-completion detector keeps seeing visible output.
-      expect(unified.content).toBe(TINY_IMAGE_MARKDOWN);
+      // Pure unified content: nothing authored, nothing baked. The typed
+      // carry is what keeps the empty-completion detector seeing visible
+      // output (see empty-completion.ts countTypedImageGenerationCalls).
+      expect(unified.content).toBeNull();
+      expect(unified.image_generation_calls?.[0]?.result).toBe(TINY_IMAGE_B64);
 
       const formatted = await transformer.formatResponse(unified as any);
       const imageItems = formatted.output.filter(
@@ -1105,8 +1139,9 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
         ],
       });
 
-      // Chat-facing content keeps the guarded placeholder...
-      expect(unified.content).toBe('[generated image omitted: 6.0 MB exceeds inline limit]');
+      // Pure unified content (the guarded placeholder exists only in the
+      // chat projection)...
+      expect(unified.content).toBeNull();
       // ...while the typed carry keeps the full payload.
       expect(unified.image_generation_calls?.[0]?.result).toBe(oversized);
 
@@ -1116,6 +1151,104 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
       const messageItem = formatted.output.find((item: any) => item.type === 'message');
       expect(messageItem.content[0].text).toBe('');
       expect(JSON.stringify(formatted).includes('exceeds inline limit')).toBe(false);
+    });
+  });
+
+  describe('unary content-corruption probe — authored text colliding with rendered image segments', () => {
+    // The model can legitimately AUTHOR text containing the exact string of a
+    // rendered image segment (echoing a small image's markdown, or quoting
+    // the oversized-omission placeholder). The authored copy is genuine
+    // message content and must reach every client byte-intact; the rendered
+    // segment is a chat-format projection a responses client never sees (it
+    // gets the native item instead). Any indexOf-based "remove the rendered
+    // segment" surgery removes the FIRST occurrence — the authored copy —
+    // and leaks the appended rendering: content corruption.
+
+    const authoredWithMarkdown = `Check this markdown I wrote myself:\n${TINY_IMAGE_MARKDOWN}\nNeat, right?`;
+
+    const collisionResponseBody = () => ({
+      id: 'resp_probe_md',
+      object: 'response',
+      model: 'gpt-image-model',
+      created_at: 1234567890,
+      status: 'completed',
+      output: [
+        {
+          type: 'message',
+          id: 'msg_1',
+          status: 'completed',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: authoredWithMarkdown }],
+        },
+        {
+          type: 'image_generation_call',
+          id: 'ig_1',
+          status: 'completed',
+          result: TINY_IMAGE_B64,
+        },
+      ],
+    });
+
+    test('authored text containing an exact copy of the image markdown reaches a responses client byte-intact', async () => {
+      const transformer = new ResponsesTransformer();
+      const unified = await transformer.transformResponse(collisionResponseBody());
+      const formatted = await transformer.formatResponse(unified as any);
+
+      // The native item is the image's only carrier...
+      const imageItems = formatted.output.filter(
+        (item: any) => item.type === 'image_generation_call'
+      );
+      expect(imageItems).toHaveLength(1);
+      expect(imageItems[0].result).toBe(TINY_IMAGE_B64);
+
+      // ...and the AUTHORED text — including its own copy of the markdown —
+      // survives byte-intact: nothing removed, no appended rendering leaked.
+      const messageItem = formatted.output.find((item: any) => item.type === 'message');
+      expect(messageItem.content[0].text).toBe(authoredWithMarkdown);
+    });
+
+    test('authored text quoting the oversized-omission placeholder reaches a responses client byte-intact', async () => {
+      const oversized = 'B'.repeat(2 * 8 * 1024 * 1024); // placeholder reads "12.0 MB"
+      const placeholder = '[generated image omitted: 12.0 MB exceeds inline limit]';
+      const authored = `If a file is too large you may see "${placeholder}" instead of the image.`;
+      const transformer = new ResponsesTransformer();
+      const unified = await transformer.transformResponse({
+        id: 'resp_probe_ph',
+        object: 'response',
+        model: 'gpt-image-model',
+        created_at: 1234567890,
+        status: 'completed',
+        output: [
+          {
+            type: 'message',
+            id: 'msg_1',
+            status: 'completed',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: authored }],
+          },
+          { type: 'image_generation_call', id: 'ig_big', status: 'completed', result: oversized },
+        ],
+      });
+
+      const formatted = await transformer.formatResponse(unified as any);
+
+      const imageItem = formatted.output.find((item: any) => item.type === 'image_generation_call');
+      expect(imageItem.result).toBe(oversized);
+
+      const messageItem = formatted.output.find((item: any) => item.type === 'message');
+      expect(messageItem.content[0].text).toBe(authored);
+      // Exactly ONE occurrence — the authored quote. The rendered
+      // placeholder itself must never leak into the responses payload.
+      expect(messageItem.content[0].text.split(placeholder).length - 1).toBe(1);
+    });
+
+    test('the same authored-collision response renders authored text + appended markdown for a CHAT client (duplication is genuine content)', async () => {
+      const unified = await new ResponsesTransformer().transformResponse(collisionResponseBody());
+      const chat = await new OpenAITransformer().formatResponse(unified as any);
+
+      expect(chat.choices[0].message.content).toBe(
+        `${authoredWithMarkdown}\n${TINY_IMAGE_MARKDOWN}`
+      );
     });
   });
 });

@@ -9,6 +9,7 @@ import {
   observeStreamChunk,
   type StreamVisibilityTracker,
 } from '../empty-completion';
+import { ResponsesTransformer } from '../../../transformers/responses';
 import type { UnifiedChatResponse } from '../../../types/unified';
 
 // A bare, all-absent UnifiedChatResponse — the "truly empty" fixture shared
@@ -241,15 +242,14 @@ describe('isEmptyUnifiedResponse — terminal finish reasons are never retryable
   });
 });
 
-describe('getResponseVisibilitySignals / isEmptyUnifiedResponse — image_generation_call visibility', () => {
+describe('getResponseVisibilitySignals / isEmptyUnifiedResponse — image_generation_call visibility (rawResponse / bypass path)', () => {
   // The Responses API returns `image_generation_call` output items
-  // (types/responses.ts ResponsesBuiltInToolCallItem). The unified response
-  // shape has no field for image outputs (no transformer populates one
-  // today — see the `images` forward-compat note), so an image-only
-  // Responses API completion would otherwise read as completely empty.
-  // `rawResponse` (populated on the bypass-transformation path — see
-  // dispatcher.ts's handleNonStreamingResponse) is the ORIGINAL body
-  // available at the call seam; detect the built-in tool call there.
+  // (types/responses.ts ResponsesBuiltInToolCallItem). On the
+  // bypass-transformation path the unified response carries no typed items —
+  // `rawResponse` (populated by dispatcher.ts's handleNonStreamingResponse)
+  // is the ORIGINAL body available at the call seam; detect the built-in
+  // tool call there. It also covers result-less items, which get no typed
+  // carry on the transformed path but still prove the model produced output.
   it('image_generation_call-only rawResponse is non-empty (no failover)', () => {
     const response = {
       ...emptyResponse(),
@@ -323,6 +323,83 @@ describe('getResponseVisibilitySignals / isEmptyUnifiedResponse — image_genera
     } as UnifiedChatResponse & { images: unknown[] };
 
     expect(getResponseVisibilitySignals(response).imageCount).toBe(2);
+  });
+});
+
+describe('getResponseVisibilitySignals / isEmptyUnifiedResponse — typed image_generation_calls signal (transformed path)', () => {
+  // With PURE unified content (image markdown is composed by the
+  // client-facing formatters, never baked into `content`), an image-only
+  // TRANSFORMED (non-bypass) response has no text and no rawResponse — the
+  // typed `image_generation_calls` carry is its only visibility signal.
+  it('typed image_generation_calls with a non-empty result count as visible output (no failover)', () => {
+    const response = {
+      ...emptyResponse(),
+      image_generation_calls: [{ id: 'ig_1', status: 'completed', result: 'aGVsbG8=' }],
+    } as UnifiedChatResponse;
+
+    expect(getResponseVisibilitySignals(response).imageCount).toBe(1);
+    expect(isEmptyUnifiedResponse(response)).toBe(false);
+  });
+
+  it('multiple typed entries are all counted', () => {
+    const response = {
+      ...emptyResponse(),
+      image_generation_calls: [
+        { id: 'ig_1', status: 'completed', result: 'aGVsbG8=' },
+        { id: 'ig_2', status: 'completed', result: 'd29ybGQ=' },
+      ],
+    } as UnifiedChatResponse;
+
+    expect(getResponseVisibilitySignals(response).imageCount).toBe(2);
+  });
+
+  it('typed entries with an empty or missing result contribute zero (defensive)', () => {
+    const response = {
+      ...emptyResponse(),
+      image_generation_calls: [{ id: 'ig_1', status: 'completed', result: '' }, { id: 'ig_2' }],
+    } as any;
+
+    expect(getResponseVisibilitySignals(response).imageCount).toBe(0);
+    expect(isEmptyUnifiedResponse(response)).toBe(true);
+  });
+
+  it('typed entries combine with the rawResponse count (bypass path unchanged)', () => {
+    const response = {
+      ...emptyResponse(),
+      image_generation_calls: [{ id: 'ig_1', status: 'completed', result: 'aGVsbG8=' }],
+      rawResponse: {
+        output: [{ type: 'image_generation_call', id: 'ig_2', status: 'completed' }],
+      },
+    } as UnifiedChatResponse;
+
+    expect(getResponseVisibilitySignals(response).imageCount).toBe(2);
+  });
+
+  // End-to-end across the two layers: a REAL ResponsesTransformer transform
+  // of an image-only completion (the transformed/non-bypass dispatch path —
+  // no rawResponse attached) must read as non-empty purely via the typed
+  // carry, since pure unified content gives it no text signal. This is the
+  // regression lock for the production empty-completion bug: if the typed
+  // signal ever regresses, image-only completions would be misclassified as
+  // empty and failed over again.
+  it('a real transformed image-only Responses completion is NOT empty (typed carry is the only signal)', async () => {
+    const unified = await new ResponsesTransformer().transformResponse({
+      id: 'resp_img_transformed',
+      object: 'response',
+      created_at: 1,
+      status: 'completed',
+      model: 'image-model',
+      output: [
+        { type: 'image_generation_call', id: 'ig_1', status: 'completed', result: 'aGVsbG8=' },
+      ],
+    });
+
+    // Pure content, no raw body: the typed carry must be what keeps this
+    // visible.
+    expect(unified.content).toBeNull();
+    expect(unified.rawResponse).toBeUndefined();
+    expect(getResponseVisibilitySignals(unified).imageCount).toBe(1);
+    expect(isEmptyUnifiedResponse(unified)).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { UnifiedChatResponse } from '../../types/unified';
+import { composeContentWithImageMarkdown } from '../image-rendering';
 
 /**
  * Formats a unified response back to Anthropic's format for returning to clients.
@@ -40,8 +41,15 @@ export async function formatAnthropicResponse(response: UnifiedChatResponse): Pr
     });
   }
 
-  if (response.content) {
-    content.push({ type: 'text', text: response.content });
+  // Messages-format clients see image_generation_call output as size-guarded
+  // markdown composed after the authored text (see
+  // transformers/image-rendering.ts) — unified `content` itself stays pure.
+  const textContent = composeContentWithImageMarkdown(
+    response.content,
+    response.image_generation_calls
+  );
+  if (textContent) {
+    content.push({ type: 'text', text: textContent });
   }
 
   if (response.tool_calls) {

@@ -21,23 +21,17 @@ import { createParser } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
 import { logger } from '../utils/logger';
 import { normalizeOpenAIChatUsage, normalizeOpenAIResponsesUsage } from '../utils/usage-normalizer';
+import { imageGenerationCallMarkdown } from './image-rendering';
 
 const OPENAI_RESPONSES_CALL_ID_MAX_LENGTH = 64;
 const OPENAI_RESPONSES_REASONING_CONTENT_MAX_ITEMS = 0;
-
-// Largest image_generation_call base64 `result` (in characters) that
-// imageGenerationCallMarkdown will inline as a data URI. Anything larger is
-// rendered as an omission placeholder instead: the markdown lands in a single
-// unified content string / SSE content delta, and a multi-megabyte data URI
-// there can blow past client/proxy message-size limits.
-const MAX_INLINE_IMAGE_BASE64_CHARS = 8 * 1024 * 1024;
 
 /**
  * Projects a completed image_generation_call output item (with a non-empty
  * base64 `result`) onto the typed unified carry — see
  * UnifiedImageGenerationCall in types/unified.ts. The `result` is carried
- * byte-intact: the inline size cap applies only to the paired markdown
- * rendering, never to the typed item.
+ * byte-intact: the inline size cap applies only to the chat-format markdown
+ * rendering (see transformers/image-rendering.ts), never to the typed item.
  */
 function toUnifiedImageGenerationCall(item: any): UnifiedImageGenerationCall {
   return {
@@ -45,67 +39,6 @@ function toUnifiedImageGenerationCall(item: any): UnifiedImageGenerationCall {
     ...(typeof item.status === 'string' ? { status: item.status } : {}),
     result: item.result,
   };
-}
-
-/**
- * Sniffs the image mime SUBTYPE from the magic bytes at the head of a base64
- * payload. `output_format` is a REQUEST-side image tool field — it is not
- * present on image_generation_call output items — so the payload's own
- * signature is the only reliable source:
- *   - PNG:  \x89 P N G
- *   - JPEG: \xFF \xD8
- *   - WebP: R I F F ...(4 size bytes)... W E B P
- *   - GIF:  G I F 8
- * Anything unrecognized defaults to png. Only the markdown data-URI rendering
- * needs a mime — the native typed re-emit carries raw base64 with no URI.
- */
-function sniffImageMimeSubtype(base64Result: string): string {
-  // 24 base64 chars decode to 18 bytes — enough for every signature above
-  // (WebP needs 12).
-  const head = Buffer.from(base64Result.slice(0, 24), 'base64');
-  if (
-    head.length >= 4 &&
-    head[0] === 0x89 &&
-    head[1] === 0x50 &&
-    head[2] === 0x4e &&
-    head[3] === 0x47
-  ) {
-    return 'png';
-  }
-  if (head.length >= 2 && head[0] === 0xff && head[1] === 0xd8) {
-    return 'jpeg';
-  }
-  if (
-    head.length >= 12 &&
-    head.toString('latin1', 0, 4) === 'RIFF' &&
-    head.toString('latin1', 8, 12) === 'WEBP'
-  ) {
-    return 'webp';
-  }
-  if (head.length >= 4 && head.toString('latin1', 0, 4) === 'GIF8') {
-    return 'gif';
-  }
-  return 'png';
-}
-
-/**
- * Removes one rendered image segment (a markdown data-URI or the oversized
- * placeholder) from a combined unified content string, consuming the single
- * `\n` join that transformResponse inserted between segments. Used by the
- * responses-facing formatResponse so the native image_generation_call item is
- * the ONLY carrier — the message text keeps just the real message segments.
- */
-function removeRenderedImageSegment(content: string, segment: string): string {
-  const index = content.indexOf(segment);
-  if (index === -1) return content;
-  const end = index + segment.length;
-  if (end < content.length && content[end] === '\n') {
-    return content.slice(0, index) + content.slice(end + 1);
-  }
-  if (index > 0 && content[index - 1] === '\n') {
-    return content.slice(0, index - 1) + content.slice(end);
-  }
-  return content.slice(0, index) + content.slice(end);
 }
 
 // Some Responses clients have been observed replaying tool calls with composite
@@ -482,31 +415,27 @@ export class ResponsesTransformer implements Transformer {
       const messageItem = response.output?.find((item: any) => item.type === 'message');
       const messageText = messageItem?.content?.map((part: any) => part.text).join('\n') || null;
 
-      // Minimal image_generation_call rendering for chat-format clients:
-      // a completed item with a base64 `result` becomes a markdown data-URI
-      // image appended to the unified content, in output-item order relative
-      // to the (first) message item. Without this, an image-only Responses
-      // completion yields no content at all once transformed. When no image
-      // items are present the content is exactly the message text, as before.
-      //
-      // The same completed items are ALSO carried typed (byte-intact, no
-      // inline size cap) on `image_generation_calls` so a responses-facing
-      // formatResponse can re-emit the native item instead of the lossy
-      // markdown — see UnifiedImageGenerationCall in types/unified.ts.
-      const contentSegments: string[] = [];
+      // Completed image_generation_call items (non-empty base64 `result`)
+      // are carried TYPED ONLY, byte-intact and never size-capped, on
+      // `image_generation_calls` — see UnifiedImageGenerationCall in
+      // types/unified.ts. The unified `content` stays PURE authored message
+      // text: chat-format client renderers compose their own markdown
+      // projection from the typed items (composeContentWithImageMarkdown in
+      // transformers/image-rendering.ts), and the responses-facing
+      // formatResponse re-emits the native item with NO string surgery on
+      // the text — so authored text that happens to contain the same
+      // characters as a rendered image segment can never be corrupted.
       const imageGenerationCalls: UnifiedImageGenerationCall[] = [];
       for (const item of response.output ?? []) {
-        if (item === messageItem && messageText) {
-          contentSegments.push(messageText);
-          continue;
-        }
-        const imageMarkdown = this.imageGenerationCallMarkdown(item);
-        if (imageMarkdown) {
-          contentSegments.push(imageMarkdown);
+        if (
+          item?.type === 'image_generation_call' &&
+          typeof item.result === 'string' &&
+          item.result.length > 0
+        ) {
           imageGenerationCalls.push(toUnifiedImageGenerationCall(item));
         }
       }
-      const content = contentSegments.length > 0 ? contentSegments.join('\n') : messageText;
+      const content = messageText;
 
       // Collect url_citation annotations from all output_text content parts
       const annotations: any[] = [];
@@ -986,35 +915,6 @@ export class ResponsesTransformer implements Transformer {
   }
 
   /**
-   * Renders a COMPLETED image_generation_call output item's base64 `result`
-   * as a markdown data-URI image for chat-format clients (minimal-scope
-   * rendering: completed items only — partial-image preview deltas are
-   * explicitly out of scope, see transformStream). Returns null when the
-   * item carries no base64 `result` payload. The mime subtype is sniffed
-   * from the decoded payload's magic bytes (see sniffImageMimeSubtype) —
-   * `output_format` is a request-tool field that never appears on output
-   * items, so it is deliberately not consulted.
-   *
-   * Results larger than MAX_INLINE_IMAGE_BASE64_CHARS are NOT inlined:
-   * a short placeholder text segment (naming the approximate decoded size)
-   * is rendered instead, so a huge image can't flood a single content
-   * string/SSE delta. Both call sites (transformResponse segments and
-   * transformStream's done/completed rendering) share this guard.
-   */
-  private imageGenerationCallMarkdown(item: any): string | null {
-    if (!item || item.type !== 'image_generation_call') return null;
-    if (typeof item.result !== 'string' || item.result.length === 0) return null;
-    if (item.result.length > MAX_INLINE_IMAGE_BASE64_CHARS) {
-      // Base64 decodes to ~3/4 of its character count; report the
-      // approximate decoded size with one decimal.
-      const approxDecodedMb = ((item.result.length * 3) / 4 / (1024 * 1024)).toFixed(1);
-      return `[generated image omitted: ${approxDecodedMb} MB exceeds inline limit]`;
-    }
-    const format = sniffImageMimeSubtype(item.result);
-    return `![generated image](data:image/${format};base64,${item.result})`;
-  }
-
-  /**
    * Converts Chat Completions response to output items array
    */
   private convertChatResponseToOutputItems(response: UnifiedChatResponse): ResponsesOutputItem[] {
@@ -1047,22 +947,15 @@ export class ResponsesTransformer implements Transformer {
     }
 
     // Re-emit typed image_generation_call items natively (full base64 — the
-    // native format has no inline-markdown size concern), and strip each
-    // item's paired chat-format rendering (recomputed via the same pure
-    // imageGenerationCallMarkdown helper: data URI, or the oversized
-    // placeholder) out of the combined content so the message text below
-    // carries only the real message segments — never the image twice, never
-    // the placeholder.
-    let messageText = response.content || '';
+    // native format has no inline-markdown size concern). Unified `content`
+    // is PURE authored text (transformResponse never bakes a rendered image
+    // segment into it — see transformers/image-rendering.ts), so the message
+    // text below needs NO string surgery: it reaches the client byte-intact
+    // even when the authored text happens to contain the same characters as
+    // a rendered image segment (markdown or oversized placeholder).
+    const messageText = response.content || '';
     for (const imageCall of response.image_generation_calls ?? []) {
       if (typeof imageCall.result !== 'string' || imageCall.result.length === 0) continue;
-      const markdown = this.imageGenerationCallMarkdown({
-        type: 'image_generation_call',
-        result: imageCall.result,
-      });
-      if (markdown) {
-        messageText = removeRenderedImageSegment(messageText, markdown);
-      }
       items.push({
         type: 'image_generation_call',
         id: imageCall.id ?? this.generateItemId('ig'),
@@ -1153,11 +1046,6 @@ export class ResponsesTransformer implements Transformer {
     // their response.output_item.done event, so the response.completed
     // fallback below doesn't render them a second time.
     const renderedImageItemIds = new Set<string>();
-    // `start(controller)` below uses method shorthand, so `this` inside it is
-    // the stream's underlying source, not this transformer instance — capture
-    // the helper as a local for use in that scope.
-    const imageGenerationCallMarkdown = (item: any) => this.imageGenerationCallMarkdown(item);
-
     const getToolCallIndex = (data: any): number => {
       const outputIndex =
         typeof data.output_index === 'number' ? (data.output_index as number) : undefined;
