@@ -320,35 +320,44 @@ export class DebugManager {
     log.responseHeaders = headers;
   }
 
-  flush(requestId: string) {
-    // Skip flushing ephemeral requests
-    if (this.ephemeralRequests.has(requestId)) {
-      logger.debug(`Skipping flush for ephemeral request ${requestId}`);
-      this.pendingLogs.delete(requestId);
-      return;
-    }
+  /**
+   * True when any debug dimension (global, key, alias, or provider) matches
+   * this request, or when the request was flagged for forced persistence
+   * (capture-on-error mode). Ephemeral traces captured for token estimation
+   * are only kept when this returns true.
+   */
+  private shouldPersistLog(log: DebugLogRecord): boolean {
+    return (
+      this.enabledGlobal ||
+      this.isKeyDimensionEnabled(log.apiKey ?? null) ||
+      this.isAliasDimensionEnabled(log.modelAlias ?? null) ||
+      this.isProviderDimensionEnabled(log.provider ?? null) ||
+      !!log.forcePersist
+    );
+  }
 
+  flush(requestId: string) {
     const log = this.pendingLogs.get(requestId);
     if (!log) return;
 
-    const enabledByGlobal = this.enabledGlobal;
-    const enabledByKey = this.isKeyDimensionEnabled(log.apiKey ?? null);
-    const enabledByAlias = this.isAliasDimensionEnabled(log.modelAlias ?? null);
-    const enabledByProvider = this.isProviderDimensionEnabled(log.provider ?? null);
+    // Skip flushing ephemeral requests, unless a debug dimension also wants
+    // the trace — ephemeral capture exists for token estimation, but an
+    // enabled dimension (or a forced persist) takes precedence.
+    if (this.ephemeralRequests.has(requestId) && !this.shouldPersistLog(log)) {
+      logger.debug(`Skipping flush for ephemeral request ${requestId}`);
+      this.pendingLogs.delete(requestId);
+      this.ephemeralRequests.delete(requestId);
+      return;
+    }
 
     // Persist when any debug dimension matches this request, or when the
     // request was flagged for forced persistence (capture-on-error mode).
-    if (
-      !enabledByGlobal &&
-      !enabledByKey &&
-      !enabledByAlias &&
-      !enabledByProvider &&
-      !log.forcePersist
-    ) {
+    if (!this.shouldPersistLog(log)) {
       logger.debug(
         `Skipping flush for ${requestId} - debug mode not enabled for key '${log.apiKey ?? '(none)'}', alias '${log.modelAlias ?? '(none)'}', provider '${log.provider ?? '(none)'}'`
       );
       this.pendingLogs.delete(requestId);
+      this.ephemeralRequests.delete(requestId);
       return;
     }
 
@@ -359,6 +368,7 @@ export class DebugManager {
       this.storage.saveDebugLog(log);
     }
     this.pendingLogs.delete(requestId);
+    this.ephemeralRequests.delete(requestId);
   }
 
   /**
@@ -374,7 +384,8 @@ export class DebugManager {
   }
 
   /**
-   * Mark a request as ephemeral (debug data won't be persisted)
+   * Mark a request as ephemeral (debug data won't be persisted unless a
+   * debug dimension matches it — see shouldPersistLog)
    */
   markEphemeral(requestId: string): void {
     this.ephemeralRequests.add(requestId);
@@ -397,10 +408,19 @@ export class DebugManager {
   }
 
   /**
-   * Discard ephemeral debug data without saving to database
+   * Discard ephemeral debug data without saving to database.
+   *
+   * The trace is kept (and persisted on the next flush) when a debug
+   * dimension matches the request — an enabled dimension takes precedence
+   * over the ephemeral marker.
    */
   discardEphemeral(requestId: string): void {
     if (this.ephemeralRequests.has(requestId)) {
+      const log = this.pendingLogs.get(requestId);
+      if (log && this.shouldPersistLog(log)) {
+        logger.debug(`Keeping ephemeral data for ${requestId} - debug mode wants it persisted`);
+        return;
+      }
       this.pendingLogs.delete(requestId);
       this.ephemeralRequests.delete(requestId);
       logger.debug(`Discarded ephemeral data for ${requestId}`);
