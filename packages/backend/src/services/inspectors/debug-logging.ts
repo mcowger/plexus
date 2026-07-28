@@ -723,6 +723,10 @@ export class DebugLoggingInspector extends BaseInspector {
               }
 
               const accTool = accChoice.delta.tool_calls[tIdx];
+              if (!accTool.function) accTool.function = { name: '', arguments: '' };
+              if (typeof accTool.function.arguments !== 'string') {
+                accTool.function.arguments = '';
+              }
               if (newTool.id) accTool.id = newTool.id;
               if (newTool.type) accTool.type = newTool.type;
               if (newTool.function?.name) accTool.function.name = newTool.function.name;

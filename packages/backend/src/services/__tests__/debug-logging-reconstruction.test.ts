@@ -63,6 +63,63 @@ describe('DebugLoggingInspector Reconstruction', () => {
     expect(snapshot.choices[0].message.tool_calls).toHaveLength(2);
   });
 
+  test('reconstructChatCompletions initializes streamed tool arguments before appending', async () => {
+    const inspector = new DebugLoggingInspector(requestId, 'raw');
+    const stream = inspector.createInspector('chat');
+    const ended = once(stream, 'end');
+    const chunks = [
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'Read' },
+                },
+              ],
+            },
+            index: 0,
+          },
+        ],
+        id: 'chatcmpl-123',
+        object: 'chat.completion.chunk',
+      },
+      {
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: '',
+                  type: 'function',
+                  function: { name: '', arguments: '{"file_path":"/tmp/hello.txt"}' },
+                },
+              ],
+            },
+            index: 0,
+          },
+        ],
+        id: 'chatcmpl-123',
+        object: 'chat.completion.chunk',
+      },
+    ];
+
+    for (const chunk of chunks) {
+      stream.write(Buffer.from(`data: ${JSON.stringify(chunk)}\n\n`));
+    }
+    stream.end(Buffer.from('data: [DONE]\n\n'));
+    await ended;
+
+    const snapshot = DebugManager.getInstance().getReconstructedRawResponse(requestId);
+    expect(snapshot.choices[0].delta.tool_calls[0].function.arguments).toBe(
+      '{"file_path":"/tmp/hello.txt"}'
+    );
+  });
+
   test('reconstructMessages handles non-streaming JSON (Anthropic style)', async () => {
     const inspector = new DebugLoggingInspector(requestId, 'raw');
     const stream = inspector.createInspector('messages');

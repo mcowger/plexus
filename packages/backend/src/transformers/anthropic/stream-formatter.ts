@@ -174,7 +174,8 @@ export function formatAnthropicStream(stream: ReadableStream): ReadableStream {
             const shouldStartToolBlock =
               activeBlockType !== 'tool_use' ||
               activeBlockIndex === null ||
-              (toolCallId !== undefined && toolCallId !== activeToolCallId);
+              // Empty IDs identify continuation chunks; coerce explicitly to keep this boolean.
+              (Boolean(toolCallId) && toolCallId !== activeToolCallId);
 
             if (shouldStartToolBlock) {
               if (!toolCallId) {
