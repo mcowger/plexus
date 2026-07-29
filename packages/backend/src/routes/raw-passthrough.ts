@@ -431,7 +431,8 @@ export async function registerRawPassthroughRoutes(
           usageStorage.registerInFlight(
             requestId,
             stallInspector,
-            (request as any).keyName ?? null
+            (request as any).keyName ?? null,
+            usageRecord.isStreamed
           );
           // pipeline() (not .pipe()) so an upstream error destroys the inspector
           // too and the for-await below terminates instead of hanging.

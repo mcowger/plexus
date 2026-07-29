@@ -439,11 +439,25 @@ describe('raw passthrough routes', () => {
     expect(usageStorage.registerInFlight).toHaveBeenCalledWith(
       requestId,
       expect.any(StallInspector),
-      'allowed'
+      'allowed',
+      false
     );
     const inspector = (usageStorage.registerInFlight as any).mock.calls[0][1] as StallInspector;
     expect(inspector.getStats().bytesReceived).toBe(upstreamResponseBody.byteLength);
     expect(usageStorage.deregisterInFlight).toHaveBeenCalledWith(requestId);
+  });
+
+  test('marks streamed raw responses in live progress updates', async () => {
+    upstreamResponseHeaders = { 'content-type': 'text/event-stream' };
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/raw/openrouter/v1/events',
+      headers: { authorization: 'Bearer plexus-secret' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect((usageStorage.registerInFlight as any).mock.calls[0]?.[3]).toBe(true);
   });
 
   test('deregisters in-flight progress tracking when the upstream request fails', async () => {

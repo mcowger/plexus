@@ -416,7 +416,8 @@ export async function handleResponse(
       usageStorage.registerInFlight(
         usageRecord.requestId!,
         stallInspector,
-        (usageRecord.apiKey as string | null) ?? null
+        (usageRecord.apiKey as string | null) ?? null,
+        !!unifiedResponse.stream
       );
     }
 

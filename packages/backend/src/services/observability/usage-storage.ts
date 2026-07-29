@@ -14,6 +14,7 @@ import type { StallInspector } from '../inspectors/stall-inspector';
 export interface ProgressUpdate {
   requestId: string;
   apiKey: string | null;
+  isStreamed: boolean;
   bytesReceived: number;
   bytesPerSec: number | null;
   state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
@@ -68,11 +69,16 @@ export class UsageStorageService extends EventEmitter {
   private telemetryQueue: Promise<void> = Promise.resolve();
   private inFlightRegistry = new Map<
     string,
-    { inspector: StallInspector; apiKey: string | null }
+    { inspector: StallInspector; apiKey: string | null; isStreamed: boolean }
   >();
 
-  registerInFlight(requestId: string, inspector: StallInspector, apiKey: string | null): void {
-    this.inFlightRegistry.set(requestId, { inspector, apiKey });
+  registerInFlight(
+    requestId: string,
+    inspector: StallInspector,
+    apiKey: string | null,
+    isStreamed = false
+  ): void {
+    this.inFlightRegistry.set(requestId, { inspector, apiKey, isStreamed });
   }
 
   deregisterInFlight(requestId: string): void {
@@ -81,10 +87,10 @@ export class UsageStorageService extends EventEmitter {
 
   getProgressUpdates(): ProgressUpdate[] {
     const updates: ProgressUpdate[] = [];
-    for (const [requestId, { inspector, apiKey }] of this.inFlightRegistry) {
+    for (const [requestId, { inspector, apiKey, isStreamed }] of this.inFlightRegistry) {
       try {
         const stats = inspector.getStats();
-        updates.push({ requestId, apiKey, ...stats });
+        updates.push({ requestId, apiKey, isStreamed, ...stats });
       } catch {
         // Inspector may have been destroyed; skip it
       }

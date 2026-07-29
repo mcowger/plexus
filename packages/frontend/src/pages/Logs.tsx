@@ -252,6 +252,7 @@ export const Logs = () => {
     requestId: string;
     bytesReceived: number;
     bytesPerSec: number | null;
+    isStreamed: boolean;
     state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
     elapsedMs: number;
   }
@@ -1553,7 +1554,10 @@ export const Logs = () => {
                               ? e2eOutputTokens / (log.durationMs / 1000)
                               : null;
                           if (progress) {
-                            const bytesPerToken = getEstimatedBytesPerToken(log);
+                            const bytesPerToken = getEstimatedBytesPerToken({
+                              ...log,
+                              isStreamed: progress.isStreamed,
+                            });
                             const effectiveBytesPerSec =
                               progress.bytesPerSec != null && progress.bytesPerSec > 0
                                 ? progress.bytesPerSec
