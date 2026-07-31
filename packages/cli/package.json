@@ -4,7 +4,7 @@
   "description": "Dynamic command line client for Plexus management APIs",
   "type": "module",
   "bin": {
-    "plexuscli": "./src/index.ts"
+    "plexuscli": "src/index.ts"
   },
   "scripts": {
     "start": "bun run src/index.ts",

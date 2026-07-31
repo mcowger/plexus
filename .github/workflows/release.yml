@@ -506,14 +506,17 @@ jobs:
           bun run --cwd packages/cli test
           bun run --cwd packages/cli typecheck
 
-      - name: Require an unpublished CLI version
+      - name: Set next CLI patch version
         run: |
           package_name=$(node -p "require('./packages/cli/package.json').name")
-          package_version=$(node -p "require('./packages/cli/package.json').version")
-          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
-            echo "::error::$package_name@$package_version is already published. Bump packages/cli/package.json before releasing."
-            exit 1
-          fi
+          latest_version=$(npm view "$package_name" version)
+          next_version=$(node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            if (![major, minor, patch].every(Number.isInteger)) process.exit(1);
+            console.log(`${major}.${minor}.${patch + 1}`);
+          ' "$latest_version")
+          npm pkg set "version=$next_version" --workspace="$package_name"
+          echo "Publishing $package_name@$next_version"
 
       - name: Publish CLI
         run: npm publish --workspace=@mcowger/plexus-cli --access public
