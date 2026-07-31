@@ -91,13 +91,23 @@
         "minimax/minimax-m3:nitro": {
           "pricing": {
             "source": "simple",
-            "input": 0.3,
-            "output": 1.2,
-            "cached": 0.06,
-            "cache_write": 0.3
+            "input": 0.6,
+            "output": 2.4,
+            "cached": 0.12
           },
           "access_via": [],
           "pi_ai_model_id": "minimax/minimax-m3"
+        },
+        "minimax/minimax-m2.7:nitro": {
+          "pricing": {
+            "source": "simple",
+            "input": 0.3,
+            "output": 1.2,
+            "cached": 0.06,
+            "cache_write": 0.375
+          },
+          "access_via": [],
+          "pi_ai_model_id": "minimax/minimax-m2.7"
         },
         "openai/gpt-5.4:nitro": {
           "pricing": {
