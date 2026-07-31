@@ -117,15 +117,24 @@ export function discoverOperations(document: {
   const candidates: Operation[] = [];
   for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
     if (!ALLOWED_PATH.test(path)) continue;
+    const pathParameters = Array.isArray(pathItem.parameters)
+      ? (pathItem.parameters as OpenApiParameter[])
+      : [];
     for (const [method, value] of Object.entries(pathItem)) {
       if (!HTTP_METHODS.has(method) || !value || typeof value !== 'object') continue;
       const operation = value as OpenApiOperation;
       if (isStreamOperation(operation)) continue;
+      const parameters = new Map(
+        pathParameters.map((parameter) => [`${parameter.in}:${parameter.name}`, parameter])
+      );
+      for (const parameter of operation.parameters ?? []) {
+        parameters.set(`${parameter.in}:${parameter.name}`, parameter);
+      }
       candidates.push({
         id: operation.operationId ?? fallbackId(method, path, operation.tags),
         method,
         path,
-        operation,
+        operation: { ...operation, parameters: [...parameters.values()] },
       });
     }
   }
@@ -280,7 +289,7 @@ async function fetchAllPages(
     limit ??= page.data.length;
     if (!limit || page.data.length === 0) break;
     allData.push(...page.data);
-    offset += limit;
+    offset += page.data.length;
   }
 
   return { data: allData, total: total ?? allData.length, limit: limit ?? 0, offset: 0 };
@@ -405,6 +414,8 @@ export async function run(
     if (args.adminKey) request.headers.set('x-admin-key', args.adminKey);
     if (body) request.headers.set('content-type', 'application/json');
     if (args.all) {
+      if (operation.method !== 'get')
+        throw new CliError('--all can only be used with GET operations');
       if (body) throw new CliError('--all cannot be used with a request body');
       runtime.stdout(
         formatOutput(

@@ -59,6 +59,20 @@ describe('dynamic OpenAPI routing', () => {
     expect(request.url).toBe('/v0/management/items/a%2Fb?limit=10');
   });
 
+  it('merges path-level parameters into operations', () => {
+    const operations = discoverOperations({
+      paths: {
+        '/v0/management/items/{id}': {
+          parameters: [{ name: 'id', in: 'path', required: true }],
+          get: { operationId: 'getItem' },
+        },
+      },
+    });
+    expect(buildRequest(operations[0]!, new Map([['id', 'a/b']])).url).toBe(
+      '/v0/management/items/a%2Fb'
+    );
+  });
+
   it('recognizes destructive operations', () => {
     expect(isRisky(discoverOperations(document)[0]!)).toBe(true);
   });
@@ -193,7 +207,7 @@ describe('execution', () => {
     };
     let stdout = '';
     const exitCode = await run(
-      ['api', 'call', 'listItems', '--all', '--param', 'limit=2'],
+      ['api', 'call', 'listItems', '--all', '--param', 'limit=5'],
       {},
       {
         fetch: async (url) => {
@@ -214,5 +228,40 @@ describe('execution', () => {
     );
     expect(exitCode).toBe(0);
     expect(JSON.parse(stdout)).toMatchObject({ data: [1, 2, 3], total: 3 });
+  });
+
+  it('rejects --all for mutating operations', async () => {
+    let stderr = '';
+    const exitCode = await run(
+      ['api', 'call', 'deleteItems', '--all', '--yes'],
+      {},
+      {
+        fetch: async () =>
+          new Response(
+            JSON.stringify({
+              paths: {
+                '/v0/management/items': {
+                  delete: {
+                    operationId: 'deleteItems',
+                    parameters: [
+                      { name: 'limit', in: 'query' },
+                      { name: 'offset', in: 'query' },
+                    ],
+                  },
+                },
+              },
+            })
+          ),
+        stdin: async () => '',
+        stdout: () => {},
+        stderr: (text) => {
+          stderr += text;
+        },
+        isTTY: false,
+        confirm: async () => true,
+      }
+    );
+    expect(exitCode).toBe(2);
+    expect(stderr).toContain('--all can only be used with GET operations');
   });
 });
