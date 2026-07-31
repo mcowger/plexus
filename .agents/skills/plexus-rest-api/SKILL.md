@@ -1,19 +1,30 @@
 ---
-name: plexus-management
+name: plexus-rest-api
 description: >-
-  Use this skill to inspect or administer a running Plexus instance via the management API, or debug
-  failures touching Plexus-proxied traffic (oauth, routing, model targets, raw provider passthrough, inference keys, MCP gateway)
-  rather than searching the local codebase. Covers request logs, debug traces (lookup by UUID), enabling/disabling
-  debug capture, providers, model targets, balances, quotas, aliases, target groups, keys, MCP logs, and
-  runtime settings (failover, cooldowns, timeouts, backup/restore). Prefer this for any Plexus admin, operational,
-  or live-debugging task, even if the user only says "check Plexus", "look at logs", "update a provider",
-  "rotate keys", "configure quotas", "debug a request", "review debug trace", or "upstream error" — Plexus state
-  lives behind the management API, not in local files.
+  Fallback for inspecting or administering a running Plexus instance with raw
+  REST API calls when plexus-cli is unavailable or cannot support a required
+  operation. Covers the full management surface, including SSE streaming.
 ---
 
-# Plexus Management API
+# Plexus REST API
 
-Use the Plexus management API through portable `curl` and `jq` commands. Do not assume local filesystem access to the Plexus data store when a management endpoint exists.
+Use raw `curl` and `jq` management API calls only as a fallback. Do not assume
+local filesystem access to the Plexus data store when a management endpoint
+exists.
+
+## CLI Preference
+
+**Strongly prefer the `plexus-cli` skill.** Before using any REST command,
+check whether either CLI invocation is available:
+
+```bash
+bun run plexuscli --help >/dev/null 2>&1 || command -v plexuscli >/dev/null 2>&1
+```
+
+If that succeeds, load and use `plexus-cli` instead of this skill. The CLI
+discovers the server's OpenAPI contract and provides safer operation handling.
+Use this REST fallback only when neither CLI invocation is available, or when
+the CLI deliberately excludes the required operation, such as SSE streaming.
 
 ## First Steps
 
@@ -234,5 +245,5 @@ When exact endpoints or payload shapes matter, consult the endpoint map first.
 
 To load the endpoint map, check for the local copy first. If found, read it directly; if absent, download it:
 
-local: .agents/skills/plexus-management/references/endpoint-map.md
-fallback with curl: "https://raw.githubusercontent.com/mcowger/plexus/refs/heads/main/.agents/skills/plexus-management/references/endpoint-map.md"
+local: .agents/skills/plexus-rest-api/references/endpoint-map.md
+fallback with curl: "https://raw.githubusercontent.com/mcowger/plexus/refs/heads/main/.agents/skills/plexus-rest-api/references/endpoint-map.md"

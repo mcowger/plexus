@@ -28,7 +28,8 @@ import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
 import { formatMs, formatResetsIn } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
-import plexusAdminSkill from '../../../../.agents/skills/plexus-management/SKILL.md' with {
+import plexusCliSkill from '../../../../.agents/skills/plexus-cli/SKILL.md' with { type: 'text' };
+import plexusRestApiSkill from '../../../../.agents/skills/plexus-rest-api/SKILL.md' with {
   type: 'text',
 };
 
@@ -514,22 +515,22 @@ export const McpPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopySkill = async () => {
+  const handleCopySkill = async (skill: string, name: string) => {
     const canCopy = isClipboardAvailable();
     if (!canCopy) {
       toast.error('Copy requires HTTPS connection');
       return;
     }
-    const success = await copyToClipboard(plexusAdminSkill);
+    const success = await copyToClipboard(skill);
     if (success) {
-      toast.success('Skill copied to clipboard');
+      toast.success(`${name} copied to clipboard`);
     } else {
       toast.error('Failed to copy to clipboard');
     }
   };
 
-  const handleDownloadSkill = () => {
-    triggerDownload(plexusAdminSkill, 'SKILL.md', 'text/markdown');
+  const handleDownloadSkill = (skill: string, filename: string) => {
+    triggerDownload(skill, filename, 'text/markdown');
   };
 
   const mcpPathForServer = (name: string) => `/mcp/${name}`;
@@ -557,7 +558,7 @@ export const McpPage: React.FC = () => {
             <div className="inline-flex rounded-md overflow-hidden border border-border-glass">
               <button
                 type="button"
-                onClick={handleCopySkill}
+                onClick={() => handleCopySkill(plexusCliSkill, 'Plexus CLI Skill')}
                 className={clsx(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all duration-fast',
                   'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
@@ -565,11 +566,37 @@ export const McpPage: React.FC = () => {
                   'border-r border-[#1A1006]/20'
                 )}
               >
-                Plexus Admin Skill
+                Plexus CLI Skill
               </button>
               <button
                 type="button"
-                onClick={handleDownloadSkill}
+                onClick={() => handleDownloadSkill(plexusCliSkill, 'plexus-cli-SKILL.md')}
+                title="Download as file"
+                className={clsx(
+                  'inline-flex items-center justify-center px-2 py-1.5 text-xs',
+                  'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                  'hover:brightness-105'
+                )}
+              >
+                <Download size={14} />
+              </button>
+            </div>
+            <div className="inline-flex rounded-md overflow-hidden border border-border-glass">
+              <button
+                type="button"
+                onClick={() => handleCopySkill(plexusRestApiSkill, 'Plexus REST API Skill')}
+                className={clsx(
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all duration-fast',
+                  'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                  'hover:brightness-105',
+                  'border-r border-[#1A1006]/20'
+                )}
+              >
+                Plexus REST API Skill
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadSkill(plexusRestApiSkill, 'plexus-rest-api-SKILL.md')}
                 title="Download as file"
                 className={clsx(
                   'inline-flex items-center justify-center px-2 py-1.5 text-xs',

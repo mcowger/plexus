@@ -23,7 +23,7 @@ You already have every piece you need:
 - **`bun run dev:full`** — starts a fully-seeded, worktree-safe dev stack (backend + frontend watcher).
 - **`bun run dev:get:port`** — tells you which port this worktree uses.
 - **agent-browser** — drives a real Chromium browser (load its `core` skill for command syntax).
-- **plexus-management** skill — inspects/seeds backend state through the management API when you need to set up or confirm data behind the UI.
+- **plexus-cli** skill — inspects/seeds backend state through the management CLI when you need to set up or confirm data behind the UI. Use **plexus-rest-api** only when the CLI is unavailable or lacks the required operation.
 
 This skill wires them together. Follow the steps in order the first time; on later runs you
 can skip straight to browsing if the instance is already up.
@@ -120,14 +120,14 @@ changed:
 
 If your UI change creates, edits, or deletes something (a provider, key, alias, quota, setting),
 don't trust the optimistic UI alone — confirm the change actually persisted. Use the
-**plexus-management** skill for this, pointed at your local instance:
+**plexus-cli** skill for this, pointed at your local instance:
 
 ```bash
 export PLEXUS_BASE_URL="http://localhost:$PORT"
 export PLEXUS_ADMIN_KEY="$ADMIN_KEY"
 ```
 
-Then follow the plexus-management skill to read back the relevant resource (e.g. list providers
+Then follow the plexus-cli skill to read back the relevant resource (e.g. list providers
 after your form submits and check the new one is there). You can also use it in the other
 direction — to seed data the UI needs before you test a read/display change.
 
@@ -163,7 +163,7 @@ be looking at the pre-change build.
 ## Troubleshooting
 
 - **`dev:agent` reports never-healthy** → read the dev log at the `LOG` path it printed (`/tmp/plexus-dev-<worktree>.log`). Two common causes: (a) the change you made broke the build or crashes the backend on start; (b) dependencies aren't installed — a `Could not resolve: "react"` (or similar) crash-loop means the worktree needs `bun install` before the stack can boot.
-- **`prep-dev` fails / DB looks empty** → the stack only seeds if a data source exists (saved local data or `PLEXUS_STAGING_URL`/`PLEXUS_STAGING_ADMIN_KEY`). Without one, the server still runs fine on an empty DB — seed what you need for the test via the plexus-management skill.
+- **`prep-dev` fails / DB looks empty** → the stack only seeds if a data source exists (saved local data or `PLEXUS_STAGING_URL`/`PLEXUS_STAGING_ADMIN_KEY`). Without one, the server still runs fine on an empty DB — seed what you need for the test via the plexus-cli skill.
 - **Stuck/old process on the port** → `bun run dev:stop` tears down this worktree's stack, then `bun run dev:agent` to start fresh.
 - **agent-browser can't launch a browser** → run `bunx agent-browser install --with-deps`. In headless/CI-like environments this can fail two ways: the downloaded Chrome binary may lack the execute bit (`chmod +x ~/.agent-browser/browsers/*/chrome`), and `--with-deps` needs `sudo` to `apt-get install` system libs. Diagnose missing libs with `ldd ~/.agent-browser/browsers/*/chrome | grep 'not found'` and install the matching packages.
 - **Login snapshot still shows the form** → the `?token=` key didn't match the server's `ADMIN_KEY`; confirm from the dev log.
