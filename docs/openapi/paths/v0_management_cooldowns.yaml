@@ -20,10 +20,8 @@ get:
 
     ## Admin-only
 
-    This endpoint is available to both admin and limited principals,
-    but limited principals only see cooldowns for their own key's usage.
-
-    **Admin access:** full list. **Limited access:** scoped to own key.
+    This endpoint is available to both admin and limited principals. Cooldown
+    state is provider-level, so both receive the same active cooldown list.
   security:
     - AdminKey: []
   responses:

@@ -42,20 +42,30 @@ get:
       description: Pagination offset.
   responses:
     '200':
-      description: Log index.
+      description: Paginated log index.
       content:
         application/json:
           schema:
-            type: array
-            items:
-              type: object
-              properties:
-                requestId:
-                  type: string
-                  format: uuid
-                createdAt:
-                  type: integer
-                  description: Epoch ms.
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    requestId:
+                      type: string
+                      format: uuid
+                    createdAt:
+                      type: integer
+                      description: Epoch ms.
+              total:
+                type: integer
+              limit:
+                type: integer
+              offset:
+                type: integer
+            required: [data, total, limit, offset]
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0ManagementDebugLogs

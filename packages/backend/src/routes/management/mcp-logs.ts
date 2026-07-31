@@ -14,7 +14,7 @@ export async function registerMcpLogRoutes(
 
     try {
       const result = await mcpUsageStorage.getLogs({ limit, offset, serverName, apiKey });
-      return reply.send(result);
+      return reply.send({ ...result, limit, offset });
     } catch (e: any) {
       return reply.code(500).send({ error: e.message });
     }

@@ -380,7 +380,11 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async getErrors(limit: number = 50, offset: number = 0, apiKey?: string): Promise<any[]> {
+  async getErrors(
+    limit: number = 50,
+    offset: number = 0,
+    apiKey?: string
+  ): Promise<{ data: any[]; total: number }> {
     try {
       const db = this.ensureDb();
       const where = apiKey ? eq(this.schema.inferenceErrors.apiKey, apiKey) : undefined;
@@ -390,11 +394,14 @@ export class UsageStorageService extends EventEmitter {
         .orderBy(desc(this.schema.inferenceErrors.createdAt))
         .limit(limit)
         .offset(offset);
-      const results = where ? await query.where(where) : await query;
-      return results;
+      const [data, countRows] = await Promise.all([
+        where ? query.where(where) : query,
+        db.select({ count: sql<number>`COUNT(*)` }).from(this.schema.inferenceErrors).where(where),
+      ]);
+      return { data, total: Number(countRows[0]?.count ?? 0) };
     } catch (error) {
       logger.error('Failed to get inference errors', error);
-      return [];
+      return { data: [], total: 0 };
     }
   }
 
@@ -453,7 +460,10 @@ export class UsageStorageService extends EventEmitter {
     limit: number = 50,
     offset: number = 0,
     apiKey?: string
-  ): Promise<{ requestId: string; createdAt: number; responseStatus: number | null }[]> {
+  ): Promise<{
+    data: { requestId: string; createdAt: number; responseStatus: number | null }[];
+    total: number;
+  }> {
     try {
       const db = this.ensureDb();
       const where = apiKey ? eq(this.schema.debugLogs.apiKey, apiKey) : undefined;
@@ -467,16 +477,22 @@ export class UsageStorageService extends EventEmitter {
         .orderBy(desc(this.schema.debugLogs.createdAt))
         .limit(limit)
         .offset(offset);
-      const results = where ? await query.where(where) : await query;
+      const [results, countRows] = await Promise.all([
+        where ? query.where(where) : query,
+        db.select({ count: sql<number>`COUNT(*)` }).from(this.schema.debugLogs).where(where),
+      ]);
 
-      return results.map((row: any) => ({
-        requestId: row.requestId,
-        createdAt: row.createdAt,
-        responseStatus: row.responseStatus,
-      }));
+      return {
+        data: results.map((row: any) => ({
+          requestId: row.requestId,
+          createdAt: row.createdAt,
+          responseStatus: row.responseStatus,
+        })),
+        total: Number(countRows[0]?.count ?? 0),
+      };
     } catch (error) {
       logger.error('Failed to get debug logs', error);
-      return [];
+      return { data: [], total: 0 };
     }
   }
 

@@ -89,7 +89,7 @@ export async function registerDebugRoutes(
     const offset = parseInt(query.offset || '0');
     const scopeKey = scopedKeyName(request);
     const logs = await usageStorage.getDebugLogs(limit, offset, scopeKey ?? undefined);
-    return reply.send(logs);
+    return reply.send({ ...logs, limit, offset });
   });
 
   fastify.delete('/v0/management/debug/logs', async (request, reply) => {

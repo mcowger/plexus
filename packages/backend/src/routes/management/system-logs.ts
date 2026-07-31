@@ -4,12 +4,17 @@ import { getRecentLogCount, getRecentLogs, logEmitter } from '../../utils/logger
 
 export async function registerSystemLogRoutes(fastify: FastifyInstance) {
   fastify.get('/v0/system/logs/recent', async (request, reply) => {
-    const query = request.query as { limit?: string };
+    const query = request.query as { limit?: string; offset?: string };
     const limit = Math.max(1, Math.min(parseInt(query.limit || '100', 10) || 100, 1000));
+    const offset = Math.max(0, parseInt(query.offset || '0', 10) || 0);
 
     return reply.send({
-      data: getRecentLogs(limit).map((entry) => serializeRecentLog(entry)),
+      data: getRecentLogs(limit + offset)
+        .slice(offset)
+        .map((entry) => serializeRecentLog(entry)),
       total: getRecentLogCount(),
+      limit,
+      offset,
     });
   });
 

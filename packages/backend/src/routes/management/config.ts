@@ -131,8 +131,14 @@ export async function registerConfigRoutes(
 
   fastify.get('/v0/management/config/status', async (_request, reply) => {
     try {
-      // No longer relevant - Plexus no longer supports YAML config
-      return reply.send({});
+      const config = configService.getConfig();
+      return reply.send({
+        providerCount: Object.keys(config.providers ?? {}).length,
+        modelAliasCount: Object.keys(config.models ?? {}).length,
+        keyCount: Object.keys(config.keys ?? {}).length,
+        quotaCount: Object.keys(config.user_quotas ?? {}).length,
+        mcpServerCount: Object.keys(config.mcpServers ?? config.mcp_servers ?? {}).length,
+      });
     } catch (e: any) {
       return reply.code(500).send({ error: 'Internal server error' });
     }

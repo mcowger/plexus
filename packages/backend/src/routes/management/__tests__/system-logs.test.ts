@@ -34,6 +34,25 @@ describe('system log routes', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.total).toBeGreaterThanOrEqual(1);
+    expect(body.limit).toBe(10);
+    expect(body.offset).toBe(0);
     expect(body.data[0].message).toBe('recent-system-log-test');
+  });
+
+  test('supports offset pagination', async () => {
+    logger.info('older-log');
+    logger.info('newer-log');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v0/system/logs/recent?limit=1&offset=1',
+    });
+
+    expect(response.json()).toMatchObject({
+      data: [expect.objectContaining({ message: 'older-log' })],
+      limit: 1,
+      offset: 1,
+    });
   });
 });

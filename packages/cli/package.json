@@ -1,0 +1,17 @@
+{
+  "name": "@plexus/cli",
+  "version": "0.0.1",
+  "description": "Dynamic command line client for Plexus management APIs",
+  "type": "module",
+  "bin": {
+    "plexuscli": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "bun x tsc --noEmit",
+    "test": "bunx --bun vitest run"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

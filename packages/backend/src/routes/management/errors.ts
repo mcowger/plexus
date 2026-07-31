@@ -12,7 +12,7 @@ export async function registerErrorRoutes(
     const offset = parseInt(query.offset || '0');
     const scopeKey = scopedKeyName(request);
     const errors = await usageStorage.getErrors(limit, offset, scopeKey ?? undefined);
-    return reply.send(errors);
+    return reply.send({ ...errors, limit, offset });
   });
 
   fastify.delete('/v0/management/errors', async (request, reply) => {

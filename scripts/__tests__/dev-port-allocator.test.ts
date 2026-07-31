@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'child_process';
 import { join } from 'path';
+import { getPaseoPort } from '../dev-config';
 import { deriveDevPort } from '../dev-port-allocator';
 
 describe('deriveDevPort', () => {
@@ -63,5 +64,15 @@ describe('dev-port-allocator executable', () => {
 
     const expected = deriveDevPort('/workspace/my-app-env');
     expect(output).toBe(expected);
+  });
+});
+
+describe('Paseo port selection', () => {
+  it('uses a running dev service instead of a stopped preferred service', () => {
+    expect(
+      getPaseoPort('dev:full', (scriptName) =>
+        scriptName === 'dev' ? { port: 11735 } : { port: null }
+      )
+    ).toBe('11735');
   });
 });

@@ -1,0 +1,18 @@
+post:
+  tags: [Management — Config]
+  summary: Clear an MCP server key cooldown (admin only)
+  security: [{ AdminKey: [] }]
+  parameters:
+    - name: serverName
+      in: path
+      required: true
+      schema: { type: string }
+    - name: keyId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  responses:
+    '200': { $ref: ../components/responses/SuccessTrue.yaml }
+    '400': { description: Invalid key ID. }
+    '404': { description: MCP key not found. }
+  operationId: postV0ManagementMcpServerKeyClearCooldown

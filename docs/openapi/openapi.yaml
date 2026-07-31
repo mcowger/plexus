@@ -347,6 +347,8 @@ tags:
 security:
   - PlexusApiKey: []
 paths:
+  /.well-known/plexus/openapi.json:
+    $ref: paths/.well-known_plexus_openapi.json.yaml
   /health:
     $ref: paths/health.yaml
   /v1/chat/completions:
@@ -471,6 +473,12 @@ paths:
     $ref: paths/v0_management_mcp-servers_{serverName}_restart.yaml
   /v0/management/mcp-servers/{serverName}/process-logs:
     $ref: paths/v0_management_mcp-servers_{serverName}_process-logs.yaml
+  /v0/management/mcp-servers/{serverName}/keys:
+    $ref: paths/v0_management_mcp-servers_{serverName}_keys.yaml
+  /v0/management/mcp-servers/{serverName}/keys/{keyId}:
+    $ref: paths/v0_management_mcp-servers_{serverName}_keys_{keyId}.yaml
+  /v0/management/mcp-servers/{serverName}/keys/{keyId}/clear-cooldown:
+    $ref: paths/v0_management_mcp-servers_{serverName}_keys_{keyId}_clear-cooldown.yaml
   /v0/management/quota-checker-types:
     $ref: paths/v0_management_quota-checker-types.yaml
   /v0/management/quota-checkers:

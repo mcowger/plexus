@@ -86,7 +86,7 @@ for (let i = 2; i < process.argv.length; i++) {
 // Two worktrees running simultaneously will land on different ports automatically.
 // Override with: PORT=4000 bun run dev
 if (!process.env.PORT) {
-  process.env.PORT = deriveDevPort();
+  process.env.PORT = deriveDevPort(process.cwd(), 'dev');
 }
 
 // Per-worktree database — persists across restarts, isolated per branch.

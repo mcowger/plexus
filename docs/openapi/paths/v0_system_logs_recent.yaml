@@ -13,6 +13,7 @@ get:
     ## Query parameters
 
     - `limit` — Maximum number of log entries to return (default 100, max 1000)
+    - `offset` — Number of newest entries to skip (default 0)
 
     **Admin only** — limited principals receive 403.
   security:
@@ -27,6 +28,13 @@ get:
         maximum: 1000
         default: 100
       description: Maximum number of recent log entries to return.
+    - in: query
+      name: offset
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of newest entries to skip.
   responses:
     '200':
       description: Recent in-memory log entries, newest first.
@@ -42,9 +50,15 @@ get:
                   additionalProperties: true
               total:
                 type: integer
+              limit:
+                type: integer
+              offset:
+                type: integer
             required:
               - data
               - total
+              - limit
+              - offset
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0SystemLogsRecent

@@ -1,0 +1,25 @@
+get:
+  tags:
+    - Health
+  summary: Get the public OpenAPI document
+  description: Returns the complete dereferenced OpenAPI 3.1 document. This endpoint is public and supports conditional requests with `If-None-Match`.
+  security: []
+  responses:
+    '200':
+      description: Dereferenced OpenAPI document.
+      headers:
+        ETag:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+    '304':
+      description: The document has not changed.
+    '400':
+      description: Invalid conditional request header.
+  operationId: getWellKnownPlexusOpenapi

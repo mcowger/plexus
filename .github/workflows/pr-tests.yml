@@ -55,6 +55,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Generate server OpenAPI asset
+        run: bun run generate:openapi:asset
+
       - name: Build frontend
         run: bun run build:frontend
 
@@ -105,4 +108,3 @@ jobs:
               started_at: new Date().toISOString(),
               completed_at: new Date().toISOString()
             });
-

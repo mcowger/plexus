@@ -54,6 +54,7 @@ import { registerManagementRoutes } from './routes/management';
 import { registerInferenceRoutes } from './routes/inference';
 import { registerRawPassthroughRoutes } from './routes/raw-passthrough';
 import { registerMcpRoutes } from './routes/mcp';
+import { registerOpenApiRoute } from './routes/openapi';
 import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { QuotaEnforcer } from './services/quota/quota-enforcer';
 import { initModelCatalog } from './services/pi-ai/catalog';
@@ -307,6 +308,9 @@ await registerRawPassthroughRoutes(fastify, usageStorage, quotaEnforcer);
 
 // --- Routes: MCP Proxy ---
 await registerMcpRoutes(fastify, mcpUsageStorage);
+
+// Public discovery document for API clients.
+await registerOpenApiRoute(fastify);
 
 // --- Response Storage Cleanup ---
 // Start cleanup job (runs every hour, deletes responses older than 7 days)

@@ -1,0 +1,62 @@
+get:
+  tags: [Management — Config]
+  summary: List MCP server keys (admin only)
+  security: [{ AdminKey: [] }]
+  parameters:
+    - name: serverName
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    '200':
+      description: MCP server keys.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              keys:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: integer }
+                    key: { type: string }
+                    is_active: { type: boolean }
+                    cooldown_until: { type: [string, 'null'], format: date-time }
+    '404': { description: MCP server not found. }
+  operationId: getV0ManagementMcpServerKeys
+post:
+  tags: [Management — Config]
+  summary: Create an MCP server key (admin only)
+  security: [{ AdminKey: [] }]
+  parameters:
+    - name: serverName
+      in: path
+      required: true
+      schema: { type: string }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [key]
+          properties:
+            key: { type: string }
+            is_active: { type: boolean, default: true }
+  responses:
+    '201':
+      description: Created MCP server key.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id: { type: integer }
+              key: { type: string }
+              is_active: { type: boolean }
+              cooldown_until: { type: [string, 'null'], format: date-time }
+    '400': { description: Invalid key payload. }
+    '404': { description: MCP server not found. }
+  operationId: postV0ManagementMcpServerKeys

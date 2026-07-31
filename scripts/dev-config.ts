@@ -10,20 +10,28 @@
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
 import { deriveDevPort } from './dev-port-allocator';
-import { isPaseoScriptAvailable, getPaseoScriptStatus } from './lib/paseo';
+import { getPaseoScriptStatus } from './lib/paseo';
 
 const dirName = basename(process.cwd());
+export const DEFAULT_DEV_TARGET = 'dev';
 
 // --- Port (check Paseo status first, fallback to deriveDevPort) ---
-function getPort(target = 'dev:full'): string {
+export function getPaseoPort(
+  target = DEFAULT_DEV_TARGET,
+  statusFor: (scriptName: string) => { port?: number | null } | null = getPaseoScriptStatus
+): string | undefined {
+  const targets = [...new Set([target, 'dev', 'dev:full', 'dev:pglite'])];
+  for (const scriptName of targets) {
+    const port = statusFor(scriptName)?.port;
+    if (port) return String(port);
+  }
+}
+
+export function getPort(target = DEFAULT_DEV_TARGET): string {
   if (process.env.PORT) return process.env.PORT;
 
-  if (isPaseoScriptAvailable(target)) {
-    const status = getPaseoScriptStatus(target) ?? getPaseoScriptStatus('dev');
-    if (status?.port) {
-      return String(status.port);
-    }
-  }
+  const paseoPort = getPaseoPort(target);
+  if (paseoPort) return paseoPort;
 
   return deriveDevPort(process.cwd(), target);
 }
@@ -40,12 +48,14 @@ function getDbPath(): string {
 }
 
 // --- CLI ---
-const command = process.argv[2];
-if (command === 'port') {
-  console.log(getPort());
-} else if (command === 'db_path') {
-  console.log(getDbPath());
-} else {
-  console.error(`Usage: bun run scripts/dev-config.ts <port|db_path>`);
-  process.exit(1);
+if (import.meta.main) {
+  const command = process.argv[2];
+  if (command === 'port') {
+    console.log(getPort());
+  } else if (command === 'db_path') {
+    console.log(getDbPath());
+  } else {
+    console.error(`Usage: bun run scripts/dev-config.ts <port|db_path>`);
+    process.exit(1);
+  }
 }

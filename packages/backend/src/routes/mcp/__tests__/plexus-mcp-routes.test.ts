@@ -156,6 +156,26 @@ describe('Plexus management MCP routes', () => {
       if (method === 'GET' && path === '/v0/management/config/export') {
         return json(setConfigSnapshot());
       }
+      if (method === 'GET' && path === '/v0/management/config/status') {
+        const config = setConfigSnapshot();
+        return json({
+          providerCount: Object.keys(config.providers ?? {}).length,
+          modelAliasCount: Object.keys(config.models ?? {}).length,
+          keyCount: Object.keys(config.keys ?? {}).length,
+          quotaCount: Object.keys(config.user_quotas ?? {}).length,
+          mcpServerCount: Object.keys(config.mcpServers ?? config.mcp_servers ?? {}).length,
+        });
+      }
+      if (method === 'GET' && path === '/v0/management/quota-checker-types') {
+        return json({ types: ['test'], count: 1 });
+      }
+      if (method === 'GET' && path === '/v0/management/quota-checkers') {
+        return json({ knownTypes: [{ type: 'test', displayName: 'Test' }], configured: [] });
+      }
+      if (method === 'GET' && path.startsWith('/v0/management/quotas/')) {
+        const checkerId = decodeURIComponent(path.replace('/v0/management/quotas/', ''));
+        return json({ checkerId, checkerType: 'test', success: true, meters: [] });
+      }
       if (method === 'GET' && path === '/v0/management/providers') {
         return json(setConfigSnapshot().providers ?? {});
       }
@@ -606,6 +626,38 @@ describe('Plexus management MCP routes', () => {
     expect(record.tool_name).toBe('plexus_config');
     expect(record.api_key).toBe('admin');
     expect(record.response_status).toBe(200);
+  });
+
+  test('uses management routes for config status and quota checker operations', async () => {
+    const configResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: { name: 'plexus_config', arguments: { operation: 'status' } },
+      },
+      adminHeaders()
+    );
+    const quotaResponse = await postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 2,
+        params: { name: 'plexus_quota_checker', arguments: { operation: 'get', id: 'checker' } },
+      },
+      adminHeaders()
+    );
+
+    expect(parseJsonRpcResponse(configResponse).result.structuredContent.data).toMatchObject({
+      providerCount: 1,
+    });
+    expect(parseJsonRpcResponse(quotaResponse).result.structuredContent.data).toMatchObject({
+      checkerId: 'checker',
+    });
+    expect(fastify.inject).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/v0/management/config/status' })
+    );
+    expect(fastify.inject).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/v0/management/quotas/checker' })
+    );
   });
 
   test('keeps other /mcp/:name gateway routes working', async () => {

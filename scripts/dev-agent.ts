@@ -236,7 +236,7 @@ if (targetConfig) {
   });
 } else {
   console.log(`Starting target "${targetName}" via default fallback launcher...`);
-  childProcess = spawn('bun', ['run', 'scripts/dev.ts', '--full', '--no-open'], {
+  childProcess = spawn('bun', ['run', 'dev', '--full', '--no-open'], {
     cwd: process.cwd(),
     env: { ...process.env, PORT: fallbackPort, ADMIN_KEY },
     detached: true,

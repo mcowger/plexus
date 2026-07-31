@@ -170,7 +170,7 @@ export async function registerUsageRoutes(
     try {
       const result = await usageStorage.getUsage(filters, { limit, offset, sortBy, sortDir });
       if (requestedFields.length === 0) {
-        return reply.send(result);
+        return reply.send({ ...result, limit, offset });
       }
 
       const filteredData = result.data.map((record: any) => {
@@ -184,6 +184,8 @@ export async function registerUsageRoutes(
       return reply.send({
         data: filteredData,
         total: result.total,
+        limit,
+        offset,
       });
     } catch (e: any) {
       return reply.code(500).send({ error: e.message });

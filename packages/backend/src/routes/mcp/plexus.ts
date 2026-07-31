@@ -334,7 +334,7 @@ async function handleToolCall(
 
     switch (toolName) {
       case 'plexus_config':
-        return await handleConfigTool(input, config, shimContext);
+        return await handleConfigTool(input, shimContext);
       case 'plexus_provider':
         return await handleProviderTool(input, shimContext);
       case 'plexus_model_alias':
@@ -344,7 +344,7 @@ async function handleToolCall(
       case 'plexus_quota':
         return await handleQuotaTool(input, shimContext);
       case 'plexus_quota_checker':
-        return handleQuotaCheckerTool(input, config);
+        return await handleQuotaCheckerTool(input, shimContext);
       case 'plexus_mcp_gateway':
         return await handleMcpGatewayTool(input, shimContext);
       case 'plexus_settings':
@@ -617,7 +617,6 @@ function asOptionalString(value: unknown): string | undefined {
 
 async function handleConfigTool(
   input: ToolInput,
-  config: PlexusConfig,
   shimContext: ManagementShimContext
 ): Promise<ToolResponse> {
   switch (input.operation) {
@@ -632,13 +631,10 @@ async function handleConfigTool(
         redactSecrets(await callManagementRoute(shimContext, 'GET', '/v0/management/config/export'))
       );
     case 'status':
-      return successResponse(input.operation, {
-        providerCount: Object.keys(config.providers ?? {}).length,
-        modelAliasCount: Object.keys(config.models ?? {}).length,
-        keyCount: Object.keys(config.keys ?? {}).length,
-        quotaCount: Object.keys(config.user_quotas ?? {}).length,
-        mcpServerCount: Object.keys(getMcpServers(config)).length,
-      });
+      return successResponse(
+        input.operation,
+        await callManagementRoute(shimContext, 'GET', '/v0/management/config/status')
+      );
     default:
       throw unsupportedOperation(input.operation, ['get', 'export', 'status']);
   }
@@ -945,44 +941,31 @@ async function handleQuotaTool(
   }
 }
 
-function handleQuotaCheckerTool(input: ToolInput, config: PlexusConfig): ToolResponse {
-  const checkers: Record<string, unknown>[] = Object.entries(config.providers ?? {}).flatMap(
-    ([providerId, provider]) => {
-      const quotaChecker = provider.quota_checker;
-      if (!quotaChecker) return [];
-      return [
-        {
-          id: quotaChecker.id ?? `${providerId}:${quotaChecker.type}`,
-          provider: providerId,
-          ...asObject(redactSecrets(quotaChecker)),
-        },
-      ];
-    }
-  );
-
+async function handleQuotaCheckerTool(
+  input: ToolInput,
+  shimContext: ManagementShimContext
+): Promise<ToolResponse> {
   switch (input.operation) {
     case 'list':
-      return successResponse(input.operation, checkers);
+      return successResponse(
+        input.operation,
+        await callManagementRoute(shimContext, 'GET', '/v0/management/quota-checkers')
+      );
     case 'get': {
-      if (!input.id) {
-        throw new McpToolError(
-          'Missing id for quota checker get operation.',
-          'invalid_request',
-          400
-        );
-      }
-      const checker = checkers.find((candidate) => candidate.id === input.id);
-      if (!checker) {
-        throw new McpToolError(`quota_checker '${input.id}' was not found.`, 'not_found', 404);
-      }
-      return successResponse(input.operation, checker);
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'GET',
+          `/v0/management/quotas/${encodeURIComponent(requireId(input, 'quota checker'))}`
+        )
+      );
     }
     case 'types':
-      return successResponse(input.operation, [
-        ...new Set(
-          checkers.map((checker) => checker.type).filter((type) => typeof type === 'string')
-        ),
-      ]);
+      return successResponse(
+        input.operation,
+        await callManagementRoute(shimContext, 'GET', '/v0/management/quota-checker-types')
+      );
     default:
       throw unsupportedOperation(input.operation, ['types', 'list', 'get']);
   }

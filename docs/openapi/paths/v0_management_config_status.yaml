@@ -1,25 +1,32 @@
 get:
   tags:
     - Management — Config
-  summary: Configuration deployment status (admin only)
+  summary: Get configuration resource counts (admin only)
   description: |
-    Returns status flags about the current configuration state.
-
-    **Note:** Plexus no longer supports file-based configuration (YAML).
-    All configuration is stored in the database and managed via the Admin UI
-    or Management API.
+    Returns counts for the database-backed configuration resources.
 
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
   responses:
     '200':
-      description: Status flags.
+      description: Configuration resource counts.
       content:
         application/json:
           schema:
             type: object
-            properties: {}
+            properties:
+              providerCount:
+                type: integer
+              modelAliasCount:
+                type: integer
+              keyCount:
+                type: integer
+              quotaCount:
+                type: integer
+              mcpServerCount:
+                type: integer
+            required: [providerCount, modelAliasCount, keyCount, quotaCount, mcpServerCount]
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0ManagementConfigStatus

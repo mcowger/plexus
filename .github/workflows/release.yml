@@ -94,6 +94,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Generate server OpenAPI asset
+        run: bun run generate:openapi:asset
+
       - name: Build frontend
         run: bun run build:frontend
 
@@ -315,6 +318,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Generate server OpenAPI asset
+        run: bun run generate:openapi:asset
+
       - name: Build frontend
         run: bun run build:frontend
 
@@ -324,6 +330,11 @@ jobs:
           bun run compile:linux-arm64
           bun run compile:macos
           bun run compile:windows
+          bun run compile:cli:linux-amd64
+          bun run compile:cli:linux-arm64
+          bun run compile:cli:macos-amd64
+          bun run compile:cli:macos-arm64
+          bun run compile:cli:windows
 
       - name: Upload binaries
         uses: actions/upload-artifact@v7
@@ -334,6 +345,11 @@ jobs:
             plexus-linux-arm64
             plexus-macos
             plexus.exe
+            plexuscli-linux-amd64
+            plexuscli-linux-arm64
+            plexuscli-macos-amd64
+            plexuscli-macos-arm64
+            plexuscli.exe
           retention-days: 1
 
   # ── Build Docker Image (per-arch, cache-isolated) ─────────────────────
@@ -483,5 +499,10 @@ jobs:
             release/plexus-linux-arm64
             release/plexus-macos
             release/plexus.exe
+            release/plexuscli-linux-amd64
+            release/plexuscli-linux-arm64
+            release/plexuscli-macos-amd64
+            release/plexuscli-macos-arm64
+            release/plexuscli.exe
           draft: false
           prerelease: false

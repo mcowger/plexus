@@ -58,6 +58,11 @@ get:
                   $ref: ../components/schemas/McpUsageRecord.yaml
               total:
                 type: integer
+              limit:
+                type: integer
+              offset:
+                type: integer
+            required: [data, total, limit, offset]
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0ManagementMcplogs

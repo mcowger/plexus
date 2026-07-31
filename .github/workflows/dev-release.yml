@@ -50,6 +50,9 @@ jobs:
         run: bun install --frozen-lockfile
         working-directory: ./packages/frontend
 
+      - name: Generate server OpenAPI asset
+        run: bun run generate:openapi:asset
+
       - name: Build frontend
         env:
           APP_VERSION: dev-${{ steps.sha.outputs.sha }}
@@ -63,6 +66,11 @@ jobs:
           bun run compile:linux-arm64
           bun run compile:macos
           bun run compile:windows
+          bun run compile:cli:linux-amd64
+          bun run compile:cli:linux-arm64
+          bun run compile:cli:macos-amd64
+          bun run compile:cli:macos-arm64
+          bun run compile:cli:windows
 
       - name: Log in to the Container registry
         uses: docker/login-action@v4
@@ -97,6 +105,11 @@ jobs:
             plexus-linux-arm64
             plexus-macos
             plexus.exe
+            plexuscli-linux-amd64
+            plexuscli-linux-arm64
+            plexuscli-macos-amd64
+            plexuscli-macos-arm64
+            plexuscli.exe
           draft: false
           prerelease: true
           tag_name: dev-${{ steps.sha.outputs.sha }}
