@@ -1,5 +1,5 @@
 {
-  "name": "@plexus/cli",
+  "name": "@mcowger/plexus-cli",
   "version": "0.0.1",
   "description": "Dynamic command line client for Plexus management APIs",
   "type": "module",
