@@ -474,13 +474,57 @@ jobs:
           docker rm plexus-smoke-test 2>/dev/null || true
           exit 1
 
+  # ── Publish CLI to npm ─────────────────────────────────────────────────
+  publish-cli:
+    name: Publish CLI to npm
+    needs: [setup, quality-gates]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node for npm trusted publishing
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test CLI package
+        run: |
+          bun run --cwd packages/cli test
+          bun run --cwd packages/cli typecheck
+
+      - name: Require an unpublished CLI version
+        run: |
+          package_name=$(node -p "require('./packages/cli/package.json').name")
+          package_version=$(node -p "require('./packages/cli/package.json').version")
+          if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+            echo "::error::$package_name@$package_version is already published. Bump packages/cli/package.json before releasing."
+            exit 1
+          fi
+
+      - name: Publish CLI
+        run: npm publish --workspace=@mcowger/plexus-cli --access public
+
   # ── Verify binary arch inside each platform image ─────────────────────
   # Catches the exact failure mode from issue #550: an arm64-labelled image
   # that actually contains an x86-64 binary.
   # ── Create Release ─────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [setup, build-binaries, build-docker-manifest, generate-release-notes]
+    needs: [setup, build-binaries, build-docker-manifest, generate-release-notes, publish-cli]
     runs-on: ubuntu-latest
     steps:
       - name: Download binaries
