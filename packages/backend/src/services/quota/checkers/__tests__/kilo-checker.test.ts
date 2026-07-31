@@ -42,6 +42,38 @@ describe('kilo checker', () => {
     expect(meters[0]?.remaining).toBe(42.5);
   });
 
+  it('marks meter exhausted when balance is negative', async () => {
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({ balance: -0.168363 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters).toHaveLength(1);
+    expect(meters[0]?.status).toBe('exhausted');
+    expect(meters[0]?.utilizationPercent).toBe(100);
+    expect(meters[0]?.remaining).toBe(-0.168363);
+  });
+
+  it('marks meter exhausted when balance is exactly zero', async () => {
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify({ balance: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters[0]?.status).toBe('exhausted');
+    expect(meters[0]?.utilizationPercent).toBe(100);
+  });
+
   it('sends x-kilocode-organizationid header when organizationId option is set', async () => {
     let orgHeader: string | undefined;
 

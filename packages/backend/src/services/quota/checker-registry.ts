@@ -102,6 +102,17 @@ function deriveStatus(utilization: Utilization): MeterStatus {
   return 'ok';
 }
 
+/**
+ * A balance meter is exhausted when the remaining balance is at or below
+ * zero. Non-finite values (NaN/Infinity) are also treated as exhausted so
+ * callers gating on exhausted balances get a single consistent signal.
+ */
+function isBalanceExhausted(remaining: number | undefined): boolean {
+  if (remaining === undefined) return false;
+  if (!Number.isFinite(remaining)) return true;
+  return remaining <= 0;
+}
+
 export function createMeterContext(
   checkerId: string,
   provider: string,
@@ -125,12 +136,14 @@ export function createMeterContext(
     },
 
     balance(params: BalanceParams): Meter {
-      const utilization: Utilization =
-        params.limit !== undefined && params.used !== undefined
-          ? deriveUtilization(params.used, params.limit, params.remaining)
+      const hasLimitAndUsed = params.limit !== undefined && params.used !== undefined;
+      const utilization: Utilization = hasLimitAndUsed
+        ? deriveUtilization(params.used, params.limit, params.remaining)
+        : isBalanceExhausted(params.remaining)
+          ? 100
           : 'not_applicable';
 
-      const status = deriveStatus(utilization);
+      const status = isBalanceExhausted(params.remaining) ? 'exhausted' : deriveStatus(utilization);
 
       return {
         key: params.key,
