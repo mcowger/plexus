@@ -1,3 +1,5 @@
+import { plexusCliSkill } from './skill';
+
 export const DEFAULT_URL = 'http://localhost:4000';
 const OPENAPI_PATH = '/.well-known/plexus/openapi.json';
 const ALLOWED_PATH = /^\/v0\/(management\/|system\/logs\/)/;
@@ -290,7 +292,15 @@ export function formatOutput(value: unknown, output: 'json' | 'yaml' | 'table'):
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-const HELP = `Usage: plexuscli [options] api <list|describe|call> [operation]
+const HELP = `Usage: plexuscli [options] <skill|api> [operation]
+
+AGENTS: Run \`plexuscli skill\` to print the \`plexus-cli\` skill and understand how to use this tool.
+
+Commands:
+  skill                  Print the bundled plexus-cli SKILL.md
+  api list               List discovered management operations
+  api describe OPERATION Describe a discovered operation
+  api call OPERATION     Call a discovered operation
 
 Options:
   --url URL              Plexus URL (default: PLEXUS_URL or ${DEFAULT_URL})
@@ -323,6 +333,10 @@ export async function run(
     const args = parseArgs(argv, env);
     if (args.help || args.positionals.length === 0) {
       runtime.stdout(HELP);
+      return 0;
+    }
+    if (args.positionals.length === 1 && args.positionals[0] === 'skill') {
+      runtime.stdout(plexusCliSkill);
       return 0;
     }
     const baseUrl = args.url.replace(/\/$/, '');

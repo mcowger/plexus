@@ -26,6 +26,7 @@
     "dev:get:port": "bun run scripts/dev-config.ts port",
     "dev:get:db_path": "bun run scripts/dev-config.ts db_path",
     "plexuscli": "bun run packages/cli/src/index.ts",
+    "sync:cli-skill": "bun run scripts/sync-cli-skill.ts",
     "build:frontend": "cd packages/frontend && bun run build",
     "build:frontend:if-needed": "[ -n \"$CI\" ] || bun run build:frontend",
     "precompile:macos": "bun run generate:openapi:asset",

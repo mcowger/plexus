@@ -83,6 +83,47 @@ describe('arguments and output', () => {
 });
 
 describe('execution', () => {
+  it('prints the bundled skill without discovering a server', async () => {
+    let stdout = '';
+    const exitCode = await run(
+      ['skill'],
+      {},
+      {
+        fetch: async () => {
+          throw new Error('skill should not fetch a server');
+        },
+        stdin: async () => '',
+        stdout: (text) => {
+          stdout += text;
+        },
+        stderr: () => {},
+        isTTY: false,
+        confirm: async () => false,
+      }
+    );
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain('name: plexus-cli');
+  });
+
+  it('directs agents to the bundled skill in help output', async () => {
+    let stdout = '';
+    await run(
+      ['--help'],
+      {},
+      {
+        fetch: async () => new Response(),
+        stdin: async () => '',
+        stdout: (text) => {
+          stdout += text;
+        },
+        stderr: () => {},
+        isTTY: false,
+        confirm: async () => false,
+      }
+    );
+    expect(stdout).toContain('AGENTS: Run `plexuscli skill`');
+  });
+
   it('fetches the schema without caching and uses JSON for non-TTY output', async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     let stdout = '';

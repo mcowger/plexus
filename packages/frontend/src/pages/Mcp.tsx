@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
+import { CopyButton } from '../components/ui/CopyButton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
@@ -22,6 +23,7 @@ import {
   Zap,
   ZapOff,
   Download,
+  Package,
   Copy,
 } from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
@@ -34,6 +36,8 @@ import plexusRestApiSkill from '../../../../.agents/skills/plexus-rest-api/SKILL
 };
 
 const LOCAL_MCP_DEFAULT_PORT = 7345;
+const CLI_BUNX_COMMAND = 'bunx @mcowger/plexus-cli';
+const CLI_GLOBAL_INSTALL_COMMAND = 'bun install -g @mcowger/plexus-cli';
 
 const EMPTY_SERVER: McpServer = {
   mode: 'remote_http',
@@ -75,6 +79,7 @@ export const McpPage: React.FC = () => {
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [newServerKey, setNewServerKey] = useState('');
   const [isSavingKey, setIsSavingKey] = useState(false);
+  const [isCliInstallOpen, setIsCliInstallOpen] = useState(false);
   const [, setCurrentTime] = useState(Date.now());
 
   // Logs state
@@ -555,31 +560,66 @@ export const McpPage: React.FC = () => {
         subtitle="Model Context Protocol connections and the Plexus admin skill"
         actions={
           <>
-            <div className="inline-flex rounded-md overflow-hidden border border-border-glass">
-              <button
-                type="button"
-                onClick={() => handleCopySkill(plexusCliSkill, 'Plexus CLI Skill')}
-                className={clsx(
-                  'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all duration-fast',
-                  'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
-                  'hover:brightness-105',
-                  'border-r border-[#1A1006]/20'
-                )}
-              >
-                Plexus CLI Skill
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDownloadSkill(plexusCliSkill, 'plexus-cli-SKILL.md')}
-                title="Download as file"
-                className={clsx(
-                  'inline-flex items-center justify-center px-2 py-1.5 text-xs',
-                  'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
-                  'hover:brightness-105'
-                )}
-              >
-                <Download size={14} />
-              </button>
+            <div className="relative inline-flex">
+              <div className="inline-flex overflow-hidden rounded-md border border-border-glass">
+                <button
+                  type="button"
+                  onClick={() => handleCopySkill(plexusCliSkill, 'Plexus CLI Skill')}
+                  className={clsx(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all duration-fast',
+                    'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                    'hover:brightness-105',
+                    'border-r border-[#1A1006]/20'
+                  )}
+                >
+                  Plexus CLI Skill
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadSkill(plexusCliSkill, 'plexus-cli-SKILL.md')}
+                  title="Download skill as file"
+                  aria-label="Download Plexus CLI skill"
+                  className={clsx(
+                    'inline-flex items-center justify-center px-2 py-1.5 text-xs',
+                    'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                    'hover:brightness-105',
+                    'border-r border-[#1A1006]/20'
+                  )}
+                >
+                  <Download size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCliInstallOpen((open) => !open)}
+                  title="Install Plexus CLI"
+                  aria-label="Install Plexus CLI"
+                  aria-expanded={isCliInstallOpen}
+                  className={clsx(
+                    'inline-flex items-center justify-center px-2 py-1.5 text-xs',
+                    'bg-gradient-to-br from-secondary to-primary text-[#1A1006]',
+                    'hover:brightness-105'
+                  )}
+                >
+                  <Package size={14} />
+                </button>
+              </div>
+              {isCliInstallOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-md border border-border-glass bg-bg-surface p-3 shadow-lg">
+                  <p className="mb-2 text-xs font-medium text-text">Install Plexus CLI</p>
+                  <div className="mb-2 flex items-center gap-1 rounded bg-bg-glass px-2 py-1 font-mono text-xs text-text-secondary">
+                    <code className="min-w-0 flex-1 break-all">{CLI_BUNX_COMMAND}</code>
+                    <CopyButton value={CLI_BUNX_COMMAND} label="Copy bunx command" size="sm" />
+                  </div>
+                  <div className="flex items-center gap-1 rounded bg-bg-glass px-2 py-1 font-mono text-xs text-text-secondary">
+                    <code className="min-w-0 flex-1 break-all">{CLI_GLOBAL_INSTALL_COMMAND}</code>
+                    <CopyButton
+                      value={CLI_GLOBAL_INSTALL_COMMAND}
+                      label="Copy Bun install command"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="inline-flex rounded-md overflow-hidden border border-border-glass">
               <button

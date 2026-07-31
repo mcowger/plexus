@@ -6,8 +6,16 @@
   "bin": {
     "plexuscli": "src/index.ts"
   },
+  "files": [
+    "README.md",
+    "skills",
+    "src/cli.ts",
+    "src/index.ts",
+    "src/skill.ts"
+  ],
   "scripts": {
     "start": "bun run src/index.ts",
+    "prepack": "bun run --cwd ../.. sync:cli-skill",
     "typecheck": "bun x tsc --noEmit",
     "test": "bunx --bun vitest run"
   },
