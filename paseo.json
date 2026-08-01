@@ -1,6 +1,6 @@
 {
   "worktree": {
-    "setup": ["bun run scripts/init_worktree.ts"],
+    "setup": ["cp \"$PASEO_SOURCE_CHECKOUT_PATH/.env\" .env", "bun run scripts/init_worktree.ts"],
     "teardown": "bun run dev:stop",
     "servicePorts": {
       "portScript": "scripts/dev-port-allocator.ts",

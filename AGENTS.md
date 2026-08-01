@@ -18,6 +18,7 @@ This file is a **guardrail**, not general documentation.
 - **NEVER** run `drizzle-kit generate` directly.
 - **NEVER** produce implementation or summary documents unless specifically requested.
 - **NEVER** assume Plexus supports file-based configuration. Providers, models, keys, quotas, and settings are database-backed; manage them through the Admin UI or Management API. Environment variables are only for server-level settings.
+- **DEBUGGING** Plexus instances: read and use the `plexus-cli` skill. The worktree `.env` contains the relevant staging configuration. When the user specifies `staging`, use `PLEXUS_STAGING_URL` for the staging URL and `PLEXUS_ADMIN_KEY` for the admin key.
 - **AVOID** searching library type definitions for documentation. Use context/search skills first when available.
 - **ASK** when requirements are ambiguous.
 - **NEVER** use --delete-branch on gh commands
