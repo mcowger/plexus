@@ -26,7 +26,8 @@ import {
   ChevronDown,
   Ban,
 } from 'lucide-react';
-import { formatNumber, formatCost } from '../lib/format';
+import { formatNumber, formatCostIn } from '../lib/format';
+import { useCurrency } from '../lib/CurrencyContext';
 import { isClipboardAvailable, copyToClipboard, generateUUID } from '../lib/clipboard';
 import {
   formatQuotaValue,
@@ -70,6 +71,7 @@ function isLeakyRollingDef(def: UserQuota | undefined): boolean {
 
 export const Keys = () => {
   const toast = useToast();
+  const { currency, rate, symbol } = useCurrency();
   const [keys, setKeys] = useState<KeyConfig[]>([]);
   const [quotas, setQuotas] = useState<Record<string, UserQuota>>({});
   const [quotaStatuses, setQuotaStatuses] = useState<Record<string, QuotaStatusResponse>>({});
@@ -629,8 +631,17 @@ export const Keys = () => {
                               <div className="flex items-center justify-between gap-2 text-xs">
                                 <span className="text-text-muted truncate">{primary.name}</span>
                                 <span className="font-medium text-text">
-                                  {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
-                                  {formatQuotaValue(primary.limit, primary.limitType)}
+                                  {formatQuotaValue(primary.currentUsage, primary.limitType, {
+                                    currency,
+                                    rate,
+                                    symbol,
+                                  })}{' '}
+                                  /{' '}
+                                  {formatQuotaValue(primary.limit, primary.limitType, {
+                                    currency,
+                                    rate,
+                                    symbol,
+                                  })}
                                 </span>
                               </div>
                               <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
@@ -791,8 +802,17 @@ export const Keys = () => {
                                   }}
                                 />
                                 <span style={{ fontSize: '12px' }}>
-                                  {formatQuotaValue(primary.currentUsage, primary.limitType)} /{' '}
-                                  {formatQuotaValue(primary.limit, primary.limitType)}
+                                  {formatQuotaValue(primary.currentUsage, primary.limitType, {
+                                    currency,
+                                    rate,
+                                    symbol,
+                                  })}{' '}
+                                  /{' '}
+                                  {formatQuotaValue(primary.limit, primary.limitType, {
+                                    currency,
+                                    rate,
+                                    symbol,
+                                  })}
                                 </span>
                                 {status && status.quotas.length > 1 && (
                                   <span className="text-[11px] text-text-muted">
@@ -1004,7 +1024,7 @@ export const Keys = () => {
                             </div>
                             <div className="truncate font-mono text-text">
                               {quota.limitType === 'cost'
-                                ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
+                                ? `${formatCostIn(quota.limit, { currency, rate, symbol, decimals: 5 })} ${quota.limitType}`
                                 : `${formatNumber(quota.limit)} ${quota.limitType}`}
                             </div>
                           </div>
@@ -1081,7 +1101,7 @@ export const Keys = () => {
                           <td className="px-4 py-3 text-left border-b border-border-glass text-text">
                             <span className="font-mono text-xs">
                               {quota.limitType === 'cost'
-                                ? `${formatCost(quota.limit, 5)} ${quota.limitType}`
+                                ? `${formatCostIn(quota.limit, { currency, rate, symbol, decimals: 5 })} ${quota.limitType}`
                                 : `${formatNumber(quota.limit)} ${quota.limitType}`}
                             </span>
                           </td>
@@ -1458,7 +1478,7 @@ export const Keys = () => {
               >
                 <option value="requests">Requests</option>
                 <option value="tokens">Tokens</option>
-                <option value="cost">Cost ($)</option>
+                <option value="cost">Cost ({symbol})</option>
               </select>
             </div>
 
@@ -1473,7 +1493,8 @@ export const Keys = () => {
                 placeholder="1000"
               />
               <p className="text-xs text-text-muted">
-                Maximum {editingQuota.limitType === 'cost' ? 'cost ($)' : editingQuota.limitType}{' '}
+                Maximum{' '}
+                {editingQuota.limitType === 'cost' ? `cost (${symbol})` : editingQuota.limitType}{' '}
                 allowed
               </p>
             </div>

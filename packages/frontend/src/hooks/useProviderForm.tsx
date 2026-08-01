@@ -5,6 +5,7 @@ import type { QuotaCheckerInfo } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../contexts/ToastContext';
+import { useCurrency } from '../lib/CurrencyContext';
 
 const KNOWN_APIS = [
   'chat',
@@ -94,6 +95,7 @@ export interface FetchedModel {
 export function useProviderForm() {
   const toast = useToast();
   const navigate = useNavigate();
+  const { currency, rate, symbol } = useCurrency();
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -833,7 +835,11 @@ export function useProviderForm() {
           className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2 bg-bg-subtle border border-border text-text-secondary"
           onClick={handleQuotaClick}
         >
-          {formatMeterValue(balanceMeter.remaining, balanceMeter.unit)}
+          {formatMeterValue(balanceMeter.remaining, balanceMeter.unit, false, {
+            currency,
+            rate,
+            symbol,
+          })}
         </Badge>
       );
     }

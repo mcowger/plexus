@@ -98,6 +98,45 @@ export function formatCost(cost: number, decimals: number = 4): string {
   return `$${cost.toFixed(decimals)}`;
 }
 
+export type FormatCostInOptions = {
+  currency: string;
+  rate: number;
+  symbol?: string;
+  decimals?: number;
+};
+
+export function formatCostIn(costUsd: number, options: FormatCostInOptions): string {
+  const decimals = options.decimals ?? 4;
+  const cost = costUsd * options.rate;
+  const formatter = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: options.currency,
+    currencyDisplay: 'symbol',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+  const formatValue = (value: number, marker?: string): string => {
+    let integerPartSeen = false;
+    return formatter
+      .formatToParts(value)
+      .map((part) => {
+        if (part.type === 'currency' && options.symbol) return options.symbol;
+        if (marker && !integerPartSeen && part.type === 'integer') {
+          integerPartSeen = true;
+          return `${marker}${part.value}`;
+        }
+        return part.value;
+      })
+      .join('');
+  };
+
+  if (cost === 0) return formatValue(cost);
+  const threshold = Math.pow(10, -decimals);
+  if (cost > 0 && cost < threshold) return formatValue(threshold, '<');
+  return formatValue(cost);
+}
+
 /**
  * Format large point balances with k, M, B suffixes (e.g., 4948499 -> "4.9M", 1500 -> "1k")
  */

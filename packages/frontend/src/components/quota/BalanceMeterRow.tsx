@@ -2,6 +2,7 @@ import React from 'react';
 import { Wallet } from 'lucide-react';
 import type { Meter } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
+import { useCurrency } from '../../lib/CurrencyContext';
 
 interface BalanceMeterRowProps {
   meter: Meter;
@@ -9,6 +10,7 @@ interface BalanceMeterRowProps {
 }
 
 export const BalanceMeterRow: React.FC<BalanceMeterRowProps> = ({ meter, onClick }) => {
+  const { currency, rate, symbol } = useCurrency();
   const displayValue =
     meter.remaining !== undefined
       ? meter.remaining
@@ -28,7 +30,7 @@ export const BalanceMeterRow: React.FC<BalanceMeterRowProps> = ({ meter, onClick
       </div>
       {displayValue !== undefined ? (
         <span className="text-xs font-semibold text-info tabular-nums flex-shrink-0">
-          {formatMeterValue(displayValue, meter.unit)}
+          {formatMeterValue(displayValue, meter.unit, false, { currency, rate, symbol })}
         </span>
       ) : (
         <span className="text-xs text-text-muted flex-shrink-0">—</span>

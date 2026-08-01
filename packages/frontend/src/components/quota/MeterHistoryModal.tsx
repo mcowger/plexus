@@ -14,6 +14,7 @@ import { api } from '../../lib/api';
 import { formatMeterValue } from './MeterValue';
 import type { Meter, QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
+import { useCurrency } from '../../lib/CurrencyContext';
 
 type TimeRange = '1h' | '3h' | '6h' | '12h' | '24h' | '1w' | '4w';
 
@@ -69,6 +70,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
   meter,
   displayName,
 }) => {
+  const { currency, rate, symbol } = useCurrency();
   const [range, setRange] = useState<TimeRange>('24h');
   const [rawHistory, setRawHistory] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -151,10 +153,14 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
   const yLabel = isBalance ? meter.unit : '%';
 
   const formatY = (v: number) =>
-    isBalance ? formatMeterValue(v, meter.unit, true) : `${Math.round(v)}%`;
+    isBalance
+      ? formatMeterValue(v, meter.unit, true, { currency, rate, symbol })
+      : `${Math.round(v)}%`;
 
   const formatTooltip = (v: number) =>
-    isBalance ? formatMeterValue(v, meter.unit) : `${v.toFixed(1)}%`;
+    isBalance
+      ? formatMeterValue(v, meter.unit, false, { currency, rate, symbol })
+      : `${v.toFixed(1)}%`;
 
   if (!isOpen) return null;
 

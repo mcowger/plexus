@@ -23,7 +23,8 @@
 import { useEffect, useState } from 'react';
 import { Key, Layers, Boxes, Gauge, Activity, AlertTriangle } from 'lucide-react';
 import { api, type PieChartDataPoint, type QuotaStatusEntry } from '../../../lib/api';
-import { formatNumber, formatTokens, formatCost } from '../../../lib/format';
+import { formatNumber, formatTokens, formatCostIn } from '../../../lib/format';
+import { useCurrency } from '../../../lib/CurrencyContext';
 import { Card } from '../../ui/Card';
 import { QuotaStatusCard } from '../../quota';
 import { TimeRangeSelector } from '../TimeRangeSelector';
@@ -113,6 +114,7 @@ const BreakdownList: React.FC<{
 };
 
 export const OverallTab: React.FC = () => {
+  const { currency, rate, symbol } = useCurrency();
   const [timeRange, setTimeRange] = useState<TimeRange>('day');
   const [info, setInfo] = useState<SelfInfo | null>(null);
   const [summary, setSummary] = useState<SummaryStats | null>(null);
@@ -369,7 +371,7 @@ export const OverallTab: React.FC = () => {
             />
             <Metric
               label="Cost (today)"
-              value={formatCost(summary.todayCost)}
+              value={formatCostIn(summary.todayCost, { currency, rate, symbol, decimals: 4 })}
               sub="attributed to this key"
             />
           </div>

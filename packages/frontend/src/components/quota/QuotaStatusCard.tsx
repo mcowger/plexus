@@ -6,6 +6,7 @@ import { QuotaProgressBar } from './QuotaProgressBar';
 import { QuotaChip, hasScope } from './QuotaChip';
 import { statusForPercent, formatQuotaValue, quotaUsagePercent } from '../../lib/quota';
 import { formatResetsIn } from '../../lib/format';
+import { useCurrency } from '../../lib/CurrencyContext';
 
 export interface QuotaStatusCardProps {
   entry: QuotaStatusEntry;
@@ -45,6 +46,7 @@ export const QuotaStatusCard: React.FC<QuotaStatusCardProps> = ({
   recomputeLeaky = false,
   recomputing = false,
 }) => {
+  const { currency, rate, symbol } = useCurrency();
   const detailed = variant === 'detailed';
   const pct = quotaUsagePercent(entry);
   const resetsLabel =
@@ -127,7 +129,7 @@ export const QuotaStatusCard: React.FC<QuotaStatusCardProps> = ({
         label={detailed && !entry.global ? `${entry.limitType} (scoped)` : entry.limitType}
         value={entry.currentUsage}
         max={entry.limit}
-        displayValue={`${formatQuotaValue(entry.currentUsage, entry.limitType)} / ${formatQuotaValue(entry.limit, entry.limitType)}`}
+        displayValue={`${formatQuotaValue(entry.currentUsage, entry.limitType, { currency, rate, symbol })} / ${formatQuotaValue(entry.limit, entry.limitType, { currency, rate, symbol })}`}
         status={statusForPercent(pct)}
         size="md"
       />
@@ -136,7 +138,7 @@ export const QuotaStatusCard: React.FC<QuotaStatusCardProps> = ({
         <span>
           Remaining:{' '}
           <span className="text-text font-medium">
-            {formatQuotaValue(entry.remaining, entry.limitType)}
+            {formatQuotaValue(entry.remaining, entry.limitType, { currency, rate, symbol })}
           </span>
         </span>
         <span>Resets {resetsLabel}</span>

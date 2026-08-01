@@ -1,5 +1,14 @@
 import React from 'react';
-import { formatCost, formatPointsFull } from '../../lib/format';
+import { formatCostIn, formatPointsFull, type FormatCostInOptions } from '../../lib/format';
+import { useCurrency } from '../../lib/CurrencyContext';
+
+type MeterCurrencyOptions = Pick<FormatCostInOptions, 'currency' | 'rate' | 'symbol'>;
+
+const DEFAULT_CURRENCY: MeterCurrencyOptions = {
+  currency: 'USD',
+  rate: 1,
+  symbol: '$',
+};
 
 interface MeterValueProps {
   value: number;
@@ -7,10 +16,15 @@ interface MeterValueProps {
   compact?: boolean;
 }
 
-export function formatMeterValue(value: number, unit: string, compact = false): string {
+export function formatMeterValue(
+  value: number,
+  unit: string,
+  compact = false,
+  currency: MeterCurrencyOptions = DEFAULT_CURRENCY
+): string {
   switch (unit) {
     case 'usd':
-      return formatCost(value);
+      return formatCostIn(value, { ...currency, decimals: 4 });
     case 'percentage':
       return `${Math.round(value)}%`;
     case 'points':
@@ -28,6 +42,16 @@ export function formatMeterValue(value: number, unit: string, compact = false): 
   }
 }
 
-export const MeterValue: React.FC<MeterValueProps> = ({ value, unit, compact }) => (
-  <span>{formatMeterValue(value, unit, compact)}</span>
-);
+export const MeterValue: React.FC<MeterValueProps> = ({ value, unit, compact }) => {
+  const currency = useCurrency();
+
+  return (
+    <span>
+      {formatMeterValue(value, unit, compact, {
+        currency: currency.currency,
+        rate: currency.rate,
+        symbol: currency.symbol,
+      })}
+    </span>
+  );
+};

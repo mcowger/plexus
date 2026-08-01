@@ -69,7 +69,8 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/layout/PageHeader';
 import { TimeRangeSelector } from '../components/dashboard/TimeRangeSelector';
 import { api, type UsageRecord } from '../lib/api';
-import { formatCost, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
+import { useCurrency } from '../lib/CurrencyContext';
+import { formatCostIn, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
 import type { CustomDateRange } from '../lib/date';
 import { parseISODate } from '../lib/date';
 import {
@@ -188,6 +189,12 @@ interface MetricConfig {
   format: (value: number) => string;
 }
 
+interface CostDisplay {
+  currency: string;
+  rate: number;
+  symbol: string;
+}
+
 /**
  * A single data point in the aggregated chart dataset.
  *
@@ -226,7 +233,7 @@ interface SummaryPoint {
  * Count-based metrics (requests, errors) use the left Y-axis;
  * rate/cost/duration metrics use the right Y-axis to avoid scale conflicts.
  */
-const METRICS: MetricConfig[] = [
+const createMetrics = ({ currency, rate, symbol }: CostDisplay): MetricConfig[] => [
   {
     key: 'requests',
     label: 'Requests',
@@ -243,10 +250,10 @@ const METRICS: MetricConfig[] = [
   },
   {
     key: 'cost',
-    label: 'Cost',
+    label: `Cost (${symbol})`,
     color: '#f59e0b',
     yAxisId: 'right',
-    format: (v) => formatCost(v, 4),
+    format: (v) => formatCostIn(v / rate, { currency, rate, symbol, decimals: 4 }),
   },
   {
     key: 'duration',
@@ -681,7 +688,8 @@ const aggregateByGroup = (records: UsageRecord[], groupBy: GroupBy): AggregatedP
 const renderTimeSeriesChart = (
   data: AggregatedPoint[],
   chartType: ChartType,
-  selectedMetrics: string[]
+  selectedMetrics: string[],
+  metrics: MetricConfig[]
 ) => {
   // Select the appropriate Recharts container component based on chart type.
   // ComposedChart is special: it can contain both Bar and Line children.
@@ -696,6 +704,14 @@ const renderTimeSeriesChart = (
   const isComposed = chartType === 'composed';
   // In composed mode, the first 2 metrics are rendered as bars, the rest as lines.
   const barMetrics = selectedMetrics.slice(0, 2);
+  const rightAxisMetrics = metrics.filter(
+    (metric) => metric.yAxisId === 'right' && selectedMetrics.includes(metric.key)
+  );
+  const costMetric = metrics.find((metric) => metric.key === 'cost');
+  const rightAxisTickFormatter =
+    rightAxisMetrics.length === 1 && rightAxisMetrics[0]?.key === 'cost'
+      ? (value: number) => rightAxisMetrics[0].format(value)
+      : undefined;
 
   return (
     <ResponsiveContainer width="100%" height={400}>
@@ -716,6 +732,18 @@ const renderTimeSeriesChart = (
           orientation="right"
           stroke="var(--color-text-secondary)"
           tick={{ fill: 'var(--color-text-secondary)', fontSize: 12 }}
+          tickFormatter={rightAxisTickFormatter}
+          label={
+            selectedMetrics.includes('cost') && costMetric
+              ? {
+                  value: costMetric.label,
+                  angle: 90,
+                  position: 'insideRight',
+                  fill: 'var(--color-text-secondary)',
+                  fontSize: 12,
+                }
+              : undefined
+          }
         />
         <Tooltip
           contentStyle={{
@@ -724,10 +752,17 @@ const renderTimeSeriesChart = (
             borderRadius: '8px',
           }}
           labelStyle={{ color: 'var(--color-text)' }}
+          formatter={(value, name) => {
+            const metric = metrics.find((candidate) => candidate.label === String(name));
+            return [
+              metric ? metric.format(Number(value)) : String(value),
+              metric?.label ?? String(name),
+            ];
+          }}
         />
         <Legend />
         {selectedMetrics.map((metricKey) => {
-          const metric = METRICS.find((m) => m.key === metricKey);
+          const metric = metrics.find((m) => m.key === metricKey);
           if (!metric) return null;
           const isBar = isComposed ? barMetrics.includes(metricKey) : chartType === 'bar';
           const yAxisId = metric.yAxisId || 'left';
@@ -817,7 +852,8 @@ const renderTimeSeriesChart = (
  * @param metricKey - Which metric to use for slice values (e.g., 'requests')
  * @returns JSX element containing the Recharts PieChart
  */
-const renderPieChart = (data: AggregatedPoint[], metricKey: string) => {
+const renderPieChart = (data: AggregatedPoint[], metricKey: string, metrics: MetricConfig[]) => {
+  const metric = metrics.find((candidate) => candidate.key === metricKey);
   const pieData = data
     .map((item, index) => ({
       name: item.name,
@@ -848,6 +884,10 @@ const renderPieChart = (data: AggregatedPoint[], metricKey: string) => {
             border: '1px solid var(--color-border)',
             borderRadius: '8px',
           }}
+          formatter={(value) => [
+            metric ? metric.format(Number(value)) : String(value),
+            metric?.label ?? metricKey,
+          ]}
         />
         <Legend />
       </PieChart>
@@ -869,6 +909,8 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   initialQueryString,
   onBack,
 }) => {
+  const { currency, rate, symbol, convert } = useCurrency();
+
   // ---------------------------------------------------------------------------
   // Query string resolution: prefer initialQueryString prop (embedded mode),
   // fall back to window.location.search (standalone mode).
@@ -972,7 +1014,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       if (groupBy === 'time') {
         const [summaryResponse, logsResponse] = await Promise.all([
           api.getSummaryData(timeRange === 'live' ? 'hour' : timeRange, true, startDate, endDate),
-          api.getLogs(100, 0, { startDate, endDate }),
+          api.getLogs(5000, 0, { startDate, endDate }),
         ]);
         // Limit to max 100 points to prevent memory issues
         const limitedData = summaryResponse.slice(0, 100) as SummaryPoint[];
@@ -1031,13 +1073,22 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       // Use pre-aggregated summary data - minimize object creation
       const isCustom = timeRange === 'custom';
       const customRange = isCustom ? customDateRange : null;
+      const { bucketFn } = getRangeConfig(timeRange, customRange);
+      const costByBucket = new Map<number, number>();
+
+      records.forEach((record) => {
+        const timestampMs = new Date(record.date).getTime();
+        if (Number.isNaN(timestampMs)) return;
+        const bucket = bucketFn(timestampMs);
+        costByBucket.set(bucket, (costByBucket.get(bucket) || 0) + (record.costTotal || 0));
+      });
 
       return summaryData.map((r) => ({
         name: formatBucketLabel(timeRange, Number(r.timestamp), customRange),
         requests: r.requests || 0,
         errors: 0,
         tokens: r.tokens || 0,
-        cost: 0,
+        cost: costByBucket.get(Number(r.timestamp)) || 0,
         duration: 0,
         ttft: 0,
         tps: 0,
@@ -1047,6 +1098,15 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
     // For categorical views, aggregate raw records
     return aggregateByGroup(records, groupBy);
   }, [summaryData, records, groupBy, timeRange, customDateRange]);
+
+  const metrics = useMemo(
+    () => createMetrics({ currency, rate, symbol }),
+    [currency, rate, symbol]
+  );
+  const chartData = useMemo(
+    () => aggregatedData.map((point) => ({ ...point, cost: convert(point.cost) })),
+    [aggregatedData, convert]
+  );
 
   /**
    * Summary statistics computed from all raw records in the current time window.
@@ -1083,13 +1143,17 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
         color: errors > 0 ? 'text-red-500' : '',
       },
       { label: 'Tokens', value: formatTokens(tokens), icon: Database },
-      { label: 'Cost', value: formatCost(cost, 4), icon: DollarSign },
+      {
+        label: 'Cost',
+        value: formatCostIn(cost, { currency, rate, symbol, decimals: 4 }),
+        icon: DollarSign,
+      },
       { label: 'Avg Duration', value: formatMs(avgDuration), icon: Clock },
       { label: 'Avg TTFT', value: formatMs(avgTtft), icon: Clock },
       { label: 'Avg TPS', value: formatNumber(avgTps, 1), icon: TrendingUp },
       { label: 'Success Rate', value: `${successRate.toFixed(1)}%`, icon: TrendingUp },
     ];
-  }, [records]);
+  }, [currency, rate, records, symbol]);
 
   /** Toggle a metric on or off in the chart. Removes it if already selected, adds it otherwise. */
   const toggleMetric = (key: string) =>
@@ -1270,7 +1334,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-text-muted uppercase">Metrics</span>
               <div className="flex gap-2 flex-wrap">
-                {METRICS.map((m) => (
+                {metrics.map((m) => (
                   <button
                     key={m.key}
                     onClick={() => toggleMetric(m.key)}
@@ -1307,9 +1371,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
               No data available
             </div>
           ) : chartType === 'pie' ? (
-            renderPieChart(aggregatedData, selectedMetrics[0] || 'requests')
+            renderPieChart(chartData, selectedMetrics[0] || 'requests', metrics)
           ) : (
-            renderTimeSeriesChart(aggregatedData, chartType, selectedMetrics)
+            renderTimeSeriesChart(chartData, chartType, selectedMetrics, metrics)
           )}
         </Card>
       ) : (
@@ -1368,7 +1432,14 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                   </div>
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
-                    <div className="font-medium text-text">{formatCost(r.costTotal || 0, 4)}</div>
+                    <div className="font-medium text-text">
+                      {formatCostIn(r.costTotal || 0, {
+                        currency,
+                        rate,
+                        symbol,
+                        decimals: 4,
+                      })}
+                    </div>
                   </div>
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">
@@ -1447,7 +1518,14 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                     <td className="py-2 pr-3">
                       {formatTokens((r.tokensInput || 0) + (r.tokensOutput || 0))}
                     </td>
-                    <td className="py-2 pr-3">{formatCost(r.costTotal || 0, 4)}</td>
+                    <td className="py-2 pr-3">
+                      {formatCostIn(r.costTotal || 0, {
+                        currency,
+                        rate,
+                        symbol,
+                        decimals: 4,
+                      })}
+                    </td>
                     <td className="py-2 pr-3">{formatMs(r.durationMs || 0)}</td>
                     <td className="py-2 pr-3">{formatMs(r.ttftMs || 0)}</td>
                     <td className="py-2 pr-3">{formatNumber(r.tokensPerSec || 0, 1)}</td>
@@ -1494,7 +1572,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                   </div>
                   <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
                     <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
-                    <div className="font-medium text-text">{formatCost(row.cost, 6)}</div>
+                    <div className="font-medium text-text">
+                      {formatCostIn(row.cost, { currency, rate, symbol, decimals: 6 })}
+                    </div>
                   </div>
                 </div>
               </article>
@@ -1532,7 +1612,9 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                     <td className="py-3 pr-4 text-red-500">{formatNumber(row.errors, 0)}</td>
                     <td className="py-3 pr-4 text-green-500">{row.successRate.toFixed(1)}%</td>
                     <td className="py-3 pr-4">{formatTokens(row.tokens)}</td>
-                    <td className="py-3 pr-4">{formatCost(row.cost, 6)}</td>
+                    <td className="py-3 pr-4">
+                      {formatCostIn(row.cost, { currency, rate, symbol, decimals: 6 })}
+                    </td>
                     <td className="py-3 pr-4">{formatMs(row.duration)}</td>
                     <td className="py-3 pr-4">{formatMs(row.ttft)}</td>
                     <td className="py-3 pr-4">{formatNumber(row.tps, 1)}</td>

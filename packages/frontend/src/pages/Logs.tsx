@@ -18,7 +18,7 @@ import {
 import {
   KWH_PER_SLICE,
   formatBytes,
-  formatCost,
+  formatCostIn,
   formatEnergy,
   formatMs,
   formatSlices,
@@ -78,6 +78,7 @@ import {
 import { clsx } from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrency } from '../lib/CurrencyContext';
 // @ts-ignore
 import messagesLogo from '../assets/messages.svg';
 // @ts-ignore
@@ -260,6 +261,7 @@ interface DesktopLogRowProps extends LogRowProps {
 }
 
 const MobileLogRow = React.memo(({ log, isNewest, onError, onDebug }: LogRowProps) => {
+  const { currency, rate, symbol } = useCurrency();
   const formatted = formatDateSafely(log.date);
   const totalTokens =
     Number(log.tokensInput || 0) +
@@ -394,7 +396,9 @@ const MobileLogRow = React.memo(({ log, isNewest, onError, onDebug }: LogRowProp
           <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
             <div className="truncate text-text">
               <span className="text-[9px] uppercase text-text-muted">Cost </span>
-              {log.costTotal == null || log.costTotal === 0 ? '-' : formatCost(log.costTotal)}
+              {log.costTotal == null || log.costTotal === 0
+                ? '-'
+                : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 4 })}
             </div>
           </div>
           <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
@@ -446,6 +450,7 @@ const DesktopLogRow = React.memo(
     onRetryDetails,
     onDelete,
   }: DesktopLogRowProps) => {
+    const { currency, rate, symbol } = useCurrency();
     return (
       <tr
         className={clsx(
@@ -765,12 +770,16 @@ const DesktopLogRow = React.memo(
                 {log.costSource ? (
                   <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
                     <span style={{ fontWeight: '500', cursor: 'help' }}>
-                      {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
+                      {log.costTotal === 0
+                        ? '-'
+                        : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
                     </span>
                   </CostToolTip>
                 ) : (
                   <span style={{ fontWeight: '500' }}>
-                    {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
+                    {log.costTotal === 0
+                      ? '-'
+                      : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
                   </span>
                 )}
               </div>
@@ -792,19 +801,32 @@ const DesktopLogRow = React.memo(
               >
                 <CloudUpload size={10} className="text-blue-400" />
                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costInput === 0 ? '$-.----' : formatCost(log.costInput || 0)}
+                  {log.costInput === 0
+                    ? `${symbol}-.----`
+                    : formatCostIn(log.costInput || 0, { currency, rate, symbol, decimals: 4 })}
                 </span>
                 <CloudDownload size={10} className="text-green-400" />
                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costOutput === 0 ? '$-.----' : formatCost(log.costOutput || 0)}
+                  {log.costOutput === 0
+                    ? `${symbol}-.----`
+                    : formatCostIn(log.costOutput || 0, { currency, rate, symbol, decimals: 4 })}
                 </span>
                 <PackageOpen size={10} className="text-orange-400" />
                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costCached === 0 ? '$-.----' : formatCost(log.costCached || 0)}
+                  {log.costCached === 0
+                    ? `${symbol}-.----`
+                    : formatCostIn(log.costCached || 0, { currency, rate, symbol, decimals: 4 })}
                 </span>
                 <PencilLine size={10} className="text-fuchsia-400" />
                 <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costCacheWrite === 0 ? '$-.----' : formatCost(log.costCacheWrite || 0)}
+                  {log.costCacheWrite === 0
+                    ? `${symbol}-.----`
+                    : formatCostIn(log.costCacheWrite || 0, {
+                        currency,
+                        rate,
+                        symbol,
+                        decimals: 4,
+                      })}
                 </span>
               </div>
             </div>

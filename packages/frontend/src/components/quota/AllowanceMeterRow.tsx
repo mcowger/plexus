@@ -2,6 +2,7 @@ import React from 'react';
 import { clsx } from 'clsx';
 import type { Meter, MeterStatus } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
+import { useCurrency } from '../../lib/CurrencyContext';
 
 interface AllowanceMeterRowProps {
   meter: Meter;
@@ -42,12 +43,15 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
   compact,
   onClick,
 }) => {
+  const { currency, rate, symbol } = useCurrency();
   const utilNum = typeof meter.utilizationPercent === 'number' ? meter.utilizationPercent : null;
   const pct = utilNum !== null ? Math.max(0, Math.min(100, utilNum)) : null;
   const period = periodLabel(meter);
 
   const remaining =
-    meter.remaining !== undefined ? formatMeterValue(meter.remaining, meter.unit, true) : undefined;
+    meter.remaining !== undefined
+      ? formatMeterValue(meter.remaining, meter.unit, true, { currency, rate, symbol })
+      : undefined;
 
   if (compact) {
     return (

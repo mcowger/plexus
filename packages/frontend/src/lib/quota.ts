@@ -1,6 +1,14 @@
 import type { QuotaStatusEntry } from './api';
-import { formatCost, formatNumber } from './format';
+import { formatCostIn, formatNumber, type FormatCostInOptions } from './format';
 import type { MeterStatus } from '../types/quota';
+
+type CostDisplayOptions = Pick<FormatCostInOptions, 'currency' | 'rate' | 'symbol'>;
+
+const DEFAULT_COST_DISPLAY: CostDisplayOptions = {
+  currency: 'USD',
+  rate: 1,
+  symbol: '$',
+};
 
 /**
  * Map a quota utilization percentage onto the progress-bar status colors
@@ -19,8 +27,14 @@ export function statusForPercent(pct: number): MeterStatus {
  * decimals (quota spend is often fractions of a cent); `tokens` and
  * `requests` reuse the compact number formatter.
  */
-export function formatQuotaValue(value: number, limitType: QuotaStatusEntry['limitType']): string {
-  return limitType === 'cost' ? formatCost(value, 5) : formatNumber(value);
+export function formatQuotaValue(
+  value: number,
+  limitType: QuotaStatusEntry['limitType'],
+  costDisplay: CostDisplayOptions = DEFAULT_COST_DISPLAY
+): string {
+  return limitType === 'cost'
+    ? formatCostIn(value, { ...costDisplay, decimals: 5 })
+    : formatNumber(value);
 }
 
 /** Most-constrained ranking now lives in @plexus/shared so the backend's

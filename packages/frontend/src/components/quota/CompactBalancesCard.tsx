@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
 import { getCheckerDisplayName } from './checker-presentation';
+import { useCurrency } from '../../lib/CurrencyContext';
 
 interface CompactBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
@@ -14,6 +15,7 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
   displayNameMap,
 }) => {
   const navigate = useNavigate();
+  const { currency, rate, symbol } = useCurrency();
 
   if (balanceQuotas.length === 0) return null;
 
@@ -39,7 +41,9 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
         const balanceMeter = quota.meters.find((m) => m.kind === 'balance');
         const remaining = balanceMeter?.remaining;
         const formattedBalance =
-          remaining !== undefined ? formatMeterValue(remaining, balanceMeter!.unit) : undefined;
+          remaining !== undefined
+            ? formatMeterValue(remaining, balanceMeter!.unit, false, { currency, rate, symbol })
+            : undefined;
 
         return (
           <div key={quota.checkerId} className="flex items-center justify-between min-w-0">
