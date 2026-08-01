@@ -64,6 +64,58 @@ Plexus uses **Pi Assistant** and **PR Agent** for automated coding assistance an
 - **Pi Assistant** (`.github/workflows/pi-assistant-issue.yml` and `.github/workflows/pi-assistant-pr.yml`): Triggered by commenting `/pi` on an issue or PR. It uses the `mcowger/pi-action` action to run an AI-agent-driven coding session directly in the repository context to address requested changes. System prompts live in `.github/prompts/pi-assistant-issue.md` and `.github/prompts/pi-assistant-pr.md`.
 - **PR Agent Review** (`.github/workflows/pr-agent-review.yml`): Triggered automatically when non-draft pull requests are opened/reopened/ready for review, or when comments are made. It performs thorough automated code reviews using the `the-pr-agent/pr-agent` action, configured via `.pr_agent.toml`.
 
+### Optional: advisory PR-Agent pre-push review (local)
+
+A `pre-push` Lefthook hook can run PR-Agent locally on the diff you are about
+to push, in **plain-diff mode** — it pipes a unified diff to PR-Agent's stdin,
+so it needs **no GitHub credentials and no PR URL**. The review is printed to
+your terminal and is purely advisory: the hook **always exits 0** and can never
+block a push. If PR-Agent isn't installed, its config is missing, or the LLM
+call fails, you just get a warning and the push proceeds.
+
+One-time setup (idempotent — safe to re-run), using mise-managed Python:
+
+```bash
+mise install             # installs the pinned Python 3.12 (and other tools)
+mise run pr-agent:setup  # creates .venv and pip-installs a pinned pr-agent
+```
+
+Equivalent explicit commands, if you prefer to do it by hand:
+
+```bash
+mise use python
+mise exec -- python -m venv .venv
+mise exec -- .venv/bin/python -m pip install pr-agent
+```
+
+Configuration is read from the repo's `.pr_agent.toml` plus environment
+variables — supply values in your shell profile or a local, git-ignored file.
+**Never commit keys or secrets.**
+
+| Variable | Purpose |
+|---|---|
+| `OPENAI__KEY` | API key for your LLM provider (not needed when `CONFIG__MODEL` points at a local model, e.g. Ollama) |
+| `OPENAI__API_BASE` | Optional endpoint override (proxy, Azure, or a local server) |
+| `CONFIG__MODEL` | Optional model override (defaults to the PR-Agent built-in default) |
+
+Plain-diff mode works fully offline from GitHub, but still requires an LLM:
+either a provider key (`OPENAI__KEY`) or a locally hosted model
+(`CONFIG__MODEL` + `OPENAI__API_BASE`, e.g. an OpenAI-compatible Ollama server).
+
+To run a review manually (no push needed), use the package script — it diffs
+`origin/HEAD...HEAD` by default, or any base you pass:
+
+```bash
+bun run review                # review origin/HEAD...HEAD
+bun run review origin/main    # review a custom base
+```
+
+Or invoke PR-Agent directly on any diff:
+
+```bash
+git diff origin/main...HEAD | .venv/bin/python -m pr_agent.cli --stdin review
+```
+
 ## Code Style
 
 All code must be formatted with Biome before committing:

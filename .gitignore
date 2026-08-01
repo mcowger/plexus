@@ -84,6 +84,9 @@ plexus
 .grepai/
 mise.local.toml
 
+# Local Python virtualenv for the advisory PR-Agent pre-push hook
+.venv/
+
 # Local raw Claude Code HTTP traces (contain auth tokens — never commit)
 claude1.txt
 claude2.txt

@@ -64,3 +64,24 @@ pre-commit:
     backend-tests:
       glob: "packages/backend/src/**"
       run: bun run test
+
+pre-push:
+  # Advisory-only hook — also skipped in CI (nothing local to review there).
+  skip:
+    - CI: "true"
+
+  # --- Advisory PR-Agent plain-diff review (NEVER blocks the push) ---------
+  # Reviews the diff being pushed relative to the upstream remote branch.
+  # Requires a one-time setup: mise run pr-agent:setup (see CONTRIBUTING.md).
+  # Always exits 0 — missing install/config/LLM key only prints a warning.
+  #
+  # Implemented as a lefthook *script* (not a command) because pre-push
+  # commands are skipped by lefthook whenever its @{push}-based file
+  # heuristic yields nothing — which is always the case for upstream-less
+  # branches/worktrees. Script jobs have no such gate.
+  scripts:
+    "pr-agent-review.sh":
+      runner: bash
+      skip:
+        - CI: "true"
+      use_stdin: true # forwards git's pre-push ref lines to the script
