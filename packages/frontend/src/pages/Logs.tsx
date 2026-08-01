@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -90,6 +90,37 @@ import geminiLogo from '../assets/gemini.svg';
 import responsesLogo from '../assets/responses.svg';
 
 const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
+const LIVE_DURATION_UPDATE_INTERVAL_MS = 500;
+const DESKTOP_LOGS_MEDIA_QUERY = '(min-width: 1024px)';
+
+interface ProgressUpdate {
+  requestId: string;
+  bytesReceived: number;
+  bytesPerSec: number | null;
+  isStreamed: boolean;
+  state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
+  elapsedMs: number;
+}
+
+const API_LOGOS: Record<string, string> = {
+  messages: messagesLogo,
+  antigravity: antigravityLogo,
+  chat: chatLogo,
+  gemini: geminiLogo,
+  responses: responsesLogo,
+  'openai-responses': responsesLogo,
+  // pi-ai/OAuth outgoing API types
+  'google-generative-ai': geminiLogo,
+  'openai-completions': chatLogo,
+  'anthropic-messages': messagesLogo,
+};
+
+const PI_AI_OUTGOING_TYPES = new Set([
+  'google-generative-ai',
+  'openai-completions',
+  'anthropic-messages',
+  'openai-responses',
+]);
 
 interface RetryAttemptDetail {
   index: number;
@@ -132,6 +163,37 @@ const getOffsetFromSearchParams = (searchParams: URLSearchParams) => {
   if (!Number.isFinite(parsedOffset) || parsedOffset < 0) return 0;
 
   return Math.floor(parsedOffset);
+};
+
+const formatDateSafely = (dateStr: string | undefined | null) => {
+  if (!dateStr) return { time: '-', date: '-' };
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return { time: 'Invalid', date: 'Date' };
+    return {
+      time: d.toLocaleTimeString(),
+      date: d.toISOString().split('T')[0],
+    };
+  } catch {
+    return { time: 'Error', date: 'Date' };
+  }
+};
+
+const useMediaQuery = (query: string) => {
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const updateMatches = () => setMatches(mediaQuery.matches);
+
+    updateMatches();
+    mediaQuery.addEventListener('change', updateMatches);
+    return () => mediaQuery.removeEventListener('change', updateMatches);
+  }, [query]);
+
+  return matches;
 };
 
 interface PaginationControlsProps {
@@ -183,6 +245,865 @@ const PaginationControls = ({
   </div>
 );
 
+interface LogRowProps {
+  log: UsageRecord;
+  isNewest: boolean;
+  liveNow?: number;
+  onError: (requestId: string) => void;
+  onDebug: (requestId: string) => void;
+}
+
+interface DesktopLogRowProps extends LogRowProps {
+  progress?: ProgressUpdate;
+  onRetryDetails: (log: UsageRecord) => void;
+  onDelete: (requestId: string) => void;
+}
+
+const MobileLogRow = React.memo(({ log, isNewest, onError, onDebug }: LogRowProps) => {
+  const formatted = formatDateSafely(log.date);
+  const totalTokens =
+    Number(log.tokensInput || 0) +
+    Number(log.tokensOutput || 0) +
+    Number(log.tokensCached || 0) +
+    Number(log.tokensCacheWrite || 0) +
+    Number(log.tokensReasoning || 0);
+  const e2eOutputTokens = Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
+  const status = log.responseStatus || (log.hasError ? 'error' : 'unknown');
+  const statusClass =
+    status === 'success'
+      ? 'border-success/30 bg-emerald-500/15 text-success'
+      : status === 'pending'
+        ? 'border-warning/30 bg-yellow-500/15 text-warning'
+        : status === 'cancelled'
+          ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
+          : status === 'timeout'
+            ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
+            : 'border-danger/30 bg-red-500/15 text-danger';
+
+  return (
+    <article
+      className={clsx(
+        'rounded-lg border border-border-glass bg-bg-card p-2 shadow-sm',
+        isNewest && 'animate-slide-in',
+        log.responseStatus === 'pending' && 'bg-yellow-500/5'
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-mono text-[11px] font-medium text-text">
+            {formatted.time} <span className="text-[10px] text-text-muted">{formatted.date}</span>
+          </div>
+        </div>
+        <span
+          className={clsx(
+            'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold capitalize',
+            statusClass
+          )}
+        >
+          {status === 'success' ? (
+            <CheckCircle size={10} />
+          ) : status === 'pending' ? (
+            <Plane size={10} className="animate-pulse" />
+          ) : status === 'cancelled' ? (
+            <Ban size={10} />
+          ) : status === 'timeout' ? (
+            <Timer size={10} />
+          ) : (
+            <XCircle size={10} />
+          )}
+          {status}
+        </span>
+      </div>
+
+      <div className="mt-1.5 space-y-1.5">
+        <div className="min-w-0">
+          <div className="truncate text-xs font-medium text-text">
+            {log.incomingModelAlias || '-'}
+            <span className="font-normal text-text-secondary">
+              {' '}
+              · {log.provider || '-'}:{log.selectedModelName || '-'}
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-1 text-[11px]">
+          <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+            <div className="truncate text-text">
+              <span className="text-[9px] uppercase text-text-muted">Key </span>
+              {log.apiKey || '-'}
+            </div>
+          </div>
+          <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+            <div className="flex items-center gap-1 text-text">
+              <div className="flex w-4 shrink-0 justify-center">
+                {log.incomingApiType === 'raw' ? (
+                  <Braces size={16} className="text-cyan-400" />
+                ) : log.incomingApiType === 'embeddings' ? (
+                  <Variable size={14} className="text-green-500" />
+                ) : log.incomingApiType === 'transcriptions' ? (
+                  <AudioLines size={14} className="text-purple-500" />
+                ) : log.incomingApiType === 'speech' ? (
+                  <Volume2 size={14} className="text-orange-500" />
+                ) : log.incomingApiType === 'images' ? (
+                  <ImageIcon size={14} className="text-fuchsia-500" />
+                ) : log.incomingApiType === 'oauth' ? (
+                  <ShieldCheck size={14} className="text-emerald-500" />
+                ) : log.incomingApiType && API_LOGOS[getApiBaseType(log.incomingApiType)] ? (
+                  <img
+                    src={API_LOGOS[getApiBaseType(log.incomingApiType)]}
+                    alt={formatApiTypeLabel(log.incomingApiType)}
+                    title={formatApiTypeLabel(log.incomingApiType)}
+                    className="h-3.5 w-3.5"
+                  />
+                ) : (
+                  <span className="text-[10px] text-text-muted">?</span>
+                )}
+              </div>
+              <span className="text-[10px] text-text-muted">→</span>
+              <div className="flex w-4 shrink-0 justify-center">
+                {log.outgoingApiType === 'raw' ? (
+                  <Braces size={16} className="text-cyan-400" />
+                ) : log.outgoingApiType === 'embeddings' ? (
+                  <Variable size={14} className="text-green-500" />
+                ) : log.outgoingApiType === 'transcriptions' ? (
+                  <AudioLines size={14} className="text-purple-500" />
+                ) : log.outgoingApiType === 'speech' ? (
+                  <Volume2 size={14} className="text-orange-500" />
+                ) : log.outgoingApiType === 'images' ? (
+                  <ImageIcon size={14} className="text-fuchsia-500" />
+                ) : log.outgoingApiType === 'oauth' ? (
+                  <ShieldCheck size={14} className="text-emerald-500" />
+                ) : log.outgoingApiType && API_LOGOS[getApiBaseType(log.outgoingApiType)] ? (
+                  <img
+                    src={API_LOGOS[getApiBaseType(log.outgoingApiType)]}
+                    alt={formatApiTypeLabel(log.outgoingApiType)}
+                    title={formatApiTypeLabel(log.outgoingApiType)}
+                    className="h-3.5 w-3.5"
+                  />
+                ) : (
+                  <span className="text-[10px] text-text-muted">?</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+            <div className="truncate text-text">
+              <span className="text-[9px] uppercase text-text-muted">Tok </span>
+              {formatLargeNumber(totalTokens)}
+            </div>
+          </div>
+          <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+            <div className="truncate text-text">
+              <span className="text-[9px] uppercase text-text-muted">Cost </span>
+              {log.costTotal == null || log.costTotal === 0 ? '-' : formatCost(log.costTotal)}
+            </div>
+          </div>
+          <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+            <div className="truncate text-text">
+              <span className="text-[9px] uppercase text-text-muted">E2E </span>
+              {log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0
+                ? formatTPS(e2eOutputTokens / (log.durationMs / 1000))
+                : '-'}
+            </div>
+          </div>
+          <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
+            <div className="truncate text-text">
+              <span className="text-[9px] uppercase text-text-muted">Meta </span>
+              {(log.messageCount || 0) === 0 ? '-' : log.messageCount} msg /{' '}
+              {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount} tools
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {(log.hasError || log.hasDebug) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {log.hasError && (
+            <Button size="sm" variant="danger" onClick={() => onError(log.requestId)}>
+              <AlertTriangle size={12} />
+              Error
+            </Button>
+          )}
+          {log.hasDebug && (
+            <Button size="sm" variant="secondary" onClick={() => onDebug(log.requestId)}>
+              <Bug size={12} />
+              Debug
+            </Button>
+          )}
+        </div>
+      )}
+    </article>
+  );
+});
+
+const DesktopLogRow = React.memo(
+  ({
+    log,
+    isNewest,
+    liveNow,
+    progress,
+    onError,
+    onDebug,
+    onRetryDetails,
+    onDelete,
+  }: DesktopLogRowProps) => {
+    return (
+      <tr
+        className={clsx(
+          'group border-b border-border-glass hover:bg-bg-hover',
+          isNewest && 'animate-slide-in'
+        )}
+        style={{
+          height: '86px',
+          backgroundColor: log.responseStatus === 'pending' ? 'rgba(234, 179, 8, 0.08)' : undefined,
+        }}
+      >
+        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {(() => {
+              const formatted = formatDateSafely(log.date);
+              return (
+                <>
+                  <span style={{ fontWeight: '500' }}>{formatted.time}</span>
+                  <span
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      fontSize: '0.85em',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {formatted.date}
+                  </span>
+                </>
+              );
+            })()}
+          </div>
+        </td>
+        <td
+          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
+          style={log.sourceIp ? { cursor: 'help' } : undefined}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: '500' }}>{log.apiKey || '-'}</span>
+            {log.attribution && (
+              <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                {log.attribution}
+              </span>
+            )}
+          </div>
+        </td>
+        <td
+          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          title={`Incoming: ${formatApiTypeLabel(log.incomingApiType)} → Outgoing: ${formatApiTypeLabel(log.outgoingApiType)} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isRaw ? `Raw ${log.requestMethod || ''} ${log.requestPath || ''}` : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
+          style={{ cursor: 'help' }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {/* API type icons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                {log.incomingApiType === 'embeddings' ? (
+                  <Variable size={16} className="text-green-500" />
+                ) : log.incomingApiType === 'transcriptions' ? (
+                  <AudioLines size={16} className="text-purple-500" />
+                ) : log.incomingApiType === 'speech' ? (
+                  <Volume2 size={16} className="text-orange-500" />
+                ) : log.incomingApiType === 'images' ? (
+                  <ImageIcon size={16} className="text-fuchsia-500" />
+                ) : log.incomingApiType === 'oauth' ? (
+                  <ShieldCheck size={16} className="text-emerald-500" />
+                ) : log.incomingApiType && API_LOGOS[getApiBaseType(log.incomingApiType)] ? (
+                  <img
+                    src={API_LOGOS[getApiBaseType(log.incomingApiType)]}
+                    alt={formatApiTypeLabel(log.incomingApiType)}
+                    title={formatApiTypeLabel(log.incomingApiType)}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                ) : (
+                  '?'
+                )}
+              </div>
+              <span style={{ width: '14px', textAlign: 'center' }}>→</span>
+              <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                {log.outgoingApiType === 'embeddings' ? (
+                  <Variable size={16} className="text-green-500" />
+                ) : log.outgoingApiType === 'transcriptions' ? (
+                  <AudioLines size={16} className="text-purple-500" />
+                ) : log.outgoingApiType === 'speech' ? (
+                  <Volume2 size={16} className="text-orange-500" />
+                ) : log.outgoingApiType === 'images' ? (
+                  <ImageIcon size={16} className="text-fuchsia-500" />
+                ) : log.outgoingApiType === 'oauth' ? (
+                  <ShieldCheck size={16} className="text-emerald-500" />
+                ) : log.outgoingApiType && API_LOGOS[getApiBaseType(log.outgoingApiType)] ? (
+                  <img
+                    src={API_LOGOS[getApiBaseType(log.outgoingApiType)]}
+                    alt={formatApiTypeLabel(log.outgoingApiType)}
+                    title={formatApiTypeLabel(log.outgoingApiType)}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                ) : (
+                  '?'
+                )}
+              </div>
+            </div>
+            <div
+              style={{
+                borderTop: '1px solid var(--color-border-glass)',
+                margin: '1px 4px',
+                width: '44px',
+              }}
+            ></div>
+            {/* Streaming/Passthrough icons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                {log.isStreamed ? (
+                  <Zap size={12} className="text-blue-400" />
+                ) : (
+                  <ZapOff size={12} className="text-gray-400" />
+                )}
+              </div>
+              <span style={{ width: '14px' }}></span>
+              <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                {log.isRaw ? (
+                  <Braces size={12} className="text-cyan-400" />
+                ) : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
+                  <Pi size={12} className="text-emerald-400" />
+                ) : log.isPassthrough ? (
+                  <MoveHorizontal size={12} className="text-yellow-500" />
+                ) : (
+                  <Languages size={12} className="text-purple-400" />
+                )}
+              </div>
+            </div>
+
+            {/* Vision Fallthrough icons */}
+            {(log.isVisionFallthrough || log.isDescriptorRequest) && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  marginTop: '2px',
+                }}
+              >
+                <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                  {log.isVisionFallthrough && (
+                    <div
+                      title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}
+                    >
+                      <ScanSearch size={12} className="text-amber-500" />
+                    </div>
+                  )}
+                </div>
+                <span style={{ width: '14px' }}></span>
+                <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                  {log.isDescriptorRequest && (
+                    <div title="Descriptor Request (Generated image description)">
+                      <Eye size={12} className="text-blue-500" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div className="group/model flex items-center gap-1">
+              <span>{log.incomingModelAlias || '-'}</span>
+              {log.incomingModelAlias && log.incomingModelAlias !== '-' && (
+                <button
+                  onClick={async () => {
+                    if (!isClipboardAvailable()) return;
+                    await copyToClipboard(log.incomingModelAlias || '');
+                  }}
+                  className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                  title={
+                    isClipboardAvailable() ? 'Copy incoming model alias' : 'Copy requires HTTPS'
+                  }
+                  disabled={!isClipboardAvailable()}
+                >
+                  <Copy size={12} className="text-text-secondary hover:text-text" />
+                </button>
+              )}
+            </div>
+            <div className="group/selected flex items-center gap-1">
+              <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>
+                {log.provider || '-'}:{log.selectedModelName || '-'}
+              </span>
+              {log.selectedModelName && log.selectedModelName !== '-' && (
+                <button
+                  onClick={async () => {
+                    if (!isClipboardAvailable()) return;
+                    await copyToClipboard(log.selectedModelName || '');
+                  }}
+                  className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                  title={
+                    isClipboardAvailable() ? 'Copy selected model name' : 'Copy requires HTTPS'
+                  }
+                  disabled={!isClipboardAvailable()}
+                >
+                  <Copy size={10} className="text-text-secondary hover:text-text" />
+                </button>
+              )}
+            </div>
+            {log.isVisionFallthrough && log.visionFallthroughModel && (
+              <div
+                className="group/vft flex items-center gap-1"
+                title="Vision fallthrough descriptor model"
+              >
+                <ScanSearch size={10} className="text-amber-500 shrink-0" />
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}>
+                  {log.visionFallthroughModel}
+                </span>
+                <button
+                  onClick={async () => {
+                    if (!isClipboardAvailable()) return;
+                    await copyToClipboard(log.visionFallthroughModel || '');
+                  }}
+                  className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                  title={
+                    isClipboardAvailable() ? 'Copy fallthrough model name' : 'Copy requires HTTPS'
+                  }
+                  disabled={!isClipboardAvailable()}
+                >
+                  <Copy size={10} className="text-text-secondary hover:text-text" />
+                </button>
+              </div>
+            )}
+          </div>
+        </td>
+        <td
+          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)} • Cache Write: ${(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
+          style={{ cursor: 'help' }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {/* Row 1: Input and Reasoning */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CloudUpload size={12} className="text-blue-400" />
+                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}>
+                  {(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)}
+                  {log.tokensEstimated ? (
+                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                  ) : null}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <BrainCog size={12} className="text-purple-400" />
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    minWidth: '30px',
+                  }}
+                >
+                  {(log.tokensReasoning || 0) === 0
+                    ? '-'
+                    : formatLargeNumber(log.tokensReasoning || 0)}
+                  {log.tokensEstimated ? (
+                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+            {/* Row 2: Output and Cache */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CloudDownload size={12} className="text-green-400" />
+                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}>
+                  {(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)}
+                  {log.tokensEstimated ? (
+                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                  ) : null}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <PackageOpen size={12} className="text-orange-400" />
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    minWidth: '30px',
+                  }}
+                >
+                  {(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}
+                  {log.tokensEstimated ? (
+                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+            {/* Row 3: Cache Write */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <PencilLine size={12} className="text-fuchsia-400" />
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    minWidth: '30px',
+                  }}
+                >
+                  {(log.tokensCacheWrite || 0) === 0
+                    ? '-'
+                    : formatLargeNumber(log.tokensCacheWrite || 0)}
+                  {log.tokensEstimated ? (
+                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle">
+          {log.costTotal !== undefined && log.costTotal !== null ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {/* Row 1: Total cost */}
+              <div>
+                {log.costSource ? (
+                  <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
+                    <span style={{ fontWeight: '500', cursor: 'help' }}>
+                      {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
+                    </span>
+                  </CostToolTip>
+                ) : (
+                  <span style={{ fontWeight: '500' }}>
+                    {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
+                  </span>
+                )}
+              </div>
+              {/* Separator */}
+              <div
+                style={{
+                  borderTop: '1px solid var(--color-border-glass)',
+                  margin: '1px 2px',
+                }}
+              />
+              {/* Breakdown grid: 2 rows x 4 columns (icon, value, icon, value) */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr auto 1fr',
+                  gap: '2px 4px',
+                  alignItems: 'center',
+                }}
+              >
+                <CloudUpload size={10} className="text-blue-400" />
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                  {log.costInput === 0 ? '$-.----' : formatCost(log.costInput || 0)}
+                </span>
+                <CloudDownload size={10} className="text-green-400" />
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                  {log.costOutput === 0 ? '$-.----' : formatCost(log.costOutput || 0)}
+                </span>
+                <PackageOpen size={10} className="text-orange-400" />
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                  {log.costCached === 0 ? '$-.----' : formatCost(log.costCached || 0)}
+                </span>
+                <PencilLine size={10} className="text-fuchsia-400" />
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                  {log.costCacheWrite === 0 ? '$-.----' : formatCost(log.costCacheWrite || 0)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <span
+              style={{
+                color: 'var(--color-text-secondary)',
+                fontSize: '1.2em',
+                display: 'block',
+                textAlign: 'center',
+              }}
+            >
+              -
+            </span>
+          )}
+        </td>
+        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+          {(() => {
+            const rawDurationMs =
+              log.durationMs != null && log.durationMs > 0
+                ? log.durationMs
+                : log.responseStatus === 'pending' && liveNow != null
+                  ? liveNow - log.startTime
+                  : null;
+            const liveDuration = rawDurationMs != null ? formatMs(rawDurationMs) : '-';
+            const e2eOutputTokens =
+              Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
+            // End-to-end throughput: output plus reasoning tokens / full request duration.
+            // Unlike TPS (which excludes the TTFT delay), E2E includes it.
+            const e2e =
+              log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0
+                ? e2eOutputTokens / (log.durationMs / 1000)
+                : null;
+            if (progress) {
+              const bytesPerToken = getEstimatedBytesPerToken({
+                ...log,
+                isStreamed: progress.isStreamed,
+              });
+              const effectiveBytesPerSec =
+                progress.bytesPerSec != null && progress.bytesPerSec > 0
+                  ? progress.bytesPerSec
+                  : progress.elapsedMs > 0 && progress.bytesReceived > 0
+                    ? (progress.bytesReceived / progress.elapsedMs) * 1000
+                    : null;
+              const estTokensPerSec =
+                effectiveBytesPerSec != null &&
+                Number.isFinite(effectiveBytesPerSec) &&
+                effectiveBytesPerSec > 0
+                  ? effectiveBytesPerSec / bytesPerToken
+                  : null;
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span>Duration: {liveDuration}</span>
+                  <span
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      fontSize: '0.85em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <CloudDownload size={12} className="text-yellow-400" />
+                    <span>{formatBytes(progress.bytesReceived)}</span>
+                  </span>
+                  {progress.bytesPerSec != null && (
+                    <span
+                      style={{
+                        color: 'var(--color-text-secondary)',
+                        fontSize: '0.85em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Gauge size={12} className="text-text-secondary" />
+                      {formatBytes(progress.bytesPerSec)}/s
+                    </span>
+                  )}
+                  {estTokensPerSec != null && (
+                    <span
+                      style={{
+                        color: 'var(--color-text-secondary)',
+                        fontSize: '0.85em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                      title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token accounting for SSE + JSON framing)`}
+                    >
+                      <Zap size={12} className="text-amber-400" />
+                      <span>~{formatTPS(estTokensPerSec)} tok/s</span>
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span>Duration: {liveDuration}</span>
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : ''}
+                </span>
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {log.tokensPerSec && log.tokensPerSec > 0
+                    ? `TPS: ${formatTPS(log.tokensPerSec)}`
+                    : ''}
+                </span>
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {e2e != null ? `E2E: ${formatTPS(e2e)}` : ''}
+                </span>
+              </div>
+            );
+          })()}
+        </td>
+        <td
+          className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
+          title={
+            log.kwhUsed != null && log.kwhUsed > 0
+              ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${formatSlices(log.kwhUsed / KWH_PER_SLICE)} toast slices`
+              : undefined
+          }
+          style={log.kwhUsed != null && log.kwhUsed > 0 ? { cursor: 'help' } : undefined}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {/* Row 1: Messages and Tool calls */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="text-blue-400"
+              >
+                <MessagesSquare size={12} />
+                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
+                  {(log.messageCount || 0) === 0 ? '-' : log.messageCount}
+                </span>
+              </div>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="text-green-400"
+              >
+                <PlugZap size={12} />
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    minWidth: '20px',
+                  }}
+                >
+                  {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount}
+                </span>
+              </div>
+            </div>
+            {/* Row 2: Tools defined and Finish reason */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                className="text-orange-400"
+              >
+                <Wrench size={12} />
+                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
+                  {(log.toolsDefined || 0) === 0 ? '-' : log.toolsDefined}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {log.finishReason === 'end_turn' ? (
+                  <CirclePause size={12} className="text-yellow-500" />
+                ) : log.finishReason === 'stop' ? (
+                  <Octagon size={12} className="text-red-500" />
+                ) : log.finishReason === 'tool_calls' ? (
+                  <Hammer size={12} className="text-purple-500" />
+                ) : log.finishReason === 'length' || log.finishReason === 'max_tokens' ? (
+                  <RulerDimensionLine size={12} className="text-pink-400" />
+                ) : (
+                  <ChevronDown size={12} className="text-gray-400" />
+                )}
+                <span
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.85em',
+                    minWidth: '20px',
+                  }}
+                >
+                  {log.finishReason || '-'}
+                </span>
+              </div>
+            </div>
+            {/* Row 3: Retry indicator */}
+            {log.attemptCount && log.attemptCount > 1 && (
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => onRetryDetails(log)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                  className="text-orange-500 bg-transparent border-0 p-0 cursor-pointer hover:text-orange-400 transition-colors"
+                  title="View retry history"
+                >
+                  <RotateCcw size={12} />
+                  <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
+                    {log.attemptCount}x
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+          <div className="flex gap-2 items-center">
+            {log.hasError && (
+              <button
+                onClick={() => onError(log.requestId)}
+                className={clsx(
+                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border',
+                  'text-danger border-danger/30 bg-red-500/15 hover:bg-red-500/25'
+                )}
+                style={{ width: '52px' }}
+                title="View Error Details"
+              >
+                <AlertTriangle size={12} />
+                <span style={{ fontWeight: 600 }}>✗</span>
+              </button>
+            )}
+            {log.hasDebug && (
+              <button
+                onClick={() => onDebug(log.requestId)}
+                className={clsx(
+                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border',
+                  'text-blue-400 border-blue-400/30 bg-blue-500/15 hover:bg-blue-500/25'
+                )}
+                style={{ width: '52px' }}
+                title="View Debug Trace"
+              >
+                <Bug size={12} />
+                <span style={{ fontWeight: 600 }}>✓</span>
+              </button>
+            )}
+            {!log.hasError && !log.hasDebug && (
+              <div
+                className={clsx(
+                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                  log.responseStatus === 'success'
+                    ? 'text-success border-success/30 bg-emerald-500/15'
+                    : log.responseStatus === 'pending'
+                      ? 'text-warning border-warning/30 bg-yellow-500/15'
+                      : log.responseStatus === 'cancelled'
+                        ? 'text-blue-400 border-blue-400/30 bg-blue-500/15'
+                        : log.responseStatus === 'timeout'
+                          ? 'text-orange-400 border-orange-400/30 bg-orange-500/15'
+                          : 'text-danger border-danger/30 bg-red-500/15'
+                )}
+                style={{ width: '52px' }}
+              >
+                {log.responseStatus === 'success' ? (
+                  <CheckCircle size={12} />
+                ) : log.responseStatus === 'pending' ? (
+                  <Plane size={12} className="animate-pulse" />
+                ) : log.responseStatus === 'cancelled' ? (
+                  <Ban size={12} />
+                ) : log.responseStatus === 'timeout' ? (
+                  <Timer size={12} />
+                ) : (
+                  <XCircle size={12} />
+                )}
+              </div>
+            )}
+          </div>
+        </td>
+        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+          <button
+            onClick={() => onDelete(log.requestId)}
+            className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
+            title="Delete log"
+          >
+            <Trash2 size={14} />
+          </button>
+        </td>
+      </tr>
+    );
+  }
+);
+
 export const Logs = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -203,26 +1124,6 @@ export const Logs = () => {
     endDate: '',
   });
 
-  const apiLogos: Record<string, string> = {
-    messages: messagesLogo,
-    antigravity: antigravityLogo,
-    chat: chatLogo,
-    gemini: geminiLogo,
-    responses: responsesLogo,
-    'openai-responses': responsesLogo,
-    // pi-ai/OAuth outgoing API types
-    'google-generative-ai': geminiLogo,
-    'openai-completions': chatLogo,
-    'anthropic-messages': messagesLogo,
-  };
-
-  const PI_AI_OUTGOING_TYPES = new Set([
-    'google-generative-ai',
-    'openai-completions',
-    'anthropic-messages',
-    'openai-responses',
-  ]);
-
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteMode, setDeleteMode] = useState<'all' | 'older'>('older');
@@ -236,6 +1137,7 @@ export const Logs = () => {
   const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
 
   const filtersRef = useRef(filters);
+  const seenRequestIdsRef = useRef<Set<string>>(new Set());
   // sseConnected tracks whether the live-update SSE stream is currently active.
   // Used to stop the liveTick timer when the stream drops so duration counters freeze.
   const sseConnected = useRef(false);
@@ -248,29 +1150,25 @@ export const Logs = () => {
     filtersRef.current = filters;
   }, [filters]);
 
-  interface ProgressUpdate {
-    requestId: string;
-    bytesReceived: number;
-    bytesPerSec: number | null;
-    isStreamed: boolean;
-    state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
-    elapsedMs: number;
-  }
-
   const progressMapRef = useRef<Map<string, ProgressUpdate>>(new Map());
+  const progressFrameRef = useRef<number | null>(null);
   // progressTick is incremented to trigger re-renders when progress data changes.
   // The value itself is intentionally unused; only the setter is called.
   const [, setProgressTick] = useState(0);
-  // liveTick triggers re-renders every 100ms so pending-request durations update live.
   const [, setLiveTick] = useState(0);
+  const hasUnfrozenPendingLogs = logs.some(
+    (log) => log.responseStatus === 'pending' && log.durationMs == null
+  );
+  const isDesktop = useMediaQuery(DESKTOP_LOGS_MEDIA_QUERY);
 
   useEffect(() => {
-    // Only tick while the SSE stream is active so duration counters freeze when it drops.
+    if (sseStatus !== 'connected' || !hasUnfrozenPendingLogs) return;
+
     const interval = setInterval(() => {
-      if (sseConnected.current) setLiveTick((t) => t + 1);
-    }, 100);
+      setLiveTick((tick) => tick + 1);
+    }, LIVE_DURATION_UPDATE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [hasUnfrozenPendingLogs, sseStatus]);
 
   useEffect(() => {
     const nextOffset = getOffsetFromSearchParams(searchParams);
@@ -302,6 +1200,7 @@ export const Logs = () => {
       if (filters.endDate) cleanFilters.endDate = new Date(filters.endDate).toISOString();
 
       const res = await api.getLogs(limit, offset, cleanFilters, sortBy, sortDir);
+      seenRequestIdsRef.current = new Set(res.data.map((log) => log.requestId));
       setLogs(res.data);
       setTotal(Number(res.total) || 0);
     } catch (e) {
@@ -332,15 +1231,22 @@ export const Logs = () => {
     }
   };
 
-  const handleDelete = (requestId: string) => {
-    setSelectedLogIdForDelete(requestId);
-    setIsSingleDeleteModalOpen(true);
-  };
-
-  const handleRetryDetails = (log: UsageRecord) => {
+  const handleError = useCallback(
+    (requestId: string) => navigate('/errors', { state: { requestId } }),
+    [navigate]
+  );
+  const handleDebug = useCallback(
+    (requestId: string) => navigate('/debug', { state: { requestId } }),
+    [navigate]
+  );
+  const handleRetryDetailsMemo = useCallback((log: UsageRecord) => {
     setSelectedRetryLog(log);
     setIsRetryModalOpen(true);
-  };
+  }, []);
+  const handleDeleteMemo = useCallback((requestId: string) => {
+    setSelectedLogIdForDelete(requestId);
+    setIsSingleDeleteModalOpen(true);
+  }, []);
 
   const confirmDeleteSingle = async () => {
     if (!selectedLogIdForDelete) return;
@@ -348,6 +1254,7 @@ export const Logs = () => {
     try {
       await api.deleteUsageLog(selectedLogIdForDelete);
       setLogs(logs.filter((l) => l.requestId !== selectedLogIdForDelete));
+      seenRequestIdsRef.current.delete(selectedLogIdForDelete);
       setTotal((prev) => Math.max(0, prev - 1));
       setIsSingleDeleteModalOpen(false);
       setSelectedLogIdForDelete(null);
@@ -460,7 +1367,12 @@ export const Logs = () => {
               try {
                 const update: ProgressUpdate = JSON.parse(eventData);
                 progressMapRef.current.set(update.requestId, update);
-                setProgressTick((t) => t + 1);
+                if (progressFrameRef.current == null) {
+                  progressFrameRef.current = requestAnimationFrame(() => {
+                    progressFrameRef.current = null;
+                    setProgressTick((tick) => tick + 1);
+                  });
+                }
               } catch {
                 // ignore malformed progress events
               }
@@ -512,6 +1424,8 @@ export const Logs = () => {
                   if (eventType === 'completed') {
                     progressMapRef.current.delete(newLog.requestId);
                   }
+                  const isNewRequest = !seenRequestIdsRef.current.has(newLog.requestId);
+                  seenRequestIdsRef.current.add(newLog.requestId);
                   setLogs((prev) => {
                     const existingIndex = prev.findIndex((l) => l.requestId === newLog.requestId);
                     if (existingIndex >= 0) {
@@ -525,7 +1439,7 @@ export const Logs = () => {
                     if (updated.length > limit) return updated.slice(0, limit);
                     return updated;
                   });
-                  setTotal((prev) => Number(prev) + 1);
+                  if (isNewRequest) setTotal((prev) => Number(prev) + 1);
                   setNewestLogId(newLog.requestId);
                 }
               } catch (e) {
@@ -605,6 +1519,10 @@ export const Logs = () => {
     });
 
     return () => {
+      if (progressFrameRef.current != null) {
+        cancelAnimationFrame(progressFrameRef.current);
+        progressFrameRef.current = null;
+      }
       sseConnected.current = false;
       setSseStatus('disconnected');
       controller.abort();
@@ -673,20 +1591,7 @@ export const Logs = () => {
 
   const totalPages = Math.ceil(total / limit);
   const currentPage = Math.floor(offset / limit) + 1;
-
-  const formatDateSafely = (dateStr: string | undefined | null) => {
-    if (!dateStr) return { time: '-', date: '-' };
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return { time: 'Invalid', date: 'Date' };
-      return {
-        time: d.toLocaleTimeString(),
-        date: d.toISOString().split('T')[0],
-      };
-    } catch (e) {
-      return { time: 'Error', date: 'Date' };
-    }
-  };
+  const liveNow = hasUnfrozenPendingLogs ? Date.now() : undefined;
 
   const selectedRetryHistory = parseRetryHistory(selectedRetryLog?.retryHistory);
   const showLiveStatus = !!adminKey && offset === 0 && sortBy === 'date' && sortDir === 'desc';
@@ -838,1003 +1743,118 @@ export const Logs = () => {
             onOffsetChange={updateOffset}
           />
 
-          <div className="space-y-1.5 p-2 lg:hidden">
-            {loading ? (
-              <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
-                Loading...
-              </div>
-            ) : logs.length === 0 ? (
-              <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
-                No logs found
-              </div>
-            ) : (
-              logs.map((log) => {
-                const formatted = formatDateSafely(log.date);
-                const totalTokens =
-                  Number(log.tokensInput || 0) +
-                  Number(log.tokensOutput || 0) +
-                  Number(log.tokensCached || 0) +
-                  Number(log.tokensCacheWrite || 0) +
-                  Number(log.tokensReasoning || 0);
-                const e2eOutputTokens =
-                  Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
-                const status = log.responseStatus || (log.hasError ? 'error' : 'unknown');
-                const statusClass =
-                  status === 'success'
-                    ? 'border-success/30 bg-emerald-500/15 text-success'
-                    : status === 'pending'
-                      ? 'border-warning/30 bg-yellow-500/15 text-warning'
-                      : status === 'cancelled'
-                        ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
-                        : status === 'timeout'
-                          ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
-                          : 'border-danger/30 bg-red-500/15 text-danger';
-
-                return (
-                  <article
-                    key={log.requestId}
-                    className={clsx(
-                      'rounded-lg border border-border-glass bg-bg-card p-2 shadow-sm',
-                      log.requestId === newestLogId && 'animate-slide-in',
-                      log.responseStatus === 'pending' && 'bg-yellow-500/5'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-mono text-[11px] font-medium text-text">
-                          {formatted.time}{' '}
-                          <span className="text-[10px] text-text-muted">{formatted.date}</span>
-                        </div>
-                      </div>
-                      <span
-                        className={clsx(
-                          'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold capitalize',
-                          statusClass
-                        )}
-                      >
-                        {status === 'success' ? (
-                          <CheckCircle size={10} />
-                        ) : status === 'pending' ? (
-                          <Plane size={10} className="animate-pulse" />
-                        ) : status === 'cancelled' ? (
-                          <Ban size={10} />
-                        ) : status === 'timeout' ? (
-                          <Timer size={10} />
-                        ) : (
-                          <XCircle size={10} />
-                        )}
-                        {status}
-                      </span>
-                    </div>
-
-                    <div className="mt-1.5 space-y-1.5">
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-medium text-text">
-                          {log.incomingModelAlias || '-'}
-                          <span className="font-normal text-text-secondary">
-                            {' '}
-                            · {log.provider || '-'}:{log.selectedModelName || '-'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1 text-[11px]">
-                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">Key </span>
-                            {log.apiKey || '-'}
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="flex items-center gap-1 text-text">
-                            <div className="flex w-4 shrink-0 justify-center">
-                              {log.incomingApiType === 'raw' ? (
-                                <Braces size={16} className="text-cyan-400" />
-                              ) : log.incomingApiType === 'embeddings' ? (
-                                <Variable size={14} className="text-green-500" />
-                              ) : log.incomingApiType === 'transcriptions' ? (
-                                <AudioLines size={14} className="text-purple-500" />
-                              ) : log.incomingApiType === 'speech' ? (
-                                <Volume2 size={14} className="text-orange-500" />
-                              ) : log.incomingApiType === 'images' ? (
-                                <ImageIcon size={14} className="text-fuchsia-500" />
-                              ) : log.incomingApiType === 'oauth' ? (
-                                <ShieldCheck size={14} className="text-emerald-500" />
-                              ) : log.incomingApiType &&
-                                apiLogos[getApiBaseType(log.incomingApiType)] ? (
-                                <img
-                                  src={apiLogos[getApiBaseType(log.incomingApiType)]}
-                                  alt={formatApiTypeLabel(log.incomingApiType)}
-                                  title={formatApiTypeLabel(log.incomingApiType)}
-                                  className="h-3.5 w-3.5"
-                                />
-                              ) : (
-                                <span className="text-[10px] text-text-muted">?</span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-text-muted">→</span>
-                            <div className="flex w-4 shrink-0 justify-center">
-                              {log.outgoingApiType === 'raw' ? (
-                                <Braces size={16} className="text-cyan-400" />
-                              ) : log.outgoingApiType === 'embeddings' ? (
-                                <Variable size={14} className="text-green-500" />
-                              ) : log.outgoingApiType === 'transcriptions' ? (
-                                <AudioLines size={14} className="text-purple-500" />
-                              ) : log.outgoingApiType === 'speech' ? (
-                                <Volume2 size={14} className="text-orange-500" />
-                              ) : log.outgoingApiType === 'images' ? (
-                                <ImageIcon size={14} className="text-fuchsia-500" />
-                              ) : log.outgoingApiType === 'oauth' ? (
-                                <ShieldCheck size={14} className="text-emerald-500" />
-                              ) : log.outgoingApiType &&
-                                apiLogos[getApiBaseType(log.outgoingApiType)] ? (
-                                <img
-                                  src={apiLogos[getApiBaseType(log.outgoingApiType)]}
-                                  alt={formatApiTypeLabel(log.outgoingApiType)}
-                                  title={formatApiTypeLabel(log.outgoingApiType)}
-                                  className="h-3.5 w-3.5"
-                                />
-                              ) : (
-                                <span className="text-[10px] text-text-muted">?</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">Tok </span>
-                            {formatLargeNumber(totalTokens)}
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">Cost </span>
-                            {log.costTotal == null || log.costTotal === 0
-                              ? '-'
-                              : formatCost(log.costTotal)}
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">E2E </span>
-                            {log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0
-                              ? formatTPS(e2eOutputTokens / (log.durationMs / 1000))
-                              : '-'}
-                          </div>
-                        </div>
-                        <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
-                          <div className="truncate text-text">
-                            <span className="text-[9px] uppercase text-text-muted">Meta </span>
-                            {(log.messageCount || 0) === 0 ? '-' : log.messageCount} msg /{' '}
-                            {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount} tools
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(log.hasError || log.hasDebug) && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {log.hasError && (
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() =>
-                              navigate('/errors', { state: { requestId: log.requestId } })
-                            }
-                          >
-                            <AlertTriangle size={12} />
-                            Error
-                          </Button>
-                        )}
-                        {log.hasDebug && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() =>
-                              navigate('/debug', { state: { requestId: log.requestId } })
-                            }
-                          >
-                            <Bug size={12} />
-                            Debug
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                );
-              })
-            )}
-          </div>
-
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full border-collapse font-body text-[13px]">
-              <thead>
-                <tr className="text-center border-b border-border">
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Date', 'date')}
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Key', 'apiKey')}
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    API
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    {renderSortableHeader('Model', 'incomingModelAlias')}
-                  </th>
-                  {/* <th style={{ padding: '6px' }}>Provider</th> */}
-                  <th
-                    className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                    style={{ width: '125px' }}
-                  >
-                    Tokens
-                  </th>
-                  <th
-                    className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                    style={{ minWidth: '130px' }}
-                  >
-                    {renderSortableHeader('Cost', 'costTotal')}
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-w-[140px]">
-                    {renderSortableHeader('Perf', 'durationMs')}
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    Meta
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    Status
-                  </th>
-                  <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <Trash2 size={12} />
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={11} className="p-5 text-center">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : logs.length === 0 ? (
-                  <tr>
-                    <td colSpan={11} className="p-5 text-center">
-                      No logs found
-                    </td>
-                  </tr>
-                ) : (
-                  logs.map((log) => (
-                    <tr
+          {!isDesktop && (
+            <div className="space-y-1.5 p-2">
+              {loading ? (
+                <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
+                  Loading...
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
+                  No logs found
+                </div>
+              ) : (
+                logs.map((log) => {
+                  return (
+                    <MobileLogRow
                       key={log.requestId}
-                      className={clsx(
-                        'group border-b border-border-glass hover:bg-bg-hover',
-                        log.requestId === newestLogId && 'animate-slide-in'
-                      )}
-                      style={{
-                        height: '86px',
-                        backgroundColor:
-                          log.responseStatus === 'pending' ? 'rgba(234, 179, 8, 0.08)' : undefined,
-                      }}
+                      log={log}
+                      isNewest={log.requestId === newestLogId}
+                      onError={handleError}
+                      onDebug={handleDebug}
+                    />
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {isDesktop && (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse font-body text-[13px]">
+                <thead>
+                  <tr className="text-center border-b border-border">
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      {renderSortableHeader('Date', 'date')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      {renderSortableHeader('Key', 'apiKey')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      API
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      {renderSortableHeader('Model', 'incomingModelAlias')}
+                    </th>
+                    {/* <th style={{ padding: '6px' }}>Provider</th> */}
+                    <th
+                      className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: '125px' }}
                     >
-                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          {(() => {
-                            const formatted = formatDateSafely(log.date);
-                            return (
-                              <>
-                                <span style={{ fontWeight: '500' }}>{formatted.time}</span>
-                                <span
-                                  style={{
-                                    color: 'var(--color-text-secondary)',
-                                    fontSize: '0.85em',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {formatted.date}
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </td>
-                      <td
-                        className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                        title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
-                        style={log.sourceIp ? { cursor: 'help' } : undefined}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontWeight: '500' }}>{log.apiKey || '-'}</span>
-                          {log.attribution && (
-                            <span
-                              style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
-                            >
-                              {log.attribution}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
-                        title={`Incoming: ${formatApiTypeLabel(log.incomingApiType)} → Outgoing: ${formatApiTypeLabel(log.outgoingApiType)} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isRaw ? `Raw ${log.requestMethod || ''} ${log.requestPath || ''}` : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
-                        style={{ cursor: 'help' }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          {/* API type icons */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <div
-                              style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
-                            >
-                              {log.incomingApiType === 'embeddings' ? (
-                                <Variable size={16} className="text-green-500" />
-                              ) : log.incomingApiType === 'transcriptions' ? (
-                                <AudioLines size={16} className="text-purple-500" />
-                              ) : log.incomingApiType === 'speech' ? (
-                                <Volume2 size={16} className="text-orange-500" />
-                              ) : log.incomingApiType === 'images' ? (
-                                <ImageIcon size={16} className="text-fuchsia-500" />
-                              ) : log.incomingApiType === 'oauth' ? (
-                                <ShieldCheck size={16} className="text-emerald-500" />
-                              ) : log.incomingApiType &&
-                                apiLogos[getApiBaseType(log.incomingApiType)] ? (
-                                <img
-                                  src={apiLogos[getApiBaseType(log.incomingApiType)]}
-                                  alt={formatApiTypeLabel(log.incomingApiType)}
-                                  title={formatApiTypeLabel(log.incomingApiType)}
-                                  style={{ width: '16px', height: '16px' }}
-                                />
-                              ) : (
-                                '?'
-                              )}
-                            </div>
-                            <span style={{ width: '14px', textAlign: 'center' }}>→</span>
-                            <div
-                              style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
-                            >
-                              {log.outgoingApiType === 'embeddings' ? (
-                                <Variable size={16} className="text-green-500" />
-                              ) : log.outgoingApiType === 'transcriptions' ? (
-                                <AudioLines size={16} className="text-purple-500" />
-                              ) : log.outgoingApiType === 'speech' ? (
-                                <Volume2 size={16} className="text-orange-500" />
-                              ) : log.outgoingApiType === 'images' ? (
-                                <ImageIcon size={16} className="text-fuchsia-500" />
-                              ) : log.outgoingApiType === 'oauth' ? (
-                                <ShieldCheck size={16} className="text-emerald-500" />
-                              ) : log.outgoingApiType &&
-                                apiLogos[getApiBaseType(log.outgoingApiType)] ? (
-                                <img
-                                  src={apiLogos[getApiBaseType(log.outgoingApiType)]}
-                                  alt={formatApiTypeLabel(log.outgoingApiType)}
-                                  title={formatApiTypeLabel(log.outgoingApiType)}
-                                  style={{ width: '16px', height: '16px' }}
-                                />
-                              ) : (
-                                '?'
-                              )}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              borderTop: '1px solid var(--color-border-glass)',
-                              margin: '1px 4px',
-                              width: '44px',
-                            }}
-                          ></div>
-                          {/* Streaming/Passthrough icons */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <div
-                              style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
-                            >
-                              {log.isStreamed ? (
-                                <Zap size={12} className="text-blue-400" />
-                              ) : (
-                                <ZapOff size={12} className="text-gray-400" />
-                              )}
-                            </div>
-                            <span style={{ width: '14px' }}></span>
-                            <div
-                              style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
-                            >
-                              {log.isRaw ? (
-                                <Braces size={12} className="text-cyan-400" />
-                              ) : log.outgoingApiType &&
-                                PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
-                                <Pi size={12} className="text-emerald-400" />
-                              ) : log.isPassthrough ? (
-                                <MoveHorizontal size={12} className="text-yellow-500" />
-                              ) : (
-                                <Languages size={12} className="text-purple-400" />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Vision Fallthrough icons */}
-                          {(log.isVisionFallthrough || log.isDescriptorRequest) && (
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                marginTop: '2px',
-                              }}
-                            >
-                              <div
-                                style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
-                              >
-                                {log.isVisionFallthrough && (
-                                  <div
-                                    title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}
-                                  >
-                                    <ScanSearch size={12} className="text-amber-500" />
-                                  </div>
-                                )}
-                              </div>
-                              <span style={{ width: '14px' }}></span>
-                              <div
-                                style={{ width: '16px', display: 'flex', justifyContent: 'center' }}
-                              >
-                                {log.isDescriptorRequest && (
-                                  <div title="Descriptor Request (Generated image description)">
-                                    <Eye size={12} className="text-blue-500" />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div className="group/model flex items-center gap-1">
-                            <span>{log.incomingModelAlias || '-'}</span>
-                            {log.incomingModelAlias && log.incomingModelAlias !== '-' && (
-                              <button
-                                onClick={async () => {
-                                  if (!isClipboardAvailable()) return;
-                                  await copyToClipboard(log.incomingModelAlias || '');
-                                }}
-                                className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
-                                title={
-                                  isClipboardAvailable()
-                                    ? 'Copy incoming model alias'
-                                    : 'Copy requires HTTPS'
-                                }
-                                disabled={!isClipboardAvailable()}
-                              >
-                                <Copy size={12} className="text-text-secondary hover:text-text" />
-                              </button>
-                            )}
-                          </div>
-                          <div className="group/selected flex items-center gap-1">
-                            <span
-                              style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}
-                            >
-                              {log.provider || '-'}:{log.selectedModelName || '-'}
-                            </span>
-                            {log.selectedModelName && log.selectedModelName !== '-' && (
-                              <button
-                                onClick={async () => {
-                                  if (!isClipboardAvailable()) return;
-                                  await copyToClipboard(log.selectedModelName || '');
-                                }}
-                                className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
-                                title={
-                                  isClipboardAvailable()
-                                    ? 'Copy selected model name'
-                                    : 'Copy requires HTTPS'
-                                }
-                                disabled={!isClipboardAvailable()}
-                              >
-                                <Copy size={10} className="text-text-secondary hover:text-text" />
-                              </button>
-                            )}
-                          </div>
-                          {log.isVisionFallthrough && log.visionFallthroughModel && (
-                            <div
-                              className="group/vft flex items-center gap-1"
-                              title="Vision fallthrough descriptor model"
-                            >
-                              <ScanSearch size={10} className="text-amber-500 shrink-0" />
-                              <span
-                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}
-                              >
-                                {log.visionFallthroughModel}
-                              </span>
-                              <button
-                                onClick={async () => {
-                                  if (!isClipboardAvailable()) return;
-                                  await copyToClipboard(log.visionFallthroughModel || '');
-                                }}
-                                className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
-                                title={
-                                  isClipboardAvailable()
-                                    ? 'Copy fallthrough model name'
-                                    : 'Copy requires HTTPS'
-                                }
-                                disabled={!isClipboardAvailable()}
-                              >
-                                <Copy size={10} className="text-text-secondary hover:text-text" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
-                        title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)} • Cache Write: ${(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
-                        style={{ cursor: 'help' }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          {/* Row 1: Input and Reasoning */}
-                          <div style={{ display: 'flex', gap: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <CloudUpload size={12} className="text-blue-400" />
-                              <span
-                                style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}
-                              >
-                                {(log.tokensInput || 0) === 0
-                                  ? '-'
-                                  : formatLargeNumber(log.tokensInput || 0)}
-                                {log.tokensEstimated ? (
-                                  <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                                ) : null}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <BrainCog size={12} className="text-purple-400" />
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  minWidth: '30px',
-                                }}
-                              >
-                                {(log.tokensReasoning || 0) === 0
-                                  ? '-'
-                                  : formatLargeNumber(log.tokensReasoning || 0)}
-                                {log.tokensEstimated ? (
-                                  <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                                ) : null}
-                              </span>
-                            </div>
-                          </div>
-                          {/* Row 2: Output and Cache */}
-                          <div style={{ display: 'flex', gap: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <CloudDownload size={12} className="text-green-400" />
-                              <span
-                                style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}
-                              >
-                                {(log.tokensOutput || 0) === 0
-                                  ? '-'
-                                  : formatLargeNumber(log.tokensOutput || 0)}
-                                {log.tokensEstimated ? (
-                                  <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                                ) : null}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <PackageOpen size={12} className="text-orange-400" />
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  minWidth: '30px',
-                                }}
-                              >
-                                {(log.tokensCached || 0) === 0
-                                  ? '-'
-                                  : formatLargeNumber(log.tokensCached || 0)}
-                                {log.tokensEstimated ? (
-                                  <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                                ) : null}
-                              </span>
-                            </div>
-                          </div>
-                          {/* Row 3: Cache Write */}
-                          <div style={{ display: 'flex', gap: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <PencilLine size={12} className="text-fuchsia-400" />
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  minWidth: '30px',
-                                }}
-                              >
-                                {(log.tokensCacheWrite || 0) === 0
-                                  ? '-'
-                                  : formatLargeNumber(log.tokensCacheWrite || 0)}
-                                {log.tokensEstimated ? (
-                                  <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                                ) : null}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle">
-                        {log.costTotal !== undefined && log.costTotal !== null ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {/* Row 1: Total cost */}
-                            <div>
-                              {log.costSource ? (
-                                <CostToolTip
-                                  source={log.costSource}
-                                  costMetadata={log.costMetadata}
-                                >
-                                  <span style={{ fontWeight: '500', cursor: 'help' }}>
-                                    {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
-                                  </span>
-                                </CostToolTip>
-                              ) : (
-                                <span style={{ fontWeight: '500' }}>
-                                  {log.costTotal === 0 ? '-' : formatCost(log.costTotal, 6)}
-                                </span>
-                              )}
-                            </div>
-                            {/* Separator */}
-                            <div
-                              style={{
-                                borderTop: '1px solid var(--color-border-glass)',
-                                margin: '1px 2px',
-                              }}
-                            />
-                            {/* Breakdown grid: 2 rows x 4 columns (icon, value, icon, value) */}
-                            <div
-                              style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'auto 1fr auto 1fr',
-                                gap: '2px 4px',
-                                alignItems: 'center',
-                              }}
-                            >
-                              <CloudUpload size={10} className="text-blue-400" />
-                              <span
-                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
-                              >
-                                {log.costInput === 0 ? '$-.----' : formatCost(log.costInput || 0)}
-                              </span>
-                              <CloudDownload size={10} className="text-green-400" />
-                              <span
-                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
-                              >
-                                {log.costOutput === 0 ? '$-.----' : formatCost(log.costOutput || 0)}
-                              </span>
-                              <PackageOpen size={10} className="text-orange-400" />
-                              <span
-                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
-                              >
-                                {log.costCached === 0 ? '$-.----' : formatCost(log.costCached || 0)}
-                              </span>
-                              <PencilLine size={10} className="text-fuchsia-400" />
-                              <span
-                                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
-                              >
-                                {log.costCacheWrite === 0
-                                  ? '$-.----'
-                                  : formatCost(log.costCacheWrite || 0)}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span
-                            style={{
-                              color: 'var(--color-text-secondary)',
-                              fontSize: '1.2em',
-                              display: 'block',
-                              textAlign: 'center',
-                            }}
-                          >
-                            -
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                        {(() => {
-                          const progress =
-                            log.responseStatus === 'pending'
-                              ? progressMapRef.current.get(log.requestId)
-                              : undefined;
-                          const rawDurationMs =
-                            log.durationMs != null && log.durationMs > 0
-                              ? log.durationMs
-                              : log.responseStatus === 'pending'
-                                ? Date.now() - log.startTime
-                                : null;
-                          const liveDuration =
-                            rawDurationMs != null ? formatMs(rawDurationMs) : '-';
-                          const e2eOutputTokens =
-                            Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
-                          // End-to-end throughput: output plus reasoning tokens / full request duration.
-                          // Unlike TPS (which excludes the TTFT delay), E2E includes it.
-                          const e2e =
-                            log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0
-                              ? e2eOutputTokens / (log.durationMs / 1000)
-                              : null;
-                          if (progress) {
-                            const bytesPerToken = getEstimatedBytesPerToken({
-                              ...log,
-                              isStreamed: progress.isStreamed,
-                            });
-                            const effectiveBytesPerSec =
-                              progress.bytesPerSec != null && progress.bytesPerSec > 0
-                                ? progress.bytesPerSec
-                                : progress.elapsedMs > 0 && progress.bytesReceived > 0
-                                  ? (progress.bytesReceived / progress.elapsedMs) * 1000
-                                  : null;
-                            const estTokensPerSec =
-                              effectiveBytesPerSec != null &&
-                              Number.isFinite(effectiveBytesPerSec) &&
-                              effectiveBytesPerSec > 0
-                                ? effectiveBytesPerSec / bytesPerToken
-                                : null;
-
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span>Duration: {liveDuration}</span>
-                                <span
-                                  style={{
-                                    color: 'var(--color-text-secondary)',
-                                    fontSize: '0.85em',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                  }}
-                                >
-                                  <CloudDownload size={12} className="text-yellow-400" />
-                                  <span>{formatBytes(progress.bytesReceived)}</span>
-                                </span>
-                                {progress.bytesPerSec != null && (
-                                  <span
-                                    style={{
-                                      color: 'var(--color-text-secondary)',
-                                      fontSize: '0.85em',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                    }}
-                                  >
-                                    <Gauge size={12} className="text-text-secondary" />
-                                    {formatBytes(progress.bytesPerSec)}/s
-                                  </span>
-                                )}
-                                {estTokensPerSec != null && (
-                                  <span
-                                    style={{
-                                      color: 'var(--color-text-secondary)',
-                                      fontSize: '0.85em',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                    }}
-                                    title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token accounting for SSE + JSON framing)`}
-                                  >
-                                    <Zap size={12} className="text-amber-400" />
-                                    <span>~{formatTPS(estTokensPerSec)} tok/s</span>
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          }
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span>Duration: {liveDuration}</span>
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {log.ttftMs && log.ttftMs > 0
-                                  ? `TTFT: ${formatMs(log.ttftMs)}`
-                                  : ''}
-                              </span>
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {log.tokensPerSec && log.tokensPerSec > 0
-                                  ? `TPS: ${formatTPS(log.tokensPerSec)}`
-                                  : ''}
-                              </span>
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {e2e != null ? `E2E: ${formatTPS(e2e)}` : ''}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td
-                        className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
-                        title={
-                          log.kwhUsed != null && log.kwhUsed > 0
-                            ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${formatSlices(log.kwhUsed / KWH_PER_SLICE)} toast slices`
-                            : undefined
-                        }
-                        style={
-                          log.kwhUsed != null && log.kwhUsed > 0 ? { cursor: 'help' } : undefined
-                        }
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          {/* Row 1: Messages and Tool calls */}
-                          <div style={{ display: 'flex', gap: '16px' }}>
-                            <div
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                              className="text-blue-400"
-                            >
-                              <MessagesSquare size={12} />
-                              <span
-                                style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}
-                              >
-                                {(log.messageCount || 0) === 0 ? '-' : log.messageCount}
-                              </span>
-                            </div>
-                            <div
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                              className="text-green-400"
-                            >
-                              <PlugZap size={12} />
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  minWidth: '20px',
-                                }}
-                              >
-                                {(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount}
-                              </span>
-                            </div>
-                          </div>
-                          {/* Row 2: Tools defined and Finish reason */}
-                          <div style={{ display: 'flex', gap: '16px' }}>
-                            <div
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                              className="text-orange-400"
-                            >
-                              <Wrench size={12} />
-                              <span
-                                style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}
-                              >
-                                {(log.toolsDefined || 0) === 0 ? '-' : log.toolsDefined}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {log.finishReason === 'end_turn' ? (
-                                <CirclePause size={12} className="text-yellow-500" />
-                              ) : log.finishReason === 'stop' ? (
-                                <Octagon size={12} className="text-red-500" />
-                              ) : log.finishReason === 'tool_calls' ? (
-                                <Hammer size={12} className="text-purple-500" />
-                              ) : log.finishReason === 'length' ||
-                                log.finishReason === 'max_tokens' ? (
-                                <RulerDimensionLine size={12} className="text-pink-400" />
-                              ) : (
-                                <ChevronDown size={12} className="text-gray-400" />
-                              )}
-                              <span
-                                style={{
-                                  color: 'var(--color-text-secondary)',
-                                  fontSize: '0.85em',
-                                  minWidth: '20px',
-                                }}
-                              >
-                                {log.finishReason || '-'}
-                              </span>
-                            </div>
-                          </div>
-                          {/* Row 3: Retry indicator */}
-                          {log.attemptCount && log.attemptCount > 1 && (
-                            <div style={{ display: 'flex', gap: '16px' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleRetryDetails(log)}
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                                className="text-orange-500 bg-transparent border-0 p-0 cursor-pointer hover:text-orange-400 transition-colors"
-                                title="View retry history"
-                              >
-                                <RotateCcw size={12} />
-                                <span
-                                  style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}
-                                >
-                                  {log.attemptCount}x
-                                </span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                        <div className="flex gap-2 items-center">
-                          {log.hasError && (
-                            <button
-                              onClick={() =>
-                                navigate('/errors', { state: { requestId: log.requestId } })
-                              }
-                              className={clsx(
-                                'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border',
-                                'text-danger border-danger/30 bg-red-500/15 hover:bg-red-500/25'
-                              )}
-                              style={{ width: '52px' }}
-                              title="View Error Details"
-                            >
-                              <AlertTriangle size={12} />
-                              <span style={{ fontWeight: 600 }}>✗</span>
-                            </button>
-                          )}
-                          {log.hasDebug && (
-                            <button
-                              onClick={() =>
-                                navigate('/debug', { state: { requestId: log.requestId } })
-                              }
-                              className={clsx(
-                                'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border',
-                                'text-blue-400 border-blue-400/30 bg-blue-500/15 hover:bg-blue-500/25'
-                              )}
-                              style={{ width: '52px' }}
-                              title="View Debug Trace"
-                            >
-                              <Bug size={12} />
-                              <span style={{ fontWeight: 600 }}>✓</span>
-                            </button>
-                          )}
-                          {!log.hasError && !log.hasDebug && (
-                            <div
-                              className={clsx(
-                                'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                                log.responseStatus === 'success'
-                                  ? 'text-success border-success/30 bg-emerald-500/15'
-                                  : log.responseStatus === 'pending'
-                                    ? 'text-warning border-warning/30 bg-yellow-500/15'
-                                    : log.responseStatus === 'cancelled'
-                                      ? 'text-blue-400 border-blue-400/30 bg-blue-500/15'
-                                      : log.responseStatus === 'timeout'
-                                        ? 'text-orange-400 border-orange-400/30 bg-orange-500/15'
-                                        : 'text-danger border-danger/30 bg-red-500/15'
-                              )}
-                              style={{ width: '52px' }}
-                            >
-                              {log.responseStatus === 'success' ? (
-                                <CheckCircle size={12} />
-                              ) : log.responseStatus === 'pending' ? (
-                                <Plane size={12} className="animate-pulse" />
-                              ) : log.responseStatus === 'cancelled' ? (
-                                <Ban size={12} />
-                              ) : log.responseStatus === 'timeout' ? (
-                                <Timer size={12} />
-                              ) : (
-                                <XCircle size={12} />
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                        <button
-                          onClick={() => handleDelete(log.requestId)}
-                          className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
-                          title="Delete log"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      Tokens
+                    </th>
+                    <th
+                      className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ minWidth: '130px' }}
+                    >
+                      {renderSortableHeader('Cost', 'costTotal')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-w-[140px]">
+                      {renderSortableHeader('Perf', 'durationMs')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      Meta
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      Status
+                    </th>
+                    <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <Trash2 size={12} />
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={11} className="p-5 text-center">
+                        Loading...
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : logs.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="p-5 text-center">
+                        No logs found
+                      </td>
+                    </tr>
+                  ) : (
+                    logs.map((log) => (
+                      <DesktopLogRow
+                        key={log.requestId}
+                        log={log}
+                        isNewest={log.requestId === newestLogId}
+                        liveNow={
+                          log.responseStatus === 'pending' && log.durationMs == null
+                            ? liveNow
+                            : undefined
+                        }
+                        progress={
+                          log.responseStatus === 'pending'
+                            ? progressMapRef.current.get(log.requestId)
+                            : undefined
+                        }
+                        onError={handleError}
+                        onDebug={handleDebug}
+                        onRetryDetails={handleRetryDetailsMemo}
+                        onDelete={handleDeleteMemo}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <PaginationControls
             position="bottom"
