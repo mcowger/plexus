@@ -8,6 +8,7 @@ import {
   MetadataSource,
   NormalizedModelMetadata,
 } from '../lib/api';
+import { dedupeById } from '../lib/modelOptions';
 
 /**
  * Encapsulates all state and logic related to the metadata accordion in the
@@ -238,7 +239,7 @@ export function useMetadataEditor(
       metadataSearchRef.current = setTimeout(async () => {
         try {
           const resp = await api.searchModelMetadata(source, query, 30);
-          setMetadataResults(resp.data);
+          setMetadataResults(dedupeById(resp.data));
         } catch {
           setMetadataResults([]);
         } finally {

@@ -243,7 +243,7 @@ export const useModels = () => {
       return true;
     } catch (e) {
       console.error('Failed to save alias', e);
-      toast.error('Failed to save alias');
+      toast.error(e instanceof Error ? e.message : 'Failed to save alias');
       return false;
     } finally {
       setIsSaving(false);

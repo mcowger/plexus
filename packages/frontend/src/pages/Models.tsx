@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Alias } from '../lib/api';
+import { getModelOptionKey } from '../lib/modelOptions';
 import { useModels } from '../hooks/useModels';
 import { AliasTableRow } from '../components/models/AliasTableRow';
 import { AliasMobileCard } from '../components/models/AliasMobileCard';
@@ -189,13 +190,16 @@ export const Models = () => {
     (targets: Array<{ provider: string; model: string }>) => {
       setEditingAlias((prev: Alias) => {
         const updatedTargets = [...(prev.target_groups[0]?.targets ?? [])];
+        const existingTargetKeys = new Set(
+          prev.target_groups.flatMap((group) =>
+            group.targets.map((target) => getModelOptionKey(target.provider, target.model))
+          )
+        );
         for (const t of targets) {
-          const alreadyExists = updatedTargets.some(
-            (x: { provider: string; model: string }) =>
-              x.provider === t.provider && x.model === t.model
-          );
-          if (!alreadyExists) {
+          const key = getModelOptionKey(t.provider, t.model);
+          if (!existingTargetKeys.has(key)) {
             updatedTargets.push({ ...t, enabled: true });
+            existingTargetKeys.add(key);
           }
         }
         const groups = [...prev.target_groups];

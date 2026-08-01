@@ -1,5 +1,6 @@
 import { formatNumber, formatPoints } from './format';
 import { normalizeApiAccessList } from './apiFormats';
+import { dedupeAliasTargets, dedupeById, dedupeModels } from './modelOptions';
 
 import type { QuotaCheckerInfo } from '../types/quota';
 
@@ -1150,6 +1151,8 @@ export interface ModelResolutionPreview {
 }
 
 function aliasToConfigPayload(alias: Alias): Record<string, unknown> {
+  const targetGroups = dedupeAliasTargets(alias.target_groups);
+
   return {
     priority: alias.priority || 'selector',
     additional_aliases: alias.aliases,
@@ -1165,7 +1168,7 @@ function aliasToConfigPayload(alias: Alias): Record<string, unknown> {
     ...(alias.extraBody && Object.keys(alias.extraBody).length > 0
       ? { extraBody: alias.extraBody }
       : {}),
-    target_groups: alias.target_groups.map((group) => ({
+    target_groups: targetGroups.map((group) => ({
       name: group.name,
       selector: group.selector,
       targets: group.targets.map((target) => ({
@@ -2123,7 +2126,9 @@ export const api = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to save alias');
+      const detail =
+        Array.isArray(err.details) && err.details[0]?.message ? `: ${err.details[0].message}` : '';
+      throw new Error(`${err.error || 'Failed to save alias'}${detail}`);
     }
 
     // Delete old alias only after new one is saved successfully
@@ -2173,7 +2178,7 @@ export const api = {
           }
         }
       });
-      return models;
+      return dedupeModels(models);
     } catch (e) {
       console.error('API Error getModels', e);
       return [];
@@ -2777,7 +2782,12 @@ export const api = {
       if (res.status === 503) return { data: [], count: 0 };
       throw new Error(`Failed to search model metadata: ${res.statusText}`);
     }
-    return res.json();
+    const result = (await res.json()) as {
+      data: { id: string; name: string }[];
+      count: number;
+    };
+    const data = dedupeById(result.data);
+    return { data, count: data.length };
   },
 
   /**
@@ -2828,7 +2838,7 @@ export const api = {
     const json = (await res.json()) as {
       data: Array<{ id: string; name: string; api: string; custom: boolean }>;
     };
-    return json.data;
+    return dedupeById(json.data);
   },
 
   getOAuthProviderModels: async (

@@ -3,6 +3,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import type { Provider, Model, AliasTargetGroup } from '../../lib/api';
+import { dedupeModels } from '../../lib/modelOptions';
 
 interface Props {
   isOpen: boolean;
@@ -20,7 +21,7 @@ const getMatchingModels = (query: string, availableModels: Model[], providers: P
 
   const searchLower = searchTerm.toLowerCase();
   const matches: Array<{ model: Model; provider: Provider }> = [];
-  availableModels.forEach((model) => {
+  dedupeModels(availableModels).forEach((model) => {
     const provider = providers.find((p) => p.id === model.providerId);
     if (
       provider &&
@@ -98,7 +99,7 @@ export function AutoAddModal({
     setSelectedModels(new Set());
   };
 
-  const group0Targets = targetGroups[0]?.targets ?? [];
+  const existingTargets = targetGroups.flatMap((group) => group.targets);
 
   return (
     <Modal
@@ -163,7 +164,7 @@ export function AutoAddModal({
                         filteredModels.every(
                           (m) =>
                             selectedModels.has(`${m.provider.id}|${m.model.id}`) ||
-                            group0Targets.some(
+                            existingTargets.some(
                               (t: any) => t.provider === m.provider.id && t.model === m.model.id
                             )
                         )
@@ -175,7 +176,7 @@ export function AutoAddModal({
                             filteredModels.forEach((m) => {
                               const key = `${m.provider.id}|${m.model.id}`;
                               if (
-                                !group0Targets.some(
+                                !existingTargets.some(
                                   (t: any) => t.provider === m.provider.id && t.model === m.model.id
                                 )
                               ) {
@@ -207,7 +208,7 @@ export function AutoAddModal({
               <tbody>
                 {filteredModels.map(({ model, provider }) => {
                   const key = `${provider.id}|${model.id}`;
-                  const alreadyExists = group0Targets.some(
+                  const alreadyExists = existingTargets.some(
                     (t: any) => t.provider === provider.id && t.model === model.id
                   );
                   const isSelected = selectedModels.has(key);

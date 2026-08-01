@@ -3,6 +3,7 @@ import { GripVertical, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react
 import { Switch } from '../ui/Switch';
 import { Button } from '../ui/Button';
 import { AliasTargetGroup } from '../../lib/api';
+import { dedupeModels, getModelOptionKey } from '../../lib/modelOptions';
 
 interface TargetGroupEditorProps {
   groups: AliasTargetGroup[];
@@ -289,6 +290,20 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   dragOver?.mode === 'target' &&
                   dragOver.groupIdx === groupIdx &&
                   dragOver.targetIdx === targetIdx;
+                const modelOptions = dedupeModels(
+                  availableModels.filter((model) => model.providerId === target.provider)
+                ).filter(
+                  (model) =>
+                    model.id === target.model ||
+                    !groups.some((candidateGroup, candidateGroupIdx) =>
+                      candidateGroup.targets.some(
+                        (candidateTarget, candidateTargetIdx) =>
+                          (candidateGroupIdx !== groupIdx || candidateTargetIdx !== targetIdx) &&
+                          getModelOptionKey(candidateTarget.provider, candidateTarget.model) ===
+                            getModelOptionKey(model.providerId, model.id)
+                      )
+                    )
+                );
 
                 return (
                   <div
@@ -367,13 +382,14 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                       disabled={!target.provider}
                     >
                       <option value="">Model...</option>
-                      {availableModels
-                        .filter((m) => m.providerId === target.provider)
-                        .map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))}
+                      {modelOptions.map((model) => (
+                        <option
+                          key={getModelOptionKey(model.providerId, model.id)}
+                          value={model.id}
+                        >
+                          {model.name}
+                        </option>
+                      ))}
                     </select>
                     <Switch
                       checked={target.enabled !== false}

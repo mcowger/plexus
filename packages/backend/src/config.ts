@@ -724,6 +724,23 @@ const ModelTargetGroupSchema = z.object({
   targets: z.array(ModelTargetSchema),
 });
 
+export function findDuplicateAliasTargets(
+  targetGroups: Array<{ targets: Array<{ provider: string; model: string }> }> | undefined
+): Array<{ provider: string; model: string }> {
+  const seen = new Set<string>();
+  const duplicates = new Map<string, { provider: string; model: string }>();
+
+  for (const group of targetGroups ?? []) {
+    for (const target of group.targets) {
+      const key = JSON.stringify([target.provider, target.model]);
+      if (seen.has(key)) duplicates.set(key, target);
+      else seen.add(key);
+    }
+  }
+
+  return Array.from(duplicates.values());
+}
+
 // Shared scope/limit fields applied to every quota-type union member below:
 //  - allowed*/excluded* restrict which provider/model pairs the quota counts
 //    against (see services/scope-match.ts for matching semantics; all-empty
@@ -922,6 +939,18 @@ export const ModelConfigSchema = z
       })
       .optional(),
     compaction: CompactionOverrideSchema.optional(),
+  })
+  .superRefine((data, context) => {
+    const targetGroups =
+      data.target_groups ?? (data.targets ? [{ targets: data.targets }] : undefined);
+
+    for (const target of findDuplicateAliasTargets(targetGroups)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['target_groups'],
+        message: `Duplicate target '${target.provider}/${target.model}' is not allowed`,
+      });
+    }
   })
   .transform((data) => {
     // Normalise legacy flat format to grouped format immediately.
