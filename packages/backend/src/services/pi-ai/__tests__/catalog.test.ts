@@ -141,7 +141,7 @@ describe('createModelCatalog', () => {
     await catalog.refresh();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
 
-    now += REMOTE_CATALOG_REFRESH_INTERVAL_MS + 1;
+    now = Date.now() + REMOTE_CATALOG_REFRESH_INTERVAL_MS + 1;
     await catalog.refresh();
     expect(fetchImpl).toHaveBeenCalledTimes(2);
 
