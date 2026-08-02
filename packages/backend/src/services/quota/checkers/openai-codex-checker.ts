@@ -25,6 +25,8 @@ interface CodexUsageResponse {
   rate_limit?: CodexRateLimitInfo;
 }
 
+const OPENAI_CODEX_OAUTH_REFRESH_INTERVAL_MS = 8 * 24 * 60 * 60 * 1000;
+
 interface OAuthCredentialsBlob {
   access_token?: string;
 }
@@ -121,6 +123,10 @@ export default defineChecker({
         ctx.getOption<string>('oauthProvider', 'openai-codex').trim() || 'openai-codex';
       const oauthAccountId = ctx.getOption<string>('oauthAccountId', '').trim();
       const authManager = OAuthAuthManager.getInstance();
+      const refreshOptions =
+        provider === 'openai-codex'
+          ? { refreshIfOlderThanMs: OPENAI_CODEX_OAUTH_REFRESH_INTERVAL_MS }
+          : undefined;
 
       const rawCreds = (
         oauthAccountId
@@ -132,13 +138,13 @@ export default defineChecker({
       let oauthApiKey: string;
       try {
         oauthApiKey = oauthAccountId
-          ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
-          : await authManager.getApiKey(provider as OAuthProvider);
+          ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId, refreshOptions)
+          : await authManager.getApiKey(provider as OAuthProvider, undefined, refreshOptions);
       } catch {
-        authManager.reload();
+        await authManager.reload();
         oauthApiKey = oauthAccountId
-          ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
-          : await authManager.getApiKey(provider as OAuthProvider);
+          ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId, refreshOptions)
+          : await authManager.getApiKey(provider as OAuthProvider, undefined, refreshOptions);
       }
 
       accessToken = parseAccessToken(oauthApiKey);

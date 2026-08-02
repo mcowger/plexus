@@ -1,15 +1,21 @@
 import { logger } from '../../utils/logger';
-import type { OAuthCredential, OAuthCredentials } from '@earendil-works/pi-ai';
+import type { OAuthAuth, OAuthCredential, OAuthCredentials } from '@earendil-works/pi-ai';
 import { ConfigService } from '../configuration/config-service';
 import { getOAuthProviderAuth, type OAuthProvider } from './oauth-providers';
 
 const LEGACY_ACCOUNT_ID = 'legacy';
+
+interface GetApiKeyOptions {
+  refreshIfOlderThanMs?: number;
+}
 
 export class OAuthAuthManager {
   private static instance: OAuthAuthManager;
   // In-memory cache for fast lookups
   private authData: Record<string, { accounts: Record<string, OAuthCredentials> }> = {};
   private initPromise: Promise<void>;
+  private readonly lastRefreshAt = new Map<string, number>();
+  private readonly refreshPromises = new Map<string, Promise<OAuthCredentials>>();
 
   private constructor() {
     this.initPromise = this.loadFromDatabaseAsync();
@@ -143,11 +149,16 @@ export class OAuthAuthManager {
       type: 'oauth',
       ...credentials,
     } as OAuthCredentials;
+    this.lastRefreshAt.set(`${provider}/${accountId}`, Date.now());
 
     await this.saveToDatabase(provider, accountId, credentials);
   }
 
-  async getApiKey(provider: OAuthProvider, accountId?: string | null): Promise<string> {
+  async getApiKey(
+    provider: OAuthProvider,
+    accountId?: string | null,
+    options: GetApiKeyOptions = {}
+  ): Promise<string> {
     const providerRecord = this.authData[provider];
     if (!providerRecord) {
       throw new Error(
@@ -175,17 +186,36 @@ export class OAuthAuthManager {
       throw new Error(`OAuth: provider '${provider}' does not support OAuth login.`);
     }
 
-    // Refresh expired tokens and persist the rotated credentials.
+    const refreshKey = `${provider}/${resolvedAccountId}`;
+    const now = Date.now();
     let current = credentials;
-    if (current.expires <= Date.now()) {
-      const refreshed = await descriptor.oauth.refresh({ ...current, type: 'oauth' });
-      logger.debug(
-        `OAuth: getApiKey for ${provider}/${resolvedAccountId} — token WAS refreshed. ` +
-          `new_refresh=${refreshed.refresh ? `present(${refreshed.refresh.length} chars)` : 'MISSING'}`
-      );
-      current = { ...refreshed };
-      providerRecord.accounts[resolvedAccountId] = current;
-      await this.saveToDatabase(provider, resolvedAccountId, current);
+    const lastRefresh = this.lastRefreshAt.get(refreshKey);
+    const refreshRequested =
+      current.expires <= now ||
+      (options.refreshIfOlderThanMs !== undefined &&
+        (lastRefresh === undefined || now - lastRefresh >= options.refreshIfOlderThanMs));
+
+    if (refreshRequested) {
+      const existingRefresh = this.refreshPromises.get(refreshKey);
+      if (existingRefresh) {
+        current = await existingRefresh;
+      } else {
+        const refreshPromise = this.refreshCredentials(
+          provider,
+          resolvedAccountId,
+          descriptor.oauth.refresh,
+          current,
+          refreshKey
+        );
+        this.refreshPromises.set(refreshKey, refreshPromise);
+        try {
+          current = await refreshPromise;
+        } finally {
+          if (this.refreshPromises.get(refreshKey) === refreshPromise) {
+            this.refreshPromises.delete(refreshKey);
+          }
+        }
+      }
     } else {
       logger.debug(
         `OAuth: getApiKey for ${provider}/${resolvedAccountId} — token was NOT refreshed (not expired).`
@@ -200,6 +230,28 @@ export class OAuthAuthManager {
     }
 
     return auth.apiKey;
+  }
+
+  private async refreshCredentials(
+    provider: OAuthProvider,
+    accountId: string,
+    refresh: OAuthAuth['refresh'],
+    credentials: OAuthCredentials,
+    refreshKey: string
+  ): Promise<OAuthCredentials> {
+    const refreshed = await refresh({ ...credentials, type: 'oauth' } as OAuthCredential);
+    const current = {
+      ...refreshed,
+      refresh: refreshed.refresh || credentials.refresh,
+    } as OAuthCredentials;
+    logger.debug(
+      `OAuth: getApiKey for ${provider}/${accountId} — token WAS refreshed. ` +
+        `new_refresh=${current.refresh ? `present(${current.refresh.length} chars)` : 'MISSING'}`
+    );
+    this.authData[provider]!.accounts[accountId] = current;
+    this.lastRefreshAt.set(refreshKey, Date.now());
+    await this.saveToDatabase(provider, accountId, current);
+    return current;
   }
 
   getCredentials(provider: OAuthProvider, accountId?: string | null): OAuthCredentials | null {
@@ -238,6 +290,9 @@ export class OAuthAuthManager {
     }
 
     delete providerRecord.accounts[accountId];
+    const refreshKey = `${provider}/${accountId}`;
+    this.lastRefreshAt.delete(refreshKey);
+    this.refreshPromises.delete(refreshKey);
     if (Object.keys(providerRecord.accounts).length === 0) {
       delete this.authData[provider];
     }

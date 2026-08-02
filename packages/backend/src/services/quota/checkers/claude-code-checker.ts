@@ -32,6 +32,7 @@ type ClaudeLimit = z.infer<typeof ClaudeLimitSchema>;
 type ClaudeUsageResponse = z.infer<typeof ClaudeUsageResponseSchema>;
 
 const SCOPED_WEEKLY_KIND = 'weekly_scoped';
+const CLAUDE_OAUTH_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 interface ScopedLimit {
   dimension: 'model' | 'surface';
@@ -177,17 +178,21 @@ async function resolveApiKey(ctx: {
   const provider = ctx.getOption<string>('oauthProvider', 'anthropic').trim() || 'anthropic';
   const oauthAccountId = ctx.getOption<string>('oauthAccountId', '').trim();
   const authManager = OAuthAuthManager.getInstance();
+  const refreshOptions =
+    provider === 'anthropic'
+      ? { refreshIfOlderThanMs: CLAUDE_OAUTH_REFRESH_INTERVAL_MS }
+      : undefined;
 
   try {
     return oauthAccountId
-      ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
-      : await authManager.getApiKey(provider as OAuthProvider);
+      ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId, refreshOptions)
+      : await authManager.getApiKey(provider as OAuthProvider, undefined, refreshOptions);
   } catch {
-    authManager.reload();
+    await authManager.reload();
     logger.info(`Reloaded OAuth auth file and retrying for '${provider}'`);
     return oauthAccountId
-      ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId)
-      : await authManager.getApiKey(provider as OAuthProvider);
+      ? await authManager.getApiKey(provider as OAuthProvider, oauthAccountId, refreshOptions)
+      : await authManager.getApiKey(provider as OAuthProvider, undefined, refreshOptions);
   }
 }
 
