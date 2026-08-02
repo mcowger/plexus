@@ -17,31 +17,61 @@ function copyDirectory(sourceDir: string, targetDir: string) {
   }
 }
 
-export default async function globalSetup() {
+export type TestDialect = 'sqlite' | 'postgres';
+
+export async function setupTestDatabase(testDialect: TestDialect) {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const backendRoot = path.resolve(moduleDir, '..');
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plexus-vitest-'));
-  const testDialect = process.env.PLEXUS_TEST_DIALECT === 'postgres' ? 'postgres' : 'sqlite';
+  const managedEnvKeys = [
+    'PLEXUS_TEST_DB_URL',
+    'PLEXUS_TEST_DB_TMP_ROOT',
+    'PLEXUS_TEST_DIALECT',
+    'PLEXUS_TEST_DB_TEMPLATE_URL',
+    'PLEXUS_TEST_PGLITE_TEMPLATE_DIR',
+    'PLEXUS_TEST_SQLITE_TEMPLATE_URL',
+    'PLEXUS_TEST_SQLITE_TMP_ROOT',
+    'PLEXUS_TEST_POSTGRES_TEMPLATE_DIR',
+    'PLEXUS_TEST_POSTGRES_TMP_ROOT',
+    'PLEXUS_TEST_POSTGRES_DB_URL',
+    'PLEXUS_PGLITE_DATA_DIR',
+    'PLEXUS_POSTGRES_DRIVER',
+    'DATABASE_URL',
+  ];
+  const originalEnv = new Map(managedEnvKeys.map((key) => [key, process.env[key]]));
 
   const sqliteTemplatePath = path.join(tmpRoot, 'vitest-template.sqlite');
   const postgresTemplateDir = path.join(tmpRoot, 'vitest-template.pglite');
+  const configuredDbUrl = process.env.PLEXUS_TEST_DB_URL;
   const defaultDbUrl =
     testDialect === 'postgres'
       ? 'postgres://postgres:postgres@localhost:5432/plexus_test'
       : `sqlite://${sqliteTemplatePath}`;
-  const testDbUrl = process.env.PLEXUS_TEST_DB_URL || defaultDbUrl;
+  const configuredDbMatchesDialect =
+    configuredDbUrl?.startsWith(testDialect === 'postgres' ? 'postgres' : 'sqlite') ?? false;
+  const testDbUrl = configuredDbMatchesDialect ? configuredDbUrl! : defaultDbUrl;
 
   process.env.PLEXUS_TEST_DB_URL = testDbUrl;
   process.env.PLEXUS_TEST_DB_TMP_ROOT = tmpRoot;
   process.env.PLEXUS_TEST_DIALECT = testDialect;
   process.env.DATABASE_URL = testDbUrl;
+  if (testDialect === 'postgres') {
+    process.env.PLEXUS_POSTGRES_DRIVER = 'pglite';
+  } else {
+    delete process.env.PLEXUS_POSTGRES_DRIVER;
+  }
 
   if (testDialect === 'sqlite') {
     process.env.PLEXUS_TEST_DB_TEMPLATE_URL = testDbUrl;
+    process.env.PLEXUS_TEST_SQLITE_TEMPLATE_URL = testDbUrl;
+    process.env.PLEXUS_TEST_SQLITE_TMP_ROOT = tmpRoot;
     delete process.env.PLEXUS_TEST_PGLITE_TEMPLATE_DIR;
     delete process.env.PLEXUS_PGLITE_DATA_DIR;
   } else {
     process.env.PLEXUS_TEST_PGLITE_TEMPLATE_DIR = postgresTemplateDir;
+    process.env.PLEXUS_TEST_POSTGRES_TEMPLATE_DIR = postgresTemplateDir;
+    process.env.PLEXUS_TEST_POSTGRES_TMP_ROOT = tmpRoot;
+    process.env.PLEXUS_TEST_POSTGRES_DB_URL = testDbUrl;
     process.env.PLEXUS_PGLITE_DATA_DIR = postgresTemplateDir;
     delete process.env.PLEXUS_TEST_DB_TEMPLATE_URL;
   }
@@ -81,12 +111,12 @@ export default async function globalSetup() {
   await closeDatabase();
 
   if (testDialect === 'postgres') {
-    const finalTemplateDir = process.env.PLEXUS_TEST_PGLITE_TEMPLATE_DIR!;
+    const finalTemplateDir = postgresTemplateDir;
     if (!fs.existsSync(finalTemplateDir)) {
       fs.mkdirSync(finalTemplateDir, { recursive: true });
     }
     // Ensure the template directory exists even if pglite created it lazily.
-    const currentDir = process.env.PLEXUS_PGLITE_DATA_DIR;
+    const currentDir = postgresTemplateDir;
     if (currentDir && currentDir !== finalTemplateDir && fs.existsSync(currentDir)) {
       copyDirectory(currentDir, finalTemplateDir);
     }
@@ -104,10 +134,18 @@ export default async function globalSetup() {
     } catch {
       // ignore temp cleanup errors
     }
-    delete process.env.PLEXUS_TEST_DB_TEMPLATE_URL;
-    delete process.env.PLEXUS_TEST_PGLITE_TEMPLATE_DIR;
-    delete process.env.PLEXUS_TEST_DB_URL;
-    delete process.env.PLEXUS_TEST_DB_TMP_ROOT;
-    delete process.env.PLEXUS_PGLITE_DATA_DIR;
+    for (const [key, value] of originalEnv) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
   };
+}
+
+export default async function globalSetup() {
+  const testDialect: TestDialect =
+    process.env.PLEXUS_TEST_DIALECT === 'postgres' ? 'postgres' : 'sqlite';
+  return setupTestDatabase(testDialect);
 }

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
+import {
+  closeDatabase,
+  getCurrentDialect,
+  getDatabase,
+  getSchema,
+  initializeDatabase,
+} from '../client';
 import { runMigrations } from '../migrate';
 import { runMcpKeyMigration } from '../mcp-key-migration';
 import { decryptJson, encrypt } from '../../utils/encryption';
@@ -15,6 +21,7 @@ describe('MCP key migration', () => {
     process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
     initializeDatabase(process.env.DATABASE_URL);
     await runMigrations();
+    expect(getCurrentDialect()).toBe(process.env.PLEXUS_TEST_DIALECT);
     db = getDatabase();
     schema = getSchema();
     await db.delete(schema.mcpServers);
@@ -40,6 +47,8 @@ describe('MCP key migration', () => {
     const [server] = await db.select().from(schema.mcpServers);
     const [key] = await db.select().from(schema.mcpKeys);
     expect(key).toMatchObject({ mcpServerId: server!.id, key: 'exa-secret' });
+    expect(key!.createdAt).toBeInstanceOf(Date);
+    expect(key!.updatedAt).toBeInstanceOf(Date);
     expect(server!.authScheme).toBe('x-api-key');
     expect(decryptJson(server!.headers)).toEqual({ Accept: 'application/json' });
   });

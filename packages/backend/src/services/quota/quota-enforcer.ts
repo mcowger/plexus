@@ -401,9 +401,11 @@ export class QuotaEnforcer {
         );
       }
       const leakPerMs = durationMs ? def.limit / durationMs : 0;
+      const leakPerMsSql =
+        this.dialect === 'postgres' ? sql`${leakPerMs}::double precision` : sql`${leakPerMs}`;
 
       const currentUsageExpr = sql`CASE WHEN ${this.schema.quotaState.limitType} != ${limitType} THEN ${usageValue}
-        ELSE ${maxFn}(0, ${this.schema.quotaState.currentUsage} - (${nowMs} - ${this.schema.quotaState.lastUpdated}) * ${leakPerMs}) + ${usageValue}
+        ELSE ${maxFn}(0, ${this.schema.quotaState.currentUsage} - (${nowMs} - ${this.schema.quotaState.lastUpdated}) * ${leakPerMsSql}) + ${usageValue}
         END`;
 
       await this.db

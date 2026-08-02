@@ -11,6 +11,10 @@ import { eq } from 'drizzle-orm';
 import { ConfigRepository } from '../config-repository';
 import { toDbBoolean } from '../../utils/normalize';
 
+function parseStoredGroups(value: unknown) {
+  return typeof value === 'string' ? JSON.parse(value) : value;
+}
+
 describe('migrateLegacyTargetGroups', () => {
   let db: ReturnType<typeof getDatabase>;
   let schema: ReturnType<typeof getSchema>;
@@ -99,7 +103,7 @@ describe('migrateLegacyTargetGroups', () => {
     expect(aliasRows).toHaveLength(1);
     const aliasRow = aliasRows[0]!;
     expect(aliasRow.targetGroups).toBeTruthy();
-    const groups = JSON.parse(aliasRow.targetGroups as string);
+    const groups = parseStoredGroups(aliasRow.targetGroups);
     expect(groups).toEqual([{ name: 'default', selector: 'in_order' }]);
 
     // Verify targets now have groupName='default'
@@ -148,7 +152,7 @@ describe('migrateLegacyTargetGroups', () => {
       .select()
       .from(schema.modelAliases)
       .where(eq(schema.modelAliases.slug, 'empty-alias'));
-    const groups = JSON.parse(rows[0]!.targetGroups as string);
+    const groups = parseStoredGroups(rows[0]!.targetGroups);
     expect(groups).toEqual([{ name: 'default', selector: 'random' }]);
   });
 
@@ -240,7 +244,7 @@ describe('migrateLegacyTargetGroups', () => {
       .select()
       .from(schema.modelAliases)
       .where(eq(schema.modelAliases.slug, 'new-alias'));
-    const storedGroups = JSON.parse(rows[0]!.targetGroups as string);
+    const storedGroups = parseStoredGroups(rows[0]!.targetGroups);
     expect(storedGroups).toEqual([
       { name: 'primary', selector: 'random' },
       { name: 'fallback', selector: 'in_order' },

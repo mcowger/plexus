@@ -7,6 +7,7 @@ export default defineProject({
   test: {
     ...baseConfig.test,
     name: 'postgres',
+    globalSetup: ['./test/vitest.postgres.global-setup.ts'],
     include: [...DB_TEST_FILES],
     env: {
       ...baseConfig.test?.env,

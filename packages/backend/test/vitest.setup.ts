@@ -18,14 +18,17 @@ function copyDirectory(sourceDir: string, targetDir: string) {
   }
 }
 
-const templateDbUrl = process.env.PLEXUS_TEST_DB_TEMPLATE_URL;
-const pgliteTemplateDir = process.env.PLEXUS_TEST_PGLITE_TEMPLATE_DIR;
-const tmpRoot = process.env.PLEXUS_TEST_DB_TMP_ROOT;
+const testDialect = process.env.PLEXUS_TEST_DIALECT;
+const sqliteTemplateDbUrl = process.env.PLEXUS_TEST_SQLITE_TEMPLATE_URL;
+const sqliteTmpRoot = process.env.PLEXUS_TEST_SQLITE_TMP_ROOT;
+const postgresTemplateDir = process.env.PLEXUS_TEST_POSTGRES_TEMPLATE_DIR;
+const postgresTmpRoot = process.env.PLEXUS_TEST_POSTGRES_TMP_ROOT;
 const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? '0';
 
-if (templateDbUrl && tmpRoot) {
-  const templateDbPath = sqliteUrlToPath(templateDbUrl);
-  const workerDbPath = path.join(tmpRoot, `vitest-worker-${workerId}.sqlite`);
+if ((testDialect === 'sqlite' || testDialect === 'unit') && sqliteTemplateDbUrl && sqliteTmpRoot) {
+  const templateDbPath = sqliteUrlToPath(sqliteTemplateDbUrl);
+  const workerPrefix = testDialect === 'unit' ? 'vitest-unit-worker' : 'vitest-worker';
+  const workerDbPath = path.join(sqliteTmpRoot, `${workerPrefix}-${workerId}.sqlite`);
 
   if (templateDbPath && !fs.existsSync(workerDbPath)) {
     fs.copyFileSync(templateDbPath, workerDbPath);
@@ -34,15 +37,16 @@ if (templateDbUrl && tmpRoot) {
   const workerDbUrl = `sqlite://${workerDbPath}`;
   process.env.PLEXUS_TEST_DB_URL = workerDbUrl;
   process.env.DATABASE_URL = workerDbUrl;
-} else if (pgliteTemplateDir && tmpRoot) {
-  const workerDataDir = path.join(tmpRoot, `vitest-worker-${workerId}.pglite`);
+} else if (testDialect === 'postgres' && postgresTemplateDir && postgresTmpRoot) {
+  const workerDataDir = path.join(postgresTmpRoot, `vitest-worker-${workerId}.pglite`);
 
   if (!fs.existsSync(workerDataDir)) {
-    copyDirectory(pgliteTemplateDir, workerDataDir);
+    copyDirectory(postgresTemplateDir, workerDataDir);
   }
 
   const workerDbUrl =
-    process.env.PLEXUS_TEST_DB_URL || 'postgres://postgres:postgres@localhost:5432/plexus_test';
+    process.env.PLEXUS_TEST_POSTGRES_DB_URL ||
+    'postgres://postgres:postgres@localhost:5432/plexus_test';
   process.env.PLEXUS_POSTGRES_DRIVER = 'pglite';
   process.env.PLEXUS_PGLITE_DATA_DIR = workerDataDir;
   process.env.PLEXUS_TEST_DB_URL = workerDbUrl;
