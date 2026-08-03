@@ -255,6 +255,56 @@ describe('matchUnsupportedParameter', () => {
   test('returns undefined for an empty body', () => {
     expect(matchUnsupportedParameter('')).toBeUndefined();
   });
+
+  // Structured unknown-field errors (e.g. Alibaba Cloud DashScope) name the
+  // offending field in a machine-readable `data.field` member with a
+  // localized message and a `code` of UNKNOWN_FIELD, instead of the English
+  // "Unsupported parameter: X" text. See issue #783.
+  test('extracts the field from a structured UNKNOWN_FIELD body (#783)', () => {
+    const body = JSON.stringify({
+      code: 'UNKNOWN_FIELD',
+      message: '未知请求字段：reasoning.effort',
+      data: { field: 'reasoning.effort' },
+      traceId: 'trace_92b98af4-b0f9-4742-b50b-31f3ac25e824',
+    });
+    expect(matchUnsupportedParameter(body)).toBe('reasoning.effort');
+  });
+
+  test('extracts the field from a structured UNKNOWN_FIELD body with a dotted path', () => {
+    expect(
+      matchUnsupportedParameter(
+        '{"code":"UNKNOWN_FIELD","message":"unknown field","data":{"field":"text.verbosity"}}'
+      )
+    ).toBe('text.verbosity');
+  });
+
+  test('normalizes bracket notation in a structured UNKNOWN_FIELD field', () => {
+    expect(
+      matchUnsupportedParameter('{"code":"UNKNOWN_FIELD","data":{"field":"messages[0].name"}}')
+    ).toBe('messages.0.name');
+  });
+
+  test('accepts data.field_path as an alternative key', () => {
+    expect(
+      matchUnsupportedParameter('{"code":"UNKNOWN_FIELD","data":{"field_path":"reasoning.effort"}}')
+    ).toBe('reasoning.effort');
+  });
+
+  test('returns undefined for a structured body without the unknown-field code', () => {
+    expect(
+      matchUnsupportedParameter('{"code":"RATE_LIMITED","data":{"field":"reasoning.effort"}}')
+    ).toBeUndefined();
+  });
+
+  test('returns undefined for a structured body without a data.field', () => {
+    expect(
+      matchUnsupportedParameter('{"code":"UNKNOWN_FIELD","message":"bad request"}')
+    ).toBeUndefined();
+  });
+
+  test('returns undefined for a non-JSON body', () => {
+    expect(matchUnsupportedParameter('not json at all')).toBeUndefined();
+  });
 });
 
 describe('deleteDottedPath', () => {
@@ -596,6 +646,18 @@ describe('planUnsupportedParamStrip', () => {
       planUnsupportedParamStrip('{"error":{"message":"Invalid request"}}', state)
     ).toBeUndefined();
     expect(state.attempts).toBe(0);
+  });
+
+  test('strips a field named by a structured UNKNOWN_FIELD body (#783)', () => {
+    const state = createUnsupportedParamStripState();
+    const body = JSON.stringify({
+      code: 'UNKNOWN_FIELD',
+      message: '未知请求字段：reasoning.effort',
+      data: { field: 'reasoning.effort' },
+    });
+    expect(planUnsupportedParamStrip(body, state)).toBe('reasoning.effort');
+    expect(state.attempts).toBe(1);
+    expect(state.strippedParams.has('reasoning.effort')).toBe(true);
   });
 
   test('structural guard: refuses to strip the whole messages/input/model field, consuming no budget', () => {

@@ -456,8 +456,51 @@ function normalizeBracketSegments(path: string): string {
  */
 export function matchUnsupportedParameter(responseBody: string): string | undefined {
   if (!responseBody) return undefined;
+
+  // Structured error formats that name an unsupported/unknown field in a
+  // machine-readable location rather than a free-text "Unsupported
+  // parameter: X" message. Example (Alibaba Cloud DashScope):
+  //   {"code":"UNKNOWN_FIELD","message":"未知请求字段：reasoning.effort","data":{"field":"reasoning.effort"}}
+  // Without this, a provider returning a localized/structured unknown-field
+  // error bypasses the strip-and-retry loop and the request fails outright.
+  const structured = matchStructuredUnknownField(responseBody);
+  if (structured) return structured;
+
   const paramName = UNSUPPORTED_PARAMETER_PATTERN.exec(responseBody)?.[1];
   return paramName === undefined ? undefined : normalizeBracketSegments(paramName);
+}
+
+/**
+ * Matches structured upstream error bodies that report an unknown/unrecognized
+ * request field via a `data.field` (or `data.field_path`) member rather than an
+ * English "Unsupported parameter" message. Covers Alibaba Cloud DashScope
+ * ({"code":"UNKNOWN_FIELD",...,"data":{"field":"reasoning.effort"}}),
+ * which is the shape reported in #783.
+ *
+ * Returns the canonical (dotted) field path, or `undefined` when the body is
+ * not one of these structured shapes.
+ */
+function matchStructuredUnknownField(responseBody: string): string | undefined {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(responseBody);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== 'object') return undefined;
+
+  // DashScope-style: { "code": "UNKNOWN_FIELD", "data": { "field": "..." } }
+  const code = typeof parsed.code === 'string' ? parsed.code.toUpperCase() : undefined;
+  const isUnknownField =
+    code === 'UNKNOWN_FIELD' || code === 'INVALID_PARAMETER' || code === 'UNEXPECTED_PARAMETER';
+  if (!isUnknownField) return undefined;
+
+  const data = parsed.data;
+  if (!data || typeof data !== 'object') return undefined;
+  const raw = data.field ?? data.field_path ?? data.fieldPath;
+  if (typeof raw !== 'string' || !raw) return undefined;
+
+  return normalizeBracketSegments(raw);
 }
 
 /** Segment names that must never be traversed — see `deleteDottedPath`. */
