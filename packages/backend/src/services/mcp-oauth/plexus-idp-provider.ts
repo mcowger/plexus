@@ -474,27 +474,45 @@ export class PlexusIdpProvider implements AuthProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Authorize Plexus MCP</title>
   <style>
-    :root { color-scheme: dark; --bg-deep: #020617; --bg-card: rgba(15, 23, 42, 0.92); --bg-input: rgba(15, 23, 42, 0.72); --border: rgba(148, 163, 184, 0.18); --border-strong: rgba(245, 158, 11, 0.5); --text: #f8fafc; --text-secondary: #cbd5e1; --text-muted: #64748b; --primary: #f59e0b; --secondary: #fbbf24; --danger: #fda4af; }
+    :root {
+      color-scheme: dark;
+      --bg-deep: #000000;
+      --bg-glass: rgba(15, 23, 42, 0.92);
+      --bg-input: rgba(15, 23, 42, 0.6);
+      --border: #1E293B;
+      --border-glass: rgba(255, 255, 255, 0.08);
+      --text: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --primary: #F59E0B;
+      --secondary: #FBBF24;
+      --glow: rgba(245, 158, 11, 0.5);
+      --focus-ring: rgba(245, 158, 11, 0.18);
+      --font-heading: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+      --font-body: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
     * { box-sizing: border-box; }
-    body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 20%, rgba(245, 158, 11, 0.10), transparent 30%), var(--bg-deep); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; padding: 1rem; }
+    body { min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 20%, rgba(245, 158, 11, 0.10), transparent 30%), var(--bg-deep); color: var(--text); font-family: var(--font-body); line-height: 1.5; padding: 1rem; }
     .mesh { position: fixed; inset: 0; pointer-events: none; opacity: 0.5; }
     main { position: relative; width: 100%; max-width: 28rem; }
     .brand { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 2rem; }
-    .mark { width: 44px; height: 44px; border-radius: 999px; background: linear-gradient(135deg, var(--secondary), var(--primary)); box-shadow: 0 0 34px rgba(245, 158, 11, 0.28); display: grid; place-items: center; }
-    .mark svg { width: 26px; height: 26px; color: #0f172a; }
-    .wordmark { font-size: 1.875rem; font-weight: 800; letter-spacing: -0.025em; background: linear-gradient(135deg, var(--secondary), var(--primary)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .version { font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-    .card { border: 1px solid var(--border); background: linear-gradient(180deg, rgba(30,41,59,0.82), var(--bg-card)); border-radius: 1rem; padding: 2rem; box-shadow: 0 24px 80px rgba(0,0,0,0.45); backdrop-filter: blur(18px); }
-    h1 { font-size: 1.5rem; line-height: 2rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 0.375rem; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    .mark { width: 44px; height: 44px; animation: float 6s ease-in-out infinite; }
+    .wordmark { font-family: var(--font-heading); font-size: 1.875rem; font-weight: 700; letter-spacing: -0.025em; background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 60%, #D97706 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .version { font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--text-muted); font-family: var(--font-mono); }
+    .card { border: 1px solid var(--border-glass); background: var(--bg-glass); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%); border-radius: 1rem; padding: 2rem; box-shadow: 0 24px 80px rgba(0,0,0,0.45); }
+    h1 { font-family: var(--font-heading); font-size: 1.5rem; line-height: 2rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.375rem; }
     p { color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 1rem; }
-    .client { margin: 1rem 0; padding: 0.75rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.06); background: rgba(2, 6, 23, 0.36); }
+    .client { margin: 1rem 0; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border); background: rgba(15, 23, 42, 0.45); }
     .client p { margin: 0.25rem 0; font-size: 0.75rem; }
-    code { color: #fde68a; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; overflow-wrap: anywhere; }
+    code { color: #FDE68A; font-family: var(--font-mono); overflow-wrap: anywhere; }
     label { display: block; margin: 1rem 0 0.375rem; color: var(--text-secondary); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
-    input[type=password] { width: 100%; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--bg-input); color: var(--text); padding: 0.75rem 0.875rem; font: 0.875rem ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; outline: none; transition: border-color 120ms ease, box-shadow 120ms ease; }
-    input[type=password]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
-    button { width: 100%; margin-top: 1rem; border: 0; border-radius: 0.5rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); color: #0f172a; font: 700 0.875rem Inter, ui-sans-serif, system-ui, sans-serif; padding: 0.75rem 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
-    .note { margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem; color: var(--text-muted); font-size: 0.75rem; }
+    input[type=password] { width: 100%; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--bg-input); color: var(--text); padding: 0.75rem 0.875rem; font: 0.875rem var(--font-mono); outline: none; transition: border-color 120ms ease, box-shadow 120ms ease; }
+    input[type=password]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+    button { width: 100%; margin-top: 1rem; border: 0; border-radius: 0.375rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); color: #1A1006; font: 500 0.875rem var(--font-body); padding: 0.75rem 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 6px 20px -10px var(--glow); transition: filter 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
+    button:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 12px 28px -10px rgba(245, 158, 11, 0.65); }
+    .note { margin-top: 1.5rem; border-top: 1px solid var(--border-glass); padding-top: 1rem; color: var(--text-muted); font-size: 0.75rem; }
     .footer { margin-top: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.75rem; }
   </style>
 </head>
@@ -505,7 +523,26 @@ export class PlexusIdpProvider implements AuthProvider {
   </svg>
   <main>
     <div class="brand">
-      <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M5 7.5l14 9M19 7.5l-14 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+      <svg class="mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="plx-oauth-mark" x1="0" y1="0" x2="44" y2="44">
+            <stop offset="0%" stop-color="#FBBF24"/>
+            <stop offset="100%" stop-color="#D97706"/>
+          </linearGradient>
+        </defs>
+        <g stroke="url(#plx-oauth-mark)" stroke-width="1.6" fill="none">
+          <line x1="22" y1="6" x2="6" y2="16"/>
+          <line x1="22" y1="6" x2="38" y2="16"/>
+          <line x1="6" y1="16" x2="22" y2="38"/>
+          <line x1="38" y1="16" x2="22" y2="38"/>
+          <line x1="6" y1="16" x2="38" y2="16"/>
+          <line x1="22" y1="6" x2="22" y2="38"/>
+        </g>
+        <circle cx="22" cy="6" r="3" fill="url(#plx-oauth-mark)"/>
+        <circle cx="6" cy="16" r="3" fill="url(#plx-oauth-mark)"/>
+        <circle cx="38" cy="16" r="3" fill="url(#plx-oauth-mark)"/>
+        <circle cx="22" cy="38" r="3" fill="url(#plx-oauth-mark)"/>
+      </svg>
       <div><span class="wordmark">Plexus</span> <span class="version">MCP OAuth</span></div>
     </div>
     <section class="card">
