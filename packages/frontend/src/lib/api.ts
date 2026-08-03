@@ -2260,7 +2260,10 @@ export const api = {
         `${API_BASE}/v0/management/debug/logs?limit=${limit}&offset=${offset}`
       );
       if (!res.ok) throw new Error('Failed to fetch debug logs');
-      return await res.json();
+      const json = (await res.json()) as BackendResponse<
+        { requestId: string; createdAt: number; responseStatus: number | null }[]
+      >;
+      return json.data || [];
     } catch (e) {
       console.error('API Error getDebugLogs', e);
       return [];
@@ -2308,7 +2311,8 @@ export const api = {
         `${API_BASE}/v0/management/errors?limit=${limit}&offset=${offset}`
       );
       if (!res.ok) throw new Error('Failed to fetch error logs');
-      return await res.json();
+      const json = (await res.json()) as BackendResponse<InferenceError[]>;
+      return json.data || [];
     } catch (e) {
       console.error('API Error getErrors', e);
       return [];
