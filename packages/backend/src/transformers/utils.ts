@@ -1,5 +1,25 @@
 import { ThinkLevel } from '../types/unified';
 
+export function projectReasoningForResponses(
+  reasoning:
+    | {
+        effort?: ThinkLevel;
+        enabled?: boolean;
+        summary?: string;
+      }
+    | undefined
+): { effort?: ThinkLevel; summary?: string } | undefined {
+  if (!reasoning) return undefined;
+  if (reasoning.enabled === false) return { effort: 'none' };
+
+  const projected = {
+    ...(reasoning.effort !== undefined ? { effort: reasoning.effort } : {}),
+    ...(reasoning.summary !== undefined ? { summary: reasoning.summary } : {}),
+  };
+
+  return Object.keys(projected).length > 0 ? projected : undefined;
+}
+
 /**
  * A more accurate token counter that accounts for common sub-word patterns.
  * No external dependencies.

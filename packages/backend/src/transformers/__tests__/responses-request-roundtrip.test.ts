@@ -5,6 +5,7 @@ import {
   normalizeResponsesReasoningContent,
 } from '../responses';
 import { OpenAITransformer } from '../openai';
+import { parseAnthropicRequest } from '../anthropic/request-parser';
 
 /**
  * Round-trip tests for the Responses API transformer.
@@ -286,6 +287,47 @@ describe('Responses responses -> responses round-trip preserves native fields', 
     expect(built.store).toBeUndefined();
     expect(built.service_tier).toBeUndefined();
     expect(built.stream_options).toBeUndefined();
+  });
+});
+
+describe('Anthropic -> Responses reasoning projection', () => {
+  it('omits unified-only reasoning fields from the Responses payload', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
+    });
+
+    const built = await new ResponsesTransformer().transformRequest(unified);
+
+    expect(built.reasoning).toEqual({ effort: 'high' });
+    expect(built.reasoning).not.toHaveProperty('enabled');
+    expect(built.reasoning).not.toHaveProperty('max_tokens');
+  });
+
+  it('uses the Responses off effort for explicitly disabled thinking', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'disabled' },
+    });
+
+    const built = await new ResponsesTransformer().transformRequest(unified);
+
+    expect(built.reasoning).toEqual({ effort: 'none' });
+  });
+
+  it('leaves adaptive magnitude selection to registry auto-compat', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'adaptive' },
+    });
+
+    const built = await new ResponsesTransformer().transformRequest(unified);
+
+    expect(built.reasoning).toBeUndefined();
   });
 });
 

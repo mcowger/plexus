@@ -126,6 +126,7 @@ export interface UnifiedChatRequest {
     effort?: ThinkLevel;
     max_tokens?: number;
     enabled?: boolean;
+    adaptive?: boolean;
     summary?: string;
   };
   include?: string[];

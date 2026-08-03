@@ -237,6 +237,12 @@ describe('matchUnsupportedParameter', () => {
     ).toBe('reasoning.summary');
   });
 
+  test('extracts a dotted-path param from an unknown-parameter error', () => {
+    expect(
+      matchUnsupportedParameter('{"error":{"message":"Unknown parameter: \'reasoning.enabled\'"}}')
+    ).toBe('reasoning.enabled');
+  });
+
   test('extracts a bracket-notation param name, normalized to canonical dotted form', () => {
     // The old `[\w.]+` capture stopped at the `[`, truncating
     // `messages[0].name` to `messages` — and the paired deleteDottedPath call

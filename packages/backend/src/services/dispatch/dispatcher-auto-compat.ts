@@ -6,6 +6,7 @@ import type { GenerationIntent } from '../pi-ai/generation';
 import { normalizeVerbosity } from '../pi-ai/generation';
 import type { ReasoningIntent, ReasoningVisibility } from '../pi-ai/reasoning';
 import { normalizeEffort, normalizeVisibility } from '../pi-ai/reasoning';
+import { projectReasoningForResponses } from '../../transformers/utils';
 
 function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -61,6 +62,7 @@ function normalizeReasoningFromUnified(
     ...(effort && effort !== 'off' ? { effort } : {}),
     ...(reasoning?.max_tokens != null ? { budgetTokens: reasoning.max_tokens } : {}),
     ...(enabled !== undefined ? { enabled } : {}),
+    ...(reasoning?.adaptive ? { adaptive: true } : {}),
     ...(visibility ? { visibility } : {}),
     ...(reasoning?.summary ? { summaryDetail: reasoning.summary } : {}),
     source: 'client',
@@ -290,17 +292,18 @@ function projectResponsesAutoCompat(
   if (options.textVerbosity !== undefined) {
     next.text = { ...(next.text ?? {}), verbosity: options.textVerbosity };
   }
+  const existingReasoning = projectReasoningForResponses(next.reasoning);
   if (options.reasoningEffort || options.reasoningSummary) {
     next.reasoning = {
-      ...(next.reasoning ?? {}),
+      ...(existingReasoning ?? {}),
       effort: mappedThinkingValue(model, options.reasoningEffort) ?? 'medium',
-      summary: options.reasoningSummary ?? next.reasoning?.summary ?? 'auto',
+      summary: options.reasoningSummary ?? existingReasoning?.summary ?? 'auto',
     };
     next.include = Array.from(
       new Set([...(Array.isArray(next.include) ? next.include : []), 'reasoning.encrypted_content'])
     );
   } else if (options.reasoning === 'off') {
-    next.reasoning = { ...(next.reasoning ?? {}), effort: mappedOffValue(model) ?? 'none' };
+    next.reasoning = { ...(existingReasoning ?? {}), effort: mappedOffValue(model) ?? 'none' };
   }
   return next;
 }
@@ -421,7 +424,7 @@ export function applyRegistryAutoCompat(
 // whole request (e.g. OpenAI-compatible Responses API providers reject a
 // client-sent `safety_identifier` or `prompt_cache_key` with
 // `{"detail":"Unsupported parameter: safety_identifier"}` or
-// `{"error":{"message":"Unsupported parameter: 'foo'"}}`). Failing over to the
+// `{"error":{"message":"Unknown parameter: 'foo'"}}`). Failing over to the
 // next configured target doesn't help when the *client* sent the offending
 // field — every target would reject it the same way. Instead, the dispatch
 // loop (see standard-attempt-request.ts) strips the named field from the
@@ -429,14 +432,15 @@ export function applyRegistryAutoCompat(
 
 /**
  * Matches both `{"detail":"Unsupported parameter: X"}` and
- * `{"error":{"message":"Unsupported parameter: 'X'"}}` shapes. The captured
+ * `{"error":{"message":"Unknown parameter: 'X'"}}` shapes. The captured
  * group also matches dotted paths (e.g. `reasoning.summary`) and
  * bracket-notation paths (e.g. `messages[0].name`), since providers name
  * nested fields both ways. A capture that stopped at `[` would truncate
  * `messages[0].name` to `messages` — and the paired delete would then remove
  * the ENTIRE conversation from the retry payload.
  */
-const UNSUPPORTED_PARAMETER_PATTERN = /unsupported parameter[:\s]+['"]?([\w.[\]]+)['"]?/i;
+const UNSUPPORTED_PARAMETER_PATTERN =
+  /(?:unsupported|unknown) parameter[:\s]+['"]?([\w.[\]]+)['"]?/i;
 
 /**
  * Canonicalizes bracket-notation segments to dotted form

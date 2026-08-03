@@ -124,6 +124,54 @@ describe('Anthropic messages -> messages round-trip preserves native fields', ()
   });
 });
 
+describe('Anthropic reasoning intent normalization', () => {
+  it('treats adaptive thinking as enabled and uses output effort', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
+    });
+
+    expect(unified.reasoning).toEqual({ effort: 'high', enabled: true, adaptive: true });
+  });
+
+  it('does not invent an effort when adaptive thinking has no budget or output effort', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'adaptive' },
+    });
+
+    expect(unified.reasoning).toEqual({ enabled: true, adaptive: true });
+  });
+
+  it('does not retain an effort when thinking is explicitly disabled', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'disabled' },
+      output_config: { effort: 'high' },
+    });
+
+    expect(unified.reasoning).toEqual({ enabled: false });
+  });
+
+  it('maps a budgeted thinking request to effort and preserves the budget', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-4-6',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'enabled', budget_tokens: 8192 },
+    });
+
+    expect(unified.reasoning).toEqual({
+      effort: 'medium',
+      max_tokens: 8192,
+      enabled: true,
+    });
+  });
+});
+
 describe('Anthropic image block cache_control round-trip', () => {
   it('preserves cache_control on image blocks (Fix #2)', async () => {
     const requestWithImage = {

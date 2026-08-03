@@ -1,4 +1,5 @@
 import { UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
+import { normalizeEffort } from '../../services/pi-ai/reasoning';
 import { getThinkLevel } from '../utils';
 import { convertAnthropicContent } from './content-mapper';
 import { convertAnthropicToolsToUnified } from './tool-mapper';
@@ -111,10 +112,24 @@ export async function parseAnthropicRequest(input: any): Promise<UnifiedChatRequ
 
   // Map Thinking/Reasoning Configuration
   if (input.thinking) {
+    const thinkingType = input.thinking.type;
+    const thinkingBudget = input.thinking.budget_tokens;
+    const thinkingEnabled = thinkingType === 'enabled' || thinkingType === 'adaptive';
+    const configuredEffort = normalizeEffort(input.output_config?.effort);
+    const effort = thinkingEnabled
+      ? configuredEffort === 'off'
+        ? 'none'
+        : (configuredEffort ??
+          (typeof thinkingBudget === 'number' ? getThinkLevel(thinkingBudget) : undefined))
+      : undefined;
+
     result.reasoning = {
-      effort: getThinkLevel(input.thinking.budget_tokens),
-      max_tokens: input.thinking.budget_tokens,
-      enabled: input.thinking.type === 'enabled',
+      ...(effort !== undefined ? { effort } : {}),
+      ...(thinkingEnabled && typeof thinkingBudget === 'number'
+        ? { max_tokens: thinkingBudget }
+        : {}),
+      enabled: thinkingEnabled,
+      ...(thinkingType === 'adaptive' ? { adaptive: true } : {}),
     };
   }
 

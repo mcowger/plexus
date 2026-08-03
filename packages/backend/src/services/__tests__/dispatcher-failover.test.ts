@@ -599,6 +599,32 @@ describe('Dispatcher Failover', () => {
     expect(paramStripWarn).toContain("'safety_identifier'");
   });
 
+  test('same-target retry: strips a named unknown parameter and retries instead of failing over', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 1 }));
+    fetchMock
+      .mockImplementationOnce(async () =>
+        errorResponse(400, "Unknown parameter: 'reasoning.enabled'")
+      )
+      .mockImplementationOnce(async () => successChatResponse('model-1'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch({
+      ...makeChatRequest(),
+      reasoning: { effort: 'high', enabled: false },
+      originalBody: {
+        model: 'test-alias',
+        messages: [{ role: 'user', content: 'hello' }],
+        reasoning: { effort: 'high', enabled: false },
+      },
+    });
+
+    expect((response as any).plexus?.finalAttemptProvider).toBe('p1');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const retriedBody = JSON.parse((fetchMock.mock.calls[1] as any[])[1].body as string);
+    expect(retriedBody.reasoning).toEqual({ effort: 'high' });
+  });
+
   test('same-target retry: gives up after the retry bound and fails normally when the upstream keeps naming a NEW unsupported param', async () => {
     setConfigForTesting(makeConfig({ targetCount: 1 }));
     fetchMock

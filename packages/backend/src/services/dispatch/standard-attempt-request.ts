@@ -260,7 +260,7 @@ export async function executeStandardAttempt(
       //      blocks were signed by a DIFFERENT Claude model/session than
       //      the one we're now targeting, and Anthropic 400s naming the
       //      stale signature specifically.
-      //   2. Unsupported parameters: some upstreams 400 naming one specific
+      //   2. Unsupported/unknown parameters: some upstreams 400 naming one specific
       //      client-sent field (e.g. LobeHub's gpt-5.5 traffic sending
       //      safety_identifier / prompt_cache_key that a provider rejects).
       if (response.status === 400) {

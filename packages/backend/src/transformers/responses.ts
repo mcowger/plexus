@@ -22,6 +22,7 @@ import { encode } from 'eventsource-encoder';
 import { logger } from '../utils/logger';
 import { normalizeOpenAIChatUsage, normalizeOpenAIResponsesUsage } from '../utils/usage-normalizer';
 import { imageGenerationCallMarkdown } from './image-rendering';
+import { projectReasoningForResponses } from './utils';
 
 const OPENAI_RESPONSES_CALL_ID_MAX_LENGTH = 64;
 const OPENAI_RESPONSES_REASONING_CONTENT_MAX_ITEMS = 0;
@@ -336,7 +337,8 @@ export class ResponsesTransformer implements Transformer {
       payload.tool_choice = request.tool_choice;
     }
     if (request.reasoning) {
-      payload.reasoning = request.reasoning;
+      const reasoning = projectReasoningForResponses(request.reasoning);
+      if (reasoning) payload.reasoning = reasoning;
     }
     if (request.include && request.include.length > 0) {
       payload.include = request.include;
