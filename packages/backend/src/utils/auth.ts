@@ -65,6 +65,85 @@ export function isRequestIpAllowed(
   return isIpAllowed(clientIp, allowedIps);
 }
 
+export interface PlexusApiKeyAuthResult {
+  keyName: string;
+  keyConfig: unknown;
+  attribution: string | null;
+}
+
+export function splitApiKeyAttribution(key: string): {
+  secretPart: string;
+  attributionPart: string | null;
+} {
+  const firstColonIndex = key.indexOf(':');
+  if (firstColonIndex === -1) {
+    return { secretPart: key, attributionPart: null };
+  }
+
+  const secretPart = key.substring(0, firstColonIndex);
+  const rawAttribution = key.substring(firstColonIndex + 1);
+  return { secretPart, attributionPart: rawAttribution.toLowerCase() || null };
+}
+
+export function validatePlexusApiKey(
+  key: string,
+  request: FastifyRequest
+): PlexusApiKeyAuthResult | null {
+  const config = getConfig();
+  logger.silly(`config.keys exists: ${!!config.keys}`);
+
+  if (!config.keys) {
+    logger.silly(`No keys configured`);
+    return null;
+  }
+
+  const { secretPart, attributionPart } = splitApiKeyAttribution(key);
+
+  logger.silly(`Looking for secret: ${secretPart.substring(0, 15)}`);
+  logger.silly(`Available keys config: ${JSON.stringify(config.keys)}`);
+
+  const entry = Object.entries(config.keys).find(
+    ([_, k]) => (k as { secret: string }).secret === secretPart
+  );
+
+  if (!entry) {
+    logger.silly(`Auth FAILED - no matching key`);
+    logger.error(`Auth FAILED - no matching key for secret: ${secretPart}`);
+    logger.error(`Available keys config: ${JSON.stringify(config.keys)}`);
+    return null;
+  }
+
+  const keyCfg = entry[1] as { allowedIps?: string[]; expiresAt?: number; disabledAt?: number };
+
+  if (isKeyDisabled(keyCfg)) {
+    if (keyCfg.expiresAt !== undefined && keyCfg.disabledAt === undefined) {
+      void ConfigService.getInstance()
+        .disableTimeBoundKey(entry[0])
+        .catch((error) => logger.error(`Failed to disable expired key ${entry[0]}`, error));
+    }
+    logger.silly(`Auth FAILED - key disabled: ${entry[0]}`);
+    return null;
+  }
+
+  if (!isRequestIpAllowed(request, keyCfg.allowedIps, config.trustedProxies)) {
+    logger.silly(`Auth FAILED - client IP not in allowlist for key: ${entry[0]}`);
+    return null;
+  }
+
+  return {
+    keyName: entry[0],
+    keyConfig: entry[1],
+    attribution: attributionPart,
+  };
+}
+
+export function attachPlexusApiKeyAuth(request: FastifyRequest, result: PlexusApiKeyAuthResult) {
+  (request as any).keyName = result.keyName;
+  (request as any).attribution = result.attribution;
+  (request as any).keyConfig = result.keyConfig;
+  enterRequestContext({ keyName: result.keyName });
+}
+
 export function createAuthHook(options: { allowQueryKey?: boolean } = {}) {
   const allowQueryKey = options.allowQueryKey !== false;
   return {
@@ -102,71 +181,12 @@ export function createAuthHook(options: { allowQueryKey?: boolean } = {}) {
       auth: (key: string, req: any) => {
         logger.silly(`bearerAuth auth called with key: ${key.substring(0, 25)}`);
 
-        const config = getConfig();
-        logger.silly(`config.keys exists: ${!!config.keys}`);
-
-        if (!config.keys) {
-          logger.silly(`No keys configured`);
-          return false;
-        }
-
-        let secretPart: string;
-        let attributionPart: string | null = null;
-
-        const firstColonIndex = key.indexOf(':');
-        if (firstColonIndex !== -1) {
-          secretPart = key.substring(0, firstColonIndex);
-          const rawAttribution = key.substring(firstColonIndex + 1);
-          attributionPart = rawAttribution.toLowerCase() || null;
-        } else {
-          secretPart = key;
-        }
-
-        logger.silly(`Looking for secret: ${secretPart.substring(0, 15)}`);
-        logger.silly(`Available keys config: ${JSON.stringify(config.keys)}`);
-
-        const entry = Object.entries(config.keys).find(
-          ([_, k]) => (k as { secret: string }).secret === secretPart
-        );
-
-        if (entry) {
-          const keyCfg = entry[1] as {
-            allowedIps?: string[];
-            expiresAt?: number;
-            disabledAt?: number;
-          };
-          if (isKeyDisabled(keyCfg)) {
-            if (keyCfg.expiresAt !== undefined && keyCfg.disabledAt === undefined) {
-              void ConfigService.getInstance()
-                .disableTimeBoundKey(entry[0])
-                .catch((error) => logger.error(`Failed to disable expired key ${entry[0]}`, error));
-            }
-            logger.silly(`Auth FAILED - key disabled: ${entry[0]}`);
-            return false;
-          }
-          // Enforce the key's IP allowlist (if any). Returning false here yields
-          // the standard 401 auth_error, which deliberately does not reveal that
-          // the key is valid-but-used-from-a-disallowed-IP.
-          if (
-            !isRequestIpAllowed(req as FastifyRequest, keyCfg.allowedIps, config.trustedProxies)
-          ) {
-            logger.silly(`Auth FAILED - client IP not in allowlist for key: ${entry[0]}`);
-            return false;
-          }
-
-          logger.silly(`Auth SUCCESS for key: ${entry[0]}`);
-          req.keyName = entry[0];
-          req.attribution = attributionPart;
-          req.keyConfig = entry[1];
-          // Seed the async-local request context so downstream code (notably
-          // DebugManager) can resolve the key name without explicit plumbing.
-          enterRequestContext({ keyName: entry[0] });
+        const result = validatePlexusApiKey(key, req as FastifyRequest);
+        if (result) {
+          logger.silly(`Auth SUCCESS for key: ${result.keyName}`);
+          attachPlexusApiKeyAuth(req as FastifyRequest, result);
           return true;
         }
-
-        logger.silly(`Auth FAILED - no matching key`);
-        logger.error(`Auth FAILED - no matching key for secret: ${secretPart}`);
-        logger.error(`Available keys config: ${JSON.stringify(config.keys)}`);
         return false;
       },
       errorResponse: ((err: Error) => {

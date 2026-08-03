@@ -327,6 +327,40 @@ export interface McpLogRecord {
   error_message: string | null;
 }
 
+export interface McpOAuthSettings {
+  enabled: boolean;
+  provider: 'plexus-idp';
+  issuer?: string;
+  resource?: string;
+}
+
+export interface McpOAuthTokenRecord {
+  id: number;
+  accessTokenHash: string;
+  refreshTokenHash: string;
+  clientId: string;
+  keyName: string;
+  apiKeySecretHash: string | null;
+  resource: string;
+  scope: string | null;
+  accessTokenExpiresAt: number;
+  refreshTokenExpiresAt: number;
+  revokedAt: number | null;
+  createdAt: number;
+}
+
+export interface McpOAuthClientRecord {
+  clientId: string;
+  clientName: string | null;
+  redirectUris: string[];
+  grantTypes: string[];
+  responseTypes: string[];
+  scope: string | null;
+  tokenEndpointAuthMethod: string;
+  createdAt: number;
+  tokens: McpOAuthTokenRecord[];
+}
+
 export interface LoggingLevelState {
   level: string;
   startupLevel: string;
@@ -1743,24 +1777,7 @@ export const api = {
   },
 
   /** All system settings (a flat key/value bag; `default_quotas` lives here). */
-  getSystemSettings: async (): Promise<Record<string, unknown>> => {
-    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`);
-    if (!res.ok) throw new Error('Failed to fetch system settings');
-    return await res.json();
-  },
-
-  /** Merge-patch one or more system settings (e.g. `{ default_quotas: [...] }`). */
-  updateSystemSettings: async (settings: Record<string, unknown>): Promise<void> => {
-    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(err.error?.message || err.error || 'Failed to update system settings');
-    }
-  },
+  // getSystemSettings + patchSystemSettings are defined further below (upstream)
 
   /** Convenience wrapper: the key names substituted in when a key has no
    * `quotas` of its own. */
@@ -1772,7 +1789,7 @@ export const api = {
   },
 
   setDefaultQuotas: async (names: string[]): Promise<void> => {
-    await api.updateSystemSettings({ default_quotas: names });
+    await api.patchSystemSettings({ default_quotas: names });
   },
 
   restart: async (): Promise<{ success: boolean; message: string }> => {
@@ -3019,6 +3036,29 @@ export const api = {
     }
   },
 
+  getMcpOAuthClients: async (): Promise<McpOAuthClientRecord[]> => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/v0/management/mcp-oauth/clients`);
+      if (!res.ok) throw new Error('Failed to fetch MCP OAuth clients');
+      const body = (await res.json()) as { clients: McpOAuthClientRecord[] };
+      return body.clients || [];
+    } catch (e) {
+      console.error('API Error getMcpOAuthClients', e);
+      return [];
+    }
+  },
+
+  revokeMcpOAuthToken: async (tokenId: number): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-oauth/tokens/${encodeURIComponent(String(tokenId))}/revoke`,
+      { method: 'POST' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to revoke MCP OAuth token');
+    }
+  },
+
   deleteMcpLog: async (requestId: string): Promise<boolean> => {
     try {
       const res = await fetchWithAuth(
@@ -3447,6 +3487,24 @@ export const api = {
       throw new Error(err.error || 'Reset logs failed');
     }
     return res.json();
+  },
+
+  getSystemSettings: async (): Promise<Record<string, unknown>> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`);
+    if (!res.ok) throw new Error('Failed to fetch system settings');
+    return res.json();
+  },
+
+  patchSystemSettings: async (updates: Record<string, unknown>): Promise<void> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/system-settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update system settings');
+    }
   },
 
   // ─── Failover Settings ────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { api, McpServer, McpLogRecord, McpServerKey } from '../lib/api';
+import { api, McpServer, McpLogRecord, McpOAuthClientRecord, McpServerKey } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -25,6 +25,9 @@ import {
   Download,
   Package,
   Copy,
+  RefreshCw,
+  KeyRound,
+  ShieldOff,
 } from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
@@ -90,6 +93,11 @@ export const McpPage: React.FC = () => {
   const [logsOffset, setLogsOffset] = useState(0);
   const [logsFilters, setLogsFilters] = useState({ serverName: '', apiKey: '' });
 
+  // OAuth clients/tokens state
+  const [oauthClients, setOauthClients] = useState<McpOAuthClientRecord[]>([]);
+  const [oauthClientsLoading, setOauthClientsLoading] = useState(false);
+  const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
+
   // Delete logs modal state
   const [isDeleteLogsModalOpen, setIsDeleteLogsModalOpen] = useState(false);
   const [deleteLogsMode, setDeleteLogsMode] = useState<'all' | 'older'>('older');
@@ -107,6 +115,7 @@ export const McpPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadOAuthClients();
   }, []);
 
   useEffect(() => {
@@ -145,6 +154,40 @@ export const McpPage: React.FC = () => {
       console.error('Failed to load MCP logs', e);
     } finally {
       setLogsLoading(false);
+    }
+  };
+
+  const loadOAuthClients = async () => {
+    setOauthClientsLoading(true);
+    try {
+      const clients = await api.getMcpOAuthClients();
+      setOauthClients(clients);
+    } catch (e) {
+      console.error('Failed to load MCP OAuth clients', e);
+      toast.error('Failed to load MCP OAuth clients');
+    } finally {
+      setOauthClientsLoading(false);
+    }
+  };
+
+  const handleRevokeOAuthToken = async (tokenId: number) => {
+    const ok = await toast.confirm({
+      title: 'Revoke OAuth token?',
+      message: 'The client will need to reconnect before it can access MCP with this token again.',
+      confirmLabel: 'Revoke',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setRevokingTokenId(tokenId);
+    try {
+      await api.revokeMcpOAuthToken(tokenId);
+      await loadOAuthClients();
+      toast.success('OAuth token revoked');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to revoke OAuth token');
+    } finally {
+      setRevokingTokenId(null);
     }
   };
 
@@ -896,6 +939,141 @@ export const McpPage: React.FC = () => {
                   </table>
                 </div>
               </>
+            )}
+          </Card>
+
+          {/* ── OAuth Clients + Tokens Card ── */}
+          <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-text m-0 mb-1">
+                  MCP OAuth Clients
+                </h2>
+                <p className="text-xs text-text-muted">
+                  Registered OAuth clients and their active tokens. Tokens show the bound Plexus API
+                  key name only; raw secrets are never displayed.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadOAuthClients}
+                isLoading={oauthClientsLoading}
+                leftIcon={<RefreshCw size={14} />}
+              >
+                Refresh
+              </Button>
+            </div>
+
+            {oauthClientsLoading ? (
+              <div className="py-8 text-center text-sm text-text-secondary">Loading...</div>
+            ) : oauthClients.length === 0 ? (
+              <div className="rounded-md border border-border-glass bg-bg-subtle p-4 text-sm text-text-secondary">
+                No MCP OAuth clients registered yet.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {oauthClients.map((client) => (
+                  <article
+                    key={client.clientId}
+                    className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                          <KeyRound size={15} className="text-primary" />
+                          <span>{client.clientName || 'Unnamed client'}</span>
+                        </div>
+                        <div className="mt-1 font-mono text-xs text-text-secondary break-all">
+                          {client.clientId}
+                        </div>
+                        <div className="mt-2 text-xs text-text-muted">
+                          Created {new Date(client.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="min-w-0 lg:max-w-[45%]">
+                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Redirect URIs
+                        </div>
+                        <div className="mt-1 flex flex-col gap-1">
+                          {client.redirectUris.map((uri) => (
+                            <code
+                              key={uri}
+                              className="rounded border border-border-glass bg-bg-glass px-2 py-1 text-[11px] text-text-secondary break-all"
+                            >
+                              {uri}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 border-t border-border-glass pt-3">
+                      <div className="mb-2 text-[10px] uppercase tracking-wider text-text-muted">
+                        Active tokens
+                      </div>
+                      {client.tokens.length === 0 ? (
+                        <div className="text-xs text-text-muted">
+                          No active tokens for this client.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse font-body text-[12px]">
+                            <thead>
+                              <tr>
+                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                                  Key name
+                                </th>
+                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                                  Scope
+                                </th>
+                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                                  Access expires
+                                </th>
+                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                                  Issued
+                                </th>
+                                <th className="px-2 py-2 text-right border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                                  Action
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {client.tokens.map((token) => (
+                                <tr key={token.id} className="hover:bg-bg-hover">
+                                  <td className="px-2 py-2 border-b border-border-glass text-text">
+                                    <span className="font-mono">{token.keyName}</span>
+                                  </td>
+                                  <td className="px-2 py-2 border-b border-border-glass text-text-secondary">
+                                    {token.scope || '-'}
+                                  </td>
+                                  <td className="px-2 py-2 border-b border-border-glass text-text-secondary whitespace-nowrap">
+                                    {new Date(token.accessTokenExpiresAt).toLocaleString()}
+                                  </td>
+                                  <td className="px-2 py-2 border-b border-border-glass text-text-secondary whitespace-nowrap">
+                                    {new Date(token.createdAt).toLocaleString()}
+                                  </td>
+                                  <td className="px-2 py-2 border-b border-border-glass text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="danger"
+                                      onClick={() => handleRevokeOAuthToken(token.id)}
+                                      isLoading={revokingTokenId === token.id}
+                                      leftIcon={<ShieldOff size={13} />}
+                                    >
+                                      Revoke
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
             )}
           </Card>
 

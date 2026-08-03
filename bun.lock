@@ -26,6 +26,7 @@
         "@earendil-works/pi-ai": "0.83.0",
         "@fastify/bearer-auth": "^10.1.2",
         "@fastify/cors": "^11.3.0",
+        "@fastify/formbody": "^8.0.2",
         "@fastify/multipart": "^10.1.0",
         "@fastify/static": "^10.1.2",
         "@google/genai": "^2.14.0",
@@ -284,6 +285,8 @@
     "@fastify/error": ["@fastify/error@4.2.0", "", {}, "sha512-RSo3sVDXfHskiBZKBPRgnQTtIqpi/7zhJOEmAxCiBcM7d0uwdGdxLlsCaLzGs8v8NnxIRlfG0N51p5yFaOentQ=="],
 
     "@fastify/fast-json-stringify-compiler": ["@fastify/fast-json-stringify-compiler@5.0.3", "", { "dependencies": { "fast-json-stringify": "^6.0.0" } }, "sha512-uik7yYHkLr6fxd8hJSZ8c+xF4WafPK+XzneQDPU+D10r5X19GW8lJcom2YijX2+qtFF1ENJlHXKFM9ouXNJYgQ=="],
+
+    "@fastify/formbody": ["@fastify/formbody@8.0.2", "", { "dependencies": { "fast-querystring": "^1.1.2", "fastify-plugin": "^5.0.0" } }, "sha512-84v5J2KrkXzjgBpYnaNRPqwgMsmY7ZDjuj0YVuMR3NXCJRCgKEZy/taSP1wUYGn0onfxJpLyRGDLa+NMaDJtnA=="],
 
     "@fastify/forwarded": ["@fastify/forwarded@3.0.1", "", {}, "sha512-JqDochHFqXs3C3Ml3gOY58zM7OqO9ENqPo0UqAjAjH8L01fRZqwX9iLeX34//kiJubF7r2ZQHtBRU36vONbLlw=="],
 

@@ -1,13 +1,103 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import bearerAuth from '@fastify/bearer-auth';
-import { createAuthHook } from '../../utils/auth';
+import formbody from '@fastify/formbody';
+import { getConfig } from '../../config';
+import {
+  attachPlexusApiKeyAuth,
+  createAuthHook,
+  isRequestIpAllowed,
+  validatePlexusApiKey,
+} from '../../utils/auth';
 import { logger } from '../../utils/logger';
 import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
 import { getClientIp } from '../../utils/ip';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 import { registerPlexusMcpRoutes } from './plexus';
+import { getMcpAuthProvider, isMcpOAuthEnabled } from '../../services/mcp-oauth/provider-factory';
+import { getMcpResourceUrl, getRequestBaseUrl } from '../../services/mcp-oauth/url';
+import { MCP_OAUTH_ACCESS_TOKEN_PREFIX } from '../../services/mcp-oauth/plexus-idp-provider';
 
 const DEFAULT_TIMEOUT_MS = 120000;
+
+function authErrorResponse(message: string) {
+  return { error: { message, type: 'auth_error', code: 401 } };
+}
+
+function getStringHeader(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function extractBearerCredential(authorization: string): string {
+  return authorization.toLowerCase().startsWith('bearer ')
+    ? authorization.slice('bearer '.length)
+    : authorization;
+}
+
+function setInitialOAuthChallenge(request: FastifyRequest, reply: FastifyReply) {
+  const metadataUrl = `${getRequestBaseUrl(request)}/.well-known/oauth-protected-resource`;
+  reply.header('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"`);
+}
+
+function setInvalidTokenChallenge(reply: FastifyReply) {
+  reply.header('WWW-Authenticate', 'Bearer error="invalid_token"');
+}
+
+async function mcpOAuthFallbackAuth(request: FastifyRequest, reply: FastifyReply) {
+  const authorization = getStringHeader(request.headers.authorization);
+  const xApiKey = getStringHeader(request.headers['x-api-key']);
+  const xGoogApiKey = getStringHeader(request.headers['x-goog-api-key']);
+  const queryKey =
+    request.query && typeof request.query === 'object'
+      ? typeof (request.query as any).key === 'string'
+        ? (request.query as any).key
+        : null
+      : null;
+
+  const tryRawApiKey = (secret: string): boolean => {
+    const result = validatePlexusApiKey(secret, request);
+    if (!result) return false;
+    attachPlexusApiKeyAuth(request, result);
+    return true;
+  };
+
+  if (authorization) {
+    const credential = extractBearerCredential(authorization);
+    if (tryRawApiKey(credential)) return;
+
+    const provider = getMcpAuthProvider();
+    const oauthResult = credential.startsWith(MCP_OAUTH_ACCESS_TOKEN_PREFIX)
+      ? await provider?.validateToken(credential)
+      : null;
+    if (oauthResult) {
+      const config = getConfig();
+      const keyConfig = config.keys?.[oauthResult.keyName];
+      if (keyConfig && isRequestIpAllowed(request, keyConfig.allowedIps, config.trustedProxies)) {
+        attachPlexusApiKeyAuth(request, {
+          keyName: oauthResult.keyName,
+          keyConfig,
+          attribution: null,
+        });
+        return;
+      }
+    }
+
+    setInvalidTokenChallenge(reply);
+    await reply.code(401).send(authErrorResponse('Invalid bearer token'));
+    return reply;
+  }
+
+  const apiKeyStyleCredential = xApiKey ?? xGoogApiKey ?? queryKey;
+  if (apiKeyStyleCredential) {
+    if (tryRawApiKey(apiKeyStyleCredential)) return;
+    await reply.code(401).send(authErrorResponse('Invalid API key'));
+    return reply;
+  }
+
+  setInitialOAuthChallenge(request, reply);
+  await reply.code(401).send(authErrorResponse('Authentication required'));
+  return reply;
+}
 
 // streamUpstreamResponse proxies an upstream MCP event-stream to the client,
 // writing the head via reply.raw so it is flushed immediately. Fastify's
@@ -67,61 +157,48 @@ export async function registerMcpRoutes(
   fastify: FastifyInstance,
   mcpUsageStorage: McpUsageStorageService
 ) {
-  // OAuth 2.0 Discovery endpoints (public, no auth required)
-  // These inform clients that we use Bearer token auth, not OAuth flow
-  fastify.get('/.well-known/oauth-authorization-server', async (_request, reply) => {
-    logger.silly('OAuth authorization server discovery');
-    return reply.send({
-      issuer: '/',
-      authorization_endpoint: '/oauth/authorize',
-      token_endpoint: '/oauth/token',
-      grant_types_supported: ['client_credentials', 'bearer'],
-      token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'none'],
-      resource_supported: true,
-    });
-  });
+  const oauthEnabled = isMcpOAuthEnabled();
+  const authProvider = getMcpAuthProvider();
 
-  fastify.get('/.well-known/oauth-protected-resource', async (_request, reply) => {
-    logger.silly('OAuth protected resource discovery');
-    return reply.send({
-      resource: '/',
-      authorization_servers: ['/'],
-      scopes_supported: ['read', 'write'],
-      bearer_methods_supported: ['header', 'body', 'query'],
-    });
-  });
+  if (oauthEnabled && authProvider) {
+    await fastify.register(formbody);
 
-  fastify.get('/.well-known/openid-configuration', async (_request, reply) => {
-    logger.silly('OpenID configuration discovery');
-    return reply.send({
-      issuer: '/',
-      authorization_endpoint: '/oauth/authorize',
-      token_endpoint: '/oauth/token',
-      jwks_uri: '/.well-known/jwks.json',
-      response_types_supported: ['code'],
-      id_token_signing_alg_values_supported: ['RS256'],
+    fastify.get('/.well-known/oauth-authorization-server', async (request, reply) => {
+      logger.silly('OAuth authorization server discovery');
+      return reply.send(authProvider.getDiscoveryMetadata(request));
     });
-  });
 
-  fastify.post('/register', async (_request, reply) => {
-    logger.silly('Dynamic client registration');
-    return reply.code(201).send({
-      client_id: 'plexus-mcp-static',
-      client_id_issued_at: Math.floor(Date.now() / 1000),
-      client_secret: 'not-supported-use-api-key',
-      grant_types: ['client_credentials', 'bearer'],
-      token_endpoint_auth_method: 'none',
+    fastify.get('/.well-known/oauth-protected-resource', async (request, reply) => {
+      logger.silly('OAuth protected resource discovery');
+      return reply.send(authProvider.getProtectedResourceMetadata(request));
     });
-  });
+
+    fastify.get('/oauth/authorize', async (request, reply) =>
+      authProvider.handleAuthorize(request, reply)
+    );
+    fastify.post('/oauth/authorize', async (request, reply) =>
+      authProvider.handleAuthorize(request, reply)
+    );
+    fastify.post('/oauth/token', async (request, reply) =>
+      authProvider.handleToken(request, reply)
+    );
+    fastify.post('/register', async (request, reply) =>
+      authProvider.handleRegister(request, reply)
+    );
+  }
 
   await registerPlexusMcpRoutes(fastify, mcpUsageStorage);
 
   fastify.register(async (protectedRoutes) => {
-    const auth = createAuthHook();
+    if (oauthEnabled) {
+      protectedRoutes.addHook('onRequest', mcpOAuthFallbackAuth);
+    } else {
+      const auth = createAuthHook();
 
-    protectedRoutes.addHook('onRequest', auth.onRequest);
+      protectedRoutes.addHook('onRequest', auth.onRequest);
 
-    await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
+      await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
+    }
 
     protectedRoutes.addHook('preHandler', async (request, reply) => {
       const serverName = (request.params as any)?.name;

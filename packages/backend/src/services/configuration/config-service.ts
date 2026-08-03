@@ -452,6 +452,7 @@ export class ConfigService {
     const failover = await this.repo.getFailoverPolicy();
     const cooldown = await this.repo.getCooldownPolicy();
     const backgroundExploration = await this.repo.getBackgroundExplorationConfig();
+    const mcpOAuth = await this.repo.getMcpOAuthConfig();
     const timeout = await this.repo.getTimeoutConfig();
     const stall = await this.repo.getStallConfig();
     const allSettings = await this.repo.getAllSettings();
@@ -475,6 +476,7 @@ export class ConfigService {
       timeout,
       stall: Object.values(stall).some((v) => v !== null && v !== undefined) ? stall : undefined,
       backgroundExploration,
+      mcpOAuth,
       quotas,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       mcp_servers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,

@@ -1,10 +1,46 @@
-import { describe, expect, test, vi, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, expect, test, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import { registerSpy } from '../../../../test/test-utils';
 import Fastify, { FastifyInstance } from 'fastify';
 import { setConfigForTesting } from '../../../config';
 import { registerMcpRoutes } from '../index';
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
 import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
+import * as mcpAuthProviderFactory from '../../../services/mcp-oauth/provider-factory';
+
+const baseConfig = (overrides: Record<string, unknown> = {}) => ({
+  providers: {},
+  models: {},
+  keys: {
+    'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
+  },
+  failover: {
+    enabled: false,
+    retryableStatusCodes: [429, 500, 502, 503, 504],
+    retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+  },
+  quotas: [],
+  mcpServers: {
+    'test-server': {
+      upstream_url: 'http://localhost:3000/mcp',
+      enabled: true,
+      headers: {
+        'x-upstream-header': 'value',
+      },
+    },
+    'server-with-auth': {
+      upstream_url: 'http://localhost:3001/mcp?auth=token123',
+      enabled: true,
+      headers: {
+        Authorization: 'Bearer upstream-secret',
+      },
+    },
+    'disabled-server': {
+      upstream_url: 'http://localhost:3002/mcp',
+      enabled: false,
+    },
+  },
+  ...overrides,
+});
 
 describe('MCP Routes', () => {
   let fastify: FastifyInstance;
@@ -28,39 +64,7 @@ describe('MCP Routes', () => {
     }));
 
     // Set config with keys and MCP servers
-    setConfigForTesting({
-      providers: {},
-      models: {},
-      keys: {
-        'test-key-1': { secret: 'sk-valid-key', comment: 'Test Key' },
-      },
-      failover: {
-        enabled: false,
-        retryableStatusCodes: [429, 500, 502, 503, 504],
-        retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
-      },
-      quotas: [],
-      mcpServers: {
-        'test-server': {
-          upstream_url: 'http://localhost:3000/mcp',
-          enabled: true,
-          headers: {
-            'x-upstream-header': 'value',
-          },
-        },
-        'server-with-auth': {
-          upstream_url: 'http://localhost:3001/mcp?auth=token123',
-          enabled: true,
-          headers: {
-            Authorization: 'Bearer upstream-secret',
-          },
-        },
-        'disabled-server': {
-          upstream_url: 'http://localhost:3002/mcp',
-          enabled: false,
-        },
-      },
-    });
+    setConfigForTesting(baseConfig());
 
     await registerMcpRoutes(fastify, mockMcpUsageStorage);
     await fastify.ready();
@@ -75,54 +79,40 @@ describe('MCP Routes', () => {
   });
 
   describe('OAuth Discovery Endpoints', () => {
-    test('GET /.well-known/oauth-authorization-server should return OAuth metadata', async () => {
+    test('GET /.well-known/oauth-authorization-server should be 404 when MCP OAuth is off', async () => {
       const response = await fastify.inject({
         method: 'GET',
         url: '/.well-known/oauth-authorization-server',
       });
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.issuer).toBe('/');
-      expect(body.authorization_endpoint).toBe('/oauth/authorize');
-      expect(body.token_endpoint).toBe('/oauth/token');
-      expect(body.grant_types_supported).toContain('bearer');
+      expect(response.statusCode).toBe(404);
     });
 
-    test('GET /.well-known/oauth-protected-resource should return protected resource metadata', async () => {
+    test('GET /.well-known/oauth-protected-resource should be 404 when MCP OAuth is off', async () => {
       const response = await fastify.inject({
         method: 'GET',
         url: '/.well-known/oauth-protected-resource',
       });
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.resource).toBe('/');
-      expect(body.scopes_supported).toContain('read');
+      expect(response.statusCode).toBe(404);
     });
 
-    test('GET /.well-known/openid-configuration should return OIDC config', async () => {
+    test('GET /.well-known/openid-configuration should be 404 when MCP OAuth is off', async () => {
       const response = await fastify.inject({
         method: 'GET',
         url: '/.well-known/openid-configuration',
       });
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.issuer).toBe('/');
-      expect(body.jwks_uri).toBe('/.well-known/jwks.json');
+      expect(response.statusCode).toBe(404);
     });
 
-    test('POST /register should return static client registration', async () => {
+    test('POST /register should be 404 when MCP OAuth is off', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/register',
       });
 
-      expect(response.statusCode).toBe(201);
-      const body = JSON.parse(response.body);
-      expect(body.client_id).toBe('plexus-mcp-static');
-      expect(body.grant_types).toContain('bearer');
+      expect(response.statusCode).toBe(404);
     });
   });
 
@@ -418,6 +408,138 @@ describe('MCP Routes', () => {
       expect(mockMcpUsageStorage.saveRequest).toHaveBeenCalled();
       const callArgs = (mockMcpUsageStorage.saveRequest as any).mock.calls[0][0];
       expect(callArgs.method).toBe('DELETE');
+    });
+  });
+
+  describe('MCP OAuth fallback when enabled', () => {
+    let oauthFastify: FastifyInstance;
+    let validateToken: any;
+
+    beforeEach(async () => {
+      oauthFastify = Fastify();
+      validateToken = vi.fn(async (token: string) =>
+        token === 'pox_valid_oauth_token' ? { keyName: 'test-key-1', scopes: ['mcp:read'] } : null
+      );
+
+      setConfigForTesting(
+        baseConfig({
+          mcpOAuth: {
+            enabled: true,
+            provider: 'plexus-idp',
+          },
+        })
+      );
+
+      registerSpy(mcpAuthProviderFactory, 'isMcpOAuthEnabled').mockReturnValue(true);
+      registerSpy(mcpAuthProviderFactory, 'getMcpAuthProvider').mockReturnValue({
+        getDiscoveryMetadata: vi.fn((request) => ({
+          issuer: 'http://localhost',
+          authorization_endpoint: 'http://localhost/oauth/authorize',
+          token_endpoint: 'http://localhost/oauth/token',
+          registration_endpoint: 'http://localhost/register',
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
+          token_endpoint_auth_methods_supported: ['none'],
+          code_challenge_methods_supported: ['S256'],
+          scopes_supported: ['mcp:read', 'mcp:write'],
+          resource_supported: true,
+        })),
+        getProtectedResourceMetadata: vi.fn(() => ({
+          resource: 'http://localhost/mcp',
+          authorization_servers: ['http://localhost'],
+          scopes_supported: ['mcp:read', 'mcp:write'],
+          bearer_methods_supported: ['header'],
+        })),
+        handleAuthorize: vi.fn(async (_request, reply) => reply.send({ ok: true })),
+        handleToken: vi.fn(async (_request, reply) => reply.send({ access_token: 'pox-token' })),
+        handleRegister: vi.fn(async (_request, reply) =>
+          reply.code(201).send({ client_id: 'mcp-test' })
+        ),
+        validateToken,
+      });
+
+      await registerMcpRoutes(oauthFastify, mockMcpUsageStorage);
+      await oauthFastify.ready();
+    });
+
+    afterEach(async () => {
+      await oauthFastify.close();
+    });
+
+    test('registers OAuth discovery and DCR routes when enabled', async () => {
+      const discovery = await oauthFastify.inject({
+        method: 'GET',
+        url: '/.well-known/oauth-authorization-server',
+      });
+      expect(discovery.statusCode).toBe(200);
+      expect(JSON.parse(discovery.body).code_challenge_methods_supported).toEqual(['S256']);
+
+      const registration = await oauthFastify.inject({
+        method: 'POST',
+        url: '/register',
+        payload: {},
+      });
+      expect(registration.statusCode).toBe(201);
+      expect(JSON.parse(registration.body).client_id).toBe('mcp-test');
+    });
+
+    test('missing auth returns an OAuth discovery challenge', async () => {
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: { 'content-type': 'application/json' },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.headers['www-authenticate']).toContain(
+        '/.well-known/oauth-protected-resource"'
+      );
+    });
+
+    test('valid raw API key still bypasses OAuth token validation', async () => {
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer sk-valid-key',
+          'content-type': 'application/json',
+        },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(validateToken).not.toHaveBeenCalled();
+    });
+
+    test('OAuth access token is accepted after raw API key lookup fails', async () => {
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer pox_valid_oauth_token',
+          'content-type': 'application/json',
+        },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(validateToken).toHaveBeenCalledWith('pox_valid_oauth_token');
+    });
+
+    test('invalid OAuth token returns invalid_token challenge', async () => {
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer pox_invalid_oauth_token',
+          'content-type': 'application/json',
+        },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.headers['www-authenticate']).toBe('Bearer error="invalid_token"');
     });
   });
 });

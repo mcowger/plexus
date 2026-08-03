@@ -21,9 +21,11 @@ import type {
   BackgroundExplorationConfig,
   TimeoutConfig,
   StallConfigType,
+  McpOAuthConfig,
   MetadataOverrides,
 } from '../config';
 import { resolveGpuParams } from '@plexus/shared';
+import { McpOauthRepository } from './mcp-oauth-repository';
 
 // Helper to parse JSON from SQLite text columns (PG jsonb auto-deserializes)
 function parseJson<T>(value: unknown): T | null {
@@ -1173,6 +1175,12 @@ export class ConfigRepository {
     };
 
     if (existing.length > 0) {
+      const existingSecretHash =
+        existing[0]!.secretHash ?? hashSecret(decrypt(existing[0]!.secret));
+      if (existingSecretHash && existingSecretHash !== secretHash) {
+        await new McpOauthRepository().revokeTokensForKeyName(name);
+      }
+
       await this.db().update(schema.apiKeys).set(keyData).where(eq(schema.apiKeys.name, name));
     } else {
       await this.db()
@@ -1183,6 +1191,7 @@ export class ConfigRepository {
 
   async deleteKey(name: string): Promise<void> {
     const schema = this.schema();
+    await new McpOauthRepository().revokeTokensForKeyName(name);
     await this.db().delete(schema.apiKeys).where(eq(schema.apiKeys.name, name));
   }
 
@@ -1663,6 +1672,22 @@ export class ConfigRepository {
       2
     );
     return { enabled, stalenessThresholdSeconds, workerConcurrency };
+  }
+
+  async getMcpOAuthConfig(): Promise<McpOAuthConfig> {
+    const stored = await this.getSetting<Partial<McpOAuthConfig>>('mcpOAuth', {});
+    const enabled = stored?.enabled === true;
+    const provider = stored?.provider === 'plexus-idp' ? stored.provider : 'plexus-idp';
+    return {
+      enabled,
+      provider,
+      ...(typeof stored?.issuer === 'string' && stored.issuer.trim()
+        ? { issuer: stored.issuer.trim() }
+        : {}),
+      ...(typeof stored?.resource === 'string' && stored.resource.trim()
+        ? { resource: stored.resource.trim() }
+        : {}),
+    };
   }
 
   async getTimeoutConfig(): Promise<TimeoutConfig> {

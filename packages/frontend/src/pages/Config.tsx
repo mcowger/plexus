@@ -14,10 +14,11 @@ import {
   Radar,
   Network,
   Trash2,
+  LockKeyhole,
   Info,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import type { CompactionSettings } from '../lib/api';
+import type { CompactionSettings, McpOAuthSettings } from '../lib/api';
 import { formatMinutesToMinSec } from '@plexus/shared';
 import { useToast } from '../contexts/ToastContext';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -126,6 +127,11 @@ const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
   retryableErrors: [],
 };
 
+const DEFAULT_MCP_OAUTH_CONFIG: McpOAuthSettings = {
+  enabled: false,
+  provider: 'plexus-idp',
+};
+
 const DEFAULT_COOLDOWN_POLICY: CooldownPolicy = {
   initialMinutes: 2,
   maxMinutes: 300,
@@ -207,6 +213,29 @@ export const Config = () => {
     useState<CompactionSettings>(DEFAULT_COMPACTION_CONFIG);
   const [compactionLoaded, setCompactionLoaded] = useState(false);
   const [compactionSaving, setCompactionSaving] = useState(false);
+
+  // MCP OAuth settings state
+  const [mcpOAuthConfig, setMcpOAuthConfig] = useState<McpOAuthSettings>(DEFAULT_MCP_OAUTH_CONFIG);
+  const [mcpOAuthLoaded, setMcpOAuthLoaded] = useState(false);
+  const [mcpOAuthSaving, setMcpOAuthSaving] = useState(false);
+  const [mcpOAuthIssuerInput, setMcpOAuthIssuerInput] = useState('');
+
+  const validateIssuerInput = (raw: string): { valid: boolean; error?: string } => {
+    const trimmed = raw.trim();
+    if (!trimmed) return { valid: true };
+    try {
+      const url = new URL(trimmed);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return { valid: false, error: 'Must use http:// or https://' };
+      }
+      return { valid: true };
+    } catch {
+      return { valid: false, error: 'Enter a well-formed URL' };
+    }
+  };
+
+  const issuerValidation = validateIssuerInput(mcpOAuthIssuerInput);
+  const isMcpOAuthValid = mcpOAuthLoaded && issuerValidation.valid;
 
   // Validate timeout input
   const validateTimeoutInput = (
@@ -543,6 +572,29 @@ export const Config = () => {
     }
   }, [toast]);
 
+  const loadMcpOAuthConfig = useCallback(async () => {
+    try {
+      const settings = await api.getSystemSettings();
+      const raw = settings.mcpOAuth as Partial<McpOAuthSettings> | undefined;
+      const cfg: McpOAuthSettings = {
+        enabled: raw?.enabled === true,
+        provider: raw?.provider === 'plexus-idp' ? raw.provider : 'plexus-idp',
+        ...(typeof raw?.issuer === 'string' && raw.issuer.trim()
+          ? { issuer: raw.issuer.trim() }
+          : {}),
+        ...(typeof raw?.resource === 'string' && raw.resource.trim()
+          ? { resource: raw.resource.trim() }
+          : {}),
+      };
+      setMcpOAuthConfig(cfg);
+      setMcpOAuthIssuerInput(cfg.issuer ?? '');
+      setMcpOAuthLoaded(true);
+    } catch (e) {
+      console.error('Failed to load MCP OAuth settings:', e);
+      toast.error('Failed to load MCP OAuth settings');
+    }
+  }, [toast]);
+
   const handleSaveTimeout = async () => {
     if (!timeoutDefaultValidation.valid) return;
     setTimeoutSaving(true);
@@ -627,6 +679,28 @@ export const Config = () => {
     }
   };
 
+  const handleSaveMcpOAuth = async () => {
+    if (!issuerValidation.valid) return;
+    setMcpOAuthSaving(true);
+    try {
+      const issuer = mcpOAuthIssuerInput.trim();
+      const next: McpOAuthSettings = {
+        enabled: mcpOAuthConfig.enabled,
+        provider: 'plexus-idp',
+        ...(issuer ? { issuer } : {}),
+        ...(mcpOAuthConfig.resource ? { resource: mcpOAuthConfig.resource } : {}),
+      };
+      await api.patchSystemSettings({ mcpOAuth: next });
+      setMcpOAuthConfig(next);
+      setMcpOAuthIssuerInput(next.issuer ?? '');
+      toast.success('MCP OAuth settings saved');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to save MCP OAuth settings');
+    } finally {
+      setMcpOAuthSaving(false);
+    }
+  };
+
   const handleSaveExploration = async () => {
     if (!stalenessValidation.valid || !concurrencyValidation.valid) return;
     // Inline rates only need to validate when background mode is off; when it
@@ -706,6 +780,7 @@ export const Config = () => {
     loadTimeoutConfig();
     loadStallConfig();
     loadCompactionConfig();
+    loadMcpOAuthConfig();
     loadExplorationRates();
     loadBackgroundExploration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1664,6 +1739,70 @@ export const Config = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </Disclosure>
+
+          {/* ─── MCP OAuth Settings ─────────────────────────────────────── */}
+          <Disclosure
+            title="MCP OAuth"
+            defaultOpen={false}
+            extra={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveMcpOAuth}
+                isLoading={mcpOAuthSaving}
+                disabled={!isMcpOAuthValid}
+                leftIcon={<Save size={14} />}
+              >
+                Save
+              </Button>
+            }
+          >
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <LockKeyhole size={16} className="text-primary" />
+                  <div>
+                    <p className="font-body text-[12px] font-medium text-text">
+                      Enable OAuth for MCP clients
+                    </p>
+                    <p className="font-body text-[11px] text-text-muted">
+                      Instance-wide OAuth discovery and token issuance for MCP clients.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={mcpOAuthConfig.enabled}
+                  onChange={(checked) => setMcpOAuthConfig({ ...mcpOAuthConfig, enabled: checked })}
+                  aria-label="Toggle MCP OAuth on/off"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="mcpOAuthIssuer"
+                  className="font-body text-[12px] font-medium text-text"
+                >
+                  External issuer URL
+                </label>
+                <input
+                  id="mcpOAuthIssuer"
+                  type="url"
+                  value={mcpOAuthIssuerInput}
+                  onChange={(e) => setMcpOAuthIssuerInput(e.target.value)}
+                  placeholder="https://your-instance.example.com"
+                  className="w-full h-[32px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                />
+                {!issuerValidation.valid && (
+                  <span className="text-[11px] text-warning">{issuerValidation.error}</span>
+                )}
+                <p className="font-body text-[11px] text-text-muted leading-relaxed">
+                  Use the externally reachable URL for this Plexus instance, such as a Tailscale
+                  Funnel URL. If this does not match the actual external URL, OAuth discovery
+                  metadata will point at the wrong origin and claude.ai MCP connections can fail.
+                </p>
+              </div>
             </div>
           </Disclosure>
 

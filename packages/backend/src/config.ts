@@ -1088,6 +1088,20 @@ const StallConfigSchema = z.object({
   stallCooldown: z.boolean().default(false).optional(),
 });
 
+export const McpOAuthConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  provider: z.enum(['plexus-idp']).default('plexus-idp'),
+  /**
+   * Optional externally-visible base URL. If omitted, OAuth metadata and
+   * validation are derived from the incoming request origin.
+   */
+  issuer: z.string().url().optional(),
+  /**
+   * Optional protected resource URL. If omitted, defaults to `${issuer}/mcp`.
+   */
+  resource: z.string().url().optional(),
+});
+
 const RawPlexusConfigSchema = z
   .object({
     providers: z.record(z.string(), ProviderConfigSchema),
@@ -1102,6 +1116,7 @@ const RawPlexusConfigSchema = z
     timeout: z.object({ defaultSeconds: z.number().min(1).max(3600).default(300) }).optional(),
     stall: StallConfigSchema.optional(),
     backgroundExploration: BackgroundExplorationConfigSchema.optional(),
+    mcpOAuth: McpOAuthConfigSchema.optional(),
     mcp_servers: z.record(z.string(), McpServerConfigSchema).optional(),
     user_quotas: z.record(z.string(), QuotaDefinitionSchema).optional(),
     // Applied to keys with NO quotas assigned (`quotas` absent/empty). Non-stacking:
@@ -1123,6 +1138,7 @@ export type StallConfigType = {
   gracePeriodSeconds?: number;
   stallCooldown?: boolean;
 };
+export type McpOAuthConfig = z.infer<typeof McpOAuthConfigSchema>;
 export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   failover: FailoverPolicy;
   cooldown?: CooldownPolicy;
@@ -1130,6 +1146,7 @@ export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   stall?: StallConfigType;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
+  mcpOAuth?: McpOAuthConfig;
   // Immediate-peer IPs/CIDRs whose forwarding headers are trusted when
   // resolving the client IP. Semantics:
   //  - undefined: legacy trust-all before DB-backed config is loaded
