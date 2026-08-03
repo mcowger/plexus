@@ -190,6 +190,8 @@ describe('openai-codex checker', () => {
     const meters = await checkerDef.check(makeCtx());
 
     expect(meters).toHaveLength(1);
-    expect(authManager.getApiKey).toHaveBeenCalledWith('openai-codex');
+    expect(authManager.getApiKey).toHaveBeenCalledWith('openai-codex', undefined, {
+      refreshIfOlderThanMs: 8 * 24 * 60 * 60 * 1000,
+    });
   });
 });
