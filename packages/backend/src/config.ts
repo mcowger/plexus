@@ -366,6 +366,10 @@ const HyperQuotaCheckerOptionsSchema = z.object({
   endpoint: z.url().optional(),
 });
 
+const DeepSeekQuotaCheckerOptionsSchema = z.object({
+  endpoint: z.string().url().optional(),
+});
+
 const SakanaQuotaCheckerOptionsSchema = z.object({
   sessionCookie: z.string().trim().min(1, 'Sakana session cookie is required'),
   endpoint: z.string().url().optional(),
@@ -579,6 +583,13 @@ const ProviderQuotaCheckerSchema = z.discriminatedUnion('type', [
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: HyperQuotaCheckerOptionsSchema.optional().default({}),
+  }),
+  z.object({
+    type: z.literal('deepseek'),
+    enabled: z.boolean().default(true),
+    intervalMinutes: z.number().min(1).default(30),
+    id: z.string().trim().min(1).optional(),
+    options: DeepSeekQuotaCheckerOptionsSchema.optional().default({}),
   }),
   z.object({
     type: z.literal('sakana'),
