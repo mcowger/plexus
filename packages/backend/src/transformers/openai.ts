@@ -130,7 +130,26 @@ export class OpenAITransformer implements Transformer {
       }
     }
 
-    if (request.reasoning) {
+    // Chat Completions and the Responses API spell reasoning intent
+    // differently: Responses uses a nested `reasoning: { effort, summary }`
+    // object, while Chat Completions uses a top-level `reasoning_effort`
+    // string. A cross-format route (e.g. a Responses client such as Claude
+    // Code targeting a Chat Completions provider) carries the nested object on
+    // the unified request, and forwarding it verbatim makes strict upstreams
+    // reject the unknown `reasoning.effort` field (UNKNOWN_FIELD). Translate
+    // the nested object to the Chat Completions top-level field instead.
+    //
+    // Same-format (chat -> chat) pass-through is left untouched: `out` already
+    // started from `request.originalBody`, which preserves whatever reasoning
+    // shape the chat client sent (top-level `reasoning_effort` or a nested
+    // `reasoning` object for OpenRouter-style upstreams), and the unified
+    // `request.reasoning` mirrors that same value.
+    if (request.reasoning && !isSameApiType) {
+      const effort = request.reasoning.effort;
+      if (effort && effort !== 'none') {
+        out.reasoning_effort = effort;
+      }
+    } else if (request.reasoning) {
       out.reasoning = request.reasoning;
     }
 
