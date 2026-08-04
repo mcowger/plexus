@@ -10,7 +10,9 @@ export function projectReasoningForResponses(
     | undefined
 ): { effort?: ThinkLevel; summary?: string } | undefined {
   if (!reasoning) return undefined;
-  if (reasoning.enabled === false) return { effort: 'none' };
+  if (reasoning.enabled === false || reasoning.effort === 'off') {
+    return { effort: 'none' };
+  }
 
   const projected = {
     ...(reasoning.effort !== undefined ? { effort: reasoning.effort } : {}),
