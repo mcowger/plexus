@@ -4,6 +4,7 @@ import { Dispatcher } from '../../services/dispatch/dispatcher';
 import {
   ResponsesTransformer,
   normalizeCompositeResponsesCallIds,
+  normalizeResponsesFunctionCallItemIds,
   normalizeResponsesReasoningContent,
 } from '../../transformers/responses';
 import { UsageStorageService } from '../../services/observability/usage-storage';
@@ -176,10 +177,16 @@ export async function registerResponsesRoute(
       // tool call IDs observed in replayed Codex CLI conversations.
       const rawBodyForDebug = JSON.parse(JSON.stringify(body));
       const normalizedCallIds = normalizeCompositeResponsesCallIds(body);
+      const normalizedItemIds = normalizeResponsesFunctionCallItemIds(body);
       const normalizedReasoningItems = normalizeResponsesReasoningContent(body);
       if (normalizedCallIds > 0) {
         logger.warn(
           `Normalized ${normalizedCallIds} composite Responses call_id value(s) for request ${requestId}`
+        );
+      }
+      if (normalizedItemIds > 0) {
+        logger.warn(
+          `Removed call-ID-shaped item id(s) from ${normalizedItemIds} Responses function_call item(s) for request ${requestId}`
         );
       }
       if (normalizedReasoningItems > 0) {

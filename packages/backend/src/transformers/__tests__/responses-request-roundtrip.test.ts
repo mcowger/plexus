@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ResponsesTransformer,
   normalizeCompositeResponsesCallIds,
+  normalizeResponsesFunctionCallItemIds,
   normalizeResponsesReasoningContent,
 } from '../responses';
 import { OpenAITransformer } from '../openai';
@@ -135,6 +136,103 @@ describe('Responses responses -> responses round-trip preserves native fields', 
         )
         .map((item: any) => item.call_id)
     ).toEqual(['call_enS4L7YycCRyOiWOg31Xpvwm', 'call_enS4L7YycCRyOiWOg31Xpvwm']);
+  });
+
+  it('strips call-ID-shaped item ids from function_call items (strict providers demand fc_...)', () => {
+    const badItem: Record<string, unknown> = {
+      type: 'function_call',
+      id: 'call_913ea4b95c694f4598cdc490',
+      name: 'exec_command',
+      call_id: 'call_913ea4b95c694f4598cdc490',
+      arguments: '{}',
+    };
+    const goodItem: Record<string, unknown> = {
+      type: 'function_call',
+      id: 'fc_0281edd961557cf2016a4b062d87948195968b8fa6c46b8c7a',
+      name: 'exec_command',
+      call_id: 'call_enS4L7YycCRyOiWOg31Xpvwm',
+      arguments: '{}',
+    };
+    const noIdItem: Record<string, unknown> = {
+      type: 'function_call',
+      name: 'exec_command',
+      call_id: 'call_no_item_id',
+      arguments: '{}',
+    };
+    const outputItem: Record<string, unknown> = {
+      type: 'function_call_output',
+      id: 'fco_019fcb3b-b025-7fc3-830a-f61ed2f8142b',
+      call_id: 'call_913ea4b95c694f4598cdc490',
+      output: 'ok',
+    };
+    const body = { input: [badItem, goodItem, noIdItem, outputItem] };
+
+    expect(normalizeResponsesFunctionCallItemIds(body)).toBe(1);
+    expect('id' in badItem).toBe(false);
+    expect(badItem.call_id).toBe('call_913ea4b95c694f4598cdc490');
+    expect(goodItem.id).toBe('fc_0281edd961557cf2016a4b062d87948195968b8fa6c46b8c7a');
+    expect('id' in noIdItem).toBe(false);
+    expect(outputItem.id).toBe('fco_019fcb3b-b025-7fc3-830a-f61ed2f8142b');
+  });
+
+  it('only touches the exact observed bad shape (function_call + call_-prefixed id)', () => {
+    const messageItem: Record<string, unknown> = {
+      type: 'message',
+      id: 'call_not_our_problem',
+      role: 'user',
+      content: [{ type: 'input_text', text: 'hi' }],
+    };
+    // Caller-provided id with another prefix: not rewritten.
+    const customIdItem: Record<string, unknown> = {
+      type: 'function_call',
+      id: 'custom_item_id',
+      name: 'exec_command',
+      call_id: 'call_plain',
+      arguments: '{}',
+    };
+    const body = { input: [messageItem, customIdItem] };
+
+    expect(normalizeResponsesFunctionCallItemIds(body)).toBe(0);
+    expect(messageItem.id).toBe('call_not_our_problem');
+    expect(customIdItem.id).toBe('custom_item_id');
+
+    expect(normalizeResponsesFunctionCallItemIds(null)).toBe(0);
+    expect(normalizeResponsesFunctionCallItemIds({})).toBe(0);
+    expect(normalizeResponsesFunctionCallItemIds({ input: 'not-an-array' })).toBe(0);
+  });
+
+  it('rebuilds a clean request after stripping replayed item ids', async () => {
+    const transformer = new ResponsesTransformer();
+    const body = {
+      model: 'gpt-4o',
+      input: [
+        {
+          type: 'function_call',
+          id: 'call_913ea4b95c694f4598cdc490',
+          name: 'exec_command',
+          call_id: 'call_913ea4b95c694f4598cdc490',
+          arguments: '{}',
+        },
+        {
+          type: 'function_call_output',
+          call_id: 'call_913ea4b95c694f4598cdc490',
+          output: 'ok',
+        },
+      ],
+    };
+
+    normalizeResponsesFunctionCallItemIds(body);
+    const unified = await transformer.parseRequest(body);
+    const built = await transformer.transformRequest(unified);
+
+    expect(
+      built.input
+        .filter(
+          (item: any) => item.type === 'function_call' || item.type === 'function_call_output'
+        )
+        .map((item: any) => item.call_id)
+    ).toEqual(['call_913ea4b95c694f4598cdc490', 'call_913ea4b95c694f4598cdc490']);
+    expect(built.input.every((item: any) => !String(item.id ?? '').startsWith('call_'))).toBe(true);
   });
 
   it('removes replayed plaintext reasoning content while preserving reasoning metadata', () => {

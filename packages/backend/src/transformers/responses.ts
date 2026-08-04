@@ -123,6 +123,35 @@ export function normalizeCompositeResponsesCallIds(body: any): number {
   return normalizedCount;
 }
 
+// Some Responses clients (observed: codex_cli_rs replaying rebuilt function
+// call history) send function_call items whose item `id` is the call ID
+// ("call_...") rather than the server-assigned "fc_..." item ID. Strict
+// Responses providers answer that with
+// `Invalid 'input[N].id': 'call_...'. Expected an ID that begins with 'fc'`.
+// The item id is optional on input and `call_id` is what correlates the call
+// with its function_call_output, so drop that exact observed bad shape instead
+// of rewriting arbitrary caller-provided IDs.
+export function normalizeResponsesFunctionCallItemIds(body: any): number {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.input)) {
+    return 0;
+  }
+
+  let normalizedCount = 0;
+  for (const item of body.input) {
+    if (!item || typeof item !== 'object' || item.type !== 'function_call') {
+      continue;
+    }
+    if (typeof item.id !== 'string' || !item.id.startsWith('call_')) {
+      continue;
+    }
+
+    delete item.id;
+    normalizedCount++;
+  }
+
+  return normalizedCount;
+}
+
 // Reasoning items are valid replay context, but some OpenAI-compatible
 // Responses providers reject replayed plaintext reasoning text with
 // "content max length 0". Drop only the optional plaintext content array once
