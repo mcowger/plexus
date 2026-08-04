@@ -59,6 +59,7 @@ class InMemoryMcpOauthRepository {
       responseTypes: input.responseTypes ?? [],
       scope: input.scope ?? null,
       tokenEndpointAuthMethod: input.tokenEndpointAuthMethod ?? 'none',
+      status: input.status ?? 'active',
       createdAt: Date.now(),
     };
     this.clients.set(record.clientId, record);
@@ -97,6 +98,7 @@ class InMemoryMcpOauthRepository {
       resource: input.resource,
       scope: input.scope ?? null,
       keyName: input.keyName,
+      apiKeySecretHash: input.apiKeySecretHash,
       codeChallenge: input.codeChallenge,
       codeChallengeMethod: input.codeChallengeMethod,
       expiresAt: input.expiresAt,
@@ -211,8 +213,16 @@ describe('PlexusIdpProvider', () => {
       client_name: 'Claude MCP',
       redirect_uris: ['http://localhost:49231/callback'],
     };
-    const firstResponse = await fastify.inject({ method: 'POST', url: '/register', payload });
-    const secondResponse = await fastify.inject({ method: 'POST', url: '/register', payload });
+    const firstResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload,
+    });
+    const secondResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload,
+    });
 
     expect(firstResponse.statusCode).toBe(201);
     expect(secondResponse.statusCode).toBe(200);

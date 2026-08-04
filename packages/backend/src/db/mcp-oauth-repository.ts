@@ -34,6 +34,7 @@ export interface McpOauthClientRecord {
   responseTypes: string[];
   scope: string | null;
   tokenEndpointAuthMethod: string;
+  status: 'active' | 'disabled';
   createdAt: number;
 }
 
@@ -45,6 +46,7 @@ export interface NewMcpOauthClient {
   responseTypes?: string[];
   scope?: string | null;
   tokenEndpointAuthMethod?: string;
+  status?: 'active' | 'disabled';
 }
 
 export interface McpOauthAuthorizationCodeRecord {
@@ -55,6 +57,7 @@ export interface McpOauthAuthorizationCodeRecord {
   resource: string;
   scope: string | null;
   keyName: string;
+  apiKeySecretHash: string | null;
   codeChallenge: string;
   codeChallengeMethod: string;
   expiresAt: number;
@@ -69,6 +72,7 @@ export interface NewMcpOauthAuthorizationCode {
   resource: string;
   scope?: string | null;
   keyName: string;
+  apiKeySecretHash: string;
   codeChallenge: string;
   codeChallengeMethod: string;
   expiresAt: number;
@@ -129,6 +133,7 @@ export class McpOauthRepository {
         responseTypes: stringifyArray(input.responseTypes),
         scope: input.scope ?? null,
         tokenEndpointAuthMethod: input.tokenEndpointAuthMethod ?? 'none',
+        status: input.status ?? 'active',
         createdAt: timestamp,
         updatedAt: timestamp,
       });
@@ -156,6 +161,7 @@ export class McpOauthRepository {
       responseTypes: parseJsonArray(row.responseTypes),
       scope: row.scope ?? null,
       tokenEndpointAuthMethod: row.tokenEndpointAuthMethod,
+      status: row.status === 'disabled' ? 'disabled' : 'active',
       createdAt: row.createdAt,
     };
   }
@@ -225,6 +231,7 @@ export class McpOauthRepository {
       responseTypes: parseJsonArray(row.responseTypes),
       scope: row.scope ?? null,
       tokenEndpointAuthMethod: row.tokenEndpointAuthMethod,
+      status: row.status === 'disabled' ? 'disabled' : 'active',
       createdAt: row.createdAt,
       tokens: tokensByClient.get(row.clientId) ?? [],
     }));
@@ -246,6 +253,7 @@ export class McpOauthRepository {
         resource: input.resource,
         scope: input.scope ?? null,
         keyName: input.keyName,
+        apiKeySecretHash: input.apiKeySecretHash,
         codeChallenge: input.codeChallenge,
         codeChallengeMethod: input.codeChallengeMethod,
         expiresAt: input.expiresAt,
@@ -276,6 +284,7 @@ export class McpOauthRepository {
       resource: row.resource,
       scope: row.scope ?? null,
       keyName: row.keyName,
+      apiKeySecretHash: row.apiKeySecretHash ?? null,
       codeChallenge: row.codeChallenge,
       codeChallengeMethod: row.codeChallengeMethod,
       expiresAt: row.expiresAt,
@@ -375,6 +384,35 @@ export class McpOauthRepository {
       .where(
         and(
           eq(schema.mcpOauthTokens.keyName, keyName),
+          sql`${schema.mcpOauthTokens.revokedAt} IS NULL`
+        )
+      );
+    return getAffectedRowCount(result);
+  }
+
+  async setClientStatus(clientId: string, status: 'active' | 'disabled'): Promise<void> {
+    const schema = this.schema();
+    await this.db()
+      .update(schema.mcpOauthClients)
+      .set({ status, updatedAt: now() })
+      .where(eq(schema.mcpOauthClients.clientId, clientId));
+  }
+
+  async deleteClient(clientId: string): Promise<void> {
+    const schema = this.schema();
+    await this.db()
+      .delete(schema.mcpOauthClients)
+      .where(eq(schema.mcpOauthClients.clientId, clientId));
+  }
+
+  async revokeTokensForClient(clientId: string): Promise<number> {
+    const schema = this.schema();
+    const result = await this.db()
+      .update(schema.mcpOauthTokens)
+      .set({ revokedAt: now(), updatedAt: now() })
+      .where(
+        and(
+          eq(schema.mcpOauthTokens.clientId, clientId),
           sql`${schema.mcpOauthTokens.revokedAt} IS NULL`
         )
       );

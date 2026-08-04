@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { getConfig } from '../../config';
+import { getConfig, isKeyDisabled } from '../../config';
 import { McpOauthRepository } from '../../db/mcp-oauth-repository';
 import { hashSecret } from '../../utils/encryption';
 import { attachPlexusApiKeyAuth, validatePlexusApiKey } from '../../utils/auth';
@@ -93,6 +93,19 @@ function splitScopes(scope: string | null | undefined): string[] {
 
 function toScopeString(scope: string | null | undefined): string {
   return splitScopes(scope).join(' ');
+}
+
+// Constrain a requested scope set to the subset the client is allowed to have
+// AND that this server actually supports. Used to prevent a client from asking
+// for (and being granted) scopes it was never registered for, or scopes Plexus
+// does not implement.
+function constrainScopes(
+  requested: string | null | undefined,
+  allowed: string | null | undefined
+): string[] {
+  const known = new Set(DEFAULT_SCOPES);
+  const allowedScopes = allowed ? new Set(splitScopes(allowed)) : new Set(DEFAULT_SCOPES);
+  return splitScopes(requested).filter((scope) => known.has(scope) && allowedScopes.has(scope));
 }
 
 function htmlEscape(value: string): string {
@@ -257,6 +270,9 @@ export class PlexusIdpProvider implements AuthProvider {
     if (!client) {
       return oauthError(reply, 400, 'invalid_client', 'Unknown OAuth client');
     }
+    if (client.status === 'disabled') {
+      return oauthError(reply, 400, 'invalid_client', 'OAuth client is disabled');
+    }
     if (!client.redirectUris.some((uri) => redirectUriMatches(uri, data.redirect_uri))) {
       return oauthError(
         reply,
@@ -274,6 +290,19 @@ export class PlexusIdpProvider implements AuthProvider {
       );
     }
 
+    // C3: constrain the requested scopes to those the client is allowed to have
+    // (from dynamic registration) and that Plexus actually supports. Reject if
+    // no permitted scope remains.
+    const grantedScopes = constrainScopes(data.scope, client.scope);
+    if (grantedScopes.length === 0) {
+      return oauthError(
+        reply,
+        400,
+        'invalid_scope',
+        'None of the requested scopes are permitted for this client'
+      );
+    }
+
     if (req.method === 'GET') {
       return this.renderConsent(reply, data);
     }
@@ -287,19 +316,27 @@ export class PlexusIdpProvider implements AuthProvider {
     }
 
     const code = randomToken(AUTH_CODE_PREFIX);
+    const apiKeySecretHash = this.getCurrentApiKeySecretHash(authResult.keyName);
+    if (!apiKeySecretHash) {
+      return oauthError(reply, 401, 'access_denied', 'Invalid Plexus API key');
+    }
     await this.repo.createAuthorizationCode({
       code,
       clientId: data.client_id,
       redirectUri: data.redirect_uri,
       resource: data.resource,
-      scope: data.scope ?? DEFAULT_SCOPES.join(' '),
+      scope: grantedScopes.join(' '),
       keyName: authResult.keyName,
+      apiKeySecretHash,
       codeChallenge: data.code_challenge,
       codeChallengeMethod: data.code_challenge_method,
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
     });
 
-    const redirectTo = appendQuery(data.redirect_uri, { code, state: data.state });
+    const redirectTo = appendQuery(data.redirect_uri, {
+      code,
+      state: data.state,
+    });
     return reply.redirect(redirectTo);
   }
 
@@ -333,6 +370,10 @@ export class PlexusIdpProvider implements AuthProvider {
     if (record.accessTokenExpiresAt <= Date.now()) return null;
     if (!this.isTokenBoundToCurrentApiKeySecret(record.keyName, record.apiKeySecretHash))
       return null;
+    // The underlying Plexus API key must still be valid (not expired/disabled/revoked).
+    if (!this.isApiKeyCurrentlyValid(record.keyName)) return null;
+    // RFC 8707: the token is only valid for the currently configured resource.
+    if (!this.resourceMatchesCurrentConfig(record.resource)) return null;
 
     return { keyName: record.keyName, scopes: splitScopes(record.scope) };
   }
@@ -343,6 +384,8 @@ export class PlexusIdpProvider implements AuthProvider {
   ): Promise<void> {
     const client = await this.repo.getClient(data.client_id);
     if (!client) return oauthError(reply, 400, 'invalid_client', 'Unknown OAuth client');
+    if (client.status === 'disabled')
+      return oauthError(reply, 400, 'invalid_client', 'OAuth client is disabled');
 
     const code = await this.repo.getAuthorizationCode(data.code);
     if (!code) return oauthError(reply, 400, 'invalid_grant', 'Invalid authorization code');
@@ -360,6 +403,17 @@ export class PlexusIdpProvider implements AuthProvider {
     }
     if (!validatePkce(data.code_verifier, code.codeChallenge)) {
       return oauthError(reply, 400, 'invalid_grant', 'PKCE verification failed');
+    }
+    // The code was bound to the API key secret that was current when it was
+    // issued. If the API key has since been rotated, the stored hash no longer
+    // matches the current secret and the code must not be exchangeable.
+    if (!this.isTokenBoundToCurrentApiKeySecret(code.keyName, code.apiKeySecretHash)) {
+      return oauthError(
+        reply,
+        400,
+        'invalid_grant',
+        'The underlying Plexus API key has been rotated'
+      );
     }
 
     await this.repo.consumeAuthorizationCode(data.code);
@@ -384,6 +438,10 @@ export class PlexusIdpProvider implements AuthProvider {
     }
     if (record.clientId !== data.client_id)
       return oauthError(reply, 400, 'invalid_grant', 'Client mismatch');
+    const client = await this.repo.getClient(record.clientId);
+    if (!client || client.status === 'disabled') {
+      return oauthError(reply, 400, 'invalid_grant', 'OAuth client is disabled');
+    }
     if (!resourceMatchesExpected(data.resource, record.resource)) {
       return oauthError(reply, 400, 'invalid_target', 'resource mismatch');
     }
@@ -397,17 +455,33 @@ export class PlexusIdpProvider implements AuthProvider {
     }
 
     await this.repo.revokeRefreshToken(data.refresh_token);
+    // C3: constrain the refreshed scope set to what the client is allowed to
+    // have (from dynamic registration) and that Plexus actually supports.
+    const grantedScopes = constrainScopes(data.scope ?? record.scope, client.scope);
+    if (grantedScopes.length === 0) {
+      return oauthError(
+        reply,
+        400,
+        'invalid_scope',
+        'None of the requested scopes are permitted for this client'
+      );
+    }
     return this.issueToken(reply, {
       clientId: record.clientId,
       keyName: record.keyName,
       resource: record.resource,
-      scope: data.scope ?? record.scope ?? DEFAULT_SCOPES.join(' '),
+      scope: grantedScopes.join(' '),
     });
   }
 
   private async issueToken(
     reply: FastifyReply,
-    input: { clientId: string; keyName: string; resource: string; scope: string }
+    input: {
+      clientId: string;
+      keyName: string;
+      resource: string;
+      scope: string;
+    }
   ): Promise<void> {
     const apiKeySecretHash = this.getCurrentApiKeySecretHash(input.keyName);
     if (!apiKeySecretHash) {
@@ -433,6 +507,10 @@ export class PlexusIdpProvider implements AuthProvider {
       refreshTokenExpiresAt: Date.now() + REFRESH_TOKEN_TTL_MS,
     });
 
+    // Tokens must never be cached by intermediaries or browsers.
+    reply.header('Cache-Control', 'no-store');
+    reply.header('Pragma', 'no-cache');
+
     return reply.send({
       access_token: accessToken,
       token_type: 'Bearer',
@@ -455,6 +533,20 @@ export class PlexusIdpProvider implements AuthProvider {
     if (!apiKeySecretHash) return false;
     const currentHash = this.getCurrentApiKeySecretHash(keyName);
     return currentHash !== null && currentHash === apiKeySecretHash;
+  }
+
+  private isApiKeyCurrentlyValid(keyName: string): boolean {
+    const keyConfig = getConfig().keys?.[keyName];
+    if (!keyConfig) return false;
+    return !isKeyDisabled(keyConfig);
+  }
+
+  private resourceMatchesCurrentConfig(resource: string): boolean {
+    const configuredResource = getConfig().mcpOAuth?.resource;
+    // When no resource is configured it is derived from the request origin, so
+    // there is no stable config value to compare against here.
+    if (!configuredResource) return true;
+    return resourceMatchesExpected(resource, configuredResource);
   }
 
   private async renderConsent(

@@ -9,6 +9,9 @@ export const mcpOauthClients = pgTable('mcp_oauth_clients', {
   responseTypes: text('response_types'), // JSON: string[]
   scope: text('scope'),
   tokenEndpointAuthMethod: text('token_endpoint_auth_method').notNull().default('none'),
+  status: text('status', { enum: ['active', 'disabled'] })
+    .notNull()
+    .default('active'),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
@@ -24,6 +27,7 @@ export const mcpOauthAuthorizationCodes = pgTable(
     resource: text('resource').notNull(),
     scope: text('scope'),
     keyName: text('key_name').notNull(),
+    apiKeySecretHash: text('api_key_secret_hash'),
     codeChallenge: text('code_challenge').notNull(),
     codeChallengeMethod: text('code_challenge_method').notNull(),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),

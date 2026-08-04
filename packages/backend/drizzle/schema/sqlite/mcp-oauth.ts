@@ -9,6 +9,9 @@ export const mcpOauthClients = sqliteTable('mcp_oauth_clients', {
   responseTypes: text('response_types'), // JSON: string[]
   scope: text('scope'),
   tokenEndpointAuthMethod: text('token_endpoint_auth_method').notNull().default('none'),
+  status: text('status', { enum: ['active', 'disabled'] })
+    .notNull()
+    .default('active'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
@@ -24,6 +27,7 @@ export const mcpOauthAuthorizationCodes = sqliteTable(
     resource: text('resource').notNull(),
     scope: text('scope'),
     keyName: text('key_name').notNull(),
+    apiKeySecretHash: text('api_key_secret_hash'),
     codeChallenge: text('code_challenge').notNull(),
     codeChallengeMethod: text('code_challenge_method').notNull(),
     expiresAt: integer('expires_at').notNull(),

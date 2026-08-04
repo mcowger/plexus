@@ -1,26 +1,48 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import bearerAuth from '@fastify/bearer-auth';
 import formbody from '@fastify/formbody';
 import { getConfig } from '../../config';
-import {
-  attachPlexusApiKeyAuth,
-  createAuthHook,
-  isRequestIpAllowed,
-  validatePlexusApiKey,
-} from '../../utils/auth';
+import { attachPlexusApiKeyAuth, isRequestIpAllowed, validatePlexusApiKey } from '../../utils/auth';
 import { logger } from '../../utils/logger';
 import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
 import { getClientIp } from '../../utils/ip';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 import { registerPlexusMcpRoutes } from './plexus';
-import { getMcpAuthProvider, isMcpOAuthEnabled } from '../../services/mcp-oauth/provider-factory';
-import { getMcpResourceUrl, getRequestBaseUrl } from '../../services/mcp-oauth/url';
+import { getMcpAuthProvider } from '../../services/mcp-oauth/provider-factory';
+import { getRequestBaseUrl } from '../../services/mcp-oauth/url';
 import { MCP_OAUTH_ACCESS_TOKEN_PREFIX } from '../../services/mcp-oauth/plexus-idp-provider';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 
+// C3: JSON-RPC methods that mutate external state (and therefore require the
+// `mcp:write` scope). Everything else is treated as read-scoped.
+const MCP_WRITE_METHODS = new Set(['tools/call']);
+
+// Required scope for an MCP proxy operation. The mutating surface is the
+// JSON-RPC `tools/call` request issued over POST; listing, streaming
+// (GET), session lifecycle (DELETE), and all other JSON-RPC methods are
+// read-scoped. Returns `mcp:write` for write operations, `mcp:read` otherwise.
+function requiredScopeForOperation(request: FastifyRequest): 'mcp:read' | 'mcp:write' {
+  if (request.method === 'POST') {
+    const method = mcpProxyService.extractJsonRpcMethod(request.body);
+    if (method && MCP_WRITE_METHODS.has(method)) {
+      return 'mcp:write';
+    }
+  }
+  return 'mcp:read';
+}
+
 function authErrorResponse(message: string) {
   return { error: { message, type: 'auth_error', code: 401 } };
+}
+
+function oauthUnavailableReply(reply: FastifyReply) {
+  return reply.code(404).send({
+    error: {
+      message: 'MCP OAuth is disabled',
+      type: 'oauth_disabled',
+      code: 404,
+    },
+  });
 }
 
 function getStringHeader(value: string | string[] | undefined): string | null {
@@ -78,6 +100,10 @@ async function mcpOAuthFallbackAuth(request: FastifyRequest, reply: FastifyReply
           keyConfig,
           attribution: null,
         });
+        // C3: retain the OAuth token's granted scopes so the protected-resource
+        // preHandler hook can enforce them against the operation's required
+        // scope (read vs write).
+        (request as any).mcpOAuthScopes = oauthResult.scopes;
         return;
       }
     }
@@ -157,56 +183,103 @@ export async function registerMcpRoutes(
   fastify: FastifyInstance,
   mcpUsageStorage: McpUsageStorageService
 ) {
-  const oauthEnabled = isMcpOAuthEnabled();
-  const authProvider = getMcpAuthProvider();
+  // C1/C7: Discovery, DCR, and OAuth endpoints are always registered (matching
+  // what openapi.json advertises) so a config change toggling MCP OAuth takes
+  // effect without a process restart. Each handler resolves the auth provider
+  // via getMcpAuthProvider() at request time; when MCP OAuth is disabled the
+  // provider is null and the endpoint reports that the feature is off.
+  await fastify.register(formbody);
 
-  if (oauthEnabled && authProvider) {
-    await fastify.register(formbody);
+  fastify.get('/.well-known/oauth-authorization-server', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    logger.silly('OAuth authorization server discovery');
+    return reply.send(provider.getDiscoveryMetadata(request));
+  });
 
-    fastify.get('/.well-known/oauth-authorization-server', async (request, reply) => {
-      logger.silly('OAuth authorization server discovery');
-      return reply.send(authProvider.getDiscoveryMetadata(request));
-    });
+  fastify.get('/.well-known/oauth-protected-resource', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    logger.silly('OAuth protected resource discovery');
+    return reply.send(provider.getProtectedResourceMetadata(request));
+  });
 
-    fastify.get('/.well-known/oauth-protected-resource', async (request, reply) => {
-      logger.silly('OAuth protected resource discovery');
-      return reply.send(authProvider.getProtectedResourceMetadata(request));
-    });
+  // C7: keep the legacy OpenID Connect discovery endpoint available and
+  // consistent with the OAuth 2.0 authorization server metadata. Plexus does
+  // not implement full OIDC (no JWT/ID tokens), but MCP clients historically
+  // probe this path, so it mirrors RFC 8414 discovery instead of returning 404.
+  fastify.get('/.well-known/openid-configuration', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    logger.silly('OpenID Connect discovery (legacy alias)');
+    return reply.send(provider.getDiscoveryMetadata(request));
+  });
 
-    fastify.get('/oauth/authorize', async (request, reply) =>
-      authProvider.handleAuthorize(request, reply)
-    );
-    fastify.post('/oauth/authorize', async (request, reply) =>
-      authProvider.handleAuthorize(request, reply)
-    );
-    fastify.post('/oauth/token', async (request, reply) =>
-      authProvider.handleToken(request, reply)
-    );
-    fastify.post('/register', async (request, reply) =>
-      authProvider.handleRegister(request, reply)
-    );
-  }
+  fastify.get('/oauth/authorize', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    return provider.handleAuthorize(request, reply);
+  });
+  fastify.post('/oauth/authorize', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    return provider.handleAuthorize(request, reply);
+  });
+  fastify.post('/oauth/token', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    return provider.handleToken(request, reply);
+  });
+  fastify.post('/register', async (request, reply) => {
+    const provider = getMcpAuthProvider();
+    if (!provider) return oauthUnavailableReply(reply);
+    return provider.handleRegister(request, reply);
+  });
 
   await registerPlexusMcpRoutes(fastify, mcpUsageStorage);
 
   fastify.register(async (protectedRoutes) => {
-    if (oauthEnabled) {
-      protectedRoutes.addHook('onRequest', mcpOAuthFallbackAuth);
-    } else {
-      const auth = createAuthHook();
+    // C1: single request-time auth hook. It handles raw API keys, OAuth bearer
+    // tokens, and api-key-style headers. OAuth token validation is a no-op when
+    // MCP OAuth is disabled (getMcpAuthProvider() returns null), so the hook
+    // reflects the current config value on every request rather than only at
+    // route registration time.
+    protectedRoutes.addHook('onRequest', mcpOAuthFallbackAuth);
 
-      protectedRoutes.addHook('onRequest', auth.onRequest);
-
-      await protectedRoutes.register(bearerAuth, auth.bearerAuthOptions);
-    }
+    // C3: enforce OAuth scopes at the protected resource once the body is
+    // available. Requests authenticated with a raw API key carry no scope
+    // restriction; OAuth-authenticated requests are constrained to the scopes
+    // granted on their access token.
+    protectedRoutes.addHook('preHandler', async (request, reply) => {
+      const scopes = (request as any).mcpOAuthScopes as string[] | undefined;
+      if (scopes) {
+        const required = requiredScopeForOperation(request);
+        if (!scopes.includes(required)) {
+          reply.header(
+            'WWW-Authenticate',
+            `Bearer error="insufficient_scope", scope="${required}"`
+          );
+          return reply.code(403).send({
+            error: {
+              message: `OAuth token lacks required scope '${required}' for this MCP operation`,
+              type: 'insufficient_scope',
+              code: 403,
+            },
+          });
+        }
+      }
+    });
 
     protectedRoutes.addHook('preHandler', async (request, reply) => {
       const serverName = (request.params as any)?.name;
 
       if (!serverName) {
-        return reply
-          .code(400)
-          .send({ error: { message: 'Server name is required', type: 'invalid_request' } });
+        return reply.code(400).send({
+          error: {
+            message: 'Server name is required',
+            type: 'invalid_request',
+          },
+        });
       }
 
       if (!mcpProxyService.validateServerName(serverName)) {
@@ -293,14 +366,14 @@ export async function registerMcpRoutes(
 
         if (result.error) {
           if (result.status === 502) {
-            return reply
-              .code(502)
-              .send({ error: { message: result.error, type: 'upstream_error' } });
+            return reply.code(502).send({
+              error: { message: result.error, type: 'upstream_error' },
+            });
           }
           if (result.status === 504) {
-            return reply
-              .code(504)
-              .send({ error: { message: result.error, type: 'upstream_timeout' } });
+            return reply.code(504).send({
+              error: { message: result.error, type: 'upstream_timeout' },
+            });
           }
           return reply
             .code(result.status)
@@ -327,7 +400,10 @@ export async function registerMcpRoutes(
     protectedRoutes.get(
       '/mcp/:name',
       async (
-        request: FastifyRequest<{ Params: { name: string }; Querystring: Record<string, string> }>,
+        request: FastifyRequest<{
+          Params: { name: string };
+          Querystring: Record<string, string>;
+        }>,
         reply: FastifyReply
       ) => {
         const { name: serverName } = request.params;
@@ -382,14 +458,14 @@ export async function registerMcpRoutes(
 
         if (result.error) {
           if (result.status === 502) {
-            return reply
-              .code(502)
-              .send({ error: { message: result.error, type: 'upstream_error' } });
+            return reply.code(502).send({
+              error: { message: result.error, type: 'upstream_error' },
+            });
           }
           if (result.status === 504) {
-            return reply
-              .code(504)
-              .send({ error: { message: result.error, type: 'upstream_timeout' } });
+            return reply.code(504).send({
+              error: { message: result.error, type: 'upstream_timeout' },
+            });
           }
           return reply
             .code(result.status)
@@ -464,14 +540,14 @@ export async function registerMcpRoutes(
 
         if (result.error) {
           if (result.status === 502) {
-            return reply
-              .code(502)
-              .send({ error: { message: result.error, type: 'upstream_error' } });
+            return reply.code(502).send({
+              error: { message: result.error, type: 'upstream_error' },
+            });
           }
           if (result.status === 504) {
-            return reply
-              .code(504)
-              .send({ error: { message: result.error, type: 'upstream_timeout' } });
+            return reply.code(504).send({
+              error: { message: result.error, type: 'upstream_timeout' },
+            });
           }
           return reply
             .code(result.status)
