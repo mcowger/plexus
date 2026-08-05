@@ -44,6 +44,46 @@ function configureOauthKey(secret: string | null) {
   });
 }
 
+function configureOauthKeyStatus(keyOverrides: Record<string, unknown>) {
+  setConfigForTesting({
+    providers: {},
+    models: {},
+    keys: { 'oauth-key': { secret: 'sk-oauth-key', ...keyOverrides } },
+    failover: {
+      enabled: false,
+      retryableStatusCodes: [429, 500, 502, 503, 504],
+      retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+    },
+    quotas: [],
+    mcpOAuth: {
+      enabled: true,
+      provider: 'plexus-idp',
+      issuer: 'http://localhost',
+      resource: 'http://localhost/mcp',
+    },
+  });
+}
+
+function configureOauthResource(resource: string) {
+  setConfigForTesting({
+    providers: {},
+    models: {},
+    keys: { 'oauth-key': { secret: 'sk-oauth-key' } },
+    failover: {
+      enabled: false,
+      retryableStatusCodes: [429, 500, 502, 503, 504],
+      retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+    },
+    quotas: [],
+    mcpOAuth: {
+      enabled: true,
+      provider: 'plexus-idp',
+      issuer: 'http://localhost',
+      resource,
+    },
+  });
+}
+
 class InMemoryMcpOauthRepository {
   clients = new Map<string, McpOauthClientRecord>();
   codes = new Map<string, McpOauthAuthorizationCodeRecord>();
@@ -378,6 +418,376 @@ describe('PlexusIdpProvider', () => {
 
     expect(refreshResponse.statusCode).toBe(400);
     expect(JSON.parse(refreshResponse.body).error).toBe('invalid_grant');
+  });
+
+  it('rejects an issued access token after the bound API key expires', async () => {
+    const tokenBody = await issueAccessAndRefreshToken();
+
+    configureOauthKeyStatus({ expiresAt: Date.now() - 1000 });
+
+    await expect(provider.validateToken(tokenBody.access_token)).resolves.toBeNull();
+  });
+
+  it('rejects an issued access token after the bound API key is disabled', async () => {
+    const tokenBody = await issueAccessAndRefreshToken();
+
+    configureOauthKeyStatus({ disabledAt: Date.now() - 1000 });
+
+    await expect(provider.validateToken(tokenBody.access_token)).resolves.toBeNull();
+  });
+
+  it('rejects an issued access token when the configured MCP resource no longer matches', async () => {
+    const tokenBody = await issueAccessAndRefreshToken();
+
+    configureOauthResource('http://other-host/mcp');
+
+    await expect(provider.validateToken(tokenBody.access_token)).resolves.toBeNull();
+    const protectedResponse = await fastify.inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { authorization: `Bearer ${tokenBody.access_token}` },
+    });
+
+    expect(protectedResponse.statusCode).toBe(401);
+  });
+
+  it('rejects authorize requests where all requested scopes are outside the client scope', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: {
+        redirect_uris: ['http://localhost:5555/callback'],
+        scope: 'mcp:read',
+      },
+    });
+    const client = JSON.parse(clientResponse.body);
+    const pkce = pkcePair();
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        state: 'abc123',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+        scope: 'mcp:write',
+      }).toString(),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).error).toBe('invalid_scope');
+  });
+
+  it('constrains granted scopes to the intersection of requested and client scope during authorization', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: {
+        redirect_uris: ['http://localhost:5555/callback'],
+        scope: 'mcp:read',
+      },
+    });
+    const client = JSON.parse(clientResponse.body);
+    const pkce = pkcePair();
+
+    const authorizeResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+        scope: 'mcp:read mcp:write',
+      }).toString(),
+    });
+
+    expect(authorizeResponse.statusCode).toBe(302);
+    const code = new URL(authorizeResponse.headers.location as string).searchParams.get('code');
+    expect(code).toMatch(/^poc_/);
+
+    const tokenResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code: code!,
+        code_verifier: pkce.verifier,
+        resource: 'http://localhost/mcp',
+      }).toString(),
+    });
+
+    expect(tokenResponse.statusCode).toBe(200);
+    const tokenBody = JSON.parse(tokenResponse.body);
+    expect(tokenBody.scope).toBe('mcp:read');
+    await expect(provider.validateToken(tokenBody.access_token)).resolves.toEqual({
+      keyName: 'oauth-key',
+      scopes: ['mcp:read'],
+    });
+  });
+
+  it('constrains refreshed scopes to the client-registered scope', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: {
+        redirect_uris: ['http://localhost:5555/callback'],
+        scope: 'mcp:read',
+      },
+    });
+    const client = JSON.parse(clientResponse.body);
+    const pkce = pkcePair();
+
+    const authorizeResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+        scope: 'mcp:read',
+      }).toString(),
+    });
+    const code = new URL(authorizeResponse.headers.location as string).searchParams.get('code');
+
+    const tokenResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code: code!,
+        code_verifier: pkce.verifier,
+        resource: 'http://localhost/mcp',
+      }).toString(),
+    });
+    const tokenBody = JSON.parse(tokenResponse.body);
+
+    // Refresh requesting a broader scope than the client is registered for;
+    // the granted scope must be constrained back to the client's `mcp:read`.
+    const refreshResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: client.client_id,
+        refresh_token: tokenBody.refresh_token,
+        resource: 'http://localhost/mcp',
+        scope: 'mcp:read mcp:write',
+      }).toString(),
+    });
+
+    expect(refreshResponse.statusCode).toBe(200);
+    const refreshBody = JSON.parse(refreshResponse.body);
+    expect(refreshBody.scope).toBe('mcp:read');
+    await expect(provider.validateToken(refreshBody.access_token)).resolves.toEqual({
+      keyName: 'oauth-key',
+      scopes: ['mcp:read'],
+    });
+  });
+
+  it('rejects authorize requests for a disabled client with invalid_client', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: { redirect_uris: ['http://localhost:5555/callback'] },
+    });
+    const client = JSON.parse(clientResponse.body);
+    repo.clients.get(client.client_id)!.status = 'disabled';
+    const pkce = pkcePair();
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+      }).toString(),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).error).toBe('invalid_client');
+  });
+
+  it('rejects authorization_code token grants for a disabled client with invalid_client', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: { redirect_uris: ['http://localhost:5555/callback'] },
+    });
+    const client = JSON.parse(clientResponse.body);
+    const pkce = pkcePair();
+
+    const authorizeResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+      }).toString(),
+    });
+    const code = new URL(authorizeResponse.headers.location as string).searchParams.get('code');
+
+    repo.clients.get(client.client_id)!.status = 'disabled';
+
+    const tokenResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code: code!,
+        code_verifier: pkce.verifier,
+        resource: 'http://localhost/mcp',
+      }).toString(),
+    });
+
+    expect(tokenResponse.statusCode).toBe(400);
+    expect(JSON.parse(tokenResponse.body).error).toBe('invalid_client');
+  });
+
+  it('rejects refresh_token grants for a disabled client with invalid_grant', async () => {
+    const tokenBody = await issueAccessAndRefreshToken();
+    repo.clients.get(tokenBody.client_id)!.status = 'disabled';
+
+    const refreshResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: tokenBody.client_id,
+        refresh_token: tokenBody.refresh_token,
+        resource: 'http://localhost/mcp',
+      }).toString(),
+    });
+
+    expect(refreshResponse.statusCode).toBe(400);
+    expect(JSON.parse(refreshResponse.body).error).toBe('invalid_grant');
+  });
+
+  it('rejects exchanging an authorization code after the bound API key is rotated', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: { redirect_uris: ['http://localhost:5555/callback'] },
+    });
+    const client = JSON.parse(clientResponse.body);
+    const pkce = pkcePair();
+
+    const authorizeResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+      }).toString(),
+    });
+    const code = new URL(authorizeResponse.headers.location as string).searchParams.get('code');
+
+    configureOauthKey('sk-oauth-key-rotated');
+
+    const tokenResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code: code!,
+        code_verifier: pkce.verifier,
+        resource: 'http://localhost/mcp',
+      }).toString(),
+    });
+
+    expect(tokenResponse.statusCode).toBe(400);
+    expect(JSON.parse(tokenResponse.body).error).toBe('invalid_grant');
+  });
+
+  it('sets no-store cache headers on token responses', async () => {
+    const clientResponse = await fastify.inject({
+      method: 'POST',
+      url: '/register',
+      payload: { redirect_uris: ['http://localhost:5555/callback'] },
+    });
+    const client = JSON.parse(clientResponse.body);
+    const pkce = pkcePair();
+
+    const authorizeResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/authorize',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code_challenge: pkce.challenge,
+        code_challenge_method: 'S256',
+        resource: 'http://localhost/mcp',
+        api_key: 'sk-oauth-key',
+      }).toString(),
+    });
+    const code = new URL(authorizeResponse.headers.location as string).searchParams.get('code');
+
+    const tokenResponse = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: client.client_id,
+        redirect_uri: 'http://localhost:5555/callback',
+        code: code!,
+        code_verifier: pkce.verifier,
+        resource: 'http://localhost/mcp',
+      }).toString(),
+    });
+
+    expect(tokenResponse.statusCode).toBe(200);
+    expect(tokenResponse.headers['cache-control']).toBe('no-store');
+    expect(tokenResponse.headers['pragma']).toBe('no-cache');
   });
 
   async function issueAccessAndRefreshToken(): Promise<{

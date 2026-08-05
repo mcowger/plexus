@@ -352,6 +352,7 @@ export interface McpOAuthTokenRecord {
 export interface McpOAuthClientRecord {
   clientId: string;
   clientName: string | null;
+  status: 'active' | 'disabled';
   redirectUris: string[];
   grantTypes: string[];
   responseTypes: string[];
@@ -3056,6 +3057,46 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to revoke MCP OAuth token');
+    }
+  },
+
+  updateMcpOAuthClientStatus: async (
+    clientId: string,
+    status: 'active' | 'disabled'
+  ): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-oauth/clients/${encodeURIComponent(clientId)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update MCP OAuth client status');
+    }
+  },
+
+  deleteMcpOAuthClient: async (clientId: string): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-oauth/clients/${encodeURIComponent(clientId)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete MCP OAuth client');
+    }
+  },
+
+  revokeMcpOAuthClientTokens: async (clientId: string): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/mcp-oauth/clients/${encodeURIComponent(clientId)}/revoke`,
+      { method: 'POST' }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to revoke MCP OAuth client tokens');
     }
   },
 

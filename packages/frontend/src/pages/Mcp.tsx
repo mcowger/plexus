@@ -28,6 +28,7 @@ import {
   RefreshCw,
   KeyRound,
   ShieldOff,
+  ShieldCheck,
 } from 'lucide-react';
 import { Switch } from '../components/ui/Switch';
 import { clsx } from 'clsx';
@@ -97,6 +98,9 @@ export const McpPage: React.FC = () => {
   const [oauthClients, setOauthClients] = useState<McpOAuthClientRecord[]>([]);
   const [oauthClientsLoading, setOauthClientsLoading] = useState(false);
   const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
+  const [updatingClientId, setUpdatingClientId] = useState<string | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [revokingAllClientId, setRevokingAllClientId] = useState<string | null>(null);
 
   // Delete logs modal state
   const [isDeleteLogsModalOpen, setIsDeleteLogsModalOpen] = useState(false);
@@ -188,6 +192,72 @@ export const McpPage: React.FC = () => {
       toast.error((e as Error).message, 'Failed to revoke OAuth token');
     } finally {
       setRevokingTokenId(null);
+    }
+  };
+
+  const handleToggleOAuthClientStatus = async (client: McpOAuthClientRecord) => {
+    const disabling = client.status !== 'disabled';
+    const ok = await toast.confirm({
+      title: disabling ? 'Disable OAuth client?' : 'Re-enable OAuth client?',
+      message: disabling
+        ? 'Disable this OAuth client? It will no longer be able to authorize or exchange tokens.'
+        : 'Re-enable this OAuth client?',
+      confirmLabel: disabling ? 'Disable' : 'Re-enable',
+      variant: disabling ? 'danger' : 'default',
+    });
+    if (!ok) return;
+
+    setUpdatingClientId(client.clientId);
+    try {
+      await api.updateMcpOAuthClientStatus(client.clientId, disabling ? 'disabled' : 'active');
+      await loadOAuthClients();
+      toast.success(disabling ? 'OAuth client disabled' : 'OAuth client re-enabled');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to update OAuth client');
+    } finally {
+      setUpdatingClientId(null);
+    }
+  };
+
+  const handleRevokeAllOAuthTokens = async (clientId: string) => {
+    const ok = await toast.confirm({
+      title: 'Revoke all tokens?',
+      message: 'Revoke all tokens for this client? This cannot be undone.',
+      confirmLabel: 'Revoke all',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setRevokingAllClientId(clientId);
+    try {
+      await api.revokeMcpOAuthClientTokens(clientId);
+      await loadOAuthClients();
+      toast.success('All tokens revoked for this client');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to revoke all tokens');
+    } finally {
+      setRevokingAllClientId(null);
+    }
+  };
+
+  const handleDeleteOAuthClient = async (clientId: string) => {
+    const ok = await toast.confirm({
+      title: 'Delete OAuth client?',
+      message: 'Delete this OAuth client? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setDeletingClientId(clientId);
+    try {
+      await api.deleteMcpOAuthClient(clientId);
+      await loadOAuthClients();
+      toast.success('OAuth client deleted');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to delete OAuth client');
+    } finally {
+      setDeletingClientId(null);
     }
   };
 
@@ -976,13 +1046,24 @@ export const McpPage: React.FC = () => {
                 {oauthClients.map((client) => (
                   <article
                     key={client.clientId}
-                    className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                    className={`rounded-md border border-border-glass bg-bg-subtle p-3 ${
+                      client.status === 'disabled' ? 'opacity-60' : ''
+                    }`}
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-semibold text-text">
                           <KeyRound size={15} className="text-primary" />
                           <span>{client.clientName || 'Unnamed client'}</span>
+                          {client.status === 'disabled' ? (
+                            <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-red-500">
+                              Disabled
+                            </span>
+                          ) : (
+                            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-emerald-500">
+                              Active
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 font-mono text-xs text-text-secondary break-all">
                           {client.clientId}
@@ -1070,6 +1151,48 @@ export const McpPage: React.FC = () => {
                           </table>
                         </div>
                       )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-border-glass pt-3">
+                      {client.status === 'disabled' ? (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => handleToggleOAuthClientStatus(client)}
+                          isLoading={updatingClientId === client.clientId}
+                          leftIcon={<ShieldCheck size={13} />}
+                        >
+                          Enable
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleToggleOAuthClientStatus(client)}
+                          isLoading={updatingClientId === client.clientId}
+                          leftIcon={<ShieldOff size={13} />}
+                        >
+                          Disable
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handleRevokeAllOAuthTokens(client.clientId)}
+                        isLoading={revokingAllClientId === client.clientId}
+                        leftIcon={<KeyRound size={13} />}
+                      >
+                        Revoke all tokens
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handleDeleteOAuthClient(client.clientId)}
+                        isLoading={deletingClientId === client.clientId}
+                        leftIcon={<Trash2 size={13} />}
+                      >
+                        Delete client
+                      </Button>
                     </div>
                   </article>
                 ))}
