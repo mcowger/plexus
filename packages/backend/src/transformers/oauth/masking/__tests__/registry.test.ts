@@ -62,6 +62,37 @@ describe('buildToolRenamePairs', () => {
     });
   });
 
+  it('leaves tools that are already in mcp__<server>__<tool> form untouched', () => {
+    // Real Claude Code already emits this convention. Clustering on the first
+    // underscore reads their literal "mcp" prefix as a server name and
+    // double-prefixes them (mcp__github__get_me ->
+    // mcp__mcp___github__get_me), which desynchronizes tools[].name from the
+    // tool_reference blocks in the message history and makes Anthropic reject
+    // the request with 400 "Tool reference ... not found in available tools".
+    const tools = [
+      tool('mcp__github__get_me'),
+      tool('mcp__github__search_users'),
+      tool('mcp__playwright__browser_click'),
+      tool('mcp__playwright__browser_navigate'),
+      tool('mcp__home-assistant__ha_get_state'),
+    ];
+    expect(buildToolRenamePairs(tools)).toEqual([]);
+  });
+
+  it('still clusters flat server_tool names when CC-shaped MCP tools are present alongside them', () => {
+    const tools = [
+      ...Array.from({ length: 4 }, (_, i) => tool(`mcp__playwright__tool_${i}`)),
+      ...Array.from({ length: 4 }, (_, i) => tool(`github_tool_${i}`)),
+    ];
+    const pairs = buildToolRenamePairs(tools);
+    expect(Object.fromEntries(pairs.map(([from, to]) => [from, to]))).toEqual({
+      github_tool_0: 'mcp__github__tool_0',
+      github_tool_1: 'mcp__github__tool_1',
+      github_tool_2: 'mcp__github__tool_2',
+      github_tool_3: 'mcp__github__tool_3',
+    });
+  });
+
   it('does not cluster prefixes with too few tools (avoids false positives)', () => {
     // Only 3 tools share the "list" prefix — below MIN_CLUSTER_SIZE (4) — so
     // opencode's own list_mcp_resources / list_mcp_resource_templates /

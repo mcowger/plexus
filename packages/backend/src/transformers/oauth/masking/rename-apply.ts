@@ -17,6 +17,11 @@
  *   - `tools[].name`
  *   - `tool_choice.name` (when `tool_choice.type === "tool"`)
  *   - assistant message `content[]` blocks with `type === "tool_use"`, `.name`
+ *   - `tool_reference` blocks (advanced tool use / tool search), `.tool_name` —
+ *     both at the top level of a message's `content[]` and nested inside a
+ *     `tool_result`'s `content[]`, which is how tool-search results are
+ *     returned. Anthropic validates these against `tools[]` and rejects a
+ *     mismatch with `400 Tool reference '<name>' not found in available tools`.
  *
  * NOT renamed (verified unaffected):
  *   - `tool_result` blocks correlate to their originating call by
@@ -67,11 +72,34 @@ export function applyToolRenames(body: any, pairs: readonly RenamePair[]): any {
       if (!Array.isArray(msg?.content)) return msg;
       let changed = false;
       const content = msg.content.map((block: any) => {
-        if (block?.type !== 'tool_use') return block;
-        const renamed = renameMap.get(block.name);
-        if (!renamed) return block;
-        changed = true;
-        return { ...block, name: renamed };
+        if (block?.type === 'tool_use') {
+          const renamed = renameMap.get(block.name);
+          if (!renamed) return block;
+          changed = true;
+          return { ...block, name: renamed };
+        }
+        if (block?.type === 'tool_reference') {
+          const renamed = renameMap.get(block.tool_name);
+          if (!renamed) return block;
+          changed = true;
+          return { ...block, tool_name: renamed };
+        }
+        // Tool-search results arrive as `tool_result` blocks whose `content[]`
+        // is a list of `tool_reference` blocks.
+        if (block?.type === 'tool_result' && Array.isArray(block.content)) {
+          let nestedChanged = false;
+          const nested = block.content.map((inner: any) => {
+            if (inner?.type !== 'tool_reference') return inner;
+            const renamed = renameMap.get(inner.tool_name);
+            if (!renamed) return inner;
+            nestedChanged = true;
+            return { ...inner, tool_name: renamed };
+          });
+          if (!nestedChanged) return block;
+          changed = true;
+          return { ...block, content: nested };
+        }
+        return block;
       });
       return changed ? { ...msg, content } : msg;
     });

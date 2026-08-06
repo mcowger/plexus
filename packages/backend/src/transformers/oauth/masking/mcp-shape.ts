@@ -32,6 +32,18 @@ import type { RenamePair, ToolDescriptor, ToolShape } from './types';
 /** Minimum number of tools sharing a prefix before it's treated as an MCP server name. */
 const MIN_CLUSTER_SIZE = 4;
 
+/**
+ * Tools that are ALREADY in the `mcp__<server>__<tool>` convention — i.e. the
+ * exact shape this module normalizes toward, as real Claude Code emits.
+ * Without this guard the first-underscore clustering below treats their
+ * literal `mcp` prefix as a server name and double-prefixes every one of
+ * them (`mcp__github__get_me` -> `mcp__mcp___github__get_me`),
+ * which desynchronizes `tools[].name` from `tool_reference.tool_name` blocks
+ * in the message history and makes Anthropic reject the request with
+ * `400 Tool reference '<name>' not found in available tools`.
+ */
+const ALREADY_MCP_SHAPED = /^mcp__[^_].*__.+$/;
+
 function firstUnderscoreSplit(name: string): { prefix: string; rest: string } | null {
   const idx = name.indexOf('_');
   if (idx <= 0 || idx === name.length - 1) return null;
@@ -44,6 +56,7 @@ export const mcpShape: ToolShape = {
     const byPrefix = new Map<string, string[]>();
 
     for (const tool of tools) {
+      if (ALREADY_MCP_SHAPED.test(tool.name)) continue;
       const split = firstUnderscoreSplit(tool.name);
       if (!split) continue;
       const list = byPrefix.get(split.prefix) ?? [];

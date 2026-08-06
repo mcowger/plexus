@@ -57,6 +57,18 @@ describe('reverseToolRenames', () => {
     expect(reverseToolRenames(input, pairs)).toBe(input);
   });
 
+  it('reverses a tool_reference.tool_name field (advanced tool use / tool search)', () => {
+    const input = '{"type":"tool_reference","tool_name":"mcp__github__search_users"}';
+    expect(reverseToolRenames(input, pairs)).toBe(
+      '{"type":"tool_reference","tool_name":"github_search_users"}'
+    );
+  });
+
+  it('does NOT rewrite a renamed tool name appearing as an unrelated *_name field value', () => {
+    const input = '{"server_name":"Bash"}';
+    expect(reverseToolRenames(input, pairs)).toBe(input);
+  });
+
   it('is a no-op for text with no rename pairs', () => {
     const input = '{"type":"tool_use","name":"Bash"}';
     expect(reverseToolRenames(input, [])).toBe(input);
