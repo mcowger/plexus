@@ -11,6 +11,7 @@ import {
   getMcpServerNameFromRequest,
   getMcpServerNameFromResource,
   getRequestBaseUrl,
+  isAllowedRedirectUri,
   resourceMatchesExpected,
 } from './url';
 import * as mcpProxyService from '../mcp-proxy/mcp-proxy-service';
@@ -38,7 +39,14 @@ const REFRESH_TOKEN_PREFIX = 'por_';
 const AUTH_CODE_PREFIX = 'poc_';
 
 const registerSchema = z.object({
-  redirect_uris: z.array(z.string().url()).min(1),
+  redirect_uris: z
+    .array(
+      z
+        .string()
+        .url()
+        .refine(isAllowedRedirectUri, { message: 'Unsupported or unsafe redirect URI scheme' })
+    )
+    .min(1),
   client_name: z.string().min(1).optional(),
   grant_types: z.array(z.string()).optional(),
   response_types: z.array(z.string()).optional(),
@@ -49,7 +57,10 @@ const registerSchema = z.object({
 const authorizeSchema = z.object({
   response_type: z.literal('code'),
   client_id: z.string().min(1),
-  redirect_uri: z.string().url(),
+  redirect_uri: z
+    .string()
+    .url()
+    .refine(isAllowedRedirectUri, { message: 'Unsupported or unsafe redirect URI scheme' }),
   state: z.string().optional(),
   scope: z.string().optional(),
   code_challenge: z.string().min(43),

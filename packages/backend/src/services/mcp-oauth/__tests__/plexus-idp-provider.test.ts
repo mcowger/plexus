@@ -254,6 +254,20 @@ describe('PlexusIdpProvider', () => {
     expect(body.token_endpoint_auth_method).toBe('none');
   });
 
+  it('rejects client registration with executable or unsafe redirect URIs', async () => {
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/oauth/register',
+      payload: {
+        client_name: 'Malicious Client',
+        redirect_uris: ['javascript:alert(1)'],
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body).error).toBe('invalid_client_metadata');
+  });
+
   it('deduplicates identical dynamic client registrations', async () => {
     const payload = {
       client_name: 'Claude MCP',

@@ -76,3 +76,27 @@ export function resourceMatchesExpected(resource: string, expected: string): boo
     return false;
   }
 }
+
+export function isAllowedRedirectUri(uri: string): boolean {
+  try {
+    const parsed = new URL(uri);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === 'https:') return true;
+    if (protocol === 'http:') {
+      return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    }
+    // Disallow dangerous or executable schemes
+    if (
+      protocol === 'javascript:' ||
+      protocol === 'data:' ||
+      protocol === 'vbscript:' ||
+      protocol === 'file:'
+    ) {
+      return false;
+    }
+    // Allow custom app URI schemes (e.g. myapp://...)
+    return /^[a-z][a-z0-9+.-]*:$/i.test(protocol);
+  } catch {
+    return false;
+  }
+}
