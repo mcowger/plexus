@@ -151,21 +151,25 @@ export async function registerPlexusMcpRoutes(
     });
 
     // Reject early when the admin MCP is disabled (before auth, to avoid leaking key validity)
-    plexusMcp.addHook('preHandler', async (_request, reply) => {
-      try {
-        const configService = ConfigService.getInstance();
-        const mcpEnabled = await configService.getSetting<boolean>('mcpEnabled', true);
-        if (!mcpEnabled) {
-          return reply.code(418).send({
-            error: {
-              message: 'Plexus Management MCP is disabled. Enable it on the MCP Servers page.',
-              type: 'mcp_disabled',
-            },
-          });
+    plexusMcp.addHook('preHandler', (_request, reply, done) => {
+      void (async () => {
+        try {
+          const configService = ConfigService.getInstance();
+          const mcpEnabled = await configService.getSetting<boolean>('mcpEnabled', true);
+          if (!mcpEnabled) {
+            reply.code(418).send({
+              error: {
+                message: 'Plexus Management MCP is disabled. Enable it on the MCP Servers page.',
+                type: 'mcp_disabled',
+              },
+            });
+            return;
+          }
+        } catch {
+          // ConfigService not initialized — default to enabled
         }
-      } catch {
-        // ConfigService not initialized — default to enabled
-      }
+        done();
+      })().catch(done);
     });
 
     plexusMcp.addHook('preHandler', authenticate);

@@ -1,0 +1,75 @@
+post:
+  tags:
+    - MCP Proxy
+  summary: OAuth token exchange (public when enabled)
+  description: |
+    Exchanges an authorization code or refresh token for opaque bearer tokens.
+    Authorization-code exchanges require the original redirect URI, PKCE
+    verifier, client ID, and route-specific RFC 8707 resource identifier.
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/x-www-form-urlencoded:
+        schema:
+          type: object
+          required:
+            - grant_type
+            - client_id
+            - resource
+          properties:
+            grant_type:
+              type: string
+              enum: [authorization_code, refresh_token]
+            code:
+              type: string
+            redirect_uri:
+              type: string
+              format: uri
+            client_id:
+              type: string
+            code_verifier:
+              type: string
+            refresh_token:
+              type: string
+            resource:
+              type: string
+              format: uri
+            scope:
+              type: string
+  responses:
+    '200':
+      description: OAuth token response.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+        Pragma:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - access_token
+              - token_type
+              - expires_in
+              - refresh_token
+            properties:
+              access_token:
+                type: string
+              token_type:
+                type: string
+                enum: [Bearer]
+              expires_in:
+                type: integer
+              refresh_token:
+                type: string
+              scope:
+                type: string
+    '400':
+      description: Invalid request, grant, target, or scope.
+    '404':
+      description: MCP OAuth is disabled (`oauth_disabled`).
+  operationId: postOauthToken

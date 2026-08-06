@@ -1684,9 +1684,6 @@ export class ConfigRepository {
       ...(typeof stored?.issuer === 'string' && stored.issuer.trim()
         ? { issuer: stored.issuer.trim() }
         : {}),
-      ...(typeof stored?.resource === 'string' && stored.resource.trim()
-        ? { resource: stored.resource.trim() }
-        : {}),
     };
   }
 

@@ -582,9 +582,6 @@ export const Config = () => {
         ...(typeof raw?.issuer === 'string' && raw.issuer.trim()
           ? { issuer: raw.issuer.trim() }
           : {}),
-        ...(typeof raw?.resource === 'string' && raw.resource.trim()
-          ? { resource: raw.resource.trim() }
-          : {}),
       };
       setMcpOAuthConfig(cfg);
       setMcpOAuthIssuerInput(cfg.issuer ?? '');
@@ -688,7 +685,6 @@ export const Config = () => {
         enabled: mcpOAuthConfig.enabled,
         provider: 'plexus-idp',
         ...(issuer ? { issuer } : {}),
-        ...(mcpOAuthConfig.resource ? { resource: mcpOAuthConfig.resource } : {}),
       };
       await api.patchSystemSettings({ mcpOAuth: next });
       setMcpOAuthConfig(next);
@@ -1768,7 +1764,7 @@ export const Config = () => {
                       Enable OAuth for MCP clients
                     </p>
                     <p className="font-body text-[11px] text-text-muted">
-                      Instance-wide OAuth discovery and token issuance for MCP clients.
+                      Shared OAuth authorization for each configured MCP server.
                     </p>
                   </div>
                 </div>
@@ -1799,8 +1795,9 @@ export const Config = () => {
                 )}
                 <p className="font-body text-[11px] text-text-muted leading-relaxed">
                   Use the externally reachable URL for this Plexus instance, such as a Tailscale
-                  Funnel URL. If this does not match the actual external URL, OAuth discovery
-                  metadata will point at the wrong origin and claude.ai MCP connections can fail.
+                  Funnel URL. Each MCP server derives its protected resource from this issuer, such
+                  as <code>/mcp/exa</code>. If this does not match the actual external URL, OAuth
+                  discovery metadata will point at the wrong origin and MCP connections can fail.
                 </p>
               </div>
             </div>

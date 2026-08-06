@@ -13,14 +13,38 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const requestedReturnTo = new URLSearchParams(location.search).get('returnTo');
+  const returnTo = (() => {
+    if (
+      !requestedReturnTo ||
+      !requestedReturnTo.startsWith('/') ||
+      requestedReturnTo.startsWith('//')
+    ) {
+      return null;
+    }
+    try {
+      const parsed = new URL(requestedReturnTo, window.location.origin);
+      return parsed.origin === window.location.origin
+        ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+        : null;
+    } catch {
+      return null;
+    }
+  })();
   const from = (location.state as any)?.from?.pathname || '/';
   const appVersion: string = process.env.APP_VERSION || 'dev';
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(from, { replace: true });
+      if (returnTo) {
+        // OAuth authorization is served by the backend rather than the UI
+        // router, so leave the SPA explicitly after completing login.
+        window.location.assign(returnTo);
+      } else {
+        navigate(from, { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, navigate, from, returnTo]);
 
   useEffect(() => {
     if (isAuthenticated) return;
@@ -29,7 +53,9 @@ export const Login: React.FC = () => {
     if (!token) return;
 
     // Strip token from URL immediately so it doesn't linger in the address bar.
-    navigate('/login', { replace: true });
+    navigate(returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login', {
+      replace: true,
+    });
     // Pre-fill the input so the user sees what's happening.
     setKey(token);
 

@@ -969,9 +969,19 @@ All MCP endpoints require a Plexus API key. Client auth headers are NOT forwarde
 
 Plexus exposes standard OAuth 2.0 endpoints for MCP clients:
 - `GET /.well-known/oauth-authorization-server`
-- `GET /.well-known/oauth-protected-resource`
-- `GET /.well-known/openid-configuration`
-- `POST /register`
+- `GET /.well-known/oauth-protected-resource/mcp/:name`
+- `GET /oauth/authorize` and `POST /oauth/authorize`
+- `POST /oauth/token`
+- `POST /oauth/register`
+
+The authorization server is shared by all configured MCP servers, while each
+`/mcp/:name` endpoint has its own protected-resource metadata and RFC 8707
+resource identifier (`<issuer>/mcp/:name`).
+
+The browser consent step uses the existing Plexus session. A limited API-key
+session is always bound to that key and cannot select another key. An
+administrator session must explicitly choose the API-key identity to which the
+MCP grant will be bound, even when only one active key exists.
 
 ---
 

@@ -1,19 +1,25 @@
 get:
   tags:
     - MCP Proxy
-  summary: OAuth 2.0 protected resource metadata (public)
+  summary: OAuth 2.0 protected resource metadata (public when enabled)
   description: |
-    Returns OAuth 2.0 protected resource metadata for MCP client
-    compatibility.
+    Returns RFC 9728 protected-resource metadata for one configured MCP
+    server. The resource identifier is `https://host/mcp/{name}`; the
+    authorization server, supported scopes, and bearer transport are resolved
+    from the active provider at request time.
 
-    ## Use case
+    MCP OAuth is opt-in. When `mcpOAuth.enabled` is false, this endpoint
+    returns `404` with an `oauth_disabled` error.
 
-    MCP clients use this endpoint to discover resource protection
-    configuration.
-
-    **Not functional OAuth** — This exists for MCP client compatibility.
-
-    **No auth** — This endpoint is public.
+    **No auth** — This endpoint is public while OAuth is enabled.
+  parameters:
+    - in: path
+      name: name
+      required: true
+      description: Enabled MCP server name.
+      schema:
+        type: string
+        pattern: ^[a-z0-9][a-z0-9-_]{1,62}$
   security: []
   responses:
     '200':
@@ -25,4 +31,6 @@ get:
             additionalProperties: true
     '400':
       description: Bad request.
-  operationId: getWellknownOauthprotectedresource
+    '404':
+      description: MCP OAuth is disabled or the MCP server is not found.
+  operationId: getWellknownOauthprotectedresourceMcpByname

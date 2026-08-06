@@ -223,18 +223,17 @@ export function filterClientAuthHeaders(headers: Record<string, string>): Record
   return filtered;
 }
 
+export function extractJsonRpcMethods(body: unknown): string[] {
+  const entries = Array.isArray(body) ? body : [body];
+  return entries.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const method = (entry as Record<string, unknown>).method;
+    return typeof method === 'string' ? [method] : [];
+  });
+}
+
 export function extractJsonRpcMethod(body: unknown): string | null {
-  if (!body || typeof body !== 'object') {
-    return null;
-  }
-
-  const rpcBody = body as Record<string, unknown>;
-
-  if (typeof rpcBody.method === 'string') {
-    return rpcBody.method;
-  }
-
-  return null;
+  return extractJsonRpcMethods(body)[0] ?? null;
 }
 
 /**

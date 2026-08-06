@@ -1,0 +1,84 @@
+post:
+  tags:
+    - MCP Proxy
+  summary: Dynamic MCP OAuth client registration (public when enabled)
+  description: |
+    Registers a public OAuth client using RFC 7591-style dynamic client
+    registration. The request must include at least one absolute `redirect_uri`;
+    Plexus returns a generated client identifier and persists the requested
+    redirect URI set, grant types, response types, and scopes. Identical
+    registrations are deduplicated.
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - redirect_uris
+          properties:
+            redirect_uris:
+              type: array
+              minItems: 1
+              items:
+                type: string
+                format: uri
+            client_name:
+              type: string
+            grant_types:
+              type: array
+              items:
+                type: string
+            response_types:
+              type: array
+              items:
+                type: string
+            scope:
+              type: string
+            token_endpoint_auth_method:
+              type: string
+              enum: [none]
+  responses:
+    '201':
+      description: New dynamic client registration.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              client_id:
+                type: string
+              client_id_issued_at:
+                type: integer
+              client_name:
+                type: string
+              redirect_uris:
+                type: array
+                items:
+                  type: string
+                  format: uri
+              grant_types:
+                type: array
+                items:
+                  type: string
+              response_types:
+                type: array
+                items:
+                  type: string
+              scope:
+                type: string
+              token_endpoint_auth_method:
+                type: string
+    '200':
+      description: Existing identical dynamic client registration.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '400':
+      description: Invalid client metadata.
+    '404':
+      description: MCP OAuth is disabled (`oauth_disabled`).
+  operationId: postOauthRegister

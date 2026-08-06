@@ -39,7 +39,9 @@ info:
 
     4. **MCP Proxy** (`/mcp/:name`) — Proxies JSON-RPC and SSE traffic to
        database-registered MCP servers. Plus unauthenticated MCP OAuth
-       discovery under `/.well-known/*` and `POST /register`.
+       discovery, authorization, token, and dynamic client-registration
+       endpoints when `mcpOAuth.enabled` is true. Each MCP server has its own
+       RFC 9728 protected-resource metadata and resource identifier.
 
 
     ## Authentication
@@ -149,8 +151,10 @@ info:
     - `GET /v1/openrouter/models`
     - `GET /v1/metadata/search`
     - `GET /v1/metadata/lookup`
-    - All `/.well-known/*` MCP discovery endpoints
-    - `POST /register` (MCP dynamic client registration)
+    - OAuth authorization-server metadata and MCP protected-resource metadata
+      when MCP OAuth is enabled
+    - MCP OAuth authorization, token, and dynamic client-registration endpoints
+      when MCP OAuth is enabled
   license:
     name: MIT
     identifier: MIT
@@ -341,9 +345,11 @@ tags:
 
       ### OAuth discovery endpoints
 
-      The `.well-known/*` and `/register` endpoints exist solely for MCP
-      client compatibility — they return static metadata and don't
-      perform functional OAuth.
+      The OAuth discovery, authorization, token, and dynamic
+      client-registration endpoints expose the MCP OAuth flow when enabled.
+      Each `/mcp/:name` server has a route-specific protected-resource
+      metadata document and resource identifier. OAuth endpoints return `404`
+      with `oauth_disabled` when `mcpOAuth.enabled` is false.
 security:
   - PlexusApiKey: []
 paths:
@@ -575,12 +581,14 @@ paths:
     $ref: paths/mcp_plexus.yaml
   /.well-known/oauth-authorization-server:
     $ref: paths/.well-known_oauth-authorization-server.yaml
-  /.well-known/oauth-protected-resource:
+  /.well-known/oauth-protected-resource/mcp/{name}:
     $ref: paths/.well-known_oauth-protected-resource.yaml
-  /.well-known/openid-configuration:
-    $ref: paths/.well-known_openid-configuration.yaml
-  /register:
-    $ref: paths/register.yaml
+  /oauth/authorize:
+    $ref: paths/oauth_authorize.yaml
+  /oauth/token:
+    $ref: paths/oauth_token.yaml
+  /oauth/register:
+    $ref: paths/oauth_register.yaml
   /v1/completions:
     $ref: paths/v1_completions.yaml
   /completions:

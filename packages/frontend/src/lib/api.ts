@@ -331,7 +331,6 @@ export interface McpOAuthSettings {
   enabled: boolean;
   provider: 'plexus-idp';
   issuer?: string;
-  resource?: string;
 }
 
 export interface McpOAuthTokenRecord {

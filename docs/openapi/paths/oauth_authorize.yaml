@@ -1,0 +1,151 @@
+get:
+  tags:
+    - MCP Proxy
+  summary: OAuth authorization request (public when enabled)
+  description: |
+    Starts the OAuth 2.1 authorization-code flow for one MCP protected
+    resource. The request must use PKCE with S256 and an RFC 8707 resource
+    identifier such as `https://host/mcp/exa`. GET renders the Plexus consent
+    page; the submitted form is handled by the POST variant.
+  security: []
+  parameters:
+    - in: query
+      name: response_type
+      required: true
+      schema:
+        type: string
+        enum: [code]
+    - in: query
+      name: client_id
+      required: true
+      schema:
+        type: string
+    - in: query
+      name: redirect_uri
+      required: true
+      schema:
+        type: string
+        format: uri
+    - in: query
+      name: state
+      schema:
+        type: string
+    - in: query
+      name: scope
+      schema:
+        type: string
+    - in: query
+      name: code_challenge
+      required: true
+      schema:
+        type: string
+    - in: query
+      name: code_challenge_method
+      required: true
+      schema:
+        type: string
+        enum: [S256]
+    - in: query
+      name: resource
+      required: true
+      schema:
+        type: string
+        format: uri
+  responses:
+    '200':
+      description: HTML consent page.
+      content:
+        text/html:
+          schema:
+            type: string
+    '302':
+      description: Redirect to the registered client callback after consent.
+    '400':
+      description: Invalid authorization request.
+    '404':
+      description: MCP OAuth is disabled (`oauth_disabled`).
+  operationId: getOauthAuthorize
+
+post:
+  tags:
+    - MCP Proxy
+  summary: Submit OAuth authorization request (public when enabled)
+  description: |
+    Completes the consent step using the existing Plexus browser login. The
+    consent page reads the logged-in credential from the same-origin Plexus UI
+    and sends it in the `x-admin-key` header; the raw API-key secret is not
+    included in the OAuth form or authorization URL. An administrator must
+    explicitly choose the non-secret `key_name` of the API-key identity to
+    which the grant will be bound, even when only one active API key exists.
+    A limited API-key session is bound automatically to its own key and cannot
+    choose another. A successful regular OAuth request redirects to the client
+    callback with a one-time authorization code. Requests with
+    `Accept: application/json` receive the callback URL in `redirect_to`
+    instead, which lets the same-origin consent page complete the redirect.
+  security:
+    - AdminKey: []
+  parameters:
+    - in: header
+      name: x-admin-key
+      required: true
+      schema:
+        type: string
+      description: Existing Plexus admin key or configured API-key secret used by the browser session.
+  requestBody:
+    required: true
+    content:
+      application/x-www-form-urlencoded:
+        schema:
+          type: object
+          required:
+            - response_type
+            - client_id
+            - redirect_uri
+            - code_challenge
+            - code_challenge_method
+            - resource
+          properties:
+            response_type:
+              type: string
+              enum: [code]
+            client_id:
+              type: string
+            redirect_uri:
+              type: string
+              format: uri
+            state:
+              type: string
+            scope:
+              type: string
+            code_challenge:
+              type: string
+            code_challenge_method:
+              type: string
+              enum: [S256]
+            resource:
+              type: string
+              format: uri
+            key_name:
+              type: string
+              description: Non-secret configured API-key name. Required for administrator sessions; limited sessions cannot choose another key.
+  responses:
+    '200':
+      description: JSON callback URL when the request accepts `application/json`.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [redirect_to]
+            properties:
+              redirect_to:
+                type: string
+                format: uri
+    '302':
+      description: Redirect containing the authorization code and state.
+    '400':
+      description: Invalid authorization request or an administrator must choose an API-key identity.
+    '401':
+      description: Missing or invalid browser-session credential.
+    '404':
+      description: MCP OAuth is disabled (`oauth_disabled`).
+  operationId: postOauthAuthorize

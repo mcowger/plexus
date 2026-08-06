@@ -26,5 +26,8 @@ export interface AuthProvider {
   handleAuthorize(req: FastifyRequest, reply: FastifyReply): Promise<void>;
   handleToken(req: FastifyRequest, reply: FastifyReply): Promise<void>;
   handleRegister(req: FastifyRequest, reply: FastifyReply): Promise<void>;
-  validateToken(token: string): Promise<{ keyName: string; scopes: string[] } | null>;
+  validateToken(
+    token: string,
+    req: FastifyRequest
+  ): Promise<{ keyName: string; scopes: string[] } | null>;
 }

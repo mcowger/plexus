@@ -1,28 +1,17 @@
 get:
   tags:
     - MCP Proxy
-  summary: OAuth 2.0 authorization server metadata (public)
+  summary: OAuth 2.0 authorization server metadata (public when enabled)
   description: |
-    Returns OAuth 2.0 authorization server metadata for MCP client
-    compatibility.
+    Returns the shared Plexus OAuth authorization-server metadata used by MCP
+    clients for discovery. The issuer, authorization, token, and dynamic
+    registration endpoints, supported grant types, PKCE method, and scopes are
+    resolved from the active provider at request time.
 
-    ## Use case
+    MCP OAuth is opt-in. When `mcpOAuth.enabled` is false, this endpoint
+    returns `404` with an `oauth_disabled` error.
 
-    MCP clients use this endpoint to discover OAuth configuration. The
-    response indicates that bearer token authentication is supported.
-
-    ## Response
-
-    Static metadata describing the authorization server. The exact content
-    varies by configuration but typically includes:
-    - `issuer` — Authorization server identifier
-    - `token_endpoint` — Where to request tokens
-    - `grant_types` — Supported grant types
-
-    **Not functional OAuth** — This exists for MCP client compatibility;
-    the actual OAuth flow is handled differently in Plexus.
-
-    **No auth** — This endpoint is public.
+    **No auth** — This endpoint is public while OAuth is enabled.
   security: []
   responses:
     '200':
@@ -34,4 +23,6 @@ get:
             additionalProperties: true
     '400':
       description: Bad request.
+    '404':
+      description: MCP OAuth is disabled (`oauth_disabled`).
   operationId: getWellknownOauthauthorizationserver

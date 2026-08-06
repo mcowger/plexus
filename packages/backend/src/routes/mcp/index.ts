@@ -8,27 +8,36 @@ import { getClientIp } from '../../utils/ip';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 import { registerPlexusMcpRoutes } from './plexus';
 import { getMcpAuthProvider } from '../../services/mcp-oauth/provider-factory';
-import { getRequestBaseUrl } from '../../services/mcp-oauth/url';
+import {
+  getMcpProtectedResourceMetadataUrl,
+  getMcpServerNameFromRequest,
+} from '../../services/mcp-oauth/url';
 import { MCP_OAUTH_ACCESS_TOKEN_PREFIX } from '../../services/mcp-oauth/plexus-idp-provider';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 
-// C3: JSON-RPC methods that mutate external state (and therefore require the
-// `mcp:write` scope). Everything else is treated as read-scoped.
+// C3: JSON-RPC methods that mutate external state require the `mcp:write`
+// scope. `mcp:write` includes read access, so a batch containing both write
+// and read methods is correctly authorized by the write scope.
 const MCP_WRITE_METHODS = new Set(['tools/call']);
 
 // Required scope for an MCP proxy operation. The mutating surface is the
 // JSON-RPC `tools/call` request issued over POST; listing, streaming
 // (GET), session lifecycle (DELETE), and all other JSON-RPC methods are
-// read-scoped. Returns `mcp:write` for write operations, `mcp:read` otherwise.
+// read-scoped. Returns `mcp:write` for write operations (which also grants
+// read access), and `mcp:read` otherwise.
 function requiredScopeForOperation(request: FastifyRequest): 'mcp:read' | 'mcp:write' {
   if (request.method === 'POST') {
-    const method = mcpProxyService.extractJsonRpcMethod(request.body);
-    if (method && MCP_WRITE_METHODS.has(method)) {
+    const methods = mcpProxyService.extractJsonRpcMethods(request.body);
+    if (methods.some((method) => MCP_WRITE_METHODS.has(method))) {
       return 'mcp:write';
     }
   }
   return 'mcp:read';
+}
+
+function scopeAllowsOperation(scopes: string[], required: 'mcp:read' | 'mcp:write'): boolean {
+  return scopes.includes(required) || (required === 'mcp:read' && scopes.includes('mcp:write'));
 }
 
 function authErrorResponse(message: string) {
@@ -57,15 +66,21 @@ function extractBearerCredential(authorization: string): string {
 }
 
 function setInitialOAuthChallenge(request: FastifyRequest, reply: FastifyReply) {
-  const metadataUrl = `${getRequestBaseUrl(request)}/.well-known/oauth-protected-resource`;
-  reply.header('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"`);
+  const metadataUrl = getMcpProtectedResourceMetadataUrl(request);
+  if (metadataUrl) {
+    reply.header('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"`);
+  }
 }
 
 function setInvalidTokenChallenge(reply: FastifyReply) {
   reply.header('WWW-Authenticate', 'Bearer error="invalid_token"');
 }
 
-async function mcpOAuthFallbackAuth(request: FastifyRequest, reply: FastifyReply) {
+function mcpOAuthFallbackAuth(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: (error?: Error) => void
+) {
   const authorization = getStringHeader(request.headers.authorization);
   const xApiKey = getStringHeader(request.headers['x-api-key']);
   const xGoogApiKey = getStringHeader(request.headers['x-goog-api-key']);
@@ -83,46 +98,68 @@ async function mcpOAuthFallbackAuth(request: FastifyRequest, reply: FastifyReply
     return true;
   };
 
+  const rejectBearer = () => {
+    setInvalidTokenChallenge(reply);
+    reply.code(401).send(authErrorResponse('Invalid bearer token'));
+  };
+
   if (authorization) {
     const credential = extractBearerCredential(authorization);
-    if (tryRawApiKey(credential)) return;
-
-    const provider = getMcpAuthProvider();
-    const oauthResult = credential.startsWith(MCP_OAUTH_ACCESS_TOKEN_PREFIX)
-      ? await provider?.validateToken(credential)
-      : null;
-    if (oauthResult) {
-      const config = getConfig();
-      const keyConfig = config.keys?.[oauthResult.keyName];
-      if (keyConfig && isRequestIpAllowed(request, keyConfig.allowedIps, config.trustedProxies)) {
-        attachPlexusApiKeyAuth(request, {
-          keyName: oauthResult.keyName,
-          keyConfig,
-          attribution: null,
-        });
-        // C3: retain the OAuth token's granted scopes so the protected-resource
-        // preHandler hook can enforce them against the operation's required
-        // scope (read vs write).
-        (request as any).mcpOAuthScopes = oauthResult.scopes;
-        return;
-      }
+    if (tryRawApiKey(credential)) {
+      done();
+      return;
     }
 
-    setInvalidTokenChallenge(reply);
-    await reply.code(401).send(authErrorResponse('Invalid bearer token'));
-    return reply;
+    const provider = getMcpAuthProvider();
+    if (credential.startsWith(MCP_OAUTH_ACCESS_TOKEN_PREFIX) && provider) {
+      void provider
+        .validateToken(credential, request)
+        .then((oauthResult) => {
+          if (oauthResult) {
+            const config = getConfig();
+            const keyConfig = config.keys?.[oauthResult.keyName];
+            if (
+              keyConfig &&
+              isRequestIpAllowed(request, keyConfig.allowedIps, config.trustedProxies)
+            ) {
+              attachPlexusApiKeyAuth(request, {
+                keyName: oauthResult.keyName,
+                keyConfig,
+                attribution: null,
+              });
+              // C3: retain the OAuth token's granted scopes so the
+              // protected-resource hook can enforce them against the
+              // operation's required scope (read vs write).
+              (request as any).mcpOAuthScopes = oauthResult.scopes;
+              done();
+              return;
+            }
+          }
+
+          rejectBearer();
+        })
+        .catch((error: unknown) => {
+          done(error instanceof Error ? error : new Error(String(error)));
+        });
+      return;
+    }
+
+    rejectBearer();
+    return;
   }
 
   const apiKeyStyleCredential = xApiKey ?? xGoogApiKey ?? queryKey;
   if (apiKeyStyleCredential) {
-    if (tryRawApiKey(apiKeyStyleCredential)) return;
-    await reply.code(401).send(authErrorResponse('Invalid API key'));
-    return reply;
+    if (tryRawApiKey(apiKeyStyleCredential)) {
+      done();
+      return;
+    }
+    reply.code(401).send(authErrorResponse('Invalid API key'));
+    return;
   }
 
   setInitialOAuthChallenge(request, reply);
-  await reply.code(401).send(authErrorResponse('Authentication required'));
-  return reply;
+  reply.code(401).send(authErrorResponse('Authentication required'));
 }
 
 // streamUpstreamResponse proxies an upstream MCP event-stream to the client,
@@ -183,7 +220,7 @@ export async function registerMcpRoutes(
   fastify: FastifyInstance,
   mcpUsageStorage: McpUsageStorageService
 ) {
-  // C1/C7: Discovery, DCR, and OAuth endpoints are always registered (matching
+  // Discovery, DCR, and OAuth endpoints are always registered (matching
   // what openapi.json advertises) so a config change toggling MCP OAuth takes
   // effect without a process restart. Each handler resolves the auth provider
   // via getMcpAuthProvider() at request time; when MCP OAuth is disabled the
@@ -197,22 +234,21 @@ export async function registerMcpRoutes(
     return reply.send(provider.getDiscoveryMetadata(request));
   });
 
-  fastify.get('/.well-known/oauth-protected-resource', async (request, reply) => {
+  fastify.get('/.well-known/oauth-protected-resource/mcp/:name', async (request, reply) => {
     const provider = getMcpAuthProvider();
     if (!provider) return oauthUnavailableReply(reply);
+    const serverName = getMcpServerNameFromRequest(request);
+    if (!serverName || !mcpProxyService.getMcpServerConfig(serverName)) {
+      return reply.code(404).send({
+        error: {
+          message: 'MCP server not found or disabled',
+          type: 'not_found',
+          code: 404,
+        },
+      });
+    }
     logger.silly('OAuth protected resource discovery');
     return reply.send(provider.getProtectedResourceMetadata(request));
-  });
-
-  // C7: keep the legacy OpenID Connect discovery endpoint available and
-  // consistent with the OAuth 2.0 authorization server metadata. Plexus does
-  // not implement full OIDC (no JWT/ID tokens), but MCP clients historically
-  // probe this path, so it mirrors RFC 8414 discovery instead of returning 404.
-  fastify.get('/.well-known/openid-configuration', async (request, reply) => {
-    const provider = getMcpAuthProvider();
-    if (!provider) return oauthUnavailableReply(reply);
-    logger.silly('OpenID Connect discovery (legacy alias)');
-    return reply.send(provider.getDiscoveryMetadata(request));
   });
 
   fastify.get('/oauth/authorize', async (request, reply) => {
@@ -230,7 +266,7 @@ export async function registerMcpRoutes(
     if (!provider) return oauthUnavailableReply(reply);
     return provider.handleToken(request, reply);
   });
-  fastify.post('/register', async (request, reply) => {
+  fastify.post('/oauth/register', async (request, reply) => {
     const provider = getMcpAuthProvider();
     if (!provider) return oauthUnavailableReply(reply);
     return provider.handleRegister(request, reply);
@@ -250,57 +286,63 @@ export async function registerMcpRoutes(
     // available. Requests authenticated with a raw API key carry no scope
     // restriction; OAuth-authenticated requests are constrained to the scopes
     // granted on their access token.
-    protectedRoutes.addHook('preHandler', async (request, reply) => {
+    protectedRoutes.addHook('preHandler', (request, reply, done) => {
       const scopes = (request as any).mcpOAuthScopes as string[] | undefined;
       if (scopes) {
         const required = requiredScopeForOperation(request);
-        if (!scopes.includes(required)) {
+        if (!scopeAllowsOperation(scopes, required)) {
           reply.header(
             'WWW-Authenticate',
             `Bearer error="insufficient_scope", scope="${required}"`
           );
-          return reply.code(403).send({
+          reply.code(403).send({
             error: {
               message: `OAuth token lacks required scope '${required}' for this MCP operation`,
               type: 'insufficient_scope',
               code: 403,
             },
           });
+          return;
         }
       }
+      done();
     });
 
-    protectedRoutes.addHook('preHandler', async (request, reply) => {
+    protectedRoutes.addHook('preHandler', (request, reply, done) => {
       const serverName = (request.params as any)?.name;
 
       if (!serverName) {
-        return reply.code(400).send({
+        reply.code(400).send({
           error: {
             message: 'Server name is required',
             type: 'invalid_request',
           },
         });
+        return;
       }
 
       if (!mcpProxyService.validateServerName(serverName)) {
-        return reply.code(400).send({
+        reply.code(400).send({
           error: {
             message: 'Invalid server name. Must be slug-safe: [a-z0-9][a-z0-9-_]{1,62}',
             type: 'invalid_request',
           },
         });
+        return;
       }
 
       const serverConfig = mcpProxyService.getMcpServerConfig(serverName);
 
       if (!serverConfig) {
-        return reply.code(404).send({
+        reply.code(404).send({
           error: {
             message: `MCP server '${serverName}' not found or disabled`,
             type: 'not_found',
           },
         });
+        return;
       }
+      done();
     });
 
     protectedRoutes.post(

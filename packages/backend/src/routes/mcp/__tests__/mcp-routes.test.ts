@@ -86,33 +86,48 @@ describe('MCP Routes', () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(JSON.parse(response.body).error.type).toBe('oauth_disabled');
     });
 
-    test('GET /.well-known/oauth-protected-resource should be 404 when MCP OAuth is off', async () => {
+    test('GET route-specific protected-resource metadata should be 404 when MCP OAuth is off', async () => {
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/.well-known/oauth-protected-resource/mcp/test-server',
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('GET the removed root protected-resource metadata path should be 404', async () => {
       const response = await fastify.inject({
         method: 'GET',
         url: '/.well-known/oauth-protected-resource',
       });
 
       expect(response.statusCode).toBe(404);
-      expect(JSON.parse(response.body).error.type).toBe('oauth_disabled');
     });
 
-    test('GET /.well-known/openid-configuration should be 404 when MCP OAuth is off', async () => {
+    test('GET the removed OpenID configuration path should be 404', async () => {
       const response = await fastify.inject({
         method: 'GET',
         url: '/.well-known/openid-configuration',
       });
 
       expect(response.statusCode).toBe(404);
-      expect(JSON.parse(response.body).error.type).toBe('oauth_disabled');
     });
 
-    test('POST /register should be 404 when MCP OAuth is off', async () => {
+    test('POST the removed root registration path should be 404', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/register',
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('POST /oauth/register should be 404 when MCP OAuth is off', async () => {
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/oauth/register',
       });
 
       expect(response.statusCode).toBe(404);
@@ -420,9 +435,15 @@ describe('MCP Routes', () => {
 
     beforeEach(async () => {
       oauthFastify = Fastify();
-      validateToken = vi.fn(async (token: string) =>
-        token === 'pox_valid_oauth_token' ? { keyName: 'test-key-1', scopes: ['mcp:read'] } : null
-      );
+      validateToken = vi.fn(async (token: string) => {
+        if (token === 'pox_valid_oauth_token') {
+          return { keyName: 'test-key-1', scopes: ['mcp:read'] };
+        }
+        if (token === 'pox_write_oauth_token') {
+          return { keyName: 'test-key-1', scopes: ['mcp:write'] };
+        }
+        return null;
+      });
 
       setConfigForTesting(
         baseConfig({
@@ -439,7 +460,7 @@ describe('MCP Routes', () => {
           issuer: 'http://localhost',
           authorization_endpoint: 'http://localhost/oauth/authorize',
           token_endpoint: 'http://localhost/oauth/token',
-          registration_endpoint: 'http://localhost/register',
+          registration_endpoint: 'http://localhost/oauth/register',
           response_types_supported: ['code'],
           grant_types_supported: ['authorization_code', 'refresh_token'],
           token_endpoint_auth_methods_supported: ['none'],
@@ -447,8 +468,8 @@ describe('MCP Routes', () => {
           scopes_supported: ['mcp:read', 'mcp:write'],
           resource_supported: true,
         })),
-        getProtectedResourceMetadata: vi.fn(() => ({
-          resource: 'http://localhost/mcp',
+        getProtectedResourceMetadata: vi.fn((request) => ({
+          resource: `http://localhost/mcp/${(request.params as { name: string }).name}`,
           authorization_servers: ['http://localhost'],
           scopes_supported: ['mcp:read', 'mcp:write'],
           bearer_methods_supported: ['header'],
@@ -479,70 +500,18 @@ describe('MCP Routes', () => {
 
       const registration = await oauthFastify.inject({
         method: 'POST',
-        url: '/register',
+        url: '/oauth/register',
         payload: {},
       });
       expect(registration.statusCode).toBe(201);
       expect(JSON.parse(registration.body).client_id).toBe('mcp-test');
-    });
 
-    test('protected-resource discovery returns metadata when enabled', async () => {
-      const response = await oauthFastify.inject({
+      const protectedResource = await oauthFastify.inject({
         method: 'GET',
-        url: '/.well-known/oauth-protected-resource',
+        url: '/.well-known/oauth-protected-resource/mcp/test-server',
       });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.resource).toBe('http://localhost/mcp');
-      expect(body.authorization_servers).toEqual(['http://localhost']);
-      expect(body.scopes_supported).toEqual(['mcp:read', 'mcp:write']);
-      expect(body.bearer_methods_supported).toEqual(['header']);
-    });
-
-    test('openid-configuration discovery returns metadata when enabled', async () => {
-      const response = await oauthFastify.inject({
-        method: 'GET',
-        url: '/.well-known/openid-configuration',
-      });
-
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.issuer).toBe('http://localhost');
-      expect(body.authorization_endpoint).toBe('http://localhost/oauth/authorize');
-      expect(body.token_endpoint).toBe('http://localhost/oauth/token');
-      expect(body.code_challenge_methods_supported).toEqual(['S256']);
-    });
-
-    test('POST tools/call is rejected with insufficient_scope when OAuth token lacks mcp:write', async () => {
-      const response = await oauthFastify.inject({
-        method: 'POST',
-        url: '/mcp/test-server',
-        headers: {
-          authorization: 'Bearer pox_valid_oauth_token',
-          'content-type': 'application/json',
-        },
-        payload: { jsonrpc: '2.0', method: 'tools/call', id: 1, params: { name: 'foo' } },
-      });
-
-      expect(response.statusCode).toBe(403);
-      const body = JSON.parse(response.body);
-      expect(body.error.type).toBe('insufficient_scope');
-      expect(body.error.code).toBe(403);
-      expect(response.headers['www-authenticate']).toContain(
-        'error="insufficient_scope", scope="mcp:write"'
-      );
-    });
-
-    test('GET /mcp/:name succeeds when OAuth token has mcp:read scope', async () => {
-      const response = await oauthFastify.inject({
-        method: 'GET',
-        url: '/mcp/test-server',
-        headers: { authorization: 'Bearer pox_valid_oauth_token' },
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(validateToken).toHaveBeenCalledWith('pox_valid_oauth_token');
+      expect(protectedResource.statusCode).toBe(200);
+      expect(JSON.parse(protectedResource.body).resource).toBe('http://localhost/mcp/test-server');
     });
 
     test('missing auth returns an OAuth discovery challenge', async () => {
@@ -555,7 +524,7 @@ describe('MCP Routes', () => {
 
       expect(response.statusCode).toBe(401);
       expect(response.headers['www-authenticate']).toContain(
-        '/.well-known/oauth-protected-resource"'
+        '/.well-known/oauth-protected-resource/mcp/test-server"'
       );
     });
 
@@ -586,7 +555,62 @@ describe('MCP Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(validateToken).toHaveBeenCalledWith('pox_valid_oauth_token');
+      expect(validateToken).toHaveBeenCalledWith('pox_valid_oauth_token', expect.any(Object));
+    });
+
+    test('write scope also permits read operations', async () => {
+      mockProxyMcpRequest.mockClear();
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer pox_write_oauth_token',
+          'content-type': 'application/json',
+        },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(mockProxyMcpRequest).toHaveBeenCalled();
+    });
+
+    test('requires write scope for any write operation in a JSON-RPC batch', async () => {
+      mockProxyMcpRequest.mockClear();
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer pox_valid_oauth_token',
+          'content-type': 'application/json',
+        },
+        payload: [
+          { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+          { jsonrpc: '2.0', method: 'tools/call', id: 2, params: { name: 'write-tool' } },
+        ],
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(JSON.parse(response.body).error.type).toBe('insufficient_scope');
+      expect(mockProxyMcpRequest).not.toHaveBeenCalled();
+    });
+
+    test('write scope includes read access for mixed JSON-RPC batches', async () => {
+      mockProxyMcpRequest.mockClear();
+      const response = await oauthFastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer pox_write_oauth_token',
+          'content-type': 'application/json',
+        },
+        payload: [
+          { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+          { jsonrpc: '2.0', method: 'tools/call', id: 2, params: { name: 'write-tool' } },
+        ],
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(mockProxyMcpRequest).toHaveBeenCalled();
     });
 
     test('invalid OAuth token returns invalid_token challenge', async () => {

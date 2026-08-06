@@ -2,19 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { vi } from 'vitest';
 
-// Suppress unhandled rejections from Fastify's lifecycle — ERR_HTTP_HEADERS_SENT
-// occurs when an onRequest hook calls reply.send() and Fastify's error handler
-// subsequently tries to write a response on the same stream. These are benign
-// in tests and all assertions pass; they only cause vitest exit code 1 noise.
-process.on('unhandledRejection', (reason: unknown) => {
-  const err = reason instanceof Error ? reason : new Error(String(reason));
-  if (err.message?.includes('ERR_HTTP_HEADERS_SENT') || err.message?.includes('writeHead')) {
-    return;
-  }
-  console.error('[unhandledRejection]', err);
-  process.exitCode = 1;
-});
-
 const sqliteUrlToPath = (url: string) =>
   url.startsWith('sqlite://') ? url.slice('sqlite://'.length) : null;
 

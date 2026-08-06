@@ -7,6 +7,7 @@ import {
   mergeUpstreamHeaders,
   redactSensitiveHeaders,
   extractJsonRpcMethod,
+  extractJsonRpcMethods,
   getEffectiveUpstreamUrl,
   proxyMcpRequest,
   selectMcpKeyRoundRobin,
@@ -249,6 +250,16 @@ describe('MCP Proxy Service', () => {
       };
 
       expect(extractJsonRpcMethod(body)).toBe('initialize');
+    });
+
+    test('should inspect every request in a JSON-RPC batch', () => {
+      const body = [
+        { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+        { jsonrpc: '2.0', method: 'tools/call', id: 2 },
+      ];
+
+      expect(extractJsonRpcMethods(body)).toEqual(['tools/list', 'tools/call']);
+      expect(extractJsonRpcMethod(body)).toBe('tools/list');
     });
   });
 

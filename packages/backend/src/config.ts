@@ -1107,10 +1107,6 @@ export const McpOAuthConfigSchema = z.object({
    * validation are derived from the incoming request origin.
    */
   issuer: z.string().url().optional(),
-  /**
-   * Optional protected resource URL. If omitted, defaults to `${issuer}/mcp`.
-   */
-  resource: z.string().url().optional(),
 });
 
 const RawPlexusConfigSchema = z

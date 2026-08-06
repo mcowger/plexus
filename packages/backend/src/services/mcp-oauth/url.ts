@@ -5,6 +5,8 @@ function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
+const MCP_SERVER_NAME_PATTERN = /^[a-z0-9][a-z0-9-_]{1,62}$/;
+
 export function getRequestBaseUrl(req: FastifyRequest): string {
   const configuredIssuer = getConfig().mcpOAuth?.issuer;
   if (configuredIssuer) return normalizeBaseUrl(configuredIssuer);
@@ -21,10 +23,47 @@ export function getRequestBaseUrl(req: FastifyRequest): string {
   return normalizeBaseUrl(`${proto || req.protocol || 'http'}://${host || 'localhost'}`);
 }
 
-export function getMcpResourceUrl(req: FastifyRequest): string {
-  const configuredResource = getConfig().mcpOAuth?.resource;
-  if (configuredResource) return configuredResource.replace(/\/+$/, '');
-  return `${getRequestBaseUrl(req)}/mcp`;
+export function getMcpServerNameFromRequest(req: FastifyRequest): string | null {
+  const params = req.params;
+  if (!params || typeof params !== 'object' || Array.isArray(params)) return null;
+  const name = (params as Record<string, unknown>).name;
+  return typeof name === 'string' && MCP_SERVER_NAME_PATTERN.test(name) ? name : null;
+}
+
+export function getMcpResourceUrl(req: FastifyRequest, serverName?: string): string {
+  const name = serverName ?? getMcpServerNameFromRequest(req);
+  if (!name) throw new Error('MCP server name is required to derive the protected resource');
+  return `${getRequestBaseUrl(req)}/mcp/${encodeURIComponent(name)}`;
+}
+
+export function getMcpProtectedResourceMetadataUrl(req: FastifyRequest): string | null {
+  const serverName = getMcpServerNameFromRequest(req);
+  if (!serverName) return null;
+  return `${getRequestBaseUrl(req)}/.well-known/oauth-protected-resource/mcp/${encodeURIComponent(serverName)}`;
+}
+
+export function getMcpServerNameFromResource(resource: string, req: FastifyRequest): string | null {
+  try {
+    const parsed = new URL(resource);
+    const base = new URL(getRequestBaseUrl(req));
+    if (
+      parsed.origin !== base.origin ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return null;
+    }
+
+    const basePath = base.pathname.replace(/\/+$/, '');
+    const prefix = `${basePath}/mcp/`.replace(/^\/\//, '/');
+    if (!parsed.pathname.startsWith(prefix)) return null;
+    const name = parsed.pathname.slice(prefix.length).replace(/\/+$/, '');
+    return MCP_SERVER_NAME_PATTERN.test(name) ? name : null;
+  } catch {
+    return null;
+  }
 }
 
 export function resourceMatchesExpected(resource: string, expected: string): boolean {

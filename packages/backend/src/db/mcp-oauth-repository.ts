@@ -293,12 +293,18 @@ export class McpOauthRepository {
     };
   }
 
-  async consumeAuthorizationCode(code: string): Promise<void> {
+  async consumeAuthorizationCode(code: string): Promise<boolean> {
     const schema = this.schema();
-    await this.db()
+    const result = await this.db()
       .update(schema.mcpOauthAuthorizationCodes)
       .set({ consumedAt: now() })
-      .where(eq(schema.mcpOauthAuthorizationCodes.codeHash, hashSecret(code)));
+      .where(
+        and(
+          eq(schema.mcpOauthAuthorizationCodes.codeHash, hashSecret(code)),
+          sql`${schema.mcpOauthAuthorizationCodes.consumedAt} IS NULL`
+        )
+      );
+    return getAffectedRowCount(result) > 0;
   }
 
   async createToken(input: NewMcpOauthToken): Promise<McpOauthTokenRecord> {
@@ -352,9 +358,9 @@ export class McpOauthRepository {
     return rows.length > 0 ? this.rowToToken(rows[0]!) : null;
   }
 
-  async revokeRefreshToken(refreshToken: string): Promise<void> {
+  async revokeRefreshToken(refreshToken: string): Promise<boolean> {
     const schema = this.schema();
-    await this.db()
+    const result = await this.db()
       .update(schema.mcpOauthTokens)
       .set({ revokedAt: now(), updatedAt: now() })
       .where(
@@ -363,6 +369,7 @@ export class McpOauthRepository {
           sql`${schema.mcpOauthTokens.revokedAt} IS NULL`
         )
       );
+    return getAffectedRowCount(result) > 0;
   }
 
   async revokeTokenById(id: number): Promise<number> {
@@ -449,6 +456,10 @@ function arraysEqual(a: string[], b: string[]): boolean {
 
 function getAffectedRowCount(result: unknown): number {
   return Number(
-    (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0
+    (result as any)?.rowsAffected ??
+      (result as any)?.changes ??
+      (result as any)?.rowCount ??
+      (result as any)?.count ??
+      0
   );
 }

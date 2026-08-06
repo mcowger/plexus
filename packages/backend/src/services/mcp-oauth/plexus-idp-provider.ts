@@ -4,19 +4,26 @@ import { z } from 'zod';
 import { getConfig, isKeyDisabled } from '../../config';
 import { McpOauthRepository } from '../../db/mcp-oauth-repository';
 import { hashSecret } from '../../utils/encryption';
-import { attachPlexusApiKeyAuth, validatePlexusApiKey } from '../../utils/auth';
 import { logger } from '../../utils/logger';
-import { getMcpResourceUrl, getRequestBaseUrl, resourceMatchesExpected } from './url';
+import { resolvePrincipal } from '../../routes/management/_principal';
+import {
+  getMcpResourceUrl,
+  getMcpServerNameFromRequest,
+  getMcpServerNameFromResource,
+  getRequestBaseUrl,
+  resourceMatchesExpected,
+} from './url';
+import * as mcpProxyService from '../mcp-proxy/mcp-proxy-service';
 import type { AuthProvider, OAuthDiscoveryMetadata, ProtectedResourceMetadata } from './types';
 
 /*
  * OAuth implementation note:
  * We intentionally hand-implement this small opaque-token authorization server
  * instead of using @node-oauth/oauth2-server. Plexus needs RFC 7591 dynamic
- * client registration, a browser consent POST where an existing Plexus API key
- * is the credential, and mandatory MCP/RFC 8707 resource validation on both
- * authorize and token requests. Those checks sit awkwardly outside the library's
- * model abstraction; the resulting glue would still custom-issue/store codes and
+ * client registration, browser authorization through the existing Plexus UI
+ * credential, and mandatory MCP/RFC 8707 resource validation on both authorize
+ * and token requests. Those checks sit awkwardly outside the library's model
+ * abstraction; the resulting glue would still custom-issue/store codes and
  * tokens. This implementation keeps the OAuth surface narrow while reusing
  * Plexus primitives for hashing, encryption-at-rest, Zod validation, and Drizzle
  * storage. It does not implement OpenID Connect or JWT/ID tokens.
@@ -29,13 +36,6 @@ const AUTH_CODE_TTL_MS = 10 * 60 * 1000;
 const ACCESS_TOKEN_PREFIX = 'pox_';
 const REFRESH_TOKEN_PREFIX = 'por_';
 const AUTH_CODE_PREFIX = 'poc_';
-
-const WELL_KNOWN_REDIRECT_URIS = [
-  'https://claude.ai/api/mcp/auth_callback',
-  'https://claude.com/api/mcp/auth_callback',
-  'http://localhost/callback',
-  'http://127.0.0.1/callback',
-];
 
 const registerSchema = z.object({
   redirect_uris: z.array(z.string().url()).min(1),
@@ -58,7 +58,10 @@ const authorizeSchema = z.object({
 });
 
 const authorizePostSchema = authorizeSchema.extend({
-  api_key: z.string().min(1),
+  // An administrator may choose which configured Plexus API-key identity the
+  // grant should represent. Limited users are always bound to their own key;
+  // this value is never a secret and is ignored for that case.
+  key_name: z.string().min(1).optional(),
 });
 
 const tokenSchema = z.discriminatedUnion('grant_type', [
@@ -95,16 +98,23 @@ function toScopeString(scope: string | null | undefined): string {
   return splitScopes(scope).join(' ');
 }
 
-// Constrain a requested scope set to the subset the client is allowed to have
-// AND that this server actually supports. Used to prevent a client from asking
-// for (and being granted) scopes it was never registered for, or scopes Plexus
-// does not implement.
+// Constrain a requested scope set to the subset every supplied allow-list
+// permits AND that this server actually supports. The refresh-token path
+// supplies both the original grant and the current client registration here;
+// intersecting those sets prevents a refresh request from escalating the
+// scopes stored on the original token.
 function constrainScopes(
   requested: string | null | undefined,
-  allowed: string | null | undefined
+  ...allowed: Array<string | null | undefined>
 ): string[] {
   const known = new Set(DEFAULT_SCOPES);
-  const allowedScopes = allowed ? new Set(splitScopes(allowed)) : new Set(DEFAULT_SCOPES);
+  let allowedScopes = new Set(DEFAULT_SCOPES);
+  for (const allowList of allowed) {
+    if (allowList == null) continue;
+    allowedScopes = new Set(
+      [...allowedScopes].filter((scope) => splitScopes(allowList).includes(scope))
+    );
+  }
   return splitScopes(requested).filter((scope) => known.has(scope) && allowedScopes.has(scope));
 }
 
@@ -171,6 +181,11 @@ function appendQuery(url: string, params: Record<string, string | undefined>): s
   return parsed.toString();
 }
 
+type AuthorizationKeyResolution =
+  | { kind: 'authorized'; keyName: string }
+  | { kind: 'selection_required'; keyNames: string[]; principalRole: 'admin' }
+  | { kind: 'denied'; description: string };
+
 export class PlexusIdpProvider implements AuthProvider {
   constructor(private readonly repo = new McpOauthRepository()) {}
 
@@ -180,7 +195,7 @@ export class PlexusIdpProvider implements AuthProvider {
       issuer,
       authorization_endpoint: `${issuer}/oauth/authorize`,
       token_endpoint: `${issuer}/oauth/token`,
-      registration_endpoint: `${issuer}/register`,
+      registration_endpoint: `${issuer}/oauth/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
       token_endpoint_auth_methods_supported: ['none'],
@@ -212,7 +227,10 @@ export class PlexusIdpProvider implements AuthProvider {
     }
 
     const redirectUris = parsed.data.redirect_uris;
-    const allowedRedirectUris = [...new Set([...WELL_KNOWN_REDIRECT_URIS, ...redirectUris])];
+    // Only persist redirect URIs the client supplied. Adding global callback
+    // URLs to every client would let any registered client redirect an
+    // authorization response through another product's callback endpoint.
+    const allowedRedirectUris = [...new Set(redirectUris)];
     const existingClient = await this.repo.findClientByRegistration({
       clientName: parsed.data.client_name ?? null,
       redirectUris: allowedRedirectUris,
@@ -281,7 +299,7 @@ export class PlexusIdpProvider implements AuthProvider {
         'redirect_uri is not registered for this client'
       );
     }
-    if (!resourceMatchesExpected(data.resource, getMcpResourceUrl(req))) {
+    if (!this.resourceMatchesMcpServer(data.resource, req)) {
       return oauthError(
         reply,
         400,
@@ -304,19 +322,27 @@ export class PlexusIdpProvider implements AuthProvider {
     }
 
     if (req.method === 'GET') {
-      return this.renderConsent(reply, data);
+      return this.renderConsent(req, reply, data);
     }
 
-    const authResult = validatePlexusApiKey(
-      (data as z.infer<typeof authorizePostSchema>).api_key,
-      req
+    const keyResolution = await this.resolveAuthorizationKey(
+      req,
+      (data as z.infer<typeof authorizePostSchema>).key_name
     );
-    if (!authResult) {
-      return oauthError(reply, 401, 'access_denied', 'Invalid Plexus API key');
+    if (keyResolution.kind === 'selection_required') {
+      return reply.code(400).send({
+        error: 'key_selection_required',
+        error_description: 'Choose which Plexus API key should authorize this MCP client',
+        principal_role: keyResolution.principalRole,
+        available_keys: keyResolution.keyNames,
+      });
+    }
+    if (keyResolution.kind === 'denied') {
+      return oauthError(reply, 401, 'access_denied', keyResolution.description);
     }
 
     const code = randomToken(AUTH_CODE_PREFIX);
-    const apiKeySecretHash = this.getCurrentApiKeySecretHash(authResult.keyName);
+    const apiKeySecretHash = this.getCurrentApiKeySecretHash(keyResolution.keyName);
     if (!apiKeySecretHash) {
       return oauthError(reply, 401, 'access_denied', 'Invalid Plexus API key');
     }
@@ -326,17 +352,23 @@ export class PlexusIdpProvider implements AuthProvider {
       redirectUri: data.redirect_uri,
       resource: data.resource,
       scope: grantedScopes.join(' '),
-      keyName: authResult.keyName,
+      keyName: keyResolution.keyName,
       apiKeySecretHash,
       codeChallenge: data.code_challenge,
       codeChallengeMethod: data.code_challenge_method,
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
     });
 
+    // The authorization code is present in either the callback URL or the
+    // JSON response. Prevent browsers and intermediaries from caching it.
+    reply.header('Cache-Control', 'no-store').header('Pragma', 'no-cache');
     const redirectTo = appendQuery(data.redirect_uri, {
       code,
       state: data.state,
     });
+    if (this.wantsJsonResponse(req)) {
+      return reply.send({ redirect_to: redirectTo });
+    }
     return reply.redirect(redirectTo);
   }
 
@@ -345,7 +377,7 @@ export class PlexusIdpProvider implements AuthProvider {
     if (!parsed.success) {
       return oauthError(reply, 400, 'invalid_request', 'Invalid token request');
     }
-    if (!resourceMatchesExpected(parsed.data.resource, getMcpResourceUrl(req))) {
+    if (!this.resourceMatchesMcpServer(parsed.data.resource, req)) {
       return oauthError(
         reply,
         400,
@@ -361,19 +393,25 @@ export class PlexusIdpProvider implements AuthProvider {
     return this.handleRefreshTokenGrant(parsed.data, reply);
   }
 
-  async validateToken(token: string): Promise<{ keyName: string; scopes: string[] } | null> {
+  async validateToken(
+    token: string,
+    req: FastifyRequest
+  ): Promise<{ keyName: string; scopes: string[] } | null> {
     if (!token.startsWith(ACCESS_TOKEN_PREFIX)) return null;
 
     const record = await this.repo.getAccessToken(token);
     if (!record) return null;
     if (record.revokedAt !== null) return null;
     if (record.accessTokenExpiresAt <= Date.now()) return null;
+    const client = await this.repo.getClient(record.clientId);
+    if (!client || client.status === 'disabled') return null;
     if (!this.isTokenBoundToCurrentApiKeySecret(record.keyName, record.apiKeySecretHash))
       return null;
     // The underlying Plexus API key must still be valid (not expired/disabled/revoked).
     if (!this.isApiKeyCurrentlyValid(record.keyName)) return null;
-    // RFC 8707: the token is only valid for the currently configured resource.
-    if (!this.resourceMatchesCurrentConfig(record.resource)) return null;
+    // RFC 8707: the token is only valid for the route-specific MCP resource
+    // on which it was issued.
+    if (!this.resourceMatchesMcpServer(record.resource, req)) return null;
 
     return { keyName: record.keyName, scopes: splitScopes(record.scope) };
   }
@@ -415,8 +453,20 @@ export class PlexusIdpProvider implements AuthProvider {
         'The underlying Plexus API key has been rotated'
       );
     }
+    if (!this.isApiKeyCurrentlyValid(code.keyName)) {
+      return oauthError(
+        reply,
+        400,
+        'invalid_grant',
+        'The underlying Plexus API key is no longer valid'
+      );
+    }
 
-    await this.repo.consumeAuthorizationCode(data.code);
+    // Consume atomically after all grant validation. A read/check followed by
+    // a separate update lets two concurrent exchanges both mint tokens from
+    // the same one-time authorization code.
+    const consumed = await this.repo.consumeAuthorizationCode(data.code);
+    if (!consumed) return oauthError(reply, 400, 'invalid_grant', 'Code already used');
     return this.issueToken(reply, {
       clientId: data.client_id,
       keyName: code.keyName,
@@ -453,11 +503,18 @@ export class PlexusIdpProvider implements AuthProvider {
         'Underlying Plexus API key is no longer valid'
       );
     }
+    if (!this.isApiKeyCurrentlyValid(record.keyName)) {
+      return oauthError(
+        reply,
+        400,
+        'invalid_grant',
+        'Underlying Plexus API key is no longer valid'
+      );
+    }
 
-    await this.repo.revokeRefreshToken(data.refresh_token);
     // C3: constrain the refreshed scope set to what the client is allowed to
-    // have (from dynamic registration) and that Plexus actually supports.
-    const grantedScopes = constrainScopes(data.scope ?? record.scope, client.scope);
+    // have on both the original grant and the current dynamic registration.
+    const grantedScopes = constrainScopes(data.scope ?? record.scope, record.scope, client.scope);
     if (grantedScopes.length === 0) {
       return oauthError(
         reply,
@@ -466,6 +523,11 @@ export class PlexusIdpProvider implements AuthProvider {
         'None of the requested scopes are permitted for this client'
       );
     }
+    // Rotate atomically after validating the requested scope. This both avoids
+    // consuming a token on invalid_scope and prevents concurrent refreshes
+    // from reusing the same refresh token.
+    const revoked = await this.repo.revokeRefreshToken(data.refresh_token);
+    if (!revoked) return oauthError(reply, 400, 'invalid_grant', 'Refresh token revoked');
     return this.issueToken(reply, {
       clientId: record.clientId,
       keyName: record.keyName,
@@ -541,15 +603,18 @@ export class PlexusIdpProvider implements AuthProvider {
     return !isKeyDisabled(keyConfig);
   }
 
-  private resourceMatchesCurrentConfig(resource: string): boolean {
-    const configuredResource = getConfig().mcpOAuth?.resource;
-    // When no resource is configured it is derived from the request origin, so
-    // there is no stable config value to compare against here.
-    if (!configuredResource) return true;
-    return resourceMatchesExpected(resource, configuredResource);
+  private resourceMatchesMcpServer(resource: string, req: FastifyRequest): boolean {
+    const serverName = getMcpServerNameFromResource(resource, req);
+    if (!serverName || !mcpProxyService.getMcpServerConfig(serverName)) return false;
+
+    const requestServerName = getMcpServerNameFromRequest(req);
+    if (requestServerName && requestServerName !== serverName) return false;
+
+    return resourceMatchesExpected(resource, getMcpResourceUrl(req, serverName));
   }
 
   private async renderConsent(
+    req: FastifyRequest,
     reply: FastifyReply,
     data: z.infer<typeof authorizeSchema>
   ): Promise<void> {
@@ -559,6 +624,7 @@ export class PlexusIdpProvider implements AuthProvider {
           `<input type="hidden" name="${htmlEscape(key)}" value="${htmlEscape(String(value))}">`
       )
       .join('\n');
+    const loginUrl = `/ui/login?returnTo=${encodeURIComponent(req.url)}`;
     const body = `<!doctype html>
 <html lang="en">
 <head>
@@ -600,8 +666,8 @@ export class PlexusIdpProvider implements AuthProvider {
     .client p { margin: 0.25rem 0; font-size: 0.75rem; }
     code { color: #FDE68A; font-family: var(--font-mono); overflow-wrap: anywhere; }
     label { display: block; margin: 1rem 0 0.375rem; color: var(--text-secondary); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
-    input[type=password] { width: 100%; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--bg-input); color: var(--text); padding: 0.75rem 0.875rem; font: 0.875rem var(--font-mono); outline: none; transition: border-color 120ms ease, box-shadow 120ms ease; }
-    input[type=password]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+    select { width: 100%; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--bg-input); color: var(--text); padding: 0.75rem 0.875rem; font: 0.875rem var(--font-body); outline: none; transition: border-color 120ms ease, box-shadow 120ms ease; }
+    select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
     button { width: 100%; margin-top: 1rem; border: 0; border-radius: 0.375rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); color: #1A1006; font: 500 0.875rem var(--font-body); padding: 0.75rem 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 1px 0 rgba(255,255,255,0.2) inset, 0 6px 20px -10px var(--glow); transition: filter 150ms ease, transform 150ms ease, box-shadow 150ms ease; }
     button:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 12px 28px -10px rgba(245, 158, 11, 0.65); }
     .note { margin-top: 1.5rem; border-top: 1px solid var(--border-glass); padding-top: 1rem; color: var(--text-muted); font-size: 0.75rem; }
@@ -639,26 +705,186 @@ export class PlexusIdpProvider implements AuthProvider {
     </div>
     <section class="card">
       <h1>Authorize MCP access</h1>
-      <p>Paste an existing Plexus API key to bind this OAuth grant to that key. Plexus will not share the raw key with the client.</p>
+      <p id="session-message">Use your existing Plexus browser session to authorize this client. Your API-key secret is never entered into or sent through this page.</p>
       <div class="client">
         <p>Client <code>${htmlEscape(data.client_id)}</code></p>
         <p>Resource <code>${htmlEscape(data.resource)}</code></p>
       </div>
-      <form method="post" action="/oauth/authorize">
+      <form method="post" action="/oauth/authorize" onsubmit="return false">
         ${hidden}
-        <label for="api_key">Plexus API key</label>
-        <input id="api_key" name="api_key" type="password" autocomplete="off" required autofocus>
-        <button type="submit">Authorize access</button>
+        <div id="key-picker" hidden>
+          <label for="key_name">Administrator: authorize as Plexus API key</label>
+          <select id="key_name" name="key_name"></select>
+        </div>
+        <p id="error-message" role="alert" hidden></p>
+        <a id="login-link" href="${htmlEscape(loginUrl)}" hidden>Sign in to Plexus</a>
+        <button id="authorize-button" type="submit">Authorize access</button>
       </form>
-      <div class="note">Only authorize clients you trust. This page is served directly by your Plexus instance.</div>
+      <div class="note">Only authorize clients you trust. This page is served directly by your Plexus instance. The grant is bound to the selected Plexus API-key identity and can be revoked from the Admin UI.</div>
     </section>
     <p class="footer">© 2026 Plexus · Unified LLM Gateway</p>
   </main>
+  <script>
+    (() => {
+      const form = document.querySelector('form');
+      const button = document.getElementById('authorize-button');
+      const message = document.getElementById('session-message');
+      const error = document.getElementById('error-message');
+      const loginLink = document.getElementById('login-link');
+      const picker = document.getElementById('key-picker');
+      const keyName = document.getElementById('key_name');
+      if (!form || !button || !message || !error || !loginLink || !picker || !keyName) return;
+
+      const showError = (text, showLogin) => {
+        error.textContent = text;
+        error.hidden = false;
+        loginLink.hidden = !showLogin;
+      };
+
+      const getCredential = () => {
+        try {
+          return window.localStorage.getItem('plexus_admin_key');
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const credential = getCredential();
+      if (!credential) {
+        message.textContent = 'Sign in to Plexus first, then return here to authorize this client.';
+        loginLink.hidden = false;
+        button.disabled = true;
+      } else {
+        message.textContent = 'You are signed in to Plexus in this browser. Click Authorize access to continue.';
+      }
+
+      form.addEventListener('submit', async () => {
+        const currentCredential = getCredential();
+        if (!currentCredential) {
+          showError('Sign in to Plexus before authorizing this client.', true);
+          return;
+        }
+
+        button.disabled = true;
+        error.hidden = true;
+        loginLink.hidden = true;
+        message.textContent = 'Authorizing…';
+        const body = new URLSearchParams(new FormData(form));
+        try {
+          const response = await fetch(form.action, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'x-admin-key': currentCredential,
+            },
+            body,
+          });
+          const result = await response.json().catch(() => ({}));
+
+          if (response.ok && result.redirect_to) {
+            message.textContent = 'Authorization complete. Returning to your MCP client…';
+            window.location.assign(result.redirect_to);
+            return;
+          }
+
+          if (response.status === 400 && result.error === 'key_selection_required' && result.principal_role === 'admin' && Array.isArray(result.available_keys)) {
+            keyName.innerHTML = '';
+            result.available_keys.forEach((name) => {
+              const option = document.createElement('option');
+              option.value = name;
+              option.textContent = name;
+              keyName.appendChild(option);
+            });
+            picker.hidden = false;
+            message.textContent = 'You are signed in as a Plexus administrator. Choose the API-key identity for this MCP grant.';
+            button.disabled = false;
+            return;
+          }
+
+          if (response.status === 401) {
+            try { window.localStorage.removeItem('plexus_admin_key'); } catch (_) {}
+            showError('Your Plexus session expired. Sign in again to continue.', true);
+          } else {
+            showError(result.error_description || 'Plexus could not authorize this client.', false);
+          }
+          button.disabled = false;
+        } catch (_) {
+          showError('Unable to contact Plexus. Check your connection and try again.', false);
+          button.disabled = false;
+        }
+      });
+    })();
+    </script>
 </body>
 </html>`;
 
     logger.silly('Rendering MCP OAuth consent screen');
-    reply.type('text/html; charset=utf-8').send(body);
+    reply
+      .header('Cache-Control', 'no-store')
+      .header('Pragma', 'no-cache')
+      .type('text/html; charset=utf-8')
+      .send(body);
+  }
+
+  private wantsJsonResponse(req: FastifyRequest): boolean {
+    const accept = req.headers.accept;
+    return (
+      typeof accept === 'string' &&
+      accept.split(',').some((value) => {
+        const mediaType = value.trim().split(';', 1)[0]?.toLowerCase();
+        return mediaType === 'application/json';
+      })
+    );
+  }
+
+  private async resolveAuthorizationKey(
+    req: FastifyRequest,
+    requestedKeyName: string | undefined
+  ): Promise<AuthorizationKeyResolution> {
+    const principal = await resolvePrincipal(req);
+    if (!principal) {
+      return { kind: 'denied', description: 'Sign in to Plexus before authorizing this client' };
+    }
+
+    const keys = getConfig().keys ?? {};
+    if (principal.role === 'limited') {
+      if (requestedKeyName && requestedKeyName !== principal.keyName) {
+        return {
+          kind: 'denied',
+          description: 'You may only authorize with your own Plexus API key',
+        };
+      }
+      const keyConfig = keys[principal.keyName];
+      if (!keyConfig || isKeyDisabled(keyConfig)) {
+        return { kind: 'denied', description: 'Your Plexus API key is no longer valid' };
+      }
+      return { kind: 'authorized', keyName: principal.keyName };
+    }
+
+    const activeKeyNames = Object.entries(keys)
+      .filter(([, keyConfig]) => !isKeyDisabled(keyConfig))
+      .map(([keyName]) => keyName)
+      .sort();
+
+    if (activeKeyNames.length === 0) {
+      return {
+        kind: 'denied',
+        description: 'Create an active Plexus API key before authorizing an MCP client',
+      };
+    }
+
+    if (requestedKeyName) {
+      if (!activeKeyNames.includes(requestedKeyName)) {
+        return { kind: 'denied', description: 'The selected Plexus API key is not active' };
+      }
+      return { kind: 'authorized', keyName: requestedKeyName };
+    }
+
+    // An admin may authorize on behalf of a configured API-key identity, but
+    // that is an explicit delegation decision. Do not silently bind the grant
+    // to whichever key happens to be active, even when there is only one.
+    return { kind: 'selection_required', principalRole: 'admin', keyNames: activeKeyNames };
   }
 }
 

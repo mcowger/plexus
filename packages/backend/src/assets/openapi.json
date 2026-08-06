@@ -4,7 +4,7 @@
     "title": "Plexus API",
     "version": "0",
     "summary": "Unified gateway for LLM provider APIs with usage tracking, quotas, cooldowns, and an admin management plane.",
-    "description": "Plexus is a unified API gateway for LLM providers. It exposes OpenAI-, Anthropic-, and Gemini-compatible endpoints and routes requests to any backend provider, handling request/response transformation automatically.\n\n## Surfaces\n\nPlexus exposes three logical surfaces:\n\n1. **Inference APIs** (`/v1/*`, `/v1beta/*`) — OpenAI-, Anthropic-, and\n   Gemini-compatible endpoints that transparently fan out to configured\n   upstream providers. Authenticated with a Plexus API key (see the\n   [`PlexusApiKey`](#/components/securitySchemes/PlexusApiKey) security\n   scheme).\n\n2. **Management APIs** (`/v0/management/*`) — Administrative operations\n   (configuration CRUD, usage analytics, debug tracing, quotas, OAuth\n   onboarding, Prometheus metrics, etc.). Authenticated with the\n   `x-admin-key` header. The admin header may be either the server's\n   `ADMIN_KEY` (full access) or the plaintext secret of a configured\n   API key (limited access, scoped to that key's own data). Endpoints\n   marked with the `AdminOnly` note reject limited principals with 403.\n\n3. **Raw Provider Proxy** (`/raw/{provider}/*`) — Relays provider-native\n   HTTP traffic without model routing or payload transformation. Requires\n   explicit provider and inference-key opt-in.\n\n\n4. **MCP Proxy** (`/mcp/:name`) — Proxies JSON-RPC and SSE traffic to\n   database-registered MCP servers. Plus unauthenticated MCP OAuth\n   discovery under `/.well-known/*` and `POST /register`.\n\n\n## Authentication\n\n### Inference (`PlexusApiKey`)\n\nA Plexus API key is accepted from any of the following, checked in order:\n\n| Location | Example | |---|---| | `Authorization` header (Bearer) | `Authorization: Bearer sk-my-key` | | `Authorization` header (no prefix) | `Authorization: sk-my-key` (server prepends `Bearer`) | | `x-api-key` header | `x-api-key: sk-my-key` | | `x-goog-api-key` header | `x-goog-api-key: sk-my-key` | | `?key=` query parameter | `GET /v1/models?key=sk-my-key` |\n\nKeys are matched against the `secret` field of entries in the `keys` configuration table.\n\n### Management (`AdminKey`)\n\nPass the header `x-admin-key: <value>`. A successful match with `process.env.ADMIN_KEY` produces an `admin` principal. Any other value is checked against `keys[*].secret` — a match yields a `limited` principal scoped to its own key's usage/debug/error records. Limited principals are rejected (403) from endpoints documented as admin-only.\n\nUse `GET /v0/management/auth/verify` to test a candidate admin/key credential before storing it in the dashboard.\n\n## Dynamic key attribution\n\nAppend `:label` to a Plexus API key (e.g. `sk-abc:copilot`) to tag every resulting usage record with an `attribution` label. The label surfaces in the `UsageRecord.attribution` field and in `api_key_attribution_*` Prometheus metrics.\n\n## Principal model\n\nThe `x-admin-key` header resolves to one of two principal types:\n\n- **`admin`** — full access to every management endpoint. Matched when\n  the header equals `process.env.ADMIN_KEY`.\n- **`limited`** — scoped to the key's own usage, debug, and error\n  records. Matched when the header equals a configured key's `secret`.\n  Limited principals are rejected (403) from admin-only endpoints.\n\nOn `/v0/management/self/*` routes an `admin` principal can impersonate any key by passing `?keyName=<name>`.\n\n## Header forwarding\n\nThe following client headers, when present, are forwarded to upstream providers:\n\n- `x-app` — application identifier. Echoed into\n  `plexus_metadata.clientHeaders` on the usage record (all inference\n  routes).\n- `session_id` — client session identifier. Forwarded as an HTTP\n  header for prompt cache routing (`/v1/responses` only).\n- `x-client-request-id` — client-supplied request correlation ID.\n  Forwarded as an HTTP header for prompt cache routing\n  (`/v1/responses` only).\n\n\n## Environment variables\n\nKey environment variables that affect runtime behaviour:\n\n| Variable | Purpose | |---|---| | `ADMIN_KEY` | Master admin key for management endpoints. | | `DATA_DIR` | Directory for SQLite database and data files. | | `LOG_LEVEL` | Runtime log level (`error`, `warn`, `info`, `debug`, `verbose`, `silly`). | | `DEBUG` | Set to `true` to enable debug log capture at startup. | | `PLEXUS_METRICS_CACHE_TTL_MS` | TTL for the Prometheus metrics cache in milliseconds. | | `DATABASE_URL` | Connection string for PostgreSQL (omit for SQLite). | | `ENCRYPTION_KEY` | Key used to encrypt secrets at rest. |\n\nSee `docs/CONFIGURATION.md` for the full list and configuration file format.\n\n## Public endpoints (no auth)\n\n- `GET /health` - `GET /v1/models` - `GET /v1/openrouter/models` - `GET /v1/metadata/search` - `GET /v1/metadata/lookup` - All `/.well-known/*` MCP discovery endpoints - `POST /register` (MCP dynamic client registration)",
+    "description": "Plexus is a unified API gateway for LLM providers. It exposes OpenAI-, Anthropic-, and Gemini-compatible endpoints and routes requests to any backend provider, handling request/response transformation automatically.\n\n## Surfaces\n\nPlexus exposes three logical surfaces:\n\n1. **Inference APIs** (`/v1/*`, `/v1beta/*`) — OpenAI-, Anthropic-, and\n   Gemini-compatible endpoints that transparently fan out to configured\n   upstream providers. Authenticated with a Plexus API key (see the\n   [`PlexusApiKey`](#/components/securitySchemes/PlexusApiKey) security\n   scheme).\n\n2. **Management APIs** (`/v0/management/*`) — Administrative operations\n   (configuration CRUD, usage analytics, debug tracing, quotas, OAuth\n   onboarding, Prometheus metrics, etc.). Authenticated with the\n   `x-admin-key` header. The admin header may be either the server's\n   `ADMIN_KEY` (full access) or the plaintext secret of a configured\n   API key (limited access, scoped to that key's own data). Endpoints\n   marked with the `AdminOnly` note reject limited principals with 403.\n\n3. **Raw Provider Proxy** (`/raw/{provider}/*`) — Relays provider-native\n   HTTP traffic without model routing or payload transformation. Requires\n   explicit provider and inference-key opt-in.\n\n\n4. **MCP Proxy** (`/mcp/:name`) — Proxies JSON-RPC and SSE traffic to\n   database-registered MCP servers. Plus unauthenticated MCP OAuth\n   discovery, authorization, token, and dynamic client-registration\n   endpoints when `mcpOAuth.enabled` is true. Each MCP server has its own\n   RFC 9728 protected-resource metadata and resource identifier.\n\n\n## Authentication\n\n### Inference (`PlexusApiKey`)\n\nA Plexus API key is accepted from any of the following, checked in order:\n\n| Location | Example | |---|---| | `Authorization` header (Bearer) | `Authorization: Bearer sk-my-key` | | `Authorization` header (no prefix) | `Authorization: sk-my-key` (server prepends `Bearer`) | | `x-api-key` header | `x-api-key: sk-my-key` | | `x-goog-api-key` header | `x-goog-api-key: sk-my-key` | | `?key=` query parameter | `GET /v1/models?key=sk-my-key` |\n\nKeys are matched against the `secret` field of entries in the `keys` configuration table.\n\n### Management (`AdminKey`)\n\nPass the header `x-admin-key: <value>`. A successful match with `process.env.ADMIN_KEY` produces an `admin` principal. Any other value is checked against `keys[*].secret` — a match yields a `limited` principal scoped to its own key's usage/debug/error records. Limited principals are rejected (403) from endpoints documented as admin-only.\n\nUse `GET /v0/management/auth/verify` to test a candidate admin/key credential before storing it in the dashboard.\n\n## Dynamic key attribution\n\nAppend `:label` to a Plexus API key (e.g. `sk-abc:copilot`) to tag every resulting usage record with an `attribution` label. The label surfaces in the `UsageRecord.attribution` field and in `api_key_attribution_*` Prometheus metrics.\n\n## Principal model\n\nThe `x-admin-key` header resolves to one of two principal types:\n\n- **`admin`** — full access to every management endpoint. Matched when\n  the header equals `process.env.ADMIN_KEY`.\n- **`limited`** — scoped to the key's own usage, debug, and error\n  records. Matched when the header equals a configured key's `secret`.\n  Limited principals are rejected (403) from admin-only endpoints.\n\nOn `/v0/management/self/*` routes an `admin` principal can impersonate any key by passing `?keyName=<name>`.\n\n## Header forwarding\n\nThe following client headers, when present, are forwarded to upstream providers:\n\n- `x-app` — application identifier. Echoed into\n  `plexus_metadata.clientHeaders` on the usage record (all inference\n  routes).\n- `session_id` — client session identifier. Forwarded as an HTTP\n  header for prompt cache routing (`/v1/responses` only).\n- `x-client-request-id` — client-supplied request correlation ID.\n  Forwarded as an HTTP header for prompt cache routing\n  (`/v1/responses` only).\n\n\n## Environment variables\n\nKey environment variables that affect runtime behaviour:\n\n| Variable | Purpose | |---|---| | `ADMIN_KEY` | Master admin key for management endpoints. | | `DATA_DIR` | Directory for SQLite database and data files. | | `LOG_LEVEL` | Runtime log level (`error`, `warn`, `info`, `debug`, `verbose`, `silly`). | | `DEBUG` | Set to `true` to enable debug log capture at startup. | | `PLEXUS_METRICS_CACHE_TTL_MS` | TTL for the Prometheus metrics cache in milliseconds. | | `DATABASE_URL` | Connection string for PostgreSQL (omit for SQLite). | | `ENCRYPTION_KEY` | Key used to encrypt secrets at rest. |\n\nSee `docs/CONFIGURATION.md` for the full list and configuration file format.\n\n## Public endpoints (no auth)\n\n- `GET /health` - `GET /v1/models` - `GET /v1/openrouter/models` - `GET /v1/metadata/search` - `GET /v1/metadata/lookup` - OAuth authorization-server metadata and MCP protected-resource metadata\n  when MCP OAuth is enabled\n- MCP OAuth authorization, token, and dynamic client-registration endpoints\n  when MCP OAuth is enabled",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -148,7 +148,7 @@
     },
     {
       "name": "MCP Proxy",
-      "description": "JSON-RPC/SSE proxy for configured MCP servers plus OAuth discovery.\n### Header forwarding rules\n- Client `Authorization` header is **stripped** — not forwarded to\n  upstream servers.\n- Client `x-api-key` header is **stripped** — not forwarded. - Static `headers` from the server's config are forwarded to the\n  upstream.\n\n### Redaction\nSensitive headers are removed from requests flowing through the proxy. Only configured static headers from `mcp_servers` are used.\n### Session semantics\nEach proxy connection maintains a session with the upstream MCP server. Sessions are per-connection and terminate when the client disconnects or `DELETE` is called.\n### OAuth discovery endpoints\nThe `.well-known/*` and `/register` endpoints exist solely for MCP client compatibility — they return static metadata and don't perform functional OAuth."
+      "description": "JSON-RPC/SSE proxy for configured MCP servers plus OAuth discovery.\n### Header forwarding rules\n- Client `Authorization` header is **stripped** — not forwarded to\n  upstream servers.\n- Client `x-api-key` header is **stripped** — not forwarded. - Static `headers` from the server's config are forwarded to the\n  upstream.\n\n### Redaction\nSensitive headers are removed from requests flowing through the proxy. Only configured static headers from `mcp_servers` are used.\n### Session semantics\nEach proxy connection maintains a session with the upstream MCP server. Sessions are per-connection and terminate when the client disconnects or `DELETE` is called.\n### OAuth discovery endpoints\nThe OAuth discovery, authorization, token, and dynamic client-registration endpoints expose the MCP OAuth flow when enabled. Each `/mcp/:name` server has a route-specific protected-resource metadata document and resource identifier. OAuth endpoints return `404` with `oauth_disabled` when `mcpOAuth.enabled` is false."
     }
   ],
   "paths": {
@@ -9644,8 +9644,8 @@
         "tags": [
           "MCP Proxy"
         ],
-        "summary": "OAuth 2.0 authorization server metadata (public)",
-        "description": "Returns OAuth 2.0 authorization server metadata for MCP client\ncompatibility.\n\n## Use case\n\nMCP clients use this endpoint to discover OAuth configuration. The\nresponse indicates that bearer token authentication is supported.\n\n## Response\n\nStatic metadata describing the authorization server. The exact content\nvaries by configuration but typically includes:\n- `issuer` — Authorization server identifier\n- `token_endpoint` — Where to request tokens\n- `grant_types` — Supported grant types\n\n**Not functional OAuth** — This exists for MCP client compatibility;\nthe actual OAuth flow is handled differently in Plexus.\n\n**No auth** — This endpoint is public.\n",
+        "summary": "OAuth 2.0 authorization server metadata (public when enabled)",
+        "description": "Returns the shared Plexus OAuth authorization-server metadata used by MCP\nclients for discovery. The issuer, authorization, token, and dynamic\nregistration endpoints, supported grant types, PKCE method, and scopes are\nresolved from the active provider at request time.\n\nMCP OAuth is opt-in. When `mcpOAuth.enabled` is false, this endpoint\nreturns `404` with an `oauth_disabled` error.\n\n**No auth** — This endpoint is public while OAuth is enabled.\n",
         "security": [],
         "responses": {
           "200": {
@@ -9661,18 +9661,33 @@
           },
           "400": {
             "description": "Bad request."
+          },
+          "404": {
+            "description": "MCP OAuth is disabled (`oauth_disabled`)."
           }
         },
         "operationId": "getWellknownOauthauthorizationserver"
       }
     },
-    "/.well-known/oauth-protected-resource": {
+    "/.well-known/oauth-protected-resource/mcp/{name}": {
       "get": {
         "tags": [
           "MCP Proxy"
         ],
-        "summary": "OAuth 2.0 protected resource metadata (public)",
-        "description": "Returns OAuth 2.0 protected resource metadata for MCP client\ncompatibility.\n\n## Use case\n\nMCP clients use this endpoint to discover resource protection\nconfiguration.\n\n**Not functional OAuth** — This exists for MCP client compatibility.\n\n**No auth** — This endpoint is public.\n",
+        "summary": "OAuth 2.0 protected resource metadata (public when enabled)",
+        "description": "Returns RFC 9728 protected-resource metadata for one configured MCP\nserver. The resource identifier is `https://host/mcp/{name}`; the\nauthorization server, supported scopes, and bearer transport are resolved\nfrom the active provider at request time.\n\nMCP OAuth is opt-in. When `mcpOAuth.enabled` is false, this endpoint\nreturns `404` with an `oauth_disabled` error.\n\n**No auth** — This endpoint is public while OAuth is enabled.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "description": "Enabled MCP server name.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-_]{1,62}$"
+            }
+          }
+        ],
         "security": [],
         "responses": {
           "200": {
@@ -9688,22 +9703,403 @@
           },
           "400": {
             "description": "Bad request."
+          },
+          "404": {
+            "description": "MCP OAuth is disabled or the MCP server is not found."
           }
         },
-        "operationId": "getWellknownOauthprotectedresource"
+        "operationId": "getWellknownOauthprotectedresourceMcpByname"
       }
     },
-    "/.well-known/openid-configuration": {
+    "/oauth/authorize": {
       "get": {
         "tags": [
           "MCP Proxy"
         ],
-        "summary": "OpenID Connect discovery (public)",
-        "description": "Returns OpenID Connect discovery document for MCP client compatibility.\n\n## Use case\n\nMCP clients use this endpoint to discover OIDC configuration, including\nsupported token types, issuer URL, and other OAuth/OIDC parameters.\n\n**Not functional OIDC** — This exists for MCP client compatibility.\n\n**No auth** — This endpoint is public.\n",
+        "summary": "OAuth authorization request (public when enabled)",
+        "description": "Starts the OAuth 2.1 authorization-code flow for one MCP protected\nresource. The request must use PKCE with S256 and an RFC 8707 resource\nidentifier such as `https://host/mcp/exa`. GET renders the Plexus consent\npage; the submitted form is handled by the POST variant.\n",
         "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "response_type",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge_method",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "S256"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "OIDC discovery document.",
+            "description": "HTML consent page.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to the registered client callback after consent."
+          },
+          "400": {
+            "description": "Invalid authorization request."
+          },
+          "404": {
+            "description": "MCP OAuth is disabled (`oauth_disabled`)."
+          }
+        },
+        "operationId": "getOauthAuthorize"
+      },
+      "post": {
+        "tags": [
+          "MCP Proxy"
+        ],
+        "summary": "Submit OAuth authorization request (public when enabled)",
+        "description": "Completes the consent step using the existing Plexus browser login. The\nconsent page reads the logged-in credential from the same-origin Plexus UI\nand sends it in the `x-admin-key` header; the raw API-key secret is not\nincluded in the OAuth form or authorization URL. An administrator must\nexplicitly choose the non-secret `key_name` of the API-key identity to\nwhich the grant will be bound, even when only one active API key exists.\nA limited API-key session is bound automatically to its own key and cannot\nchoose another. A successful regular OAuth request redirects to the client\ncallback with a one-time authorization code. Requests with\n`Accept: application/json` receive the callback URL in `redirect_to`\ninstead, which lets the same-origin consent page complete the redirect.\n",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-admin-key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing Plexus admin key or configured API-key secret used by the browser session."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "response_type",
+                  "client_id",
+                  "redirect_uri",
+                  "code_challenge",
+                  "code_challenge_method",
+                  "resource"
+                ],
+                "properties": {
+                  "response_type": {
+                    "type": "string",
+                    "enum": [
+                      "code"
+                    ]
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "code_challenge": {
+                    "type": "string"
+                  },
+                  "code_challenge_method": {
+                    "type": "string",
+                    "enum": [
+                      "S256"
+                    ]
+                  },
+                  "resource": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "key_name": {
+                    "type": "string",
+                    "description": "Non-secret configured API-key name. Required for administrator sessions; limited sessions cannot choose another key."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON callback URL when the request accepts `application/json`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "redirect_to"
+                  ],
+                  "properties": {
+                    "redirect_to": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect containing the authorization code and state."
+          },
+          "400": {
+            "description": "Invalid authorization request or an administrator must choose an API-key identity."
+          },
+          "401": {
+            "description": "Missing or invalid browser-session credential."
+          },
+          "404": {
+            "description": "MCP OAuth is disabled (`oauth_disabled`)."
+          }
+        },
+        "operationId": "postOauthAuthorize"
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "tags": [
+          "MCP Proxy"
+        ],
+        "summary": "OAuth token exchange (public when enabled)",
+        "description": "Exchanges an authorization code or refresh token for opaque bearer tokens.\nAuthorization-code exchanges require the original redirect URI, PKCE\nverifier, client ID, and route-specific RFC 8707 resource identifier.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grant_type",
+                  "client_id",
+                  "resource"
+                ],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "refresh_token"
+                    ]
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "code_verifier": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "scope": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OAuth token response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Pragma": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in",
+                    "refresh_token"
+                  ],
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "enum": [
+                        "Bearer"
+                      ]
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    },
+                    "refresh_token": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, grant, target, or scope."
+          },
+          "404": {
+            "description": "MCP OAuth is disabled (`oauth_disabled`)."
+          }
+        },
+        "operationId": "postOauthToken"
+      }
+    },
+    "/oauth/register": {
+      "post": {
+        "tags": [
+          "MCP Proxy"
+        ],
+        "summary": "Dynamic MCP OAuth client registration (public when enabled)",
+        "description": "Registers a public OAuth client using RFC 7591-style dynamic client\nregistration. The request must include at least one absolute `redirect_uri`;\nPlexus returns a generated client identifier and persists the requested\nredirect URI set, grant types, response types, and scopes. Identical\nregistrations are deduplicated.\n",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "redirect_uris"
+                ],
+                "properties": {
+                  "redirect_uris": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "client_name": {
+                    "type": "string"
+                  },
+                  "grant_types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "response_types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "token_endpoint_auth_method": {
+                    "type": "string",
+                    "enum": [
+                      "none"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing identical dynamic client registration.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9713,44 +10109,43 @@
               }
             }
           },
-          "400": {
-            "description": "Bad request."
-          }
-        },
-        "operationId": "getWellknownOpenidconfiguration"
-      }
-    },
-    "/register": {
-      "post": {
-        "tags": [
-          "MCP Proxy"
-        ],
-        "summary": "Dynamic MCP client registration (public, static response)",
-        "description": "Returns a static client registration record for MCP client compatibility.\n\n## Use case\n\nMCP clients that support dynamic registration require this endpoint.\nPlexus returns a static response indicating a pre-registered client.\n\n## Response\n\nA static registration record:\n- `client_id` — Fixed value: `plexus-mcp-static`\n- `client_id_issued_at` — Unix timestamp\n- `client_secret` — Empty (not used)\n- `grant_types` — Supported grant types\n- `token_endpoint_auth_method` — Authentication method for token endpoint\n\n## Note\n\nThis is a **static response** — it doesn't actually register new clients.\nThe endpoint exists solely for MCP client compatibility with clients\nthat expect this metadata before connecting.\n\n**No auth** — This endpoint is public.\n",
-        "security": [],
-        "responses": {
           "201": {
-            "description": "Static registration record pointing callers to Bearer auth.",
+            "description": "New dynamic client registration.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "client_id": {
-                      "type": "string",
-                      "const": "plexus-mcp-static"
+                      "type": "string"
                     },
                     "client_id_issued_at": {
                       "type": "integer"
                     },
-                    "client_secret": {
+                    "client_name": {
                       "type": "string"
+                    },
+                    "redirect_uris": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uri"
+                      }
                     },
                     "grant_types": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "response_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "scope": {
+                      "type": "string"
                     },
                     "token_endpoint_auth_method": {
                       "type": "string"
@@ -9761,10 +10156,13 @@
             }
           },
           "400": {
-            "description": "Bad request."
+            "description": "Invalid client metadata."
+          },
+          "404": {
+            "description": "MCP OAuth is disabled (`oauth_disabled`)."
           }
         },
-        "operationId": "postRegister"
+        "operationId": "postOauthRegister"
       }
     },
     "/v1/completions": {
