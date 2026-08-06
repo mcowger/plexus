@@ -15,8 +15,7 @@
       "!!packages/backend/src/assets/openapi.json",
       "!!packages/cli/src/skill.ts",
       "!!packages/backend/src/transformers/oauth/__tests__/golden-fixtures/**",
-      "!!.claude/**",
-      "!!.venv/**"
+      "!!.claude/**"
     ]
   },
   "formatter": {

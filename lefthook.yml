@@ -66,14 +66,12 @@ pre-commit:
       run: bun run test
 
 pre-push:
-  # Advisory-only hook — also skipped in CI (nothing local to review there).
+  # Local review hook placeholder — also skipped in CI.
   skip:
     - CI: "true"
 
-  # --- Advisory PR-Agent plain-diff review (NEVER blocks the push) ---------
-  # Reviews the diff being pushed relative to the upstream remote branch.
-  # Requires a one-time setup: mise run pr-agent:setup (see CONTRIBUTING.md).
-  # Always exits 0 — missing install/config/LLM key only prints a warning.
+  # Keep the script registration as the replacement point for local review.
+  # It is intentionally a no-op for now and always exits 0.
   #
   # Implemented as a lefthook *script* (not a command) because pre-push
   # commands are skipped by lefthook whenever its @{push}-based file

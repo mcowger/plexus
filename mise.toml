@@ -5,22 +5,6 @@ actionlint = "latest"
 bun = "latest"
 lefthook = "latest"
 "npm:greptile" = "latest"
-# Pinned Python for the advisory PR-Agent pre-push hook (pr-agent requires >= 3.12).
-python = "3.12"
 
 [env]
 _.path = ["./node_modules/.bin"]
-
-# Idempotent install of PR-Agent into a local .venv using the mise-managed Python.
-# Used by the advisory (non-blocking) pre-push review hook — see CONTRIBUTING.md.
-# NOTE: plain-diff mode (--stdin) is not in a PyPI release yet (merged after
-# 0.39.0 via qodo-ai/pr-agent#2467), so we install from a pinned commit.
-[tasks."pr-agent:setup"]
-description = "Install PR-Agent into ./.venv for the advisory pre-push review hook"
-run = """
-set -e
-python -m venv .venv
-.venv/bin/python -m pip install --quiet --disable-pip-version-check --upgrade pip
-.venv/bin/python -m pip install --quiet --disable-pip-version-check "pr-agent @ git+https://github.com/The-PR-Agent/pr-agent.git@4a26c38d33d16ea490d6f0dd5c11b06e6c2f2cac"
-echo "PR-Agent ready: .venv/bin/python -m pr_agent.cli"
-"""
