@@ -301,7 +301,8 @@ export class McpOauthRepository {
       .where(
         and(
           eq(schema.mcpOauthAuthorizationCodes.codeHash, hashSecret(code)),
-          sql`${schema.mcpOauthAuthorizationCodes.consumedAt} IS NULL`
+          sql`${schema.mcpOauthAuthorizationCodes.consumedAt} IS NULL`,
+          sql`${schema.mcpOauthAuthorizationCodes.expiresAt} > ${now()}`
         )
       );
     return getAffectedRowCount(result) > 0;
