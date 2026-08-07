@@ -310,6 +310,55 @@ describe('MCP Routes', () => {
       expect(mockMcpUsageStorage.saveRequest).toHaveBeenCalled();
     });
 
+    test('forwards MCP tool definitions without route-level mutation', async () => {
+      const upstreamResponse = {
+        jsonrpc: '2.0',
+        id: 1,
+        result: {
+          tools: [
+            {
+              name: 'github_search_code',
+              description: 'Search GitHub code',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  owner: {
+                    type: 'string',
+                    description: 'Repository owner',
+                    'x-mcp-header': 'owner',
+                  },
+                },
+                required: ['owner'],
+              },
+            },
+          ],
+        },
+      };
+      mockProxyMcpRequest.mockResolvedValueOnce({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: upstreamResponse,
+      });
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer sk-valid-key',
+          accept: 'application/json, text/event-stream',
+          'content-type': 'application/json',
+        },
+        payload: {
+          jsonrpc: '2.0',
+          method: 'tools/list',
+          id: 1,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(upstreamResponse);
+    });
+
     test('GET /mcp/:name should proxy GET requests', async () => {
       // Clear previous mock calls
       (mockProxyMcpRequest as any).mockClear();
@@ -351,6 +400,67 @@ describe('MCP Routes', () => {
       });
 
       expect(response.statusCode).toBe(405);
+    });
+
+    test('sets portable SSE cache headers without a Connection header', async () => {
+      (mockProxyMcpRequest as any).mockClear();
+      (mockProxyMcpRequest as any).mockResolvedValueOnce({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+        stream: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: ok\n\n'));
+            controller.close();
+          },
+        }),
+      });
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer sk-valid-key',
+          accept: 'application/json, text/event-stream',
+          'content-type': 'application/json',
+        },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-cache');
+      expect(response.headers['x-accel-buffering']).toBe('no');
+      expect(response.headers.connection).toBeUndefined();
+    });
+
+    test('preserves an upstream Cache-Control value on SSE responses', async () => {
+      (mockProxyMcpRequest as any).mockClear();
+      (mockProxyMcpRequest as any).mockResolvedValueOnce({
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream',
+          'cache-control': 'private, max-age=0',
+        },
+        stream: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: ok\n\n'));
+            controller.close();
+          },
+        }),
+      });
+
+      const response = await fastify.inject({
+        method: 'POST',
+        url: '/mcp/test-server',
+        headers: {
+          authorization: 'Bearer sk-valid-key',
+          accept: 'application/json, text/event-stream',
+          'content-type': 'application/json',
+        },
+        payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['cache-control']).toBe('private, max-age=0');
     });
 
     test('DELETE /mcp/:name should proxy DELETE requests', async () => {

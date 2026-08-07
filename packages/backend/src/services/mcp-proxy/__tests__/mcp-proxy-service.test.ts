@@ -1,4 +1,4 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
+import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import {
   getMcpServerConfig,
   validateServerName,
@@ -14,6 +14,8 @@ import {
   injectMcpKeyAuth,
 } from '../mcp-proxy-service';
 import { setConfigForTesting } from '../../../config';
+import { registerSpy } from '../../../../test/test-utils';
+import { mcpProcessManager } from '../../mcp-local/mcp-process-manager';
 
 describe('MCP Proxy Service', () => {
   describe('validateServerName', () => {
@@ -70,23 +72,35 @@ describe('MCP Proxy Service', () => {
       const headers = {
         'Content-Type': 'application/json',
         Connection: 'keep-alive',
+        'MCP-Protocol-Version': '2025-03-26',
+        'Mcp-Method': 'tools/call',
+        'Mcp-Name': 'github_search_code',
+        'Mcp-Param-owner': 'octocat',
       };
 
       const filtered = filterHopByHopHeaders(headers);
 
       expect(filtered['Content-Type']).toBe('application/json');
+      expect(filtered['MCP-Protocol-Version']).toBe('2025-03-26');
+      expect(filtered['Mcp-Method']).toBe('tools/call');
+      expect(filtered['Mcp-Name']).toBe('github_search_code');
+      expect(filtered['Mcp-Param-owner']).toBe('octocat');
       expect(filtered['connection']).toBeUndefined();
     });
 
     test('should handle array values', () => {
       const headers = {
         'x-array-header': ['value1', 'value2'],
+        accept: ['application/json', 'text/event-stream'],
+        cookie: ['a=1', 'b=2'],
         'x-string-header': 'singlevalue',
       };
 
       const filtered = filterHopByHopHeaders(headers);
 
-      expect(filtered['x-array-header']).toBe('value1');
+      expect(filtered['x-array-header']).toBe('value1, value2');
+      expect(filtered.accept).toBe('application/json, text/event-stream');
+      expect(filtered.cookie).toBe('a=1; b=2');
       expect(filtered['x-string-header']).toBe('singlevalue');
     });
 
@@ -352,6 +366,95 @@ describe('MCP Proxy Service', () => {
       const config = getMcpServerConfig('test-server');
 
       expect(config).toBeNull();
+    });
+  });
+
+  describe('upstream response streaming', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    beforeEach(() => {
+      setConfigForTesting({
+        providers: {},
+        models: {},
+        keys: {},
+        failover: {
+          enabled: false,
+          retryableStatusCodes: [429, 500, 502, 503, 504],
+          retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+        },
+        quotas: [],
+        mcpServers: {
+          'local-server': {
+            mode: 'local_http',
+            enabled: true,
+            launcher: 'bunx',
+            package: '@example/mcp-server',
+            port: 7345,
+            path: '/mcp',
+          },
+        },
+      });
+      registerSpy(mcpProcessManager, 'ensureRunning').mockResolvedValue(undefined);
+    });
+
+    test.each(['text/event-stream', 'TEXT/EVENT-STREAM;charset=utf-8'])(
+      'returns an SSE response body as a stream for %s',
+      async (contentType) => {
+        const fetchMock = vi.fn().mockResolvedValue(
+          new Response('data: {"jsonrpc":"2.0"}\n\n', {
+            status: 200,
+            headers: { 'content-type': contentType },
+          })
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        const result = await proxyMcpRequest(
+          'local-server',
+          'POST',
+          { accept: 'application/json, text/event-stream' },
+          { jsonrpc: '2.0', method: 'tools/list', id: 1 }
+        );
+
+        expect(result.stream).toBeDefined();
+        expect(result.body).toBeUndefined();
+        await expect(new Response(result.stream).text()).resolves.toContain('jsonrpc');
+      }
+    );
+
+    test('buffers a JSON GET response instead of treating it as SSE', async () => {
+      const body = {
+        jsonrpc: '2.0',
+        id: 1,
+        result: {
+          tools: [
+            {
+              name: 'github_search_code',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  owner: { type: 'string', 'x-mcp-header': 'owner' },
+                },
+              },
+            },
+          ],
+        },
+      };
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await proxyMcpRequest('local-server', 'GET', {
+        accept: 'application/json, text/event-stream',
+      });
+
+      expect(result.stream).toBeUndefined();
+      expect(result.body).toEqual(body);
     });
   });
 });

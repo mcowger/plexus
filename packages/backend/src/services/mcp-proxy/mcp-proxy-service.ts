@@ -166,8 +166,8 @@ export function filterHopByHopHeaders(
 
     if (value !== undefined && value !== null) {
       if (Array.isArray(value)) {
-        if (value.length > 0 && value[0] !== undefined) {
-          filtered[key] = value[0] as string;
+        if (value.length > 0) {
+          filtered[key] = value.join(lowerKey === 'cookie' ? '; ' : ', ');
         }
       } else {
         filtered[key] = value;
@@ -395,7 +395,7 @@ export async function proxyMcpRequest(
     const contentType = response.headers.get('content-type');
     logger.silly(`Content-Type: ${contentType}`);
 
-    if (contentType?.includes('text/event-stream') || (method === 'GET' && response.ok)) {
+    if (contentType?.toLowerCase().includes('text/event-stream')) {
       logger.info('[mcp-proxy:' + serverName + '] upstream streaming response detected');
       if (response.body) {
         return {
@@ -410,6 +410,8 @@ export async function proxyMcpRequest(
 
     logger.silly(`Response body (raw): ${responseText.substring(0, 500)}`);
 
+    // MCP JSON-RPC payloads are opaque to the gateway. Preserve tool
+    // inputSchema objects and their protocol extensions exactly as received.
     let parsedBody: unknown;
     try {
       parsedBody = JSON.parse(responseText);

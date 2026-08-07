@@ -179,8 +179,10 @@ async function streamUpstreamResponse(
   if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
     headers['Content-Type'] = 'text/event-stream';
   }
-  headers['Cache-Control'] = 'no-cache';
-  headers['Connection'] = 'keep-alive';
+  if (!Object.keys(headers).some((key) => key.toLowerCase() === 'cache-control')) {
+    headers['Cache-Control'] = 'no-cache';
+  }
+  headers['X-Accel-Buffering'] = 'no';
 
   // Take over the response lifecycle so Fastify does not also try to send a
   // reply, and write the head directly so it reaches the client immediately
@@ -363,7 +365,6 @@ export async function registerMcpRoutes(
         const body = request.body;
         const jsonrpcMethod = mcpProxyService.extractJsonRpcMethod(body);
         const toolName = mcpProxyService.extractToolName(body);
-        const isStreamed = false;
 
         logger.silly(`POST /mcp/${serverName} - requestId: ${requestId}`);
         logger.silly(`Request body: ${JSON.stringify(body)?.substring(0, 500)}`);
@@ -381,6 +382,7 @@ export async function registerMcpRoutes(
         logger.silly(`Proxy result headers: ${JSON.stringify(result.headers)}`);
 
         const durationMs = Date.now() - startTime;
+        const isStreamed = !!result.stream;
 
         await mcpUsageStorage.saveRequest({
           request_id: requestId,
@@ -460,7 +462,6 @@ export async function registerMcpRoutes(
         const clientHeaders = mcpProxyService.redactSensitiveHeaders(
           request.headers as Record<string, string>
         );
-        const isStreamed = true;
 
         logger.silly(`GET /mcp/${serverName} - requestId: ${requestId}`);
 
@@ -473,6 +474,7 @@ export async function registerMcpRoutes(
         );
 
         const durationMs = Date.now() - startTime;
+        const isStreamed = !!result.stream;
 
         await mcpUsageStorage.saveRequest({
           request_id: requestId,
@@ -544,7 +546,6 @@ export async function registerMcpRoutes(
         const clientHeaders = mcpProxyService.redactSensitiveHeaders(
           request.headers as Record<string, string>
         );
-        const isStreamed = false;
 
         logger.silly(`DELETE /mcp/${serverName} - requestId: ${requestId}`);
 
@@ -555,6 +556,7 @@ export async function registerMcpRoutes(
         );
 
         const durationMs = Date.now() - startTime;
+        const isStreamed = !!result.stream;
 
         await mcpUsageStorage.saveRequest({
           request_id: requestId,
