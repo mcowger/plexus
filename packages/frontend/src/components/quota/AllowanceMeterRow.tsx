@@ -3,6 +3,8 @@ import { clsx } from 'clsx';
 import type { Meter, MeterStatus } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
 import { useCurrency } from '../../lib/CurrencyContext';
+import { countdownTickMs, formatResetCountdown } from '../../lib/format';
+import { useNow } from '../../hooks/useNow';
 
 interface AllowanceMeterRowProps {
   meter: Meter;
@@ -44,6 +46,10 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
   onClick,
 }) => {
   const { currency, rate, symbol } = useCurrency();
+  const resetsAtMs = meter.resetsAt ? new Date(meter.resetsAt).getTime() : NaN;
+  const now = useNow(Number.isFinite(resetsAtMs) ? countdownTickMs(resetsAtMs - Date.now()) : null);
+  const reset = formatResetCountdown(meter.resetsAt, now);
+
   const utilNum = typeof meter.utilizationPercent === 'number' ? meter.utilizationPercent : null;
   const pct = utilNum !== null ? Math.max(0, Math.min(100, utilNum)) : null;
   const period = periodLabel(meter);
@@ -58,9 +64,14 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
       <div className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between gap-1 min-w-0">
           <span className="text-[11px] text-text-secondary truncate flex-1">{meter.label}</span>
-          {pct !== null && (
-            <span className="text-[10px] tabular-nums text-text-muted flex-shrink-0">
-              {Math.round(pct)}%
+          {(pct !== null || reset) && (
+            <span
+              className="text-[10px] tabular-nums text-text-muted flex-shrink-0"
+              title={reset ? `Resets at ${reset.absolute}` : undefined}
+            >
+              {pct !== null && `${Math.round(pct)}%`}
+              {pct !== null && reset && ' · '}
+              {reset?.short}
             </span>
           )}
         </div>
@@ -107,7 +118,7 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
           />
         </div>
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         {remaining !== undefined && (
           <span className="text-xs tabular-nums text-text">{remaining} left</span>
         )}
@@ -124,6 +135,19 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
             )}
           >
             {Math.round(pct)}%
+          </span>
+        )}
+        {reset && (
+          <span
+            className={clsx(
+              'text-[10px] tabular-nums',
+              meter.status === 'exhausted' || meter.status === 'critical'
+                ? 'text-text font-medium'
+                : 'text-text-muted'
+            )}
+            title={`Resets at ${reset.absolute}`}
+          >
+            {reset.long}
           </span>
         )}
       </div>

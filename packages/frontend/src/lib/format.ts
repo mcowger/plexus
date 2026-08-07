@@ -62,6 +62,67 @@ export function formatResetsIn(iso: string | null): string {
   return minutes > 0 ? `in ${minutes}m` : 'in <1m';
 }
 
+export interface ResetCountdown {
+  /** Compact form for tight layouts: "3h 12m", "45s", "now", "Dec 25" */
+  short: string;
+  /** Sentence form: "resets in 3h 12m", "resetting now", "resets Dec 25" */
+  long: string;
+  /** Absolute local timestamp, for tooltips */
+  absolute: string;
+  /** Milliseconds until the reset; <= 0 once due */
+  remainingMs: number;
+}
+
+/**
+ * Build the display forms of a quota reset countdown. Returns null when the
+ * meter reports no reset time (many providers only expose a balance).
+ */
+export function formatResetCountdown(
+  iso: string | null | undefined,
+  nowMs: number = Date.now()
+): ResetCountdown | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  const resetsAtMs = date.getTime();
+  if (!Number.isFinite(resetsAtMs)) return null;
+
+  const absolute = date.toLocaleString();
+  const remainingMs = resetsAtMs - nowMs;
+  if (remainingMs <= 0) {
+    return { short: 'now', long: 'resetting now', absolute, remainingMs };
+  }
+
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 7) {
+    const short = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return { short, long: `resets ${short}`, absolute, remainingMs };
+  }
+
+  const short =
+    days > 0
+      ? `${days}d ${hours}h`
+      : hours > 0
+        ? `${hours}h ${minutes}m`
+        : minutes > 0
+          ? `${minutes}m`
+          : `${seconds}s`;
+
+  return { short, long: `resets in ${short}`, absolute, remainingMs };
+}
+
+/**
+ * How often a countdown for `remainingMs` needs to re-render to stay accurate:
+ * every second in the final minute (seconds are shown), otherwise every 30s.
+ */
+export function countdownTickMs(remainingMs: number): number {
+  return remainingMs > 0 && remainingMs < 60_000 ? 1_000 : 30_000;
+}
+
 /**
  * Format large numbers with K, M, B suffixes (e.g., "1.3k", "2.5M")
  */
