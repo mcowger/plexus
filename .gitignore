@@ -88,3 +88,5 @@ mise.local.toml
 claude1.txt
 claude2.txt
 claude3.txt
+
+.pi-subagents/
