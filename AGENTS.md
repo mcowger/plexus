@@ -13,15 +13,12 @@ This file is a **guardrail**, not general documentation.
 - **NEVER** commit, push, or create a PR unless the user explicitly asks.
 - **NEVER** treat earlier permission as ongoing permission. Each individual commit/push needs fresh approval in local/interactive sessions.
 - **NEVER** use `--no-verify` or `LEFTHOOK=0` without user permission.
-- **NEVER** edit existing migration files.
-- **NEVER** manually create SQL migrations.
-- **NEVER** run `drizzle-kit generate` directly.
+- **NEVER** edit or manually create migration files.
 - **NEVER** produce implementation or summary documents unless specifically requested.
-- **NEVER** assume Plexus supports file-based configuration. Providers, models, keys, quotas, and settings are database-backed; manage them through the Admin UI or Management API. Environment variables are only for server-level settings.
 - **DEBUGGING** Plexus instances: read and use the `plexus-cli` skill. The worktree `.env` contains the relevant staging configuration. When the user specifies `staging`, use `PLEXUS_STAGING_URL` for the staging URL and `PLEXUS_ADMIN_KEY` for the admin key.
 - **AVOID** searching library type definitions for documentation. Use context/search skills first when available.
 - **ASK** when requirements are ambiguous.
-- **NEVER** use --delete-branch on gh commands
+- **USE** agents / subtasks aggressively where tools allow for improved cost and performance.
 ## Task triggers
 
 ### If the task changes database schema
@@ -31,21 +28,6 @@ Before editing schema files:
 1. Read the **`db-schema-migrations`** skill.
 2. Update the Drizzle schema.
 3. Generate migrations with:
-
-```bash
-bun run generate-migrations
-bun run generate-migrations --name add_foo
-```
-
-4. Lint migrations with:
-
-```bash
-bun run lint:migrations
-```
-
-Rules:
-- On `main`, `--name` is required.
-- Random migration names like `rare_skullbuster` are rejected by CI.
 
 ### If the task writes or updates tests
 
@@ -71,15 +53,13 @@ Rules:
 - Output: `./dist/main.css`
 - Keep this directive in `globals.css`:
 
-```css
-@source "../src/**/*.{tsx,ts,jsx,js}";
-```
+    ```css
+    @source "../src/**/*.{tsx,ts,jsx,js}";
+    ```
 
 - Put assets in `packages/frontend/src/assets/`.
 - Import assets with ES6 imports only.
 - Do not use dynamic asset paths.
-
-### If the task changes the frontend UI
 
 After editing anything a user sees in the browser (React `.tsx`/`.jsx`, routes, forms,
 Tailwind/CSS, layout, or any file under `packages/frontend/src`), verify it yourself
@@ -89,6 +69,7 @@ instead of handing it back unchecked:
 2. Boot the worktree-safe dev stack, auto-log into the UI, and drive it with a real
    browser to confirm your change renders and behaves correctly.
 
+
 ## Canonical project commands
 
 Use these commands exactly:
@@ -96,8 +77,6 @@ Use these commands exactly:
 - Dev server: `bun run dev`
 - Dev stack for agents (background, worktree-safe): `bun run dev:agent` (or `bun run dev:agent [target]`, e.g. `dev:pglite`, `dev:full`)
 - Stop the agent dev stack: `bun run dev:stop` (or `bun run dev:stop [target]`)
-- Dev port: `PORT=$(bun run dev:get:port)`
-- Dev DB path: `DB_PATH=$(bun run dev:get:db_path)`
 - Tests: `bun run test`
 - Type check: `bun run typecheck`
 - Format: `bun run format`

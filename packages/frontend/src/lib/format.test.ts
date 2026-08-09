@@ -2,24 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { formatCost, formatCostIn, getEstimatedBytesPerToken } from './format';
 
 describe('getEstimatedBytesPerToken', () => {
-  it('returns ~115 B/token for Anthropic messages streaming', () => {
-    expect(getEstimatedBytesPerToken({ incomingApiType: 'messages', isStreamed: true })).toBe(115);
+  it('returns ~140 B/token for Anthropic messages streaming', () => {
+    expect(getEstimatedBytesPerToken({ incomingApiType: 'messages', isStreamed: true })).toBe(140);
     expect(
       getEstimatedBytesPerToken({ outgoingApiType: 'anthropic-messages', isStreamed: true })
-    ).toBe(115);
-    expect(getEstimatedBytesPerToken({ incomingApiType: 'oauth', isStreamed: true })).toBe(115);
+    ).toBe(140);
+    expect(getEstimatedBytesPerToken({ incomingApiType: 'oauth', isStreamed: true })).toBe(140);
   });
 
-  it('returns ~160 B/token for OpenAI chat & responses streaming', () => {
-    expect(getEstimatedBytesPerToken({ incomingApiType: 'chat', isStreamed: true })).toBe(160);
+  it('returns ~215 B/token for OpenAI chat streaming', () => {
+    expect(getEstimatedBytesPerToken({ incomingApiType: 'chat', isStreamed: true })).toBe(215);
     expect(
       getEstimatedBytesPerToken({ outgoingApiType: 'openai-completions', isStreamed: true })
-    ).toBe(160);
+    ).toBe(215);
     expect(
       getEstimatedBytesPerToken({ incomingApiType: 'openai-responses', isStreamed: true })
-    ).toBe(160);
+    ).toBe(200);
+    expect(getEstimatedBytesPerToken({ incomingApiType: 'responses', isStreamed: true })).toBe(200);
     expect(getEstimatedBytesPerToken({ incomingApiType: 'antigravity', isStreamed: true })).toBe(
-      160
+      215
     );
   });
 

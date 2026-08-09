@@ -348,8 +348,13 @@ export function getEstimatedBytesPerToken(options: {
   const apiType = (options.incomingApiType || options.outgoingApiType || '').toLowerCase();
 
   if (apiType.includes('anthropic') || apiType.includes('messages') || apiType === 'oauth') {
-    // Anthropic SSE: `event: content_block_delta\ndata: {"type":...}\n\n` (~115 B/token)
-    return 115;
+    // Anthropic Messages streams average about 140 wire bytes per output token.
+    return 140;
+  }
+
+  if (apiType.includes('responses')) {
+    // Responses estimates use only `.delta` events, excluding lifecycle/tool metadata frames.
+    return 200;
   }
 
   if (
@@ -358,8 +363,8 @@ export function getEstimatedBytesPerToken(options: {
     apiType.includes('responses') ||
     apiType.includes('antigravity')
   ) {
-    // OpenAI SSE: `data: {"id":...,"object":"chat.completion.chunk",...}\n\n` (~160 B/token)
-    return 160;
+    // OpenAI Chat streams average about 215 wire bytes per output token.
+    return 215;
   }
 
   if (apiType.includes('gemini') || apiType.includes('google')) {

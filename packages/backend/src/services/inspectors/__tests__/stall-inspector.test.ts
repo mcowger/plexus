@@ -346,4 +346,44 @@ describe('StallInspector', () => {
       inspector.destroy();
     });
   });
+
+  describe('semantic progress accounting', () => {
+    it('excludes Responses lifecycle events from token-estimate bytes', () => {
+      const inspector = new StallInspector(
+        'req-responses-progress',
+        createConfig({ minBytesPerSecond: null }),
+        abortController
+      );
+      inspector.setProgressApiType('responses');
+
+      const lifecycle = 'event: response.created\ndata: {"type":"response.created"}\n\n';
+      const delta =
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Hi"}\n\n';
+      inspector.write(Buffer.from(lifecycle + delta.slice(0, 24)));
+      inspector.write(Buffer.from(delta.slice(24)));
+
+      const stats = inspector.getStats();
+      expect(stats.bytesReceived).toBe(Buffer.byteLength(lifecycle + delta));
+      expect(stats.semanticBytesReceived).toBe(Buffer.byteLength(delta));
+
+      inspector.destroy();
+    });
+
+    it('uses all streamed bytes for non-Responses formats', () => {
+      const inspector = new StallInspector(
+        'req-chat-progress',
+        createConfig({ minBytesPerSecond: null }),
+        abortController
+      );
+      inspector.setProgressApiType('chat');
+
+      const chunk = Buffer.from('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n');
+      inspector.write(chunk);
+
+      const stats = inspector.getStats();
+      expect(stats.semanticBytesReceived).toBe(chunk.length);
+
+      inspector.destroy();
+    });
+  });
 });

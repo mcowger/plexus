@@ -413,6 +413,7 @@ export async function handleResponse(
     const stallInspector = stallDetectionResult?.stallInspector ?? null;
     if (stallInspector) {
       stallInspector.setRequestId(usageRecord.requestId!);
+      stallInspector.setProgressApiType(apiType);
       usageStorage.registerInFlight(
         usageRecord.requestId!,
         stallInspector,

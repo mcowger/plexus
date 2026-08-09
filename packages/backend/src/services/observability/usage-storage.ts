@@ -17,6 +17,8 @@ export interface ProgressUpdate {
   isStreamed: boolean;
   bytesReceived: number;
   bytesPerSec: number | null;
+  semanticBytesReceived: number;
+  semanticBytesPerSec: number | null;
   state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
   elapsedMs: number;
 }

@@ -1,4 +1,5 @@
 import { PassThrough } from 'stream';
+import { StringDecoder } from 'node:string_decoder';
 import { logger } from '../../utils/logger';
 
 /**
@@ -29,6 +30,8 @@ interface ByteSample {
   timestamp: number;
   /** Cumulative bytes received at this point. */
   cumulativeBytes: number;
+  /** Cumulative bytes from token-producing stream events at this point. */
+  cumulativeSemanticBytes: number;
 }
 
 /**
@@ -68,7 +71,11 @@ export class StallInspector extends PassThrough {
 
   private state: StallState = StallState.DISPATCHED;
   private totalBytes = 0;
+  private semanticBytes = 0;
   private startTime: number;
+  private progressApiType: string | null = null;
+  private responseSseBuffer = '';
+  private readonly responseSseDecoder = new StringDecoder('utf8');
 
   // Ring buffer for sliding window: entries of { timestamp, cumulativeBytes }
   private samples: ByteSample[] = [];
@@ -121,6 +128,14 @@ export class StallInspector extends PassThrough {
     this.requestId = requestId;
   }
 
+  /** Set the client response format used for live token-progress accounting. */
+  setProgressApiType(apiType: string | null | undefined): void {
+    this.progressApiType = apiType?.toLowerCase() ?? null;
+    if (this.totalBytes === 0 && this.isResponsesStream()) {
+      this.semanticBytes = 0;
+    }
+  }
+
   /** Get the current stall config. */
   getConfig(): StallConfig {
     return this.config;
@@ -137,10 +152,19 @@ export class StallInspector extends PassThrough {
       ? chunk.length
       : Buffer.byteLength(chunk, encoding as BufferEncoding);
     this.totalBytes += chunkSize;
+    if (this.isResponsesStream()) {
+      this.consumeResponseChunk(chunk);
+    } else {
+      this.semanticBytes += chunkSize;
+    }
     const now = Date.now();
 
     // Record sample in ring buffer
-    this.samples.push({ timestamp: now, cumulativeBytes: this.totalBytes });
+    this.samples.push({
+      timestamp: now,
+      cumulativeBytes: this.totalBytes,
+      cumulativeSemanticBytes: this.semanticBytes,
+    });
     if (this.samples.length > this.MAX_SAMPLES) {
       this.samples = this.samples.slice(-this.MAX_SAMPLES);
     }
@@ -170,8 +194,61 @@ export class StallInspector extends PassThrough {
   }
 
   override _flush(callback: Function) {
+    if (this.isResponsesStream()) {
+      this.consumeResponseChunk(this.responseSseDecoder.end());
+      this.consumeResponseBlock(this.responseSseBuffer);
+      this.responseSseBuffer = '';
+    }
     this.cleanup();
     callback();
+  }
+
+  private isResponsesStream(): boolean {
+    return this.progressApiType?.includes('responses') ?? false;
+  }
+
+  private consumeResponseChunk(chunk: any): void {
+    const text =
+      typeof chunk === 'string'
+        ? chunk
+        : Buffer.isBuffer(chunk)
+          ? this.responseSseDecoder.write(chunk)
+          : Buffer.from(chunk).toString('utf8');
+    this.responseSseBuffer += text;
+
+    while (true) {
+      const separator = this.responseSseBuffer.match(/\r?\n\r?\n/);
+      if (!separator || separator.index === undefined) return;
+
+      const blockEnd = separator.index + separator[0].length;
+      const block = this.responseSseBuffer.slice(0, blockEnd);
+      this.responseSseBuffer = this.responseSseBuffer.slice(blockEnd);
+      this.consumeResponseBlock(block);
+    }
+  }
+
+  private consumeResponseBlock(block: string): void {
+    if (!block) return;
+
+    const eventName = block.match(/^event:\s*(.+)$/m)?.[1]?.trim();
+    const data = block
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n');
+    let payloadType: string | undefined;
+    if (data) {
+      try {
+        payloadType = JSON.parse(data).type;
+      } catch {
+        // Ignore non-JSON SSE data such as [DONE].
+      }
+    }
+
+    const type = eventName || payloadType;
+    if (type?.endsWith('.delta')) {
+      this.semanticBytes += Buffer.byteLength(block, 'utf8');
+    }
   }
 
   // ─── State transitions ───────────────────────────────────────────
@@ -272,34 +349,42 @@ export class StallInspector extends PassThrough {
     state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
     bytesReceived: number;
     bytesPerSec: number | null;
+    semanticBytesReceived: number;
+    semanticBytesPerSec: number | null;
     elapsedMs: number;
   } {
     const now = Date.now();
-    let bytesPerSec: number | null = null;
-
-    if (this.samples.length >= 2) {
-      const windowStart = now - this.config.windowMs;
-      // Find oldest sample within the window
-      let oldest = this.samples[0]!;
-      for (let i = 1; i < this.samples.length; i++) {
-        if (this.samples[i]!.timestamp >= windowStart) {
-          oldest = this.samples[i - 1]!;
-          break;
-        }
-      }
-      const bytesInWindow = this.totalBytes - oldest.cumulativeBytes;
-      const timeSpanMs = now - oldest.timestamp;
-      if (timeSpanMs > 0) {
-        bytesPerSec = (bytesInWindow / timeSpanMs) * 1000;
-      }
-    }
+    const bytesPerSec = this.calculateRate(now, (sample) => sample.cumulativeBytes);
+    const semanticBytesPerSec = this.calculateRate(now, (sample) => sample.cumulativeSemanticBytes);
 
     return {
       state: this.state as 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED',
       bytesReceived: this.totalBytes,
       bytesPerSec,
+      semanticBytesReceived: this.semanticBytes,
+      semanticBytesPerSec,
       elapsedMs: now - this.startTime,
     };
+  }
+
+  private calculateRate(
+    now: number,
+    getCumulativeBytes: (sample: ByteSample) => number
+  ): number | null {
+    if (this.samples.length < 2) return null;
+
+    const windowStart = now - this.config.windowMs;
+    let oldest = this.samples[0]!;
+    for (let i = 1; i < this.samples.length; i++) {
+      if (this.samples[i]!.timestamp >= windowStart) {
+        oldest = this.samples[i - 1]!;
+        break;
+      }
+    }
+    const currentBytes = getCumulativeBytes(this.samples[this.samples.length - 1]!);
+    const bytesInWindow = currentBytes - getCumulativeBytes(oldest);
+    const timeSpanMs = now - oldest.timestamp;
+    return timeSpanMs > 0 ? (bytesInWindow / timeSpanMs) * 1000 : null;
   }
 
   // ─── Cleanup ──────────────────────────────────────────────────────

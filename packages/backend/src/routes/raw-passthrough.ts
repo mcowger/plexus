@@ -428,6 +428,7 @@ export async function registerRawPassthroughRoutes(
             DEFAULT_STALL_CONFIG,
             abortController
           );
+          stallInspector.setProgressApiType(observedApiType);
           usageStorage.registerInFlight(
             requestId,
             stallInspector,
