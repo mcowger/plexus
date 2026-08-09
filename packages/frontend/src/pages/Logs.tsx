@@ -896,7 +896,15 @@ const DesktopLogRow = React.memo(
                     }}
                   >
                     <CloudDownload size={12} className="text-yellow-400" />
-                    <span>{formatBytes(progress.bytesReceived)}</span>
+                    <span>
+                      {formatBytes(progress.bytesReceived)}
+                      {semanticBytesReceived !== progress.bytesReceived && (
+                        <span title="Bytes from token-producing stream events used for the live token estimate">
+                          {' · '}
+                          {formatBytes(semanticBytesReceived)} token bytes
+                        </span>
+                      )}
+                    </span>
                   </span>
                   {progress.bytesPerSec != null && (
                     <span
@@ -910,21 +918,6 @@ const DesktopLogRow = React.memo(
                     >
                       <Gauge size={12} className="text-text-secondary" />
                       {formatBytes(progress.bytesPerSec)}/s
-                    </span>
-                  )}
-                  {semanticBytesReceived !== progress.bytesReceived && (
-                    <span
-                      style={{
-                        color: 'var(--color-text-secondary)',
-                        fontSize: '0.85em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title="Bytes from token-producing stream events used for the live token estimate"
-                    >
-                      <Zap size={12} className="text-amber-400" />
-                      {formatBytes(semanticBytesReceived)} token bytes
                     </span>
                   )}
                   {estTokensPerSec != null && (
