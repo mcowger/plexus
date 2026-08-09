@@ -57,12 +57,9 @@ The project uses separate Drizzle ORM config files for each database dialect:
 
 When running Drizzle Kit commands, specify the appropriate config file with `--config`.
 
-## Pi Assistant & PR Agent Review
+## Automated PR Review
 
-Plexus uses **Pi Assistant** and **PR Agent** for automated coding assistance and code reviews:
-
-- **Pi Assistant** (`.github/workflows/pi-assistant-issue.yml` and `.github/workflows/pi-assistant-pr.yml`): Triggered by commenting `/pi` on an issue or PR. It uses the `mcowger/pi-action` action to run an AI-agent-driven coding session directly in the repository context to address requested changes. System prompts live in `.github/prompts/pi-assistant-issue.md` and `.github/prompts/pi-assistant-pr.md`.
-- **PR Agent Review** (`.github/workflows/pr-agent-review.yml`): Triggered automatically when non-draft pull requests are opened/reopened/ready for review, or when comments are made. It performs thorough automated code reviews using the `the-pr-agent/pr-agent` action, configured via `.pr_agent.toml`.
+Plexus uses **PR Agent Review** (`.github/workflows/pr-agent-review.yml`) for automated code reviews. It is triggered when non-draft pull requests are opened, reopened, marked ready for review, or updated with comments, and is configured via `.pr_agent.toml`.
 
 ## Code Style
 

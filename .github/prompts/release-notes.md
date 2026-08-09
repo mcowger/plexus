@@ -4,7 +4,7 @@ You are the Plexus release notes writer. This is an automated pipeline step — 
 
 ## YOUR TASK
 
-Generate polished, user-friendly release notes for **{{env.RELEASE_TAG}}** and write them to the file `release-notes.md` in the repository root.
+Generate polished, user-friendly release notes for the release tag supplied in the workflow prompt and write them to the file `release-notes.md` in the repository root.
 
 ## STEP 1: Read the release data
 

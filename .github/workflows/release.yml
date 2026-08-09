@@ -257,20 +257,20 @@ jobs:
 
       - name: Run release notes agent
         id: release_notes_agent
-        uses: mcowger/pi-action@main
+        uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          provider: openrouter
-          model: ${{ vars.LLM_MODEL_ID }}
-          token: ${{ env.LLM_API_KEY }}
-          base_url: ${{ secrets.LLM_API_HOST }}
-          trigger: generate-release-notes
-          load_builtin_extensions: true
-          suppress_final_comment: true
-          export_session_html: true
-          prompt_file: .github/prompts/release-notes.md
+          anthropic_api_key: ${{ env.LLM_API_KEY }}
+          claude_args: |
+            --model ${{ vars.LLM_MODEL_ID }}
+            --max-turns 10
+            --allowedTools "Read,Write"
+          prompt: |
+            Read `.github/prompts/release-notes.md` and follow its instructions exactly.
+            The release tag is `${{ needs.setup.outputs.tag }}`. Do not perform any other work.
         env:
           RELEASE_TAG: ${{ needs.setup.outputs.tag }}
+          ANTHROPIC_BASE_URL: ${{ secrets.LLM_API_HOST }}
 
       - name: Read agent-generated notes
         id: read_notes
@@ -289,15 +289,14 @@ jobs:
             echo 'notes=' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload agent session
-        if: always()
+      - name: Upload Claude execution
+        if: always() && steps.release_notes_agent.outputs.execution_file != ''
         uses: actions/upload-artifact@v7
         with:
-          name: release-notes-session
-          path: ${{ steps.release_notes_agent.outputs.session_html_path }}
+          name: release-notes-execution
+          path: ${{ steps.release_notes_agent.outputs.execution_file }}
           retention-days: 7
           if-no-files-found: ignore
-          archive: false
 
   # ── Build Binaries ──────────────────────────────────────────────────────
   build-binaries:
