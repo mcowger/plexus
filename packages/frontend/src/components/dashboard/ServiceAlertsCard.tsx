@@ -2,7 +2,7 @@ import React from 'react';
 import { Card } from '../ui/Card';
 import { AlertTriangle } from 'lucide-react';
 import type { Cooldown } from '../../lib/api';
-import { formatMsToMinSec } from '@plexus/shared';
+import { formatMsToMinSec, INDEFINITE_COOLDOWN_THRESHOLD_MS } from '@plexus/shared';
 
 interface ServiceAlertsCardProps {
   cooldowns: Cooldown[];
@@ -47,17 +47,22 @@ export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns,
           const [provider, model] = key.split(':');
           const hasAccountId = modelCooldowns.some((c) => c.accountId);
           const maxTime = Math.max(...modelCooldowns.map((c) => c.timeRemainingMs));
-          const timeDisplay = formatMsToMinSec(maxTime);
+          const representative = modelCooldowns.reduce((a, b) =>
+            a.timeRemainingMs >= b.timeRemainingMs ? a : b
+          );
+          const timeDisplay = formatMsToMinSec(maxTime, representative.lastError);
+          const isIndefinite = maxTime >= INDEFINITE_COOLDOWN_THRESHOLD_MS;
+          const prep = isIndefinite ? ' ' : ' for ';
 
           let statusText: string;
           const modelDisplay = model || 'all models';
 
           if (hasAccountId && modelCooldowns.length > 1) {
-            statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown for up to ${timeDisplay}`;
+            statusText = `${modelDisplay} has ${modelCooldowns.length} accounts on cooldown${prep}up to ${timeDisplay}`;
           } else if (hasAccountId && modelCooldowns.length === 1) {
-            statusText = `${modelDisplay} has 1 account on cooldown for ${timeDisplay}`;
+            statusText = `${modelDisplay} has 1 account on cooldown${prep}${timeDisplay}`;
           } else {
-            statusText = `${modelDisplay} is on cooldown for ${timeDisplay}`;
+            statusText = `${modelDisplay} is on cooldown${prep}${timeDisplay}`;
           }
 
           return (

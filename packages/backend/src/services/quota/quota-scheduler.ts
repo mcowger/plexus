@@ -6,6 +6,7 @@ import type { MeterCheckResult, Meter } from '../../types/meter';
 import { toDbTimestampMs } from '../../utils/normalize';
 import { eq, desc, gte, and } from 'drizzle-orm';
 import { CooldownManager } from '../runtime/cooldown-manager';
+import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
 
 const DEFAULT_EXHAUSTION_THRESHOLD = 99;
 
@@ -165,15 +166,15 @@ export class QuotaScheduler {
     }
 
     if (isExhausted) {
-      const intervalMs = (config.intervalMinutes ?? 10) * 60 * 1000;
-      const fallbackMs = Math.max(60_000, intervalMs);
       const durationMs =
-        latestResetMs !== null ? Math.max(0, latestResetMs - Date.now()) : fallbackMs;
+        latestResetMs !== null ? Math.max(0, latestResetMs - Date.now()) : INDEFINITE_COOLDOWN_MS;
 
       logger.info(
         `Provider '${provider}' quota exhausted` +
           ` (meter: ${exhaustedMeterLabel}, threshold: ${exhaustionThreshold}%, checker: ${result.checkerId}).` +
-          ` Injecting provider-wide cooldown for ${Math.round(durationMs / 1000)}s.`
+          (latestResetMs !== null
+            ? ` Injecting provider-wide cooldown for ${Math.round(durationMs / 1000)}s.`
+            : ` Injecting provider-wide indefinite cooldown until reset/balance recovery.`)
       );
       await cooldownManager.markProviderFailure(
         provider,

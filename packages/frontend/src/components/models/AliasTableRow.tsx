@@ -4,7 +4,7 @@ import { CopyButton } from '../ui/CopyButton';
 import { Badge } from '../ui/Badge';
 import { Switch } from '../ui/Switch';
 import { Alias, Provider, Cooldown } from '../../lib/api';
-import { formatMsToMinSec } from '@plexus/shared';
+import { formatMsToMinSec, INDEFINITE_COOLDOWN_THRESHOLD_MS } from '@plexus/shared';
 import { SELECTOR_LABELS } from '../../lib/selectors';
 import { getAliasProviderLabels, getAliasTargetCount } from '../../lib/modelList';
 import { dedupeStrings } from '../../lib/modelOptions';
@@ -161,8 +161,11 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                   );
                   const isCoolingDown = !!cooldown;
                   const cooldownDisplay = cooldown
-                    ? formatMsToMinSec(cooldown.timeRemainingMs)
+                    ? formatMsToMinSec(cooldown.timeRemainingMs, cooldown.lastError)
                     : '';
+                  const isIndefinite =
+                    cooldown && cooldown.timeRemainingMs >= INDEFINITE_COOLDOWN_THRESHOLD_MS;
+                  const titlePrefix = isIndefinite ? 'On cooldown ' : 'On cooldown for ';
 
                   return (
                     <React.Fragment key={`${t.provider}-${t.model}-${targetIdx}`}>
@@ -174,7 +177,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                         {isCoolingDown && (
                           <div
                             className="flex items-center gap-1 text-warning font-medium text-[11px]"
-                            title={`On cooldown for ${cooldownDisplay}`}
+                            title={`${titlePrefix}${cooldownDisplay}`}
                           >
                             <Clock size={12} />
                             <span>{cooldownDisplay}</span>

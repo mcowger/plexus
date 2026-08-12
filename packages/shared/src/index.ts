@@ -41,7 +41,12 @@ export type {
 } from './model-params';
 
 // Cooldown time formatting utilities
-export { formatMinutesToMinSec, formatMsToMinSec } from './format-time';
+export {
+  formatMinutesToMinSec,
+  formatMsToMinSec,
+  INDEFINITE_COOLDOWN_MS,
+  INDEFINITE_COOLDOWN_THRESHOLD_MS,
+} from './format-time';
 
 // Quota ranking (most-constrained selection) shared by backend and frontend
 export { constrainedRatio, mostConstrained, sortMostConstrainedFirst } from './quota-ranking';

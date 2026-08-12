@@ -8,6 +8,7 @@ import { ModelTypeBadge } from './ModelTypeBadge';
 import type { Alias, Provider, Cooldown } from '../../lib/api';
 import { getAliasProviderLabels, getAliasTargetCount } from '../../lib/modelList';
 import { dedupeStrings } from '../../lib/modelOptions';
+import { formatMsToMinSec } from '@plexus/shared';
 
 interface Props {
   alias: Alias;
@@ -154,7 +155,9 @@ export const AliasMobileCard: React.FC<Props> = ({
                 const cooldown = cooldowns.find(
                   (c) => c.provider === t.provider && c.model === t.model && !c.accountId
                 );
-                const cooldownMinutes = cooldown ? Math.ceil(cooldown.timeRemainingMs / 60000) : 0;
+                const cooldownText = cooldown
+                  ? formatMsToMinSec(cooldown.timeRemainingMs, cooldown.lastError)
+                  : '';
 
                 return (
                   <div
@@ -178,7 +181,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                         )}
                         {cooldown && (
                           <div className="mt-1 text-[11px] font-medium text-warning">
-                            Cooldown {cooldownMinutes}m
+                            Cooldown ({cooldownText})
                           </div>
                         )}
                         {testState?.showResult && testState.message && (

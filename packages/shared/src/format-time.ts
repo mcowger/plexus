@@ -1,3 +1,6 @@
+export const INDEFINITE_COOLDOWN_MS = 100 * 365 * 24 * 60 * 60 * 1000;
+export const INDEFINITE_COOLDOWN_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
+
 /**
  * Format a fractional number of minutes into a human-readable "min:sec" string.
  *
@@ -39,11 +42,25 @@ export function formatMinutesToMinSec(minutes: number): string {
  *   90000   → "1m 30s"
  *
  * @param ms - The duration in milliseconds
- * @returns A formatted string like "2m", "30s", or "1m 30s"
+ * @param lastError - Optional error message to specialize indefinite cooldown label
+ * @returns A formatted string like "2m", "30s", "1m 30s", or "until positive balance"
  */
-export function formatMsToMinSec(ms: number): string {
+export function formatMsToMinSec(ms: number, lastError?: string): string {
   if (!Number.isFinite(ms) || ms <= 0) {
     return '0s';
+  }
+
+  if (ms >= INDEFINITE_COOLDOWN_THRESHOLD_MS) {
+    const err = lastError?.toLowerCase() ?? '';
+    if (
+      err.includes('balance') ||
+      err.includes('credit') ||
+      err.includes('payment') ||
+      err.includes('account')
+    ) {
+      return 'until positive balance';
+    }
+    return 'until reset';
   }
 
   const totalSeconds = Math.ceil(ms / 1000);

@@ -446,7 +446,7 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
     expect(isHealthy).toBe(false);
   });
 
-  it('triggers provider cooldown when a balance meter without resetsAt is exhausted', async () => {
+  it('triggers provider indefinite cooldown when a balance meter without resetsAt is exhausted', async () => {
     const scheduler = QuotaScheduler.getInstance() as any;
     const config = makeConfig({ provider: PROVIDER, intervalMinutes: 10 });
     scheduler.configs.set('balance-checker', config);
@@ -474,6 +474,12 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
 
     const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
     expect(isHealthy).toBe(false);
+
+    // Verify cooldown is indefinite (remaining time is > 30 days)
+    const cooldowns = CooldownManager.getInstance().getCooldowns();
+    const kiloCooldown = cooldowns.find((c) => c.provider === PROVIDER);
+    expect(kiloCooldown).toBeDefined();
+    expect(kiloCooldown!.timeRemainingMs).toBeGreaterThan(30 * 24 * 60 * 60 * 1000);
 
     // When balance recovers to positive, applying a healthy result clears cooldown
     const recoveredResult: MeterCheckResult = {

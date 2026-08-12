@@ -118,7 +118,7 @@ import {
   formatTokens,
   formatTPS,
 } from '../../../lib/format';
-import { formatMsToMinSec } from '@plexus/shared';
+import { formatMsToMinSec, INDEFINITE_COOLDOWN_THRESHOLD_MS } from '@plexus/shared';
 import { clsx } from 'clsx';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../../contexts/ToastContext';
@@ -2281,7 +2281,18 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                         const representative = modelCooldowns.reduce((a, b) =>
                           a.timeRemainingMs >= b.timeRemainingMs ? a : b
                         );
-                        const timeDisplay = formatMsToMinSec(maxTime);
+                        const timeDisplay = formatMsToMinSec(maxTime, representative.lastError);
+                        const isIndefinite =
+                          representative.timeRemainingMs >= INDEFINITE_COOLDOWN_THRESHOLD_MS;
+                        const lastErr = representative.lastError?.toLowerCase() ?? '';
+                        const expiryStr = isIndefinite
+                          ? lastErr.includes('balance') ||
+                            lastErr.includes('credit') ||
+                            lastErr.includes('payment') ||
+                            lastErr.includes('account')
+                            ? 'Until positive balance'
+                            : 'Until reset'
+                          : new Date(representative.expiry).toLocaleString();
                         return (
                           <CooldownRow
                             key={key}
@@ -2290,7 +2301,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
                             timeDisplay={timeDisplay}
                             consecutiveFailures={representative.consecutiveFailures}
                             lastError={representative.lastError}
-                            expiryStr={new Date(representative.expiry).toLocaleString()}
+                            expiryStr={expiryStr}
                             onClear={() => handleClearSingleCooldown(provider, model)}
                           />
                         );
