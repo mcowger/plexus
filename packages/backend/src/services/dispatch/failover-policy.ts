@@ -1,5 +1,5 @@
 export function isRetryableStatus(statusCode: number, retryableStatusCodes: number[]): boolean {
-  return retryableStatusCodes.includes(statusCode);
+  return statusCode === 402 || retryableStatusCodes.includes(statusCode);
 }
 
 /** Determines whether an OAuth failure is safe to retry on another target. */
@@ -9,7 +9,12 @@ export function isRetryableOAuthError(error: any): boolean {
   const errorMessage = error.message?.toLowerCase() || '';
   const statusCode = error.status || error.statusCode;
 
-  if (!statusCode || (statusCode >= 500 && statusCode < 600) || statusCode === 429) {
+  if (
+    !statusCode ||
+    (statusCode >= 500 && statusCode < 600) ||
+    statusCode === 429 ||
+    statusCode === 402
+  ) {
     return true;
   }
 

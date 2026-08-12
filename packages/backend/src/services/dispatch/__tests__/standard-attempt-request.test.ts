@@ -5,6 +5,7 @@ import {
   executeStandardAttempt,
   type StandardAttemptContext,
 } from '../standard-attempt-request';
+import { isRetryableStatus, isRetryableOAuthError } from '../failover-policy';
 import type { RequestManagerHost } from '../request-manager';
 import type { RouteResult } from '../../routing/router';
 import type { UnifiedChatRequest } from '../../../types/unified';
@@ -317,5 +318,21 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     // ...and the ORIGINAL payload (which can share `messages` with the
     // long-lived request) was never mutated in place.
     expect(providerPayload).toEqual(snapshot);
+  });
+});
+
+describe('failover-policy 402 status code handling', () => {
+  it('treats 402 Payment Required as retryable regardless of configured retryable status codes', () => {
+    expect(isRetryableStatus(402, [])).toBe(true);
+    expect(isRetryableStatus(402, [500, 502])).toBe(true);
+    expect(isRetryableStatus(500, [500])).toBe(true);
+    expect(isRetryableStatus(400, [500])).toBe(false);
+  });
+
+  it('treats 402 Payment Required as retryable for OAuth errors', () => {
+    expect(isRetryableOAuthError({ status: 402, message: 'Low balance' })).toBe(true);
+    expect(isRetryableOAuthError({ statusCode: 402, message: 'Payment required' })).toBe(true);
+    expect(isRetryableOAuthError({ status: 429, message: 'Rate limit' })).toBe(true);
+    expect(isRetryableOAuthError({ status: 401, message: 'Unauthorized' })).toBe(false);
   });
 });
