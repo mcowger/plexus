@@ -14,7 +14,7 @@ import {
 import { QuotaEnforcer } from '../quota/quota-enforcer';
 import { buildQuotaExceededError } from '../quota/quota-middleware';
 import { logger } from '../../utils/logger';
-import { QUOTA_ERROR_PATTERNS } from '../../utils/constants';
+import { QUOTA_ERROR_PATTERNS, DEADLINE_EXPIRED_PATTERNS } from '../../utils/constants';
 import { CooldownManager } from '../runtime/cooldown-manager';
 import { StickySessionManager } from '../routing/sticky-session-manager';
 import { RouteResult } from '../routing/router';
@@ -717,13 +717,25 @@ export class Dispatcher {
       );
     }
 
+    const isDeadlineExpired = DEADLINE_EXPIRED_PATTERNS.some((p) =>
+      errorText.toLowerCase().includes(p.toLowerCase())
+    );
+
+    if (isDeadlineExpired) {
+      logger.warn(
+        `Detected deadline expired error in response from ${route.provider}/${route.model} — skipping cooldown`
+      );
+    }
+
     // Trigger cooldown for all provider errors except:
     // - 413 (payload too large) and 422 (unprocessable entity): caller errors, not provider failures
     // - 400 without a quota pattern: likely a request validation error, not a provider failure
+    // - Deadline expired errors: transient request deadline expiration, not a provider failure
     const isCallerError =
       response.status === 413 ||
       response.status === 422 ||
-      (response.status === 400 && !isQuota400);
+      (response.status === 400 && !isQuota400) ||
+      isDeadlineExpired;
 
     if (!isCallerError) {
       let cooldownDuration: number | undefined;

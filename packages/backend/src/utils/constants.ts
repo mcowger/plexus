@@ -17,6 +17,16 @@ export const QUOTA_ERROR_PATTERNS = [
 ];
 
 /**
+ * Patterns to detect deadline expired / transient timeout errors from providers (e.g. Google).
+ * These are transient request execution timeouts and should not trigger provider cooldowns.
+ */
+export const DEADLINE_EXPIRED_PATTERNS = [
+  'deadline expired',
+  'deadline_exceeded',
+  'deadline exceeded',
+];
+
+/**
  * Default prompt for vision-to-text conversion.
  */
 export const DEFAULT_VISION_DESCRIPTION_PROMPT = `Please provide a comprehensive and detailed description of this image for a highly intelligent text-only language model.

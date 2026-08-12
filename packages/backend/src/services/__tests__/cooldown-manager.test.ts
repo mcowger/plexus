@@ -226,6 +226,19 @@ describe('CooldownManager', () => {
       expect(cooldowns.some((c) => c.provider === 'synthetic_new')).toBe(false);
     });
 
+    test('does not create cooldown when lastError indicates deadline expired', async () => {
+      const cm = CooldownManager.getInstance();
+      await cm.markProviderFailure(
+        'google-s',
+        'gemini-3.6-flash',
+        undefined,
+        '503 Deadline expired before operation could complete.'
+      );
+
+      const cooldowns = cm.getCooldowns();
+      expect(cooldowns.some((c) => c.provider === 'google-s')).toBe(false);
+    });
+
     test('filters existing cooldowns when provider switches to disable_cooldown=true', async () => {
       const cm = CooldownManager.getInstance();
 

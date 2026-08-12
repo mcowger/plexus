@@ -4,6 +4,7 @@ import { lt, eq, sql, and, desc } from 'drizzle-orm';
 import { getConfig } from '../../config';
 import { DebugManager } from '../observability/debug-manager';
 import { getCurrentRequestId } from '../observability/request-context';
+import { DEADLINE_EXPIRED_PATTERNS } from '../../utils/constants';
 
 export interface Target {
   provider: string;
@@ -188,6 +189,16 @@ export class CooldownManager {
     if (this.isCooldownDisabledForProvider(provider)) {
       logger.debug(
         `Skipping cooldown for provider '${provider}' model '${model}' (disable_cooldown=true)`
+      );
+      return;
+    }
+
+    if (
+      lastError &&
+      DEADLINE_EXPIRED_PATTERNS.some((p) => lastError.toLowerCase().includes(p.toLowerCase()))
+    ) {
+      logger.debug(
+        `Skipping cooldown for provider '${provider}' model '${model}' (deadline expired error)`
       );
       return;
     }

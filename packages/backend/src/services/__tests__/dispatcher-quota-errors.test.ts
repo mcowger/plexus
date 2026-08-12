@@ -3,7 +3,7 @@ import { Dispatcher } from '../dispatch/dispatcher';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { CooldownManager } from '../runtime/cooldown-manager';
-import { QUOTA_ERROR_PATTERNS } from '../../utils/constants';
+import { QUOTA_ERROR_PATTERNS, DEADLINE_EXPIRED_PATTERNS } from '../../utils/constants';
 
 // @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here.  With isolate: false all files share one
@@ -292,5 +292,52 @@ describe('Dispatcher Quota Error Detection', () => {
     expect(QUOTA_ERROR_PATTERNS).toContain('quota exceeded');
     expect(QUOTA_ERROR_PATTERNS).toContain('out of credits');
     expect(QUOTA_ERROR_PATTERNS).toContain('insufficient balance');
+  });
+
+  test('503 error with "Deadline expired before operation could complete." does NOT trigger cooldown', async () => {
+    fetchMock.mockImplementation(async () =>
+      errorResponse(503, 'Deadline expired before operation could complete.')
+    );
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+      throw new Error('expected dispatch to fail');
+    } catch (error: any) {
+      expect(error.message).toContain('All targets failed');
+      expect(error.routingContext?.attemptCount).toBe(2);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    }
+
+    // Verify NO cooldown was set for either provider (deadline expired is a transient request error, not provider health issue)
+    const isP1Healthy = await CooldownManager.getInstance().isProviderHealthy('p1', 'model-1');
+    const isP2Healthy = await CooldownManager.getInstance().isProviderHealthy('p2', 'model-2');
+    expect(isP1Healthy).toBe(true);
+    expect(isP2Healthy).toBe(true);
+  });
+
+  test('500 error with "deadline_exceeded" pattern does NOT trigger cooldown', async () => {
+    fetchMock.mockImplementation(async () =>
+      errorResponse(500, 'DEADLINE_EXCEEDED: upstream request deadline expired')
+    );
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+      throw new Error('expected dispatch to fail');
+    } catch (error: any) {
+      expect(error.message).toContain('All targets failed');
+    }
+
+    const isP1Healthy = await CooldownManager.getInstance().isProviderHealthy('p1', 'model-1');
+    expect(isP1Healthy).toBe(true);
+  });
+
+  test('all deadline expired error patterns are defined', () => {
+    expect(DEADLINE_EXPIRED_PATTERNS).toContain('deadline expired');
+    expect(DEADLINE_EXPIRED_PATTERNS).toContain('deadline_exceeded');
+    expect(DEADLINE_EXPIRED_PATTERNS).toContain('deadline exceeded');
   });
 });
