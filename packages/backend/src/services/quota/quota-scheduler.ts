@@ -140,12 +140,20 @@ export class QuotaScheduler {
     const cooldownManager = CooldownManager.getInstance();
     const provider = result.provider;
 
+    let isExhausted = false;
     let latestResetMs: number | null = null;
     let exhaustedMeterLabel: string | null = null;
 
     for (const meter of result.meters) {
       const util = meter.utilizationPercent;
-      if (typeof util === 'number' && util >= exhaustionThreshold) {
+      const utilExhausted = typeof util === 'number' && util >= exhaustionThreshold;
+      const statusExhausted = meter.status === 'exhausted';
+
+      if (utilExhausted || statusExhausted) {
+        isExhausted = true;
+        if (!exhaustedMeterLabel) {
+          exhaustedMeterLabel = meter.label;
+        }
         const resetMs = meter.resetsAt ? new Date(meter.resetsAt).getTime() : null;
         if (resetMs !== null && resetMs > Date.now()) {
           if (latestResetMs === null || resetMs > latestResetMs) {
@@ -156,8 +164,12 @@ export class QuotaScheduler {
       }
     }
 
-    if (latestResetMs !== null) {
-      const durationMs = Math.max(0, latestResetMs - Date.now());
+    if (isExhausted) {
+      const intervalMs = (config.intervalMinutes ?? 10) * 60 * 1000;
+      const fallbackMs = Math.max(60_000, intervalMs);
+      const durationMs =
+        latestResetMs !== null ? Math.max(0, latestResetMs - Date.now()) : fallbackMs;
+
       logger.info(
         `Provider '${provider}' quota exhausted` +
           ` (meter: ${exhaustedMeterLabel}, threshold: ${exhaustionThreshold}%, checker: ${result.checkerId}).` +

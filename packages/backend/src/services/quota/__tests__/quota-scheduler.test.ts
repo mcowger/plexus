@@ -17,13 +17,16 @@ import { registerSpy } from '../../../../test/test-utils';
 const CHECKER_ID = 'quota-persistence-checker';
 
 const makeConfig = (
-  overrides: Partial<{ maxUtilizationPercent: number }> & { id?: string; provider?: string } = {}
+  overrides: Partial<{ maxUtilizationPercent: number; intervalMinutes: number }> & {
+    id?: string;
+    provider?: string;
+  } = {}
 ): QuotaConfig => ({
   id: overrides.id ?? CHECKER_ID,
   provider: overrides.provider ?? 'test-provider',
   type: 'synthetic',
   enabled: true,
-  intervalMinutes: 60,
+  intervalMinutes: overrides.intervalMinutes ?? 60,
   options: {
     ...(overrides.maxUtilizationPercent !== undefined
       ? { maxUtilizationPercent: overrides.maxUtilizationPercent }
@@ -440,6 +443,88 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
       lenientConfig
     );
     isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+    expect(isHealthy).toBe(false);
+  });
+
+  it('triggers provider cooldown when a balance meter without resetsAt is exhausted', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    const config = makeConfig({ provider: PROVIDER, intervalMinutes: 10 });
+    scheduler.configs.set('balance-checker', config);
+
+    const balanceResult: MeterCheckResult = {
+      checkerId: 'balance-checker',
+      checkerType: 'kilo',
+      provider: PROVIDER,
+      checkedAt: new Date().toISOString(),
+      success: true,
+      meters: [
+        {
+          key: 'balance',
+          label: 'Account balance',
+          kind: 'balance',
+          unit: 'usd',
+          remaining: -0.168363,
+          utilizationPercent: 100,
+          status: 'exhausted',
+        },
+      ],
+    };
+
+    await scheduler.applyCooldownsFromResult(balanceResult, config);
+
+    const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+    expect(isHealthy).toBe(false);
+
+    // When balance recovers to positive, applying a healthy result clears cooldown
+    const recoveredResult: MeterCheckResult = {
+      ...balanceResult,
+      meters: [
+        {
+          key: 'balance',
+          label: 'Account balance',
+          kind: 'balance',
+          unit: 'usd',
+          remaining: 10.0,
+          utilizationPercent: 'not_applicable',
+          status: 'ok',
+        },
+      ],
+    };
+
+    await scheduler.applyCooldownsFromResult(recoveredResult, config);
+    const isHealthyAfterRecovery = await CooldownManager.getInstance().isProviderHealthy(
+      PROVIDER,
+      ''
+    );
+    expect(isHealthyAfterRecovery).toBe(true);
+  });
+
+  it('triggers provider cooldown when allowance meter without resetsAt is exhausted', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    const config = makeConfig({ provider: PROVIDER, intervalMinutes: 5 });
+    scheduler.configs.set('allowance-checker', config);
+
+    const result: MeterCheckResult = {
+      checkerId: 'allowance-checker',
+      checkerType: 'synthetic',
+      provider: PROVIDER,
+      checkedAt: new Date().toISOString(),
+      success: true,
+      meters: [
+        {
+          key: 'quota',
+          label: 'Usage quota',
+          kind: 'allowance',
+          unit: 'requests',
+          utilizationPercent: 100,
+          status: 'exhausted',
+        },
+      ],
+    };
+
+    await scheduler.applyCooldownsFromResult(result, config);
+
+    const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
     expect(isHealthy).toBe(false);
   });
 });
