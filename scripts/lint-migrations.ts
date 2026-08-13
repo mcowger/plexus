@@ -1,6 +1,11 @@
 #!/usr/bin/env bun
-import { readdirSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import {
+  loadJournal,
+  loadPreviousSnapshot,
+  validateTableRecreationInserts,
+} from './lib/sqlite-migration-rewrite';
 
 const MIGRATION_DIRS = [
   'packages/backend/drizzle/migrations',
@@ -241,3 +246,67 @@ if (hasError) {
 }
 
 console.log('Migration naming looks good.');
+
+// Second pass: validate SQLite table-recreation migrations don't reference
+// columns absent from the source snapshot. Under SQLite's double-quoted-string
+// (DQS) misfeature such a reference silently writes the literal column name
+// into every row (data corruption). `bun run generate-migrations` rewrites
+// these to NULL automatically; this lint is the CI safety net that catches
+// any migration that slips through (e.g. hand-authored or stale).
+validateRecreationInserts();
+
+function validateRecreationInserts(): void {
+  for (const dir of MIGRATION_DIRS) {
+    const fullDir = join(process.cwd(), dir);
+    let sqlFiles: string[];
+    try {
+      sqlFiles = readdirSync(fullDir)
+        .filter((f) => f.endsWith('.sql'))
+        .sort();
+    } catch {
+      continue;
+    }
+    if (sqlFiles.length === 0) continue;
+
+    let journal;
+    try {
+      journal = loadJournal(fullDir);
+    } catch (e) {
+      console.error(`Error loading migration journal in ${dir}: ${String(e)}`);
+      hasError = true;
+      continue;
+    }
+
+    for (const file of sqlFiles) {
+      const tag = file.replace(/\.sql$/, '');
+      let prevSnapshot;
+      try {
+        prevSnapshot = loadPreviousSnapshot(fullDir, journal, tag);
+      } catch (e) {
+        console.error(`Error loading previous snapshot for ${file}: ${String(e)}`);
+        hasError = true;
+        continue;
+      }
+      const sql = readFileSync(join(fullDir, file), 'utf8');
+      const offenses = validateTableRecreationInserts(sql, file, prevSnapshot);
+      for (const o of offenses) {
+        console.error(
+          `Error: SQLite table-recreation migration ${file} references columns ` +
+            `absent from its source table ${o.sourceTable}: ${o.absentColumns.join(', ')}.\n` +
+            '  Under SQLite DQS this silently writes the literal column name into every row. ' +
+            'Use NULL for any column new to the source table.'
+        );
+        hasError = true;
+      }
+    }
+  }
+
+  if (hasError) {
+    console.error(
+      '\nRe-run `bun run generate-migrations` to auto-rewrite table-recreation INSERT...SELECT statements.'
+    );
+    process.exit(1);
+  }
+
+  console.log('SQLite table-recreation INSERT...SELECT migrations look safe.');
+}

@@ -848,6 +848,76 @@ export class ConfigRepository {
     return Number(affected);
   }
 
+  /**
+   * One-time startup repair for databases corrupted by the buggy
+   * `model_alias_targets` table-recreation migration (alias-as-fallback-target).
+   *
+   * Background: the generated SQLite migration added the `target_alias_slug`
+   * column in the same table-recreation step that dropped NOT NULL on
+   * `provider_slug`/`model_name`. drizzle-kit's `INSERT ... SELECT` referenced
+   * the new column name on the source table, where it did not exist. Under
+   * SQLite's double-quoted-string misfeature that identifier was silently
+   * treated as a **string literal**, so every pre-existing concrete target row
+   * ended up with `target_alias_slug = 'target_alias_slug'` instead of NULL.
+   * On load, `rowToModelConfig` then mistook each concrete target for an
+   * alias-reference, discarding its provider/model — breaking every alias.
+   *
+   * This nulls the corrupt literal value, but ONLY for rows that still carry a
+   * concrete provider+model (the signature of a corrupted concrete target, not
+   * a legitimate fallback-alias reference). It is idempotent: a second run finds
+   * nothing to fix.
+   *
+   * Returns the number of rows repaired.
+   */
+  async repairCorruptedAliasFallbackSlugs(): Promise<number> {
+    const schema = this.schema();
+    // Guard: only run when the column exists (it always does post-migration,
+    // but this keeps the repair a no-op on schemas that pre-date the feature).
+    const hasColumn = await this.hasColumn('model_alias_targets', 'target_alias_slug');
+    if (!hasColumn) return 0;
+
+    const result = await this.db()
+      .update(schema.modelAliasTargets)
+      .set({ targetAliasSlug: null })
+      .where(
+        sql`${schema.modelAliasTargets.targetAliasSlug} = 'target_alias_slug'
+          AND ${schema.modelAliasTargets.providerSlug} IS NOT NULL
+          AND ${schema.modelAliasTargets.modelName} IS NOT NULL`
+      );
+    const affected =
+      (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0;
+    return Number(affected);
+  }
+
+  /**
+   * Best-effort check for whether a column exists on a table. Returns true if
+   * the column is present (or introspection is unavailable), so callers can
+   * degrade safely to "column exists" rather than failing startup.
+   */
+  private async hasColumn(table: string, column: string): Promise<boolean> {
+    const dialect = getCurrentDialect();
+    try {
+      if (dialect === 'sqlite') {
+        const rows = (await this.db().all(sql`PRAGMA table_info(${sql.raw(table)})`)) as Array<{
+          name?: string;
+        }>;
+        return rows.some((r) => r.name === column);
+      }
+      // Postgres was never affected (its migration used ALTER COLUMN), but keep
+      // the guard symmetric.
+      const rows = (await this.db().all(sql`
+        SELECT column_name AS name
+        FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column}
+      `)) as Array<{ name?: string }>;
+      return rows.length > 0;
+    } catch {
+      // If introspection fails, assume the column exists so we don't block
+      // startup; the UPDATE simply matches nothing on affected rows.
+      return true;
+    }
+  }
+
   async saveAlias(slug: string, config: ModelConfig): Promise<void> {
     const schema = this.schema();
     const timestamp = now();

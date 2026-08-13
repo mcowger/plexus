@@ -2,6 +2,14 @@
 import { $ } from 'bun';
 import { parseArgs } from 'util';
 import { execSync } from 'node:child_process';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  loadJournal,
+  loadPreviousSnapshot,
+  rewriteTableRecreationInserts,
+  validateTableRecreationInserts,
+} from './lib/sqlite-migration-rewrite';
 
 const VALID_NAME_REGEX = /^[a-z][a-z0-9_]*$/;
 
@@ -63,13 +71,85 @@ if (!VALID_NAME_REGEX.test(name)) {
   process.exit(1);
 }
 
+// Capture the set of SQLite migration files *before* generation so we can
+// post-process only the freshly generated one(s).
+const SQLITE_MIGRATIONS_DIR = join('packages', 'backend', 'drizzle', 'migrations');
+const beforeSqlite = new Set(listSqlFiles(SQLITE_MIGRATIONS_DIR));
+
 console.log(`Generating SQLite migrations with name: ${name}`);
 await $`cd packages/backend && node node_modules/drizzle-kit/bin.cjs generate --name ${name} --config drizzle.config.sqlite.ts`;
+
+// drizzle-kit's SQLite table-recreation codegen references new columns in the
+// `INSERT ... SELECT` that don't exist on the source table. Under SQLite's
+// double-quoted-string misfeature this silently writes the literal column
+// name into every row. Rewrite those SELECT terms to NULL and validate.
+postProcessSqliteMigrations(SQLITE_MIGRATIONS_DIR, beforeSqlite);
 
 console.log(`Generating Postgres migrations with name: ${name}`);
 await $`cd packages/backend && node node_modules/drizzle-kit/bin.cjs generate --name ${name} --config drizzle.config.postgres.ts`;
 
 console.log('Done!');
+
+/** List `*.sql` filenames in a migrations directory (names only). */
+function listSqlFiles(dir: string): string[] {
+  try {
+    return readdirSync(dir).filter((f) => f.endsWith('.sql'));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rewrite + validate freshly generated SQLite migration files so table
+ * recreations never SELECT a column absent from the source snapshot.
+ *
+ * This guards against the SQLite double-quoted-string data-corruption bug
+ * where `INSERT INTO __new_t (..., "newcol", ...) SELECT ..., "newcol", ... FROM t`
+ * silently fills `newcol` with the literal string 'newcol'.
+ */
+function postProcessSqliteMigrations(dir: string, before: Set<string>): void {
+  const after = listSqlFiles(dir);
+  const newFiles = after.filter((f) => !before.has(f));
+  if (newFiles.length === 0) return;
+
+  const journal = loadJournal(dir);
+
+  for (const file of newFiles) {
+    const filePath = join(dir, file);
+    const original = readFileSync(filePath, 'utf8');
+    // The migration tag is the filename without `.sql`.
+    const tag = file.replace(/\.sql$/, '');
+    const prevSnapshot = loadPreviousSnapshot(dir, journal, tag);
+
+    const rewritten = rewriteTableRecreationInserts(original, prevSnapshot);
+    if (rewritten !== original) {
+      writeFileSync(filePath, rewritten);
+      console.log(
+        `Rewrote table-recreation INSERT...SELECT in ${file} (NULL for source-absent columns)`
+      );
+    }
+
+    // Fail generation if anything dangerous survives the rewrite.
+    const offenses = validateTableRecreationInserts(
+      readFileSync(filePath, 'utf8'),
+      file,
+      prevSnapshot
+    );
+    if (offenses.length > 0) {
+      console.error(
+        `Error: SQLite table-recreation migration ${file} still references ` +
+          'columns absent from the source snapshot (would silently corrupt data under SQLite DQS):'
+      );
+      for (const o of offenses) {
+        console.error(`  table ${o.sourceTable}: ${o.absentColumns.join(', ')}`);
+      }
+      console.error(
+        'Fix the migration so the INSERT...SELECT uses NULL for any column new to the source table.'
+      );
+      process.exit(1);
+    }
+  }
+}
 
 /**
  * Derive a descriptive migration name from a git branch name.

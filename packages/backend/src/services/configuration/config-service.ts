@@ -123,6 +123,28 @@ export class ConfigService {
   }
 
   /**
+   * One-time startup repair for databases corrupted by the buggy
+   * `model_alias_targets` table-recreation migration (alias-as-fallback-target).
+   *
+   * See `ConfigRepository.repairCorruptedAliasFallbackSlugs()` for the full
+   * background. Idempotent: a second run repairs nothing. On any repair the
+   * in-memory config cache is rebuilt so the running process stops serving the
+   * corrupted alias-target mappings immediately.
+   */
+  async repairCorruptedAliasFallbackSlugs(): Promise<number> {
+    const repaired = await this.repo.repairCorruptedAliasFallbackSlugs();
+    if (repaired > 0) {
+      logger.warn(
+        `Repaired ${repaired} model_alias_targets row(s) corrupted by the ` +
+          'alias-as-fallback-target migration (target_alias_slug was set to the ' +
+          'literal column name); provider/model targets restored.'
+      );
+      await this.executeRebuild();
+    }
+    return repaired;
+  }
+
+  /**
    * One-time startup cleanup: Gemini CLI / Antigravity OAuth were removed.
    * Any persisted provider that still references them is
    * dead, unroutable config. Drop those provider records (cascade) and delete
