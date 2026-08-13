@@ -18,7 +18,7 @@
     "@earendil-works/pi-ai": "0.83.0",
     "@fastify/bearer-auth": "^10.1.2",
     "@fastify/cors": "^11.3.0",
-    "@fastify/formbody": "^8.0.2",
+    "@fastify/formbody": "^9.0.0",
     "@fastify/multipart": "^10.1.0",
     "@fastify/static": "^10.1.2",
     "@google/genai": "^2.15.0",
