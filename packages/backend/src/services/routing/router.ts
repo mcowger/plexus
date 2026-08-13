@@ -64,11 +64,14 @@ async function filterGroupTargets(
   if (groupTargets.length === 0) return [];
 
   // 1. Filter out disabled targets and disabled providers
-  const enabledTargets = groupTargets.filter((target) => {
-    if (target.enabled === false) return false;
-    const providerConfig = config.providers[target.provider];
-    return providerConfig && providerConfig.enabled !== false;
-  });
+  const enabledTargets = groupTargets.filter(
+    (target): target is ModelTarget & { provider: string; model: string } => {
+      if (target.enabled === false) return false;
+      if (!target.provider || !target.model) return false;
+      const providerConfig = config.providers[target.provider];
+      return !!providerConfig && providerConfig.enabled !== false;
+    }
+  );
 
   if (enabledTargets.length === 0) return [];
 
@@ -195,9 +198,9 @@ async function filterGroupTargets(
   }
 
   const findApiCompatibleTargets = (
-    targets: ModelTarget[],
+    targets: (ModelTarget & { provider: string; model: string })[],
     requestedApiType: string
-  ): ModelTarget[] => {
+  ): (ModelTarget & { provider: string; model: string })[] => {
     const normalizedIncoming = requestedApiType.toLowerCase();
     return targets.filter((target) => {
       const providerConfig = config.providers[target.provider];
@@ -310,11 +313,98 @@ async function selectOrderedTargets(
   return ordered;
 }
 
+function withVisited(visited: Set<string>, slug: string): Set<string> {
+  const next = new Set(visited);
+  next.add(slug);
+  return next;
+}
+
+function dedupeCandidates(candidates: RouteResult[]): RouteResult[] {
+  const seen = new Set<string>();
+  const result: RouteResult[] = [];
+  for (const candidate of candidates) {
+    const key = `${candidate.provider}\u0000${candidate.model}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(candidate);
+  }
+  return result;
+}
+
+async function buildGroupCandidates(
+  group: ModelTargetGroup,
+  config: ReturnType<typeof getConfig>,
+  alias: ModelConfig,
+  incomingApiType: string | undefined,
+  logModelName: string | undefined,
+  canonicalModel: string,
+  sessionKey: string | null | undefined,
+  visited: Set<string>
+): Promise<RouteResult[]> {
+  const concreteTargets = group.targets.filter((t) => !t.alias);
+
+  const enriched = await filterGroupTargets(
+    concreteTargets,
+    config,
+    alias,
+    incomingApiType,
+    logModelName
+  );
+  const ordered = await selectOrderedTargets(group.selector, enriched);
+
+  const results: RouteResult[] = ordered.map((target) => {
+    const providerConfig = config.providers[target.provider!];
+    let modelConfig = undefined;
+    if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
+      modelConfig = providerConfig.models[target.model!];
+    }
+    return {
+      provider: target.provider!,
+      model: target.model!,
+      config: providerConfig!,
+      modelConfig,
+      modelArchitecture: config.models?.[canonicalModel]?.model_architecture,
+      incomingModelAlias: logModelName,
+      canonicalModel,
+    };
+  });
+
+  // Concrete targets keep the selector-decided order (`results`, which may
+  // be a strict subset of `concreteTargets` after health/concurrency/API
+  // filtering — the selector never reorders across a filtered-out target,
+  // so positional remapping into group.targets is unsafe). Alias-ref
+  // expansions are appended afterward, in their declared relative order,
+  // as additional fallback candidates.
+  const merged: RouteResult[] = [...results];
+  for (const target of group.targets) {
+    if (!target.alias) continue;
+    if (target.enabled === false) continue;
+    if (visited.has(target.alias)) {
+      logger.warn(
+        `Router: alias-ref cycle detected while expanding '${target.alias}'; skipping to avoid infinite recursion.`
+      );
+      continue;
+    }
+    const nested = await Router.resolveCandidates(
+      target.alias,
+      incomingApiType,
+      sessionKey,
+      visited
+    );
+    merged.push(...nested);
+  }
+
+  BackgroundExplorer.getInstance()?.maybeTrigger(group);
+
+  return merged;
+}
+
 export class Router {
   static async resolveCandidates(
     modelName: string,
     incomingApiType?: string,
-    sessionKey?: string | null
+    sessionKey?: string | null,
+    visited: Set<string> = new Set()
   ): Promise<RouteResult[]> {
     const config = getConfig();
 
@@ -327,41 +417,17 @@ export class Router {
       if (alias?.target_groups) {
         const group = alias.target_groups.find((g) => g.name === groupName);
         if (group) {
-          const enriched = await filterGroupTargets(
-            group.targets,
+          const results = await buildGroupCandidates(
+            group,
             config,
             alias,
             incomingApiType,
-            modelName
+            modelName,
+            canonicalModel,
+            sessionKey,
+            withVisited(visited, canonicalModel)
           );
-
-          if (enriched.length === 0) return [];
-
-          const ordered = await selectOrderedTargets(group.selector, enriched);
-
-          BackgroundExplorer.getInstance()?.maybeTrigger(group);
-
-          const results: RouteResult[] = [];
-          for (const target of ordered) {
-            const providerConfig = config.providers[target.provider];
-            if (!providerConfig) continue;
-
-            let modelConfig = undefined;
-            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-              modelConfig = providerConfig.models[target.model];
-            }
-
-            results.push({
-              provider: target.provider,
-              model: target.model,
-              config: providerConfig,
-              modelConfig,
-              modelArchitecture: config.models?.[canonicalModel]?.model_architecture,
-              incomingModelAlias: modelName,
-              canonicalModel,
-            });
-          }
-          return results;
+          return dedupeCandidates(results);
         }
         // Alias exists but group doesn't → fall through to resolve() which throws 404
         return [];
@@ -375,7 +441,15 @@ export class Router {
       return [];
     }
 
-    const orderedCandidates: RouteResult[] = [];
+    if (visited.has(canonicalModel)) {
+      logger.warn(
+        `Router: alias-ref cycle detected while expanding '${canonicalModel}'; skipping to avoid infinite recursion.`
+      );
+      return [];
+    }
+    const nextVisited = withVisited(visited, canonicalModel);
+
+    let orderedCandidates: RouteResult[] = [];
 
     // Sticky session: if enabled and we have a session key, look up the
     // provider:model used last turn. We don't return early — we still build
@@ -391,40 +465,20 @@ export class Router {
     }
 
     for (const group of alias.target_groups) {
-      const enriched = await filterGroupTargets(
-        group.targets,
+      const results = await buildGroupCandidates(
+        group,
         config,
         alias,
         incomingApiType,
-        modelName
+        modelName,
+        canonicalModel,
+        sessionKey,
+        nextVisited
       );
-
-      if (enriched.length === 0) continue;
-
-      const ordered = await selectOrderedTargets(group.selector, enriched);
-
-      BackgroundExplorer.getInstance()?.maybeTrigger(group);
-
-      for (const target of ordered) {
-        const providerConfig = config.providers[target.provider];
-        if (!providerConfig) continue;
-
-        let modelConfig = undefined;
-        if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-          modelConfig = providerConfig.models[target.model];
-        }
-
-        orderedCandidates.push({
-          provider: target.provider,
-          model: target.model,
-          config: providerConfig,
-          modelConfig,
-          modelArchitecture: config.models?.[modelName]?.model_architecture,
-          incomingModelAlias: modelName,
-          canonicalModel,
-        });
-      }
+      orderedCandidates.push(...results);
     }
+
+    orderedCandidates = dedupeCandidates(orderedCandidates);
 
     if (stickyPick) {
       const idx = orderedCandidates.findIndex(
@@ -460,7 +514,7 @@ export class Router {
           const group = alias.target_groups.find((g) => g.name === groupName);
           if (group) {
             const enriched = await filterGroupTargets(
-              group.targets,
+              group.targets.filter((t) => !t.alias),
               config,
               alias,
               incomingApiType,
@@ -484,14 +538,14 @@ export class Router {
 
             BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
-            const providerConfig = config.providers[target.provider];
+            const providerConfig = config.providers[target.provider!];
             if (!providerConfig) {
               throw new Error(`Provider '${target.provider}' not found`);
             }
 
             let modelConfig = undefined;
             if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-              modelConfig = providerConfig.models[target.model];
+              modelConfig = providerConfig.models[target.model!];
             }
 
             logger.info(
@@ -499,8 +553,8 @@ export class Router {
             );
 
             return {
-              provider: target.provider,
-              model: target.model,
+              provider: target.provider!,
+              model: target.model!,
               config: providerConfig,
               modelConfig,
               incomingModelAlias: modelName,
@@ -526,7 +580,12 @@ export class Router {
 
     if (alias && alias.target_groups && alias.target_groups.length > 0) {
       for (const group of alias.target_groups) {
-        const enriched = await filterGroupTargets(group.targets, config, alias, incomingApiType);
+        const enriched = await filterGroupTargets(
+          group.targets.filter((t) => !t.alias),
+          config,
+          alias,
+          incomingApiType
+        );
 
         if (enriched.length === 0) continue;
 
@@ -537,7 +596,7 @@ export class Router {
 
         BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
-        const providerConfig = config.providers[target.provider];
+        const providerConfig = config.providers[target.provider!];
         if (!providerConfig) {
           throw new Error(
             `Provider '${target.provider}' configured for alias '${modelName}' not found`
@@ -553,12 +612,12 @@ export class Router {
 
         let modelConfig = undefined;
         if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-          modelConfig = providerConfig.models[target.model];
+          modelConfig = providerConfig.models[target.model!];
         }
 
         return {
-          provider: target.provider,
-          model: target.model,
+          provider: target.provider!,
+          model: target.model!,
           config: providerConfig,
           modelConfig,
           incomingModelAlias: modelName,

@@ -491,7 +491,13 @@ export type AliasMetadata =
 export interface AliasTargetGroup {
   name: string;
   selector: string;
-  targets: Array<{ provider: string; model: string; apiType?: string[]; enabled?: boolean }>;
+  targets: Array<{
+    provider?: string;
+    model?: string;
+    alias?: string;
+    apiType?: string[];
+    enabled?: boolean;
+  }>;
 }
 
 export type PreferredApiValue = 'chat_completions' | 'messages' | 'gemini' | 'responses';
@@ -1205,11 +1211,18 @@ function aliasToConfigPayload(alias: Alias): Record<string, unknown> {
     target_groups: targetGroups.map((group) => ({
       name: group.name,
       selector: group.selector,
-      targets: group.targets.map((target) => ({
-        provider: target.provider,
-        model: target.model,
-        ...(target.enabled === false && { enabled: false }),
-      })),
+      targets: group.targets.map((target) =>
+        target.alias
+          ? {
+              alias: target.alias,
+              ...(target.enabled === false && { enabled: false }),
+            }
+          : {
+              provider: target.provider,
+              model: target.model,
+              ...(target.enabled === false && { enabled: false }),
+            }
+      ),
     })),
   };
 }
@@ -2217,6 +2230,13 @@ export const api = {
 
       Object.entries(aliasMap).forEach(([key, val]) => {
         const readTarget = (t: any) => {
+          if (t.alias) {
+            return {
+              alias: t.alias as string,
+              enabled: t.enabled !== false,
+            };
+          }
+
           const providerConfig = providers[t.provider];
           const inferredTypes =
             providerConfig?.type || inferProviderTypes(providerConfig?.api_base_url);

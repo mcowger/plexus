@@ -55,4 +55,28 @@ describe('model option helpers', () => {
       },
     ]);
   });
+
+  test('keeps distinct alias-ref targets without colliding on missing provider/model', () => {
+    const groups: AliasTargetGroup[] = [
+      {
+        name: 'primary',
+        selector: 'in_order',
+        targets: [
+          { alias: 'fallback-a', enabled: true },
+          { alias: 'fallback-b', enabled: true },
+          { alias: 'fallback-a', enabled: true },
+        ],
+      },
+    ];
+
+    expect(dedupeAliasTargets(groups)).toEqual([
+      {
+        ...groups[0],
+        targets: [
+          { alias: 'fallback-a', enabled: true },
+          { alias: 'fallback-b', enabled: true },
+        ],
+      },
+    ]);
+  });
 });

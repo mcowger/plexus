@@ -145,7 +145,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
       editingAlias.id.trim().length > 0 ||
       !!editingAlias.pi_model?.model_id ||
       editingAlias.target_groups.some((group) =>
-        group.targets.some((target) => target.enabled !== false && target.model.trim().length > 0)
+        group.targets.some((target) => target.enabled !== false && !!target.model?.trim().length)
       );
     if (!isOpen || metadataSource !== 'auto' || !hasInput) {
       setAutomaticResolution(null);

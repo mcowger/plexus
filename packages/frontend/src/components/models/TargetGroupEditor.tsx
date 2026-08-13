@@ -9,6 +9,7 @@ interface TargetGroupEditorProps {
   groups: AliasTargetGroup[];
   providers: Array<{ id: string; name: string }>;
   availableModels: Array<{ id: string; providerId: string; name: string }>;
+  availableAliases: string[];
   onChange: (groups: AliasTargetGroup[]) => void;
 }
 
@@ -18,6 +19,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   groups,
   providers,
   availableModels,
+  availableAliases,
   onChange,
 }) => {
   const [dragState, setDragState] = useState<{
@@ -96,6 +98,29 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
       } else {
         targets[targetIdx] = { ...targets[targetIdx], enabled: value as boolean };
       }
+      next[groupIdx] = { ...next[groupIdx], targets };
+      return next;
+    });
+  };
+
+  const setTargetAlias = (groupIdx: number, targetIdx: number, alias: string) => {
+    setGroups((prev) => {
+      const next = [...prev];
+      const targets = [...next[groupIdx].targets];
+      targets[targetIdx] = { alias, enabled: true };
+      next[groupIdx] = { ...next[groupIdx], targets };
+      return next;
+    });
+  };
+
+  const setTargetType = (groupIdx: number, targetIdx: number, type: 'model' | 'alias') => {
+    setGroups((prev) => {
+      const next = [...prev];
+      const targets = [...next[groupIdx].targets];
+      targets[targetIdx] =
+        type === 'alias'
+          ? { alias: availableAliases[0] ?? '', enabled: true }
+          : { provider: '', model: '', enabled: true };
       next[groupIdx] = { ...next[groupIdx], targets };
       return next;
     });
@@ -290,20 +315,25 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   dragOver?.mode === 'target' &&
                   dragOver.groupIdx === groupIdx &&
                   dragOver.targetIdx === targetIdx;
-                const modelOptions = dedupeModels(
-                  availableModels.filter((model) => model.providerId === target.provider)
-                ).filter(
-                  (model) =>
-                    model.id === target.model ||
-                    !groups.some((candidateGroup, candidateGroupIdx) =>
-                      candidateGroup.targets.some(
-                        (candidateTarget, candidateTargetIdx) =>
-                          (candidateGroupIdx !== groupIdx || candidateTargetIdx !== targetIdx) &&
-                          getModelOptionKey(candidateTarget.provider, candidateTarget.model) ===
-                            getModelOptionKey(model.providerId, model.id)
-                      )
-                    )
-                );
+                const isAliasTarget = !!target.alias;
+                const modelOptions = isAliasTarget
+                  ? []
+                  : dedupeModels(
+                      availableModels.filter((model) => model.providerId === target.provider)
+                    ).filter(
+                      (model) =>
+                        model.id === target.model ||
+                        !groups.some((candidateGroup, candidateGroupIdx) =>
+                          candidateGroup.targets.some(
+                            (candidateTarget, candidateTargetIdx) =>
+                              (candidateGroupIdx !== groupIdx ||
+                                candidateTargetIdx !== targetIdx) &&
+                              !candidateTarget.alias &&
+                              getModelOptionKey(candidateTarget.provider, candidateTarget.model) ===
+                                getModelOptionKey(model.providerId, model.id)
+                          )
+                        )
+                    );
 
                 return (
                   <div
@@ -360,37 +390,68 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                       </button>
                     </div>
                     <select
-                      className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                       style={{ padding: '3px 6px', height: '26px' }}
-                      value={target.provider}
+                      value={isAliasTarget ? 'alias' : 'model'}
                       onChange={(e) =>
-                        updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
+                        setTargetType(groupIdx, targetIdx, e.target.value as 'model' | 'alias')
                       }
                     >
-                      <option value="">Provider...</option>
-                      {providers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
+                      <option value="model">Model</option>
+                      <option value="alias">Alias</option>
                     </select>
-                    <select
-                      className="flex-[2] min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      style={{ padding: '3px 6px', height: '26px' }}
-                      value={target.model}
-                      onChange={(e) => updateTarget(groupIdx, targetIdx, 'model', e.target.value)}
-                      disabled={!target.provider}
-                    >
-                      <option value="">Model...</option>
-                      {modelOptions.map((model) => (
-                        <option
-                          key={getModelOptionKey(model.providerId, model.id)}
-                          value={model.id}
+                    {isAliasTarget ? (
+                      <select
+                        className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        style={{ padding: '3px 6px', height: '26px' }}
+                        value={target.alias ?? ''}
+                        onChange={(e) => setTargetAlias(groupIdx, targetIdx, e.target.value)}
+                      >
+                        <option value="">Alias...</option>
+                        {availableAliases.map((aliasSlug) => (
+                          <option key={aliasSlug} value={aliasSlug}>
+                            {aliasSlug}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <>
+                        <select
+                          className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                          style={{ padding: '3px 6px', height: '26px' }}
+                          value={target.provider ?? ''}
+                          onChange={(e) =>
+                            updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
+                          }
                         >
-                          {model.name}
-                        </option>
-                      ))}
-                    </select>
+                          <option value="">Provider...</option>
+                          {providers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className="flex-[2] min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                          style={{ padding: '3px 6px', height: '26px' }}
+                          value={target.model ?? ''}
+                          onChange={(e) =>
+                            updateTarget(groupIdx, targetIdx, 'model', e.target.value)
+                          }
+                          disabled={!target.provider}
+                        >
+                          <option value="">Model...</option>
+                          {modelOptions.map((model) => (
+                            <option
+                              key={getModelOptionKey(model.providerId, model.id)}
+                              value={model.id}
+                            >
+                              {model.name}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
                     <Switch
                       checked={target.enabled !== false}
                       onChange={(val) => updateTarget(groupIdx, targetIdx, 'enabled', val)}

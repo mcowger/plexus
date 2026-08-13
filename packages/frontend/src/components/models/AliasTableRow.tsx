@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, Clock, Play, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Edit2, Trash2, Clock, Play, Loader2, CheckCircle, XCircle, Link2 } from 'lucide-react';
 import { CopyButton } from '../ui/CopyButton';
 import { Badge } from '../ui/Badge';
 import { Switch } from '../ui/Switch';
@@ -149,6 +149,30 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
               </div>
               <div className="flex flex-col gap-0.5">
                 {group.targets.map((t, targetIdx) => {
+                  if (t.alias) {
+                    const isTargetDisabled = t.enabled === false;
+                    return (
+                      <div
+                        key={`alias-${t.alias}-${targetIdx}`}
+                        className={`flex items-center gap-1.5 text-[11px] transition-opacity ${
+                          isTargetDisabled
+                            ? 'opacity-70 line-through text-danger'
+                            : 'text-text-secondary'
+                        }`}
+                      >
+                        <Link2 size={12} className="text-primary opacity-70" />
+                        <Switch
+                          checked={t.enabled !== false}
+                          onChange={(val) => onToggleTarget(alias, groupIdx, targetIdx, val)}
+                          size="sm"
+                        />
+                        <div className="flex-1 truncate" title={`alias: ${t.alias}`}>
+                          alias: {t.alias}
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const provider = providers.find((p) => p.id === t.provider);
                   const isProviderDisabled = provider?.enabled === false;
                   const isTargetDisabled = t.enabled === false;
@@ -186,7 +210,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!isDisabled) {
+                            if (!isDisabled && t.provider && t.model) {
                               let testApiTypes: string[] = ['chat'];
                               if (alias.type === 'embeddings') testApiTypes = ['embeddings'];
                               else if (alias.type === 'image') testApiTypes = ['images'];
@@ -219,7 +243,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                         />
                         <div className="flex-1 truncate" title={`${t.provider} → ${t.model}`}>
                           {t.provider} →{' '}
-                          {t.model.includes('/')
+                          {t.model?.includes('/')
                             ? `…/${t.model.split('/').slice(1).join('/')}`
                             : t.model}
                         </div>

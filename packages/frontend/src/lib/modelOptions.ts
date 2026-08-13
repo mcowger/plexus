@@ -1,7 +1,7 @@
 import type { AliasTargetGroup, Model } from './api';
 
-export const getModelOptionKey = (providerId: string, modelId: string) =>
-  `${providerId}\u0000${modelId}`;
+export const getModelOptionKey = (providerId: string | undefined, modelId: string | undefined) =>
+  `${providerId ?? ''}\u0000${modelId ?? ''}`;
 
 export const dedupeModels = <T extends Pick<Model, 'id' | 'providerId'>>(models: T[]): T[] => {
   const seen = new Set<string>();
@@ -40,7 +40,9 @@ export const dedupeAliasTargets = (groups: AliasTargetGroup[]): AliasTargetGroup
   return groups.map((group) => ({
     ...group,
     targets: group.targets.filter((target) => {
-      const key = getModelOptionKey(target.provider, target.model);
+      const key = target.alias
+        ? `alias\u0000${target.alias}`
+        : getModelOptionKey(target.provider, target.model);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

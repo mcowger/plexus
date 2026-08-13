@@ -76,6 +76,7 @@ export class BackgroundExplorer {
 
     for (const target of group.targets) {
       if (target.enabled === false) continue;
+      if (target.alias || !target.provider || !target.model) continue;
       const providerCfg = providers[target.provider];
       if (!providerCfg || providerCfg.enabled === false) continue;
 
@@ -101,7 +102,7 @@ export class BackgroundExplorer {
           // Re-check staleness in case another trigger raced us.
           if (Date.now() - captured.lastProbedAt < thresholdMs) return;
 
-          this.queue.push({ provider: target.provider, model: target.model });
+          this.queue.push({ provider: target.provider!, model: target.model! });
           this.pumpWorkers();
         })
         .catch((err) => {

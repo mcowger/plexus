@@ -917,8 +917,9 @@ export class ConfigRepository {
           for (const t of group.targets) {
             targetRows.push({
               aliasId,
-              providerSlug: t.provider,
-              modelName: t.model,
+              providerSlug: t.alias ? null : t.provider,
+              modelName: t.alias ? null : t.model,
+              targetAliasSlug: t.alias ?? null,
               enabled: fromBool(t.enabled !== false),
               groupName: group.name,
               sortOrder: sortIdx++,
@@ -988,11 +989,11 @@ export class ConfigRepository {
         const groupTargets = targetRows
           .filter((t: any) => t.groupName === def.name)
           .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-          .map((t: any) => ({
-            provider: t.providerSlug,
-            model: t.modelName,
-            enabled: toBool(t.enabled),
-          }));
+          .map((t: any) =>
+            t.targetAliasSlug
+              ? { alias: t.targetAliasSlug, enabled: toBool(t.enabled) }
+              : { provider: t.providerSlug, model: t.modelName, enabled: toBool(t.enabled) }
+          );
         targetGroups.push({
           name: def.name,
           selector: def.selector as import('../config').SelectorType,

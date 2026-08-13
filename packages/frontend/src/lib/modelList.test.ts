@@ -57,6 +57,28 @@ const aliases: Alias[] = [
 ];
 
 describe('model list helpers', () => {
+  test('ignores alias-ref targets when deriving provider labels and options', () => {
+    const aliasWithFallback: Alias = {
+      id: 'delta',
+      target_groups: [
+        {
+          name: 'default',
+          selector: 'in_order',
+          targets: [
+            { provider: 'openai', model: 'gpt-4o-mini' },
+            { alias: 'gamma', enabled: true },
+          ],
+        },
+      ],
+    };
+
+    expect(getAliasProviderLabels(aliasWithFallback, providers)).toEqual(['OpenAI (openai)']);
+    expect(getAliasTargetCount(aliasWithFallback)).toBe(2);
+    expect(getModelListProviderOptions([aliasWithFallback], providers)).toEqual([
+      'OpenAI (openai)',
+    ]);
+  });
+
   test('derives provider labels and target counts from aliases', () => {
     expect(getAliasProviderLabels(aliases[0], providers)).toEqual([
       'Anthropic (anthropic)',

@@ -145,7 +145,7 @@ describe('E2EPerformanceSelector', () => {
       const seen = new Set<string>();
       for (let i = 0; i < 30; i++) {
         const selected = await selector.select(targets);
-        seen.add(selected!.provider);
+        seen.add(selected!.provider!);
       }
       // All three providers should appear in the exploration pool
       expect(seen.has('p1')).toBe(true);

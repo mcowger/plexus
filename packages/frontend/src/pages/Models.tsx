@@ -116,6 +116,13 @@ export const Models = () => {
     [allAliases, providers]
   );
 
+  // Aliases eligible as fallback targets: exclude the alias currently being
+  // edited to avoid an obvious self-reference.
+  const availableAliasSlugs = useMemo(
+    () => allAliases.map((a) => a.id).filter((id) => id !== originalId && id !== editingAlias.id),
+    [allAliases, originalId, editingAlias.id]
+  );
+
   const visibleAliases = useMemo(
     () =>
       filterAndSortAliasesForModelsPage(
@@ -608,6 +615,7 @@ export const Models = () => {
                 groups={editingAlias.target_groups}
                 providers={providers}
                 availableModels={availableModels}
+                availableAliases={availableAliasSlugs}
                 onChange={(groups) => setEditingAlias({ ...editingAlias, target_groups: groups })}
               />
             </div>

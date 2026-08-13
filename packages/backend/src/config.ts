@@ -713,11 +713,19 @@ export const ProviderConfigSchema = z
     message: 'raw_passthrough currently supports static API-key providers only',
   });
 
-const ModelTargetSchema = z.object({
-  provider: z.string(),
-  model: z.string(),
-  enabled: z.boolean().default(true).optional(),
-});
+const ModelTargetSchema = z
+  .object({
+    provider: z.string().optional(),
+    model: z.string().optional(),
+    alias: z.string().min(1).optional(),
+    enabled: z.boolean().default(true).optional(),
+  })
+  .refine(
+    (data) => (data.alias ? !data.provider && !data.model : !!data.provider && !!data.model),
+    {
+      message: "A target must specify either 'alias' or both 'provider' and 'model', but not both",
+    }
+  );
 
 const SelectorTypeSchema = z.enum([
   'random',
@@ -736,20 +744,80 @@ const ModelTargetGroupSchema = z.object({
 });
 
 export function findDuplicateAliasTargets(
-  targetGroups: Array<{ targets: Array<{ provider: string; model: string }> }> | undefined
-): Array<{ provider: string; model: string }> {
+  targetGroups:
+    | Array<{ targets: Array<{ provider?: string; model?: string; alias?: string }> }>
+    | undefined
+): Array<{ provider?: string; model?: string; alias?: string }> {
   const seen = new Set<string>();
-  const duplicates = new Map<string, { provider: string; model: string }>();
+  const duplicates = new Map<string, { provider?: string; model?: string; alias?: string }>();
 
   for (const group of targetGroups ?? []) {
     for (const target of group.targets) {
-      const key = JSON.stringify([target.provider, target.model]);
+      const key = target.alias
+        ? JSON.stringify(['alias', target.alias])
+        : JSON.stringify([target.provider, target.model]);
       if (seen.has(key)) duplicates.set(key, target);
       else seen.add(key);
     }
   }
 
   return Array.from(duplicates.values());
+}
+
+/**
+ * Walks the alias-ref graph (target.alias references) starting from every
+ * alias and throws if a cycle is found. Called at config-load time as a hard
+ * validation error — route-time expansion also guards with a visited-set as
+ * a safety net, but cycles should never reach the router.
+ */
+export function assertNoAliasRefCycles(models: Record<string, ModelConfig> | undefined): void {
+  if (!models) return;
+
+  // target.alias may reference either a canonical model key or one of its
+  // additional_aliases (nicknames) — resolve nicknames to their canonical
+  // key so cycles routed through a nickname are still detected, matching
+  // how the router resolves alias refs at request time (see findAlias).
+  const canonicalBySlug = new Map<string, string>();
+  for (const key of Object.keys(models)) {
+    canonicalBySlug.set(key, key);
+    for (const nickname of models[key]?.additional_aliases ?? []) {
+      if (!canonicalBySlug.has(nickname)) canonicalBySlug.set(nickname, key);
+    }
+  }
+
+  const referencedAliases = (slug: string): string[] => {
+    const model = models[slug];
+    if (!model?.target_groups) return [];
+    const refs: string[] = [];
+    for (const group of model.target_groups) {
+      for (const target of group.targets) {
+        if (target.alias) refs.push(canonicalBySlug.get(target.alias) ?? target.alias);
+      }
+    }
+    return refs;
+  };
+
+  for (const startSlug of Object.keys(models)) {
+    const path: string[] = [];
+    const visiting = new Set<string>();
+
+    const walk = (slug: string) => {
+      if (visiting.has(slug)) {
+        const cycleStart = path.indexOf(slug);
+        const cycle = [...path.slice(cycleStart), slug].join(' -> ');
+        throw new Error(`Alias reference cycle detected: ${cycle}`);
+      }
+      visiting.add(slug);
+      path.push(slug);
+      for (const ref of referencedAliases(slug)) {
+        walk(ref);
+      }
+      path.pop();
+      visiting.delete(slug);
+    };
+
+    walk(startSlug);
+  }
 }
 
 export function findDuplicateAdditionalAliases(additionalAliases: string[] | undefined): string[] {
@@ -971,7 +1039,9 @@ export const ModelConfigSchema = z
       context.addIssue({
         code: 'custom',
         path: ['target_groups'],
-        message: `Duplicate target '${target.provider}/${target.model}' is not allowed`,
+        message: target.alias
+          ? `Duplicate target 'alias:${target.alias}' is not allowed`
+          : `Duplicate target '${target.provider}/${target.model}' is not allowed`,
       });
     }
 
@@ -1252,6 +1322,8 @@ export function validateConfig(configJson: string): PlexusConfig {
 }
 
 function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
+  assertNoAliasRefCycles(config.models);
+
   // Resolve GPU profiles for providers loaded from config.
   // If a provider has gpu_profile set but the numeric fields aren't populated,
   // resolve them now so the backend never needs to resolve at request time.

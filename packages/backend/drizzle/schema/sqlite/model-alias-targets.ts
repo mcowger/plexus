@@ -8,8 +8,9 @@ export const modelAliasTargets = sqliteTable(
     aliasId: integer('alias_id')
       .notNull()
       .references(() => modelAliases.id, { onDelete: 'cascade' }),
-    providerSlug: text('provider_slug').notNull(),
-    modelName: text('model_name').notNull(),
+    providerSlug: text('provider_slug'),
+    modelName: text('model_name'),
+    targetAliasSlug: text('target_alias_slug'),
     enabled: integer('enabled').notNull().default(1),
     groupName: text('group_name'), // target group label
     sortOrder: integer('sort_order').notNull().default(0),

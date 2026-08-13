@@ -23,6 +23,7 @@ export const getAliasProviderLabels = (alias: Alias, providers: Provider[]) => {
 
   for (const group of alias.target_groups) {
     for (const target of group.targets) {
+      if (!target.provider) continue;
       labels.add(getProviderDisplayLabel(providerById.get(target.provider), target.provider));
     }
   }
@@ -35,7 +36,7 @@ export const getModelListProviderOptions = (aliases: Alias[], providers: Provide
   for (const alias of aliases) {
     for (const group of alias.target_groups) {
       for (const target of group.targets) {
-        providerIds.add(target.provider);
+        if (target.provider) providerIds.add(target.provider);
       }
     }
   }
