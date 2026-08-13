@@ -372,26 +372,39 @@ async function buildGroupCandidates(
   // Concrete targets keep the selector-decided order (`results`, which may
   // be a strict subset of `concreteTargets` after health/concurrency/API
   // filtering — the selector never reorders across a filtered-out target,
-  // so positional remapping into group.targets is unsafe). Alias-ref
-  // expansions are appended afterward, in their declared relative order,
-  // as additional fallback candidates.
-  const merged: RouteResult[] = [...results];
+  // so positional remapping into group.targets is unsafe). Build a lookup
+  // of the ordered concrete results, then walk group.targets in their
+  // declared order so alias-ref expansions land in their author-declared
+  // position relative to concrete targets, instead of always trailing.
+  const resultsByKey = new Map<string, RouteResult>();
+  for (const result of results) {
+    resultsByKey.set(`${result.provider}\u0000${result.model}`, result);
+  }
+
+  const merged: RouteResult[] = [];
   for (const target of group.targets) {
-    if (!target.alias) continue;
-    if (target.enabled === false) continue;
-    if (visited.has(target.alias)) {
-      logger.warn(
-        `Router: alias-ref cycle detected while expanding '${target.alias}'; skipping to avoid infinite recursion.`
+    if (target.alias) {
+      if (target.enabled === false) continue;
+      if (visited.has(target.alias)) {
+        logger.warn(
+          `Router: alias-ref cycle detected while expanding '${target.alias}'; skipping to avoid infinite recursion.`
+        );
+        continue;
+      }
+      const nested = await Router.resolveCandidates(
+        target.alias,
+        incomingApiType,
+        sessionKey,
+        visited
       );
+      merged.push(...nested);
       continue;
     }
-    const nested = await Router.resolveCandidates(
-      target.alias,
-      incomingApiType,
-      sessionKey,
-      visited
-    );
-    merged.push(...nested);
+
+    const result = resultsByKey.get(`${target.provider}\u0000${target.model}`);
+    if (result) {
+      merged.push(result);
+    }
   }
 
   BackgroundExplorer.getInstance()?.maybeTrigger(group);
@@ -513,53 +526,30 @@ export class Router {
         if (alias?.target_groups) {
           const group = alias.target_groups.find((g) => g.name === groupName);
           if (group) {
-            const enriched = await filterGroupTargets(
-              group.targets.filter((t) => !t.alias),
+            const candidates = await buildGroupCandidates(
+              group,
               config,
               alias,
               incomingApiType,
-              modelName
+              modelName,
+              canonicalModel,
+              null,
+              withVisited(new Set(), canonicalModel)
             );
 
-            if (enriched.length === 0) {
-              throw new Error(
-                `No healthy targets in group '${groupName}' for alias '${aliasName}'`
-              );
-            }
-
-            const selector = SelectorFactory.getSelector(group.selector);
-            const target = await selector.select(enriched);
+            const [target] = dedupeCandidates(candidates);
 
             if (!target) {
               throw new Error(
-                `No target selected in group '${groupName}' for alias '${aliasName}'`
+                `No healthy targets in group '${groupName}' for alias '${aliasName}'`
               );
-            }
-
-            BackgroundExplorer.getInstance()?.maybeTrigger(group);
-
-            const providerConfig = config.providers[target.provider!];
-            if (!providerConfig) {
-              throw new Error(`Provider '${target.provider}' not found`);
-            }
-
-            let modelConfig = undefined;
-            if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-              modelConfig = providerConfig.models[target.model!];
             }
 
             logger.info(
               `Router: Direct group routing to '${target.provider}/${target.model}' from group '${groupName}' of alias '${aliasName}'`
             );
 
-            return {
-              provider: target.provider!,
-              model: target.model!,
-              config: providerConfig,
-              modelConfig,
-              incomingModelAlias: modelName,
-              canonicalModel,
-            };
+            return target;
           }
 
           const error = new Error(
@@ -579,29 +569,25 @@ export class Router {
     const { alias, canonicalModel } = findAlias(config, modelName);
 
     if (alias && alias.target_groups && alias.target_groups.length > 0) {
+      const visited = withVisited(new Set(), canonicalModel);
       for (const group of alias.target_groups) {
-        const enriched = await filterGroupTargets(
-          group.targets.filter((t) => !t.alias),
+        const candidates = await buildGroupCandidates(
+          group,
           config,
           alias,
-          incomingApiType
+          incomingApiType,
+          modelName,
+          canonicalModel,
+          null,
+          visited
         );
 
-        if (enriched.length === 0) continue;
-
-        const selector = SelectorFactory.getSelector(group.selector);
-        const target = await selector.select(enriched);
-
-        if (!target) continue;
+        if (candidates.length === 0) continue;
 
         BackgroundExplorer.getInstance()?.maybeTrigger(group);
 
-        const providerConfig = config.providers[target.provider!];
-        if (!providerConfig) {
-          throw new Error(
-            `Provider '${target.provider}' configured for alias '${modelName}' not found`
-          );
-        }
+        const deduped = dedupeCandidates(candidates);
+        const target = deduped[0]!;
 
         logger.info(
           `Router: Selected '${target.provider}/${target.model}' using strategy '${group.selector}'.`
@@ -610,19 +596,7 @@ export class Router {
           `Router resolving ${modelName} (canonical: ${canonicalModel}). Target provider: ${target.provider}, Target model: ${target.model}`
         );
 
-        let modelConfig = undefined;
-        if (!Array.isArray(providerConfig.models) && providerConfig.models) {
-          modelConfig = providerConfig.models[target.model!];
-        }
-
-        return {
-          provider: target.provider!,
-          model: target.model!,
-          config: providerConfig,
-          modelConfig,
-          incomingModelAlias: modelName,
-          canonicalModel,
-        };
+        return target;
       }
 
       throw new Error(`No healthy target selected for alias '${modelName}'`);
