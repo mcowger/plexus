@@ -27,11 +27,11 @@ import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type {
   Api,
   Model,
+  ModelsPublication,
   ModelsStore,
   ModelsStoreEntry,
   MutableModels,
   Provider,
-  ProviderModelsStore,
   ProviderStreams,
 } from '@earendil-works/pi-ai';
 import { logger } from '../../utils/logger';
@@ -74,8 +74,8 @@ function parseCatalog(providerId: string, value: unknown): Model<Api>[] {
 async function fetchPiDevCatalog(
   providerId: string,
   options: {
-    store: ProviderModelsStore;
-    signal?: AbortSignal;
+    stored?: Readonly<ModelsStoreEntry>;
+    signal: AbortSignal;
     catalogBaseUrl?: string;
     fetchImpl?: typeof fetch;
   }
@@ -88,8 +88,7 @@ async function fetchPiDevCatalog(
     signal: options.signal,
   });
   if (response.status === 404 || response.status === 501) {
-    const stored = await options.store.read();
-    return stored?.models ?? [];
+    return options.stored?.models ?? [];
   }
   if (!response.ok) {
     throw new Error(`Model catalog request failed for ${providerId}: ${response.status}`);
@@ -119,7 +118,11 @@ export function withRemoteCatalog(
     models: provider.getModels(),
     filterModels: provider.filterModels,
     fetchModels: (context) =>
-      fetchPiDevCatalog(provider.id, { ...options, store: context.store, signal: context.signal }),
+      fetchPiDevCatalog(provider.id, {
+        ...options,
+        stored: context.stored,
+        signal: context.signal,
+      }),
     api: streams,
   }) as Provider;
 }
@@ -280,6 +283,40 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
   const now = deps.now ?? Date.now;
   let wrapped = false;
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
+  const refreshGenerations = new Map<string, number>();
+
+  async function refreshProvider(
+    provider: Provider,
+    options: {
+      allowNetwork: boolean;
+      force?: boolean;
+      signal: AbortSignal;
+      generation: number;
+    }
+  ): Promise<void> {
+    const stored = await store.read(provider.id, { signal: options.signal });
+    await provider.refreshModels?.({
+      stored: stored ? structuredClone(stored) : undefined,
+      allowNetwork: options.allowNetwork,
+      force: options.allowNetwork ? options.force : undefined,
+      signal: options.signal,
+      publish: async (publication: ModelsPublication): Promise<boolean> => {
+        if (options.signal.aborted || refreshGenerations.get(provider.id) !== options.generation) {
+          return false;
+        }
+        if (publication.persist === null) {
+          await store.delete(provider.id, { signal: options.signal });
+        } else if (publication.persist !== undefined) {
+          await store.write(provider.id, publication.persist, { signal: options.signal });
+        }
+        if (options.signal.aborted || refreshGenerations.get(provider.id) !== options.generation) {
+          return false;
+        }
+        publication.update?.();
+        return true;
+      },
+    });
+  }
 
   function wrapProviders(): void {
     if (wrapped) return;
@@ -301,6 +338,7 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
   ): Promise<CatalogRefreshResult> {
     wrapProviders();
     const allowNetwork = options.allowNetwork ?? true;
+    const signal = options.signal ?? new AbortController().signal;
     const errors: Record<string, string> = {};
     let refreshed = 0;
     await Promise.all(
@@ -309,30 +347,27 @@ export function createModelCatalog(deps: ModelCatalogDeps): ModelCatalog {
         // (own store, own cadence) — don't drive their refresh here.
         if (SELF_REFRESHING_PROVIDERS.has(provider.id)) return;
         if (typeof provider.refreshModels !== 'function') return;
-        const scoped: ProviderModelsStore = {
-          read: () => store.read(provider.id),
-          write: (entry) => store.write(provider.id, entry),
-          delete: () => store.delete(provider.id),
-        };
+        const generation = (refreshGenerations.get(provider.id) ?? 0) + 1;
+        refreshGenerations.set(provider.id, generation);
         try {
           // Always restore the persisted overlay first.
-          await provider.refreshModels({
-            store: scoped,
+          await refreshProvider(provider, {
             allowNetwork: false,
-            signal: options.signal,
+            signal,
+            generation,
           });
-          if (allowNetwork && !options.signal?.aborted) {
-            const stored = await store.read(provider.id);
+          if (allowNetwork && !signal.aborted) {
+            const stored = await store.read(provider.id, { signal });
             const stale =
               options.force === true ||
               stored?.checkedAt === undefined ||
               now() - stored.checkedAt >= REMOTE_CATALOG_REFRESH_INTERVAL_MS;
             if (stale) {
-              await provider.refreshModels({
-                store: scoped,
+              await refreshProvider(provider, {
                 allowNetwork: true,
                 force: options.force,
-                signal: options.signal,
+                signal,
+                generation,
               });
             }
           }

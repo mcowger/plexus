@@ -1,4 +1,4 @@
-import type { AuthInteraction, OAuthCredentials } from '@earendil-works/pi-ai';
+import type { OAuthCredentials, ProviderAuthInteraction } from '@earendil-works/pi-ai';
 import { OAuthAuthManager } from './oauth-auth-manager';
 import {
   getOAuthProviderAuth,
@@ -293,7 +293,7 @@ export class OAuthLoginSessionManager {
       return deferred.promise;
     };
 
-    const interaction: AuthInteraction = {
+    const interaction: ProviderAuthInteraction = {
       signal: session.abortController.signal,
       notify: (event) => {
         switch (event.type) {

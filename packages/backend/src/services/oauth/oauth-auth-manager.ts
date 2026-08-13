@@ -7,6 +7,7 @@ const LEGACY_ACCOUNT_ID = 'legacy';
 
 interface GetApiKeyOptions {
   refreshIfOlderThanMs?: number;
+  signal?: AbortSignal;
 }
 
 export class OAuthAuthManager {
@@ -196,6 +197,7 @@ export class OAuthAuthManager {
         (lastRefresh === undefined || now - lastRefresh >= options.refreshIfOlderThanMs));
 
     if (refreshRequested) {
+      const signal = options.signal ?? new AbortController().signal;
       const existingRefresh = this.refreshPromises.get(refreshKey);
       if (existingRefresh) {
         current = await existingRefresh;
@@ -205,7 +207,8 @@ export class OAuthAuthManager {
           resolvedAccountId,
           descriptor.oauth.refresh,
           current,
-          refreshKey
+          refreshKey,
+          signal
         );
         this.refreshPromises.set(refreshKey, refreshPromise);
         try {
@@ -237,9 +240,10 @@ export class OAuthAuthManager {
     accountId: string,
     refresh: OAuthAuth['refresh'],
     credentials: OAuthCredentials,
-    refreshKey: string
+    refreshKey: string,
+    signal: AbortSignal
   ): Promise<OAuthCredentials> {
-    const refreshed = await refresh({ ...credentials, type: 'oauth' } as OAuthCredential);
+    const refreshed = await refresh({ ...credentials, type: 'oauth' } as OAuthCredential, signal);
     const current = {
       ...refreshed,
       refresh: refreshed.refresh || credentials.refresh,
