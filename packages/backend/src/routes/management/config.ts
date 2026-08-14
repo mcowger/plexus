@@ -7,6 +7,7 @@ import {
   McpServerConfigSchema,
   CompactionConfigSchema,
   normalizeKeyConfig,
+  assertNoAliasRefCycles,
 } from '../../config';
 import { validateRawProviderSlug } from '../../services/dispatch/raw-passthrough';
 import { ConfigService } from '../../services/configuration/config-service';
@@ -294,6 +295,9 @@ export async function registerConfigRoutes(
       return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
     try {
+      const currentModels = await configService.getRepository().getAllAliases();
+      assertNoAliasRefCycles({ ...currentModels, [slug]: result.data });
+
       await configService.saveAlias(slug, result.data);
 
       await recalculateEnergyIfChanged(
@@ -329,6 +333,9 @@ export async function registerConfigRoutes(
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
       }
+      const currentModels = await configService.getRepository().getAllAliases();
+      assertNoAliasRefCycles({ ...currentModels, [slug]: result.data });
+
       await configService.saveAlias(slug, result.data);
 
       await recalculateEnergyIfChanged(

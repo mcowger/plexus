@@ -190,6 +190,89 @@ describe('Alias-as-fallback-target', () => {
     expect(result[0]?.model).toBe('model-2');
   });
 
+  test('alias-ref expansions are appended after selector-ordered concrete targets', async () => {
+    setConfigForTesting(
+      makeConfig({
+        A: {
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ alias: 'B' }, { provider: 'p2', model: 'model-2' }],
+            },
+          ],
+        },
+        B: {
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'p1', model: 'model-1' }],
+            },
+          ],
+        },
+      })
+    );
+
+    const result = await Router.resolveCandidates('A');
+    expect(result).toHaveLength(2);
+    expect(result[0]?.provider).toBe('p2');
+    expect(result[1]?.provider).toBe('p1');
+  });
+
+  test('alias-ref declared after a concrete target stays as fallback', async () => {
+    setConfigForTesting(
+      makeConfig({
+        A: {
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'p2', model: 'model-2' }, { alias: 'B' }],
+            },
+          ],
+        },
+        B: {
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'p1', model: 'model-1' }],
+            },
+          ],
+        },
+      })
+    );
+
+    const result = await Router.resolveCandidates('A');
+    expect(result).toHaveLength(2);
+    expect(result[0]?.provider).toBe('p2');
+    expect(result[1]?.provider).toBe('p1');
+  });
+
+  test('direct/<alias>/<group> resolves a group containing only an alias-ref', async () => {
+    setConfigForTesting(
+      makeConfig({
+        A: {
+          target_groups: [{ name: 'primary', selector: 'in_order', targets: [{ alias: 'B' }] }],
+        },
+        B: {
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'p1', model: 'model-1' }],
+            },
+          ],
+        },
+      })
+    );
+
+    const result = await Router.resolve('direct/A/primary');
+    expect(result.provider).toBe('p1');
+    expect(result.model).toBe('model-1');
+  });
+
   test('assertNoAliasRefCycles throws on A -> B -> A', () => {
     const models = {
       A: {

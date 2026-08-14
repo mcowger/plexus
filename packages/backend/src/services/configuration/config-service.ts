@@ -1,5 +1,6 @@
 import { ConfigRepository, OAuthCredentialsData } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
+import { assertNoAliasRefCycles } from '../../config';
 import type {
   PlexusConfig,
   ProviderConfig,
@@ -468,6 +469,7 @@ export class ConfigService {
   private async doRebuild(): Promise<void> {
     const providers = await this.repo.getAllProviders();
     const models = await this.repo.getAllAliases();
+    assertNoAliasRefCycles(models);
     const keys = await this.repo.getAllKeys();
     const userQuotas = await this.repo.getAllUserQuotas();
     const mcpServers = await this.repo.getAllMcpServers();

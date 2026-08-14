@@ -369,41 +369,38 @@ async function buildGroupCandidates(
     };
   });
 
-  // Concrete targets keep the selector-decided order (`results`, which may
-  // be a strict subset of `concreteTargets` after health/concurrency/API
-  // filtering — the selector never reorders across a filtered-out target,
-  // so positional remapping into group.targets is unsafe). Build a lookup
-  // of the ordered concrete results, then walk group.targets in their
-  // declared order so alias-ref expansions land in their author-declared
-  // position relative to concrete targets, instead of always trailing.
-  const resultsByKey = new Map<string, RouteResult>();
-  for (const result of results) {
-    resultsByKey.set(`${result.provider}\u0000${result.model}`, result);
-  }
+  // Selector order is authoritative for concrete targets. Alias-ref
+  // expansions are appended after the selector-ordered concrete candidates,
+  // in their declared relative order. This preserves selector behaviour
+  // (cost/random/latency/performance/usage) while making alias-refs act
+  // as fallback chains.
+  const merged: RouteResult[] = [...results];
 
-  const merged: RouteResult[] = [];
   for (const target of group.targets) {
-    if (target.alias) {
-      if (target.enabled === false) continue;
-      if (visited.has(target.alias)) {
-        logger.warn(
-          `Router: alias-ref cycle detected while expanding '${target.alias}'; skipping to avoid infinite recursion.`
-        );
-        continue;
-      }
-      const nested = await Router.resolveCandidates(
-        target.alias,
-        incomingApiType,
-        sessionKey,
-        visited
+    if (!target.alias) continue;
+    if (target.enabled === false) continue;
+    if (visited.has(target.alias)) {
+      logger.warn(
+        `Router: alias-ref cycle detected while expanding '${target.alias}'; skipping to avoid infinite recursion.`
       );
-      merged.push(...nested);
       continue;
     }
-
-    const result = resultsByKey.get(`${target.provider}\u0000${target.model}`);
-    if (result) {
-      merged.push(result);
+    const nested = await Router.resolveCandidates(
+      target.alias,
+      incomingApiType,
+      sessionKey,
+      visited
+    );
+    // Rewrite metadata to the outer alias so downstream logic (extraBody,
+    // advanced behaviors, context limits, vision fallthrough, compaction,
+    // sticky sessions) treats the request as the outer alias, not the
+    // referenced one.
+    for (const candidate of nested) {
+      merged.push({
+        ...candidate,
+        canonicalModel,
+        incomingModelAlias: logModelName,
+      });
     }
   }
 
