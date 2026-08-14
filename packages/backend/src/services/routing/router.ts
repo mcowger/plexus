@@ -398,7 +398,8 @@ async function buildGroupCandidates(
     for (const candidate of nested) {
       merged.push({
         ...candidate,
-        modelArchitecture: config.models?.[canonicalModel]?.model_architecture,
+        modelArchitecture:
+          config.models?.[canonicalModel]?.model_architecture ?? candidate.modelArchitecture,
         canonicalModel,
         incomingModelAlias: logModelName,
       });
