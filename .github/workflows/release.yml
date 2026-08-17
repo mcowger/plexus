@@ -257,9 +257,13 @@ jobs:
 
       - name: Run release notes agent
         id: release_notes_agent
-        uses: anthropics/claude-code-action@v1
+        # claude-code-action detects GitHub event type (PR/issue/comment) and
+        # rejects unsupported ones, including `push` — which is how this
+        # workflow is triggered. claude-code-base-action is the same Claude
+        # Code executor without the GitHub event/webhook layer, so it runs
+        # the agentic prompt (full Read/Write tool use) regardless of event.
+        uses: anthropics/claude-code-base-action@v0.0.63
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ env.LLM_API_KEY }}
           claude_args: |
             --model ${{ vars.LLM_MODEL_ID }}
