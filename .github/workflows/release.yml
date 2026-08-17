@@ -265,10 +265,9 @@ jobs:
         uses: anthropics/claude-code-base-action@v0.0.63
         with:
           anthropic_api_key: ${{ env.LLM_API_KEY }}
-          claude_args: |
-            --model ${{ vars.LLM_MODEL_ID }}
-            --max-turns 10
-            --allowedTools "Read,Write"
+          model: ${{ vars.LLM_MODEL_ID }}
+          max_turns: '10'
+          allowed_tools: 'Read,Write'
           prompt: |
             Read `.github/prompts/release-notes.md` and follow its instructions exactly.
             The release tag is `${{ needs.setup.outputs.tag }}`. Do not perform any other work.
