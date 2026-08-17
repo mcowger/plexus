@@ -540,6 +540,13 @@
       "when": 1785963111200,
       "tag": "0076_add_mcp_oauth_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1786930336329,
+      "tag": "0077_add_alias_as_fallback_target",
+      "breakpoints": true
     }
   ]
 }

@@ -289,4 +289,25 @@ describe('Alias-as-fallback-target', () => {
 
     expect(() => assertNoAliasRefCycles(models)).toThrow(/Alias reference cycle detected/);
   });
+
+  test('ignores disabled alias-ref edges when detecting cycles', () => {
+    const models = {
+      A: {
+        target_groups: [
+          {
+            name: 'primary',
+            selector: 'in_order' as const,
+            targets: [{ alias: 'B', enabled: false }],
+          },
+        ],
+      },
+      B: {
+        target_groups: [
+          { name: 'primary', selector: 'in_order' as const, targets: [{ alias: 'A' }] },
+        ],
+      },
+    } as any;
+
+    expect(() => assertNoAliasRefCycles(models)).not.toThrow();
+  });
 });

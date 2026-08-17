@@ -791,7 +791,9 @@ export function assertNoAliasRefCycles(models: Record<string, ModelConfig> | und
     const refs: string[] = [];
     for (const group of model.target_groups) {
       for (const target of group.targets) {
-        if (target.alias) refs.push(canonicalBySlug.get(target.alias) ?? target.alias);
+        if (target.enabled !== false && target.alias) {
+          refs.push(canonicalBySlug.get(target.alias) ?? target.alias);
+        }
       }
     }
     return refs;
