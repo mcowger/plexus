@@ -1,6 +1,137 @@
 import { logger } from '../../utils/logger';
 import type { StallConfig } from '../inspectors/stall-inspector';
 
+/**
+ * Inspects the initial raw stream bytes for early SSE/JSON error events
+ * (such as OpenRouter/OpenAI 429 rate limit or server errors sent with HTTP 200).
+ */
+export function parseInitialStreamError(chunk: Uint8Array): Error | null {
+  if (!chunk || chunk.length === 0) return null;
+  const text = new TextDecoder().decode(chunk).trim();
+  if (!text) return null;
+
+  // 1. Try parsing SSE lines or raw JSON
+  const lines = text.split('\n');
+  let eventType = '';
+  let dataStr = '';
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line.startsWith('event:')) {
+      eventType = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      dataStr = line.slice(5).trim();
+    }
+  }
+
+  let candidateJson = dataStr;
+  if (!candidateJson && (text.startsWith('{') || text.startsWith('['))) {
+    candidateJson = text;
+  }
+
+  if (!candidateJson || candidateJson === '[DONE]') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(candidateJson);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    // Normal completion chunks with choices or content blocks are not error payloads
+    const isNormalChoiceChunk =
+      Array.isArray(parsed.choices) &&
+      parsed.choices.length > 0 &&
+      parsed.choices[0]?.delta !== undefined;
+    const isNormalAnthropicChunk =
+      parsed.type === 'message_start' ||
+      parsed.type === 'content_block_start' ||
+      parsed.type === 'content_block_delta' ||
+      parsed.type === 'message_delta' ||
+      parsed.type === 'message_stop';
+    if (isNormalChoiceChunk || isNormalAnthropicChunk) {
+      return null;
+    }
+
+    const hasErrorProp = parsed.error !== undefined && parsed.error !== null;
+    const isErrorEvent =
+      eventType === 'error' ||
+      parsed.type === 'error' ||
+      parsed.event === 'error' ||
+      parsed.type === 'response.failed';
+    const isErrorStatus =
+      (typeof parsed.code === 'number' && parsed.code >= 400) ||
+      (typeof parsed.status === 'number' && parsed.status >= 400);
+    const isProviderReturnedError =
+      parsed.message === 'Provider returned error' ||
+      parsed.error?.message === 'Provider returned error';
+
+    if (!hasErrorProp && !isErrorEvent && !isErrorStatus && !isProviderReturnedError) {
+      return null;
+    }
+
+    const errorObj =
+      typeof parsed.error === 'object' && parsed.error !== null ? parsed.error : parsed;
+    const meta = errorObj.metadata || parsed.metadata;
+    const rawMsg = meta?.raw;
+    const message =
+      (typeof rawMsg === 'string' && rawMsg.trim()) ||
+      errorObj.message ||
+      parsed.message ||
+      (typeof parsed.error === 'string' ? parsed.error : 'Stream error from upstream provider');
+
+    let statusCode = 502;
+    if (typeof errorObj.code === 'number') {
+      statusCode = errorObj.code;
+    } else if (typeof parsed.code === 'number') {
+      statusCode = parsed.code;
+    } else if (typeof errorObj.status === 'number') {
+      statusCode = errorObj.status;
+    } else if (typeof errorObj.code === 'string' && !isNaN(Number(errorObj.code))) {
+      statusCode = Number(errorObj.code);
+    } else if (
+      String(message).toLowerCase().includes('rate-limited') ||
+      String(message).toLowerCase().includes('rate limit') ||
+      errorObj.type === 'rate_limit_error'
+    ) {
+      statusCode = 429;
+    }
+
+    let cooldownDuration: number | undefined;
+    const retrySec = meta?.retry_after_seconds ?? meta?.retry_after_seconds_raw;
+    if (retrySec !== undefined && retrySec !== null) {
+      const sec = typeof retrySec === 'number' ? retrySec : parseFloat(String(retrySec));
+      if (Number.isFinite(sec) && sec > 0) {
+        cooldownDuration = Math.ceil(sec * 1000);
+      }
+    }
+    if (!cooldownDuration) {
+      const headerRetry = meta?.headers?.['Retry-After'] || meta?.headers?.['retry-after'];
+      if (headerRetry) {
+        const sec = parseFloat(headerRetry);
+        if (Number.isFinite(sec) && sec > 0) {
+          cooldownDuration = Math.ceil(sec * 1000);
+        }
+      }
+    }
+
+    const err = new Error(String(message));
+    (err as any).isStreamError = true;
+    (err as any).statusCode = statusCode;
+    (err as any).routingContext = {
+      statusCode,
+      providerResponse: text,
+      cooldownTriggered: true,
+    };
+    if (cooldownDuration) {
+      (err as any).cooldownDuration = cooldownDuration;
+    }
+
+    return err;
+  } catch {
+    return null;
+  }
+}
+
 export async function probeStreamingStart(
   response: Response,
   stallConfig?: StallConfig | null
@@ -75,6 +206,19 @@ export async function probeStreamingStart(
     }
 
     const first = readResult as ReadableStreamReadResult<Uint8Array>;
+    if (!first.done && first.value) {
+      const initialError = parseInitialStreamError(first.value);
+      if (initialError) {
+        reader.cancel().catch(() => {});
+        logger.warn(`probeStreamingStart: detected early stream error: ${initialError.message}`);
+        return {
+          ok: false,
+          error: initialError,
+          streamStarted: false,
+        };
+      }
+    }
+
     const replay = new ReadableStream<Uint8Array>({
       start(controller) {
         if (!first.done && first.value) {
@@ -178,6 +322,19 @@ async function probeStreamingStartWithStallCheck(
       chunks.push(value);
       totalBytes += value.length;
       streamStarted = true;
+    }
+
+    if (chunks.length > 0) {
+      const initialError = parseInitialStreamError(chunks[0]!);
+      if (initialError) {
+        reader.cancel().catch(() => {});
+        logger.warn(`probeStreamingStart: detected early stream error: ${initialError.message}`);
+        return {
+          ok: false,
+          error: initialError,
+          streamStarted: false,
+        };
+      }
     }
 
     // TTFB threshold met (or stream ended naturally) — build replay stream

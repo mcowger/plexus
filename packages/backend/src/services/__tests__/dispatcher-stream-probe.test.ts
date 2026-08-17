@@ -121,4 +121,104 @@ describe('probeStreamingStart', () => {
       expect(error.message).toBe('connection reset');
     }
   });
+
+  test('detects OpenRouter upstream rate limit SSE error and returns ok: false with parsed cooldown', async () => {
+    const encoder = new TextEncoder();
+    const errorPayload = {
+      message: 'Provider returned error',
+      code: 429,
+      metadata: {
+        raw: 'openai/gpt-5.6-luna is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations',
+        provider_name: 'OpenInference',
+        is_byok: false,
+        retry_after_seconds: 29,
+      },
+    };
+    const chunk = encoder.encode(`data: ${JSON.stringify(errorPayload)}\n\n`);
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+
+    const response = new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+
+    const dispatcher = new Dispatcher();
+    const result = await (dispatcher as any).probeStreamingStart(response);
+
+    expect(result.ok).toBe(false);
+    expect(result.error.message).toContain(
+      'openai/gpt-5.6-luna is temporarily rate-limited upstream'
+    );
+    expect(result.error.statusCode).toBe(429);
+    expect(result.error.cooldownDuration).toBe(29000);
+    expect(result.error.isStreamError).toBe(true);
+  });
+
+  test('detects Anthropic SSE error event and returns ok: false', async () => {
+    const encoder = new TextEncoder();
+    const errorEvent =
+      'event: error\ndata: {"type":"error","error":{"type":"rate_limit_error","message":"Anthropic rate limit hit"}}\n\n';
+    const chunk = encoder.encode(errorEvent);
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+
+    const response = new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+
+    const dispatcher = new Dispatcher();
+    const result = await (dispatcher as any).probeStreamingStart(response);
+
+    expect(result.ok).toBe(false);
+    expect(result.error.message).toBe('Anthropic rate limit hit');
+    expect(result.error.statusCode).toBe(429);
+    expect(result.error.isStreamError).toBe(true);
+  });
+
+  test('does not falsely flag normal delta content mentioning the word error', async () => {
+    const encoder = new TextEncoder();
+    const normalPayload = {
+      id: 'chatcmpl-123',
+      object: 'chat.completion.chunk',
+      created: 1700000000,
+      model: 'gpt-5.6-luna',
+      choices: [
+        {
+          index: 0,
+          delta: { content: 'Here is the error log you requested.' },
+          finish_reason: null,
+        },
+      ],
+    };
+    const chunk = encoder.encode(`data: ${JSON.stringify(normalPayload)}\n\n`);
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+
+    const response = new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+
+    const dispatcher = new Dispatcher();
+    const result = await (dispatcher as any).probeStreamingStart(response);
+
+    expect(result.ok).toBe(true);
+  });
 });

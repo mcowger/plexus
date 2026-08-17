@@ -319,6 +319,37 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     // long-lived request) was never mutated in place.
     expect(providerPayload).toEqual(snapshot);
   });
+
+  it('retries on early stream error from probeStreamingStart', async () => {
+    const executeProviderRequest = vi.fn(
+      async () =>
+        new Response('data: {"error":{"code":429,"message":"Rate limit"}}\n\n', { status: 200 })
+    );
+    const streamError = new Error('openai/gpt-5.6-luna is temporarily rate-limited upstream');
+    (streamError as any).isStreamError = true;
+    (streamError as any).statusCode = 429;
+    (streamError as any).cooldownDuration = 30000;
+
+    const probeStreamingStart = vi.fn().mockResolvedValue({
+      ok: false,
+      error: streamError,
+      streamStarted: false,
+    });
+    const host = makeHost({ executeProviderRequest, probeStreamingStart });
+
+    const request = makeStreamingRequest();
+    const result = await executeStandardAttempt(
+      makeContext(host, {}, { request, requestWithTargetModel: request, targetApiType: 'chat' })
+    );
+    expect(result.outcome).toBe('retry');
+    expect(host.appendFailureAttempt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      streamError,
+      'chat',
+      true
+    );
+  });
 });
 
 describe('failover-policy 402 status code handling', () => {

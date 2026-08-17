@@ -740,14 +740,29 @@ export class Dispatcher {
     if (!isCallerError) {
       let cooldownDuration: number | undefined;
 
-      // For 429 errors, try to parse provider-specific cooldown duration
-      if (response.status === 429) {
-        // Get provider type for parser lookup
-        cooldownDuration = parseCooldownDurationForProvider(
-          resolveCooldownProviderType(route),
-          errorText,
-          'HTTP'
-        );
+      // For 429/503 errors, check Retry-After header first, then try to parse provider-specific cooldown duration
+      if (response.status === 429 || response.status === 503) {
+        const retryAfterHeader = response.headers.get('retry-after');
+        if (retryAfterHeader) {
+          const seconds = parseFloat(retryAfterHeader);
+          if (Number.isFinite(seconds) && seconds > 0) {
+            cooldownDuration = Math.ceil(seconds * 1000);
+          } else {
+            const dateParsed = Date.parse(retryAfterHeader);
+            if (Number.isFinite(dateParsed) && dateParsed > Date.now()) {
+              cooldownDuration = dateParsed - Date.now();
+            }
+          }
+        }
+
+        if (!cooldownDuration) {
+          // Get provider type for parser lookup
+          cooldownDuration = parseCooldownDurationForProvider(
+            resolveCooldownProviderType(route),
+            errorText,
+            'HTTP'
+          );
+        }
       }
 
       // Mark provider+model as failed with optional duration

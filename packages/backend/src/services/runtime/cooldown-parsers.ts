@@ -31,6 +31,51 @@ export class CooldownParserRegistry {
         return Number.isFinite(minutes) && minutes > 0 ? minutes * 60 * 1000 : null;
       },
     });
+
+    // Built-in parser for OpenRouter rate limit and upstream provider error messages.
+    // Extracts retry_after_seconds from metadata or Retry-After header fields.
+    CooldownParserRegistry.register('openrouter', {
+      parseCooldownDuration(errorText: string): number | null {
+        try {
+          const data = JSON.parse(errorText);
+          const meta = data.error?.metadata || data.metadata;
+          const retrySec = meta?.retry_after_seconds ?? meta?.retry_after_seconds_raw;
+          if (retrySec !== undefined && retrySec !== null) {
+            const sec = typeof retrySec === 'number' ? retrySec : parseFloat(String(retrySec));
+            if (Number.isFinite(sec) && sec > 0) {
+              return Math.ceil(sec * 1000);
+            }
+          }
+          const headerRetry = meta?.headers?.['Retry-After'] || meta?.headers?.['retry-after'];
+          if (headerRetry) {
+            const sec = parseFloat(headerRetry);
+            if (Number.isFinite(sec) && sec > 0) {
+              return Math.ceil(sec * 1000);
+            }
+          }
+        } catch {
+          // not JSON, fall through to regex parsing
+        }
+
+        const secMatch = /retry(?:-|\s+)after[:\s]+(\d+(?:\.\d+)?)\s*s(?:ec(?:onds?)?)?/i.exec(
+          errorText
+        );
+        if (secMatch && secMatch[1]) {
+          const sec = parseFloat(secMatch[1]);
+          if (Number.isFinite(sec) && sec > 0) return Math.ceil(sec * 1000);
+        }
+
+        const minMatch = /retry(?:-|\s+)after[:\s]+(\d+(?:\.\d+)?)\s*m(?:in(?:utes?)?)?/i.exec(
+          errorText
+        );
+        if (minMatch && minMatch[1]) {
+          const min = parseFloat(minMatch[1]);
+          if (Number.isFinite(min) && min > 0) return Math.ceil(min * 60 * 1000);
+        }
+
+        return null;
+      },
+    });
   }
 
   /**

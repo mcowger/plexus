@@ -414,7 +414,9 @@ export async function executeStandardAttempt(
         hasNextTarget &&
         !streamProbe.streamStarted &&
         (host.isRetryableNetworkError(error, retryableErrors) ||
-          error.message?.includes('stalled'));
+          error.message?.includes('stalled') ||
+          (error as any).isStreamError === true ||
+          (error as any).routingContext?.statusCode !== undefined);
 
       if (canRetry) {
         attemptTimeout.cleanup();
@@ -434,7 +436,7 @@ export async function executeStandardAttempt(
           CooldownManager.getInstance().markProviderFailure(
             route.provider,
             route.model,
-            undefined,
+            (error as any).cooldownDuration,
             host.formatFailureReason(error)
           );
         }
@@ -444,6 +446,15 @@ export async function executeStandardAttempt(
         );
         doRelease();
         return { outcome: 'retry', error };
+      }
+
+      if ((error as any).isStreamError || (error as any).routingContext?.cooldownTriggered) {
+        CooldownManager.getInstance().markProviderFailure(
+          route.provider,
+          route.model,
+          (error as any).cooldownDuration,
+          host.formatFailureReason(error)
+        );
       }
 
       doRelease();

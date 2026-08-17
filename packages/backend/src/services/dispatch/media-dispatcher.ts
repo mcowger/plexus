@@ -751,7 +751,8 @@ export class MediaDispatcher {
               failoverEnabled &&
               i < targets.length - 1 &&
               !streamProbe.streamStarted &&
-              host.isRetryableNetworkError(error, failover?.retryableErrors || []);
+              (host.isRetryableNetworkError(error, failover?.retryableErrors || []) ||
+                (error as any).isStreamError === true);
 
             if (canRetry) {
               await host.recordAttemptMetric(route, request.requestId, false);
@@ -760,7 +761,7 @@ export class MediaDispatcher {
               CooldownManager.getInstance().markProviderFailure(
                 route.provider,
                 route.model,
-                undefined,
+                (error as any).cooldownDuration,
                 error.message
               );
               host.saveIntermediateError(request.requestId, 'speech', error);
@@ -768,6 +769,15 @@ export class MediaDispatcher {
                 `Failover: retrying speech stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
               );
               continue;
+            }
+
+            if ((error as any).isStreamError) {
+              CooldownManager.getInstance().markProviderFailure(
+                route.provider,
+                route.model,
+                (error as any).cooldownDuration,
+                error.message
+              );
             }
 
             throw error;
