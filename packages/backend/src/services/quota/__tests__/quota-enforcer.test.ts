@@ -466,6 +466,14 @@ describe('QuotaEnforcer', () => {
     });
 
     test('limitType change resets the bucket instead of leaking stale usage', async () => {
+      // Pin the clock: the leaky bucket decays usage by elapsed real time
+      // (see computeSnapshot's `elapsedMs * leakRate`), so without a fixed
+      // clock this test is flaky — any wall-clock jitter between the write
+      // and the read below shaves fractions of a token off currentUsage,
+      // which can round down to 4999 under CI load.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-03-15T12:00:00.000Z'));
+
       setConfigForTesting(
         createTestConfig(
           { q: { type: 'rolling', limitType: 'tokens', limit: 10000, duration: '1h' } },
