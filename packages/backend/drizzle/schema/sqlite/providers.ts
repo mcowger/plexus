@@ -16,6 +16,7 @@ export const providers = sqliteTable(
     enabled: integer('enabled').notNull().default(1),
     disableCooldown: integer('disable_cooldown').notNull().default(0),
     stallCooldown: integer('stall_cooldown').notNull().default(0),
+    allow100PercentUtilization: integer('allow_100_percent_utilization').notNull().default(0),
     discount: real('discount'),
     estimateTokens: integer('estimate_tokens').notNull().default(0),
     useClaudeMasking: integer('use_claude_masking').notNull().default(0),

@@ -667,6 +667,7 @@ export const ProviderConfigSchema = z
     enabled: z.boolean().default(true).optional(),
     disable_cooldown: z.boolean().optional().default(false),
     stall_cooldown: z.boolean().optional().default(false),
+    allow_100_percent_utilization: z.boolean().optional().default(false),
     discount: z.number().min(0).max(1).optional(),
     models: z
       .union([z.array(z.string()), z.record(z.string(), ModelProviderConfigSchema)])
@@ -1503,6 +1504,13 @@ function buildProviderQuotaConfigs(config: z.infer<typeof RawPlexusConfigSchema>
 
     if (providerConfig.oauth_account && options.oauthAccountId === undefined) {
       options.oauthAccountId = providerConfig.oauth_account;
+    }
+
+    if (
+      providerConfig.allow_100_percent_utilization !== undefined &&
+      options.allow100PercentUtilization === undefined
+    ) {
+      options.allow100PercentUtilization = providerConfig.allow_100_percent_utilization;
     }
 
     quotas.push({

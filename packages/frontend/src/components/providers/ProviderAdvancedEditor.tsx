@@ -1209,6 +1209,27 @@ export function ProviderAdvancedEditor({
                 </label>
                 <label className="flex items-start gap-2 py-1 cursor-pointer">
                   <Switch
+                    checked={editingProvider.allow100PercentUtilization || false}
+                    onChange={(checked) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        allow100PercentUtilization: checked,
+                      })
+                    }
+                  />
+                  <div>
+                    <div className="font-body text-[12px] text-text">Allow 100% Utilization</div>
+                    <div
+                      className="font-body text-[11px] text-text-muted"
+                      style={{ lineHeight: 1.35 }}
+                    >
+                      Allow quota usage to reach 100% instead of cooling down at 99%. May result in
+                      repeat attempts or failed generations.
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 py-1 cursor-pointer">
+                  <Switch
                     checked={editingProvider.useClaudeMasking || false}
                     onChange={(checked) =>
                       setEditingProvider({ ...editingProvider, useClaudeMasking: checked })

@@ -8,6 +8,7 @@ const makeProvider = (intervalMinutes: number): ProviderConfig => ({
   api_key: 'sk-test',
   disable_cooldown: false,
   stall_cooldown: false,
+  allow_100_percent_utilization: false,
   estimateTokens: false,
   useClaudeMasking: false,
   model_autosync: { enabled: true, intervalMinutes },

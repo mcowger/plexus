@@ -27,6 +27,7 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
       api_key: 'sk-test',
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
       auto_compat: true,
@@ -65,6 +66,7 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
       api_key: 'sk-test',
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
       // no pi_ai_provider
@@ -87,6 +89,7 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
       api_key: 'sk-test',
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
       pi_ai_provider: 'anthropic',
@@ -106,6 +109,7 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
       api_key: 'sk-test',
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
       // pi_ai_provider omitted

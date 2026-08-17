@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "allow_100_percent_utilization" boolean DEFAULT false NOT NULL;

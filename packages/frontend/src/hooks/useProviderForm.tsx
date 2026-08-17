@@ -64,6 +64,7 @@ export const EMPTY_PROVIDER: Provider = {
   enabled: true,
   disableCooldown: false,
   stallCooldown: false,
+  allow100PercentUtilization: false,
   estimateTokens: false,
   useClaudeMasking: false,
   apiBaseUrl: {},

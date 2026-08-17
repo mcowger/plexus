@@ -564,6 +564,12 @@ export class ConfigService {
       if (providerConfig.oauth_account && options.oauthAccountId === undefined) {
         options.oauthAccountId = providerConfig.oauth_account;
       }
+      if (
+        providerConfig.allow_100_percent_utilization !== undefined &&
+        options.allow100PercentUtilization === undefined
+      ) {
+        options.allow100PercentUtilization = providerConfig.allow_100_percent_utilization;
+      }
 
       quotas.push({
         id: checkerId,

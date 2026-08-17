@@ -130,14 +130,29 @@ export class QuotaScheduler {
     return result;
   }
 
+  private getExhaustionThreshold(config: QuotaConfig): number {
+    if (
+      typeof config.options.maxUtilizationPercent === 'number' &&
+      config.options.maxUtilizationPercent > 0
+    ) {
+      return config.options.maxUtilizationPercent;
+    }
+    if (
+      config.options.allow100PercentUtilization === true ||
+      config.options.allow_100_percent_utilization === true
+    ) {
+      return 100;
+    }
+    return DEFAULT_EXHAUSTION_THRESHOLD;
+  }
+
   private async applyCooldownsFromResult(
     result: MeterCheckResult,
     config: QuotaConfig
   ): Promise<void> {
     if (!result.success || result.meters.length === 0) return;
 
-    const exhaustionThreshold =
-      (config.options.maxUtilizationPercent as number | undefined) ?? DEFAULT_EXHAUSTION_THRESHOLD;
+    const exhaustionThreshold = this.getExhaustionThreshold(config);
     const cooldownManager = CooldownManager.getInstance();
     const provider = result.provider;
 
@@ -196,15 +211,17 @@ export class QuotaScheduler {
   }
 
   private getStrictestThresholdForProvider(provider: string): number {
-    let strictest = DEFAULT_EXHAUSTION_THRESHOLD;
+    let strictest = 100;
+    let found = false;
     for (const [, config] of this.configs) {
       if (config.provider !== provider) continue;
-      const threshold = config.options.maxUtilizationPercent as number | undefined;
-      if (threshold !== undefined && threshold < strictest) {
+      found = true;
+      const threshold = this.getExhaustionThreshold(config);
+      if (threshold < strictest) {
         strictest = threshold;
       }
     }
-    return strictest;
+    return found ? strictest : DEFAULT_EXHAUSTION_THRESHOLD;
   }
 
   private async persistResult(result: MeterCheckResult): Promise<void> {

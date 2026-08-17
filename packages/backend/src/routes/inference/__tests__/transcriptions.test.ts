@@ -45,6 +45,7 @@ const TRANSCRIPTIONS_TEST_CONFIG = {
       estimateTokens: false,
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       useClaudeMasking: false,
       models: {
         'whisper-1': {

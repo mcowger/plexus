@@ -547,6 +547,13 @@
       "when": 1786930336329,
       "tag": "0077_add_alias_as_fallback_target",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1786932513074,
+      "tag": "0078_add_allow_100_percent_utilization",
+      "breakpoints": true
     }
   ]
 }

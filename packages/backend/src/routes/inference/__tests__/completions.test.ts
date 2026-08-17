@@ -15,6 +15,7 @@ const COMPLETIONS_TEST_CONFIG = {
       estimateTokens: false,
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       useClaudeMasking: false,
       models: {
         'gpt-3.5-turbo-instruct': {

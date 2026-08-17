@@ -137,6 +137,7 @@ describe('ConfigService write coalescing', () => {
       api_key: 'synthetic-key',
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
       quota_checker: {

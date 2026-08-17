@@ -115,6 +115,7 @@ A **provider** represents an upstream AI service that Plexus routes requests to.
 | **Extra Body** | Additional fields merged into every request | No |
 | **Upstream Timeout** | Per-provider request timeout override in milliseconds. If unset, the global timeout is used. | No |
 | **Disable Cooldown** | Exclude from automatic cooldown on errors | No |
+| **Allow 100% Utilization** | Allow quota usage to reach 100% instead of cooling down at 99% | No (default: false) |
 | **Stall Detection Overrides** | Optional per-provider overrides for TTFB/throughput stall detection. Empty = inherit global setting for that field. | No |
 | **pi-ai Provider** | Builtin pi-ai provider ID used for registry model lookup (for example, `anthropic`, `openai`, `google`) | No |
 | **Auto Compat** | Use pi-ai registry metadata to automatically map reasoning/thinking and generation options for models with a `pi_ai_model_id` | No (default: false) |

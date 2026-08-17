@@ -62,6 +62,7 @@ describe('raw passthrough routes', () => {
           enabled: true,
           disable_cooldown: false,
           stall_cooldown: false,
+          allow_100_percent_utilization: false,
           estimateTokens: false,
           useClaudeMasking: false,
           raw_passthrough: {
@@ -200,6 +201,7 @@ describe('raw passthrough routes', () => {
           api_key: 'provider-secret',
           disable_cooldown: false,
           stall_cooldown: false,
+          allow_100_percent_utilization: false,
           estimateTokens: false,
           useClaudeMasking: false,
           raw_passthrough: {
@@ -291,6 +293,7 @@ describe('raw passthrough routes', () => {
           enabled: true,
           disable_cooldown: false,
           stall_cooldown: false,
+          allow_100_percent_utilization: false,
           estimateTokens: false,
           useClaudeMasking: false,
           timeoutMs: 20,
@@ -470,6 +473,7 @@ describe('raw passthrough routes', () => {
           enabled: true,
           disable_cooldown: false,
           stall_cooldown: false,
+          allow_100_percent_utilization: false,
           estimateTokens: false,
           useClaudeMasking: false,
           timeoutMs: 20,

@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `allow_100_percent_utilization` integer DEFAULT 0 NOT NULL;

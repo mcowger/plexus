@@ -220,6 +220,7 @@ export interface Provider {
   enabled: boolean;
   disableCooldown?: boolean;
   stallCooldown?: boolean;
+  allow100PercentUtilization?: boolean;
   estimateTokens?: boolean;
   useClaudeMasking?: boolean;
   geminiThinkingEnabled?: boolean;
@@ -1948,6 +1949,7 @@ export const api = {
           geminiThinkingEnabled: val.gemini_thinking_enabled === true,
           disableCooldown: val.disable_cooldown === true,
           stallCooldown: val.stall_cooldown === true,
+          allow100PercentUtilization: val.allow_100_percent_utilization === true,
           discount: val.discount,
           headers: val.headers,
           extraBody:
@@ -1999,6 +2001,8 @@ export const api = {
       geminiThinkingEnabled: provider.geminiThinkingEnabled,
       disable_cooldown: provider.disableCooldown === true ? true : undefined,
       stall_cooldown: provider.stallCooldown === true ? true : undefined,
+      allow_100_percent_utilization:
+        provider.allow100PercentUtilization === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,

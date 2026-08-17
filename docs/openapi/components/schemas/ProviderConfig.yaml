@@ -95,6 +95,12 @@ properties:
     description: >
       When enabled, stall detection cancellations will trigger cooldown for
       this provider.
+  allow_100_percent_utilization:
+    type: boolean
+    default: false
+    description: >
+      When enabled, allows quota usage to reach 100% instead of placing the provider
+      on cooldown at 99%. Note: this may result in repeat attempts or failed generations.
   discount:
     type: number
     minimum: 0

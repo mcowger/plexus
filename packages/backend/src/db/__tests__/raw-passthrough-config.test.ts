@@ -25,6 +25,7 @@ describe('raw passthrough configuration persistence', () => {
       api_key: 'provider-secret',
       disable_cooldown: false,
       stall_cooldown: false,
+      allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
       raw_passthrough: {

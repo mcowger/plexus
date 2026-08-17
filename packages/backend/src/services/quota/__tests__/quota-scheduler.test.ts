@@ -17,7 +17,11 @@ import { registerSpy } from '../../../../test/test-utils';
 const CHECKER_ID = 'quota-persistence-checker';
 
 const makeConfig = (
-  overrides: Partial<{ maxUtilizationPercent: number; intervalMinutes: number }> & {
+  overrides: Partial<{
+    maxUtilizationPercent: number;
+    allow100PercentUtilization: boolean;
+    intervalMinutes: number;
+  }> & {
     id?: string;
     provider?: string;
   } = {}
@@ -30,6 +34,9 @@ const makeConfig = (
   options: {
     ...(overrides.maxUtilizationPercent !== undefined
       ? { maxUtilizationPercent: overrides.maxUtilizationPercent }
+      : {}),
+    ...(overrides.allow100PercentUtilization !== undefined
+      ? { allow100PercentUtilization: overrides.allow100PercentUtilization }
       : {}),
   },
 });
@@ -46,7 +53,7 @@ const makeMeter = (
   used: Math.round((utilizationPercent / 100) * 1000),
   remaining: Math.round(((100 - utilizationPercent) / 100) * 1000),
   utilizationPercent,
-  status: utilizationPercent >= 99 ? 'exhausted' : utilizationPercent >= 90 ? 'critical' : 'ok',
+  status: utilizationPercent >= 100 ? 'exhausted' : utilizationPercent >= 90 ? 'critical' : 'ok',
   periodValue: 5,
   periodUnit: 'hour',
   periodCycle: 'rolling',
@@ -334,6 +341,76 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
 
     const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
     expect(isHealthy).toBe(false);
+  });
+
+  describe('allow100PercentUtilization option', () => {
+    it('allows usage to reach 99% without triggering cooldown when allow100PercentUtilization is true', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeConfig({ provider: PROVIDER, allow100PercentUtilization: true });
+      scheduler.configs.set('threshold-checker', config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeMeterResult(99, 'threshold-checker', PROVIDER),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+      expect(isHealthy).toBe(true); // 99% < 100% threshold — stays healthy
+    });
+
+    it('triggers cooldown at 100% when allow100PercentUtilization is true', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeConfig({ provider: PROVIDER, allow100PercentUtilization: true });
+      scheduler.configs.set('threshold-checker', config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeMeterResult(100, 'threshold-checker', PROVIDER),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+      expect(isHealthy).toBe(false); // 100% >= 100% — should cooldown
+    });
+
+    it('clears cooldown when utilization drops below 100%', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeConfig({ provider: PROVIDER, allow100PercentUtilization: true });
+      scheduler.configs.set('threshold-checker', config);
+
+      // Trigger at 100%
+      await scheduler.applyCooldownsFromResult(
+        makeMeterResult(100, 'threshold-checker', PROVIDER),
+        config
+      );
+      let isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+      expect(isHealthy).toBe(false);
+
+      // Drops to 99% — should clear cooldown
+      await scheduler.applyCooldownsFromResult(
+        makeMeterResult(99, 'threshold-checker', PROVIDER),
+        config
+      );
+      isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+      expect(isHealthy).toBe(true);
+    });
+
+    it('prefers explicit maxUtilizationPercent over allow100PercentUtilization', async () => {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const config = makeConfig({
+        provider: PROVIDER,
+        allow100PercentUtilization: true,
+        maxUtilizationPercent: 30,
+      });
+      scheduler.configs.set('threshold-checker', config);
+
+      await scheduler.applyCooldownsFromResult(
+        makeMeterResult(30, 'threshold-checker', PROVIDER),
+        config
+      );
+
+      const isHealthy = await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '');
+      expect(isHealthy).toBe(false); // Explicit 30% takes precedence
+    });
   });
 
   describe('Routing.run cooldown regression', () => {

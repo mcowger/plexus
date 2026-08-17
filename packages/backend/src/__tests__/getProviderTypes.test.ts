@@ -9,6 +9,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -21,6 +22,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -33,6 +35,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -45,6 +48,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -57,6 +61,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -69,6 +74,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -81,6 +87,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -94,6 +101,7 @@ describe('getProviderTypes', () => {
         oauth_provider: 'anthropic',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -108,6 +116,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -123,6 +132,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -137,6 +147,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -149,6 +160,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };
@@ -161,6 +173,7 @@ describe('getProviderTypes', () => {
         api_key: 'test-key',
         disable_cooldown: false,
         stall_cooldown: false,
+        allow_100_percent_utilization: false,
         estimateTokens: false,
         useClaudeMasking: false,
       };

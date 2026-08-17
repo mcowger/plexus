@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  '/.well-known/plexus/openapi.json': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get the public OpenAPI document
+     * @description Returns the complete dereferenced OpenAPI 3.1 document. This endpoint is public and supports conditional requests with `If-None-Match`.
+     */
+    get: operations['getWellKnownPlexusOpenapi'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -764,12 +784,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Configuration deployment status (admin only)
-     * @description Returns status flags about the current configuration state.
-     *
-     *     **Note:** Plexus no longer supports file-based configuration (YAML).
-     *     All configuration is stored in the database and managed via the Admin UI
-     *     or Management API.
+     * Get configuration resource counts (admin only)
+     * @description Returns counts for the database-backed configuration resources.
      *
      *     **Admin only** — limited principals receive 403.
      */
@@ -2209,6 +2225,58 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v0/management/mcp-servers/{serverName}/keys': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List MCP server keys (admin only) */
+    get: operations['getV0ManagementMcpServerKeys'];
+    put?: never;
+    /** Create an MCP server key (admin only) */
+    post: operations['postV0ManagementMcpServerKeys'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/keys/{keyId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete an MCP server key (admin only) */
+    delete: operations['deleteV0ManagementMcpServerKey'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/keys/{keyId}/clear-cooldown': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Clear an MCP server key cooldown (admin only) */
+    post: operations['postV0ManagementMcpServerKeyClearCooldown'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/v0/management/quota-checker-types': {
     parameters: {
       query?: never;
@@ -2815,10 +2883,8 @@ export interface paths {
      *
      *     ## Admin-only
      *
-     *     This endpoint is available to both admin and limited principals,
-     *     but limited principals only see cooldowns for their own key's usage.
-     *
-     *     **Admin access:** full list. **Limited access:** scoped to own key.
+     *     This endpoint is available to both admin and limited principals. Cooldown
+     *     state is provider-level, so both receive the same active cooldown list.
      */
     get: operations['getV0ManagementCooldowns'];
     put?: never;
@@ -4253,6 +4319,7 @@ export interface paths {
      *     ## Query parameters
      *
      *     - `limit` — Maximum number of log entries to return (default 100, max 1000)
+     *     - `offset` — Number of newest entries to skip (default 0)
      *
      *     **Admin only** — limited principals receive 403.
      */
@@ -4403,27 +4470,16 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * OAuth 2.0 authorization server metadata (public)
-     * @description Returns OAuth 2.0 authorization server metadata for MCP client
-     *     compatibility.
+     * OAuth 2.0 authorization server metadata (public when enabled)
+     * @description Returns the shared Plexus OAuth authorization-server metadata used by MCP
+     *     clients for discovery. The issuer, authorization, token, and dynamic
+     *     registration endpoints, supported grant types, PKCE method, and scopes are
+     *     resolved from the active provider at request time.
      *
-     *     ## Use case
+     *     MCP OAuth is opt-in. When `mcpOAuth.enabled` is false, this endpoint
+     *     returns `404` with an `oauth_disabled` error.
      *
-     *     MCP clients use this endpoint to discover OAuth configuration. The
-     *     response indicates that bearer token authentication is supported.
-     *
-     *     ## Response
-     *
-     *     Static metadata describing the authorization server. The exact content
-     *     varies by configuration but typically includes:
-     *     - `issuer` — Authorization server identifier
-     *     - `token_endpoint` — Where to request tokens
-     *     - `grant_types` — Supported grant types
-     *
-     *     **Not functional OAuth** — This exists for MCP client compatibility;
-     *     the actual OAuth flow is handled differently in Plexus.
-     *
-     *     **No auth** — This endpoint is public.
+     *     **No auth** — This endpoint is public while OAuth is enabled.
      */
     get: operations['getWellknownOauthauthorizationserver'];
     put?: never;
@@ -4434,7 +4490,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/.well-known/oauth-protected-resource': {
+  '/.well-known/oauth-protected-resource/mcp/{name}': {
     parameters: {
       query?: never;
       header?: never;
@@ -4442,20 +4498,18 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * OAuth 2.0 protected resource metadata (public)
-     * @description Returns OAuth 2.0 protected resource metadata for MCP client
-     *     compatibility.
+     * OAuth 2.0 protected resource metadata (public when enabled)
+     * @description Returns RFC 9728 protected-resource metadata for one configured MCP
+     *     server. The resource identifier is `https://host/mcp/{name}`; the
+     *     authorization server, supported scopes, and bearer transport are resolved
+     *     from the active provider at request time.
      *
-     *     ## Use case
+     *     MCP OAuth is opt-in. When `mcpOAuth.enabled` is false, this endpoint
+     *     returns `404` with an `oauth_disabled` error.
      *
-     *     MCP clients use this endpoint to discover resource protection
-     *     configuration.
-     *
-     *     **Not functional OAuth** — This exists for MCP client compatibility.
-     *
-     *     **No auth** — This endpoint is public.
+     *     **No auth** — This endpoint is public while OAuth is enabled.
      */
-    get: operations['getWellknownOauthprotectedresource'];
+    get: operations['getWellknownOauthprotectedresourceMcpByname'];
     put?: never;
     post?: never;
     delete?: never;
@@ -4464,7 +4518,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/.well-known/openid-configuration': {
+  '/oauth/authorize': {
     parameters: {
       query?: never;
       header?: never;
@@ -4472,28 +4526,36 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * OpenID Connect discovery (public)
-     * @description Returns OpenID Connect discovery document for MCP client compatibility.
-     *
-     *     ## Use case
-     *
-     *     MCP clients use this endpoint to discover OIDC configuration, including
-     *     supported token types, issuer URL, and other OAuth/OIDC parameters.
-     *
-     *     **Not functional OIDC** — This exists for MCP client compatibility.
-     *
-     *     **No auth** — This endpoint is public.
+     * OAuth authorization request (public when enabled)
+     * @description Starts the OAuth 2.1 authorization-code flow for one MCP protected
+     *     resource. The request must use PKCE with S256 and an RFC 8707 resource
+     *     identifier such as `https://host/mcp/exa`. GET renders the Plexus consent
+     *     page; the submitted form is handled by the POST variant.
      */
-    get: operations['getWellknownOpenidconfiguration'];
+    get: operations['getOauthAuthorize'];
     put?: never;
-    post?: never;
+    /**
+     * Submit OAuth authorization request (public when enabled)
+     * @description Completes the consent step using the existing Plexus browser login. The
+     *     consent page reads the logged-in credential from the same-origin Plexus UI
+     *     and sends it in the `x-admin-key` header; the raw API-key secret is not
+     *     included in the OAuth form or authorization URL. An administrator must
+     *     explicitly choose the non-secret `key_name` of the API-key identity to
+     *     which the grant will be bound, even when only one active API key exists.
+     *     A limited API-key session is bound automatically to its own key and cannot
+     *     choose another. A successful regular OAuth request redirects to the client
+     *     callback with a one-time authorization code. Requests with
+     *     `Accept: application/json` receive the callback URL in `redirect_to`
+     *     instead, which lets the same-origin consent page complete the redirect.
+     */
+    post: operations['postOauthAuthorize'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/register': {
+  '/oauth/token': {
     parameters: {
       query?: never;
       header?: never;
@@ -4503,32 +4565,36 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Dynamic MCP client registration (public, static response)
-     * @description Returns a static client registration record for MCP client compatibility.
-     *
-     *     ## Use case
-     *
-     *     MCP clients that support dynamic registration require this endpoint.
-     *     Plexus returns a static response indicating a pre-registered client.
-     *
-     *     ## Response
-     *
-     *     A static registration record:
-     *     - `client_id` — Fixed value: `plexus-mcp-static`
-     *     - `client_id_issued_at` — Unix timestamp
-     *     - `client_secret` — Empty (not used)
-     *     - `grant_types` — Supported grant types
-     *     - `token_endpoint_auth_method` — Authentication method for token endpoint
-     *
-     *     ## Note
-     *
-     *     This is a **static response** — it doesn't actually register new clients.
-     *     The endpoint exists solely for MCP client compatibility with clients
-     *     that expect this metadata before connecting.
-     *
-     *     **No auth** — This endpoint is public.
+     * OAuth token exchange (public when enabled)
+     * @description Exchanges an authorization code or refresh token for opaque bearer tokens.
+     *     Authorization-code exchanges require the original redirect URI, PKCE
+     *     verifier, client ID, and route-specific RFC 8707 resource identifier.
      */
-    post: operations['postRegister'];
+    post: operations['postOauthToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/oauth/register': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dynamic MCP OAuth client registration (public when enabled)
+     * @description Registers a public OAuth client using RFC 7591-style dynamic client
+     *     registration. The request must include at least one absolute `redirect_uri`;
+     *     Plexus returns a generated client identifier and persists the requested
+     *     redirect URI set, grant types, response types, and scopes. Identical
+     *     registrations are deduplicated.
+     */
+    post: operations['postOauthRegister'];
     delete?: never;
     options?: never;
     head?: never;
@@ -5188,6 +5254,11 @@ export interface components {
        * @default false
        */
       stall_cooldown: boolean;
+      /**
+       * @description When enabled, allows quota usage to reach 100% instead of placing the provider on cooldown at 99%. Note: this may result in repeat attempts or failed generations.
+       * @default false
+       */
+      allow_100_percent_utilization: boolean;
       /** @description Cost discount factor applied to usage records for this provider. `0` means no reduction, `1` means 100% discount (free). Used to reflect negotiated discounts in cost calculations. */
       discount?: number;
       /** @description Models available on this provider. Either a simple list of IDs or a map of model ID → configuration for per-model pricing/type overrides. */
@@ -5227,6 +5298,11 @@ export interface components {
                         options?: {
                           [key: string]: unknown;
                         };
+                        /**
+                         * @description Set to `false` to remove earlier instances of this adapter, including provider-level and implicitly injected ones. A later entry with `enabled: true` restores it.
+                         * @default true
+                         */
+                        enabled: boolean;
                       }
                   )[];
             };
@@ -5325,7 +5401,18 @@ export interface components {
        *       Messages, OpenAI Responses, and Gemini native).
        *       See [`WebSearchCoercionAdapterOptions`](#/components/schemas/WebSearchCoercionAdapterOptions).
        *
-       *     Pass-through optimisation is automatically disabled when any adapter is active.
+       *     - `normalize_anthropic_tool_ids` — Rewrites `tool_use` / `tool_result`
+       *       identifiers that violate Anthropic's tool-id charset
+       *       `^[a-zA-Z0-9_-]+$` (e.g. Moonshot's `functions.WebSearch:3`), which
+       *       Anthropic rejects with a hard HTTP 400. Injected automatically when the
+       *       route's outbound wire format is Anthropic Messages AND the provider
+       *       looks Anthropic (base URL containing `anthropic.com`, Anthropic OAuth,
+       *       or Claude masking). Override per provider or model with
+       *       `{ name: 'normalize_anthropic_tool_ids', options: {}, enabled: true }`
+       *       to force it on for an Anthropic-compatible gateway hosted elsewhere, or
+       *       `{ name: 'normalize_anthropic_tool_ids', enabled: false }` to opt out.
+       *
+       *     Adapters run on the outbound body whether or not the pass-through optimisation is active — a same-format request skips the transformer, but its body is still cloned, given the target model and the provider/model config fields, and run through the adapter chain before dispatch.
        */
       adapter?:
         | string
@@ -5338,6 +5425,11 @@ export interface components {
                 options?: {
                   [key: string]: unknown;
                 };
+                /**
+                 * @description Set to `false` to remove earlier instances of this adapter, including implicitly injected defaults. A later entry with `enabled: true` restores it.
+                 * @default true
+                 */
+                enabled: boolean;
               }
           )[];
       /** @description Optional per-provider upstream request timeout in milliseconds. When omitted, Plexus uses the global timeout from `/v0/management/config/timeout`. */
@@ -6589,6 +6681,42 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  getWellKnownPlexusOpenapi: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Dereferenced OpenAPI document. */
+      200: {
+        headers: {
+          ETag?: string;
+          'Cache-Control'?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': Record<string, never>;
+        };
+      };
+      /** @description The document has not changed. */
+      304: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Invalid conditional request header. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getHealth: {
     parameters: {
       query?: never;
@@ -7819,13 +7947,19 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Status flags. */
+      /** @description Configuration resource counts. */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': Record<string, never>;
+          'application/json': {
+            providerCount: number;
+            modelAliasCount: number;
+            keyCount: number;
+            quotaCount: number;
+            mcpServerCount: number;
+          };
         };
       };
       /** @description Authentication required or invalid credentials. */
@@ -10163,6 +10297,151 @@ export interface operations {
       };
     };
   };
+  getV0ManagementMcpServerKeys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description MCP server keys. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            keys?: {
+              id?: number;
+              key?: string;
+              is_active?: boolean;
+              /** Format: date-time */
+              cooldown_until?: string | null;
+            }[];
+          };
+        };
+      };
+      /** @description MCP server not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementMcpServerKeys: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          key: string;
+          /** @default true */
+          is_active?: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Created MCP server key. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            id?: number;
+            key?: string;
+            is_active?: boolean;
+            /** Format: date-time */
+            cooldown_until?: string | null;
+          };
+        };
+      };
+      /** @description Invalid key payload. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP server not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  deleteV0ManagementMcpServerKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+        keyId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components['responses']['SuccessTrue'];
+      /** @description Invalid key ID. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP key not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementMcpServerKeyClearCooldown: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+        keyId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: components['responses']['SuccessTrue'];
+      /** @description Invalid key ID. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP key not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getV0ManagementQuotacheckertypes: {
     parameters: {
       query?: never;
@@ -10293,6 +10572,8 @@ export interface operations {
           'application/json': {
             data: components['schemas']['UsageRecord'][];
             total: number;
+            limit: number;
+            offset: number;
           };
         };
       };
@@ -10538,18 +10819,23 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Log index. */
+      /** @description Paginated log index. */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           'application/json': {
-            /** Format: uuid */
-            requestId?: string;
-            /** @description Epoch ms. */
-            createdAt?: number;
-          }[];
+            data: {
+              /** Format: uuid */
+              requestId?: string;
+              /** @description Epoch ms. */
+              createdAt?: number;
+            }[];
+            total: number;
+            limit: number;
+            offset: number;
+          };
         };
       };
       /** @description Authentication required or invalid credentials. */
@@ -10653,15 +10939,20 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Array of error records. */
+      /** @description Paginated error records. */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           'application/json': {
-            [key: string]: unknown;
-          }[];
+            data: {
+              [key: string]: unknown;
+            }[];
+            total: number;
+            limit: number;
+            offset: number;
+          };
         };
       };
       /** @description Authentication required or invalid credentials. */
@@ -10739,8 +11030,10 @@ export interface operations {
         };
         content: {
           'application/json': {
-            data?: components['schemas']['McpUsageRecord'][];
-            total?: number;
+            data: components['schemas']['McpUsageRecord'][];
+            total: number;
+            limit: number;
+            offset: number;
           };
         };
       };
@@ -12356,6 +12649,8 @@ export interface operations {
       query?: {
         /** @description Maximum number of recent log entries to return. */
         limit?: number;
+        /** @description Number of newest entries to skip. */
+        offset?: number;
       };
       header?: never;
       path?: never;
@@ -12374,6 +12669,8 @@ export interface operations {
               [key: string]: unknown;
             }[];
             total: number;
+            limit: number;
+            offset: number;
           };
         };
       };
@@ -12688,13 +12985,23 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description MCP OAuth is disabled (`oauth_disabled`). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
     };
   };
-  getWellknownOauthprotectedresource: {
+  getWellknownOauthprotectedresourceMcpByname: {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        /** @description Enabled MCP server name. */
+        name: string;
+      };
       cookie?: never;
     };
     requestBody?: never;
@@ -12717,18 +13024,219 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description MCP OAuth is disabled or the MCP server is not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
     };
   };
-  getWellknownOpenidconfiguration: {
+  getOauthAuthorize: {
     parameters: {
-      query?: never;
+      query: {
+        response_type: 'code';
+        client_id: string;
+        redirect_uri: string;
+        state?: string;
+        scope?: string;
+        code_challenge: string;
+        code_challenge_method: 'S256';
+        resource: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
     };
     requestBody?: never;
     responses: {
-      /** @description OIDC discovery document. */
+      /** @description HTML consent page. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/html': string;
+        };
+      };
+      /** @description Redirect to the registered client callback after consent. */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Invalid authorization request. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP OAuth is disabled (`oauth_disabled`). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postOauthAuthorize: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Existing Plexus admin key or configured API-key secret used by the browser session. */
+        'x-admin-key': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/x-www-form-urlencoded': {
+          /** @enum {string} */
+          response_type: 'code';
+          client_id: string;
+          /** Format: uri */
+          redirect_uri: string;
+          state?: string;
+          scope?: string;
+          code_challenge: string;
+          /** @enum {string} */
+          code_challenge_method: 'S256';
+          /** Format: uri */
+          resource: string;
+          /** @description Non-secret configured API-key name. Required for administrator sessions; limited sessions cannot choose another key. */
+          key_name?: string;
+        };
+      };
+    };
+    responses: {
+      /** @description JSON callback URL when the request accepts `application/json`. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** Format: uri */
+            redirect_to: string;
+          };
+        };
+      };
+      /** @description Redirect containing the authorization code and state. */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Invalid authorization request or an administrator must choose an API-key identity. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Missing or invalid browser-session credential. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP OAuth is disabled (`oauth_disabled`). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postOauthToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/x-www-form-urlencoded': {
+          /** @enum {string} */
+          grant_type: 'authorization_code' | 'refresh_token';
+          code?: string;
+          /** Format: uri */
+          redirect_uri?: string;
+          client_id: string;
+          code_verifier?: string;
+          refresh_token?: string;
+          /** Format: uri */
+          resource: string;
+          scope?: string;
+        };
+      };
+    };
+    responses: {
+      /** @description OAuth token response. */
+      200: {
+        headers: {
+          'Cache-Control'?: string;
+          Pragma?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            access_token: string;
+            /** @enum {string} */
+            token_type: 'Bearer';
+            expires_in: number;
+            refresh_token: string;
+            scope?: string;
+          };
+        };
+      };
+      /** @description Invalid request, grant, target, or scope. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP OAuth is disabled (`oauth_disabled`). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postOauthRegister: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          redirect_uris: string[];
+          client_name?: string;
+          grant_types?: string[];
+          response_types?: string[];
+          scope?: string;
+          /** @enum {string} */
+          token_endpoint_auth_method?: 'none';
+        };
+      };
+    };
+    responses: {
+      /** @description Existing identical dynamic client registration. */
       200: {
         headers: {
           [name: string]: unknown;
@@ -12739,42 +13247,33 @@ export interface operations {
           };
         };
       };
-      /** @description Bad request. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  postRegister: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Static registration record pointing callers to Bearer auth. */
+      /** @description New dynamic client registration. */
       201: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           'application/json': {
-            /** @constant */
-            client_id?: 'plexus-mcp-static';
+            client_id?: string;
             client_id_issued_at?: number;
-            client_secret?: string;
+            client_name?: string;
+            redirect_uris?: string[];
             grant_types?: string[];
+            response_types?: string[];
+            scope?: string;
             token_endpoint_auth_method?: string;
           };
         };
       };
-      /** @description Bad request. */
+      /** @description Invalid client metadata. */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description MCP OAuth is disabled (`oauth_disabled`). */
+      404: {
         headers: {
           [name: string]: unknown;
         };
