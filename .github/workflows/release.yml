@@ -259,15 +259,20 @@ jobs:
         id: release_notes_agent
         # claude-code-action detects GitHub event type (PR/issue/comment) and
         # rejects unsupported ones, including `push` — which is how this
-        # workflow is triggered. claude-code-base-action is the same Claude
-        # Code executor without the GitHub event/webhook layer, so it runs
-        # the agentic prompt (full Read/Write tool use) regardless of event.
-        uses: anthropics/claude-code-base-action@v0.0.63
+        # workflow is triggered. The base-action/ subdirectory of the same
+        # repo is the underlying Claude Code executor without the GitHub
+        # event/webhook layer, so it runs regardless of event. Referencing
+        # it here (rather than the separately-tagged anthropics/claude-code-
+        # base-action mirror, whose tags lag far behind and pin an ancient
+        # Claude Code CLI version) keeps it on the same current v1 release
+        # line as claude-code-action.
+        uses: anthropics/claude-code-action/base-action@v1.0.193
         with:
           anthropic_api_key: ${{ env.LLM_API_KEY }}
-          model: ${{ vars.LLM_MODEL_ID }}
-          max_turns: '10'
-          allowed_tools: 'Read,Write'
+          claude_args: |
+            --model ${{ vars.LLM_MODEL_ID }}
+            --max-turns 10
+            --allowedTools "Read,Write"
           prompt: |
             Read `.github/prompts/release-notes.md` and follow its instructions exactly.
             The release tag is `${{ needs.setup.outputs.tag }}`. Do not perform any other work.
