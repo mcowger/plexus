@@ -17,6 +17,12 @@ import {
   refundThinkingSignatureStrip,
   stripThinkingSignatureBlocks,
   MAX_THINKING_SIGNATURE_STRIP_RETRIES,
+  createAdvisorResultStripState,
+  matchAdvisorResultError,
+  planAdvisorResultStrip,
+  refundAdvisorResultStrip,
+  stripAdvisorResultBlocks,
+  MAX_ADVISOR_RESULT_STRIP_RETRIES,
   createLiteToolStripState,
   matchLiteUnsupportedToolsError,
   planLiteToolStrip,
@@ -1270,6 +1276,236 @@ describe('planThinkingSignatureStrip', () => {
   test('refundThinkingSignatureStrip never drives attempts below zero', () => {
     const state = createThinkingSignatureStripState();
     refundThinkingSignatureStrip(state);
+    expect(state.attempts).toBe(0);
+  });
+});
+
+describe('matchAdvisorResultError', () => {
+  test('matches the exact production error body', () => {
+    const body = JSON.stringify({
+      type: 'error',
+      error: {
+        type: 'invalid_request_error',
+        message: 'Advisor tool result content could not be processed.',
+      },
+      request_id: 'req_test123',
+    });
+    expect(matchAdvisorResultError(body)).toBe(true);
+  });
+
+  test('matches regardless of case', () => {
+    expect(matchAdvisorResultError('ADVISOR TOOL RESULT CONTENT COULD NOT BE PROCESSED')).toBe(
+      true
+    );
+  });
+
+  test('returns false for an unrelated 400 body', () => {
+    expect(matchAdvisorResultError('{"error":{"message":"Invalid request: missing model"}}')).toBe(
+      false
+    );
+  });
+
+  test('returns false for an advisor-adjacent but unrelated error', () => {
+    expect(matchAdvisorResultError('{"error":{"message":"advisor tool is not enabled"}}')).toBe(
+      false
+    );
+  });
+
+  test('returns false for an empty body', () => {
+    expect(matchAdvisorResultError('')).toBe(false);
+  });
+});
+
+describe('stripAdvisorResultBlocks', () => {
+  // Mirrors the echoed on-wire shape: an assistant `server_tool_use` advisor
+  // invocation followed by its account-bound (encrypted) `advisor_tool_result`.
+  const advisorInvocation = {
+    type: 'server_tool_use',
+    id: 'srvtoolu_abc',
+    name: 'advisor',
+    input: {},
+  };
+  const advisorResult = {
+    type: 'advisor_tool_result',
+    tool_use_id: 'srvtoolu_abc',
+    content: { type: 'advisor_redacted_result', encrypted_content: 'EqQhCio-sealed-by-account-a' },
+  };
+
+  test('strips the advisor result and its paired invocation, preserving sibling text', () => {
+    const payload: Record<string, any> = {
+      model: 'claude-x',
+      messages: [
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'let me consult' }, advisorInvocation, advisorResult],
+        },
+      ],
+    };
+    const snapshot = structuredClone(payload);
+
+    const result = stripAdvisorResultBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    expect(result.payload.messages).toEqual([
+      { role: 'assistant', content: [{ type: 'text', text: 'let me consult' }] },
+    ]);
+    // Copy-on-write: the ORIGINAL payload argument is never mutated.
+    expect(payload).toEqual(snapshot);
+  });
+
+  test('pairs invocation and result by id even when they sit in separate messages', () => {
+    const payload: Record<string, any> = {
+      messages: [
+        { role: 'assistant', content: [{ type: 'text', text: 'thinking' }, advisorInvocation] },
+        { role: 'assistant', content: [advisorResult, { type: 'text', text: 'the answer' }] },
+      ],
+    };
+
+    const result = stripAdvisorResultBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    // Invocation removed from message 0 (paired by id), leaving its text.
+    expect(result.payload.messages[0].content).toEqual([{ type: 'text', text: 'thinking' }]);
+    // Result removed from message 1, leaving its text.
+    expect(result.payload.messages[1].content).toEqual([{ type: 'text', text: 'the answer' }]);
+  });
+
+  test('leaves an unrelated server_tool_use (no matching advisor result) untouched', () => {
+    const payload: Record<string, any> = {
+      messages: [
+        {
+          role: 'assistant',
+          content: [
+            { type: 'server_tool_use', id: 'srvtoolu_web', name: 'web_search', input: {} },
+            advisorInvocation,
+            advisorResult,
+          ],
+        },
+      ],
+    };
+
+    const result = stripAdvisorResultBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    // Only the advisor pair is gone; the web_search server tool use remains.
+    expect(result.payload.messages[0].content).toEqual([
+      { type: 'server_tool_use', id: 'srvtoolu_web', name: 'web_search', input: {} },
+    ]);
+  });
+
+  test('drops a message emptied by the strip when doing so keeps alternation valid', () => {
+    const payload: Record<string, any> = {
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'q1' }] },
+        { role: 'assistant', content: [advisorInvocation, advisorResult] },
+        { role: 'user', content: [{ type: 'text', text: 'q2' }] },
+      ],
+    };
+
+    const result = stripAdvisorResultBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    // The emptied assistant message is dropped; but that would leave two
+    // consecutive user messages, so a placeholder is substituted instead.
+    expect(result.payload.messages).toHaveLength(3);
+    expect(result.payload.messages[1]).toEqual({
+      role: 'assistant',
+      content: [{ type: 'text', text: '[advisor result elided]' }],
+    });
+  });
+
+  test('drops an emptied message entirely when alternation stays valid without it', () => {
+    const payload: Record<string, any> = {
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'q1' }] },
+        { role: 'assistant', content: [advisorInvocation, advisorResult] },
+      ],
+    };
+
+    const result = stripAdvisorResultBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    // Nothing follows the emptied assistant message, so it is dropped outright.
+    expect(result.payload.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'q1' }] },
+    ]);
+  });
+
+  test('returns the payload unchanged (0 strips) when there is no advisor result', () => {
+    const payload: Record<string, any> = {
+      model: 'claude-x',
+      messages: [{ role: 'assistant', content: [{ type: 'text', text: 'hi' }] }],
+    };
+
+    const result = stripAdvisorResultBlocks(payload);
+
+    expect(result.strippedCount).toBe(0);
+    // Same reference back — nothing to rebuild.
+    expect(result.payload).toBe(payload);
+  });
+
+  test('returns 0 strips for a non-Anthropic (Responses API) payload', () => {
+    const payload: Record<string, any> = { model: 'gpt-5.5', input: 'hi' };
+    const result = stripAdvisorResultBlocks(payload);
+    expect(result.strippedCount).toBe(0);
+    expect(result.payload).toBe(payload);
+  });
+});
+
+describe('planAdvisorResultStrip', () => {
+  const advisorBody = JSON.stringify({
+    error: { message: 'Advisor tool result content could not be processed.' },
+  });
+  const anthropicPayload = { model: 'claude-x', messages: [] };
+
+  test('MAX_ADVISOR_RESULT_STRIP_RETRIES is exactly 1 (one strip-retry per target)', () => {
+    expect(MAX_ADVISOR_RESULT_STRIP_RETRIES).toBe(1);
+  });
+
+  test('plans a strip-retry on the first matching 400 for an Anthropic messages payload', () => {
+    const state = createAdvisorResultStripState();
+    expect(planAdvisorResultStrip(advisorBody, anthropicPayload, state)).toBe(true);
+    expect(state.attempts).toBe(1);
+  });
+
+  test('does not plan a retry when the body does not name an advisor-result error', () => {
+    const state = createAdvisorResultStripState();
+    expect(
+      planAdvisorResultStrip('{"error":{"message":"Invalid request"}}', anthropicPayload, state)
+    ).toBe(false);
+    expect(state.attempts).toBe(0);
+  });
+
+  test('does not plan a retry when the outbound payload is not Anthropic-messages-shaped', () => {
+    const state = createAdvisorResultStripState();
+    const responsesPayload = { model: 'gpt-5.5', input: 'hi' };
+    expect(planAdvisorResultStrip(advisorBody, responsesPayload, state)).toBe(false);
+    expect(state.attempts).toBe(0);
+  });
+
+  test('retry bound: a second advisor 400 on the same target does not plan a second strip-retry', () => {
+    const state = createAdvisorResultStripState();
+    expect(planAdvisorResultStrip(advisorBody, anthropicPayload, state)).toBe(true);
+    expect(planAdvisorResultStrip(advisorBody, anthropicPayload, state)).toBe(false);
+    expect(state.attempts).toBe(1);
+  });
+
+  test('refundAdvisorResultStrip returns the budget after a 0-strip plan, so a later genuine advisor 400 can still strip-retry', () => {
+    const state = createAdvisorResultStripState();
+
+    expect(planAdvisorResultStrip(advisorBody, anthropicPayload, state)).toBe(true);
+    expect(state.attempts).toBe(1);
+
+    refundAdvisorResultStrip(state);
+    expect(state.attempts).toBe(0);
+
+    expect(planAdvisorResultStrip(advisorBody, anthropicPayload, state)).toBe(true);
+    expect(state.attempts).toBe(1);
+  });
+
+  test('refundAdvisorResultStrip never drives attempts below zero', () => {
+    const state = createAdvisorResultStripState();
+    refundAdvisorResultStrip(state);
     expect(state.attempts).toBe(0);
   });
 });

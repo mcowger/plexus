@@ -7,16 +7,21 @@ import type { StallConfig } from '../inspectors/stall-inspector';
 import { CooldownManager } from '../runtime/cooldown-manager';
 import type { RequestManagerHost } from './request-manager';
 import {
+  createAdvisorResultStripState,
   createLiteToolStripState,
   createThinkingSignatureStripState,
   createUnsupportedParamStripState,
   deleteDottedPath,
+  planAdvisorResultStrip,
   planLiteToolStrip,
   planThinkingSignatureStrip,
   planUnsupportedParamStrip,
+  refundAdvisorResultStrip,
   refundThinkingSignatureStrip,
+  stripAdvisorResultBlocks,
   stripLiteUnsupportedTools,
   stripThinkingSignatureBlocks,
+  MAX_ADVISOR_RESULT_STRIP_RETRIES,
   MAX_LITE_TOOL_STRIP_RETRIES,
   MAX_THINKING_SIGNATURE_STRIP_RETRIES,
   MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
@@ -125,15 +130,16 @@ export async function executeStandardAttempt(
 
   // Reactive auto-compat: bounded per-target state so a strip-and-retry
   // cycle (see the 400 handling below) can't loop forever (see
-  // dispatcher-auto-compat.ts for the matching/bound logic). Three
-  // independent mechanisms, three independent budgets — none resets another's
+  // dispatcher-auto-compat.ts for the matching/bound logic). Four
+  // independent mechanisms, four independent budgets — none resets another's
   // counter, so the combined worst case for this target is bounded at
   // exactly 1 (initial attempt) + MAX_THINKING_SIGNATURE_STRIP_RETRIES +
-  // MAX_UNSUPPORTED_PARAM_STRIP_RETRIES + MAX_LITE_TOOL_STRIP_RETRIES fetches,
-  // however the mechanisms interleave — they can't ping-pong into an
-  // unbounded loop.
+  // MAX_ADVISOR_RESULT_STRIP_RETRIES + MAX_UNSUPPORTED_PARAM_STRIP_RETRIES +
+  // MAX_LITE_TOOL_STRIP_RETRIES fetches, however the mechanisms interleave —
+  // they can't ping-pong into an unbounded loop.
   const paramStripState = createUnsupportedParamStripState();
   const thinkingStripState = createThinkingSignatureStripState();
+  const advisorStripState = createAdvisorResultStripState();
   const liteToolStripState = createLiteToolStripState();
 
   // Looped so a strip-and-retry can redo the fetch against the SAME target
@@ -266,10 +272,15 @@ export async function executeStandardAttempt(
       //      blocks were signed by a DIFFERENT Claude model/session than
       //      the one we're now targeting, and Anthropic 400s naming the
       //      stale signature specifically.
-      //   2. Unsupported/unknown parameters: some upstreams 400 naming one specific
+      //   2. Account-bound advisor results: failover can replay a
+      //      conversation whose `advisor_tool_result` was sealed (encrypted)
+      //      by a DIFFERENT Claude account than the one we're now targeting,
+      //      and Anthropic 400s "Advisor tool result content could not be
+      //      processed." — same failure class as (1).
+      //   3. Unsupported/unknown parameters: some upstreams 400 naming one specific
       //      client-sent field (e.g. LobeHub's gpt-5.5 traffic sending
       //      safety_identifier / prompt_cache_key that a provider rejects).
-      //   3. Unsupported responses:lite tools: real Codex CLI traffic
+      //   4. Unsupported responses:lite tools: real Codex CLI traffic
       //      declares a `web_search` tool by default, but the
       //      responses:lite wire contract only allows function/custom/
       //      tool_search tools — the 400 names the restriction generically,
@@ -301,6 +312,32 @@ export async function executeStandardAttempt(
           // the one-per-target budget stays available for a later genuine
           // signature 400. Loop-safe because this branch never `continue`s.
           refundThinkingSignatureStrip(thinkingStripState);
+        }
+
+        if (planAdvisorResultStrip(errorText, providerPayload, advisorStripState)) {
+          const stripResult = stripAdvisorResultBlocks(providerPayload);
+          if (stripResult.strippedCount > 0) {
+            // Copy-on-write, like the thinking-signature strip above: a NEW
+            // payload is returned and the original (whose `messages` can be
+            // shared by reference with the long-lived request) is never
+            // mutated, so a successful strip reassigns the binding.
+            providerPayload = stripResult.payload;
+            logger.warn(
+              `Auto-compat: ${route.provider}/${route.model} rejected an account-bound advisor ` +
+                `result — stripped ${stripResult.strippedCount} advisor exchange(s) and retrying the ` +
+                `same target (attempt ${advisorStripState.attempts}/${MAX_ADVISOR_RESULT_STRIP_RETRIES})`
+            );
+            continue;
+          }
+          // Zero blocks stripped — planAdvisorResultStrip's structural
+          // `messages`-array check also matches OpenAI-format payloads, which
+          // never carry advisor blocks. Retrying would resend a byte-identical
+          // request, so fall through to the unsupported-param check / normal
+          // failover handling below instead of retrying this target — and
+          // refund the planned attempt so a later genuine advisor 400 still
+          // gets its one strip-and-retry. Loop-safe: this branch never
+          // `continue`s.
+          refundAdvisorResultStrip(advisorStripState);
         }
 
         const paramToStrip = planUnsupportedParamStrip(errorText, paramStripState);
