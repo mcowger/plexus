@@ -79,6 +79,7 @@ const runBuild = async () => {
     format: 'iife',
     publicPath: '/ui/',
     minify: process.env.NODE_ENV === 'production',
+    reactCompiler: true,
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
       'process.env.APP_VERSION': JSON.stringify(process.env.APP_VERSION || 'dev'),

@@ -402,7 +402,7 @@ describe('MCP Routes', () => {
       expect(response.statusCode).toBe(405);
     });
 
-    test('sets portable SSE cache headers without a Connection header', async () => {
+    test('sets portable SSE cache headers', async () => {
       (mockProxyMcpRequest as any).mockClear();
       (mockProxyMcpRequest as any).mockResolvedValueOnce({
         status: 200,
@@ -429,7 +429,7 @@ describe('MCP Routes', () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers['cache-control']).toBe('no-cache');
       expect(response.headers['x-accel-buffering']).toBe('no');
-      expect(response.headers.connection).toBeUndefined();
+      expect(response.headers.connection).toBe('keep-alive');
     });
 
     test('preserves an upstream Cache-Control value on SSE responses', async () => {

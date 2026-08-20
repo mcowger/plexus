@@ -20,7 +20,6 @@ import { ConfigService } from './config-service';
 import { ConfigRepository, McpKeyConfig, OAuthCredentialsData } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
 import { decrypt, encrypt } from '../../utils/encryption';
-import { gzipSync, gunzipSync } from 'node:zlib';
 import { parse as parseCsvSync } from 'csv-parse/sync';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -163,111 +162,19 @@ function csvValueToDb(
   return value;
 }
 
-// ─── Minimal tar builder ─────────────────────────────────────────────
+// ─── Archive support ─────────────────────────────────────────────────
 
-/**
- * Build a tar archive (ustar format) from a map of filename → Buffer.
- * Returns the complete tar file as a Buffer.
- */
-function buildTar(files: Map<string, Buffer>): Buffer {
-  const chunks: Buffer[] = [];
-
-  for (const [name, content] of files) {
-    // Header: 512 bytes
-    const header = Buffer.alloc(512, 0);
-    const nameBytes = Buffer.from(name, 'utf8');
-    nameBytes.copy(header, 0, 0, Math.min(nameBytes.length, 100));
-
-    // mode: 0o644 = "0000644\0"
-    header.write('0000644\0', 100, 8, 'ascii');
-    // uid
-    header.write('0001750\0', 108, 8, 'ascii');
-    // gid
-    header.write('0001750\0', 116, 8, 'ascii');
-    // size as octal
-    const sizeStr = content.length.toString(8).padStart(11, '0') + '\0';
-    header.write(sizeStr, 124, 12, 'ascii');
-    // mtime
-    header.write(
-      Math.floor(Date.now() / 1000)
-        .toString(8)
-        .padStart(11, '0') + '\0',
-      136,
-      12,
-      'ascii'
-    );
-    // checksum placeholder
-    header.write('        ', 148, 8, 'ascii');
-    // type flag: '0' = regular file
-    header.write('0', 156, 1, 'ascii');
-    // ustar magic
-    header.write('ustar\0', 257, 6, 'ascii');
-    // version
-    header.write('00', 263, 2, 'ascii');
-
-    // Compute checksum
-    let checksum = 0;
-    for (let i = 0; i < 512; i++) checksum += header[i]!;
-    header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
-
-    chunks.push(header);
-    chunks.push(content);
-
-    // Pad content to 512-byte boundary
-    const remainder = content.length % 512;
-    if (remainder > 0) {
-      chunks.push(Buffer.alloc(512 - remainder, 0));
-    }
-  }
-
-  // Two empty 512-byte blocks to signal end-of-archive
-  chunks.push(Buffer.alloc(1024, 0));
-
-  return Buffer.concat(chunks);
+async function buildBunArchive(files: Map<string, Buffer>): Promise<Buffer> {
+  const archive = new Bun.Archive(Object.fromEntries(files), { compress: 'gzip' });
+  return Buffer.from(await archive.bytes());
 }
 
-/**
- * Parse a tar archive, returning a map of filename → Buffer.
- * Handles the ustar format that buildTar() produces.
- */
-function parseTar(data: Buffer): Map<string, Buffer> {
+async function readBunArchive(data: Buffer): Promise<Map<string, Buffer>> {
+  const archiveFiles = await new Bun.Archive(data).files();
   const files = new Map<string, Buffer>();
-  let offset = 0;
 
-  while (offset + 512 <= data.length) {
-    // Check for end-of-archive (two consecutive zero blocks)
-    let allZero = true;
-    for (let i = 0; i < 512; i++) {
-      if (data[offset + i] !== 0) {
-        allZero = false;
-        break;
-      }
-    }
-    if (allZero) break;
-
-    // Parse header
-    const name = data
-      .subarray(offset, offset + 100)
-      .toString('utf8')
-      .replace(/\0+$/, '');
-    const sizeStr = data
-      .subarray(offset + 124, offset + 136)
-      .toString('ascii')
-      .replace(/\0+$/, '')
-      .trim();
-    const size = parseInt(sizeStr, 8) || 0;
-
-    offset += 512; // Skip header
-
-    if (size >= 0) {
-      const content = size > 0 ? data.subarray(offset, offset + size) : Buffer.alloc(0);
-      files.set(name, Buffer.from(content));
-    }
-
-    // Advance past content + padding
-    offset += size;
-    const remainder = size % 512;
-    if (remainder > 0) offset += 512 - remainder;
+  for (const [name, file] of archiveFiles) {
+    files.set(name, Buffer.from(await file.arrayBuffer()));
   }
 
   return files;
@@ -475,15 +382,14 @@ export class BackupService {
 
       // Gzip the CSV content
       const csvContent = Buffer.from(lines.join('\n'), 'utf8');
-      const gzipped = gzipSync(csvContent);
-      files.set(`${tableName}.csv.gz`, gzipped);
+      const gzipped = Bun.gzipSync(csvContent);
+      files.set(`${tableName}.csv.gz`, Buffer.from(gzipped));
 
       logger.debug(`[Backup] Exported ${tableName}: ${rows.length} rows`);
     }
 
     // Build tar and gzip the whole archive
-    const tarData = buildTar(files);
-    return gzipSync(tarData);
+    return buildBunArchive(files);
   }
 
   /**
@@ -589,9 +495,7 @@ export class BackupService {
    * Restore from a gzipped tar archive.
    */
   private async restoreFromArchive(data: Buffer): Promise<RestoreResult> {
-    // Ungzip → parse tar → extract files
-    const tarData = gunzipSync(data);
-    const files = parseTar(tarData);
+    const files = await readBunArchive(data);
 
     // Validate manifest
     const manifestBuf = files.get('manifest.json');
@@ -661,7 +565,7 @@ export class BackupService {
       // Decompress if needed
       let csvBuffer: Buffer;
       if (csvGz) {
-        csvBuffer = gunzipSync(fileData);
+        csvBuffer = Buffer.from(Bun.gunzipSync(new Uint8Array(fileData)));
       } else {
         csvBuffer = fileData;
       }

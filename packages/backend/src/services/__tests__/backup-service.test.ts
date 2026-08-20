@@ -8,7 +8,6 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parse as parseCsvSync } from 'csv-parse/sync';
-import { gzipSync, gunzipSync } from 'node:zlib';
 
 // We test the internal helpers via the module's exported functions
 // and the archive round-trip. Since BackupService depends on the DB
@@ -81,133 +80,57 @@ describe('CSV escape and parse', () => {
   });
 });
 
-// ─── Tar builder/parser round-trip ──────────────────────────────────
+// ─── Bun archive round-trip ─────────────────────────────────────────
 
-describe('Tar archive round-trip', () => {
-  // Replicate the tar builder/parser from backup-service for unit testing
-
-  function buildTar(files: Map<string, Buffer>): Buffer {
-    const chunks: Buffer[] = [];
-    for (const [name, content] of files) {
-      const header = Buffer.alloc(512, 0);
-      const nameBytes = Buffer.from(name, 'utf8');
-      nameBytes.copy(header, 0, 0, Math.min(nameBytes.length, 100));
-      header.write('0000644\0', 100, 8, 'ascii');
-      header.write('0001750\0', 108, 8, 'ascii');
-      header.write('0001750\0', 116, 8, 'ascii');
-      const sizeStr = content.length.toString(8).padStart(11, '0') + '\0';
-      header.write(sizeStr, 124, 12, 'ascii');
-      header.write(
-        Math.floor(Date.now() / 1000)
-          .toString(8)
-          .padStart(11, '0') + '\0',
-        136,
-        12,
-        'ascii'
-      );
-      header.write('        ', 148, 8, 'ascii');
-      header.write('0', 156, 1, 'ascii');
-      header.write('ustar\0', 257, 6, 'ascii');
-      header.write('00', 263, 2, 'ascii');
-      let checksum = 0;
-      for (let i = 0; i < 512; i++) checksum += header[i]!;
-      header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
-      chunks.push(header);
-      chunks.push(content);
-      const remainder = content.length % 512;
-      if (remainder > 0) {
-        chunks.push(Buffer.alloc(512 - remainder, 0));
-      }
-    }
-    chunks.push(Buffer.alloc(1024, 0));
-    return Buffer.concat(chunks);
-  }
-
-  function parseTar(data: Buffer): Map<string, Buffer> {
-    const files = new Map<string, Buffer>();
-    let offset = 0;
-    while (offset + 512 <= data.length) {
-      let allZero = true;
-      for (let i = 0; i < 512; i++) {
-        if (data[offset + i] !== 0) {
-          allZero = false;
-          break;
-        }
-      }
-      if (allZero) break;
-      const name = data
-        .subarray(offset, offset + 100)
-        .toString('utf8')
-        .replace(/\0+$/, '');
-      const sizeStr = data
-        .subarray(offset + 124, offset + 136)
-        .toString('ascii')
-        .replace(/\0+$/, '')
-        .trim();
-      const size = parseInt(sizeStr, 8) || 0;
-      offset += 512;
-      if (size >= 0) {
-        const content = size > 0 ? data.subarray(offset, offset + size) : Buffer.alloc(0);
-        files.set(name, Buffer.from(content));
-      }
-      offset += size;
-      const remainder = size % 512;
-      if (remainder > 0) offset += 512 - remainder;
-    }
-    return files;
-  }
-
-  it('round-trips a single file', () => {
-    const files = new Map<string, Buffer>();
-    files.set('hello.txt', Buffer.from('Hello, world!', 'utf8'));
-
-    const tarData = buildTar(files);
-    const parsed = parseTar(tarData);
+describe('Archive round-trip', () => {
+  it('round-trips a single file', async () => {
+    const archive = new Bun.Archive(
+      { 'hello.txt': Buffer.from('Hello, world!', 'utf8') },
+      { compress: 'gzip' }
+    );
+    const parsed = await new Bun.Archive(await archive.bytes()).files();
 
     expect(parsed.size).toBe(1);
-    expect(parsed.get('hello.txt')?.toString('utf8')).toBe('Hello, world!');
+    expect(await parsed.get('hello.txt')?.text()).toBe('Hello, world!');
   });
 
-  it('round-trips multiple files', () => {
-    const files = new Map<string, Buffer>();
-    files.set('a.txt', Buffer.from('file a', 'utf8'));
-    files.set('b.dat', Buffer.from('file b content', 'utf8'));
-    files.set('empty.csv', Buffer.from('', 'utf8'));
-
-    const tarData = buildTar(files);
-    const parsed = parseTar(tarData);
+  it('round-trips multiple files', async () => {
+    const archive = new Bun.Archive(
+      {
+        'a.txt': 'file a',
+        'b.dat': 'file b content',
+        'empty.csv': '',
+      },
+      { compress: 'gzip' }
+    );
+    const parsed = await new Bun.Archive(await archive.bytes()).files();
 
     expect(parsed.size).toBe(3);
-    expect(parsed.get('a.txt')?.toString('utf8')).toBe('file a');
-    expect(parsed.get('b.dat')?.toString('utf8')).toBe('file b content');
-    expect(parsed.get('empty.csv')?.toString('utf8')).toBe('');
+    expect(await parsed.get('a.txt')?.text()).toBe('file a');
+    expect(await parsed.get('b.dat')?.text()).toBe('file b content');
+    expect(await parsed.get('empty.csv')?.text()).toBe('');
   });
 
-  it('round-trips binary (gzipped) content', () => {
+  it('round-trips binary content', async () => {
     const original = Buffer.from('col1,col2\nval1,val2\n', 'utf8');
-    const gzipped = gzipSync(original);
-
-    const files = new Map<string, Buffer>();
-    files.set('data.csv.gz', gzipped);
-
-    const tarData = buildTar(files);
-    const parsed = parseTar(tarData);
+    const archive = new Bun.Archive(
+      { 'data.csv.gz': Bun.gzipSync(original) },
+      { compress: 'gzip' }
+    );
+    const parsed = await new Bun.Archive(await archive.bytes()).files();
 
     const extracted = parsed.get('data.csv.gz');
     expect(extracted).toBeDefined();
-    const decompressed = gunzipSync(extracted!);
-    expect(decompressed.toString('utf8')).toBe('col1,col2\nval1,val2\n');
+    const decompressed = Bun.gunzipSync(Buffer.from(await extracted!.arrayBuffer()));
+    expect(Buffer.from(decompressed).toString('utf8')).toBe('col1,col2\nval1,val2\n');
   });
 
-  it('handles files that span multiple 512-byte blocks', () => {
+  it('handles large files', async () => {
     const largeContent = 'x'.repeat(1500);
-    const files = new Map<string, Buffer>();
-    files.set('large.txt', Buffer.from(largeContent, 'utf8'));
+    const archive = new Bun.Archive({ 'large.txt': largeContent }, { compress: 'gzip' });
+    const parsed = await new Bun.Archive(await archive.bytes()).files();
 
-    const tarData = buildTar(files);
-    const parsed = parseTar(tarData);
-
-    expect(parsed.get('large.txt')?.toString('utf8')).toBe(largeContent);
+    expect(await parsed.get('large.txt')?.text()).toBe(largeContent);
   });
 });
 

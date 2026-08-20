@@ -8,6 +8,7 @@
     "typecheck": "bun x tsc --noEmit",
     "test": "bun run --cwd ../.. generate:openapi:asset && bun run --cwd ../.. build:frontend:if-needed && bunx --bun vitest run --config vitest.config.ts --changed HEAD",
     "test:force-all": "bun run --cwd ../.. generate:openapi:asset && bun run --cwd ../.. build:frontend:if-needed && bunx --bun vitest run --config vitest.config.ts",
+    "test:coverage": "bun run --cwd ../.. generate:openapi:asset && bun run --cwd ../.. build:frontend:if-needed && bunx --bun vitest run --config vitest.config.ts --coverage --coverage.provider=istanbul",
     "test:watch": "bun run --cwd ../.. generate:openapi:asset && bunx --bun vitest --config vitest.config.ts",
     "rekey": "bun run src/cli/rekey.ts",
     "backup": "bun run src/cli/backup.ts",
