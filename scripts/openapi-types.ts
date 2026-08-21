@@ -5499,6 +5499,7 @@ export interface components {
           | 'cost'
           | 'latency'
           | 'usage'
+          | 'quota'
           | 'performance'
           | 'e2e_performance';
         targets: {

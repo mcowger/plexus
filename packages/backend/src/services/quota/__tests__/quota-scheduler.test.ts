@@ -174,6 +174,22 @@ describe('QuotaScheduler persistence', () => {
     expect(scheduler.getCheckerIds()).toEqual([]);
   });
 
+  it('does not expose quota snapshots after two polling intervals', async () => {
+    const scheduler = QuotaScheduler.getInstance();
+    const configs = Reflect.get(scheduler, 'configs') as Map<string, QuotaConfig>;
+    configs.set(CHECKER_ID, makeConfig({ intervalMinutes: 30 }));
+    const getLatestQuota = registerSpy(scheduler, 'getLatestQuota');
+
+    getLatestQuota.mockResolvedValue({
+      ...makeMeterResult(10),
+      checkedAt: new Date(Date.now() - 61 * 60 * 1000).toISOString(),
+    });
+    expect(await scheduler.getLatestQuotaForProvider('test-provider')).toBeNull();
+
+    getLatestQuota.mockResolvedValue(makeMeterResult(10));
+    expect(await scheduler.getLatestQuotaForProvider('test-provider')).not.toBeNull();
+  });
+
   it('updates existing checker options and reschedules interval changes on reload', async () => {
     vi.useFakeTimers();
 

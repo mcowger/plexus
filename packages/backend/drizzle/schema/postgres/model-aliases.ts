@@ -6,6 +6,7 @@ export const selectorStrategyEnum = pgEnum('selector_strategy', [
   'cost',
   'latency',
   'usage',
+  'quota',
   'performance',
 ]);
 

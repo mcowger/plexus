@@ -9,6 +9,8 @@ import { CooldownManager } from '../runtime/cooldown-manager';
 import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
 
 const DEFAULT_EXHAUSTION_THRESHOLD = 99;
+const MAX_STALE_QUOTA_CHECK_INTERVALS = 2;
+const MILLISECONDS_PER_MINUTE = 60 * 1000;
 
 function toMs(val: unknown): number {
   if (val instanceof Date) return val.getTime();
@@ -397,6 +399,25 @@ export class QuotaScheduler {
       logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);
       throw error;
     }
+  }
+
+  async getLatestQuotaForProvider(provider: string): Promise<MeterCheckResult | null> {
+    const config = Array.from(this.configs.values()).find(
+      (candidate) => candidate.provider === provider
+    );
+    if (!config) return null;
+
+    const latest = await this.getLatestQuota(config.id);
+    if (!latest) return null;
+
+    const checkedAtMs = Date.parse(latest.checkedAt);
+    const maxAgeMs =
+      config.intervalMinutes * MAX_STALE_QUOTA_CHECK_INTERVALS * MILLISECONDS_PER_MINUTE;
+    if (!Number.isFinite(checkedAtMs) || Date.now() - checkedAtMs > maxAgeMs) {
+      return null;
+    }
+
+    return latest;
   }
 
   async getQuotaHistory(checkerId: string, meterKey?: string, since?: number): Promise<any[]> {

@@ -7,13 +7,19 @@ import { E2EPerformanceSelector } from '../e2e-performance';
 import { LatencySelector } from '../latency';
 import { InOrderSelector } from '../in-order';
 import { UsageSelector } from '../usage';
+import { QuotaSelector } from '../quota';
 import { UsageStorageService } from '../../../observability/usage-storage';
+import { QuotaScheduler } from '../../../quota/quota-scheduler';
 
 describe('SelectorFactory', () => {
   const mockStorage = {} as unknown as UsageStorageService;
+  const mockQuotaScheduler = {
+    getLatestQuotaForProvider: vi.fn(),
+  } as unknown as QuotaScheduler;
 
   beforeEach(() => {
     SelectorFactory.setUsageStorage(mockStorage);
+    SelectorFactory.setQuotaScheduler(mockQuotaScheduler);
   });
 
   it('should return RandomSelector for "random"', () => {
@@ -64,5 +70,10 @@ describe('SelectorFactory', () => {
   it('should return UsageSelector for "usage"', () => {
     const selector = SelectorFactory.getSelector('usage');
     expect(selector).toBeInstanceOf(UsageSelector);
+  });
+
+  it('should return QuotaSelector for "quota"', () => {
+    const selector = SelectorFactory.getSelector('quota');
+    expect(selector).toBeInstanceOf(QuotaSelector);
   });
 });

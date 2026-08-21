@@ -734,6 +734,7 @@ const SelectorTypeSchema = z.enum([
   'cost',
   'latency',
   'usage',
+  'quota',
   'performance',
   'e2e_performance',
 ]);

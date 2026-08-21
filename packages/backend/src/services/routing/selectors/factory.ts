@@ -7,12 +7,19 @@ import { LatencySelector } from './latency';
 import { InOrderSelector } from './in-order';
 import { UsageSelector } from './usage';
 import { UsageStorageService } from '../../observability/usage-storage';
+import { QuotaScheduler } from '../../quota/quota-scheduler';
+import { QuotaSelector } from './quota';
 
 export class SelectorFactory {
   private static usageStorage: UsageStorageService | null = null;
+  private static quotaScheduler: QuotaScheduler | null = null;
 
   static setUsageStorage(storage: UsageStorageService) {
     this.usageStorage = storage;
+  }
+
+  static setQuotaScheduler(scheduler: QuotaScheduler | null) {
+    this.quotaScheduler = scheduler;
   }
 
   static getSelector(type?: string): Selector {
@@ -53,6 +60,13 @@ export class SelectorFactory {
           );
         }
         return new UsageSelector(this.usageStorage);
+      case 'quota':
+        if (!this.quotaScheduler) {
+          throw new Error(
+            'QuotaScheduler not initialized in SelectorFactory. Call setQuotaScheduler first.'
+          );
+        }
+        return new QuotaSelector(this.quotaScheduler);
       default:
         throw new Error(`Unknown selector type: ${type}`);
     }

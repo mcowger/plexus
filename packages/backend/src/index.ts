@@ -144,6 +144,7 @@ const quotaScheduler = QuotaScheduler.getInstance();
 dispatcher.setUsageStorage(usageStorage);
 DebugManager.getInstance().setStorage(usageStorage);
 SelectorFactory.setUsageStorage(usageStorage);
+SelectorFactory.setQuotaScheduler(quotaScheduler);
 
 // ProbeService is shared between the management test endpoint and the
 // background explorer. BackgroundExplorer is created here so router

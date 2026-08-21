@@ -11769,6 +11769,7 @@
                     "cost",
                     "latency",
                     "usage",
+                    "quota",
                     "performance",
                     "e2e_performance"
                   ],

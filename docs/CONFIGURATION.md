@@ -504,6 +504,7 @@ If no groups are explicitly configured, all targets live in a single `default` g
 | `performance` | Routes to highest post-TTFT throughput (output tokens / streaming time) |
 | `latency` | Routes to lowest time-to-first-token |
 | `usage` | Routes to provider with least recent usage (last 24 hours) |
+| `quota` | Favors tracked targets with the most quota headroom to consume before reset; utilization is scored continuously, while non-expiring balances rank after resettable quotas |
 | `e2e_performance` | Routes to highest end-to-end throughput (output tokens / total request time) |
 
 #### Inline Exploration (default)
