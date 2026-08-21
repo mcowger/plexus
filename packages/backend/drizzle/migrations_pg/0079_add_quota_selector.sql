@@ -1,0 +1,1 @@
+ALTER TYPE "public"."selector_strategy" ADD VALUE 'quota' BEFORE 'performance';

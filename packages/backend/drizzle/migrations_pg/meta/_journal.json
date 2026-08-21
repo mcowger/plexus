@@ -554,6 +554,13 @@
       "when": 1786932513074,
       "tag": "0078_add_allow_100_percent_utilization",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1787339374380,
+      "tag": "0079_add_quota_selector",
+      "breakpoints": true
     }
   ]
 }
