@@ -16,6 +16,7 @@ type PgliteDb = any;
 let dbInstance: SqliteDb | PostgresJsDb | PgliteDb | null = null;
 let sqlClient: postgres.Sql | null = null;
 let pgliteClient: any = null;
+const PGLITE_BOOT_EXIT_CODE = 99;
 let currentDialect: SupportedDialect | null = null;
 let currentSchema: any = null;
 
@@ -180,7 +181,18 @@ export function initializeDatabase(connectionString?: string) {
       const { PGlite } = require('@electric-sql/pglite');
       const { drizzle: drizzlePglite } = require('drizzle-orm/pglite');
       const dataDir = process.env.PLEXUS_PGLITE_DATA_DIR;
-      pgliteClient = dataDir ? new PGlite(dataDir) : new PGlite();
+      const previousExitCode = process.exitCode;
+      const restoreExitCode = () => {
+        if (process.exitCode === PGLITE_BOOT_EXIT_CODE) {
+          process.exitCode = previousExitCode ?? 0;
+        }
+      };
+      try {
+        pgliteClient = dataDir ? new PGlite(dataDir) : new PGlite();
+      } finally {
+        restoreExitCode();
+      }
+      void pgliteClient.waitReady.then(restoreExitCode, () => {});
       dbInstance = drizzlePglite(pgliteClient, {
         schema,
       });
