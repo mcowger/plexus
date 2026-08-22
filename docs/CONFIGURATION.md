@@ -43,6 +43,7 @@ The **Admin UI** (accessible at `http://localhost:4000` after starting) is the e
 - **Models**: Create model aliases with routing logic and pricing
 - **Keys**: Manage client API keys with optional quota assignment
 - **Quotas**: Define usage limits (tokens, requests, or spending) per time window
+- **Custom Quota Checkers**: Write JavaScript integrations for provider quota APIs
 - **MCP Servers**: Configure MCP proxy endpoints
 - **OAuth**: Login to OAuth-backed providers (Anthropic, GitHub Copilot, Codex, etc.)
 - **Settings**: Vision fallthrough, global defaults, cooldown configuration
@@ -67,10 +68,17 @@ For programmatic configuration, use the Management API (`/v0/management/*`). All
 | `GET /v0/management/user-quotas` | List quota definitions |
 | `PUT /v0/management/user-quotas/{name}` | Create/update quota |
 | `DELETE /v0/management/user-quotas/{name}` | Remove quota |
+| `GET /v0/management/custom-checkers` | List custom provider quota checkers |
+| `PUT /v0/management/custom-checkers/{id}` | Create/update a custom quota checker |
+| `POST /v0/management/custom-checkers/{id}/test` | Test custom checker code without persisting a snapshot |
+| `DELETE /v0/management/custom-checkers/{id}` | Remove a custom quota checker |
 | `GET /v0/management/config/export` | Export full config as JSON |
 | `PUT /v0/management/config` | Import config (replace all) |
 
 See the [API Reference](openapi/openapi.yaml) for complete endpoint documentation.
+
+For the complete custom checker workflow, context API, authentication/header
+configuration, and examples, see [Custom Quota Checkers](CUSTOM_QUOTA_CHECKERS.md).
 
 ### Debug Trace Capture
 

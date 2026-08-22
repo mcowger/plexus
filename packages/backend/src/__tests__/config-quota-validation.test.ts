@@ -92,25 +92,30 @@ describe('config quota checker validation', () => {
     });
   });
 
-  it('rejects minimax quota checker when groupid is missing', () => {
-    expect(() => validateConfig(makeConfigJson({ token: 'jwt-token-secret' }))).toThrow(
-      '"groupid"'
-    );
+  it('defers minimax option validation to the registry-backed save boundary', () => {
+    expect(() => validateConfig(makeConfigJson({ token: 'jwt-token-secret' }))).not.toThrow();
   });
 
-  it('rejects minimax quota checker when token is missing', () => {
-    expect(() => validateConfig(makeConfigJson({ groupid: 'group-123' }))).toThrow('"token"');
-  });
-
-  it('rejects minimax quota checker when required fields are empty strings', () => {
+  it('accepts arbitrary checker types at the generic config boundary', () => {
     expect(() =>
       validateConfig(
-        makeConfigJson({
-          groupid: '   ',
-          token: '   ',
+        JSON.stringify({
+          providers: {
+            provider: {
+              api_base_url: 'https://example.com',
+              api_key: 'test-api-key',
+              quota_checker: { type: 'admin-defined-checker', options: { value: 1 } },
+            },
+          },
+          models: {},
+          keys: {},
         })
       )
-    ).toThrow('MiniMax groupid is required');
+    ).not.toThrow();
+  });
+
+  it('accepts empty required checker options at the generic config boundary', () => {
+    expect(() => validateConfig(makeConfigJson({ groupid: '   ', token: '   ' }))).not.toThrow();
   });
 
   it('accepts devpass quota checker with session cookie', () => {
@@ -232,7 +237,7 @@ describe('config quota checker validation', () => {
       });
     });
 
-    it('rejects an invalid endpoint', () => {
+    it('defers endpoint validation to the registry-backed save boundary', () => {
       expect(() =>
         validateConfig(
           JSON.stringify({
@@ -252,7 +257,7 @@ describe('config quota checker validation', () => {
             keys: {},
           })
         )
-      ).toThrow('endpoint');
+      ).not.toThrow();
     });
   });
 });

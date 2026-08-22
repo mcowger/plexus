@@ -201,6 +201,30 @@ export class ConfigService {
     return this.repo;
   }
 
+  async getCustomCheckers() {
+    return this.repo.getCustomCheckers();
+  }
+
+  async getCustomChecker(id: string) {
+    return this.repo.getCustomChecker(id);
+  }
+
+  async saveCustomChecker(
+    id: string,
+    data: { displayName: string; code: string; enabled: boolean }
+  ) {
+    const result = await this.repo.saveCustomChecker(id, data);
+    this.pendingWrites++;
+    this.rebuildCache();
+    return result;
+  }
+
+  async deleteCustomChecker(id: string): Promise<void> {
+    await this.repo.deleteCustomChecker(id);
+    this.pendingWrites++;
+    this.rebuildCache();
+  }
+
   // ─── Provider CRUD ───────────────────────────────────────────────
 
   async saveProvider(slug: string, config: ProviderConfig): Promise<void> {
@@ -513,9 +537,11 @@ export class ConfigService {
     // on startup, index.ts calls quotaScheduler.initialize() explicitly after this.
     const scheduler = QuotaScheduler.getInstance();
     if (scheduler.isInitialized()) {
-      scheduler.reload(quotas).catch((err) => {
+      try {
+        await scheduler.reload(quotas);
+      } catch (err) {
         logger.warn(`Failed to reload QuotaScheduler after config change: ${err}`);
-      });
+      }
     }
 
     const modelAutosyncScheduler = ModelAutosyncScheduler.getInstance();

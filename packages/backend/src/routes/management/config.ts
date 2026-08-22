@@ -13,7 +13,10 @@ import { validateRawProviderSlug } from '../../services/dispatch/raw-passthrough
 import { ConfigService } from '../../services/configuration/config-service';
 import { DebugManager } from '../../services/observability/debug-manager';
 import { isValidIpRule } from '../../utils/ip-match';
-import { getCheckerDefinitions } from '../../services/quota/checker-registry';
+import {
+  getCheckerDefinitions,
+  validateCheckerOptions,
+} from '../../services/quota/checker-registry';
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
 import { mcpProcessManager } from '../../services/mcp-local/mcp-process-manager';
@@ -25,6 +28,33 @@ import { McpKeyCreateSchema } from '@plexus/shared';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateProviderQuotaChecker(config: {
+  api_key?: string;
+  oauth_provider?: string;
+  oauth_account?: string;
+  quota_checker?: {
+    type: string;
+    options?: Record<string, unknown>;
+  };
+}): { valid: true } | { valid: false; details: unknown } {
+  const quotaChecker = config.quota_checker;
+  if (!quotaChecker) return { valid: true };
+
+  const options = { ...(quotaChecker.options ?? {}) };
+  if (config.api_key && config.api_key.toLowerCase() !== 'oauth' && options.apiKey === undefined) {
+    options.apiKey = config.api_key;
+  }
+  if (config.oauth_provider && options.oauthProvider === undefined) {
+    options.oauthProvider = config.oauth_provider;
+  }
+  if (config.oauth_account && options.oauthAccountId === undefined) {
+    options.oauthAccountId = config.oauth_account;
+  }
+
+  const parsed = validateCheckerOptions(quotaChecker.type, options);
+  return parsed.success ? { valid: true } : { valid: false, details: parsed.error.issues };
 }
 
 function serializeMcpKey(key: {
@@ -198,6 +228,10 @@ export async function registerConfigRoutes(
     if (!result.success) {
       return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
     }
+    const quotaValidation = validateProviderQuotaChecker(result.data);
+    if (!quotaValidation.valid) {
+      return reply.code(400).send({ error: 'Validation failed', details: quotaValidation.details });
+    }
     if (result.data.raw_passthrough?.enabled && !validateRawProviderSlug(slug)) {
       return reply.code(400).send({
         error: 'Raw passthrough requires a single slug-safe provider ID',
@@ -230,6 +264,12 @@ export async function registerConfigRoutes(
       const result = ProviderConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
+      }
+      const quotaValidation = validateProviderQuotaChecker(result.data);
+      if (!quotaValidation.valid) {
+        return reply
+          .code(400)
+          .send({ error: 'Validation failed', details: quotaValidation.details });
       }
       if (result.data.raw_passthrough?.enabled && !validateRawProviderSlug(slug)) {
         return reply.code(400).send({

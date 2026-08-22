@@ -23,6 +23,7 @@ import { authenticate, requireAdmin, ManagementAuthError } from './management/_p
 import { registerModelRoutes } from './management/models';
 import { registerBackupRoutes } from './management/backup';
 import { registerConcurrencyRoutes } from './management/concurrency';
+import { registerCustomCheckerRoutes } from './management/custom-checkers';
 import { Dispatcher } from '../services/dispatch/dispatcher';
 import { ProbeService } from '../services/probes/probe-service';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
@@ -123,6 +124,7 @@ export async function registerManagementRoutes(
       await registerBackupRoutes(adminOnly, usageStorage, mcpUsageStorage);
       // Concurrency (live snapshot + historical timeline)
       await registerConcurrencyRoutes(adminOnly, usageStorage);
+      await registerCustomCheckerRoutes(adminOnly, quotaScheduler ?? QuotaScheduler.getInstance());
     });
   });
 }

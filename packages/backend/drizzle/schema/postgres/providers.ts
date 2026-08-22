@@ -10,9 +10,6 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { oauthCredentials } from './oauth-credentials';
-import { quotaCheckerTypeEnum } from './enums';
-
-export { quotaCheckerTypeEnum };
 
 export const providers = pgTable(
   'providers',
@@ -37,7 +34,7 @@ export const providers = pgTable(
     headers: text('headers'), // JSON or encrypted string — text for encryption compatibility
     extraBody: text('extra_body'), // JSON — not encrypted, text for consistency
     compaction: jsonb('compaction'), // compaction config
-    quotaCheckerType: quotaCheckerTypeEnum('quota_checker_type'),
+    quotaCheckerType: text('quota_checker_type'),
     quotaCheckerId: text('quota_checker_id'),
     quotaCheckerEnabled: boolean('quota_checker_enabled').notNull().default(true),
     quotaCheckerInterval: integer('quota_checker_interval').notNull().default(30),

@@ -24,3 +24,4 @@ export * from './system-settings';
 export * from './oauth-credentials';
 export * from './pi-ai-custom-providers';
 export * from './pi-ai-custom-models';
+export * from './custom-checkers';

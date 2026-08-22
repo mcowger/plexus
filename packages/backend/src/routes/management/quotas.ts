@@ -2,7 +2,10 @@ import { FastifyInstance } from 'fastify';
 import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { getConfig } from '../../config';
 import { logger } from '../../utils/logger';
-import { getCheckerDefinitions } from '../../services/quota/checker-registry';
+import {
+  getCheckerDefinitions,
+  isCustomCheckerRegistered,
+} from '../../services/quota/checker-registry';
 
 function getOAuthMetadata(checkerId: string) {
   const quotaConfig = getConfig().quotas?.find((q) => q.id === checkerId);
@@ -28,7 +31,11 @@ export async function registerQuotaRoutes(
   fastify.get('/v0/management/quota-checkers', async (_request, reply) => {
     try {
       const defs = getCheckerDefinitions();
-      const knownTypes = defs.map((d) => ({ type: d.type, displayName: d.displayName }));
+      const knownTypes = defs.map((d) => ({
+        type: d.type,
+        displayName: d.displayName,
+        custom: isCustomCheckerRegistered(d.type),
+      }));
       const displayNameMap = new Map(defs.map((d) => [d.type, d.displayName]));
 
       const configured = [];

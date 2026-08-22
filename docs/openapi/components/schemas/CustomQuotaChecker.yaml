@@ -1,0 +1,20 @@
+type: object
+required: [id, type, displayName, code, enabled, createdAt, updatedAt]
+properties:
+  id:
+    type: string
+  type:
+    type: string
+  displayName:
+    type: string
+  code:
+    type: string
+    description: JavaScript function body returning an array of quota meters.
+  enabled:
+    type: boolean
+  createdAt:
+    type: string
+    format: date-time
+  updatedAt:
+    type: string
+    format: date-time

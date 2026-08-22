@@ -49,6 +49,7 @@ export * from './sqlite/system-settings';
 export * from './sqlite/oauth-credentials';
 export * from './sqlite/pi-ai-custom-providers';
 export * from './sqlite/pi-ai-custom-models';
+export * from './sqlite/custom-checkers';
 export {
   providersRelations,
   providerModelsRelations,
@@ -76,3 +77,4 @@ export { systemSettings as pgSystemSettings } from './postgres/system-settings';
 export { oauthCredentials as pgOauthCredentials } from './postgres/oauth-credentials';
 export { piAiCustomProviders as pgPiAiCustomProviders } from './postgres/pi-ai-custom-providers';
 export { piAiCustomModels as pgPiAiCustomModels } from './postgres/pi-ai-custom-models';
+export { customCheckers as pgCustomCheckers } from './postgres/custom-checkers';

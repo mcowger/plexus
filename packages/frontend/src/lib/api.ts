@@ -691,6 +691,71 @@ const configRequestCache = new Map<string, { expiresAt: number; promise: Promise
 export interface QuotaCheckerType {
   type: string;
   displayName: string;
+  custom?: boolean;
+}
+
+export interface CustomQuotaChecker {
+  id: string;
+  type: string;
+  displayName: string;
+  code: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchCustomQuotaCheckers(): Promise<CustomQuotaChecker[]> {
+  const response = await fetchWithAuth(`${API_BASE}/v0/management/custom-checkers`);
+  if (!response.ok) throw new Error('Failed to fetch custom quota checkers');
+  return response.json();
+}
+
+export async function saveCustomQuotaChecker(
+  id: string,
+  payload: { displayName: string; code: string; enabled: boolean }
+): Promise<CustomQuotaChecker> {
+  const response = await fetchWithAuth(
+    `${API_BASE}/v0/management/custom-checkers/${encodeURIComponent(id)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...payload }),
+    }
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to save custom quota checker');
+  }
+  return response.json();
+}
+
+export async function deleteCustomQuotaChecker(id: string): Promise<void> {
+  const response = await fetchWithAuth(
+    `${API_BASE}/v0/management/custom-checkers/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+    }
+  );
+  if (!response.ok) throw new Error('Failed to delete custom quota checker');
+}
+
+export async function testCustomQuotaChecker(
+  id: string,
+  provider: string,
+  options: Record<string, unknown>,
+  code?: string
+): Promise<{ success: boolean; meters: import('../types/quota').Meter[]; error?: string }> {
+  const response = await fetchWithAuth(
+    `${API_BASE}/v0/management/custom-checkers/${encodeURIComponent(id)}/test`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, options, ...(code ? { code } : {}) }),
+    }
+  );
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Custom quota checker test failed');
+  return result;
 }
 
 export interface QuotaCheckersResponse {

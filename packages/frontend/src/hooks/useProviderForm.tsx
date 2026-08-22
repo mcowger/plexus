@@ -101,6 +101,7 @@ export function useProviderForm() {
   // up here automatically with no frontend change.
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
   const OAUTH_PROVIDERS = oauthProviders.map((p) => ({ value: p.id, label: p.name }));
+  const [customCheckerIds, setCustomCheckerIds] = useState<string[]>([]);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [quotasLoading, setQuotasLoading] = useState(true);
 
@@ -190,6 +191,7 @@ export function useProviderForm() {
   useEffect(() => {
     fetchQuotaCheckers().then((res) => {
       setQuotaCheckerTypes(res.knownTypes.map((t) => t.type));
+      setCustomCheckerIds(res.knownTypes.filter((t) => t.custom).map((t) => t.type));
     });
   }, []);
 
@@ -891,6 +893,7 @@ export function useProviderForm() {
     originalId,
     isSaving,
     quotaCheckerTypes,
+    customCheckerIds,
     quotas,
     quotasLoading,
     oauthSessionId,

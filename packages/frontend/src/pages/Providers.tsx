@@ -14,10 +14,12 @@ import { ProviderAdvancedEditor } from '../components/providers/ProviderAdvanced
 import { ProviderModelsEditor } from '../components/providers/ProviderModelsEditor';
 import { FetchModelsModal } from '../components/providers/FetchModelsModal';
 import { DeleteProviderModal } from '../components/providers/DeleteProviderModal';
-import { Plus } from 'lucide-react';
+import { Code2, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const Providers = () => {
   const f = useProviderForm();
+  const navigate = useNavigate();
 
   return (
     <div className="flex flex-col min-h-full">
@@ -25,9 +27,19 @@ export const Providers = () => {
         title="Providers"
         subtitle="Upstream LLM providers routed by the gateway"
         actions={
-          <Button leftIcon={<Plus size={14} />} onClick={f.handleAddNew} size="sm">
-            Add provider
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={<Code2 size={14} />}
+              onClick={() => navigate('/providers/custom-checkers')}
+              size="sm"
+            >
+              Custom Quota Checkers
+            </Button>
+            <Button leftIcon={<Plus size={14} />} onClick={f.handleAddNew} size="sm">
+              Add provider
+            </Button>
+          </div>
         }
       />
 
@@ -134,6 +146,7 @@ export const Providers = () => {
                 isOAuthMode={f.isOAuthMode}
                 oauthCheckerType={f.oauthCheckerType}
                 quotaValidationError={f.quotaValidationError}
+                customCheckerIds={f.customCheckerIds}
               />
             </div>
 

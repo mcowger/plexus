@@ -1,9 +1,10 @@
 get:
   tags:
     - Management — Config
-  summary: Valid built-in quota-checker type strings (admin only)
+  summary: Registered quota-checker type strings (admin only)
   description: |
-    Returns the list of valid quota checker types.
+    Returns the list of registered quota checker types, including enabled
+    admin-authored custom checkers.
 
     ## Relationship to ProviderConfig
 

@@ -27,6 +27,15 @@ import type {
 import { resolveGpuParams } from '@plexus/shared';
 import { McpOauthRepository } from './mcp-oauth-repository';
 
+export interface CustomCheckerRecord {
+  id: string;
+  displayName: string;
+  code: string;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // Helper to parse JSON from SQLite text columns (PG jsonb auto-deserializes)
 function parseJson<T>(value: unknown): T | null {
   if (value === null || value === undefined) return null;
@@ -266,6 +275,73 @@ export class ConfigRepository {
     return getSchema();
   }
 
+  async getCustomCheckers(): Promise<CustomCheckerRecord[]> {
+    const rows = await this.db().select().from(this.schema().customCheckers);
+    return rows.map((row: any) => ({
+      id: row.id,
+      displayName: row.displayName,
+      code: row.code,
+      enabled: toBool(row.enabled),
+      createdAt: Number(row.createdAt),
+      updatedAt: Number(row.updatedAt),
+    }));
+  }
+
+  async getCustomChecker(id: string): Promise<CustomCheckerRecord | null> {
+    const rows = await this.db()
+      .select()
+      .from(this.schema().customCheckers)
+      .where(eq(this.schema().customCheckers.id, id))
+      .limit(1);
+    const row = rows[0] as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      displayName: row.displayName,
+      code: row.code,
+      enabled: toBool(row.enabled),
+      createdAt: Number(row.createdAt),
+      updatedAt: Number(row.updatedAt),
+    };
+  }
+
+  async saveCustomChecker(
+    id: string,
+    data: { displayName: string; code: string; enabled: boolean }
+  ): Promise<CustomCheckerRecord> {
+    const schema = this.schema();
+    const timestamp = now();
+    const values = {
+      id,
+      displayName: data.displayName,
+      code: data.code,
+      enabled: fromBool(data.enabled),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const existing = await this.getCustomChecker(id);
+    if (existing) {
+      await this.db()
+        .update(schema.customCheckers)
+        .set({
+          displayName: values.displayName,
+          code: values.code,
+          enabled: values.enabled,
+          updatedAt: values.updatedAt,
+        })
+        .where(eq(schema.customCheckers.id, id));
+    } else {
+      await this.db().insert(schema.customCheckers).values(values);
+    }
+    return (await this.getCustomChecker(id))!;
+  }
+
+  async deleteCustomChecker(id: string): Promise<void> {
+    await this.db()
+      .delete(this.schema().customCheckers)
+      .where(eq(this.schema().customCheckers.id, id));
+  }
+
   // ─── Clear All Data (for failed bootstrap rollback) ─────────────
 
   async clearAllData(): Promise<void> {
@@ -274,6 +350,7 @@ export class ConfigRepository {
     await this.db().delete(schema.providerModels);
     await this.db().delete(schema.modelAliases);
     await this.db().delete(schema.providers);
+    await this.db().delete(schema.customCheckers);
     await this.db().delete(schema.apiKeys);
     await this.db().delete(schema.userQuotaDefinitions);
     await this.db().delete(schema.mcpKeys);

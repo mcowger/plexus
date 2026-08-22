@@ -1,0 +1,8 @@
+type: object
+properties:
+  displayName:
+    type: string
+  code:
+    type: string
+  enabled:
+    type: boolean

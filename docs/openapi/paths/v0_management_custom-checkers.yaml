@@ -1,0 +1,18 @@
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: List custom quota checkers (admin only)
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Custom quota checkers.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: ../components/schemas/CustomQuotaChecker.yaml
+    '401':
+      description: Authentication required or invalid credentials.
+  operationId: getV0ManagementCustomCheckers

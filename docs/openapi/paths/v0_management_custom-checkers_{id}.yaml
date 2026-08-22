@@ -1,0 +1,104 @@
+get:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Get a custom quota checker (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - $ref: ../components/parameters/CustomCheckerId.yaml
+  responses:
+    '200':
+      description: Custom quota checker.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/CustomQuotaChecker.yaml
+    '404':
+      description: Custom checker not found.
+  operationId: getV0ManagementCustomCheckersByid
+
+put:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Create or replace a custom quota checker (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - $ref: ../components/parameters/CustomCheckerId.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CustomQuotaCheckerInput.yaml
+  responses:
+    '200':
+      description: Saved custom quota checker.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/CustomQuotaChecker.yaml
+    '400':
+      description: Validation failed.
+    '409':
+      description: Checker type collides with a built-in checker.
+  operationId: putV0ManagementCustomCheckersByid
+
+patch:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Update a custom quota checker (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - $ref: ../components/parameters/CustomCheckerId.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CustomQuotaCheckerPatch.yaml
+  responses:
+    '200':
+      description: Updated custom quota checker.
+    '404':
+      description: Custom checker not found.
+  operationId: patchV0ManagementCustomCheckersByid
+
+delete:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Delete a custom quota checker (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - $ref: ../components/parameters/CustomCheckerId.yaml
+  responses:
+    '200':
+      description: Custom checker deleted.
+    '404':
+      description: Custom checker not found.
+  operationId: deleteV0ManagementCustomCheckersByid
+
+post:
+  tags:
+    - Management — Quotas (Provider)
+  summary: Test a custom quota checker without persisting a snapshot (admin only)
+  security:
+    - AdminKey: []
+  parameters:
+    - $ref: ../components/parameters/CustomCheckerId.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/CustomQuotaCheckerTestInput.yaml
+  responses:
+    '200':
+      description: Test result.
+    '400':
+      description: Checker execution failed.
+    '404':
+      description: Custom checker not found.
+  operationId: postV0ManagementCustomCheckersByid

@@ -5904,8 +5904,8 @@
         "tags": [
           "Management — Config"
         ],
-        "summary": "Valid built-in quota-checker type strings (admin only)",
-        "description": "Returns the list of valid quota checker types.\n\n## Relationship to ProviderConfig\n\nThese types are used in `providers[*].quota.type`. When you configure\na provider with a quota block:\n\n```yaml\nproviders:\n  my-provider:\n    quota:\n      type: naga  # <-- must be one of these types\n      options:\n        apiKey: ...\n```\n\nEach type corresponds to a specific quota checker implementation that\nmonitors a particular provider's quota/API limits.\n\n**Admin only** — limited principals receive 403.\n",
+        "summary": "Registered quota-checker type strings (admin only)",
+        "description": "Returns the list of registered quota checker types, including enabled\nadmin-authored custom checkers.\n\n## Relationship to ProviderConfig\n\nThese types are used in `providers[*].quota.type`. When you configure\na provider with a quota block:\n\n```yaml\nproviders:\n  my-provider:\n    quota:\n      type: naga  # <-- must be one of these types\n      options:\n        apiKey: ...\n```\n\nEach type corresponds to a specific quota checker implementation that\nmonitors a particular provider's quota/API limits.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -6040,6 +6040,215 @@
           }
         },
         "operationId": "getV0ManagementQuotaCheckers"
+      }
+    },
+    "/v0/management/custom-checkers": {
+      "get": {
+        "tags": [
+          "Management — Quotas (Provider)"
+        ],
+        "summary": "List custom quota checkers (admin only)",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom quota checkers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomQuotaChecker"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required or invalid credentials."
+          }
+        },
+        "operationId": "getV0ManagementCustomCheckers"
+      }
+    },
+    "/v0/management/custom-checkers/{id}": {
+      "get": {
+        "tags": [
+          "Management — Quotas (Provider)"
+        ],
+        "summary": "Get a custom quota checker (admin only)",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomCheckerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom quota checker.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomQuotaChecker"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Custom checker not found."
+          }
+        },
+        "operationId": "getV0ManagementCustomCheckersByid"
+      },
+      "put": {
+        "tags": [
+          "Management — Quotas (Provider)"
+        ],
+        "summary": "Create or replace a custom quota checker (admin only)",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomCheckerId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomQuotaCheckerInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved custom quota checker.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomQuotaChecker"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed."
+          },
+          "409": {
+            "description": "Checker type collides with a built-in checker."
+          }
+        },
+        "operationId": "putV0ManagementCustomCheckersByid"
+      },
+      "patch": {
+        "tags": [
+          "Management — Quotas (Provider)"
+        ],
+        "summary": "Update a custom quota checker (admin only)",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomCheckerId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomQuotaCheckerPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated custom quota checker."
+          },
+          "404": {
+            "description": "Custom checker not found."
+          }
+        },
+        "operationId": "patchV0ManagementCustomCheckersByid"
+      },
+      "delete": {
+        "tags": [
+          "Management — Quotas (Provider)"
+        ],
+        "summary": "Delete a custom quota checker (admin only)",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomCheckerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom checker deleted."
+          },
+          "404": {
+            "description": "Custom checker not found."
+          }
+        },
+        "operationId": "deleteV0ManagementCustomCheckersByid"
+      },
+      "post": {
+        "tags": [
+          "Management — Quotas (Provider)"
+        ],
+        "summary": "Test a custom quota checker without persisting a snapshot (admin only)",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CustomCheckerId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomQuotaCheckerTestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Test result."
+          },
+          "400": {
+            "description": "Checker execution failed."
+          },
+          "404": {
+            "description": "Custom checker not found."
+          }
+        },
+        "operationId": "postV0ManagementCustomCheckersByid"
       }
     },
     "/v0/management/usage": {
@@ -12742,6 +12951,96 @@
           }
         }
       },
+      "CustomQuotaChecker": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "displayName",
+          "code",
+          "enabled",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "JavaScript function body returning an array of quota meters."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CustomQuotaCheckerInput": {
+        "type": "object",
+        "required": [
+          "displayName",
+          "code"
+        ],
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "CustomQuotaCheckerTestInput": {
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "code": {
+            "type": "string",
+            "description": "Optional unsaved code to execute instead of the persisted code."
+          }
+        }
+      },
+      "CustomQuotaCheckerPatch": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "UsageRecord": {
         "type": "object",
         "description": "Per-request usage record stored in `request_usage`. Populated after each inference request completes (or errors). Fields may be null on error paths.\n",
@@ -14038,6 +14337,16 @@
         "schema": {
           "type": "string",
           "example": "resp_01HXYZ..."
+        }
+      },
+      "CustomCheckerId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Custom quota checker type identifier.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
         }
       }
     }

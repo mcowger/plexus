@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: Custom quota checker type identifier.
+schema:
+  type: string
+  pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'

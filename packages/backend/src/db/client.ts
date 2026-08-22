@@ -111,6 +111,7 @@ export function initializeDatabase(connectionString?: string) {
       mcpKeys,
       systemSettings,
       oauthCredentials,
+      customCheckers,
     } = sqliteSchema;
 
     currentSchema = sqliteSchema;
@@ -132,6 +133,7 @@ export function initializeDatabase(connectionString?: string) {
         mcpKeys,
         systemSettings,
         oauthCredentials,
+        customCheckers,
       },
     });
   } else {
@@ -154,6 +156,7 @@ export function initializeDatabase(connectionString?: string) {
       mcpKeys,
       systemSettings,
       oauthCredentials,
+      customCheckers,
     } = pgSchema;
 
     currentSchema = pgSchema;
@@ -175,6 +178,7 @@ export function initializeDatabase(connectionString?: string) {
       mcpKeys,
       systemSettings,
       oauthCredentials,
+      customCheckers,
     };
 
     if (postgresDriver === 'pglite') {

@@ -1,7 +1,12 @@
 import { logger } from '../../utils/logger';
 import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
 import type { QuotaConfig } from '../../config';
-import { loadAllCheckers, getCheckerDefinition, createMeterContext } from './checker-registry';
+import {
+  loadAllCheckers,
+  loadCustomCheckers,
+  getCheckerDefinition,
+  createMeterContext,
+} from './checker-registry';
 import type { MeterCheckResult, Meter } from '../../types/meter';
 import { toDbTimestampMs } from '../../utils/normalize';
 import { eq, desc, gte, and } from 'drizzle-orm';
@@ -52,6 +57,8 @@ export class QuotaScheduler {
     if (!this.checkersLoaded) {
       await loadAllCheckers();
       this.checkersLoaded = true;
+    } else {
+      await loadCustomCheckers();
     }
 
     for (const config of quotaConfigs) {
@@ -466,10 +473,12 @@ export class QuotaScheduler {
     if (!this.checkersLoaded) {
       await loadAllCheckers();
       this.checkersLoaded = true;
+    } else {
+      await loadCustomCheckers();
     }
 
     const existingIds = new Set(this.configs.keys());
-    const activeConfigs = quotaConfigs.filter((c) => c.enabled);
+    const activeConfigs = quotaConfigs.filter((c) => c.enabled && getCheckerDefinition(c.type));
     const activeIds = new Set(activeConfigs.map((c) => c.id));
 
     for (const id of existingIds) {

@@ -1,0 +1,11 @@
+type: object
+required: [provider]
+properties:
+  provider:
+    type: string
+  options:
+    type: object
+    additionalProperties: true
+  code:
+    type: string
+    description: Optional unsaved code to execute instead of the persisted code.

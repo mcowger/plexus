@@ -489,6 +489,10 @@ paths:
     $ref: paths/v0_management_quota-checker-types.yaml
   /v0/management/quota-checkers:
     $ref: paths/v0_management_quota-checkers.yaml
+  /v0/management/custom-checkers:
+    $ref: paths/v0_management_custom-checkers.yaml
+  /v0/management/custom-checkers/{id}:
+    $ref: paths/v0_management_custom-checkers_{id}.yaml
   /v0/management/usage:
     $ref: paths/v0_management_usage.yaml
   /v0/management/usage/summary:

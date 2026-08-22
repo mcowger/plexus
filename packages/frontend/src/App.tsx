@@ -11,6 +11,7 @@ import { SystemLogs } from './pages/SystemLogs';
 import { Debug } from './pages/Debug';
 import { Errors } from './pages/Errors';
 import { Quotas } from './pages/Quotas';
+import { CustomQuotaCheckers } from './pages/CustomQuotaCheckers';
 import { McpPage } from './pages/Mcp';
 import { Playground } from './pages/Playground';
 import { Login } from './pages/Login';
@@ -107,6 +108,14 @@ const AppRoutes = () => {
                   element={
                     <ProtectedRoute requireAdmin>
                       <Quotas />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/providers/custom-checkers"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <CustomQuotaCheckers />
                     </ProtectedRoute>
                   }
                 />
