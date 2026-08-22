@@ -627,6 +627,84 @@ export function copilotWireApiType(modelId: string | undefined): string {
   return 'chat';
 }
 
+// ─── Generic OAuth (any pi-ai OAuth provider that isn't native) ────────────
+//
+// Anthropic/Codex/Copilot get hand-ported paths above because they need
+// something beyond "Bearer token + standard wire body": Claude Code masking,
+// ChatGPT-backend body adornment, or per-model wire-API selection against a
+// proxy base URL. Every OTHER pi-ai OAuth provider (xai, kimi-coding,
+// openrouter, and whatever pi-ai adds next — see isNativeOAuthProvider and
+// services/oauth/oauth-providers.ts) is a plain Bearer-token OAuth provider
+// speaking one of the standard wire APIs pi-ai's registry already declares
+// per model. The standard-path transformer has already built the correct
+// wire body by the time this runs — only auth and the upstream URL need to
+// be swapped from the `oauth://` placeholder for the real ones, so there is
+// no per-provider work to do here, now or for future providers.
+
+/** Endpoint path suffix per plexus wire api type — mirrors each standard
+ * transformer's `defaultEndpoint` (see transformers/openai.ts, responses.ts,
+ * anthropic/index.ts) so a generic OAuth request hits the exact same path a
+ * plain API-key provider speaking the same wire API would. */
+const GENERIC_OAUTH_ENDPOINTS: Record<string, string> = {
+  chat: '/chat/completions',
+  responses: '/responses',
+  messages: '/messages',
+};
+
+/**
+ * Resolve the plexus wire api type for a generic (non-native) OAuth
+ * provider/model from pi-ai's own `model.api` field. Returns undefined when
+ * the model isn't in pi-ai's catalog, or resolves to a wire api generic
+ * OAuth dispatch doesn't support (e.g. `gemini`) — callers surface this as a
+ * clear per-model error rather than silently mis-routing.
+ */
+export function genericOAuthApiType(provider: string, modelId: string): string | undefined {
+  const model = getCatalogModel(provider, modelId);
+  const api = (model as any)?.api as string | undefined;
+  return api ? PIAI_API_TO_PLEXUS[api] : undefined;
+}
+
+/**
+ * Prepare a request for any OAuth provider pi-ai supports that isn't one of
+ * the native providers above. No masking, no tool-name games, no body
+ * adornment — `body` is already the correct standard-path wire body; this
+ * only resolves the real Bearer token and upstream URL.
+ */
+export async function prepareGenericOAuthDispatch(params: {
+  provider: string;
+  modelId: string;
+  body: any;
+  streaming: boolean;
+  /** Resolved wire api type from genericOAuthApiType (chat/responses/messages). */
+  apiType: string;
+  oauthAccountId?: string | null;
+  extraHeaders?: Record<string, string>;
+}): Promise<PreparedOAuthRequest> {
+  const { provider, modelId, body, streaming, apiType, oauthAccountId, extraHeaders } = params;
+  const endpoint = GENERIC_OAUTH_ENDPOINTS[apiType];
+  if (!endpoint) {
+    throw new Error(
+      `OAuth: provider '${provider}' model '${modelId}' resolved to unsupported wire API ` +
+        `'${apiType}' for generic OAuth dispatch.`
+    );
+  }
+  const token = await OAuthAuthManager.getInstance().getApiKey(provider, oauthAccountId);
+  const baseUrl = resolveOAuthBaseUrl(provider, modelId);
+  const url = `${baseUrl}${endpoint}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: streaming ? 'text/event-stream' : 'application/json',
+    Authorization: `Bearer ${token}`,
+    ...extraHeaders,
+  };
+  return {
+    url,
+    headers,
+    body,
+    reverseResponseFrame: (frame: string) => frame,
+  };
+}
+
 /**
  * Full async preparation for the native Anthropic dispatch. For OAuth routes,
  * resolves the token (with auto-refresh + DB write-back via OAuthAuthManager);

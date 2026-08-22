@@ -10,6 +10,7 @@ import { isClaudeMaskingApiKeyRoute, isPiAiRoute } from '../oauth/oauth-dispatch
 import {
   isCodexCliShapedBody,
   isNativeOAuthProvider,
+  prepareGenericOAuthDispatch,
   prepareNativeOAuthDispatch,
   type PreparedOAuthRequest,
 } from '../oauth/oauth-native-request';
@@ -104,6 +105,15 @@ export async function buildRequestPayload(
   adapters: ResolvedAdapter[] = []
 ): Promise<RequestPayload> {
   const nativeOAuth = isNativeOAuthRoute(route, targetApiType);
+  // Any other OAuth-style route (an `oauth://` provider that isn't one of the
+  // native ones, and never the Claude-masking API-key route — that always
+  // resolves to native Anthropic). Config validation already restricts
+  // `oauth_provider` to providers pi-ai actually supports, so this is any
+  // pi-ai OAuth provider Plexus doesn't hand-port — see oauth-native-request.ts.
+  const genericOAuth =
+    !nativeOAuth &&
+    !isClaudeMaskingApiKeyRoute(route, targetApiType) &&
+    isPiAiRoute(route, targetApiType);
 
   // Codex two-path decision. A genuine Codex CLI body
   // is sent to the ChatGPT backend VERBATIM (pass-through), including its native
@@ -281,6 +291,30 @@ export async function buildRequestPayload(
         ? bypassTransformation
         : incomingIsMessages;
     return { payload: prepared.body, bypassTransformation: nativeBypass };
+  }
+
+  // Generic OAuth: `payload` above is already the correct standard-path wire
+  // body (shouldUsePassThrough forces bypassTransformation=false for these
+  // routes, so it always went through transformer.transformRequest()).
+  // `targetApiType` here is the resolved wire type (effectiveApiType) that
+  // request-manager passes for generic OAuth routes. Only auth + URL differ
+  // from an ordinary API-key provider on the same wire API.
+  if (genericOAuth) {
+    const provider = route.config.oauth_provider || route.provider;
+    const prepared = await prepareGenericOAuthDispatch({
+      provider,
+      modelId: route.model,
+      body: payload,
+      streaming: !!request.stream,
+      apiType: targetApiType,
+      oauthAccountId: route.config.oauth_account?.trim(),
+      extraHeaders: route.config.headers,
+    });
+    (route as any)[NATIVE_OAUTH_STASH] = prepared;
+    logger.debug(
+      `Generic OAuth payload prepared for ${provider}/${route.model} (url=${prepared.url})`
+    );
+    return { payload: prepared.body, bypassTransformation };
   }
 
   return { payload, bypassTransformation };
