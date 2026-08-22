@@ -30,6 +30,7 @@ jobs:
         uses: jdx/mise-action@v3
         with:
           cache: true
+          install_args: bun github:universal-ctags/ctags-nightly-build
 
       - name: Generate and push repomap
         shell: bash
