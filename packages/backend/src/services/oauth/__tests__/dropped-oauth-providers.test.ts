@@ -24,7 +24,14 @@ describe('dropped OAuth providers — schema rejection', () => {
   });
 
   it('still accepts supported OAuth providers', () => {
-    for (const provider of ['anthropic', 'openai-codex', 'github-copilot']) {
+    for (const provider of [
+      'anthropic',
+      'openai-codex',
+      'github-copilot',
+      'xai',
+      'kimi-coding',
+      'openrouter',
+    ]) {
       const result = ProviderConfigSchema.safeParse({
         api_base_url: 'oauth://',
         oauth_provider: provider,
@@ -32,6 +39,15 @@ describe('dropped OAuth providers — schema rejection', () => {
       });
       expect(result.success).toBe(true);
     }
+  });
+
+  it('rejects radius (gateway factory, not a fixed identity provider)', () => {
+    const result = ProviderConfigSchema.safeParse({
+      api_base_url: 'oauth://',
+      oauth_provider: 'radius',
+      oauth_account: 'acct',
+    });
+    expect(result.success).toBe(false);
   });
 });
 

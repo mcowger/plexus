@@ -245,6 +245,20 @@ vi.mock('@earendil-works/pi-ai/compat', () => ({
 
 const MOCK_BUILTIN_PROVIDER_IDS = new Set(['anthropic', 'openai-codex', 'openai', 'google']);
 
+// Mirrors which real pi-ai builtin providers expose `auth.oauth` — kept in
+// sync with services/oauth/oauth-providers.ts's expectations so config
+// validation and OAuth provider listing behave the same under test as in
+// production. 'radius' is deliberately omitted (see that module's doc
+// comment); it must resolve as OAuth-less here too.
+const MOCK_OAUTH_PROVIDER_IDS = new Set([
+  'anthropic',
+  'openai-codex',
+  'github-copilot',
+  'xai',
+  'kimi-coding',
+  'openrouter',
+]);
+
 const mockModels = {
   complete: mockComplete,
   stream: mockStream,
@@ -253,7 +267,13 @@ const mockModels = {
   getProviders: mockGetProviders,
   // Returns a truthy stub for known builtin provider ids, undefined otherwise.
   // Mirrors the real piAiModels.getProvider() (used internally by pi-ai routing).
-  getProvider: (id: string) => (MOCK_BUILTIN_PROVIDER_IDS.has(id) ? { id } : undefined),
+  getProvider: (id: string) =>
+    MOCK_BUILTIN_PROVIDER_IDS.has(id) || MOCK_OAUTH_PROVIDER_IDS.has(id)
+      ? {
+          id,
+          ...(MOCK_OAUTH_PROVIDER_IDS.has(id) ? { auth: { oauth: { name: id } } } : {}),
+        }
+      : undefined,
 };
 
 vi.mock('../src/utils/logger', () => ({

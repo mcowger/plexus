@@ -6,6 +6,7 @@ import { isValidIpRule } from './utils/ip-match';
 import { resolveGpuParams, VALID_GPU_PROFILES } from '@plexus/shared';
 import type { ModelArchitecture } from '@plexus/shared';
 import { getCatalogModel } from './services/pi-ai/catalog';
+import { isKnownOAuthProviderId } from './services/oauth/oauth-providers';
 
 // --- Zod Schemas ---
 
@@ -212,12 +213,19 @@ const ModelProviderConfigSchema = z.object({
   pi_ai_model_id: z.string().optional(),
 });
 
-// Gemini CLI / Antigravity OAuth were removed. Their enum
-// values are gone, so new configs referencing them are rejected on write; any
-// persisted rows are purged at startup by
-// ConfigService.dropRetiredOAuthProviders() (which loads from DB columns, not
-// this schema, so old rows never fail to load before they are dropped).
-const OAuthProviderSchema = z.enum(['anthropic', 'openai-codex', 'github-copilot']);
+// Validated dynamically against every OAuth-capable provider pi-ai ships
+// (see services/oauth/oauth-providers.ts) rather than a hardcoded enum, so
+// new pi-ai OAuth flows (e.g. xAI, Kimi Code, OpenRouter) are usable without
+// a Plexus code change. `radius` is deliberately excluded there.
+//
+// Gemini CLI / Antigravity OAuth were removed upstream, so configs
+// referencing them are rejected on write; any persisted rows are purged at
+// startup by ConfigService.dropRetiredOAuthProviders() (which loads from DB
+// columns, not this schema, so old rows never fail to load before they are
+// dropped).
+const OAuthProviderSchema = z.string().refine((id) => isKnownOAuthProviderId(id), {
+  message: 'oauth_provider must be a supported OAuth provider id',
+});
 
 const NagaQuotaCheckerOptionsSchema = z.object({
   apiKey: z.string().min(1, 'Naga provisioning key is required'),

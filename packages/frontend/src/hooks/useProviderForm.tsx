@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, Provider, OAuthSession, fetchQuotaCheckers } from '../lib/api';
+import { api, Provider, OAuthSession, OAuthProviderInfo, fetchQuotaCheckers } from '../lib/api';
 import type { QuotaCheckerInfo } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
@@ -19,14 +19,6 @@ const KNOWN_APIS = [
   'responses',
   'ollama',
 ];
-
-export const OAUTH_PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic (Claude Code Pro/Max)' },
-  { value: 'github-copilot', label: 'GitHub Copilot' },
-  { value: 'openai-codex', label: 'ChatGPT Plus/Pro (Codex Subscription)' },
-];
-// Gemini CLI / Antigravity OAuth were dropped; they are no
-// longer offered as new-provider options.
 
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
@@ -104,6 +96,11 @@ export function useProviderForm() {
   const [originalId, setOriginalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([]);
+  // Populated from the backend, which surfaces every OAuth-capable provider
+  // pi-ai ships — new provider flows (e.g. xAI, Kimi Code, OpenRouter) show
+  // up here automatically with no frontend change.
+  const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
+  const OAUTH_PROVIDERS = oauthProviders.map((p) => ({ value: p.id, label: p.name }));
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [quotasLoading, setQuotasLoading] = useState(true);
 
@@ -198,6 +195,13 @@ export function useProviderForm() {
 
   useEffect(() => {
     api
+      .getOAuthProviders()
+      .then(setOauthProviders)
+      .catch(() => setOauthProviders([]));
+  }, []);
+
+  useEffect(() => {
+    api
       .getQuotas()
       .then(setQuotas)
       .catch(() => {})
@@ -236,7 +240,7 @@ export function useProviderForm() {
       setOauthCredentialChecking(false);
       return;
     }
-    const providerId = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+    const providerId = editingProvider.oauthProvider || (OAUTH_PROVIDERS[0]?.value ?? '');
     const accountId = editingProvider.oauthAccount?.trim();
     if (!accountId) {
       setOauthCredentialReady(false);
@@ -344,7 +348,7 @@ export function useProviderForm() {
     try {
       let providerToSave = editingProvider;
       if (isOAuthMode && !providerToSave.oauthProvider) {
-        providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0].value };
+        providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0]?.value ?? '' };
       }
       if (isOAuthMode && !providerToSave.oauthAccount?.trim()) {
         toast.error('OAuth account is required');
@@ -475,7 +479,7 @@ export function useProviderForm() {
   };
 
   const handleStartOAuth = async () => {
-    const providerId = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+    const providerId = editingProvider.oauthProvider || (OAUTH_PROVIDERS[0]?.value ?? '');
     const accountId = editingProvider.oauthAccount?.trim();
     if (!accountId) {
       setOauthError('OAuth account is required before starting login');
@@ -707,7 +711,7 @@ export function useProviderForm() {
 
   const handleFetchModels = async () => {
     if (isOAuthMode) {
-      const oauthProvider = editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value;
+      const oauthProvider = editingProvider.oauthProvider || (OAUTH_PROVIDERS[0]?.value ?? '');
       setIsFetchingModels(true);
       setFetchError(null);
       try {

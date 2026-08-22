@@ -561,6 +561,13 @@
       "when": 1787339374380,
       "tag": "0079_add_quota_selector",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1787424329377,
+      "tag": "0080_convert_oauth_provider_type_to_text",
+      "breakpoints": true
     }
   ]
 }

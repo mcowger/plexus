@@ -138,13 +138,18 @@ When combined with `priority: api_match` on a model alias, Plexus prefers provid
 
 ### OAuth Providers
 
-Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) library. These require authentication through the Admin UI.
+Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) library. Every OAuth-capable provider pi-ai ships is supported — new flows pi-ai adds become available without a Plexus update. These require authentication through the Admin UI.
 
-**Supported OAuth providers:**
+**Supported OAuth providers (as of the current pi-ai dependency):**
 - Anthropic Claude
 - GitHub Copilot
 - OpenAI Codex
 - OpenAI o1-pro
+- xAI (Grok / X Premium+ subscription)
+- Kimi Code (Moonshot subscription)
+- OpenRouter
+
+`radius` is the one pi-ai OAuth flow Plexus excludes — it's a configurable gateway factory rather than a fixed identity provider, so it doesn't fit this list. The current set is always available from the Admin UI's OAuth provider dropdown, or via `GET /v0/management/oauth/providers`.
 
 **Configuration:**
 - Set API Base URL to `oauth://`

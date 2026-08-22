@@ -10,9 +10,9 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { oauthCredentials } from './oauth-credentials';
-import { oauthProviderTypeEnum, quotaCheckerTypeEnum } from './enums';
+import { quotaCheckerTypeEnum } from './enums';
 
-export { oauthProviderTypeEnum, quotaCheckerTypeEnum };
+export { quotaCheckerTypeEnum };
 
 export const providers = pgTable(
   'providers',
@@ -22,7 +22,7 @@ export const providers = pgTable(
     displayName: text('display_name'),
     apiBaseUrl: jsonb('api_base_url'), // String URL or {"chat":"...","messages":"..."}
     apiKey: text('api_key'),
-    oauthProviderType: oauthProviderTypeEnum('oauth_provider_type'),
+    oauthProviderType: text('oauth_provider_type'), // any pi-ai OAuth provider id except 'radius' (see services/oauth/oauth-providers.ts)
     oauthCredentialId: integer('oauth_credential_id').references(() => oauthCredentials.id, {
       onDelete: 'set null',
     }),
