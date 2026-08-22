@@ -70,16 +70,16 @@ pre-push:
   skip:
     - CI: "true"
 
-  # Keep the script registration as the replacement point for local review.
-  # It is intentionally a no-op for now and always exits 0.
-  #
-  # Implemented as a lefthook *script* (not a command) because pre-push
-  # commands are skipped by lefthook whenever its @{push}-based file
-  # heuristic yields nothing — which is always the case for upstream-less
-  # branches/worktrees. Script jobs have no such gate.
+  # Scripts avoid Lefthook's @{push}-based file heuristic, which can skip
+  # commands for upstream-less branches and worktrees.
   scripts:
     "pr-agent-review.sh":
       runner: bash
       skip:
         - CI: "true"
       use_stdin: true # forwards git's pre-push ref lines to the script
+    "repomap.sh":
+      runner: bash
+      skip:
+        - CI: "true"
+      use_stdin: true
