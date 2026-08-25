@@ -4,6 +4,8 @@ import { BackupService } from '../../services/configuration/backup-service';
 import type { UsageStorageService } from '../../services/observability/usage-storage';
 import type { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 
+const RESTORE_BODY_LIMIT = 100 * 1024 * 1024;
+
 export async function registerBackupRoutes(
   fastify: FastifyInstance,
   usageStorage?: UsageStorageService,
@@ -55,41 +57,45 @@ export async function registerBackupRoutes(
    *
    * This is a destructive operation — all existing data is replaced.
    */
-  fastify.post('/v0/management/restore', async (request, reply) => {
-    try {
-      const contentType = request.headers['content-type'] || '';
-      let result;
+  fastify.post(
+    '/v0/management/restore',
+    { bodyLimit: RESTORE_BODY_LIMIT },
+    async (request, reply) => {
+      try {
+        const contentType = request.headers['content-type'] || '';
+        let result;
 
-      if (
-        contentType.includes('application/gzip') ||
-        contentType.includes('application/octet-stream') ||
-        contentType.includes('application/x-gzip')
-      ) {
-        // Binary archive
-        if (!Buffer.isBuffer(request.body)) {
-          return reply.code(400).send({ error: 'Expected binary body for archive restore' });
+        if (
+          contentType.includes('application/gzip') ||
+          contentType.includes('application/octet-stream') ||
+          contentType.includes('application/x-gzip')
+        ) {
+          // Binary archive
+          if (!Buffer.isBuffer(request.body)) {
+            return reply.code(400).send({ error: 'Expected binary body for archive restore' });
+          }
+          logger.info('[Backup] Starting full archive restore');
+          result = await backupService.restoreFullBackup(request.body);
+        } else {
+          // JSON config-only envelope
+          const body = request.body as Record<string, unknown>;
+          if (!body || !body.plexus_backup) {
+            return reply.code(400).send({ error: 'Invalid backup: missing plexus_backup field' });
+          }
+          logger.info('[Backup] Starting config-only restore');
+          result = await backupService.restoreFullBackup(body);
         }
-        logger.info('[Backup] Starting full archive restore');
-        result = await backupService.restoreFullBackup(request.body);
-      } else {
-        // JSON config-only envelope
-        const body = request.body as Record<string, unknown>;
-        if (!body || !body.plexus_backup) {
-          return reply.code(400).send({ error: 'Invalid backup: missing plexus_backup field' });
-        }
-        logger.info('[Backup] Starting config-only restore');
-        result = await backupService.restoreFullBackup(body);
+
+        // After restore, restart the server so all services pick up the new data.
+        // We send the response first, then close/exit after a short delay —
+        // the process manager (bun --watch, Docker, systemd) will respawn us.
+        return reply.send(result);
+      } catch (e: any) {
+        logger.error('[Backup] Restore failed:', e);
+        return reply.code(500).send({ error: e.message || 'Backup restore failed' });
       }
-
-      // After restore, restart the server so all services pick up the new data.
-      // We send the response first, then close/exit after a short delay —
-      // the process manager (bun --watch, Docker, systemd) will respawn us.
-      return reply.send(result);
-    } catch (e: any) {
-      logger.error('[Backup] Restore failed:', e);
-      return reply.code(500).send({ error: e.message || 'Backup restore failed' });
     }
-  });
+  );
 
   // Allow binary body parsing for .tar.gz uploads
   fastify.addContentTypeParser(

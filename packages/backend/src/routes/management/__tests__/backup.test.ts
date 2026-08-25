@@ -50,7 +50,7 @@ describe('Backup management routes', () => {
   let mockMcpUsageStorage: any;
 
   beforeEach(async () => {
-    fastify = Fastify();
+    fastify = Fastify({ bodyLimit: 30 * 1024 * 1024 });
     mockUsageStorage = {
       deleteAllUsageLogs: vi.fn(async () => true),
       deleteAllErrors: vi.fn(async () => true),
@@ -116,6 +116,18 @@ describe('Backup management routes', () => {
       });
 
       expect(res.statusCode).toBe(400);
+    });
+
+    it('accepts full restore archives larger than the global body limit', async () => {
+      const res = await fastify.inject({
+        method: 'POST',
+        url: '/v0/management/restore',
+        payload: Buffer.alloc(31 * 1024 * 1024),
+        headers: { 'content-type': 'application/gzip' },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).not.toBe(413);
     });
   });
 
