@@ -31,13 +31,13 @@ export const providers = sqliteTable(
     quotaCheckerOptions: text('quota_checker_options'), // JSON
     modelAutosyncEnabled: integer('model_autosync_enabled').notNull().default(0),
     modelAutosyncInterval: integer('model_autosync_interval').notNull().default(60),
-    // GPU Profile settings — display hint + resolved numeric params
-    // gpu_profile is kept as a display hint; the 4 numeric fields are the source of truth.
-    gpuProfile: text('gpu_profile'), // GPU profile name (e.g. 'H100', 'custom') — display hint only
-    gpuRamGb: real('gpu_ram_gb'), // RAM in GB
-    gpuBandwidthTbS: real('gpu_bandwidth_tb_s'), // Bandwidth in TB/s
-    gpuFlopsTflop: real('gpu_flops_tflop'), // FLOPS in TFLOP
-    gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Power draw in watts
+    // Deprecated / Unused: Legacy GPU profile settings for removed synthetic energy estimation.
+    // Retained in schema for database backwards compatibility without requiring migrations.
+    gpuProfile: text('gpu_profile'), // Deprecated / Unused
+    gpuRamGb: real('gpu_ram_gb'), // Deprecated / Unused
+    gpuBandwidthTbS: real('gpu_bandwidth_tb_s'), // Deprecated / Unused
+    gpuFlopsTflop: real('gpu_flops_tflop'), // Deprecated / Unused
+    gpuPowerDrawWatts: integer('gpu_power_draw_watts'), // Deprecated / Unused
     adapter: text('adapter'), // JSON: string[] — provider-level adapter names
     autoCompat: integer('auto_compat').notNull().default(0), // Enable pi-ai registry-aware compatibility mapping
     timeoutMs: integer('timeout_ms'), // Per-provider upstream request timeout in ms (NULL = use global default)

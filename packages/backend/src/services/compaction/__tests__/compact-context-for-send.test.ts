@@ -72,15 +72,13 @@ function makeUserMessage(text: string): UserMessage {
   return { role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() };
 }
 
-function makeRoute(canonicalModel: string, contextLength?: number): RouteResult {
+function makeRoute(canonicalModel: string): RouteResult {
   return {
     provider: 'openai',
     model: 'gpt-4o',
     config: { api_key: 'test-key' } as any,
     modelConfig: {} as any,
     canonicalModel,
-    modelArchitecture:
-      contextLength != null ? ({ context_length: contextLength } as any) : undefined,
   };
 }
 
@@ -113,6 +111,7 @@ describe('compactContextForSend', () => {
 
   test('2. below-min — enabled but minTokens very high → reason=below-min, compacted=false', async () => {
     const canonicalModel = 'gpt-4o';
+    mockResolveContextLength.mockReturnValue(128_000);
     mockGetConfig.mockReturnValue({
       models: {
         [canonicalModel]: {
@@ -122,7 +121,7 @@ describe('compactContextForSend', () => {
     });
 
     const context: Context = { messages: [makeUserMessage('short message')] };
-    const route = makeRoute(canonicalModel, 128_000);
+    const route = makeRoute(canonicalModel);
     const memo = new Map();
 
     const result = await compactContextForSend(context, route, 'my-alias', memo);
@@ -136,6 +135,7 @@ describe('compactContextForSend', () => {
 
   test('3. native compaction fires — triggerRatio=0, minTokens=0 with a large toolResult', async () => {
     const canonicalModel = 'gpt-4o';
+    mockResolveContextLength.mockReturnValue(1000);
     mockGetConfig.mockReturnValue({
       models: {
         [canonicalModel]: {
@@ -163,7 +163,7 @@ describe('compactContextForSend', () => {
     const context: Context = {
       messages: [...heavyMessages, toolResult, makeUserMessage('final')],
     };
-    const route = makeRoute(canonicalModel, 1000);
+    const route = makeRoute(canonicalModel);
     const memo = new Map();
 
     const result = await compactContextForSend(context, route, 'my-alias', memo);
@@ -179,9 +179,9 @@ describe('compactContextForSend', () => {
     expect(result.context).not.toBe(context); // a NEW context is returned
   });
 
-  test('4. selected route context_length takes precedence over alias metadata', async () => {
+  test('4. alias metadata context_length is passed to compaction', async () => {
     const canonicalModel = 'gpt-4o';
-    mockResolveContextLength.mockReturnValue(1_000_000);
+    mockResolveContextLength.mockReturnValue(10);
     mockGetConfig.mockReturnValue({
       models: {
         [canonicalModel]: {
@@ -201,13 +201,13 @@ describe('compactContextForSend', () => {
     const context: Context = {
       messages: Array.from({ length: 5 }, () => makeToolResultMessage(JSON.stringify(bigArray))),
     };
-    const route = makeRoute(canonicalModel, 10);
+    const route = makeRoute(canonicalModel);
     const memo = new Map();
 
     const result = await compactContextForSend(context, route, 'my-alias', memo);
 
     expect(result.reason).toBe('ok');
     expect(result.compacted).toBe(true);
-    expect(mockResolveContextLength).not.toHaveBeenCalled();
+    expect(mockResolveContextLength).toHaveBeenCalled();
   });
 });

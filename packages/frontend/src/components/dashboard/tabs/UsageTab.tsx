@@ -37,7 +37,6 @@ import {
   formatDateTimeLabel,
 } from '../../../lib/format';
 import { Card } from '../../ui/Card';
-import { TotalEnergyComparison } from '../../TotalEnergyComparison';
 import { TimeRangeSelector } from '../TimeRangeSelector';
 import type { CustomDateRange } from '../../../lib/date';
 import {
@@ -115,9 +114,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
    */
   const [concurrencyByProvider, setConcurrencyByProvider] = useState<ConcurrencyData[]>([]);
   const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
-  const [energySummary, setEnergySummary] = useState<{
-    totalKwhUsed: number;
-  } | null>(null);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -182,9 +178,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     api
       .getConcurrencyData(timeRange, 'timeline', 'model', startDate, endDate)
       .then(setConcurrencyByModel);
-    api
-      .getEnergySummary(timeRange, true, startDate, endDate)
-      .then((summary) => setEnergySummary(summary));
   }, [timeRange, customDateRange]);
 
   // ---------------------------------------------------------------------------
@@ -719,12 +712,6 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         <ChartToggleCard title="Usage by Provider (Tokens)" dataKey="tokens" data={providerData} />
         <ChartToggleCard title="Usage by API Key (Requests)" dataKey="requests" data={keyData} />
         <ChartToggleCard title="Usage by API Key (Tokens)" dataKey="tokens" data={keyData} />
-
-        <Card className="min-w-0" title="Energy Comparisons">
-          <div style={{ marginTop: '12px', height: 300 }}>
-            <TotalEnergyComparison totalKwh={energySummary?.totalKwhUsed} />
-          </div>
-        </Card>
       </div>
     </div>
   );

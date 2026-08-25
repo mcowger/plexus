@@ -266,9 +266,6 @@ export interface UnifiedChatResponse {
     finalAttemptModel?: string;
     allAttemptedProviders?: string;
     retryHistory?: string;
-    // Energy estimation — resolved GPU and model params from dispatcher
-    gpuParams?: import('@plexus/shared').GpuParams;
-    modelParams?: import('@plexus/shared').ModelParams;
   };
   reasoning_content?: string | null;
   thinking?: {

@@ -14,7 +14,6 @@ import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
 import { StickySessionManager } from './sticky-session-manager';
-import type { ModelArchitecture } from '@plexus/shared';
 import { getApiBaseType, isApiSubtype, normalizeApiAccessList } from '../../utils/api-format';
 
 export interface RouteResult {
@@ -22,7 +21,6 @@ export interface RouteResult {
   model: string;
   config: ProviderConfig;
   modelConfig?: ModelProviderConfig;
-  modelArchitecture?: ModelArchitecture;
   incomingModelAlias?: string;
   canonicalModel?: string;
 }
@@ -363,7 +361,6 @@ async function buildGroupCandidates(
       model: target.model!,
       config: providerConfig!,
       modelConfig,
-      modelArchitecture: config.models?.[canonicalModel]?.model_architecture,
       incomingModelAlias: logModelName,
       canonicalModel,
     };
@@ -398,8 +395,6 @@ async function buildGroupCandidates(
     for (const candidate of nested) {
       merged.push({
         ...candidate,
-        modelArchitecture:
-          config.models?.[canonicalModel]?.model_architecture ?? candidate.modelArchitecture,
         canonicalModel,
         incomingModelAlias: logModelName,
       });

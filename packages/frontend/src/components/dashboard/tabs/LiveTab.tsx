@@ -638,7 +638,6 @@ export const LiveTab: React.FC<LiveTabProps> = ({
     reasoningTokens: 0,
     cachedTokens: 0,
     cacheWriteTokens: 0,
-    kwhUsed: 0,
     totalCost: 0,
   });
   /** Raw usage records from the latest poll -- the source of truth for all derived data */

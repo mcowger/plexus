@@ -16,12 +16,9 @@ import {
   type UsageSortField,
 } from '../lib/api';
 import {
-  KWH_PER_SLICE,
   formatBytes,
   formatCostIn,
-  formatEnergy,
   formatMs,
-  formatSlices,
   formatTPS,
   getEstimatedBytesPerToken,
 } from '../lib/format';
@@ -974,15 +971,7 @@ const DesktopLogRow = React.memo(
             );
           })()}
         </td>
-        <td
-          className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"
-          title={
-            log.kwhUsed != null && log.kwhUsed > 0
-              ? `Energy: ${formatEnergy(log.kwhUsed)} ≈ ${formatSlices(log.kwhUsed / KWH_PER_SLICE)} toast slices`
-              : undefined
-          }
-          style={log.kwhUsed != null && log.kwhUsed > 0 ? { cursor: 'help' } : undefined}
-        >
+        <td className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {/* Row 1: Messages and Tool calls */}
             <div style={{ display: 'flex', gap: '16px' }}>

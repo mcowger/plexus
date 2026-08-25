@@ -5,7 +5,6 @@ import { DebouncedInput } from '../ui/DebouncedInput';
 import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import { Tooltip } from '../ui/Tooltip';
-import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
 import type { Provider, CompactionSettings } from '../../lib/api';
 import { api } from '../../lib/api';
 
@@ -1273,62 +1272,6 @@ export function ProviderAdvancedEditor({
                   justifyContent: 'center',
                 }}
               >
-                {/* GPU Profile */}
-                <div className="flex flex-col gap-0.5">
-                  <label className="font-body text-[11px] font-medium text-text-secondary">
-                    GPU Profile
-                  </label>
-                  <select
-                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                    value={editingProvider.gpu_profile || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (!value) {
-                        const resolved = resolveGpuParams('B200');
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_profile: undefined,
-                          gpu_ram_gb: resolved.ram_gb,
-                          gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
-                          gpu_flops_tflop: resolved.flops_tflop,
-                          gpu_power_draw_watts: resolved.power_draw_watts,
-                        });
-                      } else if (value === 'custom') {
-                        const resolved = resolveGpuParams('custom', {
-                          ram_gb: editingProvider.gpu_ram_gb,
-                          bandwidth_tb_s: editingProvider.gpu_bandwidth_tb_s,
-                          flops_tflop: editingProvider.gpu_flops_tflop,
-                          power_draw_watts: editingProvider.gpu_power_draw_watts,
-                        });
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_profile: 'custom',
-                          gpu_ram_gb: resolved.ram_gb,
-                          gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
-                          gpu_flops_tflop: resolved.flops_tflop,
-                          gpu_power_draw_watts: resolved.power_draw_watts,
-                        });
-                      } else {
-                        const resolved = resolveGpuParams(value);
-                        setEditingProvider({
-                          ...editingProvider,
-                          gpu_profile: value,
-                          gpu_ram_gb: resolved.ram_gb,
-                          gpu_bandwidth_tb_s: resolved.bandwidth_tb_s,
-                          gpu_flops_tflop: resolved.flops_tflop,
-                          gpu_power_draw_watts: resolved.power_draw_watts,
-                        });
-                      }
-                    }}
-                  >
-                    <option value="">Default (B200)</option>
-                    {GPU_PROFILE_OPTIONS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 {/* Discount */}
                 <div className="flex flex-col gap-0.5">
                   <label className="font-body text-[11px] font-medium text-text-secondary">
@@ -1484,91 +1427,6 @@ export function ProviderAdvancedEditor({
               </div>
             </div>
           </div>
-
-          {/* Custom GPU fields — only when gpu_profile === 'custom' */}
-          {editingProvider.gpu_profile === 'custom' && (
-            <div
-              className="border border-border-glass rounded-md p-2 bg-bg-subtle"
-              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}
-            >
-              <div className="flex flex-col gap-0.5">
-                <label className="font-body text-[11px] font-medium text-text-secondary">
-                  RAM (GB)
-                </label>
-                <input
-                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                  type="number"
-                  step="1"
-                  min="1"
-                  placeholder="e.g. 80"
-                  value={editingProvider.gpu_ram_gb || ''}
-                  onChange={(e) =>
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_ram_gb: parseFloat(e.target.value) || undefined,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <label className="font-body text-[11px] font-medium text-text-secondary">
-                  Bandwidth (TB/s)
-                </label>
-                <input
-                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  placeholder="e.g. 3.35"
-                  value={editingProvider.gpu_bandwidth_tb_s || ''}
-                  onChange={(e) =>
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_bandwidth_tb_s: parseFloat(e.target.value) || undefined,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <label className="font-body text-[11px] font-medium text-text-secondary">
-                  FLOPS (TFLOPs)
-                </label>
-                <input
-                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                  type="number"
-                  step="100"
-                  min="1"
-                  placeholder="e.g. 4000"
-                  value={editingProvider.gpu_flops_tflop || ''}
-                  onChange={(e) =>
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_flops_tflop: parseFloat(e.target.value) || undefined,
-                    })
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <label className="font-body text-[11px] font-medium text-text-secondary">
-                  Power (Watts)
-                </label>
-                <input
-                  className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                  type="number"
-                  step="10"
-                  min="1"
-                  placeholder="e.g. 700"
-                  value={editingProvider.gpu_power_draw_watts || ''}
-                  onChange={(e) =>
-                    setEditingProvider({
-                      ...editingProvider,
-                      gpu_power_draw_watts: parseInt(e.target.value, 10) || undefined,
-                    })
-                  }
-                />
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

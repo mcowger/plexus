@@ -11,8 +11,6 @@ import { logger } from '../../utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../../utils/constants';
 import { UsageStorageService } from '../observability/usage-storage';
 import { calculateCosts } from '../../utils/calculate-costs';
-import { estimateKwhUsed } from '../observability/inference-energy';
-import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 
 const DESCRIPTION_CACHE_MAX = 500;
 
@@ -222,15 +220,6 @@ export class VisionDescriptorService {
         // Calculate costs if pricing data is available
         if (response.plexus?.pricing) {
           calculateCosts(usageRecord, response.plexus.pricing, response.plexus.providerDiscount);
-        }
-
-        if (usageRecord.tokensInput != null && usageRecord.tokensOutput != null) {
-          usageRecord.kwhUsed = estimateKwhUsed(
-            usageRecord.tokensInput,
-            usageRecord.tokensOutput,
-            response.plexus?.modelParams ?? DEFAULT_MODEL,
-            response.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS
-          );
         }
 
         usageStorage.saveRequest(usageRecord).catch((err) => {

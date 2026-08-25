@@ -11,8 +11,9 @@ export const modelAliases = sqliteTable('model_aliases', {
   metadataSource: text('metadata_source'), // 'openrouter' | 'models.dev' | 'catwalk' | 'custom'
   metadataSourcePath: text('metadata_source_path'),
   useImageFallthrough: integer('use_image_fallthrough').notNull().default(0),
-  // Model architecture override for inference energy calculation
-  modelArchitecture: text('model_architecture'), // JSON: override for total_params, active_params, layers, heads, kv_lora_rank, qk_rope_head_dim, context_length, dtype
+  // Deprecated / Unused: Legacy model architecture parameters for removed synthetic energy estimation.
+  // Retained in schema for database backwards compatibility without requiring migrations.
+  modelArchitecture: text('model_architecture'), // Deprecated / Unused: JSON override for transformer params
   enforceLimits: integer('enforce_limits').notNull().default(0),
   stickySession: integer('sticky_session').notNull().default(0),
   preferredApi: text('preferred_api'), // JSON: ('chat_completions' | 'messages' | 'gemini' | 'responses')[]

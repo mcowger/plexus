@@ -3741,18 +3741,6 @@
                     }
                   }
                 },
-                "with_gpu_profile": {
-                  "summary": "Local provider with GPU energy profile",
-                  "value": {
-                    "api_base_url": "http://localhost:8080/v1",
-                    "api_key": "no-key",
-                    "disable_cooldown": false,
-                    "gpu_ram_gb": 80,
-                    "gpu_bandwidth_tb_s": 3.35,
-                    "gpu_flops_tflop": 989.4,
-                    "gpu_power_draw_watts": 700
-                  }
-                },
                 "fireworks_with_adapters": {
                   "summary": "Fireworks provider with reasoning_content adapter",
                   "value": {
@@ -4109,7 +4097,7 @@
           "Management — Config"
         ],
         "summary": "List all model aliases (admin only)",
-        "description": "Returns a map of all model aliases keyed by slug.\n\nEach entry contains:\n- `target_groups` — Ordered array of target groups; each group has a name, selector, and targets\n- `type` — Model capability type (text, embeddings, transcriptions, speech, image)\n- `model_architecture` — Used for energy estimation (kWh calculation)\n- `metadata` — Optional enriched data from external catalogs\n- `pricing` — Optional pricing configuration\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Returns a map of all model aliases keyed by slug.\n\nEach entry contains:\n- `target_groups` — Ordered array of target groups; each group has a name, selector, and targets\n- `type` — Model capability type (text, embeddings, transcriptions, speech, image)\n- `metadata` — Optional enriched data from external catalogs\n- `pricing` — Optional pricing configuration\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -4193,7 +4181,7 @@
           "Management — Config"
         ],
         "summary": "Create or replace a model alias (admin only)",
-        "description": "Creates a new alias or replaces an existing one.\n\n## Energy recalculation\n\nIf you change `model_architecture`, the system recalculates estimated\nenergy usage (kWh) for all affected usage records. This happens\nasynchronously after the alias is saved.\n\n## Validation\n\nThe request body is validated against the `AliasConfig` schema.\nInvalid configurations return a 400 with validation error details.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Creates a new alias or replaces an existing one.\n\n## Validation\n\nThe request body is validated against the `AliasConfig` schema.\nInvalid configurations return a 400 with validation error details.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -4345,7 +4333,7 @@
           "Management — Config"
         ],
         "summary": "Merge updates into a model alias (admin only)",
-        "description": "Merges the request body into the existing alias configuration,\nthen validates the result.\n\n## Energy recalculation\n\nIf you change `model_architecture` (or add it if it was previously unset),\nthe system recalculates estimated energy usage (kWh) for all affected\nusage records. This happens asynchronously after the update.\n\n## Merge behavior\n\nPATCH performs a shallow merge — new fields are added, existing fields\nare overwritten, fields not in the request are preserved.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Merges the request body into the existing alias configuration,\nthen validates the result.\n\n## Merge behavior\n\nPATCH performs a shallow merge — new fields are added, existing fields\nare overwritten, fields not in the request are preserved.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -4460,91 +4448,6 @@
           }
         },
         "operationId": "deleteV0ManagementModelsByaliasId"
-      }
-    },
-    "/v0/management/models/huggingface/{modelId}": {
-      "parameters": [
-        {
-          "in": "path",
-          "name": "modelId",
-          "required": true,
-          "schema": {
-            "type": "string"
-          },
-          "description": "HuggingFace repo ID, URL-encoded (e.g. `mistralai%2FMixtral-8x7B`). The `/` character must be encoded as `%2F`.\n"
-        }
-      ],
-      "get": {
-        "tags": [
-          "Management — Models"
-        ],
-        "summary": "Fetch model architecture from HuggingFace (admin only)",
-        "description": "Fetches model architecture parameters from HuggingFace for use by the\nenergy-usage estimator.\n\n## Use case\n\nThe energy-usage estimator needs layer count, head count, and parameter\ntotals to calculate kWh consumed. This endpoint fetches that data from\nHuggingFace's model card.\n\n## Rate limiting\n\n- HuggingFace API has rate limits; repeated calls may be throttled\n- Responses are cached in Plexus to reduce unnecessary calls\n\n## Response fields\n\n- `success` — Whether the fetch succeeded\n- `model_id` — The model ID queried\n- `architecture` — Model architecture parameters:\n  - `total_params` — Total parameters in billions (estimated)\n  - `active_params` — Active (non-quantized) parameters\n  - `layers` — Number of transformer layers\n  - `heads` — Number of attention heads\n  - `kv_lora_rank` — KV quantization rank (if applicable)\n  - `qk_rope_head_dim` — QK RoPE head dimension (if applicable)\n  - `context_length` — Maximum context window\n  - `dtype` — Model data type (e.g. `float16`, `bfloat16`)\n\n**Admin only** — limited principals receive 403.\n",
-        "security": [
-          {
-            "AdminKey": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Architecture params.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "const": true
-                    },
-                    "model_id": {
-                      "type": "string"
-                    },
-                    "architecture": {
-                      "type": "object",
-                      "properties": {
-                        "total_params": {
-                          "type": "integer"
-                        },
-                        "active_params": {
-                          "type": "integer"
-                        },
-                        "layers": {
-                          "type": "integer"
-                        },
-                        "heads": {
-                          "type": "integer"
-                        },
-                        "kv_lora_rank": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "qk_rope_head_dim": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "context_length": {
-                          "type": "integer"
-                        },
-                        "dtype": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Model not found on HuggingFace."
-          }
-        },
-        "operationId": "getV0ManagementModelsHuggingfaceBymodelId"
       }
     },
     "/v0/management/models/metadata/refresh": {
@@ -11539,26 +11442,6 @@
               }
             }
           },
-          "gpu_profile": {
-            "type": "string",
-            "description": "Named GPU profile (e.g. `H100`, `A100`, `custom`). A display hint used by the frontend; the backend uses the four numeric fields below as the source of truth.\n"
-          },
-          "gpu_ram_gb": {
-            "type": "number",
-            "description": "GPU RAM in GB. Used for energy estimation when combined with model_architecture.\n"
-          },
-          "gpu_bandwidth_tb_s": {
-            "type": "number",
-            "description": "GPU memory bandwidth in TB/s. Used for energy estimation."
-          },
-          "gpu_flops_tflop": {
-            "type": "number",
-            "description": "GPU peak FLOPs in teraflops. Used for energy estimation."
-          },
-          "gpu_power_draw_watts": {
-            "type": "number",
-            "description": "GPU TDP in watts. Used for energy estimation."
-          },
           "adapter": {
             "oneOf": [
               {
@@ -12004,48 +11887,6 @@
             ],
             "discriminator": {
               "propertyName": "source"
-            }
-          },
-          "model_architecture": {
-            "type": "object",
-            "description": "Model architecture details used for inference energy estimation. When modified, triggers async recalculation of kWh for all affected historical usage records.\n",
-            "properties": {
-              "total_params": {
-                "type": "number",
-                "description": "Total parameter count (billions)."
-              },
-              "active_params": {
-                "type": "number",
-                "description": "Active (non-MoE-gated) parameter count (billions)."
-              },
-              "layers": {
-                "type": "integer"
-              },
-              "heads": {
-                "type": "integer"
-              },
-              "kv_lora_rank": {
-                "type": "integer"
-              },
-              "qk_rope_head_dim": {
-                "type": "integer"
-              },
-              "context_length": {
-                "type": "integer"
-              },
-              "dtype": {
-                "type": "string",
-                "enum": [
-                  "fp16",
-                  "bf16",
-                  "fp8",
-                  "fp8_e4m3",
-                  "fp8_e5m2",
-                  "nvfp4",
-                  "int4",
-                  "int8"
-                ]
-              }
             }
           },
           "input_price_per_million": {
@@ -12833,7 +12674,7 @@
               "string",
               "null"
             ],
-            "description": "Resolved canonical model name. For aliases with `model_architecture`, this is the target; otherwise same as `incomingModelAlias`.\n"
+            "description": "Resolved canonical model name."
           },
           "selectedModelName": {
             "type": [
@@ -12995,7 +12836,7 @@
               "number",
               "null"
             ],
-            "description": "Estimated energy consumption in kilowatt-hours. Calculated from `model_architecture` token estimates and provider-specific energy coefficients. Requires `model_architecture` to be set on the alias.\n"
+            "description": "Measured energy consumption in kilowatt-hours reported by the provider (if available)."
           },
           "isStreamed": {
             "type": "boolean",
@@ -13110,10 +12951,6 @@
                   "type": "integer",
                   "description": "Sum of cache-write tokens across all requests."
                 },
-                "kwhUsed": {
-                  "type": "number",
-                  "description": "Sum of energy usage (kWh) across all requests."
-                },
                 "tokens": {
                   "type": "integer",
                   "description": "Total token count = inputTokens + outputTokens + cachedTokens + cacheWriteTokens.\n"
@@ -13132,10 +12969,6 @@
               "totalTokens": {
                 "type": "integer",
                 "description": "Total tokens (input + output + cached + cacheWrite) in the window."
-              },
-              "totalKwhUsed": {
-                "type": "number",
-                "description": "Total energy usage in the window."
               },
               "avgDurationMs": {
                 "type": "number",
@@ -13174,10 +13007,6 @@
               "cacheWriteTokens": {
                 "type": "integer",
                 "description": "Cache-write tokens since midnight."
-              },
-              "kwhUsed": {
-                "type": "number",
-                "description": "Energy usage since midnight."
               },
               "totalCost": {
                 "type": "number",

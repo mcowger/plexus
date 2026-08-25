@@ -249,9 +249,7 @@ export async function compactContextForSend(
   signal?: AbortSignal
 ): Promise<CompactionResult> {
   const aliasConfig = getConfig().models?.[route.canonicalModel ?? modelAlias];
-  const contextLength =
-    route.modelArchitecture?.context_length ??
-    (aliasConfig ? resolveContextLength(aliasConfig) : undefined);
+  const contextLength = aliasConfig ? resolveContextLength(aliasConfig) : undefined;
   return CompactionService.getInstance().maybeCompact(
     context,
     {

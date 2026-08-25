@@ -1,4 +1,3 @@
-import { DEFAULT_GPU_PARAMS, resolveModelParams } from '@plexus/shared';
 import type { RouteResult } from '../routing/router';
 import type { RetryAttemptRecord } from './dispatcher-types';
 
@@ -82,14 +81,6 @@ export function attachAttemptMetadata(
     pricing: finalRoute.modelConfig?.pricing,
     providerDiscount: finalRoute.config.discount,
     config: { estimateTokens: finalRoute.config.estimateTokens },
-    gpuParams: {
-      ram_gb: finalRoute.config.gpu_ram_gb ?? DEFAULT_GPU_PARAMS.ram_gb,
-      bandwidth_tb_s: finalRoute.config.gpu_bandwidth_tb_s ?? DEFAULT_GPU_PARAMS.bandwidth_tb_s,
-      flops_tflop: finalRoute.config.gpu_flops_tflop ?? DEFAULT_GPU_PARAMS.flops_tflop,
-      power_draw_watts:
-        finalRoute.config.gpu_power_draw_watts ?? DEFAULT_GPU_PARAMS.power_draw_watts,
-    },
-    modelParams: resolveModelParams(finalRoute.modelArchitecture),
   } as any;
 }
 

@@ -10,12 +10,9 @@ import { TransformerFactory } from '../dispatch/transformer-factory';
 import { DebugLoggingInspector, UsageInspector } from '../inspectors/index';
 import { Readable } from 'stream';
 import { DebugManager } from '../observability/debug-manager';
-import { estimateKwhUsed } from '../observability/inference-energy';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
 import { extractUsageCostDetails } from '../../utils/usage-normalizer';
 import { StallInspector, type StallConfig } from '../inspectors/stall-inspector';
-import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
-import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../quota/quota-enforcer';
 import { recordQuotaUsage, buildQuotaHeaders } from '../quota/quota-middleware';
 import { CooldownManager } from '../runtime/cooldown-manager';
@@ -400,8 +397,6 @@ export async function handleResponse(
       providerApiType,
       apiType,
       originalRequest,
-      unifiedResponse.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS,
-      unifiedResponse.plexus?.modelParams ?? DEFAULT_MODEL,
       quotaEnforcer,
       keyName
     );
@@ -779,23 +774,12 @@ async function finalizeUsage(
     usageRecord.tokensPerSec = (totalOutputTokens / usageRecord.durationMs) * 1000;
   }
 
-  // Use provider-reported energy if available, otherwise estimate
-  // Some providers emit `: energy {"energy_kwh": ...}` as SSE comments
+  // Use provider-reported energy if available (e.g. Neuralwatt SSE comments)
   if (reconstructed?.providerReportedEnergy?.energy_kwh != null) {
     const energyKwh = Number(reconstructed.providerReportedEnergy.energy_kwh);
     if (!isNaN(energyKwh) && energyKwh >= 0) {
       usageRecord.kwhUsed = Number(energyKwh.toFixed(10));
     }
-  } else {
-    // Estimate energy consumption using resolved GPU and model params from dispatcher
-    const plexusGpuParams = unifiedResponse.plexus?.gpuParams ?? DEFAULT_GPU_PARAMS;
-    const plexusModelParams = unifiedResponse.plexus?.modelParams ?? DEFAULT_MODEL;
-    usageRecord.kwhUsed = estimateKwhUsed(
-      usageRecord.tokensInput ?? 0,
-      usageRecord.tokensOutput ?? 0,
-      plexusModelParams,
-      plexusGpuParams
-    );
   }
 
   // Persist usage record to database

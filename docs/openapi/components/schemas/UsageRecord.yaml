@@ -79,9 +79,7 @@ properties:
     type:
       - string
       - 'null'
-    description: >
-      Resolved canonical model name. For aliases with `model_architecture`,
-      this is the target; otherwise same as `incomingModelAlias`.
+    description: Resolved canonical model name.
   selectedModelName:
     type:
       - string
@@ -235,10 +233,7 @@ properties:
     type:
       - number
       - 'null'
-    description: >
-      Estimated energy consumption in kilowatt-hours. Calculated from
-      `model_architecture` token estimates and provider-specific energy
-      coefficients. Requires `model_architecture` to be set on the alias.
+    description: Measured energy consumption in kilowatt-hours reported by the provider (if available).
   isStreamed:
     type: boolean
     description: Whether the response was streamed (SSE).

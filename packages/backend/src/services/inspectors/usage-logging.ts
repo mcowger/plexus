@@ -1,4 +1,3 @@
-import type { ModelParams, GpuParams } from '@plexus/shared';
 import { logger } from '../../utils/logger';
 import { PassThrough } from 'stream';
 import { UsageStorageService } from '../observability/usage-storage';
@@ -13,9 +12,7 @@ import {
   normalizeOpenAIResponsesUsage,
   extractUsageCostDetails,
 } from '../../utils/usage-normalizer';
-import { estimateKwhUsed } from '../observability/inference-energy';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
-import { DEFAULT_MODEL, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import { recordQuotaUsage } from '../quota/quota-middleware';
 
 export interface ExtractedObservedUsage {
@@ -112,9 +109,6 @@ export class UsageInspector extends PassThrough {
   private keyName?: string;
   private _flushed = false;
 
-  private modelParams: ModelParams;
-  private gpuParams: GpuParams;
-
   constructor(
     requestId: string,
     usageStorage: UsageStorageService,
@@ -126,8 +120,6 @@ export class UsageInspector extends PassThrough {
     providerApiType: string = 'chat',
     incomingApiType?: string,
     originalRequest?: any,
-    gpuParams: GpuParams = DEFAULT_GPU_PARAMS,
-    modelParams: ModelParams = DEFAULT_MODEL,
     quotaEnforcer?: any,
     keyName?: string
   ) {
@@ -141,8 +133,6 @@ export class UsageInspector extends PassThrough {
     this.providerApiType = providerApiType;
     this.incomingApiType = incomingApiType || providerApiType;
     this.originalRequest = originalRequest;
-    this.gpuParams = gpuParams;
-    this.modelParams = modelParams;
     this.quotaEnforcer = quotaEnforcer;
     this.keyName = keyName;
   }
@@ -265,21 +255,12 @@ export class UsageInspector extends PassThrough {
         }
       }
 
-      // Use provider-reported energy if available, otherwise estimate
-      // Some providers emit `: energy {"energy_kwh": ...}` as SSE comments
+      // Use provider-reported energy if available (e.g. Neuralwatt SSE comments)
       if (reconstructed?.providerReportedEnergy?.energy_kwh != null) {
         const energyKwh = Number(reconstructed.providerReportedEnergy.energy_kwh);
         if (!isNaN(energyKwh) && energyKwh >= 0) {
           this.usageRecord.kwhUsed = Number(energyKwh.toFixed(10));
         }
-      } else {
-        // Estimate energy consumption using resolved GPU and model params
-        this.usageRecord.kwhUsed = estimateKwhUsed(
-          stats.inputTokens,
-          stats.outputTokens,
-          this.modelParams,
-          this.gpuParams
-        );
       }
 
       // Fire-and-forget: saveRequest is async but _flush is synchronous

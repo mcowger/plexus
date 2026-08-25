@@ -37,12 +37,6 @@ put:
   description: |
     Creates a new alias or replaces an existing one.
 
-    ## Energy recalculation
-
-    If you change `model_architecture`, the system recalculates estimated
-    energy usage (kWh) for all affected usage records. This happens
-    asynchronously after the alias is saved.
-
     ## Validation
 
     The request body is validated against the `AliasConfig` schema.
@@ -140,12 +134,6 @@ patch:
   description: |
     Merges the request body into the existing alias configuration,
     then validates the result.
-
-    ## Energy recalculation
-
-    If you change `model_architecture` (or add it if it was previously unset),
-    the system recalculates estimated energy usage (kWh) for all affected
-    usage records. This happens asynchronously after the update.
 
     ## Merge behavior
 

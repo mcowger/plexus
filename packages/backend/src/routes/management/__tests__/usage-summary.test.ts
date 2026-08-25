@@ -31,7 +31,7 @@ describe('Usage summary route', () => {
     await closeDatabase();
   });
 
-  it('aggregates kwhUsed in summary series buckets', async () => {
+  it('aggregates tokens and requests in summary series buckets', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
 
@@ -44,37 +44,40 @@ describe('Usage summary route', () => {
 
     await db.insert(schema.requestUsage).values([
       {
-        requestId: 'usage-summary-kwh-1',
+        requestId: 'usage-summary-1',
         date: new Date(bucketOneA).toISOString(),
         startTime: bucketOneA,
         durationMs: 120,
         isStreamed: 0,
         isPassthrough: 0,
         tokensEstimated: 0,
+        tokensInput: 20,
+        tokensOutput: 10,
         createdAt: bucketOneA,
-        kwhUsed: 0.02,
       },
       {
-        requestId: 'usage-summary-kwh-2',
+        requestId: 'usage-summary-2',
         date: new Date(bucketOneB).toISOString(),
         startTime: bucketOneB,
         durationMs: 100,
         isStreamed: 0,
         isPassthrough: 0,
         tokensEstimated: 0,
+        tokensInput: 30,
+        tokensOutput: 15,
         createdAt: bucketOneB,
-        kwhUsed: 0.03,
       },
       {
-        requestId: 'usage-summary-kwh-3',
+        requestId: 'usage-summary-3',
         date: new Date(bucketTwo).toISOString(),
         startTime: bucketTwo,
         durationMs: 90,
         isStreamed: 0,
         isPassthrough: 0,
         tokensEstimated: 0,
+        tokensInput: 10,
+        tokensOutput: 5,
         createdAt: bucketTwo,
-        kwhUsed: 0.01,
       },
     ]);
 
@@ -86,9 +89,15 @@ describe('Usage summary route', () => {
     expect(response.statusCode).toBe(200);
 
     const body = response.json() as {
-      series: Array<{ bucketStartMs: number; kwhUsed: number }>;
-      stats: { totalKwhUsed: number };
-      today: { kwhUsed: number };
+      series: Array<{
+        bucketStartMs: number;
+        requests: number;
+        tokens: number;
+        inputTokens: number;
+        outputTokens: number;
+      }>;
+      stats: { totalRequests: number; totalTokens: number };
+      today: { requests: number; inputTokens: number; outputTokens: number };
     };
 
     const expectedBucketOneStartMs = Math.floor(bucketOneA / 60_000) * 60_000;
@@ -101,12 +110,15 @@ describe('Usage summary route', () => {
 
     expect(bucketOne).toBeDefined();
     expect(bucketTwoPoint).toBeDefined();
-    expect(bucketOne?.kwhUsed).toBeCloseTo(0.05, 8);
-    expect(bucketTwoPoint?.kwhUsed).toBeCloseTo(0.01, 8);
+    expect(bucketOne?.requests).toBe(2);
+    expect(bucketOne?.tokens).toBe(75);
+    expect(bucketTwoPoint?.requests).toBe(1);
+    expect(bucketTwoPoint?.tokens).toBe(15);
 
-    const totalFromSeries = body.series.reduce((sum, point) => sum + point.kwhUsed, 0);
-    expect(totalFromSeries).toBeCloseTo(0.06, 8);
-    expect(body.stats.totalKwhUsed).toBeCloseTo(0.06, 8);
-    expect(body.today.kwhUsed).toBeCloseTo(0.06, 8);
+    expect(body.stats.totalRequests).toBe(3);
+    expect(body.stats.totalTokens).toBe(90);
+    expect(body.today.requests).toBe(3);
+    expect(body.today.inputTokens).toBe(60);
+    expect(body.today.outputTokens).toBe(30);
   });
 });

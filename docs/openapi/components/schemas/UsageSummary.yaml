@@ -31,9 +31,6 @@ properties:
         cacheWriteTokens:
           type: integer
           description: Sum of cache-write tokens across all requests.
-        kwhUsed:
-          type: number
-          description: Sum of energy usage (kWh) across all requests.
         tokens:
           type: integer
           description: >
@@ -48,9 +45,6 @@ properties:
       totalTokens:
         type: integer
         description: Total tokens (input + output + cached + cacheWrite) in the window.
-      totalKwhUsed:
-        type: number
-        description: Total energy usage in the window.
       avgDurationMs:
         type: number
         description: Average request duration in milliseconds.
@@ -79,9 +73,6 @@ properties:
       cacheWriteTokens:
         type: integer
         description: Cache-write tokens since midnight.
-      kwhUsed:
-        type: number
-        description: Energy usage since midnight.
       totalCost:
         type: number
         description: Total cost in dollars since midnight.

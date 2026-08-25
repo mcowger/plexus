@@ -199,7 +199,6 @@ export async function registerMetricsRoutes(
           tokensOutput: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
-          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
           avgDurationMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
           errorsTotal: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
@@ -215,7 +214,6 @@ export async function registerMetricsRoutes(
           tokensReasoning: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensReasoning}), 0)`,
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
-          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
           totalCost: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
           errors: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
@@ -233,7 +231,6 @@ export async function registerMetricsRoutes(
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
           costTotal: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
-          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
           errors: sql<number>`COALESCE(SUM(CASE WHEN ${schema.requestUsage.responseStatus} != 'success' THEN 1 ELSE 0 END), 0)`,
           avgLatencyMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
@@ -253,7 +250,6 @@ export async function registerMetricsRoutes(
           tokensOutput: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
           tokensCached: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
           tokensCacheWrite: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
-          kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
           totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
         })
         .from(schema.requestUsage)
@@ -438,7 +434,6 @@ export async function registerMetricsRoutes(
         tokensOutput: 0,
         tokensCached: 0,
         tokensCacheWrite: 0,
-        kwhUsed: 0,
         totalDurationMs: 0,
         avgDurationMs: 0,
         errorsTotal: 0,
@@ -451,7 +446,6 @@ export async function registerMetricsRoutes(
         tokensReasoning: 0,
         tokensCached: 0,
         tokensCacheWrite: 0,
-        kwhUsed: 0,
         totalDurationMs: 0,
         totalCost: 0,
         errors: 0,
@@ -496,15 +490,6 @@ export async function registerMetricsRoutes(
         )
       );
 
-      blocks.push(
-        metricBlock(
-          'plexus_energy_kwh_total',
-          'counter',
-          'Total estimated energy consumption in kilowatt-hours across all requests.',
-          [{ labels: {}, value: toNum(totals.kwhUsed) }]
-        )
-      );
-
       // --- Today's gauges ---------------------------------------------------
 
       blocks.push(
@@ -546,15 +531,6 @@ export async function registerMetricsRoutes(
             { labels: { type: 'cached' }, value: toNum(today.tokensCached) },
             { labels: { type: 'cache_write' }, value: toNum(today.tokensCacheWrite) },
           ]
-        )
-      );
-
-      blocks.push(
-        metricBlock(
-          'plexus_energy_kwh_today',
-          'gauge',
-          'Estimated energy in kilowatt-hours for requests since local midnight.',
-          [{ labels: {}, value: toNum(today.kwhUsed) }]
         )
       );
 
@@ -686,18 +662,6 @@ export async function registerMetricsRoutes(
 
       blocks.push(
         metricBlock(
-          'plexus_provider_energy_kwh_total',
-          'counter',
-          'Total estimated energy consumption in kilowatt-hours per provider.',
-          byProviderRows.map((r: any) => ({
-            labels: { provider: r.provider ?? 'unknown' },
-            value: toNum(r.kwhUsed),
-          }))
-        )
-      );
-
-      blocks.push(
-        metricBlock(
           'plexus_provider_duration_ms_total',
           'counter',
           'Total inference duration in milliseconds per provider.',
@@ -734,18 +698,6 @@ export async function registerMetricsRoutes(
               toNum(r.tokensOutput) +
               toNum(r.tokensCached) +
               toNum(r.tokensCacheWrite),
-          }))
-        )
-      );
-
-      blocks.push(
-        metricBlock(
-          'plexus_model_alias_energy_kwh_total',
-          'counter',
-          'Total estimated energy consumption in kilowatt-hours per incoming model alias.',
-          byModelAliasRows.map((r: any) => ({
-            labels: { model_alias: r.modelAlias ?? 'unknown' },
-            value: toNum(r.kwhUsed),
           }))
         )
       );

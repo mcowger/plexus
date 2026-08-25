@@ -93,16 +93,6 @@ put:
                 enabled: true
                 base_url: https://openrouter.ai/api
                 auth: bearer
-          with_gpu_profile:
-            summary: Local provider with GPU energy profile
-            value:
-              api_base_url: http://localhost:8080/v1
-              api_key: no-key
-              disable_cooldown: false
-              gpu_ram_gb: 80
-              gpu_bandwidth_tb_s: 3.35
-              gpu_flops_tflop: 989.4
-              gpu_power_draw_watts: 700
           fireworks_with_adapters:
             summary: Fireworks provider with reasoning_content adapter
             value:

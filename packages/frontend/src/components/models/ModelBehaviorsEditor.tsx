@@ -3,7 +3,6 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import { DebouncedInput } from '../ui/DebouncedInput';
-import { ModelArchitectureEditor } from './ModelArchitectureEditor';
 import { AliasExtraBodyEditor } from './AliasExtraBodyEditor';
 import type { Alias, AliasBehavior, CompactionSettings } from '../../lib/api';
 
@@ -122,11 +121,6 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
               />
             </div>
           </div>
-
-          <div className="h-px bg-border-glass"></div>
-
-          {/* ── Model Architecture ── */}
-          <ModelArchitectureEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
 
           <div className="h-px bg-border-glass"></div>
 

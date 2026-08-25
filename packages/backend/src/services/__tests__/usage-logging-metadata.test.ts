@@ -5,7 +5,6 @@ import { UsageInspector } from '../inspectors/usage-logging';
 import { DebugLoggingInspector } from '../inspectors/debug-logging';
 import { DebugManager } from '../observability/debug-manager';
 import type { UsageRecord } from '../../types/usage';
-import { DEFAULT_GPU_PARAMS, DEFAULT_MODEL } from '@plexus/shared';
 
 describe('UsageInspector Metadata Robustness', () => {
   let mockStorage: any;
@@ -45,9 +44,7 @@ describe('UsageInspector Metadata Robustness', () => {
       false,
       apiType,
       undefined,
-      undefined,
-      DEFAULT_GPU_PARAMS,
-      DEFAULT_MODEL
+      undefined
     );
 
     const dm = DebugManager.getInstance();
@@ -142,9 +139,7 @@ describe('UsageInspector Metadata Robustness', () => {
       false,
       'gemini', // providerApiType
       'messages', // incomingApiType
-      undefined, // originalRequest
-      DEFAULT_GPU_PARAMS,
-      DEFAULT_MODEL
+      undefined // originalRequest
     );
 
     const dm = DebugManager.getInstance();
@@ -405,9 +400,7 @@ describe('UsageInspector Metadata Robustness', () => {
         false,
         options.providerApiType,
         options.incomingApiType,
-        undefined,
-        DEFAULT_GPU_PARAMS,
-        DEFAULT_MODEL
+        undefined
       );
 
       const dm = DebugManager.getInstance();
@@ -577,9 +570,7 @@ describe('UsageInspector Metadata Robustness', () => {
           false,
           options.providerApiType,
           options.incomingApiType,
-          undefined,
-          DEFAULT_GPU_PARAMS,
-          DEFAULT_MODEL
+          undefined
         );
 
         const dm = DebugManager.getInstance();
@@ -769,9 +760,7 @@ describe('UsageInspector Metadata Robustness', () => {
         true, // shouldEstimateTokens
         options.providerApiType,
         options.incomingApiType,
-        undefined,
-        DEFAULT_GPU_PARAMS,
-        DEFAULT_MODEL
+        undefined
       );
 
       const dm = DebugManager.getInstance();

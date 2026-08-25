@@ -134,7 +134,7 @@ export function resolveContextLength(aliasConfig: ModelConfig, aliasSlug = ''): 
 }
 
 export interface ContextLimitOptions {
-  /** Resolved context window from the caller (e.g. route.modelArchitecture). Falls back to alias metadata when omitted. */
+  /** Resolved context window from the caller. Falls back to alias metadata when omitted. */
   contextLength?: number;
   /** Requested max output tokens (e.g. streamOptions.maxTokens). */
   maxTokens?: number;
@@ -145,7 +145,6 @@ export interface ContextLimitOptions {
 /** Minimal structural view of a RouteResult — avoids importing inference types here. */
 export interface EnforceRouteInfo {
   canonicalModel?: string;
-  modelArchitecture?: { context_length?: number };
 }
 
 /**
@@ -163,9 +162,7 @@ export function enforceContextLimitForRoute(
 ): void {
   if (!aliasConfig?.enforce_limits || !route.canonicalModel) return;
   enforceContextLimitForContext(context, aliasConfig, route.canonicalModel, {
-    contextLength:
-      route.modelArchitecture?.context_length ??
-      resolveContextLength(aliasConfig, route.canonicalModel),
+    contextLength: resolveContextLength(aliasConfig, route.canonicalModel),
     maxTokens,
     apiType,
   });
