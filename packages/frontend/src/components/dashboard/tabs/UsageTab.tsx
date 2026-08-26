@@ -28,8 +28,14 @@ import { useEffect, useMemo, useState } from 'react';
  * Each record represents a single (provider, model, timestamp) data point returned
  * from the `GET /v0/management/concurrency?timeRange=...` endpoint.
  */
-import { PieChart as PieChartIcon, BarChart3 } from 'lucide-react';
-import { api, UsageData, PieChartDataPoint, type ConcurrencyData } from '../../../lib/api';
+import { PieChart as PieChartIcon, BarChart3, Loader2 } from 'lucide-react';
+import {
+  api,
+  UsageData,
+  PieChartDataPoint,
+  type ConcurrencyData,
+  type UsageSummaryBreakdown,
+} from '../../../lib/api';
 import {
   formatNumber,
   formatTokens,
@@ -39,6 +45,7 @@ import {
 import { Card } from '../../ui/Card';
 import { TimeRangeSelector } from '../TimeRangeSelector';
 import type { CustomDateRange } from '../../../lib/date';
+import { Skeleton } from '../../ui/Skeleton';
 import {
   AreaChart,
   Area,
@@ -94,7 +101,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   timeRange,
   onTimeRangeChange,
   customDateRange,
-  onCustomDateRangeChange: _onCustomDateRangeChange,
+  onCustomDateRangeChange,
 }) => {
   // ---------------------------------------------------------------------------
   // State -- pre-existing usage data
@@ -114,6 +121,8 @@ export const UsageTab: React.FC<UsageTabProps> = ({
    */
   const [concurrencyByProvider, setConcurrencyByProvider] = useState<ConcurrencyData[]>([]);
   const [concurrencyByModel, setConcurrencyByModel] = useState<ConcurrencyData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -121,10 +130,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   /**
    * Fetches all dashboard data whenever the selected time range changes.
    *
-   * All five calls fire in parallel (no `await` chaining) so the network
-   * requests overlap. Each `.then()` independently updates its own state slice,
-   * meaning cards render progressively as responses arrive rather than waiting
-   * for the slowest endpoint.
+   * The summary request owns all completed-usage charts and optional breakdowns.
+   * Concurrency remains on its separate endpoint because it represents in-flight
+   * requests rather than completed usage records.
    *
    * **Concurrency fetch (`getConcurrencyData`):** hits the
    * `GET /v0/management/concurrency?timeRange=<range>` endpoint and returns an
@@ -136,12 +144,15 @@ export const UsageTab: React.FC<UsageTabProps> = ({
    * WebSocket strategy should be added here.
    */
   useEffect(() => {
+    let cancelled = false;
     let startDate: string | undefined;
     let endDate: string | undefined;
 
     if (timeRange === 'custom' && customDateRange) {
       startDate = customDateRange.start.toISOString();
       endDate = customDateRange.end.toISOString();
+    } else if (timeRange === 'custom') {
+      return;
     } else {
       // Calculate date range for non-custom time ranges
       const now = new Date();
@@ -166,18 +177,70 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       endDate = now.toISOString();
     }
 
-    // Use summary endpoint for time-series data (much more efficient)
-    api.getSummaryData(timeRange, true, startDate, endDate).then(setData);
-    api.getUsageByModel(timeRange, true, startDate, endDate).then(setModelData);
-    api.getUsageByProvider(timeRange, true, startDate, endDate).then(setProviderData);
-    api.getUsageByKey(timeRange, true, startDate, endDate).then(setKeyData);
-    // Make two separate calls for provider and model concurrency data
-    api
+    setLoading(true);
+    setError(false);
+    const summaryPromise = api
+      .getUsageSummary(
+        timeRange,
+        true,
+        startDate,
+        endDate,
+        ['provider', 'modelAlias', 'apiKey'] satisfies UsageSummaryBreakdown[],
+        10,
+        ['directModels', 'probe']
+      )
+      .then((summary) => {
+        if (cancelled) return;
+        if (!summary) {
+          setError(true);
+          return;
+        }
+        setData(
+          summary.series.map((point) => ({
+            timestamp: String(point.bucketStartMs),
+            requests: point.requests,
+            tokens: point.tokens,
+            inputTokens: point.inputTokens,
+            outputTokens: point.outputTokens,
+            cachedTokens: point.cachedTokens,
+            cacheWriteTokens: point.cacheWriteTokens,
+          }))
+        );
+        setModelData(
+          (summary.grouped?.modelAlias?.items ?? [])
+            .filter((item) => !item.name.startsWith('direct/'))
+            .map((item) => ({ name: item.name, requests: item.requests, tokens: item.totalTokens }))
+        );
+        setProviderData(
+          (summary.grouped?.provider?.items ?? []).map((item) => ({
+            name: item.name,
+            requests: item.requests,
+            tokens: item.totalTokens,
+          }))
+        );
+        setKeyData(
+          (summary.grouped?.apiKey?.items ?? [])
+            .filter((item) => item.name !== 'probe')
+            .map((item) => ({ name: item.name, requests: item.requests, tokens: item.totalTokens }))
+        );
+      });
+    const providerPromise = api
       .getConcurrencyData(timeRange, 'timeline', 'provider', startDate, endDate)
-      .then(setConcurrencyByProvider);
-    api
+      .then((result) => {
+        if (!cancelled) setConcurrencyByProvider(result);
+      });
+    const modelPromise = api
       .getConcurrencyData(timeRange, 'timeline', 'model', startDate, endDate)
-      .then(setConcurrencyByModel);
+      .then((result) => {
+        if (!cancelled) setConcurrencyByModel(result);
+      });
+    Promise.allSettled([summaryPromise, providerPromise, modelPromise]).then(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [timeRange, customDateRange]);
 
   // ---------------------------------------------------------------------------
@@ -404,7 +467,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
     return (
       <Card className={className ?? 'min-w-0'} title={title} extra={extra}>
         <div style={{ height: 300, marginTop: '12px' }}>
-          {chartType === 'pie' ? (
+          {loading && data.length === 0 ? (
+            <Skeleton height={260} className="w-full" />
+          ) : chartType === 'pie' ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -477,7 +542,26 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       </div>
 
       <div className="mb-4">
-        <TimeRangeSelector value={timeRange} onChange={(r) => onTimeRangeChange(r as TimeRange)} />
+        <TimeRangeSelector
+          value={timeRange}
+          onChange={(r) => onTimeRangeChange(r as TimeRange)}
+          customRange={customDateRange}
+          onCustomRangeChange={onCustomDateRangeChange}
+        />
+        {loading && data.length > 0 && (
+          <span
+            className="ml-3 inline-flex items-center gap-1 text-xs text-text-secondary"
+            role="status"
+          >
+            <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+            Updating analytics…
+          </span>
+        )}
+        {error && (
+          <span className="ml-3 text-xs text-red-400" role="alert">
+            Unable to load usage analytics.
+          </span>
+        )}
       </div>
 
       {/* All Charts in 4-Column Grid */}
@@ -485,32 +569,40 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         {/* Time Series - Requests */}
         <Card className="min-w-0" title="Requests over Time">
           <div style={{ height: 300, marginTop: '12px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                <XAxis
-                  dataKey="timestamp"
-                  stroke="var(--color-text-secondary)"
-                  tickFormatter={(v) => formatTimeLabel(String(v))}
-                />
-                <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatNumber} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--color-bg-card)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text)',
-                  }}
-                  labelFormatter={(label) => formatDateTimeLabel(String(label))}
-                  formatter={(value) => formatNumber(value as number)}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="requests"
-                  stroke="var(--color-primary)"
-                  fill="var(--color-glow)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {loading && data.length === 0 ? (
+              <Skeleton height={280} className="w-full" />
+            ) : error && data.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-red-400 text-sm">
+                Unable to load usage data.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis
+                    dataKey="timestamp"
+                    stroke="var(--color-text-secondary)"
+                    tickFormatter={(v) => formatTimeLabel(String(v))}
+                  />
+                  <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatNumber} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      borderColor: 'var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                    labelFormatter={(label) => formatDateTimeLabel(String(label))}
+                    formatter={(value) => formatNumber(value as number)}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="requests"
+                    stroke="var(--color-primary)"
+                    fill="var(--color-glow)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 
@@ -541,7 +633,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
          */}
         <Card className="min-w-0" title="Concurrency by Provider">
           <div style={{ height: 300, marginTop: '12px' }}>
-            {concurrencyByProviderTimeline.length === 0 ? (
+            {loading && concurrencyByProviderTimeline.length === 0 ? (
+              <Skeleton height={280} className="w-full" />
+            ) : concurrencyByProviderTimeline.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary text-sm">
                 No concurrency data available
               </div>
@@ -595,7 +689,9 @@ export const UsageTab: React.FC<UsageTabProps> = ({
          */}
         <Card className="min-w-0" title="Concurrency by Model">
           <div style={{ height: 300, marginTop: '12px' }}>
-            {concurrencyByModelTimeline.length === 0 ? (
+            {loading && concurrencyByModelTimeline.length === 0 ? (
+              <Skeleton height={280} className="w-full" />
+            ) : concurrencyByModelTimeline.length === 0 ? (
               <div className="h-full flex items-center justify-center text-text-secondary text-sm">
                 No concurrency data available
               </div>
@@ -634,67 +730,75 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         {/* Time Series - Tokens */}
         <Card className="min-w-0" title="Token Usage">
           <div style={{ height: 300, marginTop: '12px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
-                <XAxis
-                  dataKey="timestamp"
-                  stroke="var(--color-text-secondary)"
-                  tickFormatter={(v) => formatTimeLabel(String(v))}
-                />
-                <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatTokens} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--color-bg-card)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text)',
-                  }}
-                  labelFormatter={(label) => formatDateTimeLabel(String(label))}
-                  formatter={(value) => formatTokens(value as number)}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="tokens"
-                  name="Total Tokens"
-                  stroke="var(--color-primary)"
-                  fill="var(--color-glow)"
-                  fillOpacity={0.1}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="inputTokens"
-                  name="Input"
-                  stroke="#82ca9d"
-                  fill="#82ca9d"
-                  fillOpacity={0.3}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="outputTokens"
-                  name="Output"
-                  stroke="#ffc658"
-                  fill="#ffc658"
-                  fillOpacity={0.3}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="cachedTokens"
-                  name="Cached"
-                  stroke="#ff7300"
-                  fill="#ff7300"
-                  fillOpacity={0.3}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="cacheWriteTokens"
-                  name="Cache Write"
-                  stroke="#a855f7"
-                  fill="#a855f7"
-                  fillOpacity={0.3}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {loading && data.length === 0 ? (
+              <Skeleton height={280} className="w-full" />
+            ) : error && data.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-red-400 text-sm">
+                Unable to load token data.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-glass)" />
+                  <XAxis
+                    dataKey="timestamp"
+                    stroke="var(--color-text-secondary)"
+                    tickFormatter={(v) => formatTimeLabel(String(v))}
+                  />
+                  <YAxis stroke="var(--color-text-secondary)" tickFormatter={formatTokens} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--color-bg-card)',
+                      borderColor: 'var(--color-border)',
+                      color: 'var(--color-text)',
+                    }}
+                    labelFormatter={(label) => formatDateTimeLabel(String(label))}
+                    formatter={(value) => formatTokens(value as number)}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="tokens"
+                    name="Total Tokens"
+                    stroke="var(--color-primary)"
+                    fill="var(--color-glow)"
+                    fillOpacity={0.1}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="inputTokens"
+                    name="Input"
+                    stroke="#82ca9d"
+                    fill="#82ca9d"
+                    fillOpacity={0.3}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="outputTokens"
+                    name="Output"
+                    stroke="#ffc658"
+                    fill="#ffc658"
+                    fillOpacity={0.3}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="cachedTokens"
+                    name="Cached"
+                    stroke="#ff7300"
+                    fill="#ff7300"
+                    fillOpacity={0.3}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="cacheWriteTokens"
+                    name="Cache Write"
+                    stroke="#a855f7"
+                    fill="#a855f7"
+                    fillOpacity={0.3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 

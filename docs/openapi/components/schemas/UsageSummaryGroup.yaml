@@ -1,0 +1,34 @@
+type: object
+description: Aggregate metrics for one usage dimension value.
+properties:
+  name:
+    type: string
+    description: Group label; API-key labels are display-safe prefixes.
+  requests:
+    type: integer
+  errors:
+    type: integer
+  inputTokens:
+    type: integer
+  outputTokens:
+    type: integer
+  reasoningTokens:
+    type: integer
+  cachedTokens:
+    type: integer
+  cacheWriteTokens:
+    type: integer
+  totalTokens:
+    type: integer
+  totalCost:
+    type: number
+  avgDurationMs:
+    type: number
+  totalDurationMs:
+    type: number
+  avgTtftMs:
+    type: number
+  avgTokensPerSec:
+    type: number
+  successRate:
+    type: number

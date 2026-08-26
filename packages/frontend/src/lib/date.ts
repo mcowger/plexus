@@ -20,7 +20,6 @@ export function getPresetRange(preset: DateRangePreset): CustomDateRange {
   switch (preset) {
     case 'today':
       start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
       break;
 
     case 'this-week':
@@ -28,13 +27,11 @@ export function getPresetRange(preset: DateRangePreset): CustomDateRange {
       const dayOfWeek = start.getDay();
       start.setDate(start.getDate() - dayOfWeek);
       start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
       break;
 
     case 'this-month':
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
       break;
 
     case 'last-month':
@@ -79,13 +76,8 @@ export function isValidDateRange(start: Date, end: Date): boolean {
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
   if (end < start) return false;
 
-  // Optional: prevent dates too far in the future
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(23, 59, 59, 999);
-
-  if (end > tomorrow) return false;
+  if (end > now) return false;
 
   return true;
 }

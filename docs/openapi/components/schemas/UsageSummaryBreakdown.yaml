@@ -1,0 +1,13 @@
+type: object
+description: Optional top-N aggregates for one requested dimension.
+properties:
+  items:
+    type: array
+    items:
+      $ref: ./UsageSummaryGroup.yaml
+  totalDimensions:
+    type: integer
+    description: Total distinct groups in the requested range.
+  truncated:
+    type: boolean
+    description: Whether groups were omitted from the named items.

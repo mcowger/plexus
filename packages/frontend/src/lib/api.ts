@@ -612,11 +612,44 @@ interface BackendResponse<T> {
 interface UsageSummarySeriesPoint {
   bucketStartMs: number;
   requests: number;
+  errors: number;
   inputTokens: number;
   outputTokens: number;
+  reasoningTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
   tokens: number;
+  totalCost: number;
+  avgDurationMs: number;
+  avgTtftMs: number;
+  avgTokensPerSec: number;
+}
+
+export type UsageSummaryBreakdown = 'provider' | 'modelAlias' | 'apiKey' | 'status';
+export type UsageSummaryExclusion = 'directModels' | 'probe';
+
+export interface UsageSummaryGroup {
+  name: string;
+  requests: number;
+  errors: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  totalCost: number;
+  avgDurationMs: number;
+  totalDurationMs: number;
+  avgTtftMs: number;
+  avgTokensPerSec: number;
+  successRate: number;
+}
+
+export interface UsageSummaryBreakdownResult {
+  items: UsageSummaryGroup[];
+  totalDimensions: number;
+  truncated: boolean;
 }
 
 export interface UsageSummaryResponse {
@@ -624,11 +657,22 @@ export interface UsageSummaryResponse {
   series: UsageSummarySeriesPoint[];
   stats: {
     totalRequests: number;
+    totalErrors: number;
     totalTokens: number;
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens: number;
+    cachedTokens: number;
+    cacheWriteTokens: number;
+    totalCost: number;
     avgDurationMs: number;
     totalDurationMs: number;
+    avgTtftMs: number;
+    avgTokensPerSec: number;
+    successRate: number;
   };
   today: TodayMetrics;
+  grouped?: Partial<Record<UsageSummaryBreakdown, UsageSummaryBreakdownResult>>;
 }
 
 type UsageRecordField = keyof UsageRecord;
@@ -996,7 +1040,10 @@ const fetchUsageSummary = async (
   range: 'hour' | 'day' | 'week' | 'month' | 'custom',
   cache = true,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  breakdowns: UsageSummaryBreakdown[] = [],
+  breakdownLimit = 10,
+  exclusions: UsageSummaryExclusion[] = []
 ) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', range);
@@ -1004,6 +1051,16 @@ const fetchUsageSummary = async (
   if (range === 'custom' && startDate && endDate) {
     searchParams.set('startDate', startDate);
     searchParams.set('endDate', endDate);
+  }
+
+  const normalizedBreakdowns = Array.from(new Set(breakdowns)).sort();
+  if (normalizedBreakdowns.length > 0) {
+    searchParams.set('breakdowns', normalizedBreakdowns.join(','));
+    searchParams.set('breakdownLimit', String(breakdownLimit));
+  }
+  const normalizedExclusions = Array.from(new Set(exclusions)).sort();
+  if (normalizedExclusions.length > 0) {
+    searchParams.set('exclude', normalizedExclusions.join(','));
   }
 
   const queryString = searchParams.toString();
@@ -1378,10 +1435,8 @@ export const api = {
    * Fetch the raw usage-summary response for the current principal.
    *
    * Unlike `getSummaryData` (which reshapes series into chart-ready rows),
-   * this returns the untransformed backend payload including `stats` (7-day
-   * window) and `today` roll-ups. Used by the Overall dashboard tab to
-   * compute range-scoped totals without having to duplicate the endpoint
-   * definition.
+   * this returns the untransformed backend payload including range-scoped
+   * stats, optional grouped breakdowns, and today roll-ups.
    *
    * The backend auto-scopes this endpoint to the calling limited user's
    * key, so admin callers see global totals and api-key callers see only
@@ -1391,10 +1446,21 @@ export const api = {
     range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'day',
     cache = true,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    breakdowns: UsageSummaryBreakdown[] = [],
+    breakdownLimit = 10,
+    exclusions: UsageSummaryExclusion[] = []
   ): Promise<UsageSummaryResponse | null> => {
     try {
-      return await fetchUsageSummary(range, cache, startDate, endDate);
+      return await fetchUsageSummary(
+        range,
+        cache,
+        startDate,
+        endDate,
+        breakdowns,
+        breakdownLimit,
+        exclusions
+      );
     } catch (e) {
       console.error('API Error getUsageSummary', e);
       return null;
@@ -1409,24 +1475,38 @@ export const api = {
     range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
     cache = true,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    breakdowns: UsageSummaryBreakdown[] = [],
+    breakdownLimit = 10,
+    exclusions: UsageSummaryExclusion[] = []
   ): Promise<any[]> => {
     try {
-      const summaryResponse = await fetchUsageSummary(range, cache, startDate, endDate);
+      const summaryResponse = await fetchUsageSummary(
+        range,
+        cache,
+        startDate,
+        endDate,
+        breakdowns,
+        breakdownLimit,
+        exclusions
+      );
       const series = summaryResponse.series || [];
 
-      // Hard limit to prevent memory issues
-      const limitedSeries = series.length > 100 ? series.slice(0, 100) : series;
-
       // Return raw data with minimal transformation
-      return limitedSeries.map((point) => ({
+      return series.map((point) => ({
         timestamp: String(point.bucketStartMs),
         requests: point.requests,
+        errors: point.errors,
         tokens: point.tokens,
         inputTokens: point.inputTokens,
         outputTokens: point.outputTokens,
+        reasoningTokens: point.reasoningTokens,
         cachedTokens: point.cachedTokens,
         cacheWriteTokens: point.cacheWriteTokens,
+        cost: point.totalCost,
+        duration: point.avgDurationMs,
+        ttft: point.avgTtftMs,
+        tps: point.avgTokensPerSec,
       }));
     } catch (e) {
       console.error('API Error getSummaryData', e);
@@ -1526,181 +1606,6 @@ export const api = {
         cacheWriteTokens: 0,
         totalCost: 0,
       };
-    }
-  },
-
-  getUsageByModel: async (
-    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
-    cache = true,
-    startDate?: string,
-    endDate?: string
-  ): Promise<PieChartDataPoint[]> => {
-    try {
-      const now = normalizeNow();
-
-      let queryStartDate: Date;
-      let queryEndDate: Date;
-
-      if (range === 'custom' && startDate && endDate) {
-        queryStartDate = new Date(startDate);
-        queryEndDate = new Date(endDate);
-      } else {
-        const { startDate: configStart } = getUsageRangeConfig(
-          range as 'hour' | 'day' | 'week' | 'month',
-          now
-        );
-        queryStartDate = configStart;
-        queryEndDate = now;
-      }
-
-      const usageResponse = await fetchUsageRecords({
-        limit: 5000,
-        startDate: queryStartDate.toISOString(),
-        endDate: queryEndDate.toISOString(),
-        fields: USAGE_PAGE_FIELDS,
-        cache,
-      });
-
-      const records = usageResponse.data || [];
-
-      const aggregated: Record<string, PieChartDataPoint> = {};
-
-      records.forEach((r) => {
-        const name = r.incomingModelAlias || 'Unknown';
-        if (name.startsWith('direct/')) return;
-        if (!aggregated[name]) {
-          aggregated[name] = { name, requests: 0, tokens: 0 };
-        }
-        aggregated[name].requests++;
-        aggregated[name].tokens +=
-          (r.tokensInput || 0) +
-          (r.tokensOutput || 0) +
-          (r.tokensCached || 0) +
-          (r.tokensCacheWrite || 0);
-      });
-
-      return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
-    } catch (e) {
-      console.error('API Error getUsageByModel', e);
-      return [];
-    }
-  },
-
-  getUsageByProvider: async (
-    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
-    cache = true,
-    startDate?: string,
-    endDate?: string
-  ): Promise<PieChartDataPoint[]> => {
-    try {
-      const now = normalizeNow();
-
-      let queryStartDate: Date;
-      let queryEndDate: Date;
-
-      if (range === 'custom' && startDate && endDate) {
-        queryStartDate = new Date(startDate);
-        queryEndDate = new Date(endDate);
-      } else {
-        const { startDate: configStart } = getUsageRangeConfig(
-          range as 'hour' | 'day' | 'week' | 'month',
-          now
-        );
-        queryStartDate = configStart;
-        queryEndDate = now;
-      }
-
-      const usageResponse = await fetchUsageRecords({
-        limit: 5000,
-        startDate: queryStartDate.toISOString(),
-        endDate: queryEndDate.toISOString(),
-        fields: USAGE_PAGE_FIELDS,
-        cache,
-      });
-
-      const records = usageResponse.data || [];
-
-      const aggregated: Record<string, PieChartDataPoint> = {};
-
-      records.forEach((r) => {
-        const name = r.provider || 'Unknown';
-        if (!aggregated[name]) {
-          aggregated[name] = { name, requests: 0, tokens: 0 };
-        }
-        aggregated[name].requests++;
-        aggregated[name].tokens +=
-          (r.tokensInput || 0) +
-          (r.tokensOutput || 0) +
-          (r.tokensCached || 0) +
-          (r.tokensCacheWrite || 0);
-      });
-
-      return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
-    } catch (e) {
-      console.error('API Error getUsageByProvider', e);
-      return [];
-    }
-  },
-
-  getUsageByKey: async (
-    range: 'hour' | 'day' | 'week' | 'month' | 'custom' = 'week',
-    cache = true,
-    startDate?: string,
-    endDate?: string
-  ): Promise<PieChartDataPoint[]> => {
-    try {
-      const now = normalizeNow();
-
-      let queryStartDate: Date;
-      let queryEndDate: Date;
-
-      if (range === 'custom' && startDate && endDate) {
-        queryStartDate = new Date(startDate);
-        queryEndDate = new Date(endDate);
-      } else {
-        const { startDate: configStart } = getUsageRangeConfig(
-          range as 'hour' | 'day' | 'week' | 'month',
-          now
-        );
-        queryStartDate = configStart;
-        queryEndDate = now;
-      }
-
-      const usageResponse = await fetchUsageRecords({
-        limit: 5000,
-        startDate: queryStartDate.toISOString(),
-        endDate: queryEndDate.toISOString(),
-        fields: USAGE_PAGE_FIELDS,
-        cache,
-      });
-
-      const records = usageResponse.data || [];
-
-      const aggregated: Record<string, PieChartDataPoint> = {};
-
-      records.forEach((r) => {
-        if (r.apiKey === 'probe') return;
-
-        const name = r.apiKey
-          ? r.apiKey.length > 8
-            ? `${r.apiKey.slice(0, 8)}...`
-            : r.apiKey
-          : 'Unknown';
-        if (!aggregated[name]) {
-          aggregated[name] = { name, requests: 0, tokens: 0 };
-        }
-        aggregated[name].requests++;
-        aggregated[name].tokens +=
-          (r.tokensInput || 0) +
-          (r.tokensOutput || 0) +
-          (r.tokensCached || 0) +
-          (r.tokensCacheWrite || 0);
-      });
-
-      return Object.values(aggregated).sort((a, b) => b.requests - a.requests);
-    } catch (e) {
-      console.error('API Error getUsageByKey', e);
-      return [];
     }
   },
 

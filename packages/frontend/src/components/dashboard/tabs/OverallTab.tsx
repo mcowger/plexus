@@ -9,10 +9,8 @@
  * Data sources (all already force-scoped to the caller's key on the backend):
  *   - `getSelfMe`          → identity (key name, allowedProviders, allowedModels,
  *                             quota assignment, comment)
- *   - `getUsageSummary`    → aggregated totals for the selected time range plus
- *                             an embedded 7-day / today roll-up
- *   - `getUsageByProvider` → per-provider request + token totals
- *   - `getUsageByModel`    → per-model (alias) request + token totals
+ *   - `getUsageSummary`    → aggregated totals and optional provider/model
+ *                             breakdowns for the selected time range
  *   - `getSelfQuota`       → per-quota progress for the caller's key
  *                             (`quotas[]`, most-constrained rendered first)
  *
@@ -29,8 +27,10 @@ import { Card } from '../../ui/Card';
 import { QuotaStatusCard } from '../../quota';
 import { TimeRangeSelector } from '../TimeRangeSelector';
 import { sortMostConstrainedFirst } from '../../../lib/quota';
+import type { CustomDateRange } from '../../../lib/date';
+import { Skeleton } from '../../ui/Skeleton';
 
-type TimeRange = 'hour' | 'day' | 'week' | 'month';
+type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
 
 interface SelfInfo {
   role: 'admin' | 'limited';
@@ -48,6 +48,7 @@ interface SummaryStats {
   totalTokens: number;
   inputTokens: number;
   outputTokens: number;
+  reasoningTokens: number;
   cachedTokens: number;
   cacheWriteTokens: number;
   todayCost: number;
@@ -116,6 +117,7 @@ const BreakdownList: React.FC<{
 export const OverallTab: React.FC = () => {
   const { currency, rate, symbol } = useCurrency();
   const [timeRange, setTimeRange] = useState<TimeRange>('day');
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange | null>(null);
   const [info, setInfo] = useState<SelfInfo | null>(null);
   const [summary, setSummary] = useState<SummaryStats | null>(null);
   const [providerData, setProviderData] = useState<PieChartDataPoint[]>([]);
@@ -126,6 +128,15 @@ export const OverallTab: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+
+    if (timeRange === 'custom') {
+      if (!customDateRange) return;
+      startDate = customDateRange.start.toISOString();
+      endDate = customDateRange.end.toISOString();
+    }
+
     setLoading(true);
     // Clear per-range data so switching time ranges doesn't render stale
     // totals/breakdowns under the new range's label while requests are
@@ -160,55 +171,51 @@ export const OverallTab: React.FC = () => {
 
     // Token + request totals for the selected range. The backend endpoint is
     // auto-scoped to the calling limited user.
-    const summaryPromise = api.getUsageSummary(timeRange, true).then((res) => {
-      if (cancelled || !res) return;
-      // `stats` is a fixed 7-day window; to get totals for the selected range
-      // we sum the per-bucket series instead.
-      const totals = (res.series || []).reduce(
-        (acc, p) => {
-          acc.requests += p.requests || 0;
-          acc.inputTokens += p.inputTokens || 0;
-          acc.outputTokens += p.outputTokens || 0;
-          acc.cachedTokens += p.cachedTokens || 0;
-          acc.cacheWriteTokens += p.cacheWriteTokens || 0;
-          return acc;
-        },
-        { requests: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 }
-      );
-      setSummary({
-        range: timeRange,
-        totalRequests: totals.requests,
-        totalTokens:
-          totals.inputTokens + totals.outputTokens + totals.cachedTokens + totals.cacheWriteTokens,
-        inputTokens: totals.inputTokens,
-        outputTokens: totals.outputTokens,
-        cachedTokens: totals.cachedTokens,
-        cacheWriteTokens: totals.cacheWriteTokens,
-        todayCost: res.today?.totalCost ?? 0,
+    const summaryPromise = api
+      .getUsageSummary(timeRange, true, startDate, endDate, ['provider', 'modelAlias'], 10, [
+        'directModels',
+        'probe',
+      ])
+      .then((res) => {
+        if (cancelled || !res) return;
+        const stats = res.stats;
+        setSummary({
+          range: timeRange,
+          totalRequests: stats.totalRequests,
+          totalTokens: stats.totalTokens,
+          inputTokens: stats.inputTokens,
+          outputTokens: stats.outputTokens,
+          reasoningTokens: stats.reasoningTokens,
+          cachedTokens: stats.cachedTokens,
+          cacheWriteTokens: stats.cacheWriteTokens,
+          todayCost: res.today?.totalCost ?? 0,
+        });
+        setProviderData(
+          (res.grouped?.provider?.items ?? []).map((item) => ({
+            name: item.name,
+            requests: item.requests,
+            tokens: item.totalTokens,
+          }))
+        );
+        setModelData(
+          (res.grouped?.modelAlias?.items ?? [])
+            .filter((item) => !item.name.startsWith('direct/'))
+            .map((item) => ({
+              name: item.name,
+              requests: item.requests,
+              tokens: item.totalTokens,
+            }))
+        );
       });
-    });
 
-    const providerPromise = api.getUsageByProvider(timeRange, true).then((d) => {
-      if (!cancelled) setProviderData(d);
-    });
-    const modelPromise = api.getUsageByModel(timeRange, true).then((d) => {
-      if (!cancelled) setModelData(d);
-    });
-
-    Promise.allSettled([
-      metaPromise,
-      quotaPromise,
-      summaryPromise,
-      providerPromise,
-      modelPromise,
-    ]).then(() => {
+    Promise.allSettled([metaPromise, quotaPromise, summaryPromise]).then(() => {
       if (!cancelled) setLoading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [timeRange]);
+  }, [timeRange, customDateRange]);
 
   const allowedProviders = info?.allowedProviders ?? [];
   const allowedModels = info?.allowedModels ?? [];
@@ -225,9 +232,14 @@ export const OverallTab: React.FC = () => {
         <TimeRangeSelector
           value={timeRange}
           onChange={(r) => {
-            if (r !== 'custom' && r !== 'live') setTimeRange(r);
+            if (r !== 'live') {
+              setTimeRange(r);
+              if (r !== 'custom') setCustomDateRange(null);
+            }
           }}
-          options={['hour', 'day', 'week', 'month']}
+          customRange={customDateRange}
+          onCustomRangeChange={setCustomDateRange}
+          options={['hour', 'day', 'week', 'month', 'custom']}
         />
       </header>
 
@@ -347,7 +359,7 @@ export const OverallTab: React.FC = () => {
         extra={<Activity size={16} className="text-text-muted" />}
       >
         {loading && !summary ? (
-          <p className="text-sm text-text-muted">Loading…</p>
+          <Skeleton height={120} className="w-full" />
         ) : !summary ? (
           <p className="text-sm text-text-muted">No usage recorded in this range.</p>
         ) : (
@@ -385,7 +397,7 @@ export const OverallTab: React.FC = () => {
       >
         <Card title="Requests by provider" className="min-w-0">
           {loading && !providerData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <Skeleton height={180} className="w-full" />
           ) : (
             <BreakdownList
               data={providerData}
@@ -397,7 +409,7 @@ export const OverallTab: React.FC = () => {
 
         <Card title="Tokens by provider" className="min-w-0">
           {loading && !providerData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <Skeleton height={180} className="w-full" />
           ) : (
             <BreakdownList
               data={providerData}
@@ -409,7 +421,7 @@ export const OverallTab: React.FC = () => {
 
         <Card title="Requests by model alias" className="min-w-0">
           {loading && !modelData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <Skeleton height={180} className="w-full" />
           ) : (
             <BreakdownList
               data={modelData}
@@ -421,7 +433,7 @@ export const OverallTab: React.FC = () => {
 
         <Card title="Tokens by model alias" className="min-w-0">
           {loading && !modelData.length ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <Skeleton height={180} className="w-full" />
           ) : (
             <BreakdownList
               data={modelData}

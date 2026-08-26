@@ -6392,7 +6392,7 @@
           "Management — Usage"
         ],
         "summary": "Aggregated usage time-series and totals",
-        "description": "Returns bucketed series plus 7-day and since-midnight rollups.\n\n## Scoping\n\nLimited principals see only their own key's data; admins see global data.\n\n## Bucket algorithm\n\nThe endpoint uses adaptive bucketing to ensure meaningful visualizations:\n- `hour` — returns hourly buckets for the last 24 hours\n- `day` — returns daily buckets for the last 30 days\n- `week` — returns weekly buckets for the last 12 weeks\n- `month` — returns monthly buckets for the last 12 months\n- `custom` — requires `startDate` and `endDate`; buckets are auto-sized\n  based on the range duration\n\n## Response structure\n\n- **series** — Time-bucketed data, where each bucket contains aggregated\n  counts and token sums\n- **stats** — Fixed 7-day rolling window (always the last 7 days, regardless\n  of `range`)\n- **today** — Aggregation since local midnight (not UTC), giving a\n  \"day-so-far\" view\n",
+        "description": "Returns range-scoped bucketed series and totals plus a since-midnight\nrollup. Optional grouped breakdowns are computed server-side over the\ncomplete requested range.\n\n## Scoping\n\nLimited principals see only their own key's data; admins see global data.\n\n## Range and bucket algorithm\n\nThe endpoint uses adaptive bucketing to ensure meaningful visualizations:\n- `hour` — the last hour, in one-minute buckets\n- `day` — the last 24 hours, in one-hour buckets\n- `week` — the last 7 days, in one-day buckets\n- `month` — the last 30 days, in one-day buckets\n- `custom` — requires `startDate` and `endDate`; buckets are auto-sized\n  based on the range duration and the range may not exceed 12 months.\n\n## Response structure\n\n- **series** — Time-bucketed data, where each bucket contains aggregated\n  counts and token sums\n- **stats** — Aggregation over the requested range, including rich usage\n  and performance metrics\n- **today** — Aggregation since local midnight (not UTC), giving a\n  \"day-so-far\" view\n- **grouped** — Optional top-N grouped aggregates. Request dimensions with\n  the comma-separated `breakdowns` parameter. At most three dimensions are\n  allowed, and omitted groups are represented by an `Other` item.\n",
         "security": [
           {
             "AdminKey": []
@@ -6431,11 +6431,52 @@
               "format": "date-time"
             },
             "description": "Required with `range=custom`."
+          },
+          {
+            "in": "query",
+            "name": "breakdowns",
+            "schema": {
+              "type": "string",
+              "example": "provider,modelAlias"
+            },
+            "description": "Optional comma-separated dimensions: provider, modelAlias, apiKey, or status. At most three dimensions are allowed.\n"
+          },
+          {
+            "in": "query",
+            "name": "breakdownLimit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            },
+            "description": "Maximum number of named groups returned per dimension."
+          },
+          {
+            "in": "query",
+            "name": "exclude",
+            "schema": {
+              "type": "string",
+              "example": "directModels,probe"
+            },
+            "description": "Optional comma-separated dimension-specific exclusions. `directModels` excludes model aliases beginning with `direct/`; `probe` excludes the internal probe API key from API-key breakdowns.\n"
           }
         ],
         "responses": {
           "200": {
             "description": "Aggregates.",
+            "headers": {
+              "X-Usage-Summary-Cache": {
+                "description": "Whether the response was served from the in-memory summary cache.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "HIT",
+                    "MISS"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -6446,6 +6487,9 @@
           },
           "400": {
             "description": "Invalid `range` or custom-range parameters."
+          },
+          "413": {
+            "description": "Requested aggregate response exceeds the response-size limit."
           }
         },
         "operationId": "getV0ManagementUsageSummary"
@@ -10385,6 +10429,263 @@
           "target": "openrouter"
         }
       },
+      "UsageSummary": {
+        "type": "object",
+        "description": "Aggregated usage statistics over time windows.\n",
+        "properties": {
+          "range": {
+            "type": "string",
+            "description": "Requested time range. Both series and stats use this range.\n"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Time-bucketed aggregation.",
+              "properties": {
+                "bucketStartMs": {
+                  "type": "integer",
+                  "description": "Start of the time bucket (epoch ms)."
+                },
+                "requests": {
+                  "type": "integer",
+                  "description": "Number of requests in this bucket."
+                },
+                "errors": {
+                  "type": "integer",
+                  "description": "Number of non-success requests in this bucket."
+                },
+                "inputTokens": {
+                  "type": "integer",
+                  "description": "Sum of input tokens across all requests."
+                },
+                "outputTokens": {
+                  "type": "integer",
+                  "description": "Sum of output tokens across all requests."
+                },
+                "reasoningTokens": {
+                  "type": "integer",
+                  "description": "Sum of reasoning tokens across all requests."
+                },
+                "cachedTokens": {
+                  "type": "integer",
+                  "description": "Sum of cached tokens across all requests."
+                },
+                "cacheWriteTokens": {
+                  "type": "integer",
+                  "description": "Sum of cache-write tokens across all requests."
+                },
+                "tokens": {
+                  "type": "integer",
+                  "description": "Total token count = inputTokens + outputTokens + reasoningTokens + cachedTokens + cacheWriteTokens.\n"
+                },
+                "totalCost": {
+                  "type": "number",
+                  "description": "Sum of request costs in the bucket."
+                },
+                "avgDurationMs": {
+                  "type": "number",
+                  "description": "Average request duration in milliseconds."
+                },
+                "avgTtftMs": {
+                  "type": "number",
+                  "description": "Average time to first token in milliseconds."
+                },
+                "avgTokensPerSec": {
+                  "type": "number",
+                  "description": "Average reported tokens per second."
+                }
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "description": "Aggregation over the requested range.",
+            "properties": {
+              "totalRequests": {
+                "type": "integer",
+                "description": "Total requests in the requested range."
+              },
+              "totalErrors": {
+                "type": "integer",
+                "description": "Total non-success requests in the requested range."
+              },
+              "totalTokens": {
+                "type": "integer",
+                "description": "Total tokens (input + output + reasoning + cached + cacheWrite) in the requested range.\n"
+              },
+              "inputTokens": {
+                "type": "integer",
+                "description": "Total uncached input tokens."
+              },
+              "outputTokens": {
+                "type": "integer",
+                "description": "Total output tokens."
+              },
+              "reasoningTokens": {
+                "type": "integer",
+                "description": "Total reasoning tokens."
+              },
+              "cachedTokens": {
+                "type": "integer",
+                "description": "Total cached input tokens."
+              },
+              "cacheWriteTokens": {
+                "type": "integer",
+                "description": "Total cache-write tokens."
+              },
+              "totalCost": {
+                "type": "number",
+                "description": "Total request cost in the requested range."
+              },
+              "avgDurationMs": {
+                "type": "number",
+                "description": "Average request duration in milliseconds."
+              },
+              "totalDurationMs": {
+                "type": "integer",
+                "description": "Sum of all request durations in milliseconds."
+              },
+              "avgTtftMs": {
+                "type": "number",
+                "description": "Average time to first token in milliseconds."
+              },
+              "avgTokensPerSec": {
+                "type": "number",
+                "description": "Average reported tokens per second."
+              },
+              "successRate": {
+                "type": "number",
+                "description": "Percentage of requests whose status is success."
+              }
+            }
+          },
+          "grouped": {
+            "type": "object",
+            "description": "Optional top-N aggregates for requested dimensions.",
+            "properties": {
+              "provider": {
+                "$ref": "#/components/schemas/UsageSummaryBreakdown"
+              },
+              "modelAlias": {
+                "$ref": "#/components/schemas/UsageSummaryBreakdown"
+              },
+              "apiKey": {
+                "$ref": "#/components/schemas/UsageSummaryBreakdown"
+              },
+              "status": {
+                "$ref": "#/components/schemas/UsageSummaryBreakdown"
+              }
+            }
+          },
+          "today": {
+            "type": "object",
+            "description": "Aggregation since local midnight (time-of-day based, not UTC).",
+            "properties": {
+              "requests": {
+                "type": "integer",
+                "description": "Number of requests since midnight."
+              },
+              "inputTokens": {
+                "type": "integer",
+                "description": "Input tokens since midnight."
+              },
+              "outputTokens": {
+                "type": "integer",
+                "description": "Output tokens since midnight."
+              },
+              "reasoningTokens": {
+                "type": "integer",
+                "description": "Reasoning tokens since midnight."
+              },
+              "cachedTokens": {
+                "type": "integer",
+                "description": "Cached tokens since midnight."
+              },
+              "cacheWriteTokens": {
+                "type": "integer",
+                "description": "Cache-write tokens since midnight."
+              },
+              "totalCost": {
+                "type": "number",
+                "description": "Total cost in dollars since midnight."
+              }
+            }
+          }
+        }
+      },
+      "UsageSummaryBreakdown": {
+        "type": "object",
+        "description": "Optional top-N aggregates for one requested dimension.",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageSummaryGroup"
+            }
+          },
+          "totalDimensions": {
+            "type": "integer",
+            "description": "Total distinct groups in the requested range."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether groups were omitted from the named items."
+          }
+        }
+      },
+      "UsageSummaryGroup": {
+        "type": "object",
+        "description": "Aggregate metrics for one usage dimension value.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Group label; API-key labels are display-safe prefixes."
+          },
+          "requests": {
+            "type": "integer"
+          },
+          "errors": {
+            "type": "integer"
+          },
+          "inputTokens": {
+            "type": "integer"
+          },
+          "outputTokens": {
+            "type": "integer"
+          },
+          "reasoningTokens": {
+            "type": "integer"
+          },
+          "cachedTokens": {
+            "type": "integer"
+          },
+          "cacheWriteTokens": {
+            "type": "integer"
+          },
+          "totalTokens": {
+            "type": "integer"
+          },
+          "totalCost": {
+            "type": "number"
+          },
+          "avgDurationMs": {
+            "type": "number"
+          },
+          "totalDurationMs": {
+            "type": "number"
+          },
+          "avgTtftMs": {
+            "type": "number"
+          },
+          "avgTokensPerSec": {
+            "type": "number"
+          },
+          "successRate": {
+            "type": "number"
+          }
+        }
+      },
       "ChatCompletionRequest": {
         "description": "OpenAI Chat Completions request (pass-through; full OpenAI schema accepted).",
         "type": "object",
@@ -13202,109 +13503,6 @@
           "hasError": {
             "type": "boolean",
             "description": "Whether error records exist for this request (mirrors presence in `inference_errors` table).\n"
-          }
-        }
-      },
-      "UsageSummary": {
-        "type": "object",
-        "description": "Aggregated usage statistics over time windows.\n",
-        "properties": {
-          "range": {
-            "type": "string",
-            "description": "Time range for series data. Format depends on query param (e.g. \"24h\", \"7d\", custom start/end). Affects only the series field.\n"
-          },
-          "series": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "description": "Time-bucketed aggregation.",
-              "properties": {
-                "bucketStartMs": {
-                  "type": "integer",
-                  "description": "Start of the time bucket (epoch ms)."
-                },
-                "requests": {
-                  "type": "integer",
-                  "description": "Number of requests in this bucket."
-                },
-                "inputTokens": {
-                  "type": "integer",
-                  "description": "Sum of input tokens across all requests."
-                },
-                "outputTokens": {
-                  "type": "integer",
-                  "description": "Sum of output tokens across all requests."
-                },
-                "cachedTokens": {
-                  "type": "integer",
-                  "description": "Sum of cached tokens across all requests."
-                },
-                "cacheWriteTokens": {
-                  "type": "integer",
-                  "description": "Sum of cache-write tokens across all requests."
-                },
-                "tokens": {
-                  "type": "integer",
-                  "description": "Total token count = inputTokens + outputTokens + cachedTokens + cacheWriteTokens.\n"
-                }
-              }
-            }
-          },
-          "stats": {
-            "type": "object",
-            "description": "Rolling 7-day aggregation window.",
-            "properties": {
-              "totalRequests": {
-                "type": "integer",
-                "description": "Total requests in the 7-day window."
-              },
-              "totalTokens": {
-                "type": "integer",
-                "description": "Total tokens (input + output + cached + cacheWrite) in the window."
-              },
-              "avgDurationMs": {
-                "type": "number",
-                "description": "Average request duration in milliseconds."
-              },
-              "totalDurationMs": {
-                "type": "integer",
-                "description": "Sum of all request durations in milliseconds."
-              }
-            }
-          },
-          "today": {
-            "type": "object",
-            "description": "Aggregation since local midnight (time-of-day based, not UTC).",
-            "properties": {
-              "requests": {
-                "type": "integer",
-                "description": "Number of requests since midnight."
-              },
-              "inputTokens": {
-                "type": "integer",
-                "description": "Input tokens since midnight."
-              },
-              "outputTokens": {
-                "type": "integer",
-                "description": "Output tokens since midnight."
-              },
-              "reasoningTokens": {
-                "type": "integer",
-                "description": "Reasoning tokens since midnight."
-              },
-              "cachedTokens": {
-                "type": "integer",
-                "description": "Cached tokens since midnight."
-              },
-              "cacheWriteTokens": {
-                "type": "integer",
-                "description": "Cache-write tokens since midnight."
-              },
-              "totalCost": {
-                "type": "number",
-                "description": "Total cost in dollars since midnight."
-              }
-            }
           }
         }
       },

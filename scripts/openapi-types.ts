@@ -1615,7 +1615,6 @@ export interface paths {
      *     Each entry contains:
      *     - `target_groups` — Ordered array of target groups; each group has a name, selector, and targets
      *     - `type` — Model capability type (text, embeddings, transcriptions, speech, image)
-     *     - `model_architecture` — Used for energy estimation (kWh calculation)
      *     - `metadata` — Optional enriched data from external catalogs
      *     - `pricing` — Optional pricing configuration
      *
@@ -1651,12 +1650,6 @@ export interface paths {
      * Create or replace a model alias (admin only)
      * @description Creates a new alias or replaces an existing one.
      *
-     *     ## Energy recalculation
-     *
-     *     If you change `model_architecture`, the system recalculates estimated
-     *     energy usage (kWh) for all affected usage records. This happens
-     *     asynchronously after the alias is saved.
-     *
      *     ## Validation
      *
      *     The request body is validated against the `AliasConfig` schema.
@@ -1673,12 +1666,6 @@ export interface paths {
      * Merge updates into a model alias (admin only)
      * @description Merges the request body into the existing alias configuration,
      *     then validates the result.
-     *
-     *     ## Energy recalculation
-     *
-     *     If you change `model_architecture` (or add it if it was previously unset),
-     *     the system recalculates estimated energy usage (kWh) for all affected
-     *     usage records. This happens asynchronously after the update.
      *
      *     ## Merge behavior
      *
@@ -1739,57 +1726,6 @@ export interface paths {
      *     **Admin only** — limited principals receive 403.
      */
     delete: operations['deleteV0ManagementModelsByaliasId'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v0/management/models/huggingface/{modelId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description HuggingFace repo ID, URL-encoded (e.g. `mistralai%2FMixtral-8x7B`). The `/` character must be encoded as `%2F`. */
-        modelId: string;
-      };
-      cookie?: never;
-    };
-    /**
-     * Fetch model architecture from HuggingFace (admin only)
-     * @description Fetches model architecture parameters from HuggingFace for use by the
-     *     energy-usage estimator.
-     *
-     *     ## Use case
-     *
-     *     The energy-usage estimator needs layer count, head count, and parameter
-     *     totals to calculate kWh consumed. This endpoint fetches that data from
-     *     HuggingFace's model card.
-     *
-     *     ## Rate limiting
-     *
-     *     - HuggingFace API has rate limits; repeated calls may be throttled
-     *     - Responses are cached in Plexus to reduce unnecessary calls
-     *
-     *     ## Response fields
-     *
-     *     - `success` — Whether the fetch succeeded
-     *     - `model_id` — The model ID queried
-     *     - `architecture` — Model architecture parameters:
-     *       - `total_params` — Total parameters in billions (estimated)
-     *       - `active_params` — Active (non-quantized) parameters
-     *       - `layers` — Number of transformer layers
-     *       - `heads` — Number of attention heads
-     *       - `kv_lora_rank` — KV quantization rank (if applicable)
-     *       - `qk_rope_head_dim` — QK RoPE head dimension (if applicable)
-     *       - `context_length` — Maximum context window
-     *       - `dtype` — Model data type (e.g. `float16`, `bfloat16`)
-     *
-     *     **Admin only** — limited principals receive 403.
-     */
-    get: operations['getV0ManagementModelsHuggingfaceBymodelId'];
-    put?: never;
-    post?: never;
-    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -2285,8 +2221,9 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Valid built-in quota-checker type strings (admin only)
-     * @description Returns the list of valid quota checker types.
+     * Registered quota-checker type strings (admin only)
+     * @description Returns the list of registered quota checker types, including enabled
+     *     admin-authored custom checkers.
      *
      *     ## Relationship to ProviderConfig
      *
@@ -2362,6 +2299,44 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v0/management/custom-checkers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List custom quota checkers (admin only) */
+    get: operations['getV0ManagementCustomCheckers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/custom-checkers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get a custom quota checker (admin only) */
+    get: operations['getV0ManagementCustomCheckersByid'];
+    /** Create or replace a custom quota checker (admin only) */
+    put: operations['putV0ManagementCustomCheckersByid'];
+    /** Test a custom quota checker without persisting a snapshot (admin only) */
+    post: operations['postV0ManagementCustomCheckersByid'];
+    /** Delete a custom quota checker (admin only) */
+    delete: operations['deleteV0ManagementCustomCheckersByid'];
+    options?: never;
+    head?: never;
+    /** Update a custom quota checker (admin only) */
+    patch: operations['patchV0ManagementCustomCheckersByid'];
+    trace?: never;
+  };
   '/v0/management/usage': {
     parameters: {
       query?: never;
@@ -2421,30 +2396,35 @@ export interface paths {
     };
     /**
      * Aggregated usage time-series and totals
-     * @description Returns bucketed series plus 7-day and since-midnight rollups.
+     * @description Returns range-scoped bucketed series and totals plus a since-midnight
+     *     rollup. Optional grouped breakdowns are computed server-side over the
+     *     complete requested range.
      *
      *     ## Scoping
      *
      *     Limited principals see only their own key's data; admins see global data.
      *
-     *     ## Bucket algorithm
+     *     ## Range and bucket algorithm
      *
      *     The endpoint uses adaptive bucketing to ensure meaningful visualizations:
-     *     - `hour` — returns hourly buckets for the last 24 hours
-     *     - `day` — returns daily buckets for the last 30 days
-     *     - `week` — returns weekly buckets for the last 12 weeks
-     *     - `month` — returns monthly buckets for the last 12 months
+     *     - `hour` — the last hour, in one-minute buckets
+     *     - `day` — the last 24 hours, in one-hour buckets
+     *     - `week` — the last 7 days, in one-day buckets
+     *     - `month` — the last 30 days, in one-day buckets
      *     - `custom` — requires `startDate` and `endDate`; buckets are auto-sized
-     *       based on the range duration
+     *       based on the range duration and the range may not exceed 12 months.
      *
      *     ## Response structure
      *
      *     - **series** — Time-bucketed data, where each bucket contains aggregated
      *       counts and token sums
-     *     - **stats** — Fixed 7-day rolling window (always the last 7 days, regardless
-     *       of `range`)
+     *     - **stats** — Aggregation over the requested range, including rich usage
+     *       and performance metrics
      *     - **today** — Aggregation since local midnight (not UTC), giving a
      *       "day-so-far" view
+     *     - **grouped** — Optional top-N grouped aggregates. Request dimensions with
+     *       the comma-separated `breakdowns` parameter. At most three dimensions are
+     *       allowed, and omitted groups are represented by an `Other` item.
      */
     get: operations['getV0ManagementUsageSummary'];
     put?: never;
@@ -4692,6 +4672,121 @@ export interface components {
       /** @description Maximum number of web searches allowed per request. Only honoured when `target` is `"anthropic"` (maps to `max_uses` on the `web_search_20250305` tool entry). Ignored for all other targets. */
       max_uses?: number;
     };
+    /** @description Aggregated usage statistics over time windows. */
+    UsageSummary: {
+      /** @description Requested time range. Both series and stats use this range. */
+      range?: string;
+      series?: {
+        /** @description Start of the time bucket (epoch ms). */
+        bucketStartMs?: number;
+        /** @description Number of requests in this bucket. */
+        requests?: number;
+        /** @description Number of non-success requests in this bucket. */
+        errors?: number;
+        /** @description Sum of input tokens across all requests. */
+        inputTokens?: number;
+        /** @description Sum of output tokens across all requests. */
+        outputTokens?: number;
+        /** @description Sum of reasoning tokens across all requests. */
+        reasoningTokens?: number;
+        /** @description Sum of cached tokens across all requests. */
+        cachedTokens?: number;
+        /** @description Sum of cache-write tokens across all requests. */
+        cacheWriteTokens?: number;
+        /** @description Total token count = inputTokens + outputTokens + reasoningTokens + cachedTokens + cacheWriteTokens. */
+        tokens?: number;
+        /** @description Sum of request costs in the bucket. */
+        totalCost?: number;
+        /** @description Average request duration in milliseconds. */
+        avgDurationMs?: number;
+        /** @description Average time to first token in milliseconds. */
+        avgTtftMs?: number;
+        /** @description Average reported tokens per second. */
+        avgTokensPerSec?: number;
+      }[];
+      /** @description Aggregation over the requested range. */
+      stats?: {
+        /** @description Total requests in the requested range. */
+        totalRequests?: number;
+        /** @description Total non-success requests in the requested range. */
+        totalErrors?: number;
+        /** @description Total tokens (input + output + reasoning + cached + cacheWrite) in the requested range. */
+        totalTokens?: number;
+        /** @description Total uncached input tokens. */
+        inputTokens?: number;
+        /** @description Total output tokens. */
+        outputTokens?: number;
+        /** @description Total reasoning tokens. */
+        reasoningTokens?: number;
+        /** @description Total cached input tokens. */
+        cachedTokens?: number;
+        /** @description Total cache-write tokens. */
+        cacheWriteTokens?: number;
+        /** @description Total request cost in the requested range. */
+        totalCost?: number;
+        /** @description Average request duration in milliseconds. */
+        avgDurationMs?: number;
+        /** @description Sum of all request durations in milliseconds. */
+        totalDurationMs?: number;
+        /** @description Average time to first token in milliseconds. */
+        avgTtftMs?: number;
+        /** @description Average reported tokens per second. */
+        avgTokensPerSec?: number;
+        /** @description Percentage of requests whose status is success. */
+        successRate?: number;
+      };
+      /** @description Optional top-N aggregates for requested dimensions. */
+      grouped?: {
+        provider?: components['schemas']['UsageSummaryBreakdown'];
+        modelAlias?: components['schemas']['UsageSummaryBreakdown'];
+        apiKey?: components['schemas']['UsageSummaryBreakdown'];
+        status?: components['schemas']['UsageSummaryBreakdown'];
+      };
+      /** @description Aggregation since local midnight (time-of-day based, not UTC). */
+      today?: {
+        /** @description Number of requests since midnight. */
+        requests?: number;
+        /** @description Input tokens since midnight. */
+        inputTokens?: number;
+        /** @description Output tokens since midnight. */
+        outputTokens?: number;
+        /** @description Reasoning tokens since midnight. */
+        reasoningTokens?: number;
+        /** @description Cached tokens since midnight. */
+        cachedTokens?: number;
+        /** @description Cache-write tokens since midnight. */
+        cacheWriteTokens?: number;
+        /** @description Total cost in dollars since midnight. */
+        totalCost?: number;
+      };
+    };
+    /** @description Optional top-N aggregates for one requested dimension. */
+    UsageSummaryBreakdown: {
+      items?: components['schemas']['UsageSummaryGroup'][];
+      /** @description Total distinct groups in the requested range. */
+      totalDimensions?: number;
+      /** @description Whether groups were omitted from the named items. */
+      truncated?: boolean;
+    };
+    /** @description Aggregate metrics for one usage dimension value. */
+    UsageSummaryGroup: {
+      /** @description Group label; API-key labels are display-safe prefixes. */
+      name?: string;
+      requests?: number;
+      errors?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      reasoningTokens?: number;
+      cachedTokens?: number;
+      cacheWriteTokens?: number;
+      totalTokens?: number;
+      totalCost?: number;
+      avgDurationMs?: number;
+      totalDurationMs?: number;
+      avgTtftMs?: number;
+      avgTokensPerSec?: number;
+      successRate?: number;
+    };
     /** @description OpenAI Chat Completions request (pass-through; full OpenAI schema accepted). */
     ChatCompletionRequest: {
       model: string;
@@ -5212,16 +5307,8 @@ export interface components {
           };
       /** @description API key for the provider. Can be a literal string or `$env:VARIABLE_NAME` to reference an environment variable. Required unless `api_base_url` is an `oauth://` URI. */
       api_key?: string;
-      /**
-       * @description OAuth provider identifier. Required when `api_base_url` uses an `oauth://` URI. Determines which OAuth flow is used to obtain credentials. Note: `google-gemini-cli` and `google-antigravity` are deprecated and no longer supported — they remain accepted for backward compatibility but are rejected at request routing.
-       * @enum {string}
-       */
-      oauth_provider?:
-        | 'anthropic'
-        | 'openai-codex'
-        | 'github-copilot'
-        | 'google-gemini-cli'
-        | 'google-antigravity';
+      /** @description OAuth provider identifier. Required when `api_base_url` uses an `oauth://` URI. Determines which OAuth flow is used to obtain credentials. Any OAuth-capable provider bundled with Plexus's pi-ai dependency is accepted (e.g. `anthropic`, `openai-codex`, `github-copilot`, `xai`, `kimi-coding`, `openrouter`) except `radius`, which is not supported. See `GET /v0/management/oauth/providers` for the current list. `google-gemini-cli` and `google-antigravity` are deprecated and no longer supported — they are rejected on write. */
+      oauth_provider?: string;
       /** @description OAuth account identifier. Required when `api_base_url` uses an `oauth://` URI. */
       oauth_account?: string;
       /**
@@ -5347,16 +5434,6 @@ export interface components {
         /** @default 60 */
         intervalMinutes: number;
       };
-      /** @description Named GPU profile (e.g. `H100`, `A100`, `custom`). A display hint used by the frontend; the backend uses the four numeric fields below as the source of truth. */
-      gpu_profile?: string;
-      /** @description GPU RAM in GB. Used for energy estimation when combined with model_architecture. */
-      gpu_ram_gb?: number;
-      /** @description GPU memory bandwidth in TB/s. Used for energy estimation. */
-      gpu_bandwidth_tb_s?: number;
-      /** @description GPU peak FLOPs in teraflops. Used for energy estimation. */
-      gpu_flops_tflop?: number;
-      /** @description GPU TDP in watts. Used for energy estimation. */
-      gpu_power_draw_watts?: number;
       /**
        * @description Adapter name(s) applied to every model under this provider. Adapters rewrite outbound request payloads (preDispatch) and inbound provider responses (postDispatch) to fix provider-specific field-name incompatibilities. Applied before model-level adapters.
        *     Adapters can be specified as bare strings (backward compatible) or as objects with `{ name, options }` for adapters that require configuration.
@@ -5595,20 +5672,6 @@ export interface components {
             /** @description All metadata lives here for custom sources. `name` is required because there is no catalog fallback. */
             overrides: WithRequired<components['schemas']['MetadataOverrides'], 'name'>;
           };
-      /** @description Model architecture details used for inference energy estimation. When modified, triggers async recalculation of kWh for all affected historical usage records. */
-      model_architecture?: {
-        /** @description Total parameter count (billions). */
-        total_params?: number;
-        /** @description Active (non-MoE-gated) parameter count (billions). */
-        active_params?: number;
-        layers?: number;
-        heads?: number;
-        kv_lora_rank?: number;
-        qk_rope_head_dim?: number;
-        context_length?: number;
-        /** @enum {string} */
-        dtype?: 'fp16' | 'bf16' | 'fp8' | 'fp8_e4m3' | 'fp8_e5m2' | 'nvfp4' | 'int4' | 'int8';
-      };
       /** @description Shorthand simple pricing: input price per million tokens. Equivalent to setting `pricing` to `{ source: "simple", input: <value>, output: <output_price_per_million> }`. Only used when `pricing` is not set. */
       input_price_per_million?: number;
       /** @description Shorthand simple pricing: output price per million tokens. See `input_price_per_million`. */
@@ -5920,6 +5983,37 @@ export interface components {
       /** @description Optional utilisation percentage at which the checker gates the provider onto cooldown. */
       exhaustionThreshold?: number | null;
     };
+    CustomQuotaChecker: {
+      id: string;
+      type: string;
+      displayName: string;
+      /** @description JavaScript function body returning an array of quota meters. */
+      code: string;
+      enabled: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CustomQuotaCheckerInput: {
+      displayName: string;
+      code: string;
+      /** @default true */
+      enabled: boolean;
+    };
+    CustomQuotaCheckerTestInput: {
+      provider: string;
+      options?: {
+        [key: string]: unknown;
+      };
+      /** @description Optional unsaved code to execute instead of the persisted code. */
+      code?: string;
+    };
+    CustomQuotaCheckerPatch: {
+      displayName?: string;
+      code?: string;
+      enabled?: boolean;
+    };
     /** @description Per-request usage record stored in `request_usage`. Populated after each inference request completes (or errors). Fields may be null on error paths. */
     UsageRecord: {
       /**
@@ -5963,7 +6057,7 @@ export interface components {
       retryHistory?: string | null;
       /** @description Model alias as specified in the request (before resolution). */
       incomingModelAlias?: string | null;
-      /** @description Resolved canonical model name. For aliases with `model_architecture`, this is the target; otherwise same as `incomingModelAlias`. */
+      /** @description Resolved canonical model name. */
       canonicalModelName?: string | null;
       /** @description Final model name sent to the upstream provider. May differ from `canonicalModelName` due to provider-specific transformations. */
       selectedModelName?: string | null;
@@ -6018,7 +6112,7 @@ export interface components {
       ttftMs?: number | null;
       /** @description Output tokens per second (throughput). Calculated as `tokensOutput / (durationMs - ttftMs)` for streaming requests. Null for non-streaming or if calculation invalid. */
       tokensPerSec?: number | null;
-      /** @description Estimated energy consumption in kilowatt-hours. Calculated from `model_architecture` token estimates and provider-specific energy coefficients. Requires `model_architecture` to be set on the alias. */
+      /** @description Measured energy consumption in kilowatt-hours reported by the provider (if available). */
       kwhUsed?: number | null;
       /** @description Whether the response was streamed (SSE). */
       isStreamed?: boolean;
@@ -6049,61 +6143,6 @@ export interface components {
       hasDebug?: boolean;
       /** @description Whether error records exist for this request (mirrors presence in `inference_errors` table). */
       hasError?: boolean;
-    };
-    /** @description Aggregated usage statistics over time windows. */
-    UsageSummary: {
-      /** @description Time range for series data. Format depends on query param (e.g. "24h", "7d", custom start/end). Affects only the series field. */
-      range?: string;
-      series?: {
-        /** @description Start of the time bucket (epoch ms). */
-        bucketStartMs?: number;
-        /** @description Number of requests in this bucket. */
-        requests?: number;
-        /** @description Sum of input tokens across all requests. */
-        inputTokens?: number;
-        /** @description Sum of output tokens across all requests. */
-        outputTokens?: number;
-        /** @description Sum of cached tokens across all requests. */
-        cachedTokens?: number;
-        /** @description Sum of cache-write tokens across all requests. */
-        cacheWriteTokens?: number;
-        /** @description Sum of energy usage (kWh) across all requests. */
-        kwhUsed?: number;
-        /** @description Total token count = inputTokens + outputTokens + cachedTokens + cacheWriteTokens. */
-        tokens?: number;
-      }[];
-      /** @description Rolling 7-day aggregation window. */
-      stats?: {
-        /** @description Total requests in the 7-day window. */
-        totalRequests?: number;
-        /** @description Total tokens (input + output + cached + cacheWrite) in the window. */
-        totalTokens?: number;
-        /** @description Total energy usage in the window. */
-        totalKwhUsed?: number;
-        /** @description Average request duration in milliseconds. */
-        avgDurationMs?: number;
-        /** @description Sum of all request durations in milliseconds. */
-        totalDurationMs?: number;
-      };
-      /** @description Aggregation since local midnight (time-of-day based, not UTC). */
-      today?: {
-        /** @description Number of requests since midnight. */
-        requests?: number;
-        /** @description Input tokens since midnight. */
-        inputTokens?: number;
-        /** @description Output tokens since midnight. */
-        outputTokens?: number;
-        /** @description Reasoning tokens since midnight. */
-        reasoningTokens?: number;
-        /** @description Cached tokens since midnight. */
-        cachedTokens?: number;
-        /** @description Cache-write tokens since midnight. */
-        cacheWriteTokens?: number;
-        /** @description Energy usage since midnight. */
-        kwhUsed?: number;
-        /** @description Total cost in dollars since midnight. */
-        totalCost?: number;
-      };
     };
     /** @description Debug capture for an inference request. Can contain request/response snapshots at various transformation stages. Only populated if debug is enabled for the request (via header or key configuration). */
     DebugLog: {
@@ -6675,6 +6714,8 @@ export interface components {
   };
   parameters: {
     ResponseId: string;
+    /** @description Custom quota checker type identifier. */
+    CustomCheckerId: string;
   };
   requestBodies: never;
   headers: never;
@@ -9510,50 +9551,6 @@ export interface operations {
       };
     };
   };
-  getV0ManagementModelsHuggingfaceBymodelId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description HuggingFace repo ID, URL-encoded (e.g. `mistralai%2FMixtral-8x7B`). The `/` character must be encoded as `%2F`. */
-        modelId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Architecture params. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            /** @constant */
-            success?: true;
-            model_id?: string;
-            architecture?: {
-              total_params?: number;
-              active_params?: number;
-              layers?: number;
-              heads?: number;
-              kv_lora_rank?: number | null;
-              qk_rope_head_dim?: number | null;
-              context_length?: number;
-              dtype?: string;
-            };
-          };
-        };
-      };
-      /** @description Model not found on HuggingFace. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
   postV0ManagementModelsMetadataRefresh: {
     parameters: {
       query?: never;
@@ -10536,6 +10533,203 @@ export interface operations {
       };
     };
   };
+  getV0ManagementCustomCheckers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Custom quota checkers. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomQuotaChecker'][];
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementCustomCheckersByid: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Custom quota checker type identifier. */
+        id: components['parameters']['CustomCheckerId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Custom quota checker. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomQuotaChecker'];
+        };
+      };
+      /** @description Custom checker not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  putV0ManagementCustomCheckersByid: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Custom quota checker type identifier. */
+        id: components['parameters']['CustomCheckerId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomQuotaCheckerInput'];
+      };
+    };
+    responses: {
+      /** @description Saved custom quota checker. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CustomQuotaChecker'];
+        };
+      };
+      /** @description Validation failed. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Checker type collides with a built-in checker. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementCustomCheckersByid: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Custom quota checker type identifier. */
+        id: components['parameters']['CustomCheckerId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomQuotaCheckerTestInput'];
+      };
+    };
+    responses: {
+      /** @description Test result. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Checker execution failed. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Custom checker not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  deleteV0ManagementCustomCheckersByid: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Custom quota checker type identifier. */
+        id: components['parameters']['CustomCheckerId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Custom checker deleted. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Custom checker not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  patchV0ManagementCustomCheckersByid: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Custom quota checker type identifier. */
+        id: components['parameters']['CustomCheckerId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CustomQuotaCheckerPatch'];
+      };
+    };
+    responses: {
+      /** @description Updated custom quota checker. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Custom checker not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getV0ManagementUsage: {
     parameters: {
       query?: {
@@ -10617,6 +10811,12 @@ export interface operations {
         startDate?: string;
         /** @description Required with `range=custom`. */
         endDate?: string;
+        /** @description Optional comma-separated dimensions: provider, modelAlias, apiKey, or status. At most three dimensions are allowed. */
+        breakdowns?: string;
+        /** @description Maximum number of named groups returned per dimension. */
+        breakdownLimit?: number;
+        /** @description Optional comma-separated dimension-specific exclusions. `directModels` excludes model aliases beginning with `direct/`; `probe` excludes the internal probe API key from API-key breakdowns. */
+        exclude?: string;
       };
       header?: never;
       path?: never;
@@ -10627,6 +10827,8 @@ export interface operations {
       /** @description Aggregates. */
       200: {
         headers: {
+          /** @description Whether the response was served from the in-memory summary cache. */
+          'X-Usage-Summary-Cache'?: 'HIT' | 'MISS';
           [name: string]: unknown;
         };
         content: {
@@ -10635,6 +10837,13 @@ export interface operations {
       };
       /** @description Invalid `range` or custom-range parameters. */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Requested aggregate response exceeds the response-size limit. */
+      413: {
         headers: {
           [name: string]: unknown;
         };

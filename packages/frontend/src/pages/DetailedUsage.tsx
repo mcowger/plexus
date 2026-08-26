@@ -30,13 +30,13 @@
  *    parsePresetFromQuery() --> initial state (timeRange, chartType, groupBy, etc.)
  *         |
  *         v
- *    loadData() --> api.getLogs(startDate based on timeRange)
+ *    loadData() --> api.getUsageSummary(startDate based on timeRange)
  *         |
  *         v
- *    records[] (raw UsageRecord array)
+ *    summary response + optional recent records for List mode
  *         |
  *         v
- *    aggregateByTime() or aggregateByGroup() --> aggregatedData[]
+ *    server aggregates --> aggregatedData[]
  *         |
  *         v
  *    renderTimeSeriesChart() / renderPieChart() / list table
@@ -44,15 +44,14 @@
  * ## Auto-refresh
  *
  * Data is automatically refreshed every 30 seconds via `setInterval` in a
- * `useEffect` hook. The interval is reset whenever `timeRange` changes (since
- * `loadData` depends on `timeRange` via `useCallback`). A manual "Refresh"
- * button is also available in the chart card header.
+ * `useEffect` hook. The interval is reset whenever the requested view changes.
+ * A manual "Refresh" button is also available in the chart card header.
  *
  * ## Query parameter contract (consumed by parsePresetFromQuery)
  *
  * | Param           | Values                                    | Default     |
  * |-----------------|-------------------------------------------|-------------|
- * | `range`         | live, hour, day, week, month              | day         |
+ * | `range`         | live, hour, day, week, month, custom       | day         |
  * | `chartType`     | line, bar, area, pie, composed             | area        |
  * | `groupBy`       | time, provider, model, apiKey, status      | time        |
  * | `viewMode`      | chart, list                               | chart       |
@@ -62,13 +61,20 @@
  * | `filterModel`   | model name string                         | (none)      |
  * | `filterStatus`  | status string (e.g., "error")             | (none)      |
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { Skeleton } from '../components/ui/Skeleton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { TimeRangeSelector } from '../components/dashboard/TimeRangeSelector';
-import { api, type UsageRecord } from '../lib/api';
+import {
+  api,
+  type UsageRecord,
+  type UsageSummaryBreakdown,
+  type UsageSummaryGroup,
+  type UsageSummaryResponse,
+} from '../lib/api';
 import { useCurrency } from '../lib/CurrencyContext';
 import { formatCostIn, formatMs, formatNumber, formatTokens, formatTimeAgo } from '../lib/format';
 import type { CustomDateRange } from '../lib/date';
@@ -90,6 +96,7 @@ import {
   Ban,
   Timer,
   Plane,
+  Loader2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -201,7 +208,7 @@ interface CostDisplay {
  * When groupBy='time', `name` is a formatted time bucket label (e.g., "14:30").
  * When groupBy is a categorical dimension, `name` is the group key (e.g., "openai", "gpt-4").
  *
- * Numeric fields are aggregated from raw UsageRecord values:
+ * Numeric fields are supplied by the range-scoped usage summary:
  * - `requests`, `errors`, `tokens`, `cost` are summed totals for the bucket/group.
  * - `duration`, `ttft`, `tps` are averaged across records in the bucket/group.
  * - `successRate` is derived: ((requests - errors) / requests) * 100.
@@ -220,12 +227,6 @@ interface AggregatedPoint {
   successRate: number;
   velocity?: number;
   fill?: string;
-}
-
-interface SummaryPoint {
-  timestamp: string;
-  requests: number;
-  tokens: number;
 }
 
 /**
@@ -298,7 +299,7 @@ const LIVE_WINDOW_MINUTES = 5;
 // Validation allowlists for query parameter parsing.
 // Unknown values are replaced with safe defaults (see parsePresetFromQuery).
 // ---------------------------------------------------------------------------
-const ALLOWED_TIME_RANGES: TimeRange[] = ['live', 'hour', 'day', 'week', 'month'];
+const ALLOWED_TIME_RANGES: TimeRange[] = ['live', 'hour', 'day', 'week', 'month', 'custom'];
 const ALLOWED_CHART_TYPES: ChartType[] = ['line', 'bar', 'area', 'pie', 'composed'];
 const ALLOWED_GROUP_BY: GroupBy[] = ['time', 'provider', 'model', 'apiKey', 'status'];
 const ALLOWED_VIEW_MODES: ViewMode[] = ['chart', 'list'];
@@ -495,176 +496,21 @@ const calcVelocity = (data: AggregatedPoint[]): AggregatedPoint[] => {
   }));
 };
 
-/**
- * Aggregate raw usage records into time-series buckets for chart rendering.
- *
- * Process:
- * 1. Each record's date is truncated to its time bucket via `bucketFn`
- * 2. Records falling into the same bucket are summed (requests, errors, tokens, cost)
- *    or averaged (duration, ttft, tps)
- * 3. Buckets are sorted chronologically
- * 4. Velocity is computed as the delta between adjacent buckets
- *
- * @param records - Raw usage records from the API
- * @param range   - Current time range (determines bucket granularity)
- * @returns Sorted array of aggregated data points with velocity computed
- */
-// @ts-expect-error kept for future use (client-side aggregation fallback)
-const aggregateByTime = (
-  records: UsageRecord[],
-  range: TimeRange,
-  customRange?: CustomDateRange | null
-): AggregatedPoint[] => {
-  const { bucketFn } = getRangeConfig(range);
-  const grouped = new Map<
-    number,
-    {
-      requests: number;
-      errors: number;
-      tokens: number;
-      cost: number;
-      duration: number;
-      ttft: number;
-      tps: number;
-      count: number;
-    }
-  >();
-
-  records.forEach((r) => {
-    const timestampMs = new Date(r.date).getTime();
-    if (Number.isNaN(timestampMs)) return;
-    const ms = bucketFn(timestampMs);
-    const ex = grouped.get(ms) || {
-      requests: 0,
-      errors: 0,
-      tokens: 0,
-      cost: 0,
-      duration: 0,
-      ttft: 0,
-      tps: 0,
-      count: 0,
-    };
-    ex.requests++;
-    if (r.responseStatus !== 'success') ex.errors++;
-    ex.tokens +=
-      (r.tokensInput || 0) +
-      (r.tokensOutput || 0) +
-      (r.tokensReasoning || 0) +
-      (r.tokensCached || 0);
-    ex.cost += r.costTotal || 0;
-    ex.duration += r.durationMs || 0;
-    ex.ttft += r.ttftMs || 0;
-    ex.tps += r.tokensPerSec || 0;
-    ex.count++;
-    grouped.set(ms, ex);
-  });
-
-  const data = Array.from(grouped.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([ms, v]) => ({
-      name: formatBucketLabel(range, ms, range === 'custom' ? customRange : null),
-      requests: v.requests,
-      errors: v.errors,
-      tokens: v.tokens,
-      cost: v.cost,
-      duration: v.count > 0 ? v.duration / v.count : 0,
-      ttft: v.count > 0 ? v.ttft / v.count : 0,
-      tps: v.count > 0 ? v.tps / v.count : 0,
-      successRate: v.requests > 0 ? ((v.requests - v.errors) / v.requests) * 100 : 0,
-    }));
-
-  return calcVelocity(data);
-};
-
-/**
- * Aggregate raw usage records into categorical groups (provider, model, apiKey, status).
- *
- * Unlike time-series aggregation, this produces one data point per unique group value.
- * Results are sorted by request count (descending) and capped at 10 groups to keep
- * pie charts and tables readable. Each group is assigned a deterministic color based
- * on a hash of its name string.
- *
- * @param records - Raw usage records from the API
- * @param groupBy - The categorical dimension to group by
- * @returns Array of aggregated data points, max 10, sorted by request count descending
- */
-const aggregateByGroup = (records: UsageRecord[], groupBy: GroupBy): AggregatedPoint[] => {
-  const grouped = new Map<
-    string,
-    {
-      requests: number;
-      errors: number;
-      tokens: number;
-      cost: number;
-      duration: number;
-      ttft: number;
-      tps: number;
-      count: number;
-    }
-  >();
-
-  records.forEach((r) => {
-    let key: string;
-    switch (groupBy) {
-      case 'provider':
-        key = r.provider || 'unknown';
-        break;
-      case 'model':
-        key = r.incomingModelAlias || r.selectedModelName || 'unknown';
-        break;
-      case 'apiKey':
-        key = r.apiKey ? `${r.apiKey.slice(0, 8)}...` : 'unknown';
-        break;
-      case 'status':
-        key = r.responseStatus || 'unknown';
-        break;
-      default:
-        key = 'unknown';
-    }
-
-    const ex = grouped.get(key) || {
-      requests: 0,
-      errors: 0,
-      tokens: 0,
-      cost: 0,
-      duration: 0,
-      ttft: 0,
-      tps: 0,
-      count: 0,
-    };
-    ex.requests++;
-    if (r.responseStatus !== 'success') ex.errors++;
-    ex.tokens +=
-      (r.tokensInput || 0) +
-      (r.tokensOutput || 0) +
-      (r.tokensReasoning || 0) +
-      (r.tokensCached || 0);
-    ex.cost += r.costTotal || 0;
-    ex.duration += r.durationMs || 0;
-    ex.ttft += r.ttftMs || 0;
-    ex.tps += r.tokensPerSec || 0;
-    ex.count++;
-    grouped.set(key, ex);
-  });
-
-  return Array.from(grouped.entries())
-    .map(([name, v]) => ({
-      name,
-      requests: v.requests,
-      errors: v.errors,
-      tokens: v.tokens,
-      cost: v.cost,
-      duration: v.count > 0 ? v.duration / v.count : 0,
-      ttft: v.count > 0 ? v.ttft / v.count : 0,
-      tps: v.count > 0 ? v.tps / v.count : 0,
-      successRate: v.requests > 0 ? ((v.requests - v.errors) / v.requests) * 100 : 0,
-      fill: COLORS[
-        Math.abs(name.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % COLORS.length
-      ],
-    }))
-    .sort((a, b) => b.requests - a.requests)
-    .slice(0, 10);
-};
+const toAggregatedPoint = (group: UsageSummaryGroup): AggregatedPoint => ({
+  name: group.name,
+  requests: group.requests,
+  errors: group.errors,
+  tokens: group.totalTokens,
+  cost: group.totalCost,
+  duration: group.avgDurationMs,
+  ttft: group.avgTtftMs,
+  tps: group.avgTokensPerSec,
+  successRate: group.successRate,
+  fill: COLORS[
+    Math.abs(group.name.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0)) %
+      COLORS.length
+  ],
+});
 
 /**
  * Render a time-series chart (area, line, bar, or composed) using Recharts.
@@ -934,12 +780,14 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   // and data fetching react to state changes automatically.
   // ---------------------------------------------------------------------------
 
-  /** Raw usage records fetched from the API (used for categorical grouping). */
+  /** Raw usage records fetched only for the recent List-mode preview. */
   const [records, setRecords] = useState<UsageRecord[]>([]);
-  /** Pre-aggregated summary buckets for time-series chart rendering. */
-  const [summaryData, setSummaryData] = useState<SummaryPoint[]>([]);
-  /** Whether a data fetch is currently in progress (shows loading spinner on Refresh button). */
-  const [loading, setLoading] = useState(false);
+  /** Range-scoped, server-aggregated analytics data. */
+  const [summaryResponse, setSummaryResponse] = useState<UsageSummaryResponse | null>(null);
+  /** Whether a data fetch is currently in progress. */
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const requestVersion = useRef(0);
   /** Selected time window -- controls how far back data is fetched and bucket granularity. */
   const [timeRange, setTimeRange] = useState<TimeRange>(preset.timeRange);
   /** Custom date range when timeRange is 'custom' */
@@ -986,16 +834,17 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   /**
    * Fetch usage data from the API for the currently selected time range.
    *
-   * For time-series views (groupBy='time'), uses the backend summary endpoint
-   * which returns pre-aggregated data, significantly reducing memory usage.
-   *
-   * For categorical views (groupBy!='time'), fetches raw records for client-side aggregation.
+   * Chart analytics always use the range-scoped summary endpoint. Raw records
+   * are fetched only when List mode is selected because that view is intentionally
+   * a recent request preview rather than an aggregate analytics source.
    *
    * The callback is memoized on `timeRange` and `customDateRange` so it re-creates
    * when the user changes the time window, which also resets the auto-refresh interval.
    */
   const loadData = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
+    setLoadError(false);
     try {
       let startDate: string | undefined;
       let endDate: string | undefined;
@@ -1003,37 +852,59 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       if (timeRange === 'custom' && customDateRange) {
         startDate = customDateRange.start.toISOString();
         endDate = customDateRange.end.toISOString();
-      } else if (timeRange !== 'custom') {
+      } else if (timeRange === 'custom') {
+        return;
+      } else {
         const now = new Date();
         const { minutes } = getRangeConfig(timeRange);
         startDate = new Date(now.getTime() - minutes * 60000).toISOString();
         endDate = now.toISOString();
       }
 
-      // Use backend summary endpoint for time-series views (much more efficient)
-      if (groupBy === 'time') {
-        const [summaryResponse, logsResponse] = await Promise.all([
-          api.getSummaryData(timeRange === 'live' ? 'hour' : timeRange, true, startDate, endDate),
-          api.getLogs(5000, 0, { startDate, endDate }),
+      const summaryRange = timeRange === 'live' ? 'custom' : timeRange;
+      const breakdown: UsageSummaryBreakdown[] =
+        groupBy === 'time' || viewMode === 'list'
+          ? []
+          : [groupBy === 'model' ? 'modelAlias' : (groupBy as UsageSummaryBreakdown)];
+      const summaryPromise = api
+        .getUsageSummary(summaryRange, true, startDate, endDate, breakdown, 10)
+        .then((response) => {
+          if (!response) throw new Error('Usage analytics request failed');
+          return response;
+        });
+
+      if (viewMode === 'list') {
+        const [response, logsResponse] = await Promise.all([
+          summaryPromise,
+          api.getLogs(100, 0, {
+            startDate,
+            endDate,
+            fields:
+              'date,provider,incomingModelAlias,selectedModelName,responseStatus,tokensInput,tokensOutput,costTotal,durationMs,ttftMs,tokensPerSec',
+          }),
         ]);
-        // Limit to max 100 points to prevent memory issues
-        const limitedData = summaryResponse.slice(0, 100) as SummaryPoint[];
-        setSummaryData(limitedData);
-        setRecords(logsResponse.data || []);
+        if (version === requestVersion.current) {
+          setSummaryResponse(response);
+          setRecords(logsResponse.data || []);
+        }
       } else {
-        // For categorical views, fetch raw records with strict limits
-        const logsResponse = await api.getLogs(100, 0, { startDate, endDate });
-        setSummaryData([]);
-        setRecords(logsResponse.data || []);
+        const response = await summaryPromise;
+        if (version === requestVersion.current) {
+          setSummaryResponse(response);
+          setRecords([]);
+        }
       }
 
-      setLastUpdated(new Date());
+      if (version === requestVersion.current) setLastUpdated(new Date());
     } catch (e) {
-      console.error('Failed to load usage data', e);
+      if (version === requestVersion.current) {
+        setLoadError(true);
+        console.error('Failed to load usage data', e);
+      }
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, [timeRange, customDateRange, groupBy, api]);
+  }, [timeRange, customDateRange, groupBy, viewMode, api]);
 
   /**
    * Auto-refresh mechanism: fetch data immediately on mount and whenever
@@ -1062,42 +933,29 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   }, [loadData, timeRange]);
 
   /**
-   * Derived aggregated data: re-computed whenever raw records, groupBy dimension,
-   * or timeRange changes.
-   *
-   * For time-series views (groupBy='time'), uses pre-aggregated summary data from backend.
-   * For categorical views, aggregates raw records client-side.
+   * Derived chart data from the server-side range-scoped aggregates.
    */
   const aggregatedData = useMemo(() => {
     if (groupBy === 'time') {
-      // Use pre-aggregated summary data - minimize object creation
       const isCustom = timeRange === 'custom';
       const customRange = isCustom ? customDateRange : null;
-      const { bucketFn } = getRangeConfig(timeRange, customRange);
-      const costByBucket = new Map<number, number>();
-
-      records.forEach((record) => {
-        const timestampMs = new Date(record.date).getTime();
-        if (Number.isNaN(timestampMs)) return;
-        const bucket = bucketFn(timestampMs);
-        costByBucket.set(bucket, (costByBucket.get(bucket) || 0) + (record.costTotal || 0));
-      });
-
-      return summaryData.map((r) => ({
-        name: formatBucketLabel(timeRange, Number(r.timestamp), customRange),
-        requests: r.requests || 0,
-        errors: 0,
-        tokens: r.tokens || 0,
-        cost: costByBucket.get(Number(r.timestamp)) || 0,
-        duration: 0,
-        ttft: 0,
-        tps: 0,
-        successRate: 100,
+      const data = (summaryResponse?.series ?? []).map((point) => ({
+        name: formatBucketLabel(timeRange, point.bucketStartMs, customRange),
+        requests: point.requests,
+        errors: point.errors,
+        tokens: point.tokens,
+        cost: point.totalCost,
+        duration: point.avgDurationMs,
+        ttft: point.avgTtftMs,
+        tps: point.avgTokensPerSec,
+        successRate:
+          point.requests > 0 ? ((point.requests - point.errors) / point.requests) * 100 : 0,
       }));
+      return calcVelocity(data);
     }
-    // For categorical views, aggregate raw records
-    return aggregateByGroup(records, groupBy);
-  }, [summaryData, records, groupBy, timeRange, customDateRange]);
+    const breakdown = groupBy === 'model' ? 'modelAlias' : groupBy;
+    return (summaryResponse?.grouped?.[breakdown]?.items ?? []).map(toAggregatedPoint);
+  }, [summaryResponse, groupBy, timeRange, customDateRange]);
 
   const metrics = useMemo(
     () => createMetrics({ currency, rate, symbol }),
@@ -1109,30 +967,21 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
   );
 
   /**
-   * Summary statistics computed from all raw records in the current time window.
+   * Summary statistics returned by the backend for the complete current window.
    * These are displayed as KPI cards at the top of the page, providing an
    * at-a-glance overview: total requests, errors, tokens, cost, and averages
    * for duration, TTFT (time to first token), TPS (tokens per second), and success rate.
    */
   const stats = useMemo(() => {
-    const total = records.length;
-    const errors = records.filter((r) => r.responseStatus !== 'success').length;
-    const tokens = records.reduce(
-      (acc, r) =>
-        acc +
-        (r.tokensInput || 0) +
-        (r.tokensOutput || 0) +
-        (r.tokensReasoning || 0) +
-        (r.tokensCached || 0),
-      0
-    );
-    const cost = records.reduce((acc, r) => acc + (r.costTotal || 0), 0);
-    const avgDuration =
-      total > 0 ? records.reduce((acc, r) => acc + (r.durationMs || 0), 0) / total : 0;
-    const avgTtft = total > 0 ? records.reduce((acc, r) => acc + (r.ttftMs || 0), 0) / total : 0;
-    const avgTps =
-      total > 0 ? records.reduce((acc, r) => acc + (r.tokensPerSec || 0), 0) / total : 0;
-    const successRate = total > 0 ? ((total - errors) / total) * 100 : 0;
+    const summary = summaryResponse?.stats;
+    const total = summary?.totalRequests || 0;
+    const errors = summary?.totalErrors || 0;
+    const tokens = summary?.totalTokens || 0;
+    const cost = summary?.totalCost || 0;
+    const avgDuration = summary?.avgDurationMs || 0;
+    const avgTtft = summary?.avgTtftMs || 0;
+    const avgTps = summary?.avgTokensPerSec || 0;
+    const successRate = summary?.successRate || 0;
 
     return [
       { label: 'Requests', value: formatNumber(total, 0), icon: Activity },
@@ -1153,7 +1002,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       { label: 'Avg TPS', value: formatNumber(avgTps, 1), icon: TrendingUp },
       { label: 'Success Rate', value: `${successRate.toFixed(1)}%`, icon: TrendingUp },
     ];
-  }, [currency, rate, records, symbol]);
+  }, [currency, rate, summaryResponse, symbol]);
 
   /** Toggle a metric on or off in the chart. Removes it if already selected, adds it otherwise. */
   const toggleMetric = (key: string) =>
@@ -1204,27 +1053,37 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
           </>
         }
       />
+      {loadError && (
+        <div className="mb-4 text-sm text-red-400" role="alert">
+          Unable to load usage analytics for this selection. Try refreshing or choosing a shorter
+          range.
+        </div>
+      )}
 
       {/* -------------------------------------------------------------------
           KPI Summary Cards Section
-          A responsive grid of 8 summary statistics computed from all records
+          A responsive grid of 8 summary statistics computed over the full range
           in the current time window. Each card shows a label, value, and icon.
           Errors are highlighted in red when count > 0.
       ------------------------------------------------------------------- */}
       <div className="mb-6 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8">
-        {stats.map((stat, i) => (
-          <div key={i} className="glass-bg rounded-lg p-3 flex flex-col gap-1">
-            <div className="flex justify-between items-start">
-              <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
-                {stat.label}
-              </span>
-              <stat.icon size={16} className={`text-text-secondary ${stat.color || ''}`} />
-            </div>
-            <div className={`font-heading text-xl font-bold ${stat.color || 'text-text'}`}>
-              {stat.value}
-            </div>
-          </div>
-        ))}
+        {loading && !summaryResponse
+          ? Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} height={76} className="w-full" />
+            ))
+          : stats.map((stat, i) => (
+              <div key={i} className="glass-bg rounded-lg p-3 flex flex-col gap-1">
+                <div className="flex justify-between items-start">
+                  <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    {stat.label}
+                  </span>
+                  <stat.icon size={16} className={`text-text-secondary ${stat.color || ''}`} />
+                </div>
+                <div className={`font-heading text-xl font-bold ${stat.color || 'text-text'}`}>
+                  {stat.value}
+                </div>
+              </div>
+            ))}
       </div>
 
       {/* -------------------------------------------------------------------
@@ -1265,6 +1124,7 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
                 { k: 'time', l: 'Time' },
                 { k: 'provider', l: 'Provider' },
                 { k: 'model', l: 'Model' },
+                { k: 'apiKey', l: 'API key' },
                 { k: 'status', l: 'Status' },
               ].map((o) => (
                 <Button
@@ -1366,7 +1226,18 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
             </Button>
           }
         >
-          {aggregatedData.length === 0 ? (
+          {loading && summaryResponse && (
+            <div
+              className="mb-3 inline-flex items-center gap-1 text-xs text-text-secondary"
+              role="status"
+            >
+              <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+              Updating analytics…
+            </div>
+          )}
+          {loading && !summaryResponse ? (
+            <Skeleton height={400} className="w-full" />
+          ) : aggregatedData.length === 0 ? (
             <div className="h-96 flex items-center justify-center text-text-secondary">
               No data available
             </div>
@@ -1379,7 +1250,12 @@ export const DetailedUsage: React.FC<DetailedUsageProps> = ({
       ) : (
         <Card
           title="Raw Request Log"
-          extra={<span className="text-xs text-text-secondary">{records.length} requests</span>}
+          extra={
+            <span className="text-xs text-text-secondary">
+              {records.length} shown of {summaryResponse?.stats.totalRequests ?? records.length}{' '}
+              requests
+            </span>
+          }
         >
           <div className="max-h-125 space-y-3 overflow-y-auto md:hidden">
             {records.slice(0, 100).map((r, i) => (

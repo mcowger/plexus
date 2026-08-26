@@ -601,6 +601,12 @@ components:
   schemas:
     WebSearchCoercionAdapterOptions:
       $ref: ./components/schemas/WebSearchCoercionAdapterOptions.yaml
+    UsageSummary:
+      $ref: ./components/schemas/UsageSummary.yaml
+    UsageSummaryBreakdown:
+      $ref: ./components/schemas/UsageSummaryBreakdown.yaml
+    UsageSummaryGroup:
+      $ref: ./components/schemas/UsageSummaryGroup.yaml
   securitySchemes:
     PlexusApiKey:
       type: http
