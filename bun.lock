@@ -66,6 +66,9 @@
       "bin": {
         "plexuscli": "src/index.ts",
       },
+      "devDependencies": {
+        "typescript": "^7.0.2",
+      },
     },
     "packages/frontend": {
       "name": "frontend",

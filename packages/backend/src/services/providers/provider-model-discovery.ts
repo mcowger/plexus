@@ -13,6 +13,16 @@ export interface DiscoveredModel {
   pricing?: { prompt?: string; completion?: string };
 }
 
+const ANTHROPIC_API_HOST = 'api.anthropic.com';
+
+function isAnthropicApiUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase() === ANTHROPIC_API_HOST;
+  } catch {
+    return false;
+  }
+}
+
 export function validateUrlSafety(url: string): { valid: boolean; error?: string } {
   let parsedUrl: URL;
   try {
@@ -89,7 +99,14 @@ export async function fetchModelsFromUrl(
   }
 
   const requestHeaders: Record<string, string> = { Accept: 'application/json' };
-  if (apiKey) requestHeaders.Authorization = `Bearer ${apiKey}`;
+  if (apiKey) {
+    if (isAnthropicApiUrl(url)) {
+      requestHeaders['x-api-key'] = apiKey;
+      requestHeaders['anthropic-version'] = '2023-06-01';
+    } else {
+      requestHeaders.Authorization = `Bearer ${apiKey}`;
+    }
+  }
 
   logger.debug(`Fetching models from ${url}`);
 
@@ -135,15 +152,20 @@ export function getOAuthProviderModels(providerId: string): DiscoveredModel[] {
 export function deriveModelsUrl(provider: ProviderConfig): string | null {
   if (typeof provider.api_base_url === 'string') {
     const types = getProviderTypes(provider);
-    if (types.length === 1 && types[0] === 'chat') {
-      return `${provider.api_base_url.replace(/\/chat\/completions\/?$/, '')}/models`;
+    if (types.length === 1 && (types[0] === 'chat' || types[0] === 'messages')) {
+      return `${provider.api_base_url.replace(/\/(?:chat\/completions|messages)\/?$/, '')}/models`;
     }
     return null;
   }
 
   const apiBaseUrl = provider.api_base_url as Record<string, string>;
   if (apiBaseUrl.ollama) return 'https://ollama.com/api/tags';
-  if (apiBaseUrl.chat) return `${apiBaseUrl.chat.replace(/\/chat\/completions\/?$/, '')}/models`;
+  if (apiBaseUrl.chat) {
+    return `${apiBaseUrl.chat.replace(/\/(?:chat\/completions|messages)\/?$/, '')}/models`;
+  }
+  if (apiBaseUrl.messages) {
+    return `${apiBaseUrl.messages.replace(/\/(?:chat\/completions|messages)\/?$/, '')}/models`;
+  }
   return null;
 }
 

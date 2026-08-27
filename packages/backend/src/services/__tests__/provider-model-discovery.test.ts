@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deriveModelsUrl,
   discoverProviderModels,
+  fetchModelsFromUrl,
   normalizeModelsResponse,
   validateUrlSafety,
 } from '../providers/provider-model-discovery';
@@ -24,6 +25,20 @@ describe('provider model discovery', () => {
     };
 
     expect(deriveModelsUrl(provider)).toBe('https://api.example.com/v1/models');
+  });
+
+  it('derives /models URLs from Anthropic messages URLs', () => {
+    const provider: ProviderConfig = {
+      api_base_url: 'https://api.anthropic.com/v1/messages',
+      api_key: 'sk-test',
+      disable_cooldown: false,
+      stall_cooldown: false,
+      allow_100_percent_utilization: false,
+      estimateTokens: false,
+      useClaudeMasking: false,
+    };
+
+    expect(deriveModelsUrl(provider)).toBe('https://api.anthropic.com/v1/models');
   });
 
   it('uses the Ollama catalog endpoint for native Ollama providers', () => {
@@ -87,5 +102,42 @@ describe('provider model discovery', () => {
         headers: { Accept: 'application/json' },
       })
     );
+  });
+
+  it('uses Anthropic API-key authentication for Anthropic model endpoints', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ id: 'claude-sonnet-4-20250514' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchModelsFromUrl('https://api.anthropic.com/v1/models', 'sk-ant-test');
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(request.headers).toEqual({
+      Accept: 'application/json',
+      'x-api-key': 'sk-ant-test',
+      'anthropic-version': '2023-06-01',
+    });
+  });
+
+  it('uses Bearer authentication for non-Anthropic model endpoints', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ id: 'gpt-5' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchModelsFromUrl('https://api.example.com/v1/models', 'sk-test');
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(request.headers).toEqual({
+      Accept: 'application/json',
+      Authorization: 'Bearer sk-test',
+    });
   });
 });

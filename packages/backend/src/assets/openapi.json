@@ -3900,7 +3900,7 @@
           "Management — Config"
         ],
         "summary": "Fetch `/v1/models` from an external URL (admin only)",
-        "description": "Helper used by the admin UI when adding a new provider. Fetches the\ntarget URL (with optional Bearer apiKey), normalizes OpenAI- and\nOllama-style responses into `{ data: [...] }`, and returns it.\nBlocks localhost and cloud metadata addresses to mitigate SSRF.\n",
+        "description": "Helper used by the admin UI when adding a new provider. Fetches the\ntarget URL (with provider-appropriate optional apiKey authentication), normalizes OpenAI- and\nOllama-style responses into `{ data: [...] }`, and returns it.\nBlocks localhost and cloud metadata addresses to mitigate SSRF.\n",
         "security": [
           {
             "AdminKey": []
@@ -3950,6 +3950,9 @@
           },
           "400": {
             "description": "Invalid URL, SSRF block, or upstream parse error."
+          },
+          "502": {
+            "description": "Upstream provider rejected the request or returned an authorization error."
           },
           "504": {
             "description": "Upstream fetch timed out (10s)."

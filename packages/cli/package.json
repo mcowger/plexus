@@ -23,6 +23,9 @@
     "typecheck": "bun x tsc --noEmit",
     "test": "bunx --bun vitest run"
   },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  },
   "engines": {
     "bun": ">=1.4.0"
   }

@@ -698,8 +698,14 @@ export function useProviderForm() {
     const ollamaUrl = getApiUrlValue('ollama');
     if (ollamaUrl) return 'https://ollama.com/api/tags';
     const chatUrl = getApiUrlValue('chat');
-    if (!chatUrl) return '';
-    return `${chatUrl.replace(/\/chat\/completions\/?$/, '')}/models`;
+    if (chatUrl) {
+      return `${chatUrl.replace(/\/(?:chat\/completions|messages)\/?$/, '')}/models`;
+    }
+    const messagesUrl = getApiUrlValue('messages');
+    if (messagesUrl) {
+      return `${messagesUrl.replace(/\/(?:chat\/completions|messages)\/?$/, '')}/models`;
+    }
+    return '';
   };
 
   const handleOpenFetchModels = () => {
