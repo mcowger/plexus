@@ -2,8 +2,8 @@
   "name": "plexus2",
   "module": "index.ts",
   "devDependencies": {
-    "@biomejs/biome": "2.5.9",
-    "@redocly/cli": "^2.46.1",
+    "@biomejs/biome": "2.5.10",
+    "@redocly/cli": "^2.47.0",
     "@vitest/coverage-istanbul": "4.1.11",
     "agent-browser": "^0.34.0",
     "bun-types": "1.4.0",
