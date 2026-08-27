@@ -266,7 +266,7 @@ jobs:
         # base-action mirror, whose tags lag far behind and pin an ancient
         # Claude Code CLI version) keeps it on the same current v1 release
         # line as claude-code-action.
-        uses: anthropics/claude-code-action/base-action@v1.0.194
+        uses: anthropics/claude-code-action/base-action@v1.0.202
         with:
           anthropic_api_key: ${{ env.LLM_API_KEY }}
           claude_args: |
