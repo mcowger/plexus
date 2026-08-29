@@ -27,7 +27,7 @@
  */
 
 /** pi-ai's thinking vocabulary. "off" means thinking disabled. */
-export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
  * Unified reasoning-output visibility, normalized across protocols:
@@ -85,6 +85,7 @@ export const EFFORT_LADDER: readonly ReasoningEffort[] = [
   'medium',
   'high',
   'xhigh',
+  'max',
 ] as const;
 
 /**
@@ -99,6 +100,7 @@ const EFFORT_TO_BUDGET: Record<ReasoningEffort, number> = {
   medium: 8192,
   high: 16384,
   xhigh: 32768,
+  max: 65536,
 };
 
 export function effortToBudget(effort: ReasoningEffort): number {
@@ -118,7 +120,8 @@ export function budgetToEffort(budget: number): ReasoningEffort | 'off' {
   if (budget <= 2048) return 'low';
   if (budget <= 8192) return 'medium';
   if (budget <= 16384) return 'high';
-  return 'xhigh';
+  if (budget <= 32768) return 'xhigh';
+  return 'max';
 }
 
 /** Normalize an arbitrary client effort string to our vocabulary, if possible. */
@@ -139,9 +142,10 @@ export function normalizeEffort(raw: unknown): ReasoningEffort | 'off' | undefin
     case 'high':
       return 'high';
     case 'xhigh':
+      return 'xhigh';
     case 'max':
     case 'maximum':
-      return 'xhigh';
+      return 'max';
     default:
       return undefined;
   }

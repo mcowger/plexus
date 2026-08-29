@@ -145,6 +145,68 @@ describe('GET /v1/models', () => {
   });
 });
 
+// ─── Reasoning options from the pi-ai catalog ──────────────
+
+describe('GET /v1/models – reasoning_options', () => {
+  it('exposes canonical effort levels for auto-identified reasoning models', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+
+    setConfigForTesting({
+      models: {
+        // Auto-identifies to the pi-ai catalog (openai / gpt-5.6-luna), which
+        // is reasoning-capable with a gpt-5.6 thinkingLevelMap.
+        'gpt-5.6-luna': { targets: [] },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+
+    const model = response.json().data[0];
+    expect(model.reasoning_options).toEqual([
+      {
+        type: 'effort',
+        values: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
+      },
+    ]);
+  });
+
+  it('omits reasoning_options when the resolved pi model is not reasoning-capable', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+
+    setConfigForTesting({
+      models: {
+        'claude-alias': {
+          targets: [],
+          pi_model: { provider: 'anthropic', model_id: 'claude-test' },
+        },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    const model = response.json().data[0];
+    expect(model.pi_model).toBe('claude-test');
+    expect(model.reasoning_options).toBeUndefined();
+  });
+
+  it('omits reasoning_options when no pi model can be resolved', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+
+    setConfigForTesting({
+      models: {
+        'plain-model': { targets: [] },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    const model = response.json().data[0];
+    expect(model.reasoning_options).toBeUndefined();
+  });
+});
+
 // ─── Vision fallthrough modality injection ──────────────
 
 describe('GET /v1/models – vision fallthrough modalities', () => {

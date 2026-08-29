@@ -236,7 +236,7 @@ export interface UnifiedResponsesRequest {
     verbosity?: 'low' | 'medium' | 'high';
   };
   reasoning?: {
-    effort?: 'low' | 'medium' | 'high' | 'minimal' | 'xhigh';
+    effort?: 'low' | 'medium' | 'high' | 'minimal' | 'xhigh' | 'max';
     summary?: 'auto' | 'concise' | 'detailed';
     max_tokens?: number;
   };

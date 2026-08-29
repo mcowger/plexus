@@ -178,6 +178,27 @@ const mockGetModel = (provider: string, modelId: string) => {
     else if (modelId === 'gpt-5.4' || modelId.includes('responses')) api = 'openai-responses';
     else api = 'openai-completions';
   }
+  // GPT-5.6-style reasoning model with a gpt-5.6 thinkingLevelMap, mirroring
+  // the real pi-ai openai-responses catalog (minimal unsupported, off = none).
+  if (modelId.startsWith('gpt-5.6')) {
+    return {
+      id: modelId,
+      name: modelId,
+      contextWindow: 400000,
+      provider,
+      api: 'openai-responses',
+      reasoning: true,
+      thinkingLevelMap: {
+        off: 'none',
+        minimal: null,
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+        xhigh: 'xhigh',
+        max: 'max',
+      },
+    };
+  }
   return {
     id: modelId,
     name: modelId,
@@ -194,6 +215,20 @@ const mockGetModel = (provider: string, modelId: string) => {
 };
 
 const mockGetProviders = () => ['anthropic', 'openai-codex', 'openai', 'google'];
+
+// Faithful port of pi-ai's getSupportedThinkingLevels: honours model.reasoning
+// and thinkingLevelMap ('null' = unsupported; xhigh/max require an explicit
+// entry) so reasoning-capability assertions track the model record under test.
+const EXTENDED_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+const mockGetSupportedThinkingLevels = (model: any) => {
+  if (!model?.reasoning) return ['off'];
+  return EXTENDED_THINKING_LEVELS.filter((level) => {
+    const mapped = model.thinkingLevelMap?.[level];
+    if (mapped === null) return false;
+    if (level === 'xhigh' || level === 'max') return mapped !== undefined;
+    return true;
+  });
+};
 
 // @earendil-works/pi-ai — single authoritative mock for the whole worker.
 //
@@ -220,7 +255,7 @@ vi.mock('@earendil-works/pi-ai', async (importOriginal) => {
     stream: mockModels.stream,
     calculateCost: vi.fn(() => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 })),
     clampThinkingLevel: (_m: any, l: string) => l,
-    getSupportedThinkingLevels: () => ['off', 'low', 'medium', 'high'],
+    getSupportedThinkingLevels: mockGetSupportedThinkingLevels,
     // The model catalog overlay delegates merge/restore/persist to pi-ai's
     // real createProvider — keep it real so catalog tests exercise genuine
     // library semantics.

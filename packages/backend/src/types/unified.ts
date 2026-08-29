@@ -77,7 +77,7 @@ export interface UnifiedToolConfig {
   functionCallingPreference?: string;
 }
 
-export type ThinkLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type ThinkLevel = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface KeyAccessPolicy {
   allowedModels?: string[];

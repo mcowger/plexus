@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import crypto from 'crypto';
+import { getSupportedThinkingLevels } from '@earendil-works/pi-ai';
+import type { Api, Model as PiAiModel } from '@earendil-works/pi-ai';
 import { getConfig } from '../../config';
 import { PricingManager } from '../../services/observability/pricing-manager';
 import {
@@ -47,6 +49,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
 
       // Look up pi compat options if a pi model reference is configured.
       let piOptions: Record<string, unknown> | undefined;
+      let piModel: PiAiModel<Api> | null = null;
       if (!piModelConfig && automaticIdentity.provider) {
         const inferred = getCatalogModel(automaticIdentity.provider, automaticIdentity.model);
         if (inferred) {
@@ -57,11 +60,25 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         }
       }
       if (piModelConfig) {
-        const piModel = getCatalogModel(piModelConfig.provider, piModelConfig.model_id);
+        piModel = getCatalogModel(piModelConfig.provider, piModelConfig.model_id);
         if (piModel?.compat && Object.keys(piModel.compat).length > 0) {
           piOptions = piModel.compat as Record<string, unknown>;
         }
       }
+
+      // Canonical reasoning effort levels from the pi-ai model record
+      // (thinkingLevelMap). Exposed so clients can offer a real effort picker
+      // (e.g. OpenCode) instead of relying on fallback behavior. Values use
+      // pi's canonical vocabulary ('off' | 'minimal' | 'low' | 'medium' |
+      // 'high' | 'xhigh' | 'max'); clients map them to provider-native values.
+      const reasoningOptions = piModel?.reasoning
+        ? [
+            {
+              type: 'effort' as const,
+              values: [...getSupportedThinkingLevels(piModel)],
+            },
+          ]
+        : undefined;
 
       const base = {
         id: aliasId,
@@ -72,6 +89,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         ...(piModelConfig && { pi_provider: piModelConfig.provider }),
         ...(piModelConfig && { pi_model: piModelConfig.model_id }),
         ...(piOptions !== undefined && { pi_options: piOptions }),
+        ...(reasoningOptions !== undefined && { reasoning_options: reasoningOptions }),
       };
 
       const enriched = resolveModelMetadata(

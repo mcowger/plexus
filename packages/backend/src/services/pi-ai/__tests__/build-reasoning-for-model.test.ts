@@ -2,17 +2,18 @@ import { describe, it, expect, vi } from 'vitest';
 import type { ReasoningIntent } from '../reasoning';
 
 // buildReasoningOptionsForModel calls into pi-ai's clampThinkingLevel /
-// getSupportedThinkingLevels. The global mock in test/vitest.setup.ts does NOT
-// provide those, so mock them locally with faithful re-implementations that
-// honour thinkingLevelMap (mirroring pi-ai's real models.ts).
+// getSupportedThinkingLevels. The global mock in test/vitest.setup.ts provides
+// a shared implementation, but this suite pins its own faithful copies that
+// honour thinkingLevelMap (mirroring pi-ai's real models.ts) so the tests stay
+// independent of the global mock's shape.
 vi.mock('@earendil-works/pi-ai', () => {
-  const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const;
+  const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
   const getSupportedThinkingLevels = (model: any) => {
     if (!model.reasoning) return ['off'];
     return LEVELS.filter((level) => {
       const mapped = model.thinkingLevelMap?.[level];
       if (mapped === null) return false;
-      if (level === 'xhigh') return mapped !== undefined;
+      if (level === 'xhigh' || level === 'max') return mapped !== undefined;
       return true;
     });
   };
@@ -81,6 +82,39 @@ describe('buildReasoningOptionsForModel', () => {
         intent({ effort: 'high', enabled: true, visibility: 'summary', summaryDetail: 'detailed' })
       );
       expect(opts.reasoningSummary).toBe('detailed');
+    });
+  });
+
+  describe("canonical 'max' effort", () => {
+    // gpt-5.6-style model: thinkingLevelMap explicitly supports max
+    const gpt56 = {
+      api: 'openai-responses',
+      reasoning: true,
+      thinkingLevelMap: {
+        off: 'none',
+        minimal: null,
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+        xhigh: 'xhigh',
+        max: 'max',
+      },
+    } as any;
+
+    it('round-trips a client max effort to a max egress level', () => {
+      const opts = buildReasoningOptionsForModel(gpt56, intent({ effort: 'max', enabled: true }));
+      expect(opts.reasoningEffort).toBe('max');
+      expect(opts.reasoning).toBe('max');
+    });
+
+    it('clamps max down when the model has no max level', () => {
+      const model = {
+        api: 'openai-responses',
+        reasoning: true,
+        thinkingLevelMap: { off: 'none', low: 'low', high: 'high', xhigh: 'xhigh' },
+      } as any;
+      const opts = buildReasoningOptionsForModel(model, intent({ effort: 'max', enabled: true }));
+      expect(opts.reasoningEffort).toBe('xhigh');
     });
   });
 
