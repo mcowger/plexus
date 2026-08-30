@@ -6,6 +6,7 @@ import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
 import { Select } from '../components/ui/Select';
 import { CostToolTip } from '../components/ui/CostToolTip';
+import { PerformanceToolTip } from '../components/ui/PerformanceToolTip';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import {
@@ -66,7 +67,6 @@ import {
   Timer,
   CheckCircle,
   XCircle,
-  Gauge,
   Wifi,
   WifiOff,
   Loader,
@@ -90,7 +90,15 @@ import responsesLogo from '../assets/responses.svg';
 const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
 const LIVE_DURATION_UPDATE_INTERVAL_MS = 500;
 const DESKTOP_LOGS_MEDIA_QUERY = '(min-width: 1024px)';
-const DESKTOP_PERF_COLUMN_WIDTH = '220px';
+const DESKTOP_STATUS_COLUMN_WIDTH = '32px';
+const DESKTOP_DATE_COLUMN_WIDTH = '78px';
+const DESKTOP_KEY_COLUMN_WIDTH = '82px';
+const DESKTOP_API_COLUMN_WIDTH = '58px';
+const DESKTOP_TOKENS_COLUMN_WIDTH = '144px';
+const DESKTOP_COST_COLUMN_WIDTH = '86px';
+const DESKTOP_PERF_COLUMN_WIDTH = '100px';
+const DESKTOP_DELETE_COLUMN_WIDTH = '30px';
+const DESKTOP_TABLE_MIN_WIDTH = '768px';
 
 const formatReasoningEffort = (effort?: string | null): string | null => {
   if (!effort) return null;
@@ -460,6 +468,24 @@ const DesktopLogRow = React.memo(
     onDelete,
   }: DesktopLogRowProps) => {
     const { currency, rate, symbol } = useCurrency();
+    const costBreakdown = {
+      input:
+        log.costInput === 0
+          ? `${symbol}-.----`
+          : formatCostIn(log.costInput || 0, { currency, rate, symbol, decimals: 4 }),
+      output:
+        log.costOutput === 0
+          ? `${symbol}-.----`
+          : formatCostIn(log.costOutput || 0, { currency, rate, symbol, decimals: 4 }),
+      cached:
+        log.costCached === 0
+          ? `${symbol}-.----`
+          : formatCostIn(log.costCached || 0, { currency, rate, symbol, decimals: 4 }),
+      cacheWrite:
+        log.costCacheWrite === 0
+          ? `${symbol}-.----`
+          : formatCostIn(log.costCacheWrite || 0, { currency, rate, symbol, decimals: 4 }),
+    };
     return (
       <tr
         className={clsx(
@@ -471,8 +497,97 @@ const DesktopLogRow = React.memo(
           backgroundColor: log.responseStatus === 'pending' ? 'rgba(234, 179, 8, 0.08)' : undefined,
         }}
       >
-        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <td
+          className="px-0 py-1.5 text-center border-b border-border-glass text-text align-middle"
+          style={{
+            width: DESKTOP_STATUS_COLUMN_WIDTH,
+            minWidth: DESKTOP_STATUS_COLUMN_WIDTH,
+            maxWidth: DESKTOP_STATUS_COLUMN_WIDTH,
+          }}
+        >
+          <div className="flex flex-col items-center justify-center gap-0.5">
+            {log.hasDebug ? (
+              <button
+                type="button"
+                onClick={() => onDebug(log.requestId)}
+                className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-blue-400/30 bg-blue-500/15 text-blue-400 transition-colors hover:bg-blue-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                title={
+                  log.hasError ? 'View Debug Trace (error also available)' : 'View Debug Trace'
+                }
+                aria-label={
+                  log.hasError
+                    ? 'View Debug Trace. Error details are also available.'
+                    : 'View Debug Trace'
+                }
+              >
+                <Bug size={10} />
+                {log.hasError && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-0 top-0 h-1 w-1 rounded-full bg-danger"
+                  />
+                )}
+              </button>
+            ) : log.hasError ? (
+              <button
+                type="button"
+                onClick={() => onError(log.requestId)}
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-danger/30 bg-red-500/15 text-danger transition-colors hover:bg-red-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60"
+                title="View Error Details"
+                aria-label="View Error Details"
+              >
+                <AlertTriangle size={10} />
+              </button>
+            ) : (
+              <span
+                className={clsx(
+                  'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
+                  log.responseStatus === 'success'
+                    ? 'border-success/30 bg-emerald-500/15 text-success'
+                    : log.responseStatus === 'pending'
+                      ? 'border-warning/30 bg-yellow-500/15 text-warning'
+                      : log.responseStatus === 'cancelled'
+                        ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
+                        : log.responseStatus === 'timeout'
+                          ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
+                          : 'border-danger/30 bg-red-500/15 text-danger'
+                )}
+                role="img"
+                aria-label={`Status: ${log.responseStatus || 'unknown'}`}
+                title={`Status: ${log.responseStatus || 'unknown'}`}
+              >
+                {log.responseStatus === 'success' ? (
+                  <CheckCircle size={10} />
+                ) : log.responseStatus === 'pending' ? (
+                  <Plane size={10} className="animate-pulse" />
+                ) : log.responseStatus === 'cancelled' ? (
+                  <Ban size={10} />
+                ) : log.responseStatus === 'timeout' ? (
+                  <Timer size={10} />
+                ) : (
+                  <XCircle size={10} />
+                )}
+              </span>
+            )}
+            {log.attemptCount && log.attemptCount > 1 && (
+              <button
+                type="button"
+                onClick={() => onRetryDetails(log)}
+                className="inline-flex shrink-0 items-center gap-0 border-0 bg-transparent p-0 text-orange-500 transition-colors hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60"
+                title="View retry history"
+                aria-label={`View retry history (${log.attemptCount} attempts)`}
+              >
+                <RotateCcw size={10} />
+                <span className="text-[8px] font-medium">{log.attemptCount}x</span>
+              </button>
+            )}
+          </div>
+        </td>
+        <td
+          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          style={{ width: DESKTOP_DATE_COLUMN_WIDTH }}
+        >
+          <div className="flex min-w-0 flex-col">
             {(() => {
               const formatted = formatDateSafely(log.date);
               return (
@@ -493,25 +608,35 @@ const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
           title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
-          style={log.sourceIp ? { cursor: 'help' } : undefined}
+          style={{ width: DESKTOP_KEY_COLUMN_WIDTH, ...(log.sourceIp ? { cursor: 'help' } : {}) }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: '500' }}>{log.apiKey || '-'}</span>
+          <div className="flex min-w-0 flex-col">
+            <span
+              className="truncate"
+              style={{ fontWeight: '500' }}
+              title={log.apiKey || undefined}
+            >
+              {log.apiKey || '-'}
+            </span>
             {log.attribution && (
-              <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+              <span
+                className="truncate"
+                style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
+                title={log.attribution}
+              >
                 {log.attribution}
               </span>
             )}
           </div>
         </td>
         <td
-          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          style={{ width: DESKTOP_API_COLUMN_WIDTH, cursor: 'help' }}
           title={`Incoming: ${formatApiTypeLabel(log.incomingApiType)} → Outgoing: ${formatApiTypeLabel(log.outgoingApiType)} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isRaw ? `Raw ${log.requestMethod || ''} ${log.requestPath || ''}` : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
-          style={{ cursor: 'help' }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div className="flex min-w-0 flex-col gap-0.5">
             {/* API type icons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
@@ -560,78 +685,83 @@ const DesktopLogRow = React.memo(
                 )}
               </div>
             </div>
-            <div
-              style={{
-                borderTop: '1px solid var(--color-border-glass)',
-                margin: '1px 4px',
-                width: '44px',
-              }}
-            ></div>
-            {/* Streaming/Passthrough icons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
-                {log.isStreamed ? (
-                  <Zap size={12} className="text-blue-400" />
-                ) : (
-                  <ZapOff size={12} className="text-gray-400" />
-                )}
-              </div>
-              <span style={{ width: '14px' }}></span>
-              <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
-                {log.isRaw ? (
-                  <Braces size={12} className="text-cyan-400" />
-                ) : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
-                  <Pi size={12} className="text-emerald-400" />
-                ) : log.isPassthrough ? (
-                  <MoveHorizontal size={12} className="text-yellow-500" />
-                ) : (
-                  <Languages size={12} className="text-purple-400" />
-                )}
-              </div>
-            </div>
-
-            {/* Vision Fallthrough icons */}
-            {(log.isVisionFallthrough || log.isDescriptorRequest) && (
+            <div className="hidden min-[1150px]:block">
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '2px',
-                  marginTop: '2px',
+                  borderTop: '1px solid var(--color-border-glass)',
+                  margin: '1px 4px',
+                  width: '44px',
                 }}
-              >
+              ></div>
+              {/* Streaming/Passthrough icons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                 <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
-                  {log.isVisionFallthrough && (
-                    <div
-                      title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}
-                    >
-                      <ScanSearch size={12} className="text-amber-500" />
-                    </div>
+                  {log.isStreamed ? (
+                    <Zap size={12} className="text-blue-400" />
+                  ) : (
+                    <ZapOff size={12} className="text-gray-400" />
                   )}
                 </div>
                 <span style={{ width: '14px' }}></span>
                 <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
-                  {log.isDescriptorRequest && (
-                    <div title="Descriptor Request (Generated image description)">
-                      <Eye size={12} className="text-blue-500" />
-                    </div>
+                  {log.isRaw ? (
+                    <Braces size={12} className="text-cyan-400" />
+                  ) : log.outgoingApiType && PI_AI_OUTGOING_TYPES.has(log.outgoingApiType) ? (
+                    <Pi size={12} className="text-emerald-400" />
+                  ) : log.isPassthrough ? (
+                    <MoveHorizontal size={12} className="text-yellow-500" />
+                  ) : (
+                    <Languages size={12} className="text-purple-400" />
                   )}
                 </div>
               </div>
-            )}
+
+              {/* Vision Fallthrough icons */}
+              {(log.isVisionFallthrough || log.isDescriptorRequest) && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    marginTop: '2px',
+                  }}
+                >
+                  <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                    {log.isVisionFallthrough && (
+                      <div
+                        title={`Vision Fallthrough${log.visionFallthroughModel ? ` via ${log.visionFallthroughModel}` : ''} (Images converted to text)`}
+                      >
+                        <ScanSearch size={12} className="text-amber-500" />
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ width: '14px' }}></span>
+                  <div style={{ width: '16px', display: 'flex', justifyContent: 'center' }}>
+                    {log.isDescriptorRequest && (
+                      <div title="Descriptor Request (Generated image description)">
+                        <Eye size={12} className="text-blue-500" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </td>
-        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div className="group/model flex items-center gap-1">
-              <span>{log.incomingModelAlias || '-'}</span>
+        <td className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="group/model flex min-w-0 items-center gap-1">
+              <span className="min-w-0 truncate" title={log.incomingModelAlias || undefined}>
+                {log.incomingModelAlias || '-'}
+              </span>
               {log.incomingModelAlias && log.incomingModelAlias !== '-' && (
                 <button
+                  type="button"
                   onClick={async () => {
                     if (!isClipboardAvailable()) return;
                     await copyToClipboard(log.incomingModelAlias || '');
                   }}
-                  className="opacity-0 group-hover/model:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                  className="flex shrink-0 items-center border-0 bg-transparent p-0 opacity-0 cursor-pointer transition-opacity group-hover/model:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
                   title={
                     isClipboardAvailable() ? 'Copy incoming model alias' : 'Copy requires HTTPS'
                   }
@@ -641,17 +771,22 @@ const DesktopLogRow = React.memo(
                 </button>
               )}
             </div>
-            <div className="group/selected flex items-center gap-1">
-              <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}>
+            <div className="group/selected flex min-w-0 items-center gap-1">
+              <span
+                className="min-w-0 truncate"
+                style={{ color: 'var(--color-text-secondary)', fontSize: '0.9em' }}
+                title={`${log.provider || '-'}:${log.selectedModelName || '-'}`}
+              >
                 {log.provider || '-'}:{log.selectedModelName || '-'}
               </span>
               {log.selectedModelName && log.selectedModelName !== '-' && (
                 <button
+                  type="button"
                   onClick={async () => {
                     if (!isClipboardAvailable()) return;
                     await copyToClipboard(log.selectedModelName || '');
                   }}
-                  className="opacity-0 group-hover/selected:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                  className="flex shrink-0 items-center border-0 bg-transparent p-0 opacity-0 cursor-pointer transition-opacity group-hover/selected:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
                   title={
                     isClipboardAvailable() ? 'Copy selected model name' : 'Copy requires HTTPS'
                   }
@@ -662,27 +797,35 @@ const DesktopLogRow = React.memo(
               )}
             </div>
             {formatReasoningEffort(log.reasoningEffort) && (
-              <div className="flex items-center gap-1">
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+              <div className="flex min-w-0 items-center gap-1">
+                <span
+                  className="truncate"
+                  style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}
+                >
                   Reasoning: {formatReasoningEffort(log.reasoningEffort)}
                 </span>
               </div>
             )}
             {log.isVisionFallthrough && log.visionFallthroughModel && (
               <div
-                className="group/vft flex items-center gap-1"
+                className="group/vft flex min-w-0 items-center gap-1"
                 title="Vision fallthrough descriptor model"
               >
                 <ScanSearch size={10} className="text-amber-500 shrink-0" />
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}>
+                <span
+                  className="min-w-0 truncate"
+                  style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}
+                  title={log.visionFallthroughModel}
+                >
                   {log.visionFallthroughModel}
                 </span>
                 <button
+                  type="button"
                   onClick={async () => {
                     if (!isClipboardAvailable()) return;
                     await copyToClipboard(log.visionFallthroughModel || '');
                   }}
-                  className="opacity-0 group-hover/vft:opacity-100 transition-opacity bg-transparent border-0 cursor-pointer p-0 flex items-center disabled:opacity-0"
+                  className="flex shrink-0 items-center border-0 bg-transparent p-0 opacity-0 cursor-pointer transition-opacity group-hover/vft:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
                   title={
                     isClipboardAvailable() ? 'Copy fallthrough model name' : 'Copy requires HTTPS'
                   }
@@ -695,157 +838,112 @@ const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          style={{ width: DESKTOP_TOKENS_COLUMN_WIDTH, cursor: 'help' }}
           title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)} • Cache Write: ${(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
-          style={{ cursor: 'help' }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {/* Row 1: Input and Reasoning */}
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {/* Row 1: Input, Cache Read, and Cache Write */}
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                 <CloudUpload size={12} className="text-blue-400" />
-                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}>
+                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '24px' }}>
                   {(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)}
                   {log.tokensEstimated ? (
                     <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
                   ) : null}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <BrainCog size={12} className="text-purple-400" />
-                <span
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    fontSize: '0.85em',
-                    minWidth: '30px',
-                  }}
-                >
-                  {(log.tokensReasoning || 0) === 0
-                    ? '-'
-                    : formatLargeNumber(log.tokensReasoning || 0)}
-                  {log.tokensEstimated ? (
-                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                  ) : null}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <span aria-hidden="true">(</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <PackageOpen size={12} className="text-orange-400" />
+                  <span
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      fontSize: '0.85em',
+                    }}
+                  >
+                    {(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}
+                    {log.tokensEstimated ? (
+                      <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                    ) : null}
+                  </span>
+                </div>
+                <span aria-hidden="true">/</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <PencilLine size={12} className="text-fuchsia-400" />
+                  <span
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      fontSize: '0.85em',
+                    }}
+                  >
+                    {(log.tokensCacheWrite || 0) === 0
+                      ? '-'
+                      : formatLargeNumber(log.tokensCacheWrite || 0)}
+                    {log.tokensEstimated ? (
+                      <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                    ) : null}
+                  </span>
+                </div>
+                <span aria-hidden="true">)</span>
               </div>
             </div>
-            {/* Row 2: Output and Cache */}
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* Row 2: Output and Reasoning */}
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                 <CloudDownload size={12} className="text-green-400" />
-                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '30px' }}>
+                <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '24px' }}>
                   {(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)}
                   {log.tokensEstimated ? (
                     <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
                   ) : null}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <PackageOpen size={12} className="text-orange-400" />
-                <span
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    fontSize: '0.85em',
-                    minWidth: '30px',
-                  }}
-                >
-                  {(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)}
-                  {log.tokensEstimated ? (
-                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                  ) : null}
-                </span>
-              </div>
-            </div>
-            {/* Row 3: Cache Write */}
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <PencilLine size={12} className="text-fuchsia-400" />
-                <span
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    fontSize: '0.85em',
-                    minWidth: '30px',
-                  }}
-                >
-                  {(log.tokensCacheWrite || 0) === 0
-                    ? '-'
-                    : formatLargeNumber(log.tokensCacheWrite || 0)}
-                  {log.tokensEstimated ? (
-                    <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
-                  ) : null}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <span aria-hidden="true">(</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <BrainCog size={12} className="text-purple-400" />
+                  <span
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      fontSize: '0.85em',
+                    }}
+                  >
+                    {(log.tokensReasoning || 0) === 0
+                      ? '-'
+                      : formatLargeNumber(log.tokensReasoning || 0)}
+                    {log.tokensEstimated ? (
+                      <sup style={{ fontSize: '0.7em', opacity: 0.6 }}>*</sup>
+                    ) : null}
+                  </span>
+                </div>
+                <span aria-hidden="true">)</span>
               </div>
             </div>
           </div>
         </td>
-        <td className="px-2 py-1.5 border-b border-border-glass text-text align-middle">
+        <td
+          className="min-w-0 px-1 py-1.5 border-b border-border-glass text-text align-middle"
+          style={{ width: DESKTOP_COST_COLUMN_WIDTH }}
+        >
           {log.costTotal !== undefined && log.costTotal !== null ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {/* Row 1: Total cost */}
-              <div>
-                {log.costSource ? (
-                  <CostToolTip source={log.costSource} costMetadata={log.costMetadata}>
-                    <span style={{ fontWeight: '500', cursor: 'help' }}>
-                      {log.costTotal === 0
-                        ? '-'
-                        : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
-                    </span>
-                  </CostToolTip>
-                ) : (
-                  <span style={{ fontWeight: '500' }}>
-                    {log.costTotal === 0
-                      ? '-'
-                      : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
-                  </span>
-                )}
-              </div>
-              {/* Separator */}
-              <div
-                style={{
-                  borderTop: '1px solid var(--color-border-glass)',
-                  margin: '1px 2px',
-                }}
-              />
-              {/* Breakdown grid: 2 rows x 4 columns (icon, value, icon, value) */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr auto 1fr',
-                  gap: '2px 4px',
-                  alignItems: 'center',
-                }}
-              >
-                <CloudUpload size={10} className="text-blue-400" />
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costInput === 0
-                    ? `${symbol}-.----`
-                    : formatCostIn(log.costInput || 0, { currency, rate, symbol, decimals: 4 })}
-                </span>
-                <CloudDownload size={10} className="text-green-400" />
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costOutput === 0
-                    ? `${symbol}-.----`
-                    : formatCostIn(log.costOutput || 0, { currency, rate, symbol, decimals: 4 })}
-                </span>
-                <PackageOpen size={10} className="text-orange-400" />
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costCached === 0
-                    ? `${symbol}-.----`
-                    : formatCostIn(log.costCached || 0, { currency, rate, symbol, decimals: 4 })}
-                </span>
-                <PencilLine size={10} className="text-fuchsia-400" />
-                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
-                  {log.costCacheWrite === 0
-                    ? `${symbol}-.----`
-                    : formatCostIn(log.costCacheWrite || 0, {
-                        currency,
-                        rate,
-                        symbol,
-                        decimals: 4,
-                      })}
-                </span>
-              </div>
-            </div>
+            <CostToolTip
+              source={log.costSource}
+              costMetadata={log.costMetadata}
+              costBreakdown={costBreakdown}
+            >
+              <span className="block truncate" style={{ fontWeight: '500', cursor: 'help' }}>
+                {log.costTotal === 0
+                  ? '-'
+                  : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
+              </span>
+            </CostToolTip>
           ) : (
             <span
               style={{
@@ -860,7 +958,7 @@ const DesktopLogRow = React.memo(
           )}
         </td>
         <td
-          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
           style={{
             width: DESKTOP_PERF_COLUMN_WIDTH,
             minWidth: DESKTOP_PERF_COLUMN_WIDTH,
@@ -904,86 +1002,69 @@ const DesktopLogRow = React.memo(
                 effectiveBytesPerSec > 0
                   ? effectiveBytesPerSec / bytesPerToken
                   : null;
+              const semanticBytesFormatted = formatBytes(semanticBytesReceived);
+              const rawBytesFormatted =
+                semanticBytesReceived !== progress.bytesReceived
+                  ? formatBytes(progress.bytesReceived).replace(' ', '')
+                  : undefined;
+              const bytesPerSecFormatted =
+                progress.bytesPerSec != null ? formatBytes(progress.bytesPerSec) : undefined;
+              const estimatedTokensPerSecFormatted =
+                estTokensPerSec != null ? `~${formatTPS(estTokensPerSec)} tok/s` : undefined;
 
               return (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    width: '100%',
-                    minWidth: 0,
-                    overflow: 'hidden',
-                  }}
+                <PerformanceToolTip
+                  duration={liveDuration}
+                  semanticBytes={semanticBytesFormatted}
+                  rawBytes={rawBytesFormatted}
+                  bytesPerSec={bytesPerSecFormatted}
+                  estimatedTokensPerSec={estimatedTokensPerSecFormatted}
                 >
-                  <span>Duration: {liveDuration}</span>
-                  <span
-                    style={{
-                      color: 'var(--color-text-secondary)',
-                      fontSize: '0.85em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <CloudDownload size={12} className="text-yellow-400" />
-                    <span title="Bytes from token-producing stream events used for the live token estimate">
-                      {formatBytes(semanticBytesReceived)}
-                    </span>
-                    {semanticBytesReceived !== progress.bytesReceived && (
-                      <span title="Raw bytes received">
-                        ({formatBytes(progress.bytesReceived).replace(' ', '')})
+                  <div className="flex min-w-0 flex-col" title="Hover for live performance details">
+                    <span title={`Duration: ${liveDuration}`}>Dur: {liveDuration}</span>
+                    {estTokensPerSec != null && (
+                      <span
+                        className="flex items-center gap-1 whitespace-nowrap"
+                        style={{
+                          color: 'var(--color-text-secondary)',
+                          fontSize: '0.85em',
+                        }}
+                      >
+                        <Zap size={12} className="text-amber-400" />
+                        <span
+                          title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token for this API's streamed token events)`}
+                        >
+                          {estimatedTokensPerSecFormatted}
+                        </span>
                       </span>
                     )}
-                  </span>
-                  {(progress.bytesPerSec != null || estTokensPerSec != null) && (
-                    <span
-                      style={{
-                        color: 'var(--color-text-secondary)',
-                        fontSize: '0.85em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {progress.bytesPerSec != null && (
-                        <>
-                          <Gauge size={12} className="text-text-secondary" />
-                          <span>{formatBytes(progress.bytesPerSec)}/s</span>
-                        </>
-                      )}
-                      {progress.bytesPerSec != null && estTokensPerSec != null && (
-                        <span aria-hidden="true">·</span>
-                      )}
-                      {estTokensPerSec != null && (
-                        <>
-                          <Zap size={12} className="text-amber-400" />
-                          <span
-                            title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token for this API's streamed token events)`}
-                          >
-                            ~{formatTPS(estTokensPerSec)} tok/s
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  )}
-                </div>
+                  </div>
+                </PerformanceToolTip>
               );
             }
             return (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span>Duration: {liveDuration}</span>
+                <span title={`Duration: ${liveDuration}`}>Dur: {liveDuration}</span>
                 <span
+                  title={
+                    log.ttftMs && log.ttftMs > 0
+                      ? `Time to first token: ${formatMs(log.ttftMs)}`
+                      : 'Time to first token: unavailable'
+                  }
                   style={{
                     color: 'var(--color-text-secondary)',
                     fontSize: '0.85em',
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : ''}
+                  {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : 'TTFT: -'}
                 </span>
                 <span
+                  title={
+                    log.tokensPerSec && log.tokensPerSec > 0
+                      ? `Tokens per second: ${formatTPS(log.tokensPerSec)}`
+                      : 'Tokens per second: unavailable'
+                  }
                   style={{
                     color: 'var(--color-text-secondary)',
                     fontSize: '0.85em',
@@ -992,25 +1073,30 @@ const DesktopLogRow = React.memo(
                 >
                   {log.tokensPerSec && log.tokensPerSec > 0
                     ? `TPS: ${formatTPS(log.tokensPerSec)}`
-                    : ''}
+                    : 'TPS: -'}
                 </span>
                 <span
+                  title={
+                    e2e != null
+                      ? `End-to-end throughput: ${formatTPS(e2e)}`
+                      : 'End-to-end throughput: unavailable'
+                  }
                   style={{
                     color: 'var(--color-text-secondary)',
                     fontSize: '0.85em',
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {e2e != null ? `E2E: ${formatTPS(e2e)}` : ''}
+                  {e2e != null ? `E2E: ${formatTPS(e2e)}` : 'E2E: -'}
                 </span>
               </div>
             );
           })()}
         </td>
-        <td className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle">
+        <td className="hidden px-1 py-1.5 text-center border-b border-border-glass text-text align-middle min-[1150px]:table-cell">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {/* Row 1: Messages and Tool calls */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <div
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                 className="text-blue-400"
@@ -1037,7 +1123,7 @@ const DesktopLogRow = React.memo(
               </div>
             </div>
             {/* Row 2: Tools defined and Finish reason */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <div
                 style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                 className="text-orange-400"
@@ -1070,91 +1156,18 @@ const DesktopLogRow = React.memo(
                 </span>
               </div>
             </div>
-            {/* Row 3: Retry indicator */}
-            {log.attemptCount && log.attemptCount > 1 && (
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <button
-                  type="button"
-                  onClick={() => onRetryDetails(log)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                  className="text-orange-500 bg-transparent border-0 p-0 cursor-pointer hover:text-orange-400 transition-colors"
-                  title="View retry history"
-                >
-                  <RotateCcw size={12} />
-                  <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
-                    {log.attemptCount}x
-                  </span>
-                </button>
-              </div>
-            )}
           </div>
         </td>
-        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-          <div className="flex gap-2 items-center">
-            {log.hasError && (
-              <button
-                onClick={() => onError(log.requestId)}
-                className={clsx(
-                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border',
-                  'text-danger border-danger/30 bg-red-500/15 hover:bg-red-500/25'
-                )}
-                style={{ width: '52px' }}
-                title="View Error Details"
-              >
-                <AlertTriangle size={12} />
-                <span style={{ fontWeight: 600 }}>✗</span>
-              </button>
-            )}
-            {log.hasDebug && (
-              <button
-                onClick={() => onDebug(log.requestId)}
-                className={clsx(
-                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium cursor-pointer transition-all duration-200 border',
-                  'text-blue-400 border-blue-400/30 bg-blue-500/15 hover:bg-blue-500/25'
-                )}
-                style={{ width: '52px' }}
-                title="View Debug Trace"
-              >
-                <Bug size={12} />
-                <span style={{ fontWeight: 600 }}>✓</span>
-              </button>
-            )}
-            {!log.hasError && !log.hasDebug && (
-              <div
-                className={clsx(
-                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                  log.responseStatus === 'success'
-                    ? 'text-success border-success/30 bg-emerald-500/15'
-                    : log.responseStatus === 'pending'
-                      ? 'text-warning border-warning/30 bg-yellow-500/15'
-                      : log.responseStatus === 'cancelled'
-                        ? 'text-blue-400 border-blue-400/30 bg-blue-500/15'
-                        : log.responseStatus === 'timeout'
-                          ? 'text-orange-400 border-orange-400/30 bg-orange-500/15'
-                          : 'text-danger border-danger/30 bg-red-500/15'
-                )}
-                style={{ width: '52px' }}
-              >
-                {log.responseStatus === 'success' ? (
-                  <CheckCircle size={12} />
-                ) : log.responseStatus === 'pending' ? (
-                  <Plane size={12} className="animate-pulse" />
-                ) : log.responseStatus === 'cancelled' ? (
-                  <Ban size={12} />
-                ) : log.responseStatus === 'timeout' ? (
-                  <Timer size={12} />
-                ) : (
-                  <XCircle size={12} />
-                )}
-              </div>
-            )}
-          </div>
-        </td>
-        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+        <td
+          className="px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          style={{ width: DESKTOP_DELETE_COLUMN_WIDTH }}
+        >
           <button
+            type="button"
             onClick={() => onDelete(log.requestId)}
-            className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 opacity-0"
+            className="flex items-center justify-center rounded border-0 bg-transparent p-1 text-text-muted opacity-0 cursor-pointer transition-all duration-200 hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
             title="Delete log"
+            aria-label="Delete log"
           >
             <Trash2 size={14} />
           </button>
@@ -1831,36 +1844,67 @@ export const Logs = () => {
 
           {isDesktop && (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse font-body text-[13px]">
+              <table
+                className="w-full table-fixed border-collapse font-body text-[13px]"
+                style={{ minWidth: DESKTOP_TABLE_MIN_WIDTH }}
+              >
+                <colgroup>
+                  <col style={{ width: DESKTOP_STATUS_COLUMN_WIDTH }} />
+                  <col style={{ width: DESKTOP_DATE_COLUMN_WIDTH }} />
+                  <col style={{ width: DESKTOP_KEY_COLUMN_WIDTH }} />
+                  <col style={{ width: DESKTOP_API_COLUMN_WIDTH }} />
+                  <col />
+                  <col style={{ width: DESKTOP_TOKENS_COLUMN_WIDTH }} />
+                  <col style={{ width: DESKTOP_COST_COLUMN_WIDTH }} />
+                  <col style={{ width: DESKTOP_PERF_COLUMN_WIDTH }} />
+                  <col className="hidden min-[1150px]:table-column" />
+                  <col style={{ width: DESKTOP_DELETE_COLUMN_WIDTH }} />
+                </colgroup>
                 <thead>
                   <tr className="text-center border-b border-border">
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_STATUS_COLUMN_WIDTH }}
+                    >
+                      <span className="sr-only">Status</span>
+                      <Circle size={12} className="mx-auto" aria-hidden="true" />
+                    </th>
+                    <th
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_DATE_COLUMN_WIDTH }}
+                    >
                       {renderSortableHeader('Date', 'date')}
                     </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_KEY_COLUMN_WIDTH }}
+                    >
                       {renderSortableHeader('Key', 'apiKey')}
                     </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_API_COLUMN_WIDTH }}
+                    >
                       API
                     </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                       {renderSortableHeader('Model', 'incomingModelAlias')}
                     </th>
                     {/* <th style={{ padding: '6px' }}>Provider</th> */}
                     <th
-                      className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                      style={{ width: '125px' }}
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_TOKENS_COLUMN_WIDTH }}
                     >
                       Tokens
                     </th>
                     <th
-                      className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                      style={{ minWidth: '130px' }}
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_COST_COLUMN_WIDTH }}
                     >
                       {renderSortableHeader('Cost', 'costTotal')}
                     </th>
                     <th
-                      className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
                       style={{
                         width: DESKTOP_PERF_COLUMN_WIDTH,
                         minWidth: DESKTOP_PERF_COLUMN_WIDTH,
@@ -1868,13 +1912,13 @@ export const Logs = () => {
                     >
                       {renderSortableHeader('Perf', 'durationMs')}
                     </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th className="hidden px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-[1150px]:table-cell">
                       Meta
                     </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Status
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th
+                      className="px-1 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{ width: DESKTOP_DELETE_COLUMN_WIDTH }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'center' }}>
                         <Trash2 size={12} />
                       </div>
@@ -1884,13 +1928,13 @@ export const Logs = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={11} className="p-5 text-center">
+                      <td colSpan={10} className="p-5 text-center">
                         Loading...
                       </td>
                     </tr>
                   ) : logs.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-5 text-center">
+                      <td colSpan={10} className="p-5 text-center">
                         No logs found
                       </td>
                     </tr>

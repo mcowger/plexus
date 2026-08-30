@@ -2,12 +2,23 @@ import React from 'react';
 import { Tooltip } from './Tooltip';
 
 interface CostToolTipProps {
-  source: string;
+  source?: string;
   costMetadata?: string;
+  costBreakdown?: {
+    input: string;
+    output: string;
+    cached: string;
+    cacheWrite: string;
+  };
   children: React.ReactNode;
 }
 
-export const CostToolTip: React.FC<CostToolTipProps> = ({ source, costMetadata, children }) => {
+export const CostToolTip: React.FC<CostToolTipProps> = ({
+  source,
+  costMetadata,
+  costBreakdown,
+  children,
+}) => {
   let content: React.ReactNode = 'No details';
 
   const containerStyle: React.CSSProperties = {
@@ -189,5 +200,31 @@ export const CostToolTip: React.FC<CostToolTipProps> = ({ source, costMetadata, 
     content = <span style={{ color: '#f87171' }}>Error parsing metadata</span>;
   }
 
-  return <Tooltip content={content}>{children}</Tooltip>;
+  const tooltipContent = costBreakdown ? (
+    <div style={{ ...containerStyle, minWidth: '200px' }}>
+      <div style={headerStyle}>Cost breakdown</div>
+      <div style={gridStyle}>
+        <span style={labelStyle}>Input:</span>
+        <span style={valueStyle}>{costBreakdown.input}</span>
+
+        <span style={labelStyle}>Output:</span>
+        <span style={valueStyle}>{costBreakdown.output}</span>
+
+        <span style={labelStyle}>Cached:</span>
+        <span style={valueStyle}>{costBreakdown.cached}</span>
+
+        <span style={labelStyle}>Cache write:</span>
+        <span style={valueStyle}>{costBreakdown.cacheWrite}</span>
+      </div>
+      {source && (
+        <div style={{ borderTop: '1px solid #4a4a4a', paddingTop: '4px', marginTop: '4px' }}>
+          {content}
+        </div>
+      )}
+    </div>
+  ) : (
+    content
+  );
+
+  return <Tooltip content={tooltipContent}>{children}</Tooltip>;
 };
