@@ -1214,7 +1214,7 @@ const DesktopLogRow = React.memo(
               >
                 <Wrench size={12} />
                 <span style={{ fontWeight: '500', fontSize: '0.9em', minWidth: '20px' }}>
-                  {(log.toolsDefined || 0) === 0 ? '-' : log.toolsDefined}
+                  {log.toolsDefined || 0}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
