@@ -16,6 +16,7 @@ export interface UsageRecord {
   finalAttemptModel: string | null;
   allAttemptedProviders: string | null;
   outgoingApiType: string | null;
+  reasoningEffort?: string | null;
   tokensInput: number | null;
   tokensOutput: number | null;
   tokensReasoning: number | null;

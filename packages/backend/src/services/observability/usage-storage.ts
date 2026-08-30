@@ -223,6 +223,7 @@ export class UsageStorageService extends EventEmitter {
           canonicalModelName: record.canonicalModelName || null,
           selectedModelName: record.selectedModelName || null,
           outgoingApiType: record.outgoingApiType || null,
+          reasoningEffort: record.reasoningEffort || null,
           startTime: record.startTime || Date.now(),
           durationMs: null, // null indicates pending/in-flight
           responseStatus: 'pending',
@@ -251,12 +252,17 @@ export class UsageStorageService extends EventEmitter {
    */
   async emitUpdated(record: Partial<UsageRecord>): Promise<void> {
     // Update the pending record in DB if we have provider/model info
-    if (record.requestId && (record.provider || record.canonicalModelName)) {
+    if (
+      record.requestId &&
+      (record.provider || record.canonicalModelName || record.reasoningEffort !== undefined)
+    ) {
       try {
         const updateSet: Record<string, unknown> = {};
         if (record.provider) updateSet.provider = record.provider;
         if (record.canonicalModelName) updateSet.canonicalModelName = record.canonicalModelName;
         if (record.selectedModelName) updateSet.selectedModelName = record.selectedModelName;
+        if (record.reasoningEffort !== undefined)
+          updateSet.reasoningEffort = record.reasoningEffort;
         if (record.incomingModelAlias) updateSet.incomingModelAlias = record.incomingModelAlias;
         if (record.apiKey) updateSet.apiKey = record.apiKey;
         if (record.attribution !== undefined) updateSet.attribution = record.attribution;
@@ -640,6 +646,7 @@ export class UsageStorageService extends EventEmitter {
           finalAttemptModel: schema.requestUsage.finalAttemptModel,
           allAttemptedProviders: schema.requestUsage.allAttemptedProviders,
           outgoingApiType: schema.requestUsage.outgoingApiType,
+          reasoningEffort: schema.requestUsage.reasoningEffort,
           tokensInput: schema.requestUsage.tokensInput,
           tokensOutput: schema.requestUsage.tokensOutput,
           tokensReasoning: schema.requestUsage.tokensReasoning,
@@ -699,6 +706,7 @@ export class UsageStorageService extends EventEmitter {
         finalAttemptModel: row.finalAttemptModel,
         allAttemptedProviders: row.allAttemptedProviders,
         outgoingApiType: row.outgoingApiType,
+        reasoningEffort: row.reasoningEffort,
         tokensInput: row.tokensInput,
         tokensOutput: row.tokensOutput,
         tokensReasoning: row.tokensReasoning,

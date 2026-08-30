@@ -151,6 +151,107 @@ export function normalizeEffort(raw: unknown): ReasoningEffort | 'off' | undefin
   }
 }
 
+export type ReasoningLogValue = ReasoningEffort | 'off' | 'on';
+
+function reasoningIntentToLogValue(intent: {
+  effort?: unknown;
+  budgetTokens?: unknown;
+  enabled?: unknown;
+  adaptive?: unknown;
+}): ReasoningLogValue | undefined {
+  if (intent.enabled === false) return 'off';
+
+  const effort = normalizeEffort(intent.effort);
+  if (effort) return effort === 'off' ? 'off' : effort;
+
+  if (typeof intent.budgetTokens === 'number') {
+    const budgetEffort = budgetToEffort(intent.budgetTokens);
+    return budgetEffort === 'off' ? 'off' : budgetEffort;
+  }
+
+  if (intent.adaptive === true || intent.enabled === true) return 'on';
+  return undefined;
+}
+
+export function getReasoningLogValue(
+  request:
+    | {
+        reasoning?: {
+          effort?: unknown;
+          max_tokens?: unknown;
+          enabled?: unknown;
+          adaptive?: unknown;
+        };
+      }
+    | undefined,
+  payload: any
+): ReasoningLogValue | undefined {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const thinking = source.thinking;
+  if (thinking && typeof thinking === 'object') {
+    const thinkingType =
+      typeof thinking.type === 'string' ? thinking.type.toLowerCase() : undefined;
+    const value = reasoningIntentToLogValue({
+      effort: source.output_config?.effort,
+      budgetTokens: thinking.budget_tokens,
+      enabled: thinkingType === 'disabled' ? false : thinkingType ? true : undefined,
+      adaptive: thinkingType === 'adaptive',
+    });
+    if (value) return value;
+  }
+
+  const rawReasoning = source.reasoning;
+  if (rawReasoning && typeof rawReasoning === 'object') {
+    const value = reasoningIntentToLogValue({
+      effort: rawReasoning.effort ?? rawReasoning.level,
+      budgetTokens: rawReasoning.max_tokens,
+      enabled: rawReasoning.enabled,
+      adaptive: rawReasoning.adaptive,
+    });
+    if (value) return value;
+  }
+
+  const chatEffort = normalizeEffort(source.reasoning_effort ?? source.reasoning_level);
+  if (chatEffort) return chatEffort === 'off' ? 'off' : chatEffort;
+
+  const thinkingConfig = source.generationConfig?.thinkingConfig;
+  if (thinkingConfig && typeof thinkingConfig === 'object') {
+    const thinkingBudget = thinkingConfig.thinkingBudget ?? thinkingConfig.thinking_budget;
+    const thinkingLevel = thinkingConfig.thinkingLevel ?? thinkingConfig.thinking_level;
+    const value = reasoningIntentToLogValue({
+      effort: thinkingLevel,
+      budgetTokens: thinkingBudget,
+      enabled:
+        thinkingBudget === 0
+          ? false
+          : thinkingConfig.includeThoughts === true || thinkingConfig.include_thoughts === true
+            ? true
+            : undefined,
+    });
+    if (value) return value;
+  }
+
+  const value = reasoningIntentToLogValue({
+    effort: source.output_config?.effort ?? source.thinking_level,
+    budgetTokens: source.budget_tokens ?? source.thinking_budget,
+    enabled: source.enable_thinking ?? source.chat_template_kwargs?.enable_thinking,
+  });
+  if (value) return value;
+
+  if (typeof source.model === 'string') {
+    const suffixIntent = splitReasoningSuffix(source.model).intent;
+    const suffixValue = suffixIntent ? reasoningIntentToLogValue(suffixIntent) : undefined;
+    if (suffixValue) return suffixValue;
+  }
+
+  return reasoningIntentToLogValue({
+    effort: request?.reasoning?.effort,
+    budgetTokens: request?.reasoning?.max_tokens,
+    enabled: request?.reasoning?.enabled,
+    adaptive: request?.reasoning?.adaptive,
+  });
+}
+
 /**
  * Normalize a client-supplied visibility expression to our vocabulary.
  * Accepts OpenAI summary strings, Anthropic display strings, and booleans.

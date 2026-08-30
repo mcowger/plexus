@@ -21,6 +21,7 @@ export const requestUsage = pgTable(
     finalAttemptModel: text('final_attempt_model'),
     allAttemptedProviders: text('all_attempted_providers'),
     outgoingApiType: text('outgoing_api_type'),
+    reasoningEffort: text('reasoning_effort'),
     tokensInput: integer('tokens_input'),
     tokensOutput: integer('tokens_output'),
     tokensReasoning: integer('tokens_reasoning'),

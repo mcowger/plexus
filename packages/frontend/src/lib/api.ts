@@ -560,6 +560,7 @@ export interface UsageRecord {
   finalAttemptModel?: string | null;
   allAttemptedProviders?: string | null;
   outgoingApiType?: string;
+  reasoningEffort?: string | null;
   tokensInput?: number;
   tokensOutput?: number;
   tokensReasoning?: number;

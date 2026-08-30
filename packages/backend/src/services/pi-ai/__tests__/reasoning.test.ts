@@ -3,6 +3,7 @@ import {
   normalizeEffort,
   budgetToEffort,
   effortToBudget,
+  getReasoningLogValue,
   splitReasoningSuffix,
 } from '../reasoning';
 
@@ -64,5 +65,26 @@ describe('splitReasoningSuffix', () => {
 
   it('leaves unknown suffixes intact', () => {
     expect(splitReasoningSuffix('my-model:custom')).toEqual({ alias: 'my-model:custom' });
+  });
+});
+
+describe('getReasoningLogValue', () => {
+  it.each([
+    [{ reasoning_effort: 'low' }, undefined, 'low'],
+    [{ reasoning: { effort: 'max' } }, undefined, 'max'],
+    [{ thinking: { type: 'enabled', budget_tokens: 2048 } }, undefined, 'low'],
+    [{ generationConfig: { thinkingConfig: { thinkingLevel: 'HIGH' } } }, undefined, 'high'],
+    [{ reasoning: { enabled: true } }, undefined, 'on'],
+    [{ reasoning: { enabled: false } }, undefined, 'off'],
+  ] as const)('extracts %s as %s', (payload, request, expected) => {
+    expect(getReasoningLogValue(request, payload)).toBe(expected);
+  });
+
+  it('falls back to the normalized request', () => {
+    expect(getReasoningLogValue({ reasoning: { effort: 'medium' } }, {})).toBe('medium');
+  });
+
+  it('does not report an unspecified reasoning setting', () => {
+    expect(getReasoningLogValue({}, {})).toBeUndefined();
   });
 });

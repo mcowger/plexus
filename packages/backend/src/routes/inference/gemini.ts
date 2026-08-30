@@ -15,6 +15,7 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/t
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getReasoningLogValue } from '../../services/pi-ai/reasoning';
 
 export async function registerGeminiRoute(
   fastify: FastifyInstance,
@@ -42,6 +43,7 @@ export async function registerGeminiRoute(
       startTime,
       isStreamed: false,
       responseStatus: 'pending',
+      reasoningEffort: getReasoningLogValue(undefined, request.body) ?? null,
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
@@ -75,6 +77,7 @@ export async function registerGeminiRoute(
       unifiedRequest.incomingApiType = 'gemini';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      usageRecord.reasoningEffort = getReasoningLogValue(unifiedRequest, body) ?? null;
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])
         ? request.headers['x-app'][0]
@@ -124,6 +127,7 @@ export async function registerGeminiRoute(
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,
         canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+        reasoningEffort: usageRecord.reasoningEffort,
       });
 
       // Determine if token estimation is needed

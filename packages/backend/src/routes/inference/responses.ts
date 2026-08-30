@@ -22,6 +22,7 @@ import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
 import { getCacheRoutingHeaders } from '../../utils/cache-routing-headers';
+import { getReasoningLogValue } from '../../services/pi-ai/reasoning';
 
 export function detectResponsesApiType(
   headers: Record<string, unknown>,
@@ -88,6 +89,7 @@ export async function registerResponsesRoute(
       startTime,
       isStreamed: false,
       responseStatus: 'pending',
+      reasoningEffort: getReasoningLogValue(undefined, request.body) ?? null,
     };
 
     // Emit 'started' event immediately - this allows frontend to show in-flight requests
@@ -199,6 +201,7 @@ export async function registerResponsesRoute(
       unifiedRequest.incomingApiType = incomingApiType;
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      usageRecord.reasoningEffort = getReasoningLogValue(unifiedRequest, body) ?? null;
       if (body.previous_response_id) {
         unifiedRequest.previousResponseId = body.previous_response_id;
       }
@@ -256,6 +259,7 @@ export async function registerResponsesRoute(
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,
         canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+        reasoningEffort: usageRecord.reasoningEffort,
       });
 
       // Determine if token estimation is needed

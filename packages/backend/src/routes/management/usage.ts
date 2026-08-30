@@ -25,6 +25,7 @@ const USAGE_FIELDS = new Set([
   'canonicalModelName',
   'selectedModelName',
   'outgoingApiType',
+  'reasoningEffort',
   'tokensInput',
   'tokensOutput',
   'tokensReasoning',

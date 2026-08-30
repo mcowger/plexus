@@ -1,0 +1,1 @@
+ALTER TABLE `request_usage` ADD `reasoning_effort` text;

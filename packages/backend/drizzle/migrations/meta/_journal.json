@@ -449,6 +449,13 @@
       "when": 1787432170507,
       "tag": "0063_add_custom_quota_checkers",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "6",
+      "when": 1788056024543,
+      "tag": "0064_add_reasoning_effort_to_usage",
+      "breakpoints": true
     }
   ]
 }

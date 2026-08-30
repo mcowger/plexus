@@ -15,6 +15,7 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/t
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getReasoningLogValue } from '../../services/pi-ai/reasoning';
 
 export async function registerCompletionsRoute(
   fastify: FastifyInstance,
@@ -37,6 +38,7 @@ export async function registerCompletionsRoute(
       startTime,
       isStreamed: false,
       responseStatus: 'pending',
+      reasoningEffort: getReasoningLogValue(undefined, request.body) ?? null,
     };
 
     // Emit 'started' event immediately
@@ -62,6 +64,7 @@ export async function registerCompletionsRoute(
       unifiedRequest.incomingApiType = 'completions';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      usageRecord.reasoningEffort = getReasoningLogValue(unifiedRequest, body) ?? null;
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
 
       const xAppHeader = Array.isArray(request.headers['x-app'])
@@ -106,6 +109,7 @@ export async function registerCompletionsRoute(
         provider: unifiedResponse.plexus?.provider,
         selectedModelName: unifiedResponse.plexus?.model,
         canonicalModelName: unifiedResponse.plexus?.canonicalModel,
+        reasoningEffort: usageRecord.reasoningEffort,
       });
 
       const shouldEstimateTokens = unifiedResponse.plexus?.config?.estimateTokens || false;

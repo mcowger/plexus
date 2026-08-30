@@ -91,6 +91,11 @@ const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
 const LIVE_DURATION_UPDATE_INTERVAL_MS = 500;
 const DESKTOP_LOGS_MEDIA_QUERY = '(min-width: 1024px)';
 
+const formatReasoningEffort = (effort?: string | null): string | null => {
+  if (!effort) return null;
+  return effort.charAt(0).toUpperCase() + effort.slice(1);
+};
+
 interface ProgressUpdate {
   requestId: string;
   bytesReceived: number;
@@ -320,11 +325,15 @@ const MobileLogRow = React.memo(({ log, isNewest, onError, onDebug }: LogRowProp
         <div className="min-w-0">
           <div className="truncate text-xs font-medium text-text">
             {log.incomingModelAlias || '-'}
-            <span className="font-normal text-text-secondary">
-              {' '}
-              · {log.provider || '-'}:{log.selectedModelName || '-'}
-            </span>
           </div>
+          <div className="truncate text-xs font-normal text-text-secondary">
+            {log.provider || '-'}:{log.selectedModelName || '-'}
+          </div>
+          {formatReasoningEffort(log.reasoningEffort) && (
+            <div className="truncate text-xs font-normal text-text-secondary">
+              Reasoning: {formatReasoningEffort(log.reasoningEffort)}
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-1 text-[11px]">
           <div className="min-w-0 rounded bg-bg-subtle px-1.5 py-1">
@@ -651,6 +660,13 @@ const DesktopLogRow = React.memo(
                 </button>
               )}
             </div>
+            {formatReasoningEffort(log.reasoningEffort) && (
+              <div className="flex items-center gap-1">
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.85em' }}>
+                  Reasoning: {formatReasoningEffort(log.reasoningEffort)}
+                </span>
+              </div>
+            )}
             {log.isVisionFallthrough && log.visionFallthroughModel && (
               <div
                 className="group/vft flex items-center gap-1"

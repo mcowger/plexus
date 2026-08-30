@@ -111,6 +111,13 @@ properties:
     description: >
       API format sent to upstream provider. May differ from `incomingApiType`
       due to protocol transformation.
+  reasoningEffort:
+    type:
+      - string
+      - 'null'
+    description: >
+      Reasoning setting requested by the client. Values are `on`, `off`, or a
+      normalized effort level such as `low`, `high`, or `max`.
   tokensInput:
     type:
       - integer
