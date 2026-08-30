@@ -1052,7 +1052,7 @@ const DesktopLogRow = React.memo(
                   <CirclePause size={12} className="text-yellow-500" />
                 ) : log.finishReason === 'stop' ? (
                   <Octagon size={12} className="text-red-500" />
-                ) : log.finishReason === 'tool_calls' ? (
+                ) : log.finishReason === 'tool_calls' || log.finishReason === 'tool_use' ? (
                   <Hammer size={12} className="text-purple-500" />
                 ) : log.finishReason === 'length' || log.finishReason === 'max_tokens' ? (
                   <RulerDimensionLine size={12} className="text-pink-400" />

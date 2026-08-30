@@ -467,5 +467,78 @@ describe('DebugLoggingInspector Reconstruction', () => {
         output_tokens_details: { reasoning_tokens: 0 },
       });
     });
+
+    test('response.completed preserves output items when its output array is empty', async () => {
+      const completedRequestId = 'test-responses-completed-empty-output';
+      const inspector = new DebugLoggingInspector(completedRequestId, 'raw');
+      const stream = inspector.createInspector('responses');
+
+      writeEvents(stream, [
+        {
+          type: 'response.created',
+          response: {
+            id: 'resp_tools',
+            object: 'response',
+            status: 'in_progress',
+            model: 'gpt-5-codex',
+            output: [],
+          },
+        },
+        {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: {
+            id: 'fc_1',
+            type: 'function_call',
+            call_id: 'call_1',
+            name: 'lookup',
+            arguments: '',
+          },
+        },
+        {
+          type: 'response.function_call_arguments.delta',
+          output_index: 0,
+          delta: '{}',
+        },
+        {
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: {
+            id: 'fc_1',
+            type: 'function_call',
+            call_id: 'call_1',
+            name: 'lookup',
+            arguments: '{}',
+            status: 'completed',
+          },
+        },
+        {
+          type: 'response.completed',
+          response: {
+            id: 'resp_tools',
+            object: 'response',
+            status: 'completed',
+            model: 'gpt-5-codex',
+            output: [],
+            usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+          },
+        },
+      ]);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const snapshot = DebugManager.getInstance().getReconstructedRawResponse(completedRequestId);
+      expect(snapshot.output).toEqual([
+        {
+          id: 'fc_1',
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'lookup',
+          arguments: '{}',
+          status: 'completed',
+        },
+      ]);
+      expect(snapshot.usage).toEqual({ input_tokens: 10, output_tokens: 5, total_tokens: 15 });
+    });
   });
 });

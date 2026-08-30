@@ -375,6 +375,39 @@ describe('UsageInspector Metadata Robustness', () => {
       expect(record?.tokensInput).toBe(42);
       expect(record?.tokensOutput).toBe(20);
     });
+
+    it('should map completed Responses API tool calls to finishReason "tool_calls"', async () => {
+      const requestId = 'responses-completed-tool-call-stream';
+      const snapshot = {
+        id: 'resp_tools',
+        object: 'response',
+        status: 'completed',
+        model: 'gpt-5-codex',
+        output: [
+          {
+            id: 'fc_1',
+            type: 'function_call',
+            call_id: 'call_1',
+            name: 'lookup',
+            arguments: '{}',
+            status: 'completed',
+          },
+          {
+            id: 'ct_1',
+            type: 'custom_tool_call',
+            call_id: 'call_2',
+            name: 'apply_patch',
+            input: '*** Begin Patch',
+            status: 'completed',
+          },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      };
+
+      const record = await runInspector(requestId, 'responses', snapshot);
+      expect(record?.toolCallsCount).toBe(2);
+      expect(record?.finishReason).toBe('tool_calls');
+    });
   });
 
   describe('usage fallback to the transformed-mode snapshot', () => {

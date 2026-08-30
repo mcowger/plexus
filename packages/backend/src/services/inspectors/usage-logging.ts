@@ -472,11 +472,11 @@ export class UsageInspector extends PassThrough {
         return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
       }
       case 'responses': {
-        // Responses API format: function_call items in output array
+        // Responses API format: function_call/custom_tool_call items in output array
         let toolCallsCount = 0;
         if (reconstructed.output && Array.isArray(reconstructed.output)) {
           toolCallsCount = reconstructed.output.filter(
-            (item: any) => item.type === 'function_call'
+            (item: any) => item.type === 'function_call' || item.type === 'custom_tool_call'
           ).length;
         }
         // Responses API doesn't have a direct finish_reason, use status instead.
@@ -488,7 +488,9 @@ export class UsageInspector extends PassThrough {
         // 'length', matching the OpenAI-compatible finish reason vocabulary.
         const finishReason =
           reconstructed.status === 'completed'
-            ? 'stop'
+            ? toolCallsCount > 0
+              ? 'tool_calls'
+              : 'stop'
             : reconstructed.status === 'failed'
               ? 'error'
               : reconstructed.status === 'incomplete'

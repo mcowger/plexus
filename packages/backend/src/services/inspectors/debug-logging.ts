@@ -808,7 +808,16 @@ export class DebugLoggingInspector extends BaseInspector {
       case 'response.completed':
         // Final response state
         if (event.response) {
+          const accumulatedOutput = acc.output;
           Object.assign(acc, event.response);
+          if (
+            Array.isArray(accumulatedOutput) &&
+            accumulatedOutput.length > 0 &&
+            Array.isArray(event.response.output) &&
+            event.response.output.length === 0
+          ) {
+            acc.output = accumulatedOutput;
+          }
         }
         break;
 
