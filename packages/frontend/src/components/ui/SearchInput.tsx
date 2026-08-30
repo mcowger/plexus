@@ -8,6 +8,7 @@ interface SearchInputProps
   onChange: (value: string) => void;
   onClear?: () => void;
   placeholder?: string;
+  label?: string;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -15,6 +16,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   onChange,
   onClear,
   placeholder = 'Search...',
+  label,
   ...rest
 }) => {
   const handleClear = () => {
@@ -25,6 +27,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   return (
     <Input
       type="search"
+      label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}

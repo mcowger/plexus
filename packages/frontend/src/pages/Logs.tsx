@@ -26,6 +26,7 @@ import {
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import { formatApiTypeLabel, getApiBaseType } from '../lib/apiFormats';
 import { DateTimePicker } from '../components/ui/DateTimePicker';
+import { Drawer } from '../components/ui/Drawer';
 import {
   ChevronLeft,
   ChevronRight,
@@ -74,6 +75,7 @@ import {
   WifiOff,
   Loader,
   Pi,
+  ListFilter,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -102,6 +104,14 @@ const DESKTOP_COST_COLUMN_WIDTH = '86px';
 const DESKTOP_PERF_COLUMN_WIDTH = '100px';
 const DESKTOP_DELETE_COLUMN_WIDTH = '30px';
 const DESKTOP_TABLE_MIN_WIDTH = '768px';
+
+const EMPTY_LOG_FILTERS = {
+  apiKey: '',
+  incomingModelAlias: '',
+  provider: '',
+  startDate: '',
+  endDate: '',
+};
 
 const formatReasoningEffort = (effort?: string | null): string | null => {
   if (!effort) return null;
@@ -1263,13 +1273,8 @@ export const Logs = () => {
   const [newestLogId, setNewestLogId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<UsageSortField>('date');
   const [sortDir, setSortDir] = useState<UsageSortDirection>('desc');
-  const [filters, setFilters] = useState({
-    apiKey: '',
-    incomingModelAlias: '',
-    provider: '',
-    startDate: '',
-    endDate: '',
-  });
+  const [filters, setFilters] = useState(EMPTY_LOG_FILTERS);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1687,6 +1692,7 @@ export const Logs = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsMobileFiltersOpen(false);
     if (offset === 0) {
       loadLogs();
       return;
@@ -1700,6 +1706,12 @@ export const Logs = () => {
     setLimit(nextLimit);
     // Reset to the first page so we don't land on an out-of-range offset.
     updateOffset(0);
+  };
+
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
+  const clearFilters = () => {
+    setFilters(EMPTY_LOG_FILTERS);
   };
 
   const handleSort = (field: UsageSortField) => {
@@ -1801,12 +1813,26 @@ export const Logs = () => {
           </>
         }
       >
+        <div className="lg:hidden">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-full justify-between"
+            onClick={() => setIsMobileFiltersOpen(true)}
+            leftIcon={<ListFilter size={15} />}
+          >
+            <span>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+            <ChevronRight size={15} className="rotate-180" />
+          </Button>
+        </div>
+
         <form
           onSubmit={handleSearch}
-          className="grid grid-cols-3 items-end gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end"
+          className="hidden items-end gap-2 lg:flex lg:flex-row lg:flex-wrap"
         >
           {!isLimited && (
-            <div className="col-span-1 sm:w-56">
+            <div className="sm:w-56">
               <SearchInput
                 placeholder="Key…"
                 value={filters.apiKey}
@@ -1814,14 +1840,14 @@ export const Logs = () => {
               />
             </div>
           )}
-          <div className="col-span-1 sm:w-56">
+          <div className="sm:w-56">
             <SearchInput
               placeholder="Model…"
               value={filters.incomingModelAlias}
               onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
             />
           </div>
-          <div className="col-span-1 sm:w-44">
+          <div className="sm:w-44">
             <SearchInput
               placeholder="Provider…"
               value={filters.provider}
@@ -1858,10 +1884,10 @@ export const Logs = () => {
               </button>
             )}
           </div>
-          <Button type="submit" variant="primary" size="sm" className="col-span-2 w-full sm:w-auto">
+          <Button type="submit" variant="primary" size="sm">
             Search
           </Button>
-          <div className="col-span-1 sm:w-40">
+          <div className="sm:w-40">
             <Select
               label="Per page"
               value={String(limit)}
@@ -1877,6 +1903,108 @@ export const Logs = () => {
           </div>
         </form>
       </PageHeader>
+
+      <Drawer
+        open={isMobileFiltersOpen}
+        onClose={() => setIsMobileFiltersOpen(false)}
+        side="right"
+        aria-label="Log filters"
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex items-start justify-between gap-4 border-b border-border-glass p-4">
+            <div>
+              <h2 className="m-0 font-heading text-lg font-semibold text-text">Filters</h2>
+              <p className="mt-1 text-xs text-text-secondary">Narrow down the request logs.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMobileFiltersOpen(false)}
+              className="rounded-md border-0 bg-transparent p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text"
+              aria-label="Close filters"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSearch} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {!isLimited && (
+                <SearchInput
+                  label="Key"
+                  placeholder="Search by key…"
+                  value={filters.apiKey}
+                  onChange={(v) => setFilters({ ...filters, apiKey: v })}
+                  className="h-10 text-sm"
+                />
+              )}
+              <SearchInput
+                label="Model"
+                placeholder="Search by model…"
+                value={filters.incomingModelAlias}
+                onChange={(v) => setFilters({ ...filters, incomingModelAlias: v })}
+                className="h-10 text-sm"
+              />
+              <SearchInput
+                label="Provider"
+                placeholder="Search by provider…"
+                value={filters.provider}
+                onChange={(v) => setFilters({ ...filters, provider: v })}
+                className="h-10 text-sm"
+              />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
+                  <PlayCircle size={15} />
+                  <span>Start date</span>
+                </div>
+                <DateTimePicker
+                  value={filters.startDate}
+                  onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
+                  placeholder="Select start date"
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
+                  <Circle size={15} />
+                  <span>End date</span>
+                </div>
+                <DateTimePicker
+                  value={filters.endDate}
+                  onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
+                  placeholder="Select end date"
+                  className="w-full"
+                />
+              </div>
+              <Select
+                label="Per page"
+                value={String(limit)}
+                onChange={handleLimitChange}
+                options={[
+                  { value: '20', label: '20' },
+                  { value: '50', label: '50' },
+                  { value: '100', label: '100' },
+                  { value: '200', label: '200' },
+                ]}
+              />
+            </div>
+            <div className="flex gap-2 border-t border-border-glass p-4">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="flex-1"
+                onClick={clearFilters}
+                disabled={activeFilterCount === 0}
+              >
+                Clear
+              </Button>
+              <Button type="submit" variant="primary" size="sm" className="flex-1">
+                Apply filters
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Drawer>
 
       <PageContainer>
         <Card flush>
