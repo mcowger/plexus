@@ -90,6 +90,7 @@ import responsesLogo from '../assets/responses.svg';
 const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
 const LIVE_DURATION_UPDATE_INTERVAL_MS = 500;
 const DESKTOP_LOGS_MEDIA_QUERY = '(min-width: 1024px)';
+const DESKTOP_PERF_COLUMN_WIDTH = '220px';
 
 const formatReasoningEffort = (effort?: string | null): string | null => {
   if (!effort) return null;
@@ -858,7 +859,15 @@ const DesktopLogRow = React.memo(
             </span>
           )}
         </td>
-        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+        <td
+          className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          style={{
+            width: DESKTOP_PERF_COLUMN_WIDTH,
+            minWidth: DESKTOP_PERF_COLUMN_WIDTH,
+            maxWidth: DESKTOP_PERF_COLUMN_WIDTH,
+            overflow: 'hidden',
+          }}
+        >
           {(() => {
             const rawDurationMs =
               log.durationMs != null && log.durationMs > 0
@@ -897,7 +906,15 @@ const DesktopLogRow = React.memo(
                   : null;
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    width: '100%',
+                    minWidth: 0,
+                    overflow: 'hidden',
+                  }}
+                >
                   <span>Duration: {liveDuration}</span>
                   <span
                     style={{
@@ -906,20 +923,20 @@ const DesktopLogRow = React.memo(
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     <CloudDownload size={12} className="text-yellow-400" />
-                    <span>
-                      {formatBytes(progress.bytesReceived)}
-                      {semanticBytesReceived !== progress.bytesReceived && (
-                        <span title="Bytes from token-producing stream events used for the live token estimate">
-                          {' · '}
-                          {formatBytes(semanticBytesReceived)} token bytes
-                        </span>
-                      )}
+                    <span title="Bytes from token-producing stream events used for the live token estimate">
+                      {formatBytes(semanticBytesReceived)}
                     </span>
+                    {semanticBytesReceived !== progress.bytesReceived && (
+                      <span title="Raw bytes received">
+                        ({formatBytes(progress.bytesReceived).replace(' ', '')})
+                      </span>
+                    )}
                   </span>
-                  {progress.bytesPerSec != null && (
+                  {(progress.bytesPerSec != null || estTokensPerSec != null) && (
                     <span
                       style={{
                         color: 'var(--color-text-secondary)',
@@ -927,25 +944,28 @@ const DesktopLogRow = React.memo(
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      <Gauge size={12} className="text-text-secondary" />
-                      {formatBytes(progress.bytesPerSec)}/s
-                    </span>
-                  )}
-                  {estTokensPerSec != null && (
-                    <span
-                      style={{
-                        color: 'var(--color-text-secondary)',
-                        fontSize: '0.85em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token for this API's streamed token events)`}
-                    >
-                      <Zap size={12} className="text-amber-400" />
-                      <span>~{formatTPS(estTokensPerSec)} tok/s</span>
+                      {progress.bytesPerSec != null && (
+                        <>
+                          <Gauge size={12} className="text-text-secondary" />
+                          <span>{formatBytes(progress.bytesPerSec)}/s</span>
+                        </>
+                      )}
+                      {progress.bytesPerSec != null && estTokensPerSec != null && (
+                        <span aria-hidden="true">·</span>
+                      )}
+                      {estTokensPerSec != null && (
+                        <>
+                          <Zap size={12} className="text-amber-400" />
+                          <span
+                            title={`Estimated tokens/sec (~${Math.round(bytesPerToken)} bytes/token for this API's streamed token events)`}
+                          >
+                            ~{formatTPS(estTokensPerSec)} tok/s
+                          </span>
+                        </>
+                      )}
                     </span>
                   )}
                 </div>
@@ -1839,7 +1859,13 @@ export const Logs = () => {
                     >
                       {renderSortableHeader('Cost', 'costTotal')}
                     </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-w-[140px]">
+                    <th
+                      className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      style={{
+                        width: DESKTOP_PERF_COLUMN_WIDTH,
+                        minWidth: DESKTOP_PERF_COLUMN_WIDTH,
+                      }}
+                    >
                       {renderSortableHeader('Perf', 'durationMs')}
                     </th>
                     <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
