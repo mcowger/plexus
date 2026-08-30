@@ -237,6 +237,20 @@ describe('Gemini Request Builder', () => {
       expect(result.generationConfig?.thinkingConfig?.includeThoughts).toBe(true);
     });
 
+    it('clamps xhigh and max efforts to HIGH (valid Gemini ThinkingLevel)', async () => {
+      // Gemini has no level above HIGH; forwarding 'XHIGH'/'MAX' would be
+      // rejected upstream.
+      for (const effort of ['xhigh', 'max'] as const) {
+        const request: UnifiedChatRequest = {
+          messages: [{ role: 'user', content: 'Think' }],
+          model: 'gemini-2.5-flash',
+          reasoning: { enabled: true, effort },
+        };
+        const result = await buildGeminiRequest(request);
+        expect(result.generationConfig?.thinkingConfig?.thinkingLevel).toBe('HIGH');
+      }
+    });
+
     it('should emit camelCase thinkingBudget from max_tokens', async () => {
       const request: UnifiedChatRequest = {
         messages: [{ role: 'user', content: 'Think' }],

@@ -1,6 +1,20 @@
 import { Content, Part, Tool } from '@google/genai';
-import { UnifiedChatRequest, GoogleBuiltInToolType } from '../../types/unified';
+import { UnifiedChatRequest, GoogleBuiltInToolType, ThinkLevel } from '../../types/unified';
 import { convertUnifiedPartsToGemini } from './part-mapper';
+
+/**
+ * Unified ThinkLevel → Gemini ThinkingLevel enum. Gemini has no level above
+ * HIGH, so the extended canonical efforts (xhigh, max) clamp to HIGH.
+ */
+const GEMINI_THINKING_LEVEL: Record<ThinkLevel, string> = {
+  none: 'NONE',
+  minimal: 'MINIMAL',
+  low: 'LOW',
+  medium: 'MEDIUM',
+  high: 'HIGH',
+  xhigh: 'HIGH',
+  max: 'HIGH',
+};
 
 export interface GenerateContentRequest {
   contents: Content[];
@@ -212,8 +226,12 @@ export async function buildGeminiRequest(
     generationConfig.thinkingConfig = {
       includeThoughts: request.reasoning.enabled,
       thinkingBudget: request.reasoning.max_tokens,
-      // Map unified effort back to Gemini's ThinkingLevel enum values (MINIMAL/LOW/MEDIUM/HIGH)
-      thinkingLevel: request.reasoning.effort ? request.reasoning.effort.toUpperCase() : undefined,
+      // Map unified effort to Gemini's ThinkingLevel enum values
+      // (MINIMAL/LOW/MEDIUM/HIGH). Gemini has no level above HIGH, so the
+      // extended canonical efforts (xhigh, max) clamp to HIGH.
+      thinkingLevel: request.reasoning.effort
+        ? GEMINI_THINKING_LEVEL[request.reasoning.effort]
+        : undefined,
     };
   }
 
