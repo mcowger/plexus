@@ -68,4 +68,29 @@ describe('SQLite diagnostics', () => {
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('SQLite contention'));
   });
+
+  test('logs transaction execution including transaction modes', () => {
+    process.env.PLEXUS_SQLITE_SLOW_QUERY_MS = '0.0001';
+    const warnSpy = registerSpy(logger, 'warn');
+    const runTransaction = (..._args: unknown[]) => undefined;
+    const transaction = Object.assign(runTransaction, {
+      deferred: runTransaction,
+      immediate: runTransaction,
+      exclusive: runTransaction,
+    });
+    const database = instrumentSqliteDatabase({
+      prepare: (..._args: unknown[]) => ({}),
+      query: (..._args: unknown[]) => ({}),
+      run: () => undefined,
+      exec: () => undefined,
+      transaction: (..._args: unknown[]) => transaction,
+    });
+
+    database.transaction(() => {})();
+    database.transaction(() => {}).immediate?.();
+
+    expect(
+      warnSpy.mock.calls.filter(([message]: unknown[]) => String(message).includes('transaction'))
+    ).toHaveLength(2);
+  });
 });
