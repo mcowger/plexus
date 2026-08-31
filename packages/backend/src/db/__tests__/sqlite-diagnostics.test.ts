@@ -93,4 +93,30 @@ describe('SQLite diagnostics', () => {
       warnSpy.mock.calls.filter(([message]: unknown[]) => String(message).includes('transaction'))
     ).toHaveLength(2);
   });
+
+  test('preserves the transaction receiver', () => {
+    process.env.PLEXUS_SQLITE_SLOW_QUERY_MS = '250';
+    const receiver = { value: 'preserved' };
+    let observedReceiver: unknown;
+    const runTransaction = function (this: unknown) {
+      observedReceiver = this;
+    };
+    const transaction = Object.assign(runTransaction, {
+      deferred: runTransaction,
+      immediate: runTransaction,
+      exclusive: runTransaction,
+    });
+    const database = instrumentSqliteDatabase({
+      prepare: (..._args: unknown[]) => ({}),
+      query: (..._args: unknown[]) => ({}),
+      run: () => undefined,
+      exec: () => undefined,
+      transaction: (..._args: unknown[]) => transaction,
+    });
+    const wrappedTransaction = database.transaction(() => {});
+
+    wrappedTransaction.call(receiver);
+
+    expect(observedReceiver).toBe(receiver);
+  });
 });

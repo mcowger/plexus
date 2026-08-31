@@ -125,9 +125,9 @@ function instrumentTransaction(
   config: SqliteDiagnosticsConfig
 ): (...args: any[]) => any {
   return new Proxy(transaction, {
-    apply(target, _thisArg, args) {
+    apply(target, thisArg, args) {
       return measureSqliteOperation('transaction', 'transaction', config, () =>
-        Reflect.apply(target, target, args)
+        Reflect.apply(target, thisArg, args)
       );
     },
     get(target, property) {
