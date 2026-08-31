@@ -1017,24 +1017,25 @@ const DesktopLogRow = React.memo(
           style={{ width: DESKTOP_COST_COLUMN_WIDTH }}
         >
           {log.costTotal !== undefined && log.costTotal !== null ? (
-            <CostToolTip
-              source={log.costSource}
-              costMetadata={log.costMetadata}
-              costBreakdown={costBreakdown}
-            >
-              <span className="block truncate" style={{ fontWeight: '500', cursor: 'help' }}>
-                {log.costTotal === 0
-                  ? '-'
-                  : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
-              </span>
-            </CostToolTip>
+            <div className={log.costTotal === 0 ? 'text-center' : undefined}>
+              <CostToolTip
+                source={log.costSource}
+                costMetadata={log.costMetadata}
+                costBreakdown={costBreakdown}
+              >
+                <span className="block truncate" style={{ fontWeight: '500', cursor: 'help' }}>
+                  {log.costTotal === 0
+                    ? '-'
+                    : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 6 })}
+                </span>
+              </CostToolTip>
+            </div>
           ) : (
             <span
               style={{
                 color: 'var(--color-text-secondary)',
                 fontSize: '1.2em',
                 display: 'block',
-                textAlign: 'center',
               }}
             >
               -
