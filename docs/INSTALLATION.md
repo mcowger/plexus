@@ -29,6 +29,7 @@ docker run -p 4000:4000 \
 -   `ADMIN_KEY` is required — set it to a secure password for accessing the admin dashboard and management API.
 -   `DATABASE_URL` is optional (defaults to SQLite at `./data/plexus.db` when unset) — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string when connecting to PostgreSQL or custom locations.
 -   Set `LOG_LEVEL` to control verbosity.
+-   To temporarily enable SQLite diagnostics, add `-e PLEXUS_SQLITE_SLOW_QUERY_MS=250` to the command. Queries at or above the threshold are logged, as are SQLite busy/locked errors. It is unset by default.
 -   The Docker image includes `bunx` and `uvx` so Plexus can run configured Local HTTP MCP servers inside the container.
 
 ## Building the Docker Image
@@ -130,6 +131,7 @@ When running Plexus, you can use the following environment variables to control 
     - Default: `info`.
     - Note: `silly` logs all request/response/transformations.
     - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
+- **`PLEXUS_SQLITE_SLOW_QUERY_MS`** (Optional): Logs SQLite queries that take at least this many milliseconds and SQLite busy/locked errors. Unset by default.
 - **`PORT`** (Optional): HTTP server port. Default: `4000` (Note: When running `bun run dev` locally, the port is automatically derived from the git worktree directory name).
 - **`HOST`** (Optional): Address to bind to. Default: `0.0.0.0`
 - **`DATA_DIR`** (Optional): Directory for SQLite database. Default: `./data`

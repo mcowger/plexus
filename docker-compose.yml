@@ -13,4 +13,5 @@ services:
       - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/plexus.db}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - LOG_LEVEL=info
+      - PLEXUS_SQLITE_SLOW_QUERY_MS=${PLEXUS_SQLITE_SLOW_QUERY_MS:-}
       - DATA_DIR=/app/data
