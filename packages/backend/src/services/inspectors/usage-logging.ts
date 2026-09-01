@@ -160,178 +160,15 @@ export class UsageInspector extends PassThrough {
 
   override _flush(callback: Function) {
     this._flushed = true;
-    const stats = {
-      inputTokens: 0,
-      outputTokens: 0,
-      cachedTokens: 0,
-      cacheWriteTokens: 0,
-      reasoningTokens: 0,
-    };
 
     try {
       const debugManager = DebugManager.getInstance();
       const { rawCapture, transformedCapture } = this.getFinalizedCaptures();
-      const reconstructed = rawCapture?.reconstructed ?? null;
-      const usage = this.readObservedUsage(
-        reconstructed,
+      this.finalizeSuccessfulUsage(
+        rawCapture?.reconstructed ?? null,
         transformedCapture?.reconstructed ?? null
       );
-
-      if (reconstructed || usage) {
-        if (usage) {
-          stats.inputTokens = usage.inputTokens || 0;
-          stats.outputTokens = usage.outputTokens || 0;
-          stats.cachedTokens = usage.cachedTokens || 0;
-          stats.cacheWriteTokens = usage.cacheWriteTokens || 0;
-          stats.reasoningTokens = usage.reasoningTokens || 0;
-        }
-
-        if (reconstructed) {
-          // Extract response metadata (tool calls count and finish reason) —
-          // raw-mode only: the transformed snapshot never feeds metadata.
-          const responseMetadata = this.extractResponseMetadataFromReconstructed(
-            reconstructed,
-            this.providerApiType
-          );
-          this.usageRecord.toolCallsCount = responseMetadata.toolCallsCount;
-          this.usageRecord.finishReason = responseMetadata.finishReason;
-
-          if (this.shouldEstimateTokens) {
-            // Estimation is a FALLBACK for responses that carried no usage at
-            // all: it must never overwrite real usage extracted from the raw
-            // reconstruction or the transformed-snapshot fallback above (for
-            // a 'responses' provider the estimator has no dialect support
-            // and returns zeros — the overwrite would zero out real counts
-            // and corrupt costs/quota).
-            if (!usage) {
-              logger.debug(
-                `No usage data found for ${this.usageRecord.requestId}, attempting estimation`
-              );
-              const estimated = estimateTokensFromReconstructed(
-                reconstructed,
-                this.providerApiType
-              );
-              stats.outputTokens = estimated.output;
-              stats.reasoningTokens = estimated.reasoning;
-              this.usageRecord.tokensEstimated = 1;
-              logger.debug(
-                `Estimated tokens for ${this.usageRecord.requestId}: ` +
-                  `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
-              );
-            }
-            // The ephemeral capture was made solely for this estimation pass —
-            // discard it whether estimation ran or real usage won, so the
-            // marker doesn't leak past this request.
-            debugManager.discardEphemeral(this.usageRecord.requestId!);
-          }
-        }
-
-        if (this.originalRequest && stats.inputTokens === 0) {
-          stats.inputTokens = estimateInputTokens(this.originalRequest, this.incomingApiType);
-        }
-
-        this.usageRecord.tokensInput = stats.inputTokens;
-        this.usageRecord.tokensOutput = stats.outputTokens;
-        this.usageRecord.tokensCached = stats.cachedTokens;
-        this.usageRecord.tokensCacheWrite = stats.cacheWriteTokens;
-        this.usageRecord.tokensReasoning = stats.reasoningTokens;
-      }
-
-      this.usageRecord.durationMs = Date.now() - this.startTime;
-      const totalOutputTokens = stats.outputTokens + stats.reasoningTokens;
-      if (totalOutputTokens > 0 && this.usageRecord.durationMs && this.usageRecord.durationMs > 0) {
-        const timeToTokensMs = this.usageRecord.durationMs - (this.usageRecord.ttftMs || 0);
-        this.usageRecord.tokensPerSec =
-          timeToTokensMs > 0 ? (totalOutputTokens / timeToTokensMs) * 1000 : 0;
-      }
-
-      calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
-
-      // Override with provider-reported cost if available
-      // Some providers emit `: cost {"request_cost_usd": ...}` as SSE comments
-      if (reconstructed?.providerReportedCost) {
-        applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
-        if (reconstructed?.usage) {
-          const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
-          if (usageCostDetails) {
-            logger.debug(
-              `[ProviderCost] Both SSE :cost and usage.cost_details present for ${this.usageRecord.requestId}; ` +
-                `SSE value ($${this.usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
-            );
-          }
-        }
-      }
-
-      // Override with provider-reported cost from usage.cost_details if available
-      // Some providers include detailed cost breakdowns in the usage block
-      if (!this.usageRecord.providerReportedCost && reconstructed?.usage) {
-        const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
-        if (usageCostDetails) {
-          applyUsageCostDetails(this.usageRecord, usageCostDetails);
-        }
-      }
-
-      // Use provider-reported energy if available (e.g. Neuralwatt SSE comments)
-      if (reconstructed?.providerReportedEnergy?.energy_kwh != null) {
-        const energyKwh = Number(reconstructed.providerReportedEnergy.energy_kwh);
-        if (!isNaN(energyKwh) && energyKwh >= 0) {
-          this.usageRecord.kwhUsed = Number(energyKwh.toFixed(10));
-        }
-      }
-
-      // Fire-and-forget: saveRequest is async but _flush is synchronous
-      // Attach error handler to prevent unhandled promise rejections
-      this.usageStorage.saveRequest(this.usageRecord as UsageRecord).catch((err) => {
-        logger.error(`Failed to save usage record for ${this.usageRecord.requestId}:`, err);
-      });
-
-      // Record quota usage after costs are calculated (fire-and-forget) —
-      // against the FINAL attempt's resolved provider/model.
-      if (this.quotaEnforcer && this.keyName) {
-        recordQuotaUsage(
-          this.keyName,
-          this.usageRecord.finalAttemptProvider,
-          this.usageRecord.finalAttemptModel,
-          {
-            tokensInput: this.usageRecord.tokensInput,
-            tokensOutput: this.usageRecord.tokensOutput,
-            tokensCached: this.usageRecord.tokensCached,
-            tokensCacheWrite: this.usageRecord.tokensCacheWrite,
-            tokensReasoning: this.usageRecord.tokensReasoning,
-            costTotal: this.usageRecord.costTotal,
-          },
-          this.quotaEnforcer
-        ).catch((err) => {
-          logger.error(`Failed to record quota usage for ${this.keyName}:`, err);
-        });
-      }
-
-      if (
-        this.usageRecord.responseStatus === 'success' &&
-        this.usageRecord.provider &&
-        this.usageRecord.selectedModelName
-      ) {
-        // Fire-and-forget: updatePerformanceMetrics is async but _flush is synchronous
-        // Attach error handler to prevent unhandled promise rejections
-        this.usageStorage
-          .updatePerformanceMetrics(
-            this.usageRecord.provider,
-            this.usageRecord.selectedModelName,
-            this.usageRecord.canonicalModelName ?? null,
-            this.usageRecord.ttftMs || null,
-            stats.outputTokens + stats.reasoningTokens > 0
-              ? stats.outputTokens + stats.reasoningTokens
-              : null,
-            this.usageRecord.durationMs,
-            this.usageRecord.requestId!
-          )
-          .catch((err) => {
-            logger.error(
-              `Failed to update performance metrics for ${this.usageRecord.requestId}:`,
-              err
-            );
-          });
-      }
+      debugManager.discardEphemeral(this.usageRecord.requestId!);
 
       logger.debug(`Request ${this.usageRecord.requestId} usage analysis complete.`);
       DebugManager.getInstance().flush(this.usageRecord.requestId!);
@@ -378,6 +215,14 @@ export class UsageInspector extends PassThrough {
       this.usageRecord.durationMs = Date.now() - this.startTime;
 
       const reconstructed = rawCapture?.reconstructed ?? null;
+      if (status === 'success') {
+        this.finalizeSuccessfulUsage(reconstructed, transformedCapture?.reconstructed ?? null);
+        DebugManager.getInstance().discardEphemeral(this.usageRecord.requestId!);
+        DebugManager.getInstance().flush(this.usageRecord.requestId!);
+        callback(err);
+        return;
+      }
+
       // Same read-raw-then-fallback as _flush (readObservedUsage): a stream
       // destroyed mid-flight can have usage only in the transformed-mode
       // snapshot, and without the fallback the cancelled/timeout record
@@ -410,6 +255,143 @@ export class UsageInspector extends PassThrough {
     }
 
     callback(err);
+  }
+
+  private finalizeSuccessfulUsage(reconstructed: any, transformedReconstructed: any): void {
+    const stats = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedTokens: 0,
+      cacheWriteTokens: 0,
+      reasoningTokens: 0,
+    };
+    const usage = this.readObservedUsage(reconstructed, transformedReconstructed);
+
+    if (reconstructed || usage) {
+      if (usage) {
+        stats.inputTokens = usage.inputTokens || 0;
+        stats.outputTokens = usage.outputTokens || 0;
+        stats.cachedTokens = usage.cachedTokens || 0;
+        stats.cacheWriteTokens = usage.cacheWriteTokens || 0;
+        stats.reasoningTokens = usage.reasoningTokens || 0;
+      }
+
+      if (reconstructed) {
+        const responseMetadata = this.extractResponseMetadataFromReconstructed(
+          reconstructed,
+          this.normalizeApiType(this.providerApiType)
+        );
+        this.usageRecord.toolCallsCount = responseMetadata.toolCallsCount;
+        this.usageRecord.finishReason = responseMetadata.finishReason;
+
+        if (this.shouldEstimateTokens && !usage) {
+          logger.debug(
+            `No usage data found for ${this.usageRecord.requestId}, attempting estimation`
+          );
+          const estimated = estimateTokensFromReconstructed(reconstructed, this.providerApiType);
+          stats.outputTokens = estimated.output;
+          stats.reasoningTokens = estimated.reasoning;
+          this.usageRecord.tokensEstimated = 1;
+          logger.debug(
+            `Estimated tokens for ${this.usageRecord.requestId}: ` +
+              `output=${stats.outputTokens}, reasoning=${stats.reasoningTokens}`
+          );
+        }
+      }
+
+      if (this.originalRequest && stats.inputTokens === 0) {
+        stats.inputTokens = estimateInputTokens(this.originalRequest, this.incomingApiType);
+      }
+
+      this.usageRecord.tokensInput = stats.inputTokens;
+      this.usageRecord.tokensOutput = stats.outputTokens;
+      this.usageRecord.tokensCached = stats.cachedTokens;
+      this.usageRecord.tokensCacheWrite = stats.cacheWriteTokens;
+      this.usageRecord.tokensReasoning = stats.reasoningTokens;
+    }
+
+    this.usageRecord.durationMs = Date.now() - this.startTime;
+    const totalOutputTokens = stats.outputTokens + stats.reasoningTokens;
+    if (totalOutputTokens > 0 && this.usageRecord.durationMs && this.usageRecord.durationMs > 0) {
+      const timeToTokensMs = this.usageRecord.durationMs - (this.usageRecord.ttftMs || 0);
+      this.usageRecord.tokensPerSec =
+        timeToTokensMs > 0 ? (totalOutputTokens / timeToTokensMs) * 1000 : 0;
+    }
+
+    calculateCosts(this.usageRecord, this.pricing, this.providerDiscount);
+
+    if (reconstructed?.providerReportedCost) {
+      applyProviderReportedCost(this.usageRecord, reconstructed.providerReportedCost);
+      if (reconstructed?.usage) {
+        const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+        if (usageCostDetails) {
+          logger.debug(
+            `[ProviderCost] Both SSE :cost and usage.cost_details present for ${this.usageRecord.requestId}; ` +
+              `SSE value ($${this.usageRecord.providerReportedCost}) takes priority over cost_details total ($${usageCostDetails.total_cost})`
+          );
+        }
+      }
+    }
+
+    if (!this.usageRecord.providerReportedCost && reconstructed?.usage) {
+      const usageCostDetails = extractUsageCostDetails(reconstructed.usage);
+      if (usageCostDetails) {
+        applyUsageCostDetails(this.usageRecord, usageCostDetails);
+      }
+    }
+
+    if (reconstructed?.providerReportedEnergy?.energy_kwh != null) {
+      const energyKwh = Number(reconstructed.providerReportedEnergy.energy_kwh);
+      if (!isNaN(energyKwh) && energyKwh >= 0) {
+        this.usageRecord.kwhUsed = Number(energyKwh.toFixed(10));
+      }
+    }
+
+    this.usageStorage.saveRequest(this.usageRecord as UsageRecord).catch((saveErr) => {
+      logger.error(`Failed to save usage record for ${this.usageRecord.requestId}:`, saveErr);
+    });
+
+    if (this.quotaEnforcer && this.keyName) {
+      recordQuotaUsage(
+        this.keyName,
+        this.usageRecord.finalAttemptProvider,
+        this.usageRecord.finalAttemptModel,
+        {
+          tokensInput: this.usageRecord.tokensInput,
+          tokensOutput: this.usageRecord.tokensOutput,
+          tokensCached: this.usageRecord.tokensCached,
+          tokensCacheWrite: this.usageRecord.tokensCacheWrite,
+          tokensReasoning: this.usageRecord.tokensReasoning,
+          costTotal: this.usageRecord.costTotal,
+        },
+        this.quotaEnforcer
+      ).catch((err) => {
+        logger.error(`Failed to record quota usage for ${this.keyName}:`, err);
+      });
+    }
+
+    if (
+      this.usageRecord.responseStatus === 'success' &&
+      this.usageRecord.provider &&
+      this.usageRecord.selectedModelName
+    ) {
+      this.usageStorage
+        .updatePerformanceMetrics(
+          this.usageRecord.provider,
+          this.usageRecord.selectedModelName,
+          this.usageRecord.canonicalModelName ?? null,
+          this.usageRecord.ttftMs || null,
+          totalOutputTokens > 0 ? totalOutputTokens : null,
+          this.usageRecord.durationMs,
+          this.usageRecord.requestId!
+        )
+        .catch((err) => {
+          logger.error(
+            `Failed to update performance metrics for ${this.usageRecord.requestId}:`,
+            err
+          );
+        });
+    }
   }
 
   /**
@@ -490,6 +472,8 @@ export class UsageInspector extends PassThrough {
       return { toolCallsCount: null, finishReason: null };
     }
 
+    const incomingApiType = this.normalizeApiType(this.incomingApiType);
+
     switch (apiType) {
       case 'chat': {
         // OpenAI format: tool_calls are in choices[0].delta.tool_calls in the reconstructed snapshot
@@ -534,10 +518,10 @@ export class UsageInspector extends PassThrough {
         if (finishReason) {
           finishReason = finishReason.toLowerCase();
           if ((finishReason === 'stop' || finishReason === 'end_turn') && toolCallsCount > 0) {
-            finishReason = this.incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
+            finishReason = incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
           }
         } else if (toolCallsCount > 0) {
-          finishReason = this.incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
+          finishReason = incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
         }
 
         return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
@@ -613,10 +597,10 @@ export class UsageInspector extends PassThrough {
         if (finishReason) {
           finishReason = finishReason.toLowerCase();
           if (finishReason === 'stop' && toolCallsCount > 0) {
-            finishReason = this.incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
+            finishReason = incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
           }
         } else if (toolCallsCount > 0) {
-          finishReason = this.incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
+          finishReason = incomingApiType === 'messages' ? 'tool_use' : 'tool_calls';
         }
 
         return { toolCallsCount: toolCallsCount > 0 ? toolCallsCount : null, finishReason };
