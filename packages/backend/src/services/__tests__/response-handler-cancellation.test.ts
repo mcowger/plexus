@@ -278,7 +278,7 @@ describe('nodeStream destruction state', () => {
 });
 
 // ---------------------------------------------------------------------------
-// End-to-end: cancellation mid-stream still records usage
+// End-to-end: stream teardown still records usage
 // ---------------------------------------------------------------------------
 //
 // The debug taps' snapshots (which UsageInspector's _destroy fallback reads)
@@ -296,10 +296,10 @@ describe('handleResponse cancellation records usage from live captures (no pre-s
 
   it('a client disconnect after usage-bearing chunks finalizes the record WITH usage and costs', async () => {
     const encoder = new TextEncoder();
-    // Chat-format provider SSE: role/content chunk, then the usage-bearing
-    // final chunk — and then the stream stays OPEN (no [DONE], no close):
-    // the client disconnects first, so no flush ever runs anywhere. (In
-    // production the upstream fetch is killed by the abort signal +
+    // Chat-format provider SSE: role/content chunk, then a usage-bearing
+    // non-terminal chunk — and then the stream stays OPEN (no [DONE], no
+    // close): the client disconnects first, so no flush ever runs anywhere.
+    // In production the upstream fetch is killed by the abort signal +
     // nodeStream.destroy(); this test asserts the usage RECORD, which is
     // what cancellations used to lose.)
     const providerStream = new ReadableStream<Uint8Array>({
@@ -311,7 +311,7 @@ describe('handleResponse cancellation records usage from live captures (no pre-s
         );
         controller.enqueue(
           encoder.encode(
-            'data: {"id":"chatcmpl_e2e","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":9,"total_tokens":59}}\n\n'
+            'data: {"id":"chatcmpl_e2e","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":null}],"usage":{"prompt_tokens":50,"completion_tokens":9,"total_tokens":59}}\n\n'
           )
         );
         // Deliberately NOT closed.
@@ -393,5 +393,164 @@ describe('handleResponse cancellation records usage from live captures (no pre-s
     // 50/1M * $1000 + 9/1M * $2000 = $0.068.
     expect(record.costSource).toBe('simple');
     expect(record.costTotal).toBeCloseTo(0.068, 10);
+  });
+
+  it('preserves success for a bypassed Chat Completions stream after its terminal chunk', async () => {
+    const encoder = new TextEncoder();
+    const providerStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'data: {"id":"chatcmpl-e2e","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":50,"completion_tokens":9,"total_tokens":59}}\n\n'
+          )
+        );
+        // OMP closes its reader after consuming the terminal chunk.
+      },
+    });
+
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-chat-bypass-e2e',
+      model: 'gpt-4o',
+      content: null,
+      stream: providerStream,
+      bypassTransformation: true,
+      plexus: {
+        provider: 'test-provider',
+        model: 'gpt-4o',
+        apiType: 'chat',
+        pricing: { source: 'simple', input: 1000, output: 2000 },
+      },
+    };
+
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-chat-bypass-e2e' };
+    const savedRecords: UsageRecord[] = [];
+    const mockStorage = {
+      saveRequest: vi.fn(async (record: UsageRecord) => {
+        savedRecords.push(record);
+      }),
+      updatePerformanceMetrics: vi.fn(async () => {}),
+      saveError: vi.fn(),
+    };
+    const reply = {
+      header: vi.fn(function (this: any) {
+        return this;
+      }),
+      send: vi.fn((pipeline: any) => pipeline),
+      code: vi.fn(function (this: any) {
+        return this;
+      }),
+    };
+    const request = { headers: {}, raw: {} };
+    const abortController = new AbortController();
+
+    await handleResponse(
+      request as any,
+      reply as any,
+      unifiedResponse,
+      new OpenAITransformer(),
+      usageRecord,
+      mockStorage as any,
+      Date.now(),
+      'chat',
+      false,
+      undefined,
+      undefined,
+      undefined,
+      abortController,
+      null
+    );
+
+    const pipeline = (reply.send as any).mock.calls.at(-1)[0];
+    pipeline.on('data', () => {});
+    pipeline.on('error', () => {});
+
+    await wait(80);
+    abortController.abort();
+    await wait(300);
+
+    expect(savedRecords).toHaveLength(1);
+    expect(savedRecords[0]!.responseStatus).toBe('success');
+    expect(savedRecords[0]!.tokensInput).toBe(50);
+    expect(savedRecords[0]!.tokensOutput).toBe(9);
+  });
+
+  it('preserves success when a bypassed Responses stream closes after response.completed', async () => {
+    const encoder = new TextEncoder();
+    const providerStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'event: response.completed\n' +
+              'data: {"type":"response.completed","response":{"id":"resp-e2e","status":"completed","usage":{"input_tokens":50,"output_tokens":9,"total_tokens":59}}}\n\n'
+          )
+        );
+        // OMP closes its reader after consuming response.completed.
+      },
+    });
+
+    const unifiedResponse: UnifiedChatResponse = {
+      id: 'resp-bypass-e2e',
+      model: 'gpt-5',
+      content: null,
+      stream: providerStream,
+      bypassTransformation: true,
+      plexus: {
+        provider: 'test-provider',
+        model: 'gpt-5',
+        apiType: 'responses',
+        pricing: { source: 'simple', input: 1000, output: 2000 },
+      },
+    };
+
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-bypass-e2e' };
+    const savedRecords: UsageRecord[] = [];
+    const mockStorage = {
+      saveRequest: vi.fn(async (record: UsageRecord) => {
+        savedRecords.push(record);
+      }),
+      updatePerformanceMetrics: vi.fn(async () => {}),
+      saveError: vi.fn(),
+    };
+    const reply = {
+      header: vi.fn(function (this: any) {
+        return this;
+      }),
+      send: vi.fn((pipeline: any) => pipeline),
+      code: vi.fn(function (this: any) {
+        return this;
+      }),
+    };
+    const request = { headers: {}, raw: {} };
+    const abortController = new AbortController();
+
+    await handleResponse(
+      request as any,
+      reply as any,
+      unifiedResponse,
+      new OpenAITransformer(),
+      usageRecord,
+      mockStorage as any,
+      Date.now(),
+      'responses',
+      false,
+      undefined,
+      undefined,
+      undefined,
+      abortController,
+      null
+    );
+
+    const pipeline = (reply.send as any).mock.calls.at(-1)[0];
+    pipeline.on('data', () => {});
+    pipeline.on('error', () => {});
+
+    await wait(80);
+    abortController.abort();
+    await wait(300);
+
+    expect(savedRecords).toHaveLength(1);
+    expect(savedRecords[0]!.responseStatus).toBe('success');
+    expect(savedRecords[0]!.tokensInput).toBe(50);
+    expect(savedRecords[0]!.tokensOutput).toBe(9);
   });
 });

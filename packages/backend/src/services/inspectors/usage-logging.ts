@@ -15,6 +15,10 @@ import {
 import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
 import { recordQuotaUsage } from '../quota/quota-middleware';
 
+const RESPONSES_COMPLETED_EVENT_RE = /(?:^|\r?\n)event:\s*response\.completed(?:\r?\n|$)/;
+const CHAT_COMPLETION_TERMINAL_EVENT_RE =
+  /(?:^|\r?\n)data:\s*(?:\[DONE\]|\{[^\r\n]*"finish_reason"\s*:\s*"(?:stop|length|tool_calls|function_call|content_filter)")/;
+
 export interface ExtractedObservedUsage {
   inputTokens: number;
   outputTokens: number;
@@ -108,6 +112,7 @@ export class UsageInspector extends PassThrough {
   private quotaEnforcer?: any;
   private keyName?: string;
   private _flushed = false;
+  private terminalResponseObserved = false;
 
   constructor(
     requestId: string,
@@ -138,12 +143,36 @@ export class UsageInspector extends PassThrough {
   }
 
   override _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
+    this.observeTerminalResponse(chunk);
+
     if (this.firstChunk) {
       const now = Date.now();
       this.usageRecord.ttftMs = now - this.startTime;
       this.firstChunk = false;
     }
     callback(null, chunk);
+  }
+
+  private observeTerminalResponse(chunk: any): void {
+    if (this.terminalResponseObserved) return;
+
+    const apiType = this.incomingApiType.trim().toLowerCase().split(':', 1)[0];
+    if (apiType !== 'responses' && apiType !== 'chat') return;
+
+    const chunkText =
+      typeof chunk === 'string'
+        ? chunk
+        : Buffer.isBuffer(chunk)
+          ? chunk.toString('utf8')
+          : chunk instanceof Uint8Array
+            ? Buffer.from(chunk).toString('utf8')
+            : null;
+    if (!chunkText) return;
+
+    this.terminalResponseObserved =
+      apiType === 'responses'
+        ? RESPONSES_COMPLETED_EVENT_RE.test(chunkText)
+        : CHAT_COMPLETION_TERMINAL_EVENT_RE.test(chunkText);
   }
 
   override _flush(callback: Function) {
@@ -334,8 +363,8 @@ export class UsageInspector extends PassThrough {
 
     const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('timeout');
     const isStall = err?.message?.includes('stalled');
-    // If onDisconnect() already set the status to 'stall' or 'timeout' (e.g. when
-    // the abort signal carried a stall/timeout error), don't overwrite it with 'cancelled'.
+    // A normal client can close immediately after receiving the terminal SSE
+    // event, so that transport teardown is not itself a failure.
     const status =
       this.usageRecord.responseStatus === 'stall' || this.usageRecord.responseStatus === 'timeout'
         ? this.usageRecord.responseStatus
@@ -343,7 +372,12 @@ export class UsageInspector extends PassThrough {
           ? 'stall'
           : isTimeout
             ? 'timeout'
-            : 'cancelled';
+            : this.usageRecord.responseStatus === 'error' ||
+                this.usageRecord.responseStatus === 'empty'
+              ? this.usageRecord.responseStatus
+              : this.terminalResponseObserved
+                ? 'success'
+                : 'cancelled';
 
     logger.info(
       `UsageInspector: stream destroyed for ${this.usageRecord.requestId} ` +

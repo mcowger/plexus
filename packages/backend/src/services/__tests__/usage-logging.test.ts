@@ -419,17 +419,22 @@ describe('UsageInspector', () => {
   });
 
   describe('_destroy() — client disconnect handling', () => {
-    function makeInspector(requestId: string, startTime: number) {
+    function makeInspector(
+      requestId: string,
+      startTime: number,
+      incomingApiType = 'chat',
+      responseStatus?: string
+    ) {
       return new UsageInspector(
         requestId,
         mockStorage,
-        { requestId } as Partial<UsageRecord>,
+        { requestId, responseStatus } as Partial<UsageRecord>,
         mockPricing,
         undefined,
         startTime,
         false,
-        'chat',
-        undefined,
+        incomingApiType,
+        incomingApiType,
         undefined
       );
     }
@@ -458,6 +463,93 @@ describe('UsageInspector', () => {
       expect(capturedRecord!.responseStatus).toBe('cancelled');
       expect(capturedRecord!.durationMs).toBeGreaterThanOrEqual(0);
     });
+
+    it('preserves success when a Responses terminal event precedes stream destruction', async () => {
+      const requestId = 'test-destroy-responses-completed';
+      const inspector = makeInspector(requestId, Date.now() - 200, 'responses', 'success');
+      inspector.on('error', () => {});
+
+      let capturedRecord: UsageRecord | null = null;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+        capturedRecord = record;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+      src.write('event: response.completed\ndata: {"type":"response.completed"}\n\n');
+      inspector.destroy();
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(capturedRecord).not.toBeNull();
+      expect(capturedRecord!.responseStatus).toBe('success');
+    });
+
+    it('preserves success when a Chat Completions terminal chunk precedes stream destruction', async () => {
+      const requestId = 'test-destroy-chat-completed';
+      const inspector = makeInspector(requestId, Date.now() - 200, 'chat', 'success');
+      inspector.on('error', () => {});
+
+      let capturedRecord: UsageRecord | null = null;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+        capturedRecord = record;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+      src.write('data: {"id":"chatcmpl_test","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
+      inspector.destroy();
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(capturedRecord).not.toBeNull();
+      expect(capturedRecord!.responseStatus).toBe('success');
+    });
+
+    it('records cancellation when destroyed before the terminal event', async () => {
+      const requestId = 'test-destroy-before-terminal';
+      const inspector = makeInspector(requestId, Date.now() - 200, 'responses', 'success');
+      inspector.on('error', () => {});
+
+      let capturedRecord: UsageRecord | null = null;
+      registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+        capturedRecord = record;
+      });
+
+      const src = new PassThrough();
+      src.pipe(inspector);
+      src.write('event: response.output_text.delta\n');
+      inspector.destroy();
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(capturedRecord).not.toBeNull();
+      expect(capturedRecord!.responseStatus).toBe('cancelled');
+    });
+
+    it.each(['gemini', 'messages'])(
+      'does not classify %s streams from Responses markers',
+      async (apiType) => {
+        const requestId = `test-destroy-${apiType}-marker`;
+        const inspector = makeInspector(requestId, Date.now() - 200, apiType, 'success');
+        inspector.on('error', () => {});
+
+        let capturedRecord: UsageRecord | null = null;
+        registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+          capturedRecord = record;
+        });
+
+        const src = new PassThrough();
+        src.pipe(inspector);
+        src.write('event: response.completed\n');
+        inspector.destroy();
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(capturedRecord).not.toBeNull();
+        expect(capturedRecord!.responseStatus).toBe('cancelled');
+      }
+    );
 
     it('records responseStatus=timeout when destroyed with a TimeoutError', async () => {
       const requestId = 'test-destroy-timeout';
