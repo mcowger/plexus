@@ -5,6 +5,11 @@ import { DebugManager } from '../observability/debug-manager';
 
 const MAX_DEBUG_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
 
+export interface FinalizedDebugCapture {
+  rawBody: string;
+  reconstructed: any | null;
+}
+
 export class DebugLoggingInspector extends BaseInspector {
   private debugManager = DebugManager.getInstance();
   private mode: 'raw' | 'transformed';
@@ -16,6 +21,7 @@ export class DebugLoggingInspector extends BaseInspector {
   private totalSize = 0;
   private truncated = false;
   private finalized = false;
+  private finalizedCapture: FinalizedDebugCapture | null = null;
 
   constructor(requestId: string, mode: 'raw' | 'transformed' = 'raw') {
     super(requestId);
@@ -49,12 +55,24 @@ export class DebugLoggingInspector extends BaseInspector {
     return inspector;
   }
 
+  createTapStream(providerApiType: string): TransformStream {
+    this.providerApiType = providerApiType;
+
+    return new TransformStream({
+      transform: (chunk, controller) => {
+        this.captureChunk(chunk);
+        controller.enqueue(chunk);
+      },
+      flush: () => this.finalize(),
+    });
+  }
+
   private captureChunk(chunk: any): void {
     logger.silly(
       `[Inspector:${this.mode}] Request ${this.requestId} received chunk, length: ${chunk.length || chunk.toString().length}: ${chunk.toString()}`
     );
 
-    if (this.truncated) return;
+    if (this.finalized || this.truncated) return;
 
     let chunkStr: string;
     if (typeof chunk === 'string') {
@@ -131,6 +149,7 @@ export class DebugLoggingInspector extends BaseInspector {
         default:
           logger.warn(`Unknown providerApiType: ${this.providerApiType}`);
       }
+      this.finalizedCapture = { rawBody, reconstructed };
       // Always save to memory for usage extraction/estimation
       this.saveReconstructedResponse(reconstructed);
 
@@ -138,8 +157,14 @@ export class DebugLoggingInspector extends BaseInspector {
       this.saveRawResponse(rawBody);
     } catch (err) {
       logger.error(`[Inspector:${this.mode}] Reconstruction failed: ${err}`);
+      this.finalizedCapture = { rawBody, reconstructed: null };
       this.saveRawResponse(rawBody);
     }
+  }
+
+  getFinalizedCapture(): FinalizedDebugCapture | null {
+    this.finalize();
+    return this.finalizedCapture;
   }
 
   private saveRawResponse(fullBody: string): void {

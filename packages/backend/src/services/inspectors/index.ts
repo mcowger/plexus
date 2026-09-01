@@ -10,6 +10,7 @@
  */
 
 export { DebugLoggingInspector } from './debug-logging';
+export type { FinalizedDebugCapture } from './debug-logging';
 export { UsageInspector, extractUsageFromReconstructed } from './usage-logging';
 export type { ExtractedObservedUsage } from './usage-logging';
 export { StallInspector } from './stall-inspector';

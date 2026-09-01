@@ -222,19 +222,7 @@ export async function handleResponse(
     // the cancellation teardown below must finalize() the capture explicitly,
     // because a cancelled pipeline never runs the tap's flush.
     const rawDebugLogging = new DebugLoggingInspector(usageRecord.requestId!, 'raw');
-    const rawLogInspector = rawDebugLogging.createInspector(providerApiType);
-
-    const tapStream = new TransformStream({
-      transform(chunk, controller) {
-        rawLogInspector.write(chunk);
-        controller.enqueue(chunk);
-      },
-      flush() {
-        rawLogInspector.end();
-      },
-    });
-
-    rawStream = rawStream.pipeThrough(tapStream);
+    rawStream = rawStream.pipeThrough(rawDebugLogging.createTapStream(providerApiType));
 
     if (providerApiType === 'gemini') {
       rawStream = rawStream.pipeThrough(
@@ -363,19 +351,9 @@ export async function handleResponse(
       usageRecord.requestId!,
       'transformed'
     );
-    const transformedLogInspector = transformedDebugLogging.createInspector(apiType);
-
-    const transformedTapStream = new TransformStream({
-      transform(chunk, controller) {
-        transformedLogInspector.write(chunk);
-        controller.enqueue(chunk);
-      },
-      flush() {
-        transformedLogInspector.end();
-      },
-    });
-
-    finalClientStream = finalClientStream.pipeThrough(transformedTapStream);
+    finalClientStream = finalClientStream.pipeThrough(
+      transformedDebugLogging.createTapStream(apiType)
+    );
 
     // Standard SSE headers to prevent buffering and timeouts
     reply.header('Content-Type', 'text/event-stream');
@@ -398,7 +376,9 @@ export async function handleResponse(
       apiType,
       originalRequest,
       quotaEnforcer,
-      keyName
+      keyName,
+      rawDebugLogging,
+      transformedDebugLogging
     );
 
     // Convert Web Stream to Node Stream for piping

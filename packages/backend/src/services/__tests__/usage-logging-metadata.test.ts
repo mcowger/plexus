@@ -593,19 +593,6 @@ describe('UsageInspector Metadata Robustness', () => {
           pricing?: any;
         }
       ): Promise<UsageRecord | null> => {
-        const inspector = new UsageInspector(
-          requestId,
-          mockStorage,
-          { requestId } as Partial<UsageRecord>,
-          options.pricing ?? mockPricing,
-          undefined,
-          Date.now(),
-          false,
-          options.providerApiType,
-          options.incomingApiType,
-          undefined
-        );
-
         const dm = DebugManager.getInstance();
         dm.startLog(requestId, {});
 
@@ -622,6 +609,23 @@ describe('UsageInspector Metadata Robustness', () => {
         if (options.transformedBody !== undefined) {
           transformedTap.write(options.transformedBody);
         }
+
+        const inspector = new UsageInspector(
+          requestId,
+          mockStorage,
+          { requestId } as Partial<UsageRecord>,
+          options.pricing ?? mockPricing,
+          undefined,
+          Date.now(),
+          false,
+          options.providerApiType,
+          options.incomingApiType,
+          undefined,
+          undefined,
+          undefined,
+          rawDebugLogging,
+          transformedDebugLogging
+        );
 
         let capturedRecord: UsageRecord | null = null;
         registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
@@ -641,6 +645,51 @@ describe('UsageInspector Metadata Robustness', () => {
       };
 
       const responsesRawBodyWithUsage = () => JSON.stringify(responsesRawSnapshotWithUsage());
+
+      it('reads finalized captures directly after DebugManager state is gone', async () => {
+        const requestId = 'destroy-direct-capture-after-debug-flush';
+        const rawDebugLogging = new DebugLoggingInspector(requestId, 'raw');
+        const rawTap = rawDebugLogging.createInspector('responses');
+        rawTap.write(responsesRawBodyWithUsage());
+
+        const transformedDebugLogging = new DebugLoggingInspector(requestId, 'transformed');
+        const transformedTap = transformedDebugLogging.createInspector('responses');
+        transformedTap.write(
+          'event: response.completed\ndata: {"type":"response.completed","response":{"status":"completed"}}\n\n'
+        );
+
+        const inspector = new UsageInspector(
+          requestId,
+          mockStorage,
+          { requestId, responseStatus: 'success' } as Partial<UsageRecord>,
+          { source: 'simple', input: 1000, output: 2000 },
+          undefined,
+          Date.now(),
+          false,
+          'responses',
+          'responses',
+          undefined,
+          undefined,
+          undefined,
+          rawDebugLogging,
+          transformedDebugLogging
+        );
+
+        let capturedRecord: UsageRecord | null = null;
+        registerSpy(mockStorage, 'saveRequest').mockImplementation(async (record: UsageRecord) => {
+          capturedRecord = record;
+        });
+
+        DebugManager.getInstance().resetForTesting();
+        inspector.destroy();
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const record = capturedRecord as UsageRecord | null;
+        expect(record?.responseStatus).toBe('success');
+        expect(record?.tokensInput).toBe(42);
+        expect(record?.tokensOutput).toBe(8);
+      });
 
       const responsesRawBodyWithoutUsage = () =>
         JSON.stringify({
@@ -668,7 +717,7 @@ describe('UsageInspector Metadata Robustness', () => {
           transformedBody: chatTransformedSseWithUsage(),
         });
 
-        expect(record?.responseStatus).toBe('cancelled');
+        expect(record?.responseStatus).toBe('success');
         expect(record?.tokensInput).toBe(42);
         expect(record?.tokensOutput).toBe(8);
       });
@@ -681,7 +730,7 @@ describe('UsageInspector Metadata Robustness', () => {
           pricing: { source: 'simple', input: 1000, output: 2000 },
         });
 
-        expect(record?.responseStatus).toBe('cancelled');
+        expect(record?.responseStatus).toBe('success');
         expect(record?.tokensInput).toBe(21);
         expect(record?.tokensOutput).toBe(7);
         // Costs are calculated over the fallback tokens too — "tokens

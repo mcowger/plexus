@@ -14,8 +14,10 @@ import {
 } from '../../utils/usage-normalizer';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
 import { recordQuotaUsage } from '../quota/quota-middleware';
+import type { DebugLoggingInspector, FinalizedDebugCapture } from './debug-logging';
 
-const RESPONSES_COMPLETED_EVENT_RE = /(?:^|\r?\n)event:\s*response\.completed(?:\r?\n|$)/;
+const RESPONSES_COMPLETED_EVENT_RE =
+  /(?:^|\r?\n)(?:event:\s*response\.completed(?:\r?\n|$)|data:\s*\{[^\r\n]*"type"\s*:\s*"response\.completed")/;
 const CHAT_COMPLETION_TERMINAL_EVENT_RE =
   /(?:^|\r?\n)data:\s*(?:\[DONE\]|\{[^\r\n]*"finish_reason"\s*:\s*"(?:stop|length|tool_calls|function_call|content_filter)")/;
 
@@ -111,8 +113,9 @@ export class UsageInspector extends PassThrough {
   private firstChunk = true;
   private quotaEnforcer?: any;
   private keyName?: string;
+  private rawDebugCapture?: DebugLoggingInspector;
+  private transformedDebugCapture?: DebugLoggingInspector;
   private _flushed = false;
-  private terminalResponseObserved = false;
 
   constructor(
     requestId: string,
@@ -126,7 +129,9 @@ export class UsageInspector extends PassThrough {
     incomingApiType?: string,
     originalRequest?: any,
     quotaEnforcer?: any,
-    keyName?: string
+    keyName?: string,
+    rawDebugCapture?: DebugLoggingInspector,
+    transformedDebugCapture?: DebugLoggingInspector
   ) {
     super();
     this.usageStorage = usageStorage;
@@ -140,39 +145,17 @@ export class UsageInspector extends PassThrough {
     this.originalRequest = originalRequest;
     this.quotaEnforcer = quotaEnforcer;
     this.keyName = keyName;
+    this.rawDebugCapture = rawDebugCapture;
+    this.transformedDebugCapture = transformedDebugCapture;
   }
 
   override _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
-    this.observeTerminalResponse(chunk);
-
     if (this.firstChunk) {
       const now = Date.now();
       this.usageRecord.ttftMs = now - this.startTime;
       this.firstChunk = false;
     }
     callback(null, chunk);
-  }
-
-  private observeTerminalResponse(chunk: any): void {
-    if (this.terminalResponseObserved) return;
-
-    const apiType = this.incomingApiType.trim().toLowerCase().split(':', 1)[0];
-    if (apiType !== 'responses' && apiType !== 'chat') return;
-
-    const chunkText =
-      typeof chunk === 'string'
-        ? chunk
-        : Buffer.isBuffer(chunk)
-          ? chunk.toString('utf8')
-          : chunk instanceof Uint8Array
-            ? Buffer.from(chunk).toString('utf8')
-            : null;
-    if (!chunkText) return;
-
-    this.terminalResponseObserved =
-      apiType === 'responses'
-        ? RESPONSES_COMPLETED_EVENT_RE.test(chunkText)
-        : CHAT_COMPLETION_TERMINAL_EVENT_RE.test(chunkText);
   }
 
   override _flush(callback: Function) {
@@ -187,8 +170,12 @@ export class UsageInspector extends PassThrough {
 
     try {
       const debugManager = DebugManager.getInstance();
-      const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
-      const usage = this.readObservedUsage(debugManager, reconstructed);
+      const { rawCapture, transformedCapture } = this.getFinalizedCaptures();
+      const reconstructed = rawCapture?.reconstructed ?? null;
+      const usage = this.readObservedUsage(
+        reconstructed,
+        transformedCapture?.reconstructed ?? null
+      );
 
       if (reconstructed || usage) {
         if (usage) {
@@ -361,6 +348,8 @@ export class UsageInspector extends PassThrough {
       return;
     }
 
+    const { rawCapture, transformedCapture } = this.getFinalizedCaptures();
+    const terminalResponseObserved = this.hasTerminalResponse(transformedCapture);
     const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('timeout');
     const isStall = err?.message?.includes('stalled');
     // A normal client can close immediately after receiving the terminal SSE
@@ -375,7 +364,7 @@ export class UsageInspector extends PassThrough {
             : this.usageRecord.responseStatus === 'error' ||
                 this.usageRecord.responseStatus === 'empty'
               ? this.usageRecord.responseStatus
-              : this.terminalResponseObserved
+              : terminalResponseObserved
                 ? 'success'
                 : 'cancelled';
 
@@ -388,13 +377,15 @@ export class UsageInspector extends PassThrough {
       this.usageRecord.responseStatus = status;
       this.usageRecord.durationMs = Date.now() - this.startTime;
 
-      const debugManager = DebugManager.getInstance();
-      const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
+      const reconstructed = rawCapture?.reconstructed ?? null;
       // Same read-raw-then-fallback as _flush (readObservedUsage): a stream
       // destroyed mid-flight can have usage only in the transformed-mode
       // snapshot, and without the fallback the cancelled/timeout record
       // would finalize with no tokens at all.
-      const usage = this.readObservedUsage(debugManager, reconstructed);
+      const usage = this.readObservedUsage(
+        reconstructed,
+        transformedCapture?.reconstructed ?? null
+      );
       if (usage) {
         this.usageRecord.tokensInput = usage.inputTokens || null;
         this.usageRecord.tokensOutput = usage.outputTokens || null;
@@ -410,7 +401,7 @@ export class UsageInspector extends PassThrough {
         logger.error(`Failed to save ${status} usage for ${this.usageRecord.requestId}:`, saveErr);
       });
 
-      debugManager.flush(this.usageRecord.requestId!);
+      DebugManager.getInstance().flush(this.usageRecord.requestId!);
     } catch (destroyErr) {
       logger.error(
         `Error in UsageInspector._destroy for ${this.usageRecord.requestId}:`,
@@ -431,16 +422,62 @@ export class UsageInspector extends PassThrough {
    * writes — mirroring the raw extraction per api type (the transformed
    * snapshot is keyed by the CLIENT api type).
    */
+  private getFinalizedCaptures(): {
+    rawCapture: FinalizedDebugCapture | null;
+    transformedCapture: FinalizedDebugCapture | null;
+  } {
+    const debugManager = DebugManager.getInstance();
+    const rawCapture = this.rawDebugCapture?.getFinalizedCapture() ?? null;
+    const transformedCapture = this.transformedDebugCapture?.getFinalizedCapture() ?? null;
+    const rawReconstructed = rawCapture
+      ? rawCapture.reconstructed
+      : debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
+    const transformedReconstructed = transformedCapture
+      ? transformedCapture.reconstructed
+      : debugManager.getPendingLog(this.usageRecord.requestId!)?.transformedResponseSnapshot;
+
+    return {
+      rawCapture: rawCapture
+        ? { ...rawCapture, reconstructed: rawReconstructed }
+        : rawReconstructed
+          ? { rawBody: '', reconstructed: rawReconstructed }
+          : null,
+      transformedCapture: transformedCapture
+        ? { ...transformedCapture, reconstructed: transformedReconstructed }
+        : transformedReconstructed
+          ? { rawBody: '', reconstructed: transformedReconstructed }
+          : null,
+    };
+  }
+
+  private hasTerminalResponse(capture: FinalizedDebugCapture | null): boolean {
+    if (!capture?.rawBody) return false;
+
+    const apiType = this.normalizeApiType(this.incomingApiType);
+    return apiType === 'responses'
+      ? RESPONSES_COMPLETED_EVENT_RE.test(capture.rawBody)
+      : apiType === 'chat'
+        ? CHAT_COMPLETION_TERMINAL_EVENT_RE.test(capture.rawBody)
+        : false;
+  }
+
+  private normalizeApiType(apiType: string): string {
+    return apiType.trim().toLowerCase().split(':', 1)[0] ?? '';
+  }
+
   private readObservedUsage(
-    debugManager: DebugManager,
-    reconstructed: any
+    reconstructed: any,
+    transformedReconstructed: any
   ): ExtractedObservedUsage | null {
-    let usage = extractUsageFromReconstructed(reconstructed, this.providerApiType);
+    let usage = extractUsageFromReconstructed(
+      reconstructed,
+      this.normalizeApiType(this.providerApiType)
+    );
     if (!usage) {
-      const transformedSnapshot = debugManager.getPendingLog(
-        this.usageRecord.requestId!
-      )?.transformedResponseSnapshot;
-      usage = extractUsageFromReconstructed(transformedSnapshot, this.incomingApiType);
+      usage = extractUsageFromReconstructed(
+        transformedReconstructed,
+        this.normalizeApiType(this.incomingApiType)
+      );
     }
     return usage;
   }

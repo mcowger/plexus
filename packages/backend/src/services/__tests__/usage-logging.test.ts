@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { PassThrough } from 'stream';
 import { UsageInspector } from '../inspectors/usage-logging';
+import { DebugLoggingInspector } from '../inspectors/debug-logging';
 import { UsageStorageService } from '../observability/usage-storage';
 import { DebugManager } from '../observability/debug-manager';
 import type { UsageRecord } from '../../types/usage';
@@ -466,7 +467,25 @@ describe('UsageInspector', () => {
 
     it('preserves success when a Responses terminal event precedes stream destruction', async () => {
       const requestId = 'test-destroy-responses-completed';
-      const inspector = makeInspector(requestId, Date.now() - 200, 'responses', 'success');
+      const transformedCapture = new DebugLoggingInspector(requestId, 'transformed');
+      const transformedTap = transformedCapture.createInspector('responses');
+      transformedTap.write('event: response.completed\ndata: {"type":"response.completed"}\n\n');
+      const inspector = new UsageInspector(
+        requestId,
+        mockStorage,
+        { requestId, responseStatus: 'success' } as Partial<UsageRecord>,
+        mockPricing,
+        undefined,
+        Date.now() - 200,
+        false,
+        'responses',
+        'responses',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        transformedCapture
+      );
       inspector.on('error', () => {});
 
       let capturedRecord: UsageRecord | null = null;
@@ -474,9 +493,6 @@ describe('UsageInspector', () => {
         capturedRecord = record;
       });
 
-      const src = new PassThrough();
-      src.pipe(inspector);
-      src.write('event: response.completed\ndata: {"type":"response.completed"}\n\n');
       inspector.destroy();
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -487,7 +503,27 @@ describe('UsageInspector', () => {
 
     it('preserves success when a Chat Completions terminal chunk precedes stream destruction', async () => {
       const requestId = 'test-destroy-chat-completed';
-      const inspector = makeInspector(requestId, Date.now() - 200, 'chat', 'success');
+      const transformedCapture = new DebugLoggingInspector(requestId, 'transformed');
+      const transformedTap = transformedCapture.createInspector('chat');
+      transformedTap.write(
+        'data: {"id":"chatcmpl_test","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+      );
+      const inspector = new UsageInspector(
+        requestId,
+        mockStorage,
+        { requestId, responseStatus: 'success' } as Partial<UsageRecord>,
+        mockPricing,
+        undefined,
+        Date.now() - 200,
+        false,
+        'chat',
+        'chat',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        transformedCapture
+      );
       inspector.on('error', () => {});
 
       let capturedRecord: UsageRecord | null = null;
@@ -495,9 +531,6 @@ describe('UsageInspector', () => {
         capturedRecord = record;
       });
 
-      const src = new PassThrough();
-      src.pipe(inspector);
-      src.write('data: {"id":"chatcmpl_test","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n');
       inspector.destroy();
 
       await new Promise((resolve) => setTimeout(resolve, 100));
