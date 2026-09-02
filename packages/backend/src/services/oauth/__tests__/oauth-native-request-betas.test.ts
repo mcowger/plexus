@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { REQUIRED_BETAS } from '../../../transformers/oauth/masking';
+import { CC_VERSION, REQUIRED_BETAS } from '../../../transformers/oauth/masking';
 import { prepareOAuthNativeRequest } from '../oauth-native-request';
 
 const AUTH = { mode: 'oauth', token: 'oauth-token-for-test' } as const;
@@ -74,5 +74,23 @@ describe('prepareOAuthNativeRequest — anthropic-beta merging', () => {
   it('emits exactly REQUIRED_BETAS when the caller sent no header', () => {
     expect(betasFor(undefined)).toEqual([...REQUIRED_BETAS]);
     expect(betasFor('')).toEqual([...REQUIRED_BETAS]);
+  });
+});
+
+describe('prepareOAuthNativeRequest — Claude Code identity', () => {
+  // The version gate applies to both the HTTP identity and billing identity.
+  it('uses the current shared version in the user agent and billing header', () => {
+    const prepared = prepareOAuthNativeRequest(
+      'anthropic',
+      'claude-sonnet-4-5',
+      AUTH,
+      nativeBody(),
+      false
+    );
+    const sentBody = prepared.body;
+    const billingHeader = sentBody.system[0].text as string;
+
+    expect(prepared.headers['user-agent']).toBe(`claude-cli/${CC_VERSION} (external, cli)`);
+    expect(billingHeader).toContain(`cc_version=${CC_VERSION}.`);
   });
 });

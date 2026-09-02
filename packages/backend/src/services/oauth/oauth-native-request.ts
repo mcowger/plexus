@@ -41,6 +41,7 @@ import {
 import type { RenamePair } from '../../transformers/oauth/masking/types';
 import { CodexVersionService } from './codex-version-service';
 import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
+import { CC_VERSION } from '../../transformers/oauth/masking/cc-constants';
 
 /**
  * Auth for a native Anthropic request. Two modes, mirroring the old executor:
@@ -149,7 +150,7 @@ function prepareAnthropicOAuthRequest(
   // canon-only variant, which drops the system relocation). We do NOT reuse
   // their internal rename bookkeeping for the response — see reversal below.
   const { payload: transformed } = applyClaudeOAuthTransform(nativeBody, maskingToken, {
-    version: '2.1.63',
+    version: CC_VERSION,
     entrypoint: 'cli',
     workload: '',
     oauthMode: true,
