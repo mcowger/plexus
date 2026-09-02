@@ -24,13 +24,17 @@
  * Claude Code CLI version string to emulate in the billing header's
  * cc_version and the `user-agent`/`claude-cli` headers.
  *
- * SOURCE: vendor/eliza's CC_VERSION, itself kept in sync with whatever
- * Claude Code version was current when that constant was last updated.
- * TO UPDATE: install the real `claude` CLI and run `claude --version`, or
- * inspect a genuine Claude Code session's `user-agent` header
- * (`claude-cli/<version> (external, cli)`).
+ * Anthropic gates new models on this version: requests advertising an
+ * older Claude Code are rejected with `claude_code_version_too_old`
+ * (e.g. claude-fable-5-1 requires >= 2.1.251; see mcowger/plexus#842), so
+ * letting this constant go stale blocks newly released models even when
+ * everything else about the fingerprint is correct.
+ *
+ * SOURCE: latest real `@anthropic-ai/claude-code` release.
+ * TO UPDATE: check the npm registry (`npm view @anthropic-ai/claude-code
+ * version`) or install the real `claude` CLI and run `claude --version`.
  */
-export const CC_VERSION = '2.1.207';
+export const CC_VERSION = '2.1.258';
 
 /**
  * Billing fingerprint salt + character-index selection, used to compute the
