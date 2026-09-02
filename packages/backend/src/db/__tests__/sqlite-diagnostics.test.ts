@@ -72,18 +72,18 @@ describe('SQLite diagnostics', () => {
   test('logs transaction execution including transaction modes', () => {
     process.env.PLEXUS_SQLITE_SLOW_QUERY_MS = '0.0001';
     const warnSpy = registerSpy(logger, 'warn');
-    const runTransaction = (..._args: unknown[]) => undefined;
-    const transaction = Object.assign(runTransaction, {
-      deferred: runTransaction,
-      immediate: runTransaction,
-      exclusive: runTransaction,
-    });
+    const createTx = (fn: (...args: unknown[]) => unknown) =>
+      Object.assign((...args: unknown[]) => fn(...args), {
+        deferred: (...args: unknown[]) => fn(...args),
+        immediate: (...args: unknown[]) => fn(...args),
+        exclusive: (...args: unknown[]) => fn(...args),
+      });
     const database = instrumentSqliteDatabase({
       prepare: (..._args: unknown[]) => ({}),
       query: (..._args: unknown[]) => ({}),
       run: () => undefined,
       exec: () => undefined,
-      transaction: (..._args: unknown[]) => transaction,
+      transaction: (fn: (...args: unknown[]) => unknown) => createTx(fn),
     });
 
     database.transaction(() => {})();
@@ -98,20 +98,28 @@ describe('SQLite diagnostics', () => {
     process.env.PLEXUS_SQLITE_SLOW_QUERY_MS = '250';
     const receiver = { value: 'preserved' };
     let observedReceiver: unknown;
-    const runTransaction = function (this: unknown) {
+    const runTransaction = function (this: unknown, fn: (...args: unknown[]) => unknown) {
       observedReceiver = this;
+      return fn?.();
     };
-    const transaction = Object.assign(runTransaction, {
-      deferred: runTransaction,
-      immediate: runTransaction,
-      exclusive: runTransaction,
-    });
+    const createTx = (fn: (...args: unknown[]) => unknown) =>
+      Object.assign(
+        function (this: unknown) {
+          observedReceiver = this;
+          return fn?.();
+        },
+        {
+          deferred: runTransaction,
+          immediate: runTransaction,
+          exclusive: runTransaction,
+        }
+      );
     const database = instrumentSqliteDatabase({
       prepare: (..._args: unknown[]) => ({}),
       query: (..._args: unknown[]) => ({}),
       run: () => undefined,
       exec: () => undefined,
-      transaction: (..._args: unknown[]) => transaction,
+      transaction: (fn: (...args: unknown[]) => unknown) => createTx(fn),
     });
     const wrappedTransaction = database.transaction(() => {});
 

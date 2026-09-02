@@ -4,7 +4,6 @@ const SQLITE_SLOW_QUERY_ENV = 'PLEXUS_SQLITE_SLOW_QUERY_MS';
 const MAX_LOGGED_SQL_LENGTH = 1000;
 const SQLITE_CONTENTION_PATTERN = /SQLITE_(?:BUSY|LOCKED)|database\s+(?:is\s+)?(?:busy|locked)/i;
 const STATEMENT_EXECUTION_METHODS = new Set(['all', 'get', 'raw', 'run', 'values']);
-const TRANSACTION_MODES = new Set(['deferred', 'immediate', 'exclusive']);
 
 type SqliteDatabase = {
   prepare: (...args: any[]) => any;
@@ -120,34 +119,6 @@ function instrumentStatement(
   });
 }
 
-function instrumentTransaction(
-  transaction: (...args: any[]) => any,
-  config: SqliteDiagnosticsConfig
-): (...args: any[]) => any {
-  return new Proxy(transaction, {
-    apply(target, thisArg, args) {
-      return measureSqliteOperation('transaction', 'transaction', config, () =>
-        Reflect.apply(target, thisArg, args)
-      );
-    },
-    get(target, property) {
-      const method = Reflect.get(target, property, target);
-      if (
-        typeof property === 'string' &&
-        TRANSACTION_MODES.has(property) &&
-        typeof method === 'function'
-      ) {
-        return (...args: unknown[]) =>
-          measureSqliteOperation('transaction', property, config, () =>
-            Reflect.apply(method, target, args)
-          );
-      }
-
-      return typeof method === 'function' ? method.bind(target) : method;
-    },
-  });
-}
-
 export function instrumentSqliteDatabase<T extends SqliteDatabase>(database: T): T {
   const slowQueryMs = getSqliteSlowQueryThresholdMs();
   if (slowQueryMs === null) return database;
@@ -181,11 +152,13 @@ export function instrumentSqliteDatabase<T extends SqliteDatabase>(database: T):
       }
 
       if (property === 'transaction' && typeof method === 'function') {
-        return (...args: unknown[]) => {
-          const transaction = Reflect.apply(method, target, args);
-          return typeof transaction === 'function'
-            ? instrumentTransaction(transaction, config)
-            : transaction;
+        return (fn: (...args: unknown[]) => unknown, ...outerArgs: unknown[]) => {
+          if (typeof fn !== 'function') {
+            return Reflect.apply(method, target, [fn, ...outerArgs]);
+          }
+          const measuredFn = (...args: unknown[]) =>
+            measureSqliteOperation('transaction', 'transaction', config, () => fn(...args));
+          return Reflect.apply(method, target, [measuredFn, ...outerArgs]);
         };
       }
 
