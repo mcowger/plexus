@@ -16,13 +16,13 @@
     "lint:migrations": "cd ../.. && bun run scripts/lint-migrations.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-ai": "0.84.4",
     "@fastify/bearer-auth": "^10.1.3",
     "@fastify/cors": "^11.3.0",
     "@fastify/formbody": "^9.0.0",
     "@fastify/multipart": "^10.1.1",
     "@fastify/static": "^10.1.3",
-    "@google/genai": "^2.18.0",
+    "@google/genai": "^2.19.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@plexus/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.52",
@@ -33,7 +33,7 @@
     "eventsource-encoder": "^1.0.2",
     "eventsource-parser": "^4.1.0",
     "fastify": "^5.12.1",
-    "headroom-ai": "^0.36.5",
+    "headroom-ai": "^0.37.0",
     "js-tiktoken": "^1.0.21",
     "parse-duration": "^2.1.8",
     "pkce-challenge": "^6.0.0",
@@ -41,12 +41,12 @@
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
     "yaml": "^2.8.4",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.7",
+    "@electric-sql/pglite": "^0.5.8",
     "@types/bun": "latest",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/winston": "^2.4.4",
     "drizzle-kit": "^0.31.10",
     "form-data": "^4.0.6"
