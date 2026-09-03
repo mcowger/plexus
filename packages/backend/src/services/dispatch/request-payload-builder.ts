@@ -19,6 +19,7 @@ import {
   hasCodexResponsesExtensions,
   stripLiteUnsupportedTools,
 } from './dispatcher-auto-compat';
+import { appendUserAfterTextOnlyModelTail } from '../../transformers/gemini/utils/model-tail';
 
 /** Symbol stash for the native OAuth prep, read by the standard dispatch seams. */
 export const NATIVE_OAUTH_STASH = Symbol('nativeOAuthPrep');
@@ -149,6 +150,19 @@ export async function buildRequestPayload(
     payload = JSON.parse(JSON.stringify(request.originalBody));
     payload.model = route.model;
 
+    // Native Gemini pass-through forwards `contents` verbatim, so a client
+    // history ending on a text-only model turn would 400 upstream
+    // ("Requests ending with a model turn are not supported", LiteLLM
+    // #38537 / PR #38652). Normalize the tail the same way the transform
+    // path does. Tool-call / media tails are left untouched.
+    if (getApiBaseType(targetApiType) === 'gemini' && Array.isArray((payload as any)?.contents)) {
+      const before = (payload as any).contents.length;
+      (payload as any).contents = appendUserAfterTextOnlyModelTail((payload as any).contents);
+      if ((payload as any).contents.length !== before) {
+        logger.debug('Auto-compat: appended synthetic user turn after text-only model tail');
+      }
+    }
+
     if (request.metadata) {
       const apiMetadata = getApiMetadata(request.metadata);
       if (Object.keys(apiMetadata).length > 0) payload.metadata = apiMetadata;
@@ -170,6 +184,14 @@ export async function buildRequestPayload(
         }
       : request;
     payload = await transformer.transformRequest(requestWithOAuthProvider);
+  }
+
+  // Defense in depth: non-Gemini-transformer paths (cross-format routing to
+  // a Gemini target, adapters that rewrite contents) can still produce a
+  // trailing text-only model turn. Normalize unconditionally for Gemini
+  // targets — the helper is a no-op unless the tail matches.
+  if (getApiBaseType(targetApiType) === 'gemini' && Array.isArray((payload as any)?.contents)) {
+    (payload as any).contents = appendUserAfterTextOnlyModelTail((payload as any).contents);
   }
 
   payload = applyGeminiThinkingConfig(route, targetApiType, payload);

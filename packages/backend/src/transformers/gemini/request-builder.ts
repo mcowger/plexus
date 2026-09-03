@@ -1,6 +1,7 @@
 import { Content, Part, Tool } from '@google/genai';
 import { UnifiedChatRequest, GoogleBuiltInToolType, ThinkLevel } from '../../types/unified';
 import { convertUnifiedPartsToGemini } from './part-mapper';
+import { ensureContentsEndWithUser } from './utils/model-tail';
 
 /**
  * Unified ThinkLevel → Gemini ThinkingLevel enum. Gemini has no level above
@@ -135,6 +136,14 @@ export async function buildGeminiRequest(
 
     if (role && parts.length > 0) contents.push({ role, parts });
   }
+
+  // Gemini 3+ rejects histories ending on a model turn ("Requests ending
+  // with a model turn are not supported", LiteLLM #38537 / PR #38652).
+  // Agent loops replaying conversation state hit this when the last message
+  // is a text-only assistant turn. Append a minimal synthetic user turn so
+  // the request is accepted upstream. Tool-call / media tails are left
+  // alone — a user turn there would break functionCall pairing.
+  ensureContentsEndWithUser(contents);
 
   // Gap 4 & 5: Transform Unified tools to Gemini function declarations or built-in tools
   if (request.tools && request.tools.length > 0) {
