@@ -121,6 +121,18 @@ describe('same-format emission (chat -> chat, non-bypass transform path)', () =>
     });
     expect('max_tokens' in unified).toBe(false);
   });
+
+  it('passes an invalid caller budget through untouched so the upstream 400s', async () => {
+    const unified = await parse({
+      model: 'alias-B',
+      messages: MESSAGES,
+      max_completion_tokens: 'lots' as any,
+    });
+    const transformer = new OpenAITransformer();
+    const out = await transformer.transformRequest(unified);
+    expect(out.max_completion_tokens).toBe('lots');
+    expect('max_tokens' in out).toBe(false);
+  });
 });
 
 describe('enforce-limits pickup', () => {

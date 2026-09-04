@@ -116,9 +116,13 @@ export class OpenAITransformer implements Transformer {
     // parseRequest), so emit that alone rather than a contradictory pair.
     const callerSentMct = request.originalBody?.max_completion_tokens !== undefined;
     const callerSentMaxTokens = request.originalBody?.max_tokens !== undefined;
-    delete out.max_tokens;
-    delete out.max_completion_tokens;
     if (request.max_tokens !== undefined) {
+      // Only clear the keys when a unified budget exists to re-emit: an
+      // invalid caller value (e.g. a non-numeric budget the parse-time guard
+      // rejected) must pass through untouched so the upstream still 400s on
+      // it instead of silently running uncapped.
+      delete out.max_tokens;
+      delete out.max_completion_tokens;
       if (callerSentMct && !callerSentMaxTokens) {
         out.max_completion_tokens = request.max_tokens;
       } else if (callerSentMaxTokens && !callerSentMct) {
