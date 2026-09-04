@@ -1914,7 +1914,7 @@ export const api = {
       stall_cooldown: provider.stallCooldown === true ? true : undefined,
       allow_100_percent_utilization:
         provider.allow100PercentUtilization === true ? true : undefined,
-      auto_compat: provider.auto_compat === true ? true : undefined,
+      auto_compat: provider.auto_compat === true,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,
