@@ -96,8 +96,7 @@ const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
 const LIVE_DURATION_UPDATE_INTERVAL_MS = 500;
 const DESKTOP_LOGS_MEDIA_QUERY = '(min-width: 1024px)';
 const DESKTOP_STATUS_COLUMN_WIDTH = '32px';
-const DESKTOP_DATE_COLUMN_WIDTH = '78px';
-const DESKTOP_KEY_COLUMN_WIDTH = '82px';
+const DESKTOP_DATE_COLUMN_WIDTH = '96px';
 const DESKTOP_API_COLUMN_WIDTH = '58px';
 const DESKTOP_TOKENS_COLUMN_WIDTH = '144px';
 const DESKTOP_COST_COLUMN_WIDTH = '86px';
@@ -694,7 +693,7 @@ const DesktopLogRow = React.memo(
         <td
           className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
           title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
-          style={{ width: DESKTOP_KEY_COLUMN_WIDTH, ...(log.sourceIp ? { cursor: 'help' } : {}) }}
+          style={log.sourceIp ? { cursor: 'help' } : undefined}
         >
           <div className="flex min-w-0 flex-col">
             <span
@@ -2077,7 +2076,7 @@ export const Logs = () => {
                 <colgroup>
                   <col style={{ width: DESKTOP_STATUS_COLUMN_WIDTH }} />
                   <col style={{ width: DESKTOP_DATE_COLUMN_WIDTH }} />
-                  <col style={{ width: DESKTOP_KEY_COLUMN_WIDTH }} />
+                  <col />
                   <col style={{ width: DESKTOP_API_COLUMN_WIDTH }} />
                   <col />
                   <col style={{ width: DESKTOP_TOKENS_COLUMN_WIDTH }} />
@@ -2101,10 +2100,7 @@ export const Logs = () => {
                     >
                       {renderSortableHeader('Date', 'date')}
                     </th>
-                    <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
-                      style={{ width: DESKTOP_KEY_COLUMN_WIDTH }}
-                    >
+                    <th className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
                       {renderSortableHeader('Key', 'apiKey')}
                     </th>
                     <th
