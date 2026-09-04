@@ -4,6 +4,32 @@ import { ConfigService } from '../configuration/config-service';
 import { getOAuthProviderAuth, type OAuthProvider } from './oauth-providers';
 
 const LEGACY_ACCOUNT_ID = 'legacy';
+const REFRESH_RETRY_BACKOFF_INITIAL_MS = 60 * 1000;
+const REFRESH_RETRY_BACKOFF_MAX_MS = 15 * 60 * 1000;
+
+// Anthropic rate-limits its shared OAuth token endpoint independently of the
+// account being refreshed. Keep pooled-seat rotations out of the same burst.
+const PROVIDER_REFRESH_MIN_INTERVAL_MS: Readonly<Record<string, number>> = {
+  anthropic: 30 * 1000,
+};
+
+function waitForDelay(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason ?? new DOMException('Request aborted', 'AbortError'));
+  }
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(signal.reason ?? new DOMException('Request aborted', 'AbortError'));
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 interface GetApiKeyOptions {
   refreshIfOlderThanMs?: number;
@@ -17,6 +43,12 @@ export class OAuthAuthManager {
   private initPromise: Promise<void>;
   private readonly lastRefreshAt = new Map<string, number>();
   private readonly refreshPromises = new Map<string, Promise<OAuthCredentials>>();
+  private readonly providerRefreshTails = new Map<string, Promise<void>>();
+  private readonly lastProviderRefreshAttemptAt = new Map<string, number>();
+  private readonly refreshBackoffs = new Map<
+    string,
+    { consecutiveFailures: number; retryAt: number }
+  >();
 
   private constructor() {
     this.initPromise = this.loadFromDatabaseAsync();
@@ -42,6 +74,7 @@ export class OAuthAuthManager {
       const configService = ConfigService.getInstance();
       const providers = await configService.getAllOAuthProviders();
       const newAuthData: Record<string, { accounts: Record<string, OAuthCredentials> }> = {};
+      const loadedAt = Date.now();
 
       for (const { providerType, accountId } of providers) {
         const creds = await configService.getOAuthCredentials(providerType, accountId);
@@ -61,6 +94,10 @@ export class OAuthAuthManager {
             refresh: creds.refreshToken,
             expires: creds.expiresAt,
           } as OAuthCredentials;
+          // Loading a valid persisted credential must not count as "never
+          // refreshed". Otherwise process startup rotates every pooled account
+          // as soon as synchronized quota checkers run.
+          this.lastRefreshAt.set(`${providerType}/${accountId}`, loadedAt);
         } else {
           logger.warn(`OAuth: No credentials found in DB for ${providerType}/${accountId}`);
         }
@@ -150,7 +187,9 @@ export class OAuthAuthManager {
       type: 'oauth',
       ...credentials,
     } as OAuthCredentials;
-    this.lastRefreshAt.set(`${provider}/${accountId}`, Date.now());
+    const refreshKey = `${provider}/${accountId}`;
+    this.lastRefreshAt.set(refreshKey, Date.now());
+    this.refreshBackoffs.delete(refreshKey);
 
     await this.saveToDatabase(provider, accountId, credentials);
   }
@@ -198,25 +237,54 @@ export class OAuthAuthManager {
 
     if (refreshRequested) {
       const signal = options.signal ?? new AbortController().signal;
-      const existingRefresh = this.refreshPromises.get(refreshKey);
-      if (existingRefresh) {
-        current = await existingRefresh;
-      } else {
-        const refreshPromise = this.refreshCredentials(
-          provider,
-          resolvedAccountId,
-          descriptor.oauth.refresh,
-          current,
-          refreshKey,
-          signal
+      const backoff = this.refreshBackoffs.get(refreshKey);
+      if (backoff && backoff.retryAt > now) {
+        if (current.expires <= now) {
+          throw new Error(
+            `OAuth: refresh for ${provider}/${resolvedAccountId} is backed off until ` +
+              `${new Date(backoff.retryAt).toISOString()} after a previous failure.`
+          );
+        }
+        logger.warn(
+          `OAuth: Skipping proactive refresh for ${provider}/${resolvedAccountId} during ` +
+            `refresh backoff; continuing with the still-valid access token.`
         );
-        this.refreshPromises.set(refreshKey, refreshPromise);
+      } else {
         try {
-          current = await refreshPromise;
-        } finally {
-          if (this.refreshPromises.get(refreshKey) === refreshPromise) {
-            this.refreshPromises.delete(refreshKey);
+          const existingRefresh = this.refreshPromises.get(refreshKey);
+          if (existingRefresh) {
+            current = await existingRefresh;
+          } else {
+            const refreshPromise = this.refreshCredentials(
+              provider,
+              resolvedAccountId,
+              descriptor.oauth.refresh,
+              current,
+              refreshKey,
+              signal
+            );
+            this.refreshPromises.set(refreshKey, refreshPromise);
+            try {
+              current = await refreshPromise;
+            } finally {
+              if (this.refreshPromises.get(refreshKey) === refreshPromise) {
+                this.refreshPromises.delete(refreshKey);
+              }
+            }
           }
+        } catch (error) {
+          // Cancellation belongs to the caller and must not be converted into a
+          // successful auth lookup using the old token.
+          if (signal.aborted) throw error;
+
+          // Proactive rotation is best-effort. If the access token is still
+          // valid, keep serving instead of turning a transient token-endpoint
+          // failure into an immediate provider outage.
+          if (current.expires <= Date.now()) throw error;
+          logger.warn(
+            `OAuth: Proactive refresh failed for ${provider}/${resolvedAccountId}; ` +
+              `continuing with the still-valid access token.`
+          );
         }
       }
     } else {
@@ -243,19 +311,83 @@ export class OAuthAuthManager {
     refreshKey: string,
     signal: AbortSignal
   ): Promise<OAuthCredentials> {
-    const refreshed = await refresh({ ...credentials, type: 'oauth' } as OAuthCredential, signal);
-    const current = {
-      ...refreshed,
-      refresh: refreshed.refresh || credentials.refresh,
-    } as OAuthCredentials;
-    logger.debug(
-      `OAuth: getApiKey for ${provider}/${accountId} — token WAS refreshed. ` +
-        `new_refresh=${current.refresh ? `present(${current.refresh.length} chars)` : 'MISSING'}`
-    );
-    this.authData[provider]!.accounts[accountId] = current;
-    this.lastRefreshAt.set(refreshKey, Date.now());
-    await this.saveToDatabase(provider, accountId, current);
-    return current;
+    try {
+      const refreshed = await this.runProviderRefresh(
+        provider,
+        () => refresh({ ...credentials, type: 'oauth' } as OAuthCredential, signal),
+        signal
+      );
+      if (!refreshed.access || !Number.isFinite(refreshed.expires)) {
+        throw new Error(
+          `OAuth: refresh returned incomplete credentials for ${provider}/${accountId}`
+        );
+      }
+      const current = {
+        ...refreshed,
+        refresh: refreshed.refresh || credentials.refresh,
+      } as OAuthCredentials;
+      logger.debug(
+        `OAuth: getApiKey for ${provider}/${accountId} — token WAS refreshed. ` +
+          `new_refresh=${current.refresh ? `present(${current.refresh.length} chars)` : 'MISSING'}`
+      );
+      this.authData[provider]!.accounts[accountId] = current;
+      this.lastRefreshAt.set(refreshKey, Date.now());
+      this.refreshBackoffs.delete(refreshKey);
+      await this.saveToDatabase(provider, accountId, current);
+      return current;
+    } catch (error) {
+      if (signal.aborted) throw error;
+
+      const previousFailures = this.refreshBackoffs.get(refreshKey)?.consecutiveFailures ?? 0;
+      const consecutiveFailures = previousFailures + 1;
+      const delayMs = Math.min(
+        REFRESH_RETRY_BACKOFF_INITIAL_MS * 2 ** (consecutiveFailures - 1),
+        REFRESH_RETRY_BACKOFF_MAX_MS
+      );
+      this.refreshBackoffs.set(refreshKey, {
+        consecutiveFailures,
+        retryAt: Date.now() + delayMs,
+      });
+      logger.warn(
+        `OAuth: Refresh failed for ${provider}/${accountId}; backing off for ` +
+          `${Math.round(delayMs / 1000)}s before another token-endpoint attempt.`
+      );
+      throw error;
+    }
+  }
+
+  private async runProviderRefresh<T>(
+    provider: OAuthProvider,
+    operation: () => Promise<T>,
+    signal: AbortSignal
+  ): Promise<T> {
+    const previous = this.providerRefreshTails.get(provider) ?? Promise.resolve();
+    let release: (() => void) | undefined;
+    const tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.providerRefreshTails.set(provider, tail);
+
+    await previous;
+    try {
+      const minIntervalMs = PROVIDER_REFRESH_MIN_INTERVAL_MS[provider] ?? 0;
+      const lastAttemptAt = this.lastProviderRefreshAttemptAt.get(provider) ?? 0;
+      const delayMs = Math.max(0, minIntervalMs - (Date.now() - lastAttemptAt));
+      if (delayMs > 0) {
+        logger.info(
+          `OAuth: Spacing pooled ${provider} credential refresh by ` +
+            `${Math.round(delayMs / 1000)}s.`
+        );
+        await waitForDelay(delayMs, signal);
+      }
+      this.lastProviderRefreshAttemptAt.set(provider, Date.now());
+      return await operation();
+    } finally {
+      release?.();
+      if (this.providerRefreshTails.get(provider) === tail) {
+        this.providerRefreshTails.delete(provider);
+      }
+    }
   }
 
   getCredentials(provider: OAuthProvider, accountId?: string | null): OAuthCredentials | null {
@@ -297,6 +429,7 @@ export class OAuthAuthManager {
     const refreshKey = `${provider}/${accountId}`;
     this.lastRefreshAt.delete(refreshKey);
     this.refreshPromises.delete(refreshKey);
+    this.refreshBackoffs.delete(refreshKey);
     if (Object.keys(providerRecord.accounts).length === 0) {
       delete this.authData[provider];
     }

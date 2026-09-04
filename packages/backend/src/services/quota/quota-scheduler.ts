@@ -16,6 +16,11 @@ import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
 const DEFAULT_EXHAUSTION_THRESHOLD = 99;
 const MAX_STALE_QUOTA_CHECK_INTERVALS = 2;
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
+const CHECKER_RUN_MIN_INTERVAL_MS: Readonly<Record<string, number>> = {
+  // Pooled Claude providers otherwise poll the same Anthropic endpoint on the
+  // same interval phase, creating a burst on every scheduler tick.
+  'claude-code': 15 * 1000,
+};
 
 function toMs(val: unknown): number {
   if (val instanceof Date) return val.getTime();
@@ -32,6 +37,8 @@ export class QuotaScheduler {
   private static instance: QuotaScheduler;
   private configs: Map<string, QuotaConfig> = new Map();
   private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private checkerRunTails: Map<string, Promise<void>> = new Map();
+  private lastCheckerRunAt: Map<string, number> = new Map();
   private checkersLoaded = false;
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: ReturnType<typeof getSchema> | null = null;
@@ -102,12 +109,17 @@ export class QuotaScheduler {
     }
 
     logger.debug(`Running quota check for '${checkerId}'`);
-    const checkedAt = new Date().toISOString();
+    let checkedAt = new Date().toISOString();
     let result: MeterCheckResult;
 
     try {
       const ctx = createMeterContext(checkerId, config.provider, config.options);
-      const meters = await def.check(ctx);
+      const meters = await this.runCheckerWithSpacing(config.type, () => {
+        // Record when the queued check actually starts, rather than when it was
+        // enqueued, so history and staleness calculations remain accurate.
+        checkedAt = new Date().toISOString();
+        return def.check(ctx);
+      });
       result = {
         checkerId,
         checkerType: config.type,
@@ -137,6 +149,41 @@ export class QuotaScheduler {
     await this.applyCooldownsFromResult(result, config);
 
     return result;
+  }
+
+  private async runCheckerWithSpacing<T>(
+    checkerType: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const minIntervalMs = CHECKER_RUN_MIN_INTERVAL_MS[checkerType] ?? 0;
+    if (minIntervalMs === 0) return operation();
+
+    const previous = this.checkerRunTails.get(checkerType) ?? Promise.resolve();
+    let release: (() => void) | undefined;
+    const tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.checkerRunTails.set(checkerType, tail);
+
+    await previous;
+    try {
+      const lastRunAt = this.lastCheckerRunAt.get(checkerType) ?? 0;
+      const delayMs = Math.max(0, minIntervalMs - (Date.now() - lastRunAt));
+      if (delayMs > 0) {
+        logger.debug(
+          `Spacing '${checkerType}' quota check by ${Math.round(delayMs / 1000)}s ` +
+            `to avoid a shared-endpoint burst.`
+        );
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      }
+      this.lastCheckerRunAt.set(checkerType, Date.now());
+      return await operation();
+    } finally {
+      release?.();
+      if (this.checkerRunTails.get(checkerType) === tail) {
+        this.checkerRunTails.delete(checkerType);
+      }
+    }
   }
 
   private getExhaustionThreshold(config: QuotaConfig): number {
@@ -467,6 +514,8 @@ export class QuotaScheduler {
     }
     this.intervals.clear();
     this.configs.clear();
+    this.checkerRunTails.clear();
+    this.lastCheckerRunAt.clear();
   }
 
   async reload(quotaConfigs: QuotaConfig[]): Promise<void> {
