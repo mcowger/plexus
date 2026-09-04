@@ -13,6 +13,7 @@ import { CooldownManager } from '../../runtime/cooldown-manager';
 import type { MeterCheckResult, Meter } from '../../../types/meter';
 import type { QuotaConfig } from '../../../config';
 import { registerSpy } from '../../../../test/test-utils';
+import claudeChecker from '../checkers/claude-code-checker';
 
 const CHECKER_ID = 'quota-persistence-checker';
 
@@ -230,6 +231,40 @@ describe('QuotaScheduler persistence', () => {
       await vi.advanceTimersByTimeAsync(60_000);
 
       expect(runCheckNow).toHaveBeenCalledWith('synthetic-reload-checker');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('serializes and spaces Claude checks that share the Anthropic usage endpoint', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const scheduler = QuotaScheduler.getInstance() as any;
+      const check = registerSpy(claudeChecker, 'check').mockResolvedValue([]);
+      scheduler.configs.set('claude-checker-1', {
+        ...makeConfig({ id: 'claude-checker-1', provider: 'anthropic-claude-1' }),
+        type: 'claude-code',
+      });
+      scheduler.configs.set('claude-checker-2', {
+        ...makeConfig({ id: 'claude-checker-2', provider: 'anthropic-claude-2' }),
+        type: 'claude-code',
+      });
+
+      const first = scheduler.runCheckNow('claude-checker-1');
+      const second = scheduler.runCheckNow('claude-checker-2');
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(check).toHaveBeenCalledTimes(1);
+      const firstResult = await first;
+
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(check).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      const secondResult = await second;
+      expect(check).toHaveBeenCalledTimes(2);
+      expect(Date.parse(secondResult!.checkedAt) - Date.parse(firstResult!.checkedAt)).toBe(15_000);
     } finally {
       vi.useRealTimers();
     }
