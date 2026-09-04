@@ -48,10 +48,19 @@ export class OpenAITransformer implements Transformer {
         })
       : input.messages;
 
+    // `max_completion_tokens` is the non-deprecated Chat Completions spelling
+    // (required by o-series/GPT-5-style reasoning models); `max_tokens` is the
+    // legacy spelling. They are mutually exclusive upstream (sending both
+    // 400s), so normalize either into unified `max_tokens`, preferring
+    // `max_completion_tokens` when both are present. Conditional spread keeps
+    // the key absent (not `max_tokens: undefined`) when the caller sent
+    // neither — downstream `in`-checks must not see a phantom key.
+    const maxTokens = input.max_completion_tokens ?? input.max_tokens;
+
     return {
       messages,
       model: input.model,
-      max_tokens: input.max_tokens,
+      ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
       temperature: input.temperature,
       stream: input.stream,
       tools: input.tools,
@@ -100,7 +109,24 @@ export class OpenAITransformer implements Transformer {
     // Override with explicitly-transformed fields
     out.model = request.model;
     out.messages = messages;
-    out.max_tokens = request.max_tokens;
+    // `max_tokens` and `max_completion_tokens` are mutually exclusive
+    // upstream (sending both 400s). Mirror the caller's spelling: a caller
+    // that sent only `max_completion_tokens` must not gain a `max_tokens`
+    // key from the overlay (the spread above preserved their spelling).
+    // Callers that sent both keep both — that request is invalid and the
+    // upstream 400 explains why.
+    const callerSentMct = request.originalBody?.max_completion_tokens !== undefined;
+    const callerSentMaxTokens = request.originalBody?.max_tokens !== undefined;
+    if (request.max_tokens !== undefined) {
+      if (callerSentMct && !callerSentMaxTokens) {
+        delete out.max_tokens;
+        out.max_completion_tokens = request.max_tokens;
+      } else {
+        out.max_tokens = request.max_tokens;
+      }
+    } else {
+      delete out.max_tokens;
+    }
     out.temperature = request.temperature;
     out.stream = request.stream;
     out.tools = normalizedTools && normalizedTools.length > 0 ? normalizedTools : undefined;

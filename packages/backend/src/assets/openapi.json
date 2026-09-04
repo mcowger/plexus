@@ -10744,6 +10744,10 @@
             "type": "number"
           },
           "max_tokens": {
+            "type": "integer",
+            "deprecated": true
+          },
+          "max_completion_tokens": {
             "type": "integer"
           },
           "tools": {
