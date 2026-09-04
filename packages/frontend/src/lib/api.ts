@@ -1860,6 +1860,7 @@ export const api = {
           disableCooldown: val.disable_cooldown === true,
           stallCooldown: val.stall_cooldown === true,
           allow100PercentUtilization: val.allow_100_percent_utilization === true,
+          auto_compat: val.auto_compat === true,
           discount: val.discount,
           headers: val.headers,
           extraBody:
@@ -1913,6 +1914,7 @@ export const api = {
       stall_cooldown: provider.stallCooldown === true ? true : undefined,
       allow_100_percent_utilization:
         provider.allow100PercentUtilization === true ? true : undefined,
+      auto_compat: provider.auto_compat === true ? true : undefined,
       discount: provider.discount,
       headers: provider.headers,
       extraBody: provider.extraBody,
