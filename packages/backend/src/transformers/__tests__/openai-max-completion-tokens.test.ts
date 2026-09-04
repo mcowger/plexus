@@ -122,6 +122,16 @@ describe('same-format emission (chat -> chat, non-bypass transform path)', () =>
     expect('max_tokens' in unified).toBe(false);
   });
 
+  it('ignores a garbage mct without dropping a valid legacy max_tokens', async () => {
+    const unified = await parse({
+      model: 'alias-B',
+      messages: MESSAGES,
+      max_tokens: 512,
+      max_completion_tokens: '1024' as any,
+    });
+    expect(unified.max_tokens).toBe(512);
+  });
+
   it('passes an invalid caller budget through untouched so the upstream 400s', async () => {
     const unified = await parse({
       model: 'alias-B',

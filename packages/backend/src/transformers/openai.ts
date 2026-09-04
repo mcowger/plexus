@@ -55,12 +55,23 @@ export class OpenAITransformer implements Transformer {
     // `max_completion_tokens` when both are present. Conditional spread keeps
     // the key absent (not `max_tokens: undefined`) when the caller sent
     // neither — downstream `in`-checks must not see a phantom key.
-    const maxTokens = input.max_completion_tokens ?? input.max_tokens;
+    // First valid number wins (`max_completion_tokens` preferred): a garbage
+    // value in one spelling must not shadow a good value in the other via a
+    // bare `??` (e.g. `{max_tokens: 512, max_completion_tokens: "1024"}` must
+    // still normalize to 512 rather than dropping the budget entirely).
+    const mct = input.max_completion_tokens;
+    const legacy = input.max_tokens;
+    const maxTokens =
+      typeof mct === 'number' && mct > 0
+        ? mct
+        : typeof legacy === 'number' && legacy > 0
+          ? legacy
+          : undefined;
 
     return {
       messages,
       model: input.model,
-      ...(typeof maxTokens === 'number' && maxTokens > 0 ? { max_tokens: maxTokens } : {}),
+      ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
       temperature: input.temperature,
       stream: input.stream,
       tools: input.tools,
