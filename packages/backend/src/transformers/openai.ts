@@ -60,7 +60,7 @@ export class OpenAITransformer implements Transformer {
     return {
       messages,
       model: input.model,
-      ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
+      ...(typeof maxTokens === 'number' && maxTokens > 0 ? { max_tokens: maxTokens } : {}),
       temperature: input.temperature,
       stream: input.stream,
       tools: input.tools,
@@ -110,22 +110,26 @@ export class OpenAITransformer implements Transformer {
     out.model = request.model;
     out.messages = messages;
     // `max_tokens` and `max_completion_tokens` are mutually exclusive
-    // upstream (sending both 400s). Mirror the caller's spelling: a caller
-    // that sent only `max_completion_tokens` must not gain a `max_tokens`
-    // key from the overlay (the spread above preserved their spelling).
-    // Callers that sent both keep both — that request is invalid and the
-    // upstream 400 explains why.
+    // upstream (sending both 400s), so emit exactly one spelling. Mirror the
+    // caller's spelling when they sent only one; when they sent both, the
+    // unified value already prefers `max_completion_tokens` (see
+    // parseRequest), so emit that alone rather than a contradictory pair.
     const callerSentMct = request.originalBody?.max_completion_tokens !== undefined;
     const callerSentMaxTokens = request.originalBody?.max_tokens !== undefined;
+    delete out.max_tokens;
+    delete out.max_completion_tokens;
     if (request.max_tokens !== undefined) {
       if (callerSentMct && !callerSentMaxTokens) {
-        delete out.max_tokens;
+        out.max_completion_tokens = request.max_tokens;
+      } else if (callerSentMaxTokens && !callerSentMct) {
+        out.max_tokens = request.max_tokens;
+      } else if (callerSentMct && callerSentMaxTokens) {
         out.max_completion_tokens = request.max_tokens;
       } else {
+        // No caller spelling to mirror (unified value came from middleware
+        // or a default): use the legacy key this wire format defaults to.
         out.max_tokens = request.max_tokens;
       }
-    } else {
-      delete out.max_tokens;
     }
     out.temperature = request.temperature;
     out.stream = request.stream;

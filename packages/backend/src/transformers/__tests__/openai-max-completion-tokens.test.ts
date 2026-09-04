@@ -99,6 +99,28 @@ describe('same-format emission (chat -> chat, non-bypass transform path)', () =>
     expect('max_tokens' in out).toBe(false);
     expect('max_completion_tokens' in out).toBe(false);
   });
+
+  it('emits only max_completion_tokens when the caller sent both spellings', async () => {
+    const unified = await parse({
+      model: 'alias-B',
+      messages: MESSAGES,
+      max_tokens: 100,
+      max_completion_tokens: 200,
+    });
+    const transformer = new OpenAITransformer();
+    const out = await transformer.transformRequest(unified);
+    expect(out.max_completion_tokens).toBe(200);
+    expect('max_tokens' in out).toBe(false);
+  });
+
+  it('ignores non-numeric budget values at parse time', async () => {
+    const unified = await parse({
+      model: 'alias-B',
+      messages: MESSAGES,
+      max_completion_tokens: 'lots' as any,
+    });
+    expect('max_tokens' in unified).toBe(false);
+  });
 });
 
 describe('enforce-limits pickup', () => {
