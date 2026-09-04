@@ -15,6 +15,7 @@ import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/t
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getCacheRoutingHeaders } from '../../utils/cache-routing-headers';
 import { getReasoningLogValue } from '../../services/pi-ai/reasoning';
 
 export async function registerChatRoute(
@@ -73,6 +74,10 @@ export async function registerChatRoute(
       unifiedRequest.incomingApiType = 'chat';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      unifiedRequest.cacheRoutingHeaders = getCacheRoutingHeaders(
+        request.headers,
+        body.prompt_cache_key
+      );
       usageRecord.reasoningEffort = getReasoningLogValue(unifiedRequest, body) ?? null;
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])

@@ -2,6 +2,9 @@ import type { UnifiedChatRequest } from '../../types/unified';
 import { getApiBaseType } from '../../utils/api-format';
 import type { RouteResult } from '../routing/router';
 
+const OPENCODE_GO_PI_AI_PROVIDER = 'opencode-go';
+const OPENCODE_SESSION_HEADER = 'x-opencode-session';
+
 export function setupProviderHeaders(
   route: RouteResult,
   apiType: string,
@@ -48,6 +51,12 @@ export function setupProviderHeaders(
       // the hyphenated form (more proxy-compatible); the old name is now
       // silently ignored upstream, so send the current one.
       headers['session-id'] = request.cacheRoutingHeaders.session_id;
+      if (
+        route.config.pi_ai_provider === OPENCODE_GO_PI_AI_PROVIDER &&
+        (route.config.auto_compat === true || route.modelConfig?.auto_compat === true)
+      ) {
+        headers[OPENCODE_SESSION_HEADER] = request.cacheRoutingHeaders.session_id;
+      }
     }
     if (request.cacheRoutingHeaders['x-client-request-id']) {
       headers['x-client-request-id'] = request.cacheRoutingHeaders['x-client-request-id'];
