@@ -1,6 +1,75 @@
 import { UnifiedChatRequest } from '../../types/unified';
 import { convertUnifiedToolsToAnthropic } from './tool-mapper';
 
+class AnthropicImageValidationError extends Error {
+  readonly routingContext = {
+    statusCode: 400,
+    code: 'invalid_image_source',
+  } as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'AnthropicImageValidationError';
+  }
+}
+
+/**
+ * Converts a unified `image_url` part into an Anthropic image `source`.
+ * Unified carries images as data URIs (Anthropic base64 sources and Chat /
+ * Responses data URIs), http(s) URLs, or raw base64 with a `media_type`
+ * sibling. Nothing is validated beyond what is needed to pick a source shape;
+ * Anthropic rejects malformed data or unsupported media types itself.
+ */
+export function toAnthropicImageSource(part: {
+  image_url?: { url?: string };
+  media_type?: string;
+}): { type: 'base64'; media_type: string; data: string } | { type: 'url'; url: string } {
+  const url = part.image_url?.url;
+  if (typeof url !== 'string' || url.length === 0) {
+    throw new AnthropicImageValidationError(
+      'Invalid Anthropic image source: image_url.url must be a non-empty string'
+    );
+  }
+
+  if (/^data:/i.test(url)) {
+    const match = /^data:([^;,]+);base64,(.*)$/s.exec(url);
+    if (!match) {
+      throw new AnthropicImageValidationError(
+        'Invalid Anthropic image source: data URI images must be base64-encoded (data:<media_type>;base64,<data>)'
+      );
+    }
+    return { type: 'base64', media_type: match[1]!, data: match[2]! };
+  }
+
+  if (/^https?:\/\//i.test(url)) {
+    return { type: 'url', url };
+  }
+
+  return {
+    type: 'base64',
+    media_type: part.media_type || 'image/jpeg',
+    data: url,
+  };
+}
+
+/**
+ * Pulls the JSON Schema from the unified `response_format` (populated by the
+ * Chat and Responses parsers; `json_schema` holds the schema itself).
+ */
+export function jsonSchemaFromUnified(
+  request: UnifiedChatRequest
+): Record<string, unknown> | undefined {
+  const responseFormat = request.response_format;
+  if (
+    responseFormat?.type === 'json_schema' &&
+    responseFormat.json_schema &&
+    typeof responseFormat.json_schema === 'object'
+  ) {
+    return responseFormat.json_schema as Record<string, unknown>;
+  }
+  return undefined;
+}
+
 /**
  * Transforms a Unified request into Anthropic API format.
  *
@@ -61,13 +130,10 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
                 ...(part.cache_control !== undefined ? { cache_control: part.cache_control } : {}),
               });
             } else if (part.type === 'image_url') {
+              const source = toAnthropicImageSource(part);
               content.push({
                 type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: part.media_type || 'image/jpeg',
-                  data: '',
-                },
+                source,
                 ...(part.cache_control !== undefined ? { cache_control: part.cache_control } : {}),
               });
             }
@@ -146,6 +212,17 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
         payload[field] = request.originalBody[field];
       }
     }
+  }
+
+  // Cross-format (Responses `text.format` / Chat `response_format`) → Anthropic
+  // structured outputs. Same-format messages already carry `output_config` via
+  // the passthrough above; only fill `format` when the client didn't send one.
+  const schema = jsonSchemaFromUnified(request);
+  if (schema && payload.output_config?.format === undefined) {
+    payload.output_config = {
+      ...(payload.output_config ?? {}),
+      format: { type: 'json_schema', schema },
+    };
   }
 
   return payload;

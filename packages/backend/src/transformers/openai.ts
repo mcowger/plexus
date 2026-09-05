@@ -7,6 +7,31 @@ import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../utils/gemini-malformed-f
 import { composeContentWithImageMarkdown } from './image-rendering';
 
 /**
+ * Normalizes a Chat Completions `response_format` onto the unified shape:
+ * `json_schema` holds the schema itself and the OpenAI wrapper's `name` /
+ * `description` / `strict` ride alongside it (see `UnifiedChatRequest`).
+ * Every consumer (chat -> chat re-wrapping below, responses `text.format`,
+ * Anthropic `output_config.format`) reads that shape; carrying the raw
+ * wrapper through nests the schema one level too deep.
+ */
+function normalizeChatResponseFormat(
+  responseFormat: any
+): NonNullable<UnifiedChatRequest['response_format']> | undefined {
+  if (!responseFormat || typeof responseFormat !== 'object') return undefined;
+  if (responseFormat.type !== 'json_schema') {
+    return { type: responseFormat.type };
+  }
+  const wrapper = responseFormat.json_schema ?? {};
+  return {
+    type: 'json_schema',
+    json_schema: wrapper.schema,
+    ...(wrapper.name !== undefined ? { name: wrapper.name } : {}),
+    ...(wrapper.description !== undefined ? { description: wrapper.description } : {}),
+    ...(wrapper.strict !== undefined ? { strict: wrapper.strict } : {}),
+  };
+}
+
+/**
  * OpenAITransformer
  */
 export class OpenAITransformer implements Transformer {
@@ -77,6 +102,9 @@ export class OpenAITransformer implements Transformer {
       tools: input.tools,
       tool_choice: input.tool_choice,
       reasoning: input.reasoning,
+      ...(input.response_format !== undefined
+        ? { response_format: normalizeChatResponseFormat(input.response_format) }
+        : {}),
     };
   }
 
