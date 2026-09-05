@@ -386,7 +386,7 @@ export function useProviderForm() {
   const handleToggleEnabled = async (provider: Provider, newState: boolean) => {
     setProviders(providers.map((p) => (p.id === provider.id ? { ...p, enabled: newState } : p)));
     try {
-      await api.saveProvider({ ...provider, enabled: newState }, provider.id);
+      await api.updateProviderEnabled(provider.id, newState);
     } catch (e) {
       console.error('Toggle error', e);
       toast.error('Failed to update provider status: ' + e);

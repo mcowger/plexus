@@ -73,4 +73,21 @@ describe('provider auto-compat persistence', () => {
       auto_compat: false,
     });
   });
+
+  it('patches only enabled when updating provider status', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('localStorage', { getItem: vi.fn(() => 'test-admin-key') });
+    vi.stubGlobal('window', { location: { pathname: '/ui/providers' } });
+
+    await api.updateProviderEnabled('provider/with-slash', false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v0/management/providers/provider/with-slash',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: false }),
+      })
+    );
+  });
 });

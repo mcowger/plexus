@@ -1973,6 +1973,21 @@ export const api = {
     }
   },
 
+  updateProviderEnabled: async (providerId: string, enabled: boolean): Promise<void> => {
+    const res = await fetchWithAuth(
+      `${API_BASE}/v0/management/providers/${encodePathPreservingSlashes(providerId)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update provider status');
+    }
+  },
+
   getVisionFallthroughConfig: async (): Promise<{
     descriptor_model?: string;
     default_prompt?: string;
