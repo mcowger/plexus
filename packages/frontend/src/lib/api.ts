@@ -1910,10 +1910,9 @@ export const api = {
       estimateTokens: provider.estimateTokens,
       useClaudeMasking: provider.useClaudeMasking,
       geminiThinkingEnabled: provider.geminiThinkingEnabled,
-      disable_cooldown: provider.disableCooldown === true ? true : undefined,
-      stall_cooldown: provider.stallCooldown === true ? true : undefined,
-      allow_100_percent_utilization:
-        provider.allow100PercentUtilization === true ? true : undefined,
+      disable_cooldown: provider.disableCooldown === true,
+      stall_cooldown: provider.stallCooldown === true,
+      allow_100_percent_utilization: provider.allow100PercentUtilization === true,
       auto_compat: provider.auto_compat === true,
       discount: provider.discount,
       headers: provider.headers,

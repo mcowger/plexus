@@ -46,7 +46,7 @@ describe('provider auto-compat persistence', () => {
     expect(reloadedProvider?.auto_compat).toBe(true);
   });
 
-  it('sends false when disabling provider-level auto_compat', async () => {
+  it('sends false when disabling provider boolean settings', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('localStorage', { getItem: vi.fn(() => 'test-admin-key') });
@@ -59,10 +59,18 @@ describe('provider auto-compat persistence', () => {
       apiBaseUrl: 'https://api.example.com/v1',
       apiKey: 'test-key',
       enabled: true,
+      disableCooldown: false,
+      stallCooldown: false,
+      allow100PercentUtilization: false,
       auto_compat: false,
     });
 
     const saveRequest = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(JSON.parse(saveRequest.body as string)).toMatchObject({ auto_compat: false });
+    expect(JSON.parse(saveRequest.body as string)).toMatchObject({
+      disable_cooldown: false,
+      stall_cooldown: false,
+      allow_100_percent_utilization: false,
+      auto_compat: false,
+    });
   });
 });
