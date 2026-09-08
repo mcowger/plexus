@@ -1,6 +1,7 @@
 import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { logger } from '../../utils/logger';
 import { countTokens } from '../utils';
+import { anthropicReasoningTokens } from '../../utils/usage-normalizer';
 
 /**
  * Transforms an Anthropic stream (Server-Sent Events) into unified stream format.
@@ -142,7 +143,16 @@ export function transformAnthropicStream(stream: ReadableStream): ReadableStream
                 let realOutputTokens = totalOutputTokens;
                 let imputedThinkingTokens = 0;
 
-                if (seenThinking) {
+                // Prefer the provider's own figure (Anthropic:
+                // `usage.output_tokens_details.thinking_tokens`, present on the
+                // final message_delta); fall back to imputation from the text
+                // we accumulated when the upstream gave thinking content but
+                // no count.
+                const reportedThinkingTokens = anthropicReasoningTokens(data.usage);
+                if (reportedThinkingTokens > 0) {
+                  imputedThinkingTokens = Math.min(reportedThinkingTokens, totalOutputTokens);
+                  realOutputTokens = totalOutputTokens - imputedThinkingTokens;
+                } else if (seenThinking) {
                   realOutputTokens = countTokens(accumulatedText);
                   imputedThinkingTokens = Math.max(0, totalOutputTokens - realOutputTokens);
                 }

@@ -1747,14 +1747,14 @@
   │ [function] convertAnthropicContent (line 11)
 
 📁 packages/backend/src/transformers/anthropic/index.ts:
-  │ [class] AnthropicTransformer (line 24)
-  │ [method] extractUsage (line 55)
-  │ [method] formatResponse (line 40)
-  │ [method] formatStream (line 48)
-  │ [method] parseRequest (line 28)
-  │ [method] transformRequest (line 32)
-  │ [method] transformResponse (line 36)
-  │ [method] transformStream (line 44)
+  │ [class] AnthropicTransformer (line 25)
+  │ [method] extractUsage (line 56)
+  │ [method] formatResponse (line 41)
+  │ [method] formatStream (line 49)
+  │ [method] parseRequest (line 29)
+  │ [method] transformRequest (line 33)
+  │ [method] transformResponse (line 37)
+  │ [method] transformStream (line 45)
 
 📁 packages/backend/src/transformers/anthropic/request-builder.ts:
   │ [function] buildAnthropicImageBlock (line 191)
@@ -1767,13 +1767,13 @@
   │ [function] formatAnthropicResponse (line 13)
 
 📁 packages/backend/src/transformers/anthropic/response-transformer.ts:
-  │ [function] transformAnthropicResponse (line 13)
+  │ [function] transformAnthropicResponse (line 14)
 
 📁 packages/backend/src/transformers/anthropic/stream-formatter.ts:
   │ [function] formatAnthropicStream (line 19)
 
 📁 packages/backend/src/transformers/anthropic/stream-transformer.ts:
-  │ [function] transformAnthropicStream (line 21)
+  │ [function] transformAnthropicStream (line 22)
 
 📁 packages/backend/src/transformers/anthropic/tool-mapper.ts:
   │ [function] convertAnthropicToolsToUnified (line 12)
@@ -2285,10 +2285,11 @@
 📁 packages/backend/src/utils/usage-normalizer.ts:
   │ [interface] ProviderCostDetails (line 26)
   │ [interface] UsageWithCostDetails (line 43)
+  │ [function] anthropicReasoningTokens (line 220)
   │ [function] extractUsageCostDetails (line 52)
-  │ [function] normalizeAnthropicUsage (line 204)
+  │ [function] normalizeAnthropicUsage (line 224)
   │ [function] normalizeGeminiUsage (line 181)
-  │ [function] normalizeOAuthUsage (line 220)
+  │ [function] normalizeOAuthUsage (line 240)
   │ [function] normalizeOpenAIChatUsage (line 127)
   │ [function] normalizeOpenAIResponsesUsage (line 152)
 

@@ -1,5 +1,6 @@
 import { UnifiedChatResponse } from '../../types/unified';
 import { countTokens } from '../utils';
+import { anthropicReasoningTokens } from '../../utils/usage-normalizer';
 
 /**
  * Transforms an Anthropic API response into unified format.
@@ -45,10 +46,17 @@ export async function transformAnthropicResponse(response: any): Promise<Unified
   let realOutputTokens = totalOutputTokens;
   let imputedThinkingTokens = 0;
 
-  // TOKEN IMPUTATION LOGIC:
-  // If the provider doesn't explicitly return thinking tokens but has thinking content,
-  // we estimate text tokens and assume the remainder is reasoning.
-  if (reasoning.length > 0) {
+  // Prefer the provider's own figure: Anthropic reports thinking under
+  // `usage.output_tokens_details.thinking_tokens`. `output_tokens` already
+  // includes it, so the visible-text share is the remainder.
+  const reportedThinkingTokens = anthropicReasoningTokens(response.usage);
+  if (reportedThinkingTokens > 0) {
+    imputedThinkingTokens = Math.min(reportedThinkingTokens, totalOutputTokens);
+    realOutputTokens = totalOutputTokens - imputedThinkingTokens;
+  } else if (reasoning.length > 0) {
+    // TOKEN IMPUTATION LOGIC (fallback for upstreams that return thinking
+    // content without a thinking token count): estimate text tokens and
+    // assume the remainder is reasoning.
     realOutputTokens = countTokens(text);
     imputedThinkingTokens = Math.max(0, totalOutputTokens - realOutputTokens);
   }
