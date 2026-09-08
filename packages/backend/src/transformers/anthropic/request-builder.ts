@@ -41,12 +41,30 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
     } else if (msg.role === 'user' || msg.role === 'assistant') {
       const content: any[] = [];
 
+      // Anthropic requires every `thinking` block to carry the `signature` it
+      // issued alongside it; a block without one is rejected outright with
+      // `messages.N.content.0.thinking.signature: Field required` (HTTP 400).
+      //
+      // A signature can go missing when the conversation history reached us on
+      // a wire format that has nowhere to carry it: OpenAI chat-completions
+      // exposes prior reasoning only as `reasoning_content` text, so a client
+      // that generated earlier turns with another model (or with Claude via a
+      // translating proxy) and then targets Claude replays thinking we cannot
+      // sign. Dropping the block is the only well-formed option — Anthropic's
+      // own guidance is that prior-turn thinking is optional, and an unsigned
+      // replay would never have been accepted anyway. The rest of the message
+      // (text, tool_use) is preserved so the turn stays coherent.
+      let droppedUnsignedThinking = false;
       if (msg.thinking) {
-        content.push({
-          type: 'thinking',
-          thinking: msg.thinking.content,
-          signature: msg.thinking.signature,
-        });
+        if (msg.thinking.signature) {
+          content.push({
+            type: 'thinking',
+            thinking: msg.thinking.content,
+            signature: msg.thinking.signature,
+          });
+        } else {
+          droppedUnsignedThinking = true;
+        }
       }
 
       if (msg.content) {
@@ -84,6 +102,16 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
             input: JSON.parse(tc.function.arguments),
           });
         }
+      }
+
+      // If the unsigned thinking block was this message's only content (a turn
+      // that reasoned but produced neither text nor a tool call), dropping it
+      // leaves an empty content array, which Anthropic also rejects. Omit the
+      // message entirely; the same-role merge below keeps the user/assistant
+      // alternation intact. Scoped to the drop above so pre-existing behaviour
+      // for other empty messages is unchanged.
+      if (droppedUnsignedThinking && content.length === 0) {
+        continue;
       }
 
       messages.push({ role: msg.role, content });
