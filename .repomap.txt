@@ -1754,6 +1754,7 @@
   │ [method] transformStream (line 44)
 
 📁 packages/backend/src/transformers/anthropic/request-builder.ts:
+  │ [function] buildAnthropicImageBlock (line 201)
   │ [function] buildAnthropicRequest (line 13)
 
 📁 packages/backend/src/transformers/anthropic/request-parser.ts:
