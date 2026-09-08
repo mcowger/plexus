@@ -41,30 +41,30 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
     } else if (msg.role === 'user' || msg.role === 'assistant') {
       const content: any[] = [];
 
-      // Anthropic requires every `thinking` block to carry the `signature` it
-      // issued alongside it; a block without one is rejected outright with
-      // `messages.N.content.0.thinking.signature: Field required` (HTTP 400).
+      // A `thinking` block is emitted whether or not a signature is present.
+      // This builder does not know the concrete upstream: the Messages wire
+      // format is shared by Anthropic itself and by compatible endpoints with
+      // different thinking semantics. Anthropic requires a signature on every
+      // thinking block and 400s without one, but e.g. Kimi's compatible
+      // endpoint requires unsigned thinking to remain on historical assistant
+      // tool-call messages — dropping it here would break that provider. The
+      // Anthropic-specific strip lives in the `strip_unsigned_thinking`
+      // adapter, injected only for targets known to be Anthropic
+      // (`adapter-resolver.ts`), with the reactive strip-and-retry in
+      // `dispatcher-auto-compat.ts` as the fallback for unknown gateways.
       //
-      // A signature can go missing when the conversation history reached us on
-      // a wire format that has nowhere to carry it: OpenAI chat-completions
-      // exposes prior reasoning only as `reasoning_content` text, so a client
-      // that generated earlier turns with another model (or with Claude via a
-      // translating proxy) and then targets Claude replays thinking we cannot
-      // sign. Dropping the block is the only well-formed option — Anthropic's
-      // own guidance is that prior-turn thinking is optional, and an unsigned
-      // replay would never have been accepted anyway. The rest of the message
-      // (text, tool_use) is preserved so the turn stays coherent.
-      let droppedUnsignedThinking = false;
+      // A signature can go missing when the history reached us on a wire
+      // format that has nowhere to carry it: OpenAI chat-completions exposes
+      // prior reasoning only as `reasoning_content` text. In that case the
+      // `signature` key is omitted entirely rather than sent as `undefined` —
+      // JSON serialisation would drop it anyway, but downstream code that
+      // inspects the built payload should see the true shape.
       if (msg.thinking) {
-        if (msg.thinking.signature) {
-          content.push({
-            type: 'thinking',
-            thinking: msg.thinking.content,
-            signature: msg.thinking.signature,
-          });
-        } else {
-          droppedUnsignedThinking = true;
-        }
+        content.push({
+          type: 'thinking',
+          thinking: msg.thinking.content,
+          ...(msg.thinking.signature ? { signature: msg.thinking.signature } : {}),
+        });
       }
 
       if (msg.content) {
@@ -102,16 +102,6 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
             input: JSON.parse(tc.function.arguments),
           });
         }
-      }
-
-      // If the unsigned thinking block was this message's only content (a turn
-      // that reasoned but produced neither text nor a tool call), dropping it
-      // leaves an empty content array, which Anthropic also rejects. Omit the
-      // message entirely; the same-role merge below keeps the user/assistant
-      // alternation intact. Scoped to the drop above so pre-existing behaviour
-      // for other empty messages is unchanged.
-      if (droppedUnsignedThinking && content.length === 0) {
-        continue;
       }
 
       messages.push({ role: msg.role, content });

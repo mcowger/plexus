@@ -3,6 +3,7 @@ import type { RouteResult } from '../routing/router';
 import type { AdapterEntry } from '../../config';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
 import { normalizeAnthropicToolIdsAdapter } from '../../transformers/adapters/normalize-anthropic-tool-ids.adapter';
+import { stripUnsignedThinkingAdapter } from '../../transformers/adapters/strip-unsigned-thinking.adapter';
 import { stripUnsupportedToolSearchAdapter } from '../../transformers/adapters/strip-unsupported-tool-search.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import { getApiBaseType } from '../../utils/api-format';
@@ -126,6 +127,10 @@ function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string):
     isAnthropicTargetProvider(route, effectiveApiType)
   ) {
     adapters.push({ name: normalizeAnthropicToolIdsAdapter.name, options: {}, enabled: true });
+    // Same gate: Anthropic itself 400s on a `thinking` block without a
+    // `signature`, but other Messages-speaking upstreams (e.g. Kimi) need
+    // unsigned thinking preserved, so the strip is target-aware, not global.
+    adapters.push({ name: stripUnsignedThinkingAdapter.name, options: {}, enabled: true });
   }
   return adapters;
 }

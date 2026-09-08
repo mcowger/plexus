@@ -772,16 +772,25 @@ export function planUnsupportedParamStrip(
 // payload and retry the SAME target once.
 
 /**
- * Matches Anthropic's stale/invalid thinking-block-signature 400, e.g.
- * `messages.3.content.0: Invalid \`signature\` in \`thinking\` block`.
- * Backtick-quoting of "signature"/"thinking" is optional since not every
- * upstream quotes them identically.
+ * Matches the two ways an Anthropic-strict upstream rejects a thinking block
+ * on signature grounds:
+ *
+ *   - stale/invalid signature — `messages.3.content.0: Invalid \`signature\` in
+ *     \`thinking\` block` (a block signed by a different model/session);
+ *   - missing signature — `messages.1.content.0.thinking.signature: Field
+ *     required` (a block that reached us on a wire format with no place to
+ *     carry the signature, e.g. OpenAI chat-completions `reasoning_content`).
+ *
+ * Both are cured by the same strip-and-retry. Backtick-quoting of
+ * "signature"/"thinking" is optional since not every upstream quotes them
+ * identically.
  */
-const THINKING_SIGNATURE_ERROR_PATTERN = /invalid\s+`?signature`?\s+in\s+`?thinking`?\s+block/i;
+const THINKING_SIGNATURE_ERROR_PATTERN =
+  /invalid\s+`?signature`?\s+in\s+`?thinking`?\s+block|thinking\.signature:\s*field\s+required/i;
 
 /**
- * True when an upstream error response body names an invalid/stale
- * thinking-block signature.
+ * True when an upstream error response body names an invalid, stale, or
+ * missing thinking-block signature.
  */
 export function matchThinkingSignatureError(responseBody: string): boolean {
   if (!responseBody) return false;
@@ -867,9 +876,14 @@ export interface ThinkingSignatureStripResult {
  * dropping the message, so the conversation shape stays valid.
  *
  * Non-array `content` (e.g. plain-string messages) is left untouched.
+ *
+ * `shouldStrip` narrows WHICH thinking blocks are removed; it defaults to all
+ * of them (the stale-signature retry case). The `strip_unsigned_thinking`
+ * adapter passes a predicate that only matches blocks with no `signature`.
  */
 export function stripThinkingSignatureBlocks(
-  payload: Record<string, any>
+  payload: Record<string, any>,
+  shouldStrip: (block: any) => boolean = () => true
 ): ThinkingSignatureStripResult {
   if (!isAnthropicMessagesPayload(payload)) return { payload, strippedCount: 0 };
 
@@ -884,7 +898,7 @@ export function stripThinkingSignatureBlocks(
       return { message, content: message?.content, isArrayContent: false, changed: false };
     }
     const kept = message.content.filter((block: any) => {
-      if (isThinkingBlock(block)) {
+      if (isThinkingBlock(block) && shouldStrip(block)) {
         strippedCount++;
         return false;
       }
