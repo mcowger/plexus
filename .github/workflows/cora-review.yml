@@ -1,4 +1,5 @@
 name: Cora AI Code Review
+# Temporary smoke-test change for the Cora model configuration.
 run-name: "Cora Review: PR #${{ github.event.pull_request.number }}"
 
 on:
