@@ -48,6 +48,7 @@ export class ConfigService {
   private rebuildPromise: Promise<void> | null = null;
   /** Delay (ms) before a coalesced rebuild fires. */
   private readonly COALESCE_MS = 100;
+  private shuttingDown = false;
 
   constructor(repo?: ConfigRepository) {
     this.repo = repo ?? new ConfigRepository();
@@ -422,6 +423,7 @@ export class ConfigService {
    * Useful in tests or operations that need immediate consistency.
    */
   async flush(): Promise<void> {
+    if (this.shuttingDown) return;
     if (this.coalesceTimer) {
       clearTimeout(this.coalesceTimer);
       this.coalesceTimer = null;
@@ -433,6 +435,16 @@ export class ConfigService {
     await this.executeRebuild();
   }
 
+  /** Writes are already persisted; stop cache rebuilds that could restart schedulers. */
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    if (this.coalesceTimer) {
+      clearTimeout(this.coalesceTimer);
+      this.coalesceTimer = null;
+    }
+    await this.rebuildPromise;
+  }
+
   // ─── Internal ────────────────────────────────────────────────────
 
   /**
@@ -441,6 +453,7 @@ export class ConfigService {
    * final call in a burst actually hits the database.
    */
   private rebuildCache(): void {
+    if (this.shuttingDown) return;
     if (this.coalesceTimer) {
       clearTimeout(this.coalesceTimer);
       this.coalesceTimer = null;
@@ -535,6 +548,7 @@ export class ConfigService {
     // changes saved via the UI take effect without a restart.
     // Only reload if the scheduler has already been initialized;
     // on startup, index.ts calls quotaScheduler.initialize() explicitly after this.
+    if (this.shuttingDown) return;
     const scheduler = QuotaScheduler.getInstance();
     if (scheduler.isInitialized()) {
       try {

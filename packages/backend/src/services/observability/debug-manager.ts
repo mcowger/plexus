@@ -3,6 +3,7 @@ import { logger } from '../../utils/logger';
 import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
 import { getCurrentKeyName, setCurrentRequestId } from './request-context';
+import { PendingTasks } from '../runtime/pending-tasks';
 
 export interface DebugLogRecord {
   requestId: string;
@@ -38,6 +39,7 @@ export class DebugManager {
   private enabledProviders: Set<string> = new Set();
   private pendingLogs: Map<string, DebugLogRecord> = new Map();
   private ephemeralRequests: Set<string> = new Set();
+  private writes = new PendingTasks();
 
   private constructor() {}
 
@@ -365,10 +367,18 @@ export class DebugManager {
 
     logger.debug(`Flushing debug log for ${requestId}`);
     if (typeof this.storage.saveDebugLog === 'function') {
-      this.storage.saveDebugLog(log);
+      this.writes.track(Promise.resolve(this.storage.saveDebugLog(log))).catch((error) => {
+        logger.error(`Failed to flush debug log for ${requestId}`, error);
+      });
     }
     this.pendingLogs.delete(requestId);
     this.ephemeralRequests.delete(requestId);
+  }
+
+  /** Flush eligible traces and wait for writes that previous flushes started. */
+  async drain(): Promise<void> {
+    for (const requestId of this.pendingLogs.keys()) this.flush(requestId);
+    await this.writes.drain();
   }
 
   /**

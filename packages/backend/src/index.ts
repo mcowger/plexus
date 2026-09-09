@@ -44,6 +44,7 @@ import { BackgroundExplorer } from './services/routing/background-explorer';
 import { CooldownManager } from './services/runtime/cooldown-manager';
 import { DebugManager } from './services/observability/debug-manager';
 import { ModelMetadataManager } from './services/models/model-metadata-manager';
+import { ModelAutosyncScheduler } from './services/models/model-autosync-scheduler';
 import { CodexVersionService } from './services/oauth/codex-version-service';
 import { SelectorFactory } from './services/routing/selectors/factory';
 import { QuotaScheduler } from './services/quota/quota-scheduler';
@@ -57,7 +58,10 @@ import { registerMcpRoutes } from './routes/mcp';
 import { registerOpenApiRoute } from './routes/openapi';
 import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
 import { QuotaEnforcer } from './services/quota/quota-enforcer';
-import { initModelCatalog } from './services/pi-ai/catalog';
+import { getModelCatalog, initModelCatalog } from './services/pi-ai/catalog';
+import { OAuthLoginSessionManager } from './services/oauth/oauth-login-session';
+import { createShutdown } from './services/runtime/shutdown';
+import { trackRequestHandlers } from './services/runtime/request-lifecycle';
 import { initializeDatabase } from './db/client';
 import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
@@ -97,6 +101,7 @@ const fastify = Fastify({
   bodyLimit: 30 * 1024 * 1024, // 30MB to accommodate 25MB audio files + metadata
   forceCloseConnections: true, // Destroy all open sockets on shutdown (fixes SSE hang)
 });
+const requestHandlers = trackRequestHandlers(fastify);
 
 // --- Plugin Registration ---
 
@@ -324,6 +329,41 @@ await registerOpenApiRoute(fastify);
 const responsesStorage = new ResponsesStorageService();
 responsesStorage.startCleanupJob(1, 7);
 
+const shutdown = createShutdown({
+  closeServer: async () => {
+    try {
+      await fastify.close();
+    } finally {
+      await requestHandlers.drain();
+    }
+  },
+  stopBackground: async () => {
+    getModelCatalog().dispose();
+    OAuthLoginSessionManager.instance?.dispose();
+    const results = await Promise.allSettled([
+      ConfigService.getInstance().shutdown(),
+      quotaScheduler.shutdown(),
+      ModelAutosyncScheduler.getInstance().shutdown(),
+      ModelMetadataManager.getInstance().shutdown(),
+      responsesStorage.shutdown(),
+      BackgroundExplorer.getInstance()?.shutdown(),
+    ]);
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : []
+    );
+    if (failures.length) throw new AggregateError(failures, 'Background shutdown failed');
+  },
+  stopProcesses: () => mcpProcessManager.stopAll(),
+  drainTelemetry: async () => {
+    await usageStorage.drain();
+    await DebugManager.getInstance().drain();
+  },
+  closeStorage: async () => {
+    const { closeDatabase } = await import('./db/client');
+    await closeDatabase();
+  },
+});
+
 // --- Management API (v0) ---
 await registerManagementRoutes(
   fastify,
@@ -332,7 +372,8 @@ await registerManagementRoutes(
   probeService,
   quotaScheduler,
   mcpUsageStorage,
-  quotaEnforcer
+  quotaEnforcer,
+  shutdown
 );
 
 // Health check endpoint for container orchestration
@@ -450,19 +491,22 @@ const start = async () => {
     await fastify.listen({ port, host });
     logger.info(`Server listening on http://localhost:${port}`);
 
-    const shutdown = async (signal: string) => {
+    const onShutdownSignal = (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
-      quotaScheduler.stop();
-      await mcpProcessManager.stopAll();
-      await fastify.close();
-      const { closeDatabase } = await import('./db/client');
-      await closeDatabase();
-      logger.info('Shutdown complete');
-      process.exit(0);
+      void shutdown().then(
+        () => {
+          logger.info('Shutdown complete');
+          process.exit(0);
+        },
+        (error) => {
+          logger.error('Shutdown failed', error);
+          process.exit(1);
+        }
+      );
     };
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => onShutdownSignal('SIGTERM'));
+    process.on('SIGINT', () => onShutdownSignal('SIGINT'));
   } catch (err) {
     logger.error('Fatal error during server startup', err);
     process.exit(1);

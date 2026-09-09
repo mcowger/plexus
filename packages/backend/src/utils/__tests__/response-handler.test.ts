@@ -14,6 +14,7 @@ describe('handleResponse', () => {
   const originalAdminKey = process.env.ADMIN_KEY;
 
   const mockStorage = {
+    trackFinalization: <T>(task: Promise<T>) => task,
     saveRequest: vi.fn(),
     saveError: vi.fn(),
     updatePerformanceMetrics: vi.fn(),
@@ -56,6 +57,48 @@ describe('handleResponse', () => {
     } else {
       process.env.ADMIN_KEY = originalAdminKey;
     }
+  });
+
+  test('drain waits for the detached unary finalizer through performance writes', async () => {
+    const storage = new UsageStorageService();
+    let finishUsage!: () => void;
+    let finishMetrics!: () => void;
+    const usage = new Promise<void>((resolve) => {
+      finishUsage = resolve;
+    });
+    const metrics = new Promise<void>((resolve) => {
+      finishMetrics = resolve;
+    });
+    registerSpy(storage, 'saveRequest').mockReturnValue(usage);
+    const update = registerSpy(storage, 'updatePerformanceMetrics').mockReturnValue(metrics);
+    await handleResponse(
+      mockRequest,
+      mockReply,
+      {
+        id: 'response',
+        model: 'model',
+        content: 'done',
+        plexus: { provider: 'provider', model: 'model', apiType: 'chat' },
+      },
+      mockTransformer,
+      { requestId: 'draining' },
+      storage,
+      Date.now(),
+      'chat'
+    );
+    expect(mockReply.send).toHaveBeenCalled();
+    let drained = false;
+    const draining = storage.drain().then(() => {
+      drained = true;
+    });
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    finishUsage();
+    await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
+    expect(drained).toBe(false);
+    finishMetrics();
+    await draining;
+    expect(drained).toBe(true);
   });
 
   test('should process non-streaming response correctly', async () => {

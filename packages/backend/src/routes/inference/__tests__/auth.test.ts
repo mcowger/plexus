@@ -26,6 +26,7 @@ describe('Auth Middleware', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),
@@ -251,6 +252,7 @@ describe('Key Attribution', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),
@@ -486,6 +488,7 @@ describe('Key Access Policy Propagation', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),
@@ -596,6 +599,7 @@ describe('Key Access Policy Exclusion Propagation', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),
@@ -674,6 +678,7 @@ describe('Key IP Allowlist', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),
@@ -792,6 +797,7 @@ describe('Trusted Proxy Header Handling', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),

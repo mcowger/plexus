@@ -2,11 +2,14 @@ import { getDatabase, getSchema } from '../../db/client';
 import { eq, sql, lt, inArray } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import { UnifiedResponsesResponse } from '../../types/responses';
+import { PendingTasks } from '../runtime/pending-tasks';
 
 export class ResponsesStorageService {
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: any = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private cleanupTasks = new PendingTasks();
+  private shuttingDown = false;
 
   /**
    * Response Storage with Automatic TTL Cleanup
@@ -27,21 +30,22 @@ export class ResponsesStorageService {
    * - Logs statistics when deletions occur
    */
   startCleanupJob(intervalHours: number = 24, ttlDays: number = 7): void {
+    if (this.shuttingDown) return;
     if (this.cleanupInterval) {
       logger.warn('Response cleanup job already running');
       return;
     }
 
     // Run initial cleanup
-    this.cleanupOldResponses(ttlDays).catch((err) =>
-      logger.error('Initial response cleanup failed:', err)
-    );
+    this.cleanupTasks
+      .track(this.cleanupOldResponses(ttlDays))
+      .catch((err) => logger.error('Initial response cleanup failed:', err));
 
     // Schedule periodic cleanup
     this.cleanupInterval = setInterval(
       async () => {
         try {
-          const result = await this.cleanupOldResponses(ttlDays);
+          const result = await this.cleanupTasks.track(this.cleanupOldResponses(ttlDays));
           if (result.deletedResponses > 0) {
             logger.debug(
               `Scheduled cleanup: deleted ${result.deletedResponses} responses, ${result.deletedItems} items, ${result.deletedConversations} conversations`
@@ -66,6 +70,12 @@ export class ResponsesStorageService {
       this.cleanupInterval = null;
       logger.debug('Response cleanup job stopped');
     }
+  }
+
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    this.stopCleanupJob();
+    await this.cleanupTasks.drain();
   }
 
   private ensureDb() {

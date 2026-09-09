@@ -356,6 +356,7 @@ export class ModelMetadataManager {
   private autoRefreshIntervalMinutes = 60;
   private autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
   private inFlightRefresh: Promise<ModelMetadataRefreshResult> | null = null;
+  private shuttingDown = false;
   private fetchCache = new Map<string, { etag: string; data: unknown }>();
 
   private constructor() {}
@@ -385,6 +386,7 @@ export class ModelMetadataManager {
     sources?: Partial<MetadataCatalogSources>,
     trigger: 'startup' | 'scheduled' | 'manual' = 'manual'
   ): Promise<ModelMetadataRefreshResult> {
+    if (this.shuttingDown) throw new Error('Model metadata manager is shutting down');
     if (sources) {
       this.sourceConfig = {
         ...this.sourceConfig,
@@ -439,6 +441,7 @@ export class ModelMetadataManager {
   }
 
   public startAutoRefresh(intervalMinutes = 60, sources?: Partial<MetadataCatalogSources>): void {
+    if (this.shuttingDown) return;
     if (sources) {
       this.sourceConfig = {
         ...this.sourceConfig,
@@ -467,6 +470,12 @@ export class ModelMetadataManager {
       clearInterval(this.autoRefreshTimer);
       this.autoRefreshTimer = null;
     }
+  }
+
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    this.stopAutoRefresh();
+    await this.inFlightRefresh;
   }
 
   // ─── Loaders ────────────────────────────────────

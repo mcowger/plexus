@@ -1,7 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { logger } from '../../utils/logger';
 
-export async function registerRestartRoutes(fastify: FastifyInstance) {
+export async function registerRestartRoutes(
+  fastify: FastifyInstance,
+  shutdown: () => Promise<void> = () => fastify.close()
+) {
   /**
    * POST /v0/management/restart
    * Gracefully restart the application by closing the server and exiting.
@@ -20,9 +23,14 @@ export async function registerRestartRoutes(fastify: FastifyInstance) {
       // Give the response time to be sent before closing
       setTimeout(async () => {
         logger.info('[RESTART] Closing server gracefully');
-        await fastify.close();
-        logger.info('[RESTART] Server closed, exiting process');
-        process.exit(1);
+        try {
+          await shutdown();
+          logger.info('[RESTART] Shutdown complete, exiting process');
+        } catch (error) {
+          logger.error('[RESTART] Shutdown failed', error);
+        } finally {
+          process.exit(1);
+        }
       }, 100);
     } catch (error: any) {
       logger.error('[RESTART] Error during restart:', error);

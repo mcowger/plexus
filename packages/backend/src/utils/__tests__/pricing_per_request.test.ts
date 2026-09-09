@@ -95,6 +95,7 @@ describe('calculateCosts - per_request pricing', () => {
 
 describe('handleResponse - per_request pricing', () => {
   const mockStorage = {
+    trackFinalization: <T>(task: Promise<T>) => task,
     saveRequest: vi.fn(),
     updatePerformanceMetrics: vi.fn(),
   } as unknown as UsageStorageService;

@@ -10,6 +10,7 @@ import path from 'path';
 
 describe('handleResponse - OpenRouter Pricing', () => {
   const mockStorage = {
+    trackFinalization: <T>(task: Promise<T>) => task,
     saveRequest: vi.fn(),
     updatePerformanceMetrics: vi.fn(),
   } as unknown as UsageStorageService;

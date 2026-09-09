@@ -429,6 +429,7 @@ describe('Dispatcher OAuth pass-through — cross-format Anthropic response tran
     const clientTransformer = TransformerFactory.getTransformer('chat');
     const usageRecord: Partial<UsageRecord> = { requestId: 'req-e2e-cross-format' };
     const usageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       updatePerformanceMetrics: vi.fn(),

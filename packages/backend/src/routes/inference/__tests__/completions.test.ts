@@ -76,6 +76,7 @@ describe('Completions Endpoint', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(),
       saveError: vi.fn(),
       saveDebugLog: vi.fn(),

@@ -8,6 +8,7 @@ import {
 } from '../../config';
 import { CooldownManager } from '../runtime/cooldown-manager';
 import { ProbeService } from '../probes/probe-service';
+import { PendingTasks } from '../runtime/pending-tasks';
 
 type TargetKey = `${string}:${string}`;
 type ModelKind = NonNullable<ModelConfig['type']>;
@@ -55,6 +56,8 @@ export class BackgroundExplorer {
   private state = new Map<TargetKey, TargetState>();
   private queue: Array<{ provider: string; model: string }> = [];
   private activeWorkers = 0;
+  private shuttingDown = false;
+  private tasks = new PendingTasks();
   private readonly processStartTime = Date.now();
 
   private constructor(probeService: ProbeService) {
@@ -87,6 +90,7 @@ export class BackgroundExplorer {
    * Non-blocking. Returns immediately. Safe to call on every live request.
    */
   maybeTrigger(group: ModelTargetGroup, aliasType?: ModelKind): void {
+    if (this.shuttingDown) return;
     const config = getConfig();
     const bg = config.backgroundExploration;
     if (!bg || bg.enabled !== true) {
@@ -136,22 +140,24 @@ export class BackgroundExplorer {
       // we don't want to block the live-request path waiting on it. The
       // worker re-checks cooldown right before probing as well.
       const captured = st;
-      cooldownMgr
-        .isProviderHealthy(target.provider, target.model)
-        .then((healthy) => {
-          if (!healthy) return;
-          if (captured.inFlight) return;
-          // Re-check staleness in case another trigger raced us.
-          if (Date.now() - captured.lastProbedAt < thresholdMs) return;
+      this.tasks.track(
+        cooldownMgr
+          .isProviderHealthy(target.provider, target.model)
+          .then((healthy) => {
+            if (!healthy || this.shuttingDown) return;
+            if (captured.inFlight) return;
+            // Re-check staleness in case another trigger raced us.
+            if (Date.now() - captured.lastProbedAt < thresholdMs) return;
 
-          this.queue.push({ provider: target.provider!, model: target.model! });
-          this.pumpWorkers();
-        })
-        .catch((err) => {
-          logger.debug(
-            `BackgroundExplorer: cooldown check failed for ${target.provider}/${target.model}: ${err?.message ?? err}`
-          );
-        });
+            this.queue.push({ provider: target.provider!, model: target.model! });
+            this.pumpWorkers();
+          })
+          .catch((err) => {
+            logger.debug(
+              `BackgroundExplorer: cooldown check failed for ${target.provider}/${target.model}: ${err?.message ?? err}`
+            );
+          })
+      );
     }
   }
 
@@ -160,6 +166,7 @@ export class BackgroundExplorer {
   }
 
   private pumpWorkers(): void {
+    if (this.shuttingDown) return;
     const config = getConfig();
     const bg = config.backgroundExploration;
     if (!bg || bg.enabled !== true) return;
@@ -168,13 +175,13 @@ export class BackgroundExplorer {
     while (this.activeWorkers < concurrency && this.queue.length > 0) {
       this.activeWorkers++;
       // Fire and forget; the worker manages its own lifecycle.
-      void this.worker();
+      void this.tasks.track(this.worker());
     }
   }
 
   private async worker(): Promise<void> {
     try {
-      while (this.queue.length > 0) {
+      while (!this.shuttingDown && this.queue.length > 0) {
         const next = this.queue.shift();
         if (!next) break;
 
@@ -188,7 +195,7 @@ export class BackgroundExplorer {
         const healthy = await CooldownManager.getInstance()
           .isProviderHealthy(next.provider, next.model)
           .catch(() => false);
-        if (!healthy) {
+        if (!healthy || this.shuttingDown) {
           logger.debug(
             `BackgroundExplorer: skipping probe for ${next.provider}/${next.model} — on cooldown`
           );
@@ -217,5 +224,12 @@ export class BackgroundExplorer {
     } finally {
       this.activeWorkers--;
     }
+  }
+
+  /** Discard queued probes and wait for probes already producing usage records. */
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    this.queue.length = 0;
+    await this.tasks.drain();
   }
 }

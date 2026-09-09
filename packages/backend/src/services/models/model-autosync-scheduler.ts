@@ -2,6 +2,7 @@ import type { ProviderConfig } from '../../config';
 import { ConfigRepository } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
 import { discoverProviderModelIds } from '../providers/provider-model-discovery';
+import { PendingTasks } from '../runtime/pending-tasks';
 
 type ModelsChangedCallback = () => void | Promise<void>;
 
@@ -17,6 +18,8 @@ export class ModelAutosyncScheduler {
   private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private runningProviders: Set<string> = new Set();
   private initialized = false;
+  private shuttingDown = false;
+  private readonly pendingTasks = new PendingTasks();
   private onModelsChanged?: ModelsChangedCallback;
 
   private constructor(private repo: ConfigRepository = new ConfigRepository()) {}
@@ -36,12 +39,14 @@ export class ModelAutosyncScheduler {
     providers: Record<string, ProviderConfig>,
     onModelsChanged?: ModelsChangedCallback
   ): void {
+    if (this.shuttingDown) return;
     this.initialized = true;
     this.onModelsChanged = onModelsChanged;
     this.reload(providers, onModelsChanged);
   }
 
   reload(providers: Record<string, ProviderConfig>, onModelsChanged?: ModelsChangedCallback): void {
+    if (this.shuttingDown) return;
     if (onModelsChanged) this.onModelsChanged = onModelsChanged;
 
     const nextConfigs = new Map<string, AutosyncConfig>();
@@ -76,7 +81,12 @@ export class ModelAutosyncScheduler {
     }
   }
 
-  async runSyncNow(providerId: string): Promise<number> {
+  runSyncNow(providerId: string): Promise<number> {
+    if (this.shuttingDown) return Promise.resolve(0);
+    return this.pendingTasks.track(this.runSync(providerId));
+  }
+
+  private async runSync(providerId: string): Promise<number> {
     const config = this.configs.get(providerId);
     if (!config) {
       logger.warn(`Model autosync config for provider '${providerId}' not found`);
@@ -115,12 +125,23 @@ export class ModelAutosyncScheduler {
     return this.initialized;
   }
 
-  stop(): void {
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    this.clearIntervals();
+    await this.pendingTasks.drain();
+    this.stop();
+  }
+
+  private clearIntervals(): void {
     for (const [providerId, intervalId] of this.intervals) {
       clearInterval(intervalId);
       logger.info(`Stopped model autosync for provider '${providerId}'`);
     }
     this.intervals.clear();
+  }
+
+  stop(): void {
+    this.clearIntervals();
     this.configs.clear();
     this.runningProviders.clear();
     this.initialized = false;

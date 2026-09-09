@@ -755,16 +755,22 @@ export async function handleResponse(
     }
 
     // Record the usage.
-    finalizeUsage(
-      usageRecord,
-      unifiedResponse,
-      usageStorage,
-      startTime,
-      pricing,
-      providerDiscount,
-      quotaEnforcer,
-      keyName
-    );
+    void usageStorage
+      .trackFinalization(
+        finalizeUsage(
+          usageRecord,
+          unifiedResponse,
+          usageStorage,
+          startTime,
+          pricing,
+          providerDiscount,
+          quotaEnforcer,
+          keyName
+        )
+      )
+      .catch((error) => {
+        logger.error('Failed to finalize response usage', error);
+      });
 
     logger.debug(`Outgoing ${apiType} Response`, responseBody);
     return reply.send(responseBody);

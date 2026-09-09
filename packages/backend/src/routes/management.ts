@@ -37,7 +37,8 @@ export async function registerManagementRoutes(
   probeService: ProbeService,
   quotaScheduler?: QuotaScheduler,
   mcpUsageStorage?: McpUsageStorageService,
-  quotaEnforcer?: QuotaEnforcer
+  quotaEnforcer?: QuotaEnforcer,
+  shutdown?: () => Promise<void>
 ) {
   // Encapsulate all management routes in their own scope so the management
   // error handler doesn't collide with the global one (avoids FSTWRN004).
@@ -103,7 +104,7 @@ export async function registerManagementRoutes(
       await registerTestRoutes(adminOnly, probeService);
       await registerOAuthRoutes(adminOnly);
       await registerLoggingRoutes(adminOnly);
-      await registerRestartRoutes(adminOnly);
+      await registerRestartRoutes(adminOnly, shutdown);
       await registerProviderRoutes(adminOnly);
       await registerMetricsRoutes(adminOnly, usageStorage);
       await registerPerformanceRoutes(adminOnly, usageStorage);

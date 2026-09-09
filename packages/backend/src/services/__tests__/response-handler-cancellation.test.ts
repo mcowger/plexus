@@ -334,6 +334,7 @@ describe('handleResponse cancellation records usage from live captures (no pre-s
     const usageRecord: Partial<UsageRecord> = { requestId: 'req-cancel-e2e' };
     const savedRecords: UsageRecord[] = [];
     const mockStorage = {
+      trackFinalization: <T>(task: Promise<T>) => task,
       saveRequest: vi.fn(async (record: UsageRecord) => {
         savedRecords.push(record);
       }),

@@ -1,3 +1,4 @@
+import { PendingTasks } from '../runtime/pending-tasks';
 import { logger } from '../../utils/logger';
 import { UsageRecord } from '../../types/usage';
 import { getDatabase, getSchema } from '../../db/client';
@@ -65,6 +66,7 @@ export class UsageStorageService extends EventEmitter {
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: any = null;
   private readonly defaultPerformanceRetentionLimit = 100;
+  private readonly pendingWrites = new PendingTasks();
   private telemetryQueue: Promise<void> = Promise.resolve();
   private inFlightRegistry = new Map<
     string,
@@ -124,7 +126,11 @@ export class UsageStorageService extends EventEmitter {
     return parsed;
   }
 
-  async saveRequest(record: NewRequestUsage | UsageRecord) {
+  saveRequest(record: NewRequestUsage | UsageRecord) {
+    return this.pendingWrites.track(this.saveRequestInternal(record));
+  }
+
+  private async saveRequestInternal(record: NewRequestUsage | UsageRecord) {
     try {
       const isStreamedValue =
         typeof record.isStreamed === 'boolean' ? (record.isStreamed ? 1 : 0) : record.isStreamed;
@@ -191,13 +197,25 @@ export class UsageStorageService extends EventEmitter {
   }
 
   private enqueueTelemetryTask(task: () => Promise<void>): void {
-    this.telemetryQueue = this.telemetryQueue
-      .then(async () => {
-        await task();
-      })
-      .catch((error) => {
-        logger.error('Telemetry queue task failed', error);
-      });
+    this.telemetryQueue = this.pendingWrites.track(
+      this.telemetryQueue
+        .then(async () => {
+          await task();
+        })
+        .catch((error) => {
+          logger.error('Telemetry queue task failed', error);
+        })
+    );
+  }
+
+  /** Include a detached response finalizer, including writes it schedules after awaits. */
+  trackFinalization<T>(task: Promise<T>): Promise<T> {
+    return this.pendingWrites.track(task);
+  }
+
+  /** Wait for queued events, direct writes, and complete response finalizers. */
+  async drain(): Promise<void> {
+    await this.pendingWrites.drain();
   }
 
   /**
@@ -205,7 +223,11 @@ export class UsageStorageService extends EventEmitter {
    * This allows the frontend to show in-flight requests immediately.
    * The record is inserted with durationMs=null to indicate it's still in-flight.
    */
-  async emitStarted(record: Partial<UsageRecord>): Promise<void> {
+  emitStarted(record: Partial<UsageRecord>): Promise<void> {
+    return this.pendingWrites.track(this.emitStartedInternal(record));
+  }
+
+  private async emitStartedInternal(record: Partial<UsageRecord>): Promise<void> {
     try {
       // Insert pending record with durationMs=null to indicate in-flight status
       await this.ensureDb()
@@ -250,7 +272,11 @@ export class UsageStorageService extends EventEmitter {
    * Also updates the pending DB record with provider/model info so the concurrency
    * endpoint can group in-flight requests by provider.
    */
-  async emitUpdated(record: Partial<UsageRecord>): Promise<void> {
+  emitUpdated(record: Partial<UsageRecord>): Promise<void> {
+    return this.pendingWrites.track(this.emitUpdatedInternal(record));
+  }
+
+  private async emitUpdatedInternal(record: Partial<UsageRecord>): Promise<void> {
     // Update the pending record in DB if we have provider/model info
     if (
       record.requestId &&
@@ -278,7 +304,11 @@ export class UsageStorageService extends EventEmitter {
     this.emit('updated', record);
   }
 
-  async saveDebugLog(record: DebugLogRecord) {
+  saveDebugLog(record: DebugLogRecord) {
+    return this.pendingWrites.track(this.saveDebugLogInternal(record));
+  }
+
+  private async saveDebugLogInternal(record: DebugLogRecord) {
     try {
       const serialize = (data: any): string | null => {
         if (!data) return null;
@@ -334,7 +364,16 @@ export class UsageStorageService extends EventEmitter {
     return JSON.stringify(normalized);
   }
 
-  async saveError(requestId: string, error: any, details?: any, apiKey?: string | null) {
+  saveError(requestId: string, error: any, details?: any, apiKey?: string | null) {
+    return this.pendingWrites.track(this.saveErrorInternal(requestId, error, details, apiKey));
+  }
+
+  private async saveErrorInternal(
+    requestId: string,
+    error: any,
+    details?: any,
+    apiKey?: string | null
+  ) {
     try {
       // Resolve the owning key name in preference order:
       //   1. Explicit caller-supplied apiKey (most accurate).
@@ -803,7 +842,31 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async updatePerformanceMetrics(
+  updatePerformanceMetrics(
+    provider: string,
+    model: string,
+    canonicalModelName: string | null,
+    timeToFirstTokenMs: number | null,
+    outputTokens: number | null,
+    durationMs: number,
+    requestId: string,
+    success: boolean = true
+  ) {
+    return this.pendingWrites.track(
+      this.updatePerformanceMetricsInternal(
+        provider,
+        model,
+        canonicalModelName,
+        timeToFirstTokenMs,
+        outputTokens,
+        durationMs,
+        requestId,
+        success
+      )
+    );
+  }
+
+  private async updatePerformanceMetricsInternal(
     provider: string,
     model: string,
     canonicalModelName: string | null,
@@ -870,7 +933,23 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async recordSuccessfulAttempt(
+  recordSuccessfulAttempt(
+    provider: string,
+    model: string,
+    canonicalModelName: string | null,
+    requestId: string,
+    metadata?: {
+      isVisionFallthrough?: boolean;
+      isDescriptorRequest?: boolean;
+      visionFallthroughModel?: string;
+    }
+  ) {
+    return this.pendingWrites.track(
+      this.recordSuccessfulAttemptInternal(provider, model, canonicalModelName, requestId, metadata)
+    );
+  }
+
+  private async recordSuccessfulAttemptInternal(
     provider: string,
     model: string,
     canonicalModelName: string | null,
@@ -908,7 +987,23 @@ export class UsageStorageService extends EventEmitter {
     );
   }
 
-  async recordFailedAttempt(
+  recordFailedAttempt(
+    provider: string,
+    model: string,
+    canonicalModelName: string | null,
+    requestId: string,
+    metadata?: {
+      isVisionFallthrough?: boolean;
+      isDescriptorRequest?: boolean;
+      visionFallthroughModel?: string;
+    }
+  ) {
+    return this.pendingWrites.track(
+      this.recordFailedAttemptInternal(provider, model, canonicalModelName, requestId, metadata)
+    );
+  }
+
+  private async recordFailedAttemptInternal(
     provider: string,
     model: string,
     canonicalModelName: string | null,

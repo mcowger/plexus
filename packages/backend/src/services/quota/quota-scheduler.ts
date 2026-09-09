@@ -12,6 +12,7 @@ import { toDbTimestampMs } from '../../utils/normalize';
 import { eq, desc, gte, and } from 'drizzle-orm';
 import { CooldownManager } from '../runtime/cooldown-manager';
 import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
+import { PendingTasks } from '../runtime/pending-tasks';
 
 const DEFAULT_EXHAUSTION_THRESHOLD = 99;
 const MAX_STALE_QUOTA_CHECK_INTERVALS = 2;
@@ -40,6 +41,8 @@ export class QuotaScheduler {
   private checkerRunTails: Map<string, Promise<void>> = new Map();
   private lastCheckerRunAt: Map<string, number> = new Map();
   private checkersLoaded = false;
+  private shuttingDown = false;
+  private readonly pendingTasks = new PendingTasks();
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: ReturnType<typeof getSchema> | null = null;
 
@@ -52,6 +55,11 @@ export class QuotaScheduler {
     return QuotaScheduler.instance;
   }
 
+  static resetForTesting(): void {
+    QuotaScheduler.instance?.stop();
+    QuotaScheduler.instance = undefined as any;
+  }
+
   private ensureDb() {
     if (!this.db) {
       this.db = getDatabase();
@@ -60,13 +68,20 @@ export class QuotaScheduler {
     return { db: this.db, schema: this.schema! };
   }
 
-  async initialize(quotaConfigs: QuotaConfig[]): Promise<void> {
+  initialize(quotaConfigs: QuotaConfig[]): Promise<void> {
+    if (this.shuttingDown) return Promise.resolve();
+    return this.pendingTasks.track(this.initializeCheckers(quotaConfigs));
+  }
+
+  private async initializeCheckers(quotaConfigs: QuotaConfig[]): Promise<void> {
     if (!this.checkersLoaded) {
       await loadAllCheckers();
       this.checkersLoaded = true;
     } else {
       await loadCustomCheckers();
     }
+
+    if (this.shuttingDown) return;
 
     for (const config of quotaConfigs) {
       if (!config.enabled) {
@@ -95,7 +110,12 @@ export class QuotaScheduler {
     }
   }
 
-  async runCheckNow(checkerId: string): Promise<MeterCheckResult | null> {
+  runCheckNow(checkerId: string): Promise<MeterCheckResult | null> {
+    if (this.shuttingDown) return Promise.resolve(null);
+    return this.pendingTasks.track(this.runCheck(checkerId));
+  }
+
+  private async runCheck(checkerId: string): Promise<MeterCheckResult | null> {
     const config = this.configs.get(checkerId);
     if (!config) {
       logger.warn(`Quota checker '${checkerId}' not found`);
@@ -507,24 +527,42 @@ export class QuotaScheduler {
     }
   }
 
-  stop(): void {
+  async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    this.clearIntervals();
+    await this.pendingTasks.drain();
+    this.stop();
+  }
+
+  private clearIntervals(): void {
     for (const [id, intervalId] of this.intervals) {
       clearInterval(intervalId);
       logger.info(`Stopped quota checker '${id}'`);
     }
     this.intervals.clear();
+  }
+
+  stop(): void {
+    this.clearIntervals();
     this.configs.clear();
     this.checkerRunTails.clear();
     this.lastCheckerRunAt.clear();
   }
 
-  async reload(quotaConfigs: QuotaConfig[]): Promise<void> {
+  reload(quotaConfigs: QuotaConfig[]): Promise<void> {
+    if (this.shuttingDown) return Promise.resolve();
+    return this.pendingTasks.track(this.reloadCheckers(quotaConfigs));
+  }
+
+  private async reloadCheckers(quotaConfigs: QuotaConfig[]): Promise<void> {
     if (!this.checkersLoaded) {
       await loadAllCheckers();
       this.checkersLoaded = true;
     } else {
       await loadCustomCheckers();
     }
+
+    if (this.shuttingDown) return;
 
     const existingIds = new Set(this.configs.keys());
     const activeConfigs = quotaConfigs.filter((c) => c.enabled && getCheckerDefinition(c.type));
