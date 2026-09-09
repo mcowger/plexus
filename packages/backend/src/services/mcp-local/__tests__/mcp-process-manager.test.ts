@@ -48,8 +48,11 @@ beforeEach(async () => {
 
 afterEach(async () => {
   for (const child of children) child.finish(0);
-  await mcpProcessManager.resetForTesting();
-  vi.useRealTimers();
+  try {
+    await mcpProcessManager.resetForTesting();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 describe('local MCP process supervision', () => {
@@ -89,6 +92,31 @@ describe('local MCP process supervision', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  test('allows a readiness request to use a proportional share of a larger startup budget', async () => {
+    registerSpy(Bun, 'spawn').mockReturnValue(makeChild(110));
+    let readinessSignal: AbortSignal | undefined;
+    registerSpy(globalThis, 'fetch').mockImplementation((_url: string, init: RequestInit) => {
+      readinessSignal = init.signal!;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(new Response(null, { status: 405 })), 1500);
+        readinessSignal!.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            reject(readinessSignal!.reason);
+          },
+          { once: true }
+        );
+      });
+    });
+
+    const starting = mcpProcessManager.start('test', { ...config, startup_timeout_ms: 8000 });
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(readinessSignal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(starting).resolves.toMatchObject({ status: 'running', pid: 110 });
+  });
+
   test('waits for SIGTERM grace then escalates and confirms exit', async () => {
     const child = makeChild(103, 'SIGKILL');
     registerSpy(Bun, 'spawn').mockReturnValue(child);
@@ -122,6 +150,21 @@ describe('local MCP process supervision', () => {
     await vi.advanceTimersByTimeAsync(4000);
     await restarted;
     expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  test('clears test state while propagating an unconfirmed termination failure', async () => {
+    const child = makeChild(111, null);
+    registerSpy(Bun, 'spawn').mockReturnValue(child);
+    registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
+    await mcpProcessManager.start('test', config);
+
+    const resetting = expect(mcpProcessManager.resetForTesting()).rejects.toBeInstanceOf(
+      AggregateError
+    );
+    await vi.advanceTimersByTimeAsync(4000);
+    await resetting;
+
+    expect(mcpProcessManager.getStatus('test')).toMatchObject({ status: 'stopped', pid: null });
   });
 
   test('cancels in-progress startup before a queued restart and ignores the old probe', async () => {

@@ -155,8 +155,11 @@ class McpProcessManager {
   }
 
   async resetForTesting(): Promise<void> {
-    await this.stopAll();
-    this.states.clear();
+    try {
+      await this.stopAll();
+    } finally {
+      this.states.clear();
+    }
   }
 
   getStatus(serverName: string, config?: McpServerConfig): LocalMcpRuntimeStatus {
@@ -287,16 +290,21 @@ class McpProcessManager {
   private async waitForReady(config: McpServerConfig, signal: AbortSignal): Promise<void> {
     const url = this.getLocalUrl(config);
     if (!url || config.mode !== 'local_http') return;
-    const deadline = Date.now() + (config.startup_timeout_ms || 30000);
+    const startupTimeoutMs = config.startup_timeout_ms || 30000;
+    const deadline = Date.now() + startupTimeoutMs;
     let lastError = '';
     while (Date.now() < deadline) {
       signal.throwIfAborted();
       const controller = new AbortController();
       const abort = () => controller.abort(signal.reason);
       signal.addEventListener('abort', abort, { once: true });
+      const attemptTimeoutMs = Math.min(
+        Math.max(1000, Math.floor(startupTimeoutMs / 4)),
+        deadline - Date.now()
+      );
       const timer = setTimeout(
         () => controller.abort(new Error('Readiness request timed out')),
-        Math.min(1000, deadline - Date.now())
+        attemptTimeoutMs
       );
       try {
         const response = await fetch(url, { method: 'GET', signal: controller.signal });
