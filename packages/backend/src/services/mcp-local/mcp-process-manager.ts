@@ -16,7 +16,9 @@ export interface LocalMcpRuntimeStatus {
 interface LocalProcessState {
   status: LocalMcpStatus;
   process: Bun.Subprocess<'pipe', 'pipe', 'pipe'> | null;
-  startPromise: Promise<void> | null;
+  operation: Promise<unknown>;
+  startupController: AbortController | null;
+  lifecycleVersion: number;
   configFingerprint: string | null;
   logs: string[];
   lastError: string | null;
@@ -48,73 +50,113 @@ class McpProcessManager {
 
   async ensureRunning(serverName: string, config: McpServerConfig): Promise<void> {
     if (config.mode !== 'local_http') return;
+    const version = this.getState(serverName).lifecycleVersion;
+    return this.enqueue(serverName, () => this.ensureRunningInternal(serverName, config, version));
+  }
+
+  private async ensureRunningInternal(
+    serverName: string,
+    config: McpServerConfig,
+    version: number
+  ): Promise<void> {
     const state = this.getState(serverName);
-    const configFingerprint = this.getConfigFingerprint(config);
-    if (state.status === 'running' && state.process) {
-      if (state.configFingerprint !== configFingerprint) {
-        logger.info(`[mcp-local:${serverName}] local MCP config changed; restarting process`, {
-          pid: state.process.pid,
-          url: this.getLocalUrl(config),
-        });
-        await this.stop(serverName);
-      } else {
-        logger.debug(`[mcp-local:${serverName}] process already running`, {
-          pid: state.process.pid,
-          url: this.getLocalUrl(config),
-        });
-        return;
-      }
+    if (state.lifecycleVersion !== version) throw new Error('Local MCP startup cancelled');
+    const fingerprint = this.getConfigFingerprint(config);
+    if (state.process) {
+      if (state.status === 'running' && state.configFingerprint === fingerprint) return;
+      await this.stopInternal(serverName);
     }
-    if (state.startPromise) {
-      logger.info(`[mcp-local:${serverName}] startup already in progress`);
-      return state.startPromise;
+    if (state.lifecycleVersion !== version) throw new Error('Local MCP startup cancelled');
+    const controller = new AbortController();
+    state.startupController = controller;
+    try {
+      await this.startInternal(serverName, config, fingerprint, controller.signal);
+    } finally {
+      state.startupController = null;
     }
-    logger.info(`[mcp-local:${serverName}] ensuring local MCP server is running`, {
-      status: state.status,
-      launcher: config.launcher,
-      package: config.package,
-      port: config.port,
-      path: config.path || '/mcp',
-    });
-    state.startPromise = this.startInternal(serverName, config, configFingerprint).finally(() => {
-      state.startPromise = null;
-    });
-    return state.startPromise;
   }
 
   async start(serverName: string, config: McpServerConfig): Promise<LocalMcpRuntimeStatus> {
     if (config.mode !== 'local_http') throw new Error('MCP server is not local_http');
-    await this.ensureRunning(serverName, config);
-    return this.getStatus(serverName, config);
+    const version = this.getState(serverName).lifecycleVersion;
+    return this.enqueue(serverName, async () => {
+      await this.ensureRunningInternal(serverName, config, version);
+      return this.getStatus(serverName, config);
+    });
   }
 
   async stop(serverName: string): Promise<LocalMcpRuntimeStatus> {
     const state = this.getState(serverName);
+    state.lifecycleVersion++;
+    state.startupController?.abort(new Error('Local MCP startup cancelled'));
+    return this.enqueue(serverName, () => this.stopInternal(serverName));
+  }
+
+  private async stopInternal(serverName: string): Promise<LocalMcpRuntimeStatus> {
+    const state = this.getState(serverName);
     const child = state.process;
-    state.process = null;
-    state.startPromise = null;
     if (child) {
       try {
         logger.info(`[mcp-local:${serverName}] stopping local MCP process`, { pid: child.pid });
         child.kill('SIGTERM');
-        await Promise.race([child.exited, Bun.sleep(3000)]);
+        if (!(await this.waitForExit(child, 3000))) {
+          child.kill('SIGKILL');
+          if (!(await this.waitForExit(child, 1000))) {
+            throw new Error('Local MCP process did not exit after SIGKILL');
+          }
+        }
+        if (state.process === child) state.process = null;
       } catch (error) {
+        state.status = 'failed';
+        state.lastError = (error as Error).message;
         logger.warn(`[mcp-local:${serverName}] failed to stop local MCP process`, error);
-        this.appendLog(state, 'Failed to stop process: ' + (error as Error).message);
+        this.appendLog(state, 'Failed to stop process: ' + state.lastError);
+        throw error;
       }
-    } else {
-      logger.info(`[mcp-local:${serverName}] stop requested but no process is running`, {
-        status: state.status,
-      });
     }
     state.status = 'stopped';
+    state.lastError = null;
     state.exitedAt = new Date().toISOString();
     return this.getStatus(serverName);
   }
 
   async restart(serverName: string, config: McpServerConfig): Promise<LocalMcpRuntimeStatus> {
-    await this.stop(serverName);
-    return this.start(serverName, config);
+    if (config.mode !== 'local_http') throw new Error('MCP server is not local_http');
+    const state = this.getState(serverName);
+    const version = ++state.lifecycleVersion;
+    state.startupController?.abort(new Error('Local MCP startup cancelled'));
+    return this.enqueue(serverName, async () => {
+      await this.stopInternal(serverName);
+      await this.ensureRunningInternal(serverName, config, version);
+      return this.getStatus(serverName, config);
+    });
+  }
+
+  private enqueue<T>(serverName: string, operation: () => Promise<T>): Promise<T> {
+    const state = this.getState(serverName);
+    const result = state.operation.then(operation);
+    // Failed operations must not prevent a later stop or restart.
+    state.operation = result.catch(() => {});
+    return result;
+  }
+
+  private async waitForExit(child: Bun.Subprocess, timeoutMs: number): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        child.exited.then(() => true),
+        new Promise<boolean>((resolve) => {
+          timer = setTimeout(() => resolve(false), timeoutMs);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async resetForTesting(): Promise<void> {
+    await this.stopAll();
+    this.states.clear();
   }
 
   getStatus(serverName: string, config?: McpServerConfig): LocalMcpRuntimeStatus {
@@ -135,13 +177,23 @@ class McpProcessManager {
   }
 
   async stopAll(): Promise<void> {
-    await Promise.all([...this.states.keys()].map((serverName) => this.stop(serverName)));
+    const results = await Promise.allSettled(
+      [...this.states.keys()].map((serverName) => this.stop(serverName))
+    );
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) {
+      throw new AggregateError(
+        failures.map((result) => result.reason),
+        'Failed to stop local MCP processes'
+      );
+    }
   }
 
   private async startInternal(
     serverName: string,
     config: McpServerConfig,
-    configFingerprint: string
+    configFingerprint: string,
+    signal: AbortSignal
   ): Promise<void> {
     if (config.mode !== 'local_http') return;
     const state = this.getState(serverName);
@@ -190,6 +242,7 @@ class McpProcessManager {
 
     child.exited.then((code) => {
       if (state.process === child) {
+        state.startupController?.abort(new Error('Local MCP process exited before readiness'));
         state.process = null;
         state.status = code === 0 ? 'stopped' : 'failed';
         state.lastError = code === 0 ? null : 'Process exited with code ' + code;
@@ -204,7 +257,9 @@ class McpProcessManager {
     });
 
     try {
-      await this.waitForReady(config);
+      await this.waitForReady(config, signal);
+      signal.throwIfAborted();
+      if (state.process !== child) throw new Error('Local MCP process exited before readiness');
       if (state.process === child) {
         state.status = 'running';
         logger.info(`[mcp-local:${serverName}] local MCP server is ready`, {
@@ -218,40 +273,60 @@ class McpProcessManager {
       state.lastError = (error as Error).message;
       logger.error(`[mcp-local:${serverName}] local MCP server startup failed`, error);
       this.appendLog(state, 'Startup failed: ' + state.lastError);
-      child.kill('SIGTERM');
+      try {
+        await this.stopInternal(serverName);
+      } catch (stopError) {
+        logger.warn(`[mcp-local:${serverName}] startup cleanup failed`, stopError);
+      }
+      state.status = 'failed';
+      state.lastError = (error as Error).message;
       throw error;
     }
   }
 
-  private async waitForReady(config: McpServerConfig): Promise<void> {
+  private async waitForReady(config: McpServerConfig, signal: AbortSignal): Promise<void> {
     const url = this.getLocalUrl(config);
     if (!url || config.mode !== 'local_http') return;
     const deadline = Date.now() + (config.startup_timeout_ms || 30000);
     let lastError = '';
-    let attempts = 0;
-    logger.info(`[mcp-local] waiting for local MCP server readiness`, {
-      url,
-      timeoutMs: config.startup_timeout_ms || 30000,
-    });
     while (Date.now() < deadline) {
-      attempts++;
+      signal.throwIfAborted();
+      const controller = new AbortController();
+      const abort = () => controller.abort(signal.reason);
+      signal.addEventListener('abort', abort, { once: true });
+      const timer = setTimeout(
+        () => controller.abort(new Error('Readiness request timed out')),
+        Math.min(1000, deadline - Date.now())
+      );
       try {
-        const response = await fetch(url, { method: 'GET' });
-        if (response.status < 500) {
-          logger.info(`[mcp-local] readiness check passed`, {
-            url,
-            status: response.status,
-            attempts,
-          });
-          return;
-        }
+        const response = await fetch(url, { method: 'GET', signal: controller.signal });
+        // GET may return 405 on a healthy HTTP MCP endpoint. Headers are enough;
+        // never retain a response body (which may be an indefinite SSE stream).
+        void response.body?.cancel().catch(() => {});
+        if (response.status < 500) return;
         lastError = 'HTTP ' + response.status;
       } catch (error) {
         lastError = (error as Error).message;
+      } finally {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+        controller.abort();
       }
-      await Bun.sleep(500);
+      signal.throwIfAborted();
+      const remaining = deadline - Date.now();
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            clearTimeout(retryTimer);
+            signal.removeEventListener('abort', done);
+            resolve();
+          };
+          const retryTimer = setTimeout(done, Math.min(500, remaining));
+          signal.addEventListener('abort', done, { once: true });
+        });
+      }
     }
-    logger.warn(`[mcp-local] readiness check timed out`, { url, attempts, lastError });
+    signal.throwIfAborted();
     throw new Error('Local MCP server did not become ready: ' + lastError);
   }
 
@@ -304,6 +379,8 @@ class McpProcessManager {
         }
       } catch (error) {
         logger.silly('Local MCP log stream error: ' + (error as Error).message);
+      } finally {
+        reader.releaseLock();
       }
     })();
   }
@@ -319,7 +396,9 @@ class McpProcessManager {
       state = {
         status: 'stopped',
         process: null,
-        startPromise: null,
+        operation: Promise.resolve(),
+        startupController: null,
+        lifecycleVersion: 0,
         configFingerprint: null,
         logs: [],
         lastError: null,

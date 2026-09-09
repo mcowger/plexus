@@ -429,7 +429,11 @@ describe('MCP Routes', () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers['cache-control']).toBe('no-cache');
       expect(response.headers['x-accel-buffering']).toBe('no');
-      expect(response.headers.connection).toBe('keep-alive');
+      // Bun 1.4's injector synthesizes this HTTP/1.1 hop-by-hop header;
+      // older runtimes omit it. The route's portable SSE contract allows both.
+      if (response.headers.connection !== undefined) {
+        expect(response.headers.connection).toBe('keep-alive');
+      }
     });
 
     test('preserves an upstream Cache-Control value on SSE responses', async () => {
