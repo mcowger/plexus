@@ -140,7 +140,7 @@ export async function registerImagesRoute(
     const startTime = Date.now();
     const abortController = new AbortController();
     const { signal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
-    const disconnect = wireEarlyDisconnectDetection(request, abortController);
+    const disconnect = wireEarlyDisconnectDetection(request, abortController, requestId);
 
     let usageRecord: Partial<UsageRecord> = {
       requestId,
@@ -307,7 +307,7 @@ export async function registerImagesRoute(
     const startTime = Date.now();
     const abortController = new AbortController();
     const { signal, resolveTimeoutMs } = wireUpstreamTimeout(abortController);
-    const disconnect = wireEarlyDisconnectDetection(request, abortController);
+    const disconnect = wireEarlyDisconnectDetection(request, abortController, requestId);
 
     let usageRecord: Partial<UsageRecord> = {
       requestId,
