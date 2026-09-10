@@ -9476,7 +9476,7 @@
           "Events"
         ],
         "summary": "Live usage event stream",
-        "description": "Server-Sent Events stream of request lifecycle events, used by the\nadmin dashboard for real-time monitoring.\n\n## Event types\n\n- **started** — Request received, dispatched to provider.\n- **updated** — Request metadata updated (e.g. token counts known).\n- **completed** — Request finished (success or error). Contains the\n  full `UsageRecord`.\n- **created** — Legacy/alias for `started`.\n\nEach event includes the `UsageRecord` payload (for `completed`) or\npartial data (for `started`/`updated`).\n\n## Ping\n\nA `ping` event is sent every 10 seconds to keep the connection alive.\n\n## Format\n\n```\nevent: completed\ndata: {\"requestId\":\"...\",\"date\":\"...\",\"provider\":\"openai\",...}\nid: 1735689599000\n```\n\n## Scoping\n\nLimited principals see only events for their own API key.\nAdmins see all events.\n",
+        "description": "Server-Sent Events stream of request lifecycle events, used by the\nadmin dashboard for real-time monitoring. The server does not replay\nhistorical events when a client connects; fetch `/v0/management/usage`\nseparately for historical records.\n\n## Wire format\n\nThe response is a UTF-8 `text/event-stream`. Each SSE message is a block\nof lines terminated by a blank line (`\\\\n\\\\n`):\n\n- `event` identifies the event type.\n- `data` contains one line of JSON, except for `ping`, whose data is the\n  literal string `pong`.\n- `id` is the event's server-generated epoch-millisecond timestamp encoded\n  as a string. It is informational; clients should not use it as a resume\n  cursor.\n\nClients should parse the `data` field according to the `event` value and\nignore event types they do not understand.\n\n## Event types\n\n### `started`\n\nSent when a request is received. The `data` value is a partial\n[`UsageRecord`](#/components/schemas/UsageRecord) with the fields\nknown at request start. It includes `responseStatus: \"pending\"`.\n\n### `updated`\n\nSent when additional request or routing metadata becomes available. The\n`data` value is a sparse partial `UsageRecord`; it always includes\n`requestId` and may contain only the fields that changed.\n\n### `progress`\n\nSent approximately once per second for each in-flight request being\nmonitored. The `data` value is a [`ProgressUpdate`](#/components/schemas/ProgressUpdate).\nProgress events are transient and are not persisted as usage records.\n\n### `completed`\n\nSent when the request finishes, including success, error, cancellation,\ntimeout, or stall. The `data` value is the full `UsageRecord`, including\nthe final `responseStatus` and any available token, cost, and timing data.\n\n### `ping`\n\nSent every 10 seconds to keep the connection alive. Its `data` value is\nthe literal string `pong`; it has no JSON payload.\n\nThe backend may receive an internal legacy `created` notification when a\nusage record is saved. That notification is normalized to the wire-level\n`completed` event, so clients should not depend on an `event: created`\nmessage.\n\n## Examples\n\nA started request:\n\n```text\nevent: started\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"date\":\"2025-01-15T12:00:00.000Z\",\"startTime\":1736942400000,\"responseStatus\":\"pending\",\"isStreamed\":true}\nid: 1736942400000\n\n```\n\nA progress update:\n\n```text\nevent: progress\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"apiKey\":\"team-a\",\"isStreamed\":true,\"bytesReceived\":4096,\"bytesPerSec\":2048,\"semanticBytesReceived\":3900,\"semanticBytesPerSec\":1950,\"state\":\"MONITORING\",\"elapsedMs\":2000}\nid: 1736942402000\n\n```\n\nA completed request:\n\n```text\nevent: completed\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"date\":\"2025-01-15T12:00:00.000Z\",\"provider\":\"openai\",\"responseStatus\":\"success\",\"tokensInput\":120,\"tokensOutput\":42,\"durationMs\":2300}\nid: 1736942402300\n\n```\n\nA keepalive:\n\n```text\nevent: ping\ndata: pong\nid: 1736942410000\n\n```\n\n## Scoping\n\nLimited principals see only events for their own API key.\nAdmins see all events.\n",
         "security": [
           {
             "AdminKey": []
@@ -9484,11 +9484,57 @@
         ],
         "responses": {
           "200": {
-            "description": "SSE stream.",
+            "description": "Long-lived SSE stream of usage lifecycle and progress events.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Disables intermediary caching for the live stream.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-cache"
+                }
+              },
+              "Connection": {
+                "description": "Keeps the HTTP connection open while the stream is active.",
+                "schema": {
+                  "type": "string",
+                  "example": "keep-alive"
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "description": "CORS origin allowed for the stream.",
+                "schema": {
+                  "type": "string",
+                  "example": "*"
+                }
+              }
+            },
             "content": {
               "text/event-stream": {
                 "schema": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "UTF-8 Server-Sent Events stream. See the operation description for the event framing and payload schemas."
+                },
+                "examples": {
+                  "started": {
+                    "summary": "Request started",
+                    "value": "event: started\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"date\":\"2025-01-15T12:00:00.000Z\",\"startTime\":1736942400000,\"responseStatus\":\"pending\",\"isStreamed\":true}\nid: 1736942400000"
+                  },
+                  "updated": {
+                    "summary": "Request metadata updated",
+                    "value": "event: updated\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"provider\":\"openai\",\"selectedModelName\":\"gpt-4.1-mini\"}\nid: 1736942400100"
+                  },
+                  "progress": {
+                    "summary": "In-flight progress update",
+                    "value": "event: progress\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"apiKey\":\"team-a\",\"isStreamed\":true,\"bytesReceived\":4096,\"bytesPerSec\":2048,\"semanticBytesReceived\":3900,\"semanticBytesPerSec\":1950,\"state\":\"MONITORING\",\"elapsedMs\":2000}\nid: 1736942402000"
+                  },
+                  "completed": {
+                    "summary": "Request completed",
+                    "value": "event: completed\ndata: {\"requestId\":\"550e8400-e29b-41d4-a716-446655440000\",\"date\":\"2025-01-15T12:00:00.000Z\",\"provider\":\"openai\",\"responseStatus\":\"success\",\"tokensInput\":120,\"tokensOutput\":42,\"durationMs\":2300}\nid: 1736942402300"
+                  },
+                  "ping": {
+                    "summary": "Keepalive",
+                    "value": "event: ping\ndata: pong\nid: 1736942410000"
+                  }
                 }
               }
             }
@@ -10778,6 +10824,81 @@
           },
           "successRate": {
             "type": "number"
+          }
+        }
+      },
+      "ProgressUpdate": {
+        "type": "object",
+        "description": "Transient throughput snapshot for an in-flight request. This payload is emitted by the management event stream approximately once per second and is not persisted as a usage record.\n",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "apiKey",
+          "isStreamed",
+          "bytesReceived",
+          "bytesPerSec",
+          "semanticBytesReceived",
+          "semanticBytesPerSec",
+          "state",
+          "elapsedMs"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Request identifier shared with the related UsageRecord."
+          },
+          "apiKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "API key associated with the request, if available."
+          },
+          "isStreamed": {
+            "type": "boolean",
+            "description": "Whether the request is using a streamed response."
+          },
+          "bytesReceived": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total upstream response bytes received so far."
+          },
+          "bytesPerSec": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Current total-byte throughput in bytes per second, or null until measurable."
+          },
+          "semanticBytesReceived": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total semantic response bytes received so far, excluding protocol framing where applicable."
+          },
+          "semanticBytesPerSec": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Current semantic-byte throughput in bytes per second, or null until measurable."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DISPATCHED",
+              "GRACE_PERIOD",
+              "MONITORING",
+              "THROUGHPUT_STALLED"
+            ],
+            "description": "Current stream stall-monitoring state."
+          },
+          "elapsedMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Milliseconds elapsed since monitoring started."
           }
         }
       },

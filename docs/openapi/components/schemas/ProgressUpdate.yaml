@@ -1,0 +1,61 @@
+type: object
+description: >
+  Transient throughput snapshot for an in-flight request. This payload is
+  emitted by the management event stream approximately once per second and
+  is not persisted as a usage record.
+additionalProperties: false
+required:
+  - requestId
+  - apiKey
+  - isStreamed
+  - bytesReceived
+  - bytesPerSec
+  - semanticBytesReceived
+  - semanticBytesPerSec
+  - state
+  - elapsedMs
+properties:
+  requestId:
+    type: string
+    format: uuid
+    description: Request identifier shared with the related UsageRecord.
+  apiKey:
+    type:
+      - string
+      - 'null'
+    description: API key associated with the request, if available.
+  isStreamed:
+    type: boolean
+    description: Whether the request is using a streamed response.
+  bytesReceived:
+    type: integer
+    minimum: 0
+    description: Total upstream response bytes received so far.
+  bytesPerSec:
+    type:
+      - number
+      - 'null'
+    minimum: 0
+    description: Current total-byte throughput in bytes per second, or null until measurable.
+  semanticBytesReceived:
+    type: integer
+    minimum: 0
+    description: Total semantic response bytes received so far, excluding protocol framing where applicable.
+  semanticBytesPerSec:
+    type:
+      - number
+      - 'null'
+    minimum: 0
+    description: Current semantic-byte throughput in bytes per second, or null until measurable.
+  state:
+    type: string
+    enum:
+      - DISPATCHED
+      - GRACE_PERIOD
+      - MONITORING
+      - THROUGHPUT_STALLED
+    description: Current stream stall-monitoring state.
+  elapsedMs:
+    type: integer
+    minimum: 0
+    description: Milliseconds elapsed since monitoring started.

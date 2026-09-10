@@ -4,29 +4,97 @@ get:
   summary: Live usage event stream
   description: |
     Server-Sent Events stream of request lifecycle events, used by the
-    admin dashboard for real-time monitoring.
+    admin dashboard for real-time monitoring. The server does not replay
+    historical events when a client connects; fetch `/v0/management/usage`
+    separately for historical records.
+
+    ## Wire format
+
+    The response is a UTF-8 `text/event-stream`. Each SSE message is a block
+    of lines terminated by a blank line (`\\n\\n`):
+
+    - `event` identifies the event type.
+    - `data` contains one line of JSON, except for `ping`, whose data is the
+      literal string `pong`.
+    - `id` is the event's server-generated epoch-millisecond timestamp encoded
+      as a string. It is informational; clients should not use it as a resume
+      cursor.
+
+    Clients should parse the `data` field according to the `event` value and
+    ignore event types they do not understand.
 
     ## Event types
 
-    - **started** — Request received, dispatched to provider.
-    - **updated** — Request metadata updated (e.g. token counts known).
-    - **completed** — Request finished (success or error). Contains the
-      full `UsageRecord`.
-    - **created** — Legacy/alias for `started`.
+    ### `started`
 
-    Each event includes the `UsageRecord` payload (for `completed`) or
-    partial data (for `started`/`updated`).
+    Sent when a request is received. The `data` value is a partial
+    [`UsageRecord`](#/components/schemas/UsageRecord) with the fields
+    known at request start. It includes `responseStatus: "pending"`.
 
-    ## Ping
+    ### `updated`
 
-    A `ping` event is sent every 10 seconds to keep the connection alive.
+    Sent when additional request or routing metadata becomes available. The
+    `data` value is a sparse partial `UsageRecord`; it always includes
+    `requestId` and may contain only the fields that changed.
 
-    ## Format
+    ### `progress`
+
+    Sent approximately once per second for each in-flight request being
+    monitored. The `data` value is a [`ProgressUpdate`](#/components/schemas/ProgressUpdate).
+    Progress events are transient and are not persisted as usage records.
+
+    ### `completed`
+
+    Sent when the request finishes, including success, error, cancellation,
+    timeout, or stall. The `data` value is the full `UsageRecord`, including
+    the final `responseStatus` and any available token, cost, and timing data.
+
+    ### `ping`
+
+    Sent every 10 seconds to keep the connection alive. Its `data` value is
+    the literal string `pong`; it has no JSON payload.
+
+    The backend may receive an internal legacy `created` notification when a
+    usage record is saved. That notification is normalized to the wire-level
+    `completed` event, so clients should not depend on an `event: created`
+    message.
+
+    ## Examples
+
+    A started request:
+
+    ```text
+    event: started
+    data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","date":"2025-01-15T12:00:00.000Z","startTime":1736942400000,"responseStatus":"pending","isStreamed":true}
+    id: 1736942400000
 
     ```
+
+    A progress update:
+
+    ```text
+    event: progress
+    data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","apiKey":"team-a","isStreamed":true,"bytesReceived":4096,"bytesPerSec":2048,"semanticBytesReceived":3900,"semanticBytesPerSec":1950,"state":"MONITORING","elapsedMs":2000}
+    id: 1736942402000
+
+    ```
+
+    A completed request:
+
+    ```text
     event: completed
-    data: {"requestId":"...","date":"...","provider":"openai",...}
-    id: 1735689599000
+    data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","date":"2025-01-15T12:00:00.000Z","provider":"openai","responseStatus":"success","tokensInput":120,"tokensOutput":42,"durationMs":2300}
+    id: 1736942402300
+
+    ```
+
+    A keepalive:
+
+    ```text
+    event: ping
+    data: pong
+    id: 1736942410000
+
     ```
 
     ## Scoping
@@ -37,11 +105,59 @@ get:
     - AdminKey: []
   responses:
     '200':
-      description: SSE stream.
+      description: Long-lived SSE stream of usage lifecycle and progress events.
+      headers:
+        Cache-Control:
+          description: Disables intermediary caching for the live stream.
+          schema:
+            type: string
+            example: no-cache
+        Connection:
+          description: Keeps the HTTP connection open while the stream is active.
+          schema:
+            type: string
+            example: keep-alive
+        Access-Control-Allow-Origin:
+          description: CORS origin allowed for the stream.
+          schema:
+            type: string
+            example: '*'
       content:
         text/event-stream:
           schema:
             type: string
+            description: UTF-8 Server-Sent Events stream. See the operation description for the event framing and payload schemas.
+          examples:
+            started:
+              summary: Request started
+              value: |-
+                event: started
+                data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","date":"2025-01-15T12:00:00.000Z","startTime":1736942400000,"responseStatus":"pending","isStreamed":true}
+                id: 1736942400000
+            updated:
+              summary: Request metadata updated
+              value: |-
+                event: updated
+                data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","provider":"openai","selectedModelName":"gpt-4.1-mini"}
+                id: 1736942400100
+            progress:
+              summary: In-flight progress update
+              value: |-
+                event: progress
+                data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","apiKey":"team-a","isStreamed":true,"bytesReceived":4096,"bytesPerSec":2048,"semanticBytesReceived":3900,"semanticBytesPerSec":1950,"state":"MONITORING","elapsedMs":2000}
+                id: 1736942402000
+            completed:
+              summary: Request completed
+              value: |-
+                event: completed
+                data: {"requestId":"550e8400-e29b-41d4-a716-446655440000","date":"2025-01-15T12:00:00.000Z","provider":"openai","responseStatus":"success","tokensInput":120,"tokensOutput":42,"durationMs":2300}
+                id: 1736942402300
+            ping:
+              summary: Keepalive
+              value: |-
+                event: ping
+                data: pong
+                id: 1736942410000
     '401':
       description: Authentication required or invalid credentials.
   operationId: getV0ManagementEvents

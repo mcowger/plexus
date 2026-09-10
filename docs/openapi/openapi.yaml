@@ -609,6 +609,8 @@ components:
       $ref: ./components/schemas/UsageSummaryBreakdown.yaml
     UsageSummaryGroup:
       $ref: ./components/schemas/UsageSummaryGroup.yaml
+    ProgressUpdate:
+      $ref: ./components/schemas/ProgressUpdate.yaml
   securitySchemes:
     PlexusApiKey:
       type: http
