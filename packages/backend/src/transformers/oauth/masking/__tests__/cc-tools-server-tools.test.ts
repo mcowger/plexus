@@ -2,9 +2,10 @@
  * Regression test: server-side tools must survive the masking pipeline
  * byte-identical.
  *
- * `stripDescriptionsAndInjectSyntheticTools()` blanks client-authored tool
- * descriptions so no caller fingerprint reaches Anthropic. It used to do that
- * with an unconditional `{ ...t, description: note ?? '' }` over every entry in
+ * `stripDescriptionsAndInjectSyntheticTools()` preserves client-authored tool
+ * descriptions by default. It used to blank them so no caller fingerprint
+ * reached Anthropic, using an unconditional `{ ...t, description: note ?? '' }`
+ * over every entry in
  * `tools[]` — including SERVER-SIDE tools (`bash_20250124`, `web_search_*`,
  * `advisor_20260301`, …), which are identified by a `type` other than "custom".
  *
@@ -44,7 +45,7 @@ describe('stripDescriptionsAndInjectSyntheticTools — server-side tools', () =>
     }
   });
 
-  it('still strips descriptions from custom tools alongside server tools', () => {
+  it('preserves custom descriptions alongside server tools by default', () => {
     const out = stripDescriptionsAndInjectSyntheticTools({
       tools: [
         { type: 'advisor_20260301', name: 'advisor', model: 'claude-sonnet-5' },
@@ -55,11 +56,10 @@ describe('stripDescriptionsAndInjectSyntheticTools — server-side tools', () =>
 
     const advisor = out.tools.find((t: any) => t.type === 'advisor_20260301');
     expect(Object.hasOwn(advisor, 'description')).toBe(false);
-
-    // type-less and type:"custom" tools are still blanked — the fingerprint
-    // stripping this function exists for must not regress.
-    expect(out.tools.find((t: any) => t.name === 'MyTool').description).toBe('');
-    expect(out.tools.find((t: any) => t.name === 'MyOtherTool').description).toBe('');
+    expect(out.tools.find((t: any) => t.name === 'MyTool').description).toBe('client authored');
+    expect(out.tools.find((t: any) => t.name === 'MyOtherTool').description).toBe(
+      'also client authored'
+    );
   });
 
   it('leaves a body without tools[] untouched', () => {

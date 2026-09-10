@@ -1999,7 +1999,7 @@
   │ [function] sortedUnique (line 64)
 
 📁 packages/backend/src/transformers/oauth/masking/cc-tools.ts:
-  │ [function] stripDescriptionsAndInjectSyntheticTools (line 49)
+  │ [function] stripDescriptionsAndInjectSyntheticTools (line 50)
 
 📁 packages/backend/src/transformers/oauth/masking/dedupe.ts:
   │ [function] dedupeSyntheticToolCollisions (line 28)

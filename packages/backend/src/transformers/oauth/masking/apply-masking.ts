@@ -27,10 +27,10 @@
  *      convention (`mcp-shape.ts`).
  *   2. `applyToolRenames()` — apply those renames across `tools[]`,
  *      `tool_choice`, and any `tool_use` blocks in message history.
- *   3. `stripDescriptionsAndInjectSyntheticTools()` — strip caller tool
- *      descriptions (fingerprint parity), except collision renames get a
- *      note instructing the model to prefer them over the real CC tool of
- *      their original name; prepend the synthetic Claude Code tool stubs.
+ *   3. `stripDescriptionsAndInjectSyntheticTools()` — preserve caller tool
+ *      descriptions, except collision renames get a note appended instructing
+ *      the model to prefer them over the real CC tool of their original name;
+ *      prepend the synthetic Claude Code tool stubs.
  *   4. `dedupeSyntheticToolCollisions()` — defensive backstop for the rare
  *      case a computed rename collides with one of the synthetic names.
  *   5. `injectClaudeCodeIdentity()` — replace `system[]` with the genuine

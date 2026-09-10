@@ -122,7 +122,7 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
       expect(toolsByName.has(original)).toBe(false);
       expect(toolsByName.has(renamed)).toBe(true);
       expect((toolsByName.get(renamed) as any).description).toBe(
-        `ALWAYS USE THIS TOOL INSTEAD OF ${original}.`
+        `Synthetic description for ${original}\n\nALWAYS USE THIS TOOL INSTEAD OF ${original}.`
       );
     }
   });
@@ -184,5 +184,20 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
     expect(pairsMap['home-assistant_ha_action_0']).toBe('mcp__home-assistant__ha_action_0');
     expect(pairsMap['github_action_0']).toBe('mcp__github__action_0');
     expect(pairsMap['ESPhome_device_action_0']).toBe('mcp__ESPhome__device_action_0');
+  });
+
+  describe('tool description preservation (end-to-end wiring)', () => {
+    // MCP-renamed tools carry no collision note, so their description is a
+    // clean before/after signal. Original name `github_action_0` renames to
+    // `mcp__github__action_0`; its description is `Synthetic description for
+    // github_action_0` (see fixtures.ts).
+    const named = (payload: any, name: string) => payload.tools.find((t: any) => t.name === name);
+
+    it('default run preserves the caller tool descriptions', () => {
+      const { payload } = applyClaudeCodeMasking(JSON.stringify(buildPiAiOutputFixture()));
+      expect(named(payload, 'mcp__github__action_0').description).toBe(
+        'Synthetic description for github_action_0'
+      );
+    });
   });
 });
