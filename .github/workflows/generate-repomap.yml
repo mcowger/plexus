@@ -1,0 +1,60 @@
+name: Generate Repo Map
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'package.json'
+      - '.github/workflows/generate-repomap.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: generate-repomap
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate Repo Map
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install ctags and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes universal-ctags jq
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate repo map
+        run: bun run generate:repomap
+
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet -- .repomap.txt; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push repo map
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .repomap.txt
+          git commit -m "chore: regenerate repository map"
+          git push
