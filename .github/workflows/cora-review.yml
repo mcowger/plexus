@@ -37,7 +37,7 @@ jobs:
 
       - name: Checkout trusted base
         if: steps.preflight.outputs.should_run == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.event.pull_request.base.sha }}
