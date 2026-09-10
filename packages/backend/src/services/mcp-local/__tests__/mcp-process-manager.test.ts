@@ -167,6 +167,29 @@ describe('local MCP process supervision', () => {
     expect(mcpProcessManager.getStatus('test')).toMatchObject({ status: 'stopped', pid: null });
   });
 
+  test('preserves a cleanup failure after startup readiness fails', async () => {
+    registerSpy(Bun, 'spawn').mockReturnValue(makeChild(112, null));
+    registerSpy(globalThis, 'fetch').mockImplementation((_url: string, init: RequestInit) => {
+      const signal = init.signal!;
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+
+    const starting = expect(mcpProcessManager.start('test', config)).rejects.toThrow(
+      'did not become ready'
+    );
+    await vi.advanceTimersByTimeAsync(5200);
+    await starting;
+
+    expect(mcpProcessManager.getStatus('test')).toMatchObject({
+      status: 'failed',
+      pid: 112,
+      lastError:
+        'Local MCP server did not become ready: Readiness request timed out; cleanup failed: Local MCP process did not exit after SIGKILL',
+    });
+  });
+
   test('cancels in-progress startup before a queued restart and ignores the old probe', async () => {
     const first = makeChild(105);
     const second = makeChild(106);

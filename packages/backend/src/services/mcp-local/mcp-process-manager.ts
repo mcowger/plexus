@@ -280,6 +280,9 @@ class McpProcessManager {
         await this.stopInternal(serverName);
       } catch (stopError) {
         logger.warn(`[mcp-local:${serverName}] startup cleanup failed`, stopError);
+        state.status = 'failed';
+        state.lastError = `${(error as Error).message}; cleanup failed: ${(stopError as Error).message}`;
+        throw error;
       }
       state.status = 'failed';
       state.lastError = (error as Error).message;
