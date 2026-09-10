@@ -6,6 +6,7 @@ import { transformAnthropicResponse } from './response-transformer';
 import { formatAnthropicResponse } from './response-formatter';
 import { transformAnthropicStream } from './stream-transformer';
 import { formatAnthropicStream } from './stream-formatter';
+import { anthropicReasoningTokens } from '../../utils/usage-normalizer';
 
 /**
  * AnthropicTransformer
@@ -63,7 +64,10 @@ export class AnthropicTransformer implements Transformer {
     try {
       const data = JSON.parse(dataStr);
 
-      // Anthropic sends usage in message_start and message_delta events
+      // Anthropic sends usage in message_start and message_delta events.
+      // Reasoning lives at `usage.output_tokens_details.thinking_tokens` on
+      // Anthropic's own wire (with a `thinkingTokens` fallback for
+      // Plexus-formatted upstreams) — see `anthropicReasoningTokens`.
       if (data.type === 'message_start' && data.message?.usage) {
         return {
           input_tokens: data.message.usage.input_tokens || 0,
@@ -72,7 +76,7 @@ export class AnthropicTransformer implements Transformer {
             data.message.usage.cache_read_input_tokens ||
             data.message.usage.cache_creation_input_tokens ||
             0,
-          reasoning_tokens: data.message.usage.thinkingTokens || 0,
+          reasoning_tokens: anthropicReasoningTokens(data.message.usage),
         };
       }
 
@@ -81,7 +85,7 @@ export class AnthropicTransformer implements Transformer {
           input_tokens: data.usage.input_tokens || 0,
           output_tokens: data.usage.output_tokens || 0,
           cached_tokens: data.usage.cache_read_input_tokens || 0,
-          reasoning_tokens: data.usage.thinkingTokens || 0,
+          reasoning_tokens: anthropicReasoningTokens(data.usage),
         };
       }
     } catch (e) {

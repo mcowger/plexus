@@ -88,6 +88,9 @@ export async function formatAnthropicResponse(response: UnifiedChatResponse): Pr
     usage: {
       input_tokens: response.usage?.input_tokens || 0,
       output_tokens: response.usage?.output_tokens || 0,
+      // Anthropic's own wire shape for thinking usage; `thinkingTokens` is kept
+      // for clients that already read Plexus's older flat field.
+      output_tokens_details: { thinking_tokens: response.usage?.reasoning_tokens || 0 },
       thinkingTokens: response.usage?.reasoning_tokens || 0,
       cache_read_input_tokens: response.usage?.cached_tokens || 0,
       cache_creation_input_tokens: response.usage?.cache_creation_tokens || 0,

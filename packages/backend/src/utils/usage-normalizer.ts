@@ -217,6 +217,26 @@ export function normalizeGeminiUsage(usageMetadata: any): UsageSubset {
   };
 }
 
+/**
+ * Reasoning tokens from an Anthropic-shaped `usage` object.
+ *
+ * Anthropic itself reports thinking under
+ * `usage.output_tokens_details.thinking_tokens` (non-streaming body and the
+ * final streaming `message_delta`). Plexus's own Anthropic-format responses
+ * (`transformers/anthropic/response-formatter.ts`, `stream-formatter.ts`)
+ * surface the same figure as a flat `usage.thinkingTokens`, which matters when
+ * one Plexus fronts another. Read the provider's field first, then Plexus's.
+ *
+ * Before this existed, `normalizeAnthropicUsage` hard-coded `reasoning_tokens:
+ * 0` and `AnthropicTransformer.extractUsage` read only `thinkingTokens`, so the
+ * recorded reasoning count for every real Anthropic request was 0 regardless of
+ * how much the model thought — invisible in the dashboard and excluded from
+ * cost.
+ */
+export function anthropicReasoningTokens(usage: any): number {
+  return safeToken(usage?.output_tokens_details?.thinking_tokens ?? usage?.thinkingTokens);
+}
+
 export function normalizeAnthropicUsage(usage: any): UsageSubset {
   const inputTokens = safeToken(usage?.input_tokens);
   const cachedTokens = safeToken(usage?.cache_read_input_tokens);
@@ -227,7 +247,7 @@ export function normalizeAnthropicUsage(usage: any): UsageSubset {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     total_tokens: inputTokens + cachedTokens + cacheCreationTokens + outputTokens,
-    reasoning_tokens: 0,
+    reasoning_tokens: anthropicReasoningTokens(usage),
     cached_tokens: cachedTokens,
     cache_creation_tokens: cacheCreationTokens,
   };
