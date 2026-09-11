@@ -41,6 +41,7 @@ import {
 import type { RenamePair } from '../../transformers/oauth/masking/types';
 import { CodexVersionService } from './codex-version-service';
 import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
+import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 
 /**
  * Auth for a native Anthropic request. Two modes, mirroring the old executor:
@@ -134,6 +135,7 @@ function prepareAnthropicOAuthRequest(
   streaming: boolean,
   callerBetas?: string
 ): PreparedOAuthRequest {
+  const preparedBody = clampAnthropicEffortAndThinking(nativeBody, modelId);
   // The token used to GATE masking (not necessarily the auth credential). For
   // the API-key masking route we force the masking's OAuth codepath with the
   // same `sk-ant-oat-mask-` shim the old executor used; the real key still goes
@@ -148,7 +150,7 @@ function prepareAnthropicOAuthRequest(
   // We keep these verbatim for the body (verified byte-for-byte against a
   // canon-only variant, which drops the system relocation). We do NOT reuse
   // their internal rename bookkeeping for the response — see reversal below.
-  const { payload: transformed } = applyClaudeOAuthTransform(nativeBody, maskingToken, {
+  const { payload: transformed } = applyClaudeOAuthTransform(preparedBody, maskingToken, {
     version: '2.1.63',
     entrypoint: 'cli',
     workload: '',
@@ -164,7 +166,7 @@ function prepareAnthropicOAuthRequest(
   // EVERY rename in one place regardless of which internal step produced it.
   // The response reversal is simply this map inverted — no per-mechanism
   // bookkeeping, no dependency on masking-internal flags.
-  const callerToolNames: string[] = (Array.isArray(nativeBody?.tools) ? nativeBody.tools : [])
+  const callerToolNames: string[] = (Array.isArray(preparedBody?.tools) ? preparedBody.tools : [])
     .map((t: any) => t?.name)
     .filter((n: any): n is string => typeof n === 'string');
 

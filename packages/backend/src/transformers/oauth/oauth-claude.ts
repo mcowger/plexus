@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../utils/logger';
+import { clampAnthropicEffortAndThinking } from '../anthropic/thinking-clamp';
 
 // ============================================================================
 // Tool Name Remapping
@@ -682,6 +683,8 @@ export function applyClaudeOAuthTransform(
   logger.debug('Applying Claude OAuth transforms for token');
 
   let result = JSON.parse(JSON.stringify(payload));
+  const modelId = typeof result?.model === 'string' ? result.model : undefined;
+  result = clampAnthropicEffortAndThinking(result, modelId);
   let toolNamesRemapped = false;
 
   // 1. Tool name remapping

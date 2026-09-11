@@ -19,7 +19,7 @@ import { getCatalogModel } from './catalog';
 
 import type { RouteResult } from '../routing/router';
 import type { ReasoningEffort, ReasoningIntent } from './reasoning';
-import { effortToBudget, intentToEffort } from './reasoning';
+import { clampEffortToWindow, effortToBudget, intentToEffort } from './reasoning';
 import type { GenerationIntent } from './generation';
 
 // ─── resolveBaseUrl ───────────────────────────────────────────────────────────
@@ -143,10 +143,13 @@ export function buildReasoningOptionsForModel(
     if (!modelSupportsDisable(model as PiAiModel<any>)) {
       // Model cannot disable thinking — clamp to its lowest supported level
       // instead of emitting an option the provider will reject.
+      const isAdaptiveAnthropic =
+        api === 'anthropic-messages' &&
+        (model.compat as { forceAdaptiveThinking?: boolean })?.forceAdaptiveThinking === true;
       const supported = getSupportedThinkingLevels(model as PiAiModel<any>).filter(
-        (l) => l !== 'off'
+        (l) => l !== 'off' && (!isAdaptiveAnthropic || l !== 'minimal')
       );
-      const lowest = supported[0] as ReasoningEffort | undefined;
+      const lowest = isAdaptiveAnthropic ? 'low' : (supported[0] as ReasoningEffort | undefined);
       if (!lowest) return {};
       return buildEnabledOptions(model, lowest, intent);
     }
@@ -213,8 +216,8 @@ function buildEnabledOptions(
       } else {
         // Client committed to a magnitude (explicit effort / reasoning suffix):
         // pass it and let pi-ai map it via thinkingLevelMap (e.g. xhigh → "max"
-        // on Opus 4.6).
-        base.effort = effort;
+        // on Opus 4.6). Clamp to Anthropic's allowed window ['low', 'max'].
+        base.effort = clampEffortToWindow(effort, 'low', 'max');
       }
     } else {
       // Budget-based thinking for older Claude models. Round-trip the client's

@@ -145,6 +145,166 @@ describe('Dispatcher registry auto-compat', () => {
     expect(result.payload.temperature).toBeUndefined();
   });
 
+  test('clamps minimal effort to low for Anthropic adaptive thinking models', async () => {
+    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+      piModel({
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const dispatcher = new Dispatcher() as any;
+
+    const result = await dispatcher.transformRequestPayload(
+      request({
+        reasoning: { effort: 'minimal', enabled: true },
+      }),
+      route({
+        config: {
+          api_base_url: 'https://api.anthropic.com',
+          api_key: 'test-key',
+          auto_compat: true,
+          pi_ai_provider: 'anthropic',
+        } as any,
+      }),
+      {
+        transformRequest: vi.fn(async () => ({
+          model: 'provider-model',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+          max_tokens: 4096,
+        })),
+      },
+      'messages',
+      []
+    );
+
+    expect(result.payload.thinking).toEqual({
+      type: 'adaptive',
+      display: 'summarized',
+    });
+    expect(result.payload.output_config).toEqual({ effort: 'low' });
+  });
+
+  test('clamps disabled thinking to adaptive with low effort for Opus 5 cannot-disable model', async () => {
+    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+      piModel({
+        id: 'claude-opus-5',
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        thinkingLevelMap: { off: null, xhigh: 'xhigh', max: 'max' },
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const dispatcher = new Dispatcher() as any;
+
+    const result = await dispatcher.transformRequestPayload(
+      request({
+        reasoning: { enabled: false },
+      }),
+      route({
+        model: 'claude-opus-5',
+        config: {
+          api_base_url: 'https://api.anthropic.com',
+          api_key: 'test-key',
+          auto_compat: true,
+          pi_ai_provider: 'anthropic',
+        } as any,
+      }),
+      {
+        transformRequest: vi.fn(async () => ({
+          model: 'claude-opus-5',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+          max_tokens: 4096,
+        })),
+      },
+      'messages',
+      []
+    );
+
+    expect(result.payload.thinking).toEqual({
+      type: 'adaptive',
+      display: 'summarized',
+    });
+    expect(result.payload.output_config).toEqual({ effort: 'low' });
+  });
+
+  test('maps transformed payload output_config.effort off to disabled thinking on supported model', async () => {
+    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+      piModel({
+        id: 'claude-sonnet-4-6',
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const dispatcher = new Dispatcher() as any;
+
+    const result = await dispatcher.transformRequestPayload(
+      request({}),
+      route({
+        model: 'claude-sonnet-4-6',
+        config: {
+          api_base_url: 'https://api.anthropic.com',
+          api_key: 'test-key',
+          auto_compat: true,
+          pi_ai_provider: 'anthropic',
+        } as any,
+      }),
+      {
+        transformRequest: vi.fn(async () => ({
+          model: 'claude-sonnet-4-6',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+          max_tokens: 4096,
+          output_config: { effort: 'off' },
+        })),
+      },
+      'messages',
+      []
+    );
+
+    expect(result.payload.thinking).toEqual({ type: 'disabled' });
+    expect(result.payload.output_config).toBeUndefined();
+  });
+
+  test('clamps transformed payload output_config.effort off to adaptive low effort on Opus 5', async () => {
+    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+      piModel({
+        id: 'claude-opus-5',
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        thinkingLevelMap: { off: null, xhigh: 'xhigh', max: 'max' },
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const dispatcher = new Dispatcher() as any;
+
+    const result = await dispatcher.transformRequestPayload(
+      request({}),
+      route({
+        model: 'claude-opus-5',
+        config: {
+          api_base_url: 'https://api.anthropic.com',
+          api_key: 'test-key',
+          auto_compat: true,
+          pi_ai_provider: 'anthropic',
+        } as any,
+      }),
+      {
+        transformRequest: vi.fn(async () => ({
+          model: 'claude-opus-5',
+          messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+          max_tokens: 4096,
+          output_config: { effort: 'off' },
+        })),
+      },
+      'messages',
+      []
+    );
+
+    expect(result.payload.thinking).toEqual({ type: 'adaptive' });
+    expect(result.payload.output_config).toEqual({ effort: 'low' });
+  });
+
   test('skips auto-compat when the model has no pi_ai_model_id', async () => {
     const dispatcher = new Dispatcher() as any;
 
