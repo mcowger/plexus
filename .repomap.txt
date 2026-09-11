@@ -1674,15 +1674,55 @@
   │ [class] OpenAITransformer (line 12)
   │ [method] parseRequest (line 16)
 
-📁 packages/backend/src/transformers/responses.ts:
-  │ [class] ResponsesTransformer (line 228)
-  │ [function] buildResponsesUsagePayload (line 63)
-  │ [function] clientToolCallKey (line 120)
-  │ [function] isClientExecutedToolItem (line 101)
-  │ [function] normalizeCompositeResponsesCallIds (line 131)
-  │ [function] normalizeResponsesFunctionCallItemIds (line 172)
-  │ [function] normalizeResponsesReasoningContent (line 198)
-  │ [function] toUnifiedImageGenerationCall (line 39)
+📁 packages/backend/src/transformers/responses/index.ts:
+  │ [class] ResponsesTransformer (line 38)
+
+📁 packages/backend/src/transformers/responses/normalization.ts:
+  │ [function] normalizeCompositeResponsesCallIds (line 9)
+  │ [function] normalizeResponsesFunctionCallItemIds (line 56)
+  │ [function] normalizeResponsesReasoningContent (line 83)
+
+📁 packages/backend/src/transformers/responses/request-builder.ts:
+  │ [function] buildResponsesRequest (line 7)
+
+📁 packages/backend/src/transformers/responses/request-parser.ts:
+  │ [function] convertContentParts (line 54)
+  │ [function] convertInputItemsToMessages (line 99)
+  │ [function] mapInputRole (line 36)
+  │ [function] normalizeInput (line 14)
+  │ [function] normalizeMessageContent (line 84)
+  │ [function] parseResponsesRequest (line 205)
+
+📁 packages/backend/src/transformers/responses/response-formatter.ts:
+  │ [function] convertChatResponseToOutputItems (line 13)
+  │ [function] formatResponsesResponse (line 91)
+
+📁 packages/backend/src/transformers/responses/response-transformer.ts:
+  │ [function] transformResponsesResponse (line 17)
+
+📁 packages/backend/src/transformers/responses/stream-formatter.ts:
+  │ [function] formatResponsesStream (line 9)
+
+📁 packages/backend/src/transformers/responses/stream-transformer.ts:
+  │ [function] transformResponsesStream (line 12)
+
+📁 packages/backend/src/transformers/responses/tool-mapper.ts:
+  │ [interface] ResponsesToolState (line 4)
+  │ [function] buildToolOutputItem (line 194)
+  │ [function] convertToolChoiceForChatCompletions (line 175)
+  │ [function] convertToolsForChatCompletions (line 158)
+  │ [function] convertToolsForUnified (line 95)
+  │ [function] createResponsesToolState (line 9)
+  │ [function] customToolArgumentsForModel (line 21)
+  │ [function] customToolInput (line 34)
+
+📁 packages/backend/src/transformers/responses/utils.ts:
+  │ [function] buildResponsesUsagePayload (line 54)
+  │ [function] clientToolCallKey (line 115)
+  │ [function] generateItemId (line 17)
+  │ [function] generateResponseId (line 10)
+  │ [function] isClientExecutedToolItem (line 94)
+  │ [function] toUnifiedImageGenerationCall (line 28)
 
 📁 packages/backend/src/transformers/speech.ts:
   │ [class] SpeechTransformer (line 3)
