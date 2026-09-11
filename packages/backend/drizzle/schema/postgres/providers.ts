@@ -41,6 +41,7 @@ export const providers = pgTable(
     quotaCheckerOptions: text('quota_checker_options'), // JSON or encrypted string
     modelAutosyncEnabled: boolean('model_autosync_enabled').notNull().default(false),
     modelAutosyncInterval: integer('model_autosync_interval').notNull().default(60),
+    modelAutosyncCreateAliases: boolean('model_autosync_create_aliases').notNull().default(false),
     // Deprecated / Unused: Legacy GPU profile settings for removed synthetic energy estimation.
     // Retained in schema for database backwards compatibility without requiring migrations.
     gpuProfile: text('gpu_profile'), // Deprecated / Unused

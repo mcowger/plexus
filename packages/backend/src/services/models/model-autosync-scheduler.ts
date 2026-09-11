@@ -1,4 +1,4 @@
-import type { ProviderConfig } from '../../config';
+import type { ModelConfig, ProviderConfig } from '../../config';
 import { ConfigRepository } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
 import { discoverProviderModelIds } from '../providers/provider-model-discovery';
@@ -97,11 +97,18 @@ export class ModelAutosyncScheduler {
       }
 
       const added = await this.repo.addMissingProviderModels(providerId, modelIds);
+
+      let aliasesCreated = 0;
+      if (config.provider.model_autosync?.createAliases === true) {
+        aliasesCreated = await this.createMissingAliases(providerId, modelIds);
+      }
+
       logger.info(
-        `Model autosync for provider '${providerId}' discovered ${modelIds.length} models, added ${added}`
+        `Model autosync for provider '${providerId}' discovered ${modelIds.length} models, ` +
+          `added ${added}, created ${aliasesCreated} alias(es)`
       );
 
-      if (added > 0) await this.onModelsChanged?.();
+      if (added > 0 || aliasesCreated > 0) await this.onModelsChanged?.();
       return added;
     } catch (error) {
       logger.error(`Model autosync failed for provider '${providerId}': ${error}`);
@@ -109,6 +116,34 @@ export class ModelAutosyncScheduler {
     } finally {
       this.runningProviders.delete(providerId);
     }
+  }
+
+  /**
+   * Create a passthrough alias (slug === model id) for each provider model that
+   * has no existing alias, so the model becomes routable and appears in
+   * GET /v1/models. Never overwrites an alias that already exists — a slug
+   * already taken (by this or any other provider) is left untouched. Returns
+   * the number of aliases created.
+   */
+  private async createMissingAliases(providerId: string, modelIds: string[]): Promise<number> {
+    let created = 0;
+    for (const modelId of modelIds) {
+      if (await this.repo.getAlias(modelId)) continue;
+      const aliasConfig: ModelConfig = {
+        priority: 'api_match',
+        sticky_session: true,
+        target_groups: [
+          {
+            name: providerId,
+            selector: 'random',
+            targets: [{ provider: providerId, model: modelId, enabled: true }],
+          },
+        ],
+      };
+      await this.repo.saveAlias(modelId, aliasConfig);
+      created++;
+    }
+    return created;
   }
 
   isInitialized(): boolean {

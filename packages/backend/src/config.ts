@@ -236,6 +236,11 @@ const ProviderQuotaCheckerSchema = z.object({
 const ModelAutosyncSchema = z.object({
   enabled: z.boolean().default(false),
   intervalMinutes: z.number().int().min(1).default(60),
+  // When true, autosync also creates a passthrough model alias (slug === model
+  // id) for each newly discovered provider model that has no existing alias, so
+  // the model becomes routable and shows up in GET /v1/models without a manual
+  // alias. Never overwrites an alias that already exists.
+  createAliases: z.boolean().default(false),
 });
 
 const CompactionNativeSchema = z.object({

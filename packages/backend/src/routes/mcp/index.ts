@@ -183,6 +183,10 @@ async function streamUpstreamResponse(
     headers['Cache-Control'] = 'no-cache';
   }
   headers['X-Accel-Buffering'] = 'no';
+  // Explicitly signal keep-alive for the SSE stream rather than relying on the
+  // HTTP runtime to add it — some runtimes (e.g. Bun's inject/light-my-request
+  // harness) omit the implicit Connection header.
+  headers['Connection'] = 'keep-alive';
 
   // Take over the response lifecycle so Fastify does not also try to send a
   // reply, and write the head directly so it reaches the client immediately

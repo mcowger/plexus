@@ -267,6 +267,15 @@ properties:
         type: integer
         minimum: 1
         default: 60
+      createAliases:
+        type: boolean
+        default: false
+        description: >
+          When true, autosync also creates a passthrough model alias (slug
+          equal to the model id) for each newly discovered provider model that
+          has no existing alias, so the model becomes routable and appears in
+          GET /v1/models without a manually created alias. Never overwrites an
+          alias that already exists.
   adapter:
     oneOf:
       - type: string

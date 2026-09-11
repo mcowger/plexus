@@ -465,6 +465,7 @@ export class ConfigRepository {
         : null,
       modelAutosyncEnabled: fromBool(config.model_autosync?.enabled === true),
       modelAutosyncInterval: Math.max(1, config.model_autosync?.intervalMinutes ?? 60),
+      modelAutosyncCreateAliases: fromBool(config.model_autosync?.createAliases === true),
       gpuProfile: null,
       gpuRamGb: null,
       gpuBandwidthTbS: null,
@@ -713,6 +714,7 @@ export class ConfigRepository {
       model_autosync: {
         enabled: toBool(row.modelAutosyncEnabled),
         intervalMinutes: Math.max(1, row.modelAutosyncInterval ?? 60),
+        createAliases: toBool(row.modelAutosyncCreateAliases),
       },
       ...(() => {
         const adapterVal = parseJson(row.adapter);

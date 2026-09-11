@@ -66,7 +66,7 @@ export const EMPTY_PROVIDER: Provider = {
   headers: {},
   extraBody: {},
   models: {},
-  modelAutosync: { enabled: false, intervalMinutes: 60 },
+  modelAutosync: { enabled: false, intervalMinutes: 60, createAliases: false },
   adapter: [],
   timeoutMs: undefined,
   maxConcurrency: undefined,

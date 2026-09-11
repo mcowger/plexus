@@ -31,6 +31,7 @@ export const providers = sqliteTable(
     quotaCheckerOptions: text('quota_checker_options'), // JSON
     modelAutosyncEnabled: integer('model_autosync_enabled').notNull().default(0),
     modelAutosyncInterval: integer('model_autosync_interval').notNull().default(60),
+    modelAutosyncCreateAliases: integer('model_autosync_create_aliases').notNull().default(0),
     // Deprecated / Unused: Legacy GPU profile settings for removed synthetic energy estimation.
     // Retained in schema for database backwards compatibility without requiring migrations.
     gpuProfile: text('gpu_profile'), // Deprecated / Unused

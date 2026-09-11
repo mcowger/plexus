@@ -130,6 +130,7 @@ export function ProviderAdvancedEditor({
                           1,
                           editingProvider.modelAutosync?.intervalMinutes || 60
                         ),
+                        createAliases: editingProvider.modelAutosync?.createAliases === true,
                       },
                     });
                   }}
@@ -152,6 +153,7 @@ export function ProviderAdvancedEditor({
                       modelAutosync: {
                         enabled: editingProvider.modelAutosync?.enabled === true,
                         intervalMinutes,
+                        createAliases: editingProvider.modelAutosync?.createAliases === true,
                       },
                     });
                   }}
@@ -161,6 +163,34 @@ export function ProviderAdvancedEditor({
                   Sync Interval Minutes
                 </span>
               </div>
+            </div>
+            <div className="p-2 px-3 border-t border-border-glass">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={editingProvider.modelAutosync?.enabled !== true}
+                  checked={editingProvider.modelAutosync?.createAliases === true}
+                  onChange={(e) => {
+                    setEditingProvider({
+                      ...editingProvider,
+                      modelAutosync: {
+                        enabled: editingProvider.modelAutosync?.enabled === true,
+                        intervalMinutes: Math.max(
+                          1,
+                          editingProvider.modelAutosync?.intervalMinutes || 60
+                        ),
+                        createAliases: e.target.checked,
+                      },
+                    });
+                  }}
+                />
+                <span className="font-body text-[12px] font-medium text-text-secondary">
+                  Auto-create model aliases
+                </span>
+                <span className="font-body text-[11px] text-text-muted">
+                  Makes newly discovered models routable and visible in /v1/models
+                </span>
+              </label>
             </div>
           </div>
 

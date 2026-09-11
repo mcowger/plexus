@@ -30,7 +30,7 @@ describe('provider model autosync persistence', () => {
       allow_100_percent_utilization: false,
       estimateTokens: false,
       useClaudeMasking: false,
-      model_autosync: { enabled: true, intervalMinutes: 15 },
+      model_autosync: { enabled: true, intervalMinutes: 15, createAliases: false },
       models: {
         existing: {
           pricing: { source: 'simple', input: 1, output: 2 },
@@ -42,7 +42,11 @@ describe('provider model autosync persistence', () => {
     await repo.saveProvider('autosync-provider', provider);
 
     const loaded = await repo.getProvider('autosync-provider');
-    expect(loaded?.model_autosync).toEqual({ enabled: true, intervalMinutes: 15 });
+    expect(loaded?.model_autosync).toEqual({
+      enabled: true,
+      intervalMinutes: 15,
+      createAliases: false,
+    });
 
     const added = await repo.addMissingProviderModels('autosync-provider', [
       'existing',
@@ -68,6 +72,28 @@ describe('provider model autosync persistence', () => {
         pricing: { source: 'simple', input: 0, output: 0 },
         access_via: [],
       },
+    });
+  });
+
+  it('persists model_autosync.createAliases when enabled', async () => {
+    const provider: ProviderConfig = {
+      api_base_url: 'https://api.example.com/v1',
+      api_key: 'sk-test',
+      disable_cooldown: false,
+      stall_cooldown: false,
+      allow_100_percent_utilization: false,
+      estimateTokens: false,
+      useClaudeMasking: false,
+      model_autosync: { enabled: true, intervalMinutes: 30, createAliases: true },
+    };
+
+    await repo.saveProvider('alias-autosync-provider', provider);
+
+    const loaded = await repo.getProvider('alias-autosync-provider');
+    expect(loaded?.model_autosync).toEqual({
+      enabled: true,
+      intervalMinutes: 30,
+      createAliases: true,
     });
   });
 });
