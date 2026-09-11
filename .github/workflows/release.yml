@@ -271,6 +271,7 @@ jobs:
           anthropic_api_key: ${{ env.LLM_API_KEY }}
           claude_args: |
             --model ${{ vars.LLM_MODEL_ID }}
+            --effort medium
             --max-turns 10
             --allowedTools "Read,Write"
           prompt: |
