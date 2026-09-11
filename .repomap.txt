@@ -2052,6 +2052,12 @@
 📁 packages/frontend/src/components/dashboard/liveTypes.ts:
   │ [interface] EntityStats (line 129)
 
+📁 packages/frontend/src/components/logs/types.ts:
+  │ [interface] DesktopLogRowProps (line 33)
+  │ [interface] LogRowProps (line 24)
+  │ [interface] PaginationControlsProps (line 14)
+  │ [interface] ProgressUpdate (line 3)
+
 📁 packages/frontend/src/components/quota/checker-presentation.ts:
   │ [function] getCheckerDisplayName (line 1)
 
