@@ -18,10 +18,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.REPOMAP_APP_ID }}
+          private-key: ${{ secrets.REPOMAP_APP_PRIVATE_KEY }}
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -54,4 +61,3 @@ jobs:
           git add packages/backend/drizzle/migrations/ packages/backend/drizzle/migrations_pg/
           git commit --no-verify -m "chore: auto-generate migrations for schema changes"
           git push
-
