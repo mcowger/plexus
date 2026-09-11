@@ -31,6 +31,7 @@ export default defineConfig({
     mockReset: true,
     pool: 'forks',
     isolate: true,
+    fsModuleCache: true,
     server: {
       deps: {
         inline: ['zod', 'yaml', '@plexus/shared', '@earendil-works/pi-ai'],
