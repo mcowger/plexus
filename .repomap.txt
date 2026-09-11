@@ -2045,6 +2045,9 @@
   │ [function] table (line 226)
   │ [function] yaml (line 205)
 
+📁 packages/frontend/src/components/dashboard/liveTypes.ts:
+  │ [interface] EntityStats (line 129)
+
 📁 packages/frontend/src/components/quota/checker-presentation.ts:
   │ [function] getCheckerDisplayName (line 1)
 
@@ -2054,6 +2057,11 @@
 📁 packages/frontend/src/hooks/useCardPositions.ts:
   │ [interface] UseCardPositionsReturn (line 56)
   │ [function] useCardPositions (line 82)
+
+📁 packages/frontend/src/hooks/useLiveDashboardData.ts:
+  │ [interface] LiveDashboardData (line 47)
+  │ [interface] UseLiveDashboardDataOptions (line 37)
+  │ [function] useLiveDashboardData (line 116)
 
 📁 packages/frontend/src/hooks/useMetadataEditor.ts:
   │ [function] useMetadataEditor (line 19)
