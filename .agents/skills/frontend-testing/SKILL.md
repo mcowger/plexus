@@ -48,6 +48,8 @@ Use the agent launcher — it does the right thing in one call:
 bun run dev:agent --detach
 ```
 
+If mise is not activated, use `mise exec -- bun run dev:agent --detach`.
+
 `dev:agent --detach` starts or reuses the full stack target, waits until the server is healthy, then returns
 while the stack keeps running in the background. (When run interactively without `--detach`, `dev:agent` streams live process logs via Paseo or log tailing.) Do **not** use `bun run dev:full` directly for this — it runs in the foreground under a file watcher and never returns, so it will hang your session. `dev:agent` is also idempotent: if an instance is already up on this worktree's port it just reports it and returns immediately.
 

@@ -221,7 +221,8 @@ All custom checker endpoints require the `x-admin-key` header:
 Example create request:
 
 ```bash
-curl -X PUT http://localhost:4000/v0/management/custom-checkers/openrouter-custom \
+PORT=$(bun scripts/dev-config.ts port)
+curl -X PUT "http://localhost:${PORT}/v0/management/custom-checkers/openrouter-custom" \
   -H 'x-admin-key: your-admin-password' \
   -H 'Content-Type: application/json' \
   -d '{

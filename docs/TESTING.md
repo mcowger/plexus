@@ -39,8 +39,28 @@ bun run test:watch
    ```bash
    bun run dev
    ```
-2. Open the Dashboard at `http://localhost:4000`.
-3. Send requests to the API proxy at `http://localhost:4000/v1/...`.
+   Use the startup `PORT` value for the local URL. It is derived from the
+   worktree directory name. If mise is not activated, use `mise exec -- bun run dev`.
+2. Open the Dashboard at `http://localhost:<PORT>`.
+3. Send requests to the API proxy at `http://localhost:<PORT>/v1/...`.
+
+If `frpc`, `FRPC_SERVER_ADDR`, and `FRPC_AUTH_TOKEN` are available, the dev
+server also starts a worktree-specific FRP tunnel after the health check passes.
+Set `FRPC_SUBDOMAIN_HOST` if you want startup output to include the full HTTPS
+URL; otherwise it prints the generated subdomain. The tunnel is optional and
+stops with the direct dev process, or when Paseo stops its managed service.
+
+For a background stack:
+
+```bash
+bun run dev:agent --detach
+bun run dev:stop
+```
+
+Use `mise exec --` before these commands when mise is not activated. When
+Paseo manages the stack, make sure Paseo itself runs with the project mise
+environment if you want to use the mise-managed `frpc` binary. The same
+Paseo-managed or direct-process lifecycle is used either way.
 
 ### Dev Data Management (`prep-dev`)
 
@@ -81,7 +101,8 @@ This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future ca
 **Notes:**
 - The local port is auto-derived from your directory name (matches `bun run dev`)
 - OAuth providers are excluded by default to avoid credential conflicts
-- After restore, restart the dev server if needed
+- After restore, restart the dev server if needed. Use `bun run dev:stop` to
+  stop the full stack before starting it again.
 
 ## Test Architecture
 

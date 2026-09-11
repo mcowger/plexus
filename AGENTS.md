@@ -94,6 +94,7 @@ Use these commands exactly:
 Notes:
 - `bun run dev` derives the backend port from the worktree name and runs the frontend watcher.
 - `bun run dev:agent` boots or attaches to a workspace script target (defaults to `dev:full`), managed by Paseo when available with automatic log streaming, and falling back seamlessly to direct background process execution for non-Paseo environments. Use `--detach` to return immediately once healthy.
+- The dev stack can start an optional FRP tunnel when `frpc`, `FRPC_SERVER_ADDR`, and `FRPC_AUTH_TOKEN` are available. `mise.toml` declares `frpc` for mise users; run `mise install` if needed. Otherwise it must be installed separately and available on `PATH`.
 - `bun test` is intentionally blocked. Use `bun run test`.
 - Cora reviews are manual and are not part of the commit hooks. Use the matching
   `code:review:*` command when a review is useful if Cora is available. If Cora is

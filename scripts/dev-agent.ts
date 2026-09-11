@@ -24,6 +24,7 @@ import { tmpdir } from 'os';
 import { openSync, existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { spawn } from 'child_process';
 import { deriveDevPort } from './dev-port-allocator';
+import { buildFrpcSubdomain, buildFrpcUrl, getRepositoryName, isFrpcAvailable } from './frpc';
 import {
   isPaseoScriptAvailable,
   startPaseoScript,
@@ -69,6 +70,14 @@ function getLogFile(target: string): string {
   return join(tmpdir(), `plexus-dev-${target.replace(/[:/]/g, '_')}-${dirName}.log`);
 }
 
+function getFrpcEndpoint(): { subdomain: string; url?: string } | undefined {
+  if (!process.env.FRPC_SERVER_ADDR || !process.env.FRPC_AUTH_TOKEN || !isFrpcAvailable()) {
+    return undefined;
+  }
+  const subdomain = buildFrpcSubdomain(getRepositoryName(process.cwd()), dirName);
+  return { subdomain, url: buildFrpcUrl(subdomain, process.env.FRPC_SUBDOMAIN_HOST) };
+}
+
 // Standard fallback PID file from previous dev-agent versions
 const LEGACY_PID_FILE = join(tmpdir(), `plexus-${dirName}.pid`);
 
@@ -95,7 +104,12 @@ async function waitForHealthy(port = PORT, timeoutMs = READY_TIMEOUT_MS): Promis
   return false;
 }
 
-function printReady(target: string, port: string | number, proxyUrl?: string, prefix = 'Ready.') {
+function printReady(
+  target: string,
+  port: string | number,
+  frpcEndpoint?: { subdomain: string; url?: string },
+  prefix = 'Ready.'
+) {
   const baseUrl = `http://localhost:${port}`;
   const loginUrl = `${baseUrl}/ui/login?token=${encodeURIComponent(ADMIN_KEY)}`;
   console.log(`\n${prefix}`);
@@ -103,8 +117,11 @@ function printReady(target: string, port: string | number, proxyUrl?: string, pr
   console.log(`PORT=${port}`);
   console.log(`ADMIN_KEY=${ADMIN_KEY}`);
   console.log(`URL=${loginUrl}`);
-  if (proxyUrl) {
-    console.log(`PROXY_URL=${proxyUrl}`);
+  if (frpcEndpoint) {
+    console.log(`FRPC_SUBDOMAIN=${frpcEndpoint.subdomain}`);
+    if (frpcEndpoint.url) {
+      console.log(`PROXY_URL=${frpcEndpoint.url}`);
+    }
   }
 }
 
@@ -166,7 +183,7 @@ if (isPaseoScriptAvailable(targetName)) {
         printReady(
           targetName,
           servicePort,
-          scriptPayload.proxyUrl,
+          getFrpcEndpoint(),
           `Target "${targetName}" ready (Paseo managed).`
         );
       } else {
@@ -207,7 +224,7 @@ if (await isHealthy(fallbackPort)) {
   printReady(
     targetName,
     fallbackPort,
-    undefined,
+    getFrpcEndpoint(),
     `Dev stack already running on port ${fallbackPort} — reusing it.`
   );
   if (detach) {
@@ -254,7 +271,7 @@ childProcess.unref();
 console.log(`Started "${targetName}" in background (logs: ${logFile})...`);
 
 if (await waitForHealthy(fallbackPort)) {
-  printReady(targetName, fallbackPort, undefined, `Target "${targetName}" ready.`);
+  printReady(targetName, fallbackPort, getFrpcEndpoint(), `Target "${targetName}" ready.`);
   if (detach) {
     process.exit(0);
   }

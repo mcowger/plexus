@@ -19,6 +19,10 @@ Plexus stores all configuration in the database and manages it via the **Admin U
 | `LOG_LEVEL` | Verbosity: `error`, `warn`, `info`, `debug`, `silly` | No |
 | `PORT` | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`). | No |
 | `HOST` | Address to bind to. | No |
+| `FRPC_SERVER_ADDR` | Development-only LAN address of the frps server. | No |
+| `FRPC_AUTH_TOKEN` | Development-only token shared with frps. | No |
+| `FRPC_SERVER_PORT` | Development-only frps control port (defaults to 7000). | No |
+| `FRPC_SUBDOMAIN_HOST` | Optional development-only host suffix used to print the full HTTPS tunnel URL. | No |
 
 ### Quick Start
 
@@ -37,7 +41,9 @@ docker run -e ADMIN_KEY="my-secret" -v ./data:/app/data -p 4000:4000 plexus:late
 
 ## Configuration via Admin UI
 
-The **Admin UI** (accessible at `http://localhost:4000` after starting) is the easiest way to configure Plexus. It provides forms for all configuration options with real-time validation.
+The **Admin UI** is accessible at the port printed by `bun run dev` after
+starting. It provides forms for all configuration options with real-time
+validation.
 
 - **Providers**: Add/edit upstream AI providers (API keys, base URLs, model lists)
 - **Models**: Create model aliases with routing logic and pricing

@@ -64,15 +64,17 @@ Plexus can be compiled into a single, self-contained binary that includes the Bu
 
 2. **Install dependencies**:
    ```bash
-   bun run install:all
+   bun install
    ```
 
 3. **Compile**:
-   - **macOS (ARM64/Apple Silicon):** `bun run compile:macos`
-   - **Linux (x64):** `bun run compile:linux`
-   - **Windows (x64):** `bun run compile:windows`
+    - **macOS (ARM64/Apple Silicon):** `bun run compile:macos`
+    - **Linux (x64):** `bun run compile:linux-amd64`
+    - **Linux (ARM64):** `bun run compile:linux-arm64`
+    - **Windows (x64):** `bun run compile:windows`
 
-The resulting executable will be named `plexus-macos` (or `plexus-linux` / `plexus.exe`) in the project root.
+The resulting executable will be named `plexus-macos`, `plexus-linux-amd64`,
+`plexus-linux-arm64`, or `plexus.exe` in the project root.
 
 The binary is fully self-contained: migration SQL files are embedded inside it at compile time, so no separate `drizzle/` directory or `DRIZZLE_MIGRATIONS_PATH` environment variable is needed when running the standalone binary.
 
@@ -104,13 +106,29 @@ plexus.exe
 
 2. **Install dependencies**:
    ```bash
-   bun run install:all
+   bun install
    ```
 
 3. **Start Development Stack**:
    ```bash
    ADMIN_KEY="your-admin-key" DATABASE_URL=sqlite://./data/plexus.db bun run dev
    ```
+
+   If mise is not activated in your shell, use `mise exec -- bun run dev`.
+   Run `mise install` once to install the project-managed tools. FRP is
+   optional; without `frpc` on `PATH`, or without `FRPC_SERVER_ADDR` and
+   `FRPC_AUTH_TOKEN`, the dev server runs without a tunnel. The tunnel is
+   stopped with the direct dev process, or when Paseo stops its managed service.
+
+   To run the background lifecycle instead:
+   ```bash
+   bun run dev:agent --detach
+   bun run dev:stop
+   ```
+
+   Prefix these commands with `mise exec --` when mise is not activated. When
+   Paseo manages the stack, make sure Paseo itself runs with the project mise
+   environment if you want to use the mise-managed `frpc` binary.
 
 ## Environment Variables
 
@@ -133,6 +151,10 @@ When running Plexus, you can use the following environment variables to control 
 - **`PORT`** (Optional): HTTP server port. Default: `4000` (Note: When running `bun run dev` locally, the port is automatically derived from the git worktree directory name).
 - **`HOST`** (Optional): Address to bind to. Default: `0.0.0.0`
 - **`DATA_DIR`** (Optional): Directory for SQLite database. Default: `./data`
+- **`FRPC_SERVER_ADDR`** (Development only): LAN-reachable address of the frps server.
+- **`FRPC_AUTH_TOKEN`** (Development only): Token shared with frps.
+- **`FRPC_SERVER_PORT`** (Development only): frps control port. Default: `7000`.
+- **`FRPC_SUBDOMAIN_HOST`** (Development only): Optional suffix used only to print the full HTTPS URL. The frps `subDomainHost` setting controls routing.
 
 ### Example Usage
 

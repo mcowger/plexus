@@ -4,6 +4,14 @@ import { createServer } from 'net';
 import { existsSync, writeFileSync, unlinkSync, statSync, readFileSync } from 'fs';
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process';
 import { deriveDevPort } from './dev-port-allocator';
+import {
+  buildFrpcArgs,
+  buildFrpcSubdomain,
+  buildFrpcUrl,
+  DEFAULT_FRPC_SERVER_PORT,
+  getRepositoryName,
+  isFrpcAvailable,
+} from './frpc';
 
 // --- Dev defaults (only applied when not already set in environment) ---
 
@@ -163,6 +171,114 @@ writeFileSync(PID_FILE, String(process.pid));
 const BACKEND_DIR = join(process.cwd(), 'packages/backend');
 const FRONTEND_DIR = join(process.cwd(), 'packages/frontend');
 
+const WIN = process.platform === 'win32';
+
+const childPgids: number[] = [];
+let isShuttingDown = false;
+let frpcProcess: ChildProcess | undefined;
+
+function spawnManaged(
+  command: string,
+  args: string[],
+  cwd: string,
+  options: { detached?: boolean } = {}
+): ChildProcess {
+  const detached = options.detached ?? true;
+  const proc = nodeSpawn(command, args, {
+    cwd,
+    env: { ...process.env },
+    stdio: 'inherit',
+    detached,
+    ...(WIN ? { shell: true } : {}),
+  });
+  proc.on('error', (error) => {
+    console.error(`[${command}] ${error.message}`);
+  });
+  if (proc.pid && detached) childPgids.push(proc.pid);
+  return proc;
+}
+
+function killAll() {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  if (frpcProcess?.pid) {
+    try {
+      process.kill(frpcProcess.pid, WIN ? undefined : 'SIGTERM');
+    } catch {
+      // already dead
+    }
+  }
+
+  for (const pgid of childPgids) {
+    try {
+      if (WIN) {
+        process.kill(pgid);
+      } else {
+        process.kill(-pgid, 'SIGKILL');
+      }
+    } catch {
+      // already dead
+    }
+  }
+
+  try {
+    unlinkSync(PID_FILE);
+  } catch {}
+}
+
+process.on('exit', killAll);
+
+function startFrpc() {
+  if (!isFrpcAvailable()) {
+    console.log('[frpc] Tunnel disabled: frpc is not available on PATH.');
+    return;
+  }
+
+  const serverAddr = process.env.FRPC_SERVER_ADDR;
+  const token = process.env.FRPC_AUTH_TOKEN;
+  if (!serverAddr && !token) {
+    console.log('[frpc] Tunnel disabled: FRPC_SERVER_ADDR and FRPC_AUTH_TOKEN are not set.');
+    return;
+  }
+  if (!serverAddr || !token) {
+    console.warn('[frpc] Tunnel disabled: set both FRPC_SERVER_ADDR and FRPC_AUTH_TOKEN.');
+    return;
+  }
+
+  const serverPort = Number(process.env.FRPC_SERVER_PORT ?? DEFAULT_FRPC_SERVER_PORT);
+  if (!Number.isInteger(serverPort) || serverPort < 1 || serverPort > 65535) {
+    console.error(
+      `[frpc] Tunnel disabled: invalid FRPC_SERVER_PORT "${process.env.FRPC_SERVER_PORT}".`
+    );
+    return;
+  }
+
+  const repositoryName = getRepositoryName(process.cwd());
+  const worktreeName = basename(process.cwd());
+  const subdomain = buildFrpcSubdomain(repositoryName, worktreeName);
+  const publicUrl = buildFrpcUrl(subdomain, process.env.FRPC_SUBDOMAIN_HOST);
+  const args = buildFrpcArgs({
+    serverAddr,
+    serverPort,
+    token,
+    proxyName: subdomain,
+    localPort: Number(process.env.PORT),
+    subdomain,
+  });
+
+  console.log(`[frpc] Starting tunnel for subdomain: ${subdomain}`);
+  const proc = spawnManaged('frpc', args, process.cwd(), { detached: false });
+  frpcProcess = proc;
+  proc.on('exit', (code, signal) => {
+    if (frpcProcess === proc) frpcProcess = undefined;
+    if (!isShuttingDown && code !== 0) {
+      console.error(`[frpc] Tunnel exited with ${signal ? `signal ${signal}` : `code ${code}`}.`);
+    }
+  });
+  console.log(`[frpc] ${publicUrl ? `URL=${publicUrl}` : `Subdomain=${subdomain}`}`);
+}
+
 console.log('Starting Plexus Dev Stack...');
 console.log(`  PORT:         ${process.env.PORT}`);
 if (process.env.PLEXUS_POSTGRES_DRIVER === 'pglite') {
@@ -212,68 +328,14 @@ if (profileMode) {
   process.exit(0);
 }
 
-// --- Process management ---
-//
-// Bun's --watch processes trap SIGINT and *restart* instead of exiting.
-// So on shutdown we must SIGKILL them to force-terminate. Otherwise they
-// become orphaned and accumulate, eventually exhausting memory.
-//
-// Each child is spawned in its own process group (detached: true / setsid)
-// so that process.kill(-pgid) kills the entire subtree including
-// grandchildren spawned by --watch restarts.
-//
-// Note: terminal close (SIGHUP) is not reliably delivered to this process
-// because Bun may not propagate it. If you close your terminal without
-// Ctrl+C, run: pkill -f "bun run" to clean up.
-
-const WIN = process.platform === 'win32';
-
-const childPgids: number[] = [];
-let isShuttingDown = false;
-
-function spawnManaged(args: string[], cwd: string): ChildProcess {
-  const proc = nodeSpawn('bun', args, {
-    cwd,
-    env: { ...process.env },
-    stdio: 'inherit',
-    detached: true, // own process group → can kill -pgid
-    ...(WIN ? { shell: true } : {}),
-  });
-  // Don't unref() — we need the child handles to keep the event loop alive.
-  // Without them, Bun sees no pending work and exits immediately.
-  childPgids.push(proc.pid!);
-  return proc;
-}
-
-function killAll() {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-
-  for (const pgid of childPgids) {
-    try {
-      if (WIN) {
-        process.kill(pgid);
-      } else {
-        process.kill(-pgid, 'SIGKILL');
-      }
-    } catch {
-      // already dead
-    }
-  }
-
-  try {
-    unlinkSync(PID_FILE);
-  } catch {}
-}
-
 function spawnBackend(): ChildProcess {
-  return spawnManaged(['run', '--watch', '--no-clear-screen', 'src/index.ts'], BACKEND_DIR);
+  return spawnManaged('bun', ['run', '--watch', '--no-clear-screen', 'src/index.ts'], BACKEND_DIR);
 }
 
 let backend = spawnBackend();
 
 console.log('[Frontend] Starting builder (watch mode)...');
-const frontend = spawnManaged(['run', 'dev'], FRONTEND_DIR);
+const frontend = spawnManaged('bun', ['run', 'dev'], FRONTEND_DIR);
 
 console.log(`Backend: http://localhost:${process.env.PORT}`);
 console.log('Watching for changes...');
@@ -334,6 +396,17 @@ async function waitForServer(timeout = 30000): Promise<void> {
   }
   throw new Error(`Server did not become ready within ${timeout / 1000}s`);
 }
+
+(async () => {
+  try {
+    await waitForServer();
+    startFrpc();
+  } catch (error) {
+    console.warn(
+      `[frpc] Tunnel disabled: server did not become ready (${error instanceof Error ? error.message : 'unknown error'}).`
+    );
+  }
+})();
 
 if (fullMode) {
   (async () => {
@@ -432,6 +505,3 @@ process.on('SIGUSR1', () => {
   backend = spawnBackend();
   console.log('[dev] Backend restarted.');
 });
-
-// Synchronous fallback — runs even if the signal handler doesn't complete.
-process.on('exit', killAll);
