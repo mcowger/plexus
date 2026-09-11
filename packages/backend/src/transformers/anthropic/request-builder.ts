@@ -1,5 +1,6 @@
 import { UnifiedChatRequest } from '../../types/unified';
 import { convertUnifiedToolsToAnthropic } from './tool-mapper';
+import { clampAnthropicEffortAndThinking } from './thinking-clamp';
 
 /**
  * Transforms a Unified request into Anthropic API format.
@@ -148,5 +149,5 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
     }
   }
 
-  return payload;
+  return clampAnthropicEffortAndThinking(payload, request.model);
 }

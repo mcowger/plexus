@@ -24,6 +24,8 @@ import {
   stripLiteUnsupportedTools,
 } from './dispatcher-auto-compat';
 import { appendUserAfterTextOnlyModelTail } from '../../transformers/gemini/utils/model-tail';
+import { isAnthropicTargetProvider } from './adapter-resolver';
+import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 
 /** Symbol stash for the native OAuth prep, read by the standard dispatch seams. */
 export const NATIVE_OAUTH_STASH = Symbol('nativeOAuthPrep');
@@ -215,6 +217,14 @@ export async function buildRequestPayload(
       `Adapters applied (preDispatch): [${adapters.map((entry) => entry.adapter.name).join(', ')}] ` +
         `for ${route.provider}/${route.model}`
     );
+  }
+
+  if (
+    isAnthropicTargetProvider(route, targetApiType) ||
+    getApiBaseType(targetApiType) === 'messages'
+  ) {
+    const outboundModel = typeof payload?.model === 'string' ? payload.model : route.model;
+    payload = clampAnthropicEffortAndThinking(payload, outboundModel);
   }
 
   // The provider-side `X-OpenAI-Internal-Codex-Responses-Lite` header (set in

@@ -474,57 +474,57 @@
   │ [function] formatAttemptedProvidersSummary (line 123)
 
 📁 packages/backend/src/services/dispatch/dispatcher-auto-compat.ts:
-  │ [interface] AdvisorResultStripResult (line 1055)
-  │ [interface] AdvisorResultStripState (line 1166)
-  │ [interface] DeleteDottedPathResult (line 542)
-  │ [interface] LiteToolStripResult (line 1255)
-  │ [interface] LiteToolStripState (line 1289)
-  │ [interface] ThinkingSignatureStripResult (line 827)
-  │ [interface] ThinkingSignatureStripState (line 937)
-  │ [interface] UnsupportedParamStripState (line 711)
-  │ [function] advisorElidedPlaceholder (line 1051)
-  │ [function] applyRegistryAutoCompat (line 418)
-  │ [function] contentHasBlockType (line 813)
-  │ [function] createAdvisorResultStripState (line 1170)
-  │ [function] createLiteToolStripState (line 1293)
-  │ [function] createThinkingSignatureStripState (line 941)
-  │ [function] createUnsupportedParamStripState (line 716)
-  │ [function] deleteDottedPath (line 605)
-  │ [function] extractGenerationIntent (line 138)
-  │ [function] extractReasoningIntent (line 72)
-  │ [function] hasCodexResponsesExtensions (line 23)
-  │ [function] hasOwn (line 11)
-  │ [function] isAdvisorInvocationBlock (line 1039)
-  │ [function] isAdvisorResultBlock (line 1035)
-  │ [function] isAnthropicMessagesPayload (line 801)
-  │ [function] isCanonicalArrayIndex (line 538)
-  │ [function] isStructuralArrayElementPath (line 703)
-  │ [function] isThinkingBlock (line 805)
-  │ [function] mappedOffValue (line 166)
-  │ [function] mappedThinkingValue (line 160)
-  │ [function] matchAdvisorResultError (line 1030)
-  │ [function] matchLiteUnsupportedToolsError (line 1250)
-  │ [function] matchThinkingSignatureError (line 786)
-  │ [function] matchUnsupportedParameter (line 518)
-  │ [function] normalizeBracketSegments (line 509)
-  │ [function] normalizeReasoningFromUnified (line 55)
-  │ [function] planAdvisorResultStrip (line 1186)
-  │ [function] planLiteToolStrip (line 1308)
-  │ [function] planThinkingSignatureStrip (line 959)
-  │ [function] planUnsupportedParamStrip (line 741)
-  │ [function] projectAnthropicAutoCompat (line 361)
-  │ [function] projectGeminiAutoCompat (line 393)
-  │ [function] projectOpenAiCompletionsAutoCompat (line 175)
-  │ [function] projectResponsesAutoCompat (line 331)
-  │ [function] reasoningElidedPlaceholder (line 823)
-  │ [function] refundAdvisorResultStrip (line 1209)
-  │ [function] refundThinkingSignatureStrip (line 989)
-  │ [function] resolveChatTemplateKwargValue (line 318)
-  │ [function] resolveChatTemplateKwargs (line 306)
-  │ [function] shouldDropTemperature (line 171)
-  │ [function] stripAdvisorResultBlocks (line 1088)
-  │ [function] stripLiteUnsupportedTools (line 1273)
-  │ [function] stripThinkingSignatureBlocks (line 871)
+  │ [interface] AdvisorResultStripResult (line 1061)
+  │ [interface] AdvisorResultStripState (line 1172)
+  │ [interface] DeleteDottedPathResult (line 548)
+  │ [interface] LiteToolStripResult (line 1261)
+  │ [interface] LiteToolStripState (line 1295)
+  │ [interface] ThinkingSignatureStripResult (line 833)
+  │ [interface] ThinkingSignatureStripState (line 943)
+  │ [interface] UnsupportedParamStripState (line 717)
+  │ [function] advisorElidedPlaceholder (line 1057)
+  │ [function] applyRegistryAutoCompat (line 424)
+  │ [function] contentHasBlockType (line 819)
+  │ [function] createAdvisorResultStripState (line 1176)
+  │ [function] createLiteToolStripState (line 1299)
+  │ [function] createThinkingSignatureStripState (line 947)
+  │ [function] createUnsupportedParamStripState (line 722)
+  │ [function] deleteDottedPath (line 611)
+  │ [function] extractGenerationIntent (line 139)
+  │ [function] extractReasoningIntent (line 73)
+  │ [function] hasCodexResponsesExtensions (line 24)
+  │ [function] hasOwn (line 12)
+  │ [function] isAdvisorInvocationBlock (line 1045)
+  │ [function] isAdvisorResultBlock (line 1041)
+  │ [function] isAnthropicMessagesPayload (line 807)
+  │ [function] isCanonicalArrayIndex (line 544)
+  │ [function] isStructuralArrayElementPath (line 709)
+  │ [function] isThinkingBlock (line 811)
+  │ [function] mappedOffValue (line 167)
+  │ [function] mappedThinkingValue (line 161)
+  │ [function] matchAdvisorResultError (line 1036)
+  │ [function] matchLiteUnsupportedToolsError (line 1256)
+  │ [function] matchThinkingSignatureError (line 792)
+  │ [function] matchUnsupportedParameter (line 524)
+  │ [function] normalizeBracketSegments (line 515)
+  │ [function] normalizeReasoningFromUnified (line 56)
+  │ [function] planAdvisorResultStrip (line 1192)
+  │ [function] planLiteToolStrip (line 1314)
+  │ [function] planThinkingSignatureStrip (line 965)
+  │ [function] planUnsupportedParamStrip (line 747)
+  │ [function] projectAnthropicAutoCompat (line 362)
+  │ [function] projectGeminiAutoCompat (line 399)
+  │ [function] projectOpenAiCompletionsAutoCompat (line 176)
+  │ [function] projectResponsesAutoCompat (line 332)
+  │ [function] reasoningElidedPlaceholder (line 829)
+  │ [function] refundAdvisorResultStrip (line 1215)
+  │ [function] refundThinkingSignatureStrip (line 995)
+  │ [function] resolveChatTemplateKwargValue (line 319)
+  │ [function] resolveChatTemplateKwargs (line 307)
+  │ [function] shouldDropTemperature (line 172)
+  │ [function] stripAdvisorResultBlocks (line 1094)
+  │ [function] stripLiteUnsupportedTools (line 1279)
+  │ [function] stripThinkingSignatureBlocks (line 877)
 
 📁 packages/backend/src/services/dispatch/dispatcher-types.ts:
   │ [interface] RetryAttemptRecord (line 1)
@@ -657,11 +657,11 @@
   │ [method] transformRequestPayload (line 68)
 
 📁 packages/backend/src/services/dispatch/request-payload-builder.ts:
-  │ [interface] RequestPayload (line 44)
-  │ [function] buildRequestPayload (line 96)
-  │ [function] isNativeOAuthRoute (line 37)
-  │ [function] refreshOAuthRoute (line 346)
-  │ [function] shouldUsePassThrough (line 49)
+  │ [interface] RequestPayload (line 46)
+  │ [function] buildRequestPayload (line 98)
+  │ [function] isNativeOAuthRoute (line 39)
+  │ [function] refreshOAuthRoute (line 356)
+  │ [function] shouldUsePassThrough (line 51)
 
 📁 packages/backend/src/services/dispatch/standard-attempt-request.ts:
   │ [interface] StandardAttemptContext (line 64)
@@ -874,32 +874,32 @@
   │ [class] OAuthLoginSessionManager (line 81)
 
 📁 packages/backend/src/services/oauth/oauth-native-request.ts:
-  │ [interface] PreparedOAuthRequest (line 56)
-  │ [function] adornCodexResponsesBody (line 311)
-  │ [function] adornCopilotBody (line 547)
-  │ [function] buildCodexModelsUrl (line 439)
-  │ [function] buildCodexOAuthHeaders (line 339)
-  │ [function] buildCopilotDynamicHeaders (line 531)
-  │ [function] buildFrameReverser (line 210)
-  │ [function] copilotEndpoint (line 465)
-  │ [function] copilotWireApiType (line 687)
-  │ [function] extractChatgptAccountId (line 291)
-  │ [function] genericOAuthApiType (line 727)
-  │ [function] hasCopilotVisionInput (line 514)
-  │ [function] inferCopilotInitiator (line 501)
-  │ [function] isCodexCliShapedBody (line 250)
-  │ [function] isNativeOAuthProvider (line 646)
-  │ [function] mergeBetas (line 112)
-  │ [function] nativeOAuthApiType (line 673)
-  │ [function] prepareAnthropicOAuthRequest (line 130)
-  │ [function] prepareCodexImagesDispatch (line 408)
-  │ [function] prepareCodexOAuthRequest (line 355)
-  │ [function] prepareCopilotOAuthRequest (line 561)
-  │ [function] prepareGenericOAuthDispatch (line 739)
-  │ [function] prepareNativeOAuthDispatch (line 798)
-  │ [function] prepareOAuthNativeRequest (line 603)
-  │ [function] resolveCopilotBaseUrl (line 483)
-  │ [function] resolveOAuthBaseUrl (line 84)
+  │ [interface] PreparedOAuthRequest (line 57)
+  │ [function] adornCodexResponsesBody (line 313)
+  │ [function] adornCopilotBody (line 549)
+  │ [function] buildCodexModelsUrl (line 441)
+  │ [function] buildCodexOAuthHeaders (line 341)
+  │ [function] buildCopilotDynamicHeaders (line 533)
+  │ [function] buildFrameReverser (line 212)
+  │ [function] copilotEndpoint (line 467)
+  │ [function] copilotWireApiType (line 689)
+  │ [function] extractChatgptAccountId (line 293)
+  │ [function] genericOAuthApiType (line 729)
+  │ [function] hasCopilotVisionInput (line 516)
+  │ [function] inferCopilotInitiator (line 503)
+  │ [function] isCodexCliShapedBody (line 252)
+  │ [function] isNativeOAuthProvider (line 648)
+  │ [function] mergeBetas (line 113)
+  │ [function] nativeOAuthApiType (line 675)
+  │ [function] prepareAnthropicOAuthRequest (line 131)
+  │ [function] prepareCodexImagesDispatch (line 410)
+  │ [function] prepareCodexOAuthRequest (line 357)
+  │ [function] prepareCopilotOAuthRequest (line 563)
+  │ [function] prepareGenericOAuthDispatch (line 741)
+  │ [function] prepareNativeOAuthDispatch (line 800)
+  │ [function] prepareOAuthNativeRequest (line 605)
+  │ [function] resolveCopilotBaseUrl (line 485)
+  │ [function] resolveOAuthBaseUrl (line 85)
 
 📁 packages/backend/src/services/oauth/oauth-providers.ts:
   │ [interface] OAuthProviderDescriptor (line 25)
@@ -978,14 +978,14 @@
   │ [function] splitReasoningSuffix (line 333)
 
 📁 packages/backend/src/services/pi-ai/registry.ts:
-  │ [function] buildEnabledOptions (line 172)
-  │ [function] buildGenerationOptions (line 280)
+  │ [function] buildEnabledOptions (line 175)
+  │ [function] buildGenerationOptions (line 283)
   │ [function] buildReasoningOptionsForModel (line 123)
-  │ [function] isOpenAiFamily (line 321)
-  │ [function] isPlaceholderThinkingSignature (line 362)
+  │ [function] isOpenAiFamily (line 324)
+  │ [function] isPlaceholderThinkingSignature (line 365)
   │ [function] modelSupportsDisable (line 117)
   │ [function] resolveBaseUrl (line 52)
-  │ [function] resolvePiAiModel (line 334)
+  │ [function] resolvePiAiModel (line 337)
 
 📁 packages/backend/src/services/probes/probe-request.ts:
   │ [function] buildProbeChatRequest (line 103)
@@ -1412,7 +1412,7 @@
   │ [method] transformStream (line 44)
 
 📁 packages/backend/src/transformers/anthropic/request-builder.ts:
-  │ [function] buildAnthropicRequest (line 13)
+  │ [function] buildAnthropicRequest (line 14)
 
 📁 packages/backend/src/transformers/anthropic/request-parser.ts:
   │ [function] parseAnthropicRequest (line 16)
@@ -1428,6 +1428,10 @@
 
 📁 packages/backend/src/transformers/anthropic/stream-transformer.ts:
   │ [function] transformAnthropicStream (line 21)
+
+📁 packages/backend/src/transformers/anthropic/thinking-clamp.ts:
+  │ [function] anthropicModelSupportsDisable (line 16)
+  │ [function] clampAnthropicEffortAndThinking (line 50)
 
 📁 packages/backend/src/transformers/anthropic/tool-mapper.ts:
   │ [function] convertAnthropicToolsToUnified (line 12)
@@ -1638,25 +1642,25 @@
   │ [method] detect (line 86)
 
 📁 packages/backend/src/transformers/oauth/oauth-claude.ts:
-  │ [interface] ClaudeOAuthConfig (line 321)
-  │ [interface] ClaudeOAuthContext (line 643)
-  │ [function] applyClaudeOAuthTransform (line 664)
-  │ [function] canonicalizeOAuthToolName (line 60)
-  │ [function] computeFingerprint (line 388)
-  │ [function] computeSHA256Truncated (line 411)
-  │ [function] computeSimpleHash (line 374)
-  │ [function] generateBillingHeader (line 336)
-  │ [function] injectClaudeCodeSystemPrompt (line 482)
-  │ [function] isClaudeOAuthToken (line 653)
-  │ [function] prependToFirstUserMessage (line 439)
-  │ [function] remapOAuthToolNames (line 79)
-  │ [function] reverseRemapOAuthToolNames (line 163)
-  │ [function] reverseRemapOAuthToolNamesFromStreamLine (line 204)
-  │ [function] reverseRemapToolName (line 68)
-  │ [function] sanitizeForwardedSystemPrompt (line 426)
-  │ [function] shouldRemapToolName (line 53)
-  │ [function] signAnthropicMessagesBody (line 603)
-  │ [function] xxHash64 (line 586)
+  │ [interface] ClaudeOAuthConfig (line 322)
+  │ [interface] ClaudeOAuthContext (line 644)
+  │ [function] applyClaudeOAuthTransform (line 665)
+  │ [function] canonicalizeOAuthToolName (line 61)
+  │ [function] computeFingerprint (line 389)
+  │ [function] computeSHA256Truncated (line 412)
+  │ [function] computeSimpleHash (line 375)
+  │ [function] generateBillingHeader (line 337)
+  │ [function] injectClaudeCodeSystemPrompt (line 483)
+  │ [function] isClaudeOAuthToken (line 654)
+  │ [function] prependToFirstUserMessage (line 440)
+  │ [function] remapOAuthToolNames (line 80)
+  │ [function] reverseRemapOAuthToolNames (line 164)
+  │ [function] reverseRemapOAuthToolNamesFromStreamLine (line 205)
+  │ [function] reverseRemapToolName (line 69)
+  │ [function] sanitizeForwardedSystemPrompt (line 427)
+  │ [function] shouldRemapToolName (line 54)
+  │ [function] signAnthropicMessagesBody (line 604)
+  │ [function] xxHash64 (line 587)
 
 📁 packages/backend/src/transformers/ollama.ts:
   │ [class] OllamaTransformer (line 16)
@@ -1674,15 +1678,55 @@
   │ [class] OpenAITransformer (line 12)
   │ [method] parseRequest (line 16)
 
-📁 packages/backend/src/transformers/responses.ts:
-  │ [class] ResponsesTransformer (line 228)
-  │ [function] buildResponsesUsagePayload (line 63)
-  │ [function] clientToolCallKey (line 120)
-  │ [function] isClientExecutedToolItem (line 101)
-  │ [function] normalizeCompositeResponsesCallIds (line 131)
-  │ [function] normalizeResponsesFunctionCallItemIds (line 172)
-  │ [function] normalizeResponsesReasoningContent (line 198)
-  │ [function] toUnifiedImageGenerationCall (line 39)
+📁 packages/backend/src/transformers/responses/index.ts:
+  │ [class] ResponsesTransformer (line 38)
+
+📁 packages/backend/src/transformers/responses/normalization.ts:
+  │ [function] normalizeCompositeResponsesCallIds (line 9)
+  │ [function] normalizeResponsesFunctionCallItemIds (line 56)
+  │ [function] normalizeResponsesReasoningContent (line 83)
+
+📁 packages/backend/src/transformers/responses/request-builder.ts:
+  │ [function] buildResponsesRequest (line 7)
+
+📁 packages/backend/src/transformers/responses/request-parser.ts:
+  │ [function] convertContentParts (line 54)
+  │ [function] convertInputItemsToMessages (line 99)
+  │ [function] mapInputRole (line 36)
+  │ [function] normalizeInput (line 14)
+  │ [function] normalizeMessageContent (line 84)
+  │ [function] parseResponsesRequest (line 205)
+
+📁 packages/backend/src/transformers/responses/response-formatter.ts:
+  │ [function] convertChatResponseToOutputItems (line 13)
+  │ [function] formatResponsesResponse (line 91)
+
+📁 packages/backend/src/transformers/responses/response-transformer.ts:
+  │ [function] transformResponsesResponse (line 17)
+
+📁 packages/backend/src/transformers/responses/stream-formatter.ts:
+  │ [function] formatResponsesStream (line 9)
+
+📁 packages/backend/src/transformers/responses/stream-transformer.ts:
+  │ [function] transformResponsesStream (line 12)
+
+📁 packages/backend/src/transformers/responses/tool-mapper.ts:
+  │ [interface] ResponsesToolState (line 4)
+  │ [function] buildToolOutputItem (line 194)
+  │ [function] convertToolChoiceForChatCompletions (line 175)
+  │ [function] convertToolsForChatCompletions (line 158)
+  │ [function] convertToolsForUnified (line 95)
+  │ [function] createResponsesToolState (line 9)
+  │ [function] customToolArgumentsForModel (line 21)
+  │ [function] customToolInput (line 34)
+
+📁 packages/backend/src/transformers/responses/utils.ts:
+  │ [function] buildResponsesUsagePayload (line 54)
+  │ [function] clientToolCallKey (line 115)
+  │ [function] generateItemId (line 17)
+  │ [function] generateResponseId (line 10)
+  │ [function] isClientExecutedToolItem (line 94)
+  │ [function] toUnifiedImageGenerationCall (line 28)
 
 📁 packages/backend/src/transformers/speech.ts:
   │ [class] SpeechTransformer (line 3)
@@ -2005,6 +2049,15 @@
   │ [function] table (line 226)
   │ [function] yaml (line 205)
 
+📁 packages/frontend/src/components/dashboard/liveTypes.ts:
+  │ [interface] EntityStats (line 129)
+
+📁 packages/frontend/src/components/logs/types.ts:
+  │ [interface] DesktopLogRowProps (line 33)
+  │ [interface] LogRowProps (line 24)
+  │ [interface] PaginationControlsProps (line 14)
+  │ [interface] ProgressUpdate (line 3)
+
 📁 packages/frontend/src/components/quota/checker-presentation.ts:
   │ [function] getCheckerDisplayName (line 1)
 
@@ -2014,6 +2067,11 @@
 📁 packages/frontend/src/hooks/useCardPositions.ts:
   │ [interface] UseCardPositionsReturn (line 56)
   │ [function] useCardPositions (line 82)
+
+📁 packages/frontend/src/hooks/useLiveDashboardData.ts:
+  │ [interface] LiveDashboardData (line 47)
+  │ [interface] UseLiveDashboardDataOptions (line 37)
+  │ [function] useLiveDashboardData (line 116)
 
 📁 packages/frontend/src/hooks/useMetadataEditor.ts:
   │ [function] useMetadataEditor (line 19)

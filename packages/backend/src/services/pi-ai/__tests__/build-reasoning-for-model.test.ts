@@ -239,6 +239,18 @@ describe('buildReasoningOptionsForModel', () => {
       // off is unsupported → clamp to lowest non-off supported level (minimal)
       expect(opts.reasoningEffort).toBe('minimal');
     });
+
+    it('anthropic cannot-disable model (like opus-5) clamps to low instead of minimal', () => {
+      const model = {
+        api: 'anthropic-messages',
+        reasoning: true,
+        thinkingLevelMap: { off: null, xhigh: 'xhigh', max: 'max' },
+        compat: { forceAdaptiveThinking: true },
+      } as any;
+      const opts = buildReasoningOptionsForModel(model, intent({ enabled: false }));
+      expect(opts.thinkingEnabled).toBe(true);
+      expect(opts.effort).toBe('low');
+    });
   });
 
   describe('clamping unsupported levels', () => {
@@ -255,6 +267,20 @@ describe('buildReasoningOptionsForModel', () => {
       );
       // medium unsupported → clamp up to high
       expect(opts.thinking).toEqual({ enabled: true, includeThoughts: true, level: 'HIGH' });
+    });
+
+    it('clamps minimal effort to low for anthropic models with adaptive thinking', () => {
+      const model = {
+        api: 'anthropic-messages',
+        reasoning: true,
+        compat: { forceAdaptiveThinking: true },
+      } as any;
+      const opts = buildReasoningOptionsForModel(
+        model,
+        intent({ effort: 'minimal', enabled: true })
+      );
+      expect(opts.thinkingEnabled).toBe(true);
+      expect(opts.effort).toBe('low');
     });
   });
 });

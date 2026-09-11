@@ -5,8 +5,9 @@ import { buildGenerationOptions, resolvePiAiModel } from '../pi-ai/registry';
 import type { GenerationIntent } from '../pi-ai/generation';
 import { normalizeVerbosity } from '../pi-ai/generation';
 import type { ReasoningIntent, ReasoningVisibility } from '../pi-ai/reasoning';
-import { normalizeEffort, normalizeVisibility } from '../pi-ai/reasoning';
+import { clampEffortToWindow, normalizeEffort, normalizeVisibility } from '../pi-ai/reasoning';
 import { projectReasoningForResponses } from '../../transformers/utils';
+import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 
 function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -374,7 +375,8 @@ function projectAnthropicAutoCompat(
     if (model.compat?.forceAdaptiveThinking === true) {
       next.thinking = { type: 'adaptive', display };
       if (options.effort) {
-        next.output_config = { ...(next.output_config ?? {}), effort: options.effort };
+        const clampedEffort = clampEffortToWindow(options.effort, 'low', 'max');
+        next.output_config = { ...(next.output_config ?? {}), effort: clampedEffort };
       }
     } else {
       next.thinking = {
@@ -385,9 +387,13 @@ function projectAnthropicAutoCompat(
     }
   } else if (options.thinkingEnabled === false) {
     next.thinking = { type: 'disabled' };
+    if (next.output_config?.effort) {
+      delete next.output_config.effort;
+      if (Object.keys(next.output_config).length === 0) delete next.output_config;
+    }
   }
 
-  return next;
+  return clampAnthropicEffortAndThinking(next, model.id);
 }
 
 function projectGeminiAutoCompat(
