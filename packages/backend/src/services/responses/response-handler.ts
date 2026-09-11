@@ -415,23 +415,11 @@ export async function handleResponse(
         : observedUnifiedStream;
     }
 
-    const usageInspector = new UsageInspector(
-      usageRecord.requestId!,
-      usageStorage,
-      usageRecord,
-      pricing,
-      providerDiscount,
-      startTime,
-      shouldEstimateTokens,
-      providerApiType,
-      apiType,
-      originalRequest,
-      quotaEnforcer,
-      keyName
-    );
-
     // TAP THE TRANSFORMED STREAM for debugging
-    // This captures what is actually sent to the client
+    // This captures what is actually sent to the client. The terminal
+    // callback fires lazily (when the client stream emits its terminal
+    // frame), by which point usageInspector below is assigned.
+    let usageInspector: UsageInspector;
     const transformedDebugLogging = new DebugLoggingInspector(
       usageRecord.requestId!,
       'transformed',
@@ -450,6 +438,23 @@ export async function handleResponse(
     });
 
     finalClientStream = finalClientStream.pipeThrough(transformedTapStream);
+
+    usageInspector = new UsageInspector(
+      usageRecord.requestId!,
+      usageStorage,
+      usageRecord,
+      pricing,
+      providerDiscount,
+      startTime,
+      shouldEstimateTokens,
+      providerApiType,
+      apiType,
+      originalRequest,
+      quotaEnforcer,
+      keyName,
+      rawDebugLogging,
+      transformedDebugLogging
+    );
 
     // Standard SSE headers to prevent buffering and timeouts
     reply.header('Content-Type', 'text/event-stream');

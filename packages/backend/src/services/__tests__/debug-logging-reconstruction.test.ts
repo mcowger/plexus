@@ -180,8 +180,8 @@ describe('DebugLoggingInspector Reconstruction', () => {
 
     test('finalizes a completed Responses stream before the transport ends', () => {
       const completedRequestId = 'test-responses-completed-before-end';
-      const onResponsesTerminal = vi.fn();
-      const inspector = new DebugLoggingInspector(completedRequestId, 'raw', onResponsesTerminal);
+      const onTerminal = vi.fn();
+      const inspector = new DebugLoggingInspector(completedRequestId, 'raw', onTerminal);
       const stream = inspector.createInspector('responses');
       const completedEvent = `data: ${JSON.stringify({
         type: 'response.completed',
@@ -201,7 +201,7 @@ describe('DebugLoggingInspector Reconstruction', () => {
       stream.write(Buffer.from(completedEvent.slice(40)));
 
       const log = DebugManager.getInstance().getPendingLog(completedRequestId);
-      expect(onResponsesTerminal).toHaveBeenCalledTimes(1);
+      expect(onTerminal).toHaveBeenCalledTimes(1);
       expect(log?.rawResponse).toBe(completedEvent);
       expect(log?.rawResponseSnapshot).toMatchObject({
         id: 'resp_completed',
@@ -572,6 +572,94 @@ describe('DebugLoggingInspector Reconstruction', () => {
         },
       ]);
       expect(snapshot.usage).toEqual({ input_tokens: 10, output_tokens: 5, total_tokens: 15 });
+    });
+  });
+
+  describe('reconstructChatCompletions streaming terminal finalization', () => {
+    test('finalizes a completed chat stream before the transport ends', () => {
+      const completedRequestId = 'test-chat-completed-before-end';
+      const onTerminal = vi.fn();
+      const inspector = new DebugLoggingInspector(completedRequestId, 'raw', onTerminal);
+      const stream = inspector.createInspector('chat');
+      const usageFrame = `data: ${JSON.stringify({
+        id: 'chatcmpl_completed',
+        object: 'chat.completion.chunk',
+        model: 'deepseek-v4.1-flash',
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 42, completion_tokens: 7, total_tokens: 49 },
+      })}\n\n`;
+      const doneFrame = 'data: [DONE]\n\n';
+      const fullBody = `${usageFrame}${doneFrame}`;
+
+      stream.write(Buffer.from(fullBody.slice(0, 40)));
+      // A usage-bearing frame alone must not finalize: only the terminal
+      // `[DONE]` frame does.
+      expect(DebugManager.getInstance().getReconstructedRawResponse(completedRequestId)).toBeNull();
+
+      stream.write(Buffer.from(fullBody.slice(40)));
+
+      const log = DebugManager.getInstance().getPendingLog(completedRequestId);
+      expect(onTerminal).toHaveBeenCalledTimes(1);
+      expect(log?.rawResponse).toBe(fullBody);
+      expect(log?.rawResponseSnapshot).toMatchObject({
+        id: 'chatcmpl_completed',
+        choices: [{ finish_reason: 'stop' }],
+        usage: { prompt_tokens: 42, completion_tokens: 7, total_tokens: 49 },
+      });
+      stream.destroy();
+    });
+
+    test('does not finalize a chat stream on a non-terminal data frame', () => {
+      const requestIdOpen = 'test-chat-no-terminal';
+      const onTerminal = vi.fn();
+      const inspector = new DebugLoggingInspector(requestIdOpen, 'raw', onTerminal);
+      const stream = inspector.createInspector('chat');
+
+      stream.write(
+        Buffer.from(
+          `data: ${JSON.stringify({
+            id: 'chatcmpl_open',
+            object: 'chat.completion.chunk',
+            choices: [{ index: 0, delta: { content: 'hello' } }],
+          })}\n\n`
+        )
+      );
+
+      expect(onTerminal).not.toHaveBeenCalled();
+      expect(DebugManager.getInstance().getReconstructedRawResponse(requestIdOpen)).toBeNull();
+      stream.destroy();
+    });
+
+    test('detects the terminal frame after the debug body is truncated', async () => {
+      const truncatedRequestId = 'test-chat-terminal-after-truncation';
+      const onTerminal = vi.fn();
+      const inspector = new DebugLoggingInspector(truncatedRequestId, 'raw', onTerminal);
+      const stream = inspector.createInspector('chat');
+      const write = (value: string) =>
+        new Promise<void>((resolve, reject) => {
+          stream.write(Buffer.from(value), (error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+      const filler = `data: ${JSON.stringify({
+        id: 'chatcmpl_big',
+        object: 'chat.completion.chunk',
+        choices: [{ index: 0, delta: { content: 'x'.repeat(1024 * 1024) } }],
+      })}\n\n`;
+
+      // Push the capture past the 10MB debug buffer limit.
+      for (let i = 0; i < 11; i++) {
+        await write(filler);
+      }
+      expect(onTerminal).not.toHaveBeenCalled();
+
+      await write('data: [DONE]\n\n');
+
+      expect(onTerminal).toHaveBeenCalledTimes(1);
+      const log = DebugManager.getInstance().getPendingLog(truncatedRequestId);
+      expect(log?.rawResponse).toContain('[DEBUG OUTPUT TRUNCATED');
+      stream.destroy();
     });
   });
 });

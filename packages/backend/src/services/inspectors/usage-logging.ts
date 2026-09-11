@@ -14,6 +14,7 @@ import {
 } from '../../utils/usage-normalizer';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
 import { recordQuotaUsage } from '../quota/quota-middleware';
+import type { DebugLoggingInspector } from './debug-logging';
 
 export interface ExtractedObservedUsage {
   inputTokens: number;
@@ -107,6 +108,8 @@ export class UsageInspector extends PassThrough {
   private firstChunk = true;
   private quotaEnforcer?: any;
   private keyName?: string;
+  private rawDebugCapture?: DebugLoggingInspector;
+  private transformedDebugCapture?: DebugLoggingInspector;
   private _flushed = false;
 
   constructor(
@@ -121,7 +124,9 @@ export class UsageInspector extends PassThrough {
     incomingApiType?: string,
     originalRequest?: any,
     quotaEnforcer?: any,
-    keyName?: string
+    keyName?: string,
+    rawDebugCapture?: DebugLoggingInspector,
+    transformedDebugCapture?: DebugLoggingInspector
   ) {
     super();
     this.usageStorage = usageStorage;
@@ -135,6 +140,8 @@ export class UsageInspector extends PassThrough {
     this.originalRequest = originalRequest;
     this.quotaEnforcer = quotaEnforcer;
     this.keyName = keyName;
+    this.rawDebugCapture = rawDebugCapture;
+    this.transformedDebugCapture = transformedDebugCapture;
   }
 
   override _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
@@ -335,6 +342,15 @@ export class UsageInspector extends PassThrough {
       callback(err);
       return;
     }
+
+    // The HTTP layer can tear the response pipeline down as soon as the
+    // client disconnects — before the 250ms socket-close poll runs
+    // onDisconnect(), which is what normally finalizes the debug taps. The
+    // taps capture synchronously at write() time, so reconstruct them here
+    // first; otherwise teardown reads no snapshot and the record is saved
+    // with no tokens and a trace with no response body.
+    this.rawDebugCapture?.finalize();
+    this.transformedDebugCapture?.finalize();
 
     const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('timeout');
     const isStall = err?.message?.includes('stalled');

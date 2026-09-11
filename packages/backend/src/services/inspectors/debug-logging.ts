@@ -10,6 +10,8 @@ const RESPONSES_TERMINAL_EVENT_TYPES = new Set([
   'response.failed',
   'response.incomplete',
 ]);
+/** OpenAI-compatible chat/completions streams end with this literal frame. */
+const CHAT_TERMINAL_EVENT_DATA = '[DONE]';
 
 /**
  * Provider API types whose "raw" stream is a stream of unified chunk OBJECTS
@@ -32,12 +34,12 @@ export class DebugLoggingInspector extends BaseInspector {
   private totalSize = 0;
   private truncated = false;
   private finalized = false;
-  private responsesEventParser: ReturnType<typeof createParser> | null = null;
+  private terminalEventParser: ReturnType<typeof createParser> | null = null;
 
   constructor(
     requestId: string,
     mode: 'raw' | 'transformed' = 'raw',
-    private readonly onResponsesTerminal?: () => void
+    private readonly onTerminal?: () => void
   ) {
     super(requestId);
     this.mode = mode;
@@ -45,7 +47,7 @@ export class DebugLoggingInspector extends BaseInspector {
 
   createInspector(providerApiType: string): PassThrough {
     this.providerApiType = providerApiType;
-    this.initializeResponsesTerminalEventDetection();
+    this.initializeTerminalEventDetection();
 
     // Capture happens synchronously in the transform hook (i.e. at write()
     // time), NOT in a 'data' listener: 'data' emission for the very first
@@ -76,8 +78,6 @@ export class DebugLoggingInspector extends BaseInspector {
       `[Inspector:${this.mode}] Request ${this.requestId} received chunk, length: ${chunk.length || chunk.toString().length}: ${chunk.toString()}`
     );
 
-    if (this.truncated) return;
-
     let chunkStr: string;
     if (typeof chunk === 'string') {
       chunkStr = chunk;
@@ -96,40 +96,67 @@ export class DebugLoggingInspector extends BaseInspector {
       }
     }
 
+    // Terminal detection keeps running even after the debug body is
+    // truncated: a >10MB stream still needs its terminal frame observed so
+    // usage and captures finalize before the client can close. The parser is
+    // fed AFTER the chunk is accumulated so a terminal event finalized during
+    // this feed sees the complete body.
+    if (this.truncated) {
+      this.terminalEventParser?.feed(chunkStr);
+      return;
+    }
+
     const newSize = this.totalSize + chunkStr.length;
 
     if (newSize > MAX_DEBUG_BUFFER_SIZE) {
       this.truncated = true;
       this.bodyChunks.push('\n\n[DEBUG OUTPUT TRUNCATED - Exceeded 10MB limit]');
       logger.warn(`Request ${this.requestId} debug output truncated at ${this.totalSize} bytes`);
+      this.terminalEventParser?.feed(chunkStr);
       return;
     }
 
     this.totalSize = newSize;
     this.bodyChunks.push(chunkStr);
-    this.responsesEventParser?.feed(chunkStr);
+    this.terminalEventParser?.feed(chunkStr);
   }
 
-  private initializeResponsesTerminalEventDetection(): void {
-    if (this.providerApiType !== 'responses') return;
-
-    this.responsesEventParser = createParser({
-      onEvent: (event) => {
-        try {
-          const responseEvent = JSON.parse(event.data);
-          if (RESPONSES_TERMINAL_EVENT_TYPES.has(responseEvent.type) && !this.finalized) {
-            // Codex may close its HTTP connection immediately after receiving
-            // this terminal event. Finalize before the chunk continues to the
-            // client so the completed response and usage are available during
-            // teardown.
-            this.finalize();
-            this.onResponsesTerminal?.();
+  private initializeTerminalEventDetection(): void {
+    if (this.providerApiType === 'responses') {
+      this.terminalEventParser = createParser({
+        onEvent: (event) => {
+          try {
+            const responseEvent = JSON.parse(event.data);
+            if (RESPONSES_TERMINAL_EVENT_TYPES.has(responseEvent.type)) {
+              this.finalizeOnTerminal();
+            }
+          } catch {
+            // Non-JSON SSE frames cannot be Responses terminal events.
           }
-        } catch {
-          // Non-JSON SSE frames cannot be Responses terminal events.
-        }
-      },
-    });
+        },
+      });
+      return;
+    }
+
+    if (this.providerApiType === 'chat') {
+      this.terminalEventParser = createParser({
+        onEvent: (event) => {
+          if (event.data.trim() === CHAT_TERMINAL_EVENT_DATA) {
+            this.finalizeOnTerminal();
+          }
+        },
+      });
+    }
+  }
+
+  private finalizeOnTerminal(): void {
+    if (this.finalized) return;
+    // OpenAI-compatible chat clients (e.g. OMP) close their connection
+    // immediately after `data: [DONE]`, just as Codex does after
+    // `response.completed`. Finalize before the chunk continues to the client
+    // so the completed response and usage are available during teardown.
+    this.finalize();
+    this.onTerminal?.();
   }
 
   /**
