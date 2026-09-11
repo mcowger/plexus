@@ -367,45 +367,64 @@
   │ [function] setInvalidTokenChallenge (line 75)
   │ [function] streamUpstreamResponse (line 169)
 
-📁 packages/backend/src/routes/mcp/plexus.ts:
-  │ [class] McpToolError (line 130)
-  │ [function] appendQuery (line 1257)
-  │ [function] asObject (line 1384)
-  │ [function] asOptionalString (line 618)
-  │ [function] buildShimHeaders (line 1206)
-  │ [function] callManagementRoute (line 1215)
-  │ [method] constructor (line 134)
-  │ [function] createPlexusMcpServer (line 260)
-  │ [function] encodePathPreservingSlashes (line 1294)
-  │ [function] errorResponse (line 1328)
-  │ [function] getMcpServers (line 1390)
-  │ [function] getToolDescription (line 1394)
-  │ [function] handleConfigTool (line 622)
-  │ [function] handleDebugTool (line 433)
-  │ [function] handleKeyTool (line 786)
-  │ [function] handleMcpGatewayTool (line 978)
-  │ [function] handleModelAliasTool (line 720)
-  │ [function] handleOperationsTool (line 506)
-  │ [function] handlePlexusMcpRequest (line 190)
-  │ [function] handleProviderTool (line 647)
-  │ [function] handleQuotaCheckerTool (line 948)
-  │ [function] handleQuotaTool (line 856)
-  │ [function] handleSettingsTool (line 1074)
-  │ [function] handleSystemLogsTool (line 1143)
-  │ [function] handleToolCall (line 327)
-  │ [function] handleUsageTool (line 374)
-  │ [function] isSensitiveKey (line 1368)
-  │ [function] mapRecordResponse (line 1195)
-  │ [function] redactSecrets (line 1349)
-  │ [function] registerPlexusMcpRoutes (line 141)
-  │ [function] requireDestructiveAck (line 1301)
-  │ [function] requireId (line 1188)
-  │ [function] stripNamedId (line 1200)
-  │ [function] successResponse (line 1324)
-  │ [function] toMcpToolError (line 1268)
-  │ [function] toToolResult (line 1311)
-  │ [function] toWebRequest (line 1425)
-  │ [function] unsupportedOperation (line 1341)
+📁 packages/backend/src/routes/mcp/plexus/configuration.ts:
+  │ [function] handleConfigTool (line 18)
+  │ [function] handleKeyTool (line 182)
+  │ [function] handleModelAliasTool (line 116)
+  │ [function] handleProviderTool (line 43)
+  │ [function] handleQuotaCheckerTool (line 344)
+  │ [function] handleQuotaTool (line 252)
+  │ [function] handleSettingsTool (line 373)
+
+📁 packages/backend/src/routes/mcp/plexus/dispatch.ts:
+  │ [function] handleToolCall (line 28)
+
+📁 packages/backend/src/routes/mcp/plexus/http.ts:
+  │ [function] createPlexusMcpRequestContext (line 15)
+  │ [function] handlePlexusMcpHttpRequest (line 36)
+  │ [function] toWebRequest (line 73)
+
+📁 packages/backend/src/routes/mcp/plexus/index.ts:
+  │ [function] createPlexusMcpServer (line 97)
+  │ [function] handlePlexusMcpRequest (line 63)
+  │ [function] registerPlexusMcpRoutes (line 14)
+
+📁 packages/backend/src/routes/mcp/plexus/management.ts:
+  │ [function] appendQuery (line 56)
+  │ [function] buildShimHeaders (line 5)
+  │ [function] callManagementRoute (line 14)
+  │ [function] encodePathPreservingSlashes (line 67)
+
+📁 packages/backend/src/routes/mcp/plexus/metadata.ts:
+  │ [function] getToolDescription (line 47)
+
+📁 packages/backend/src/routes/mcp/plexus/operations.ts:
+  │ [function] handleDebugTool (line 73)
+  │ [function] handleMcpGatewayTool (line 256)
+  │ [function] handleOperationsTool (line 144)
+  │ [function] handleSystemLogsTool (line 352)
+  │ [function] handleUsageTool (line 18)
+
+📁 packages/backend/src/routes/mcp/plexus/responses.ts:
+  │ [function] asObject (line 22)
+  │ [function] asOptionalString (line 28)
+  │ [function] errorResponse (line 75)
+  │ [function] mapRecordResponse (line 11)
+  │ [function] requireId (line 4)
+  │ [function] stripNamedId (line 16)
+  │ [function] successResponse (line 71)
+  │ [function] toMcpToolError (line 32)
+  │ [function] toToolResult (line 58)
+  │ [function] unsupportedOperation (line 88)
+
+📁 packages/backend/src/routes/mcp/plexus/security.ts:
+  │ [function] isSensitiveKey (line 49)
+  │ [function] redactSecrets (line 30)
+  │ [function] requireDestructiveAck (line 20)
+
+📁 packages/backend/src/routes/mcp/plexus/types.ts:
+  │ [class] McpToolError (line 74)
+  │ [method] constructor (line 78)
 
 📁 packages/backend/src/routes/openapi.ts:
   │ [function] registerOpenApiRoute (line 8)
@@ -2138,6 +2157,23 @@
   │ [interface] PaginationControlsProps (line 14)
   │ [interface] ProgressUpdate (line 3)
 
+📁 packages/frontend/src/components/providers/model-editor/adapter-utils.ts:
+  │ [function] getAdapterName (line 40)
+  │ [function] normalizeAdapterEntries (line 35)
+  │ [function] removeRecordKey (line 58)
+  │ [function] renameRecordKey (line 48)
+
+📁 packages/frontend/src/components/providers/model-editor/constants.ts:
+  │ [function] getApiBadgeStyle (line 37)
+  │ [function] isGpt5Model (line 33)
+
+📁 packages/frontend/src/components/providers/model-editor/types.ts:
+  │ [interface] ModelTestState (line 3)
+
+📁 packages/frontend/src/components/providers/model-editor/usePiAiModels.ts:
+  │ [interface] PiAiModel (line 6)
+  │ [function] usePiAiModels (line 13)
+
 📁 packages/frontend/src/components/quota/checker-presentation.ts:
   │ [function] getCheckerDisplayName (line 1)
 
@@ -2255,6 +2291,38 @@
   │ [function] formatQuotaValue (line 30)
   │ [function] quotaUsagePercent (line 50)
   │ [function] statusForPercent (line 18)
+
+📁 packages/frontend/src/pages/detailed-usage/types.ts:
+  │ [interface] AggregatedPoint (line 33)
+  │ [interface] CostDisplay (line 47)
+  │ [interface] DetailedUsageData (line 70)
+  │ [interface] DetailedUsagePreset (line 53)
+  │ [interface] DetailedUsageProps (line 9)
+  │ [interface] MetricConfig (line 25)
+  │ [interface] UseDetailedUsageDataOptions (line 63)
+
+📁 packages/frontend/src/pages/keys/helpers.ts:
+  │ [function] filterKeys (line 34)
+  │ [function] filterQuotas (line 48)
+  │ [function] formatExpiry (line 14)
+  │ [function] getAllModelNames (line 24)
+  │ [function] getQuotaStatusColor (line 18)
+  │ [function] isKeyDisabled (line 8)
+  │ [function] isLeakyRollingDef (line 3)
+
+📁 packages/frontend/src/pages/keys/types.ts:
+  │ [interface] KeysPageData (line 30)
+
+📁 packages/frontend/src/pages/keys/useKeyActions.ts:
+  │ [interface] UseKeyActionsOptions (line 9)
+  │ [function] useKeyActions (line 13)
+
+📁 packages/frontend/src/pages/keys/useKeysPageData.ts:
+  │ [function] useKeysPageData (line 7)
+
+📁 packages/frontend/src/pages/keys/useQuotaActions.ts:
+  │ [interface] UseQuotaActionsOptions (line 9)
+  │ [function] useQuotaActions (line 16)
 
 📁 packages/frontend/src/types/aliases.ts:
   │ [interface] Alias (line 133)
