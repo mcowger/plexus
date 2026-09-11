@@ -1,6 +1,80 @@
 import { describe, expect, test } from 'vitest';
 import { ResponsesTransformer } from '../responses';
 import { OpenAITransformer } from '../openai';
+import {
+  AT_LIMIT_IMAGE_RESULT,
+  AUTHORED_WITH_MARKDOWN,
+  AUTHORED_WITH_PLACEHOLDER,
+  CHAT_FAILED_USAGE_EVENTS,
+  CHAT_IMAGE_EVENTS,
+  CHAT_INCOMPLETE_CONTENT_FILTER_EVENTS,
+  CHAT_INCOMPLETE_USAGE_EVENTS,
+  COMPLETED_FUNCTION_CALL_EVENTS,
+  CLIENT_FAILED_EVENTS,
+  CLIENT_FAILED_ITEMS_EVENTS,
+  CLIENT_HARD_ERROR_EVENTS,
+  CLIENT_INCOMPLETE_CONTENT_FILTER_EVENTS,
+  CLIENT_INCOMPLETE_ITEMS_EVENTS,
+  CLIENT_INCOMPLETE_MAX_EVENTS,
+  DETAIL_LESS_CHAT_EVENTS,
+  DETAIL_LESS_RESPONSES_EVENTS,
+  FAILED_RESPONSE_EVENTS,
+  FAILED_WITHOUT_USAGE_EVENTS,
+  FAILED_WITH_USAGE_EVENTS,
+  FUNCTION_CALL_COMPLETION_EVENTS,
+  GENERIC_ERROR_EVENTS,
+  IMAGE_AT_LIMIT_RESPONSE,
+  IMAGE_COMPLETED_ONLY_EVENTS,
+  IMAGE_DEDUPLICATION_EVENTS,
+  IMAGE_NATIVE_MESSAGE_EVENTS,
+  IMAGE_NATIVE_OVERSIZED_EVENTS,
+  IMAGE_NATIVE_SINGLE_EVENTS,
+  IMAGE_NO_RESULT_RESPONSE,
+  IMAGE_ORDER_RESPONSE,
+  IMAGE_OUTPUT_FORMAT_RESPONSE,
+  IMAGE_OVERSIZED_RESPONSE,
+  IMAGE_OVERSIZED_STREAM_EVENTS,
+  IMAGE_PLACEHOLDER_12_MB,
+  IMAGE_PARTIAL_EVENTS,
+  IMAGE_RESPONSE,
+  IMAGE_ROUND_TRIP_EVENTS,
+  IMAGE_STREAM_ITEM_DONE_EVENTS,
+  INCOMPLETE_CONTENT_FILTER_EVENTS,
+  INCOMPLETE_WITHOUT_DETAILS_EVENTS,
+  INCOMPLETE_WITH_USAGE_EVENTS,
+  INCOMPLETE_MAX_OUTPUT_EVENTS,
+  NATIVE_OVERSIZED_IMAGE_RESULT,
+  OVERSIZED_IMAGE_RESULT_12_MB,
+  OVERSIZED_IMAGE_RESULT_6_MB,
+  PARALLEL_FUNCTION_CALL_EVENTS,
+  TEXT_COMPLETION_EVENTS,
+  TEXT_ONLY_RESPONSE,
+  TINY_IMAGE_B64,
+  TINY_IMAGE_MARKDOWN,
+  TYPED_IMAGE_COMPLETED_ONLY_EVENTS,
+  TYPED_IMAGE_DEDUPLICATION_EVENTS,
+  TYPED_IMAGE_DELTA_EVENTS,
+  TYPED_IMAGE_EVENTS,
+  UNARY_IMAGE_ONLY_RESPONSE,
+  UNARY_IMAGE_ROUND_TRIP_RESPONSE,
+  UNARY_OVERSIZED_IMAGE_RESPONSE,
+  UNARY_OVERSIZED_IMAGE_RESULT,
+  UNARY_TYPED_IMAGE_RESPONSE,
+  UNARY_NO_RESULT_RESPONSE,
+  createCollisionResponseBody,
+  createImageSniffResponse,
+  createPlaceholderCollisionResponseBody,
+  createToolSearchItem,
+  TOOL_SEARCH_CHAT_EVENTS,
+  TOOL_SEARCH_COMPLETED_ONLY_EVENTS,
+  TOOL_SEARCH_COMPLETED_STOP_EVENTS,
+  TOOL_SEARCH_DEDUPLICATION_EVENTS,
+  TOOL_SEARCH_NATIVE_CHUNKS,
+  TOOL_SEARCH_STOP_EVENTS,
+  TOOL_SEARCH_STREAM_EVENTS,
+  TOOL_SEARCH_UNARY_RESPONSE,
+  TOOL_SEARCH_WITH_FUNCTION_EVENTS,
+} from './responses-stream.fixtures';
 
 async function transformEvents(events: Record<string, unknown>[]): Promise<any[]> {
   const encoder = new TextEncoder();
@@ -26,44 +100,7 @@ async function transformEvents(events: Record<string, unknown>[]): Promise<any[]
 
 describe('ResponsesTransformer stream transformation', () => {
   test('keeps parallel function calls distinct when their argument deltas are interleaved', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_1', model: 'gpt-5', created_at: 1234567890 },
-      },
-      {
-        type: 'response.output_item.added',
-        output_index: 4,
-        item: {
-          id: 'fc_first',
-          type: 'function_call',
-          call_id: 'call_first',
-          name: 'add_task',
-        },
-      },
-      {
-        type: 'response.output_item.added',
-        output_index: 9,
-        item: {
-          id: 'fc_second',
-          type: 'function_call',
-          call_id: 'call_second',
-          name: 'add_task',
-        },
-      },
-      {
-        type: 'response.function_call_arguments.delta',
-        output_index: 9,
-        item_id: 'fc_second',
-        delta: '{"title":"second"}',
-      },
-      {
-        type: 'response.function_call_arguments.delta',
-        output_index: 4,
-        item_id: 'fc_first',
-        delta: '{"title":"first"}',
-      },
-    ]);
+    const chunks = await transformEvents(PARALLEL_FUNCTION_CALL_EVENTS);
 
     expect(chunks.filter((chunk) => chunk.delta.tool_calls)).toEqual([
       {
@@ -116,32 +153,7 @@ describe('ResponsesTransformer stream transformation', () => {
   });
 
   test('finishes with tool_calls after streaming a function call', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_1', model: 'gpt-4o', created_at: 1234567890 },
-      },
-      {
-        type: 'response.output_item.added',
-        output_index: 0,
-        item: {
-          type: 'function_call',
-          call_id: 'call_1',
-          name: 'get_date',
-          arguments: '',
-        },
-      },
-      {
-        type: 'response.function_call_arguments.delta',
-        output_index: 0,
-        item_id: 'fc_1',
-        delta: '{"timezone":"UTC"}',
-      },
-      {
-        type: 'response.completed',
-        response: { usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } },
-      },
-    ]);
+    const chunks = await transformEvents(FUNCTION_CALL_COMPLETION_EVENTS);
 
     expect(chunks.find((chunk) => chunk.delta?.tool_calls)?.delta.tool_calls).toEqual([
       {
@@ -155,29 +167,13 @@ describe('ResponsesTransformer stream transformation', () => {
   });
 
   test('finishes with stop when no function call was streamed', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_1', model: 'gpt-4o', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'Done' },
-      { type: 'response.completed', response: {} },
-    ]);
+    const chunks = await transformEvents(TEXT_COMPLETION_EVENTS);
 
     expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('stop');
   });
 
   test('recognizes function calls present only in the completed response', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_1', model: 'gpt-4o', created_at: 1234567890 },
-      },
-      {
-        type: 'response.completed',
-        response: { output: [{ type: 'function_call' }] },
-      },
-    ]);
+    const chunks = await transformEvents(COMPLETED_FUNCTION_CALL_EVENTS);
 
     expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('tool_calls');
   });
@@ -185,20 +181,7 @@ describe('ResponsesTransformer stream transformation', () => {
 
 describe('ResponsesTransformer stream transformation - error handling', () => {
   test('maps response.failed to a unified error chunk instead of dropping it', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_1', model: 'gpt-5', created_at: 1234567890 },
-      },
-      {
-        type: 'response.failed',
-        response: {
-          id: 'resp_1',
-          status: 'failed',
-          error: { code: 'server_error', message: 'The model encountered an error.' },
-        },
-      },
-    ]);
+    const chunks = await transformEvents(FAILED_RESPONSE_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -208,21 +191,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 
   test('maps response.incomplete (max_output_tokens) to a unified error chunk carrying a length finish hint and incomplete_details', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_2', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'Partial output' },
-      {
-        type: 'response.incomplete',
-        response: {
-          id: 'resp_2',
-          status: 'incomplete',
-          incomplete_details: { reason: 'max_output_tokens' },
-        },
-      },
-    ]);
+    const chunks = await transformEvents(INCOMPLETE_MAX_OUTPUT_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -232,21 +201,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 
   test('maps response.incomplete (content_filter) to a unified error chunk carrying a content_filter finish hint and incomplete_details', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_cf', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'Partial' },
-      {
-        type: 'response.incomplete',
-        response: {
-          id: 'resp_cf',
-          status: 'incomplete',
-          incomplete_details: { reason: 'content_filter' },
-        },
-      },
-    ]);
+    const chunks = await transformEvents(INCOMPLETE_CONTENT_FILTER_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -264,17 +219,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
     // everything-but-content_filter default as usage-logging's raw-mode
     // incomplete mapping) — otherwise downstream renders the event as a
     // hard failure.
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_nodetails', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'Partial' },
-      {
-        type: 'response.incomplete',
-        response: { id: 'resp_nodetails', status: 'incomplete' },
-      },
-    ]);
+    const chunks = await transformEvents(INCOMPLETE_WITHOUT_DETAILS_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -284,21 +229,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 
   test('propagates response.usage on response.failed into the unified error chunk', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_failusage', model: 'gpt-5', created_at: 1234567890 },
-      },
-      {
-        type: 'response.failed',
-        response: {
-          id: 'resp_failusage',
-          status: 'failed',
-          error: { code: 'server_error', message: 'boom' },
-          usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
-        },
-      },
-    ]);
+    const chunks = await transformEvents(FAILED_WITH_USAGE_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -308,21 +239,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 
   test('propagates response.usage on response.incomplete into the unified error chunk', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_incompleteusage', model: 'gpt-5', created_at: 1234567890 },
-      },
-      {
-        type: 'response.incomplete',
-        response: {
-          id: 'resp_incompleteusage',
-          status: 'incomplete',
-          incomplete_details: { reason: 'max_output_tokens' },
-          usage: { input_tokens: 20, output_tokens: 8, total_tokens: 28 },
-        },
-      },
-    ]);
+    const chunks = await transformEvents(INCOMPLETE_WITH_USAGE_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -332,16 +249,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 
   test('does not attach a usage field when response.failed/response.incomplete carry none', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_nousage', model: 'gpt-5', created_at: 1234567890 },
-      },
-      {
-        type: 'response.failed',
-        response: { id: 'resp_nousage', status: 'failed', error: { message: 'boom' } },
-      },
-    ]);
+    const chunks = await transformEvents(FAILED_WITHOUT_USAGE_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -349,13 +257,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 
   test('maps a generic top-level error event to a unified error chunk', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_3', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'error', code: 'server_error', message: 'boom' },
-    ]);
+    const chunks = await transformEvents(GENERIC_ERROR_EVENTS);
 
     const errorChunk = chunks.find((chunk) => chunk.event === 'error');
     expect(errorChunk).toBeDefined();
@@ -363,10 +265,7 @@ describe('ResponsesTransformer stream transformation - error handling', () => {
   });
 });
 
-// Tiny fake base64 payload — content is irrelevant, only the data-URI
-// plumbing matters.
-const TINY_IMAGE_B64 = 'aGVsbG8=';
-const TINY_IMAGE_MARKDOWN = `![generated image](data:image/png;base64,${TINY_IMAGE_B64})`;
+// Tiny image payloads and generated size-boundary values live in responses-stream.fixtures.ts.
 
 describe('ResponsesTransformer image_generation_call rendering (pure unified content + chat composition)', () => {
   // The chat-visible text for a unified response, exactly as a CHAT-format
@@ -381,17 +280,7 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   };
 
   test('an image_generation_call with a base64 result renders markdown data-URI content for chat clients', async () => {
-    const unified = await new ResponsesTransformer().transformResponse({
-      id: 'resp_img',
-      object: 'response',
-      model: 'gpt-image-model',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [
-        { type: 'image_generation_call', id: 'ig_1', status: 'completed', result: TINY_IMAGE_B64 },
-      ],
-      usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 },
-    });
+    const unified = await new ResponsesTransformer().transformResponse(IMAGE_RESPONSE);
 
     // Unified content stays PURE — no message item, no text. The image
     // travels typed; the markdown exists only in the chat projection.
@@ -403,23 +292,7 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   });
 
   test('chat composition appends image markdown after the authored message text', async () => {
-    const unified = await new ResponsesTransformer().transformResponse({
-      id: 'resp_img_order',
-      object: 'response',
-      model: 'gpt-image-model',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [
-        {
-          type: 'message',
-          id: 'msg_1',
-          status: 'completed',
-          role: 'assistant',
-          content: [{ type: 'output_text', text: 'Here is your image:' }],
-        },
-        { type: 'image_generation_call', id: 'ig_1', status: 'completed', result: TINY_IMAGE_B64 },
-      ],
-    });
+    const unified = await new ResponsesTransformer().transformResponse(IMAGE_ORDER_RESPONSE);
 
     expect(unified.content).toBe('Here is your image:');
     expect(await chatVisibleContent(unified)).toBe(`Here is your image:\n${TINY_IMAGE_MARKDOWN}`);
@@ -432,17 +305,10 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   describe('mime subtype sniffing from the base64 signature', () => {
     const b64 = (bytes: number[]) => Buffer.from(bytes).toString('base64');
 
-    const renderImage = async (result: string) => {
-      const unified = await new ResponsesTransformer().transformResponse({
-        id: 'resp_img_sniff',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [{ type: 'image_generation_call', id: 'ig_1', status: 'completed', result }],
-      });
-      return chatVisibleContent(unified);
-    };
+    const renderImage = async (result: string) =>
+      chatVisibleContent(
+        await new ResponsesTransformer().transformResponse(createImageSniffResponse(result))
+      );
 
     test('PNG signature (\\x89PNG) renders image/png', async () => {
       const png = b64([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]);
@@ -473,22 +339,9 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
     });
 
     test('a request-style output_format field on the item is IGNORED (not a response field)', async () => {
-      const unified = await new ResponsesTransformer().transformResponse({
-        id: 'resp_img_webp',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [
-          {
-            type: 'image_generation_call',
-            id: 'ig_1',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-            output_format: 'webp',
-          },
-        ],
-      });
+      const unified = await new ResponsesTransformer().transformResponse(
+        IMAGE_OUTPUT_FORMAT_RESPONSE
+      );
 
       // The payload's actual bytes ("hello" — no signature) decide: png.
       expect(await chatVisibleContent(unified)).toBe(TINY_IMAGE_MARKDOWN);
@@ -505,14 +358,7 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   });
 
   test('an image_generation_call without a base64 result contributes nothing', async () => {
-    const unified = await new ResponsesTransformer().transformResponse({
-      id: 'resp_img_noresult',
-      object: 'response',
-      model: 'gpt-image-model',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [{ type: 'image_generation_call', id: 'ig_1', status: 'completed' }],
-    });
+    const unified = await new ResponsesTransformer().transformResponse(IMAGE_NO_RESULT_RESPONSE);
 
     expect(unified.content).toBeNull();
     expect(unified.image_generation_calls).toBeUndefined();
@@ -520,22 +366,7 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   });
 
   test('a text-only response keeps its existing unified content shape (happy path unchanged)', async () => {
-    const unified = await new ResponsesTransformer().transformResponse({
-      id: 'resp_text_only',
-      object: 'response',
-      model: 'gpt-4o',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [
-        {
-          type: 'message',
-          id: 'msg_1',
-          status: 'completed',
-          role: 'assistant',
-          content: [{ type: 'output_text', text: 'Full answer' }],
-        },
-      ],
-    });
+    const unified = await new ResponsesTransformer().transformResponse(TEXT_ONLY_RESPONSE);
 
     expect(unified.content).toBe('Full answer');
   });
@@ -543,17 +374,8 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   test('a base64 result over the inline limit renders the omission placeholder for chat clients, not a data URI', async () => {
     // One char past MAX_INLINE_IMAGE_BASE64_CHARS (8 * 1024 * 1024).
     // Approximate decoded size = 8388609 * 3/4 bytes ≈ 6.0 MB.
-    const oversized = 'A'.repeat(8 * 1024 * 1024 + 1);
-    const unified = await new ResponsesTransformer().transformResponse({
-      id: 'resp_img_oversized',
-      object: 'response',
-      model: 'gpt-image-model',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [
-        { type: 'image_generation_call', id: 'ig_1', status: 'completed', result: oversized },
-      ],
-    });
+    const oversized = OVERSIZED_IMAGE_RESULT_6_MB;
+    const unified = await new ResponsesTransformer().transformResponse(IMAGE_OVERSIZED_RESPONSE);
 
     // Pure unified content; the size guard applies only to the chat
     // projection — the typed carry keeps the full payload.
@@ -565,15 +387,8 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
   });
 
   test('a base64 result exactly at the inline limit still renders as a data URI (boundary)', async () => {
-    const atLimit = 'A'.repeat(8 * 1024 * 1024);
-    const unified = await new ResponsesTransformer().transformResponse({
-      id: 'resp_img_at_limit',
-      object: 'response',
-      model: 'gpt-image-model',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [{ type: 'image_generation_call', id: 'ig_1', status: 'completed', result: atLimit }],
-    });
+    const atLimit = AT_LIMIT_IMAGE_RESULT;
+    const unified = await new ResponsesTransformer().transformResponse(IMAGE_AT_LIMIT_RESPONSE);
 
     expect(await chatVisibleContent(unified)).toBe(
       `![generated image](data:image/png;base64,${atLimit})`
@@ -583,23 +398,7 @@ describe('ResponsesTransformer image_generation_call rendering (pure unified con
 
 describe('ResponsesTransformer transformStream - image_generation_call rendering', () => {
   test('a completed image_generation_call output item becomes a unified content delta (markdown data URI)', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_img_s1', model: 'gpt-image-model', created_at: 1234567890 },
-      },
-      {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item: {
-          id: 'ig_1',
-          type: 'image_generation_call',
-          status: 'completed',
-          result: TINY_IMAGE_B64,
-        },
-      },
-      { type: 'response.completed', response: {} },
-    ]);
+    const chunks = await transformEvents(IMAGE_STREAM_ITEM_DONE_EVENTS);
 
     const contentChunks = chunks.filter(
       (chunk) => typeof chunk.delta?.content === 'string' && chunk.delta.content.length > 0
@@ -609,28 +408,7 @@ describe('ResponsesTransformer transformStream - image_generation_call rendering
   });
 
   test('an image_generation_call present only in response.completed still renders, before the final chunk', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_img_s2', model: 'gpt-image-model', created_at: 1234567890 },
-      },
-      {
-        type: 'response.completed',
-        response: {
-          id: 'resp_img_s2',
-          status: 'completed',
-          output: [
-            {
-              id: 'ig_1',
-              type: 'image_generation_call',
-              status: 'completed',
-              result: TINY_IMAGE_B64,
-            },
-          ],
-          usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 },
-        },
-      },
-    ]);
+    const chunks = await transformEvents(IMAGE_COMPLETED_ONLY_EVENTS);
 
     const contentIndex = chunks.findIndex((chunk) => chunk.delta?.content === TINY_IMAGE_MARKDOWN);
     const finishIndex = chunks.findIndex((chunk) => chunk.finish_reason);
@@ -639,50 +417,14 @@ describe('ResponsesTransformer transformStream - image_generation_call rendering
   });
 
   test('does not double-render an item that streamed via output_item.done AND appears in response.completed', async () => {
-    const imageItem = {
-      id: 'ig_1',
-      type: 'image_generation_call',
-      status: 'completed',
-      result: TINY_IMAGE_B64,
-    };
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_img_s3', model: 'gpt-image-model', created_at: 1234567890 },
-      },
-      { type: 'response.output_item.done', output_index: 0, item: imageItem },
-      { type: 'response.completed', response: { id: 'resp_img_s3', output: [imageItem] } },
-    ]);
+    const chunks = await transformEvents(IMAGE_DEDUPLICATION_EVENTS);
 
     const contentChunks = chunks.filter((chunk) => chunk.delta?.content === TINY_IMAGE_MARKDOWN);
     expect(contentChunks).toHaveLength(1);
   });
 
   test('partial-image delta events are skipped (explicitly out of scope) — only the completed item renders', async () => {
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_img_s4', model: 'gpt-image-model', created_at: 1234567890 },
-      },
-      {
-        type: 'response.image_generation_call.partial_image',
-        output_index: 0,
-        item_id: 'ig_1',
-        partial_image_index: 0,
-        partial_image_b64: 'UEFSVElBTA==',
-      },
-      {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item: {
-          id: 'ig_1',
-          type: 'image_generation_call',
-          status: 'completed',
-          result: TINY_IMAGE_B64,
-        },
-      },
-      { type: 'response.completed', response: {} },
-    ]);
+    const chunks = await transformEvents(IMAGE_PARTIAL_EVENTS);
 
     const contentChunks = chunks.filter(
       (chunk) => typeof chunk.delta?.content === 'string' && chunk.delta.content.length > 0
@@ -695,24 +437,8 @@ describe('ResponsesTransformer transformStream - image_generation_call rendering
   test('a base64 result over the inline limit streams the omission placeholder instead of the data URI', async () => {
     // Twice MAX_INLINE_IMAGE_BASE64_CHARS (8 * 1024 * 1024).
     // Approximate decoded size = 16777216 * 3/4 bytes = 12.0 MB.
-    const oversized = 'B'.repeat(2 * 8 * 1024 * 1024);
-    const chunks = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_img_s5', model: 'gpt-image-model', created_at: 1234567890 },
-      },
-      {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item: {
-          id: 'ig_1',
-          type: 'image_generation_call',
-          status: 'completed',
-          result: oversized,
-        },
-      },
-      { type: 'response.completed', response: {} },
-    ]);
+    const oversized = OVERSIZED_IMAGE_RESULT_12_MB;
+    const chunks = await transformEvents(IMAGE_OVERSIZED_STREAM_EVENTS);
 
     const contentChunks = chunks.filter(
       (chunk) => typeof chunk.delta?.content === 'string' && chunk.delta.content.length > 0
@@ -781,23 +507,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
 
   describe('transformStream carries the typed item alongside the markdown', () => {
     test('a completed image item carries a typed entry on the SAME chunk as its markdown delta', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_typed_1', model: 'gpt-image-model', created_at: 1234567890 },
-        },
-        {
-          type: 'response.output_item.done',
-          output_index: 0,
-          item: {
-            id: 'ig_1',
-            type: 'image_generation_call',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-          },
-        },
-        { type: 'response.completed', response: {} },
-      ]);
+      const chunks = await transformEvents(TYPED_IMAGE_EVENTS);
 
       const imageChunks = chunks.filter((chunk) => chunk.image_generation_calls);
       expect(imageChunks).toHaveLength(1);
@@ -809,23 +519,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('the typed entry is chunk-level, NOT inside delta (chat formatters forward delta by reference)', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_typed_2', model: 'gpt-image-model', created_at: 1234567890 },
-        },
-        {
-          type: 'response.output_item.done',
-          output_index: 0,
-          item: {
-            id: 'ig_1',
-            type: 'image_generation_call',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-          },
-        },
-        { type: 'response.completed', response: {} },
-      ]);
+      const chunks = await transformEvents(TYPED_IMAGE_DELTA_EVENTS);
 
       const imageChunk = chunks.find((chunk) => chunk.image_generation_calls);
       expect(imageChunk).toBeDefined();
@@ -833,47 +527,14 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('the completed-fallback also carries the typed entry, without double-carrying deduped items', async () => {
-      const imageItem = {
-        id: 'ig_1',
-        type: 'image_generation_call',
-        status: 'completed',
-        result: TINY_IMAGE_B64,
-      };
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_typed_3', model: 'gpt-image-model', created_at: 1234567890 },
-        },
-        { type: 'response.output_item.done', output_index: 0, item: imageItem },
-        { type: 'response.completed', response: { id: 'resp_typed_3', output: [imageItem] } },
-      ]);
+      const chunks = await transformEvents(TYPED_IMAGE_DEDUPLICATION_EVENTS);
 
       const imageChunks = chunks.filter((chunk) => chunk.image_generation_calls);
       expect(imageChunks).toHaveLength(1);
     });
 
     test('a completed-only item (never streamed via output_item.done) still gets the typed carry', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_typed_4', model: 'gpt-image-model', created_at: 1234567890 },
-        },
-        {
-          type: 'response.completed',
-          response: {
-            id: 'resp_typed_4',
-            status: 'completed',
-            output: [
-              {
-                id: 'ig_9',
-                type: 'image_generation_call',
-                status: 'completed',
-                result: TINY_IMAGE_B64,
-              },
-            ],
-          },
-        },
-      ]);
+      const chunks = await transformEvents(TYPED_IMAGE_COMPLETED_ONLY_EVENTS);
 
       const imageChunks = chunks.filter((chunk) => chunk.image_generation_calls);
       expect(imageChunks).toHaveLength(1);
@@ -886,35 +547,8 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
   });
 
   describe('formatStream re-emits typed items as native output items', () => {
-    const imageChunkFor = (result: string) => ({
-      id: 'resp_native_1',
-      model: 'gpt-image-model',
-      created: 1234567890,
-      delta: { content: `![generated image](data:image/png;base64,${result})` },
-      image_generation_calls: [{ id: 'ig_1', status: 'completed', result }],
-      finish_reason: null,
-    });
-
-    const finishChunk = () => ({
-      id: 'resp_native_1',
-      model: 'gpt-image-model',
-      created: 1234567890,
-      finish_reason: 'stop',
-      usage: {
-        input_tokens: 5,
-        output_tokens: 1,
-        total_tokens: 6,
-        reasoning_tokens: 0,
-        cached_tokens: 0,
-        cache_creation_tokens: 0,
-      },
-    });
-
     test('emits a native image_generation_call output item (byte-intact) instead of markdown text', async () => {
-      const events = await collectFormatStreamEvents([
-        imageChunkFor(TINY_IMAGE_B64),
-        finishChunk(),
-      ]);
+      const events = await collectFormatStreamEvents(IMAGE_NATIVE_SINGLE_EVENTS);
 
       const doneEvents = events.filter(
         (e) => e.type === 'response.output_item.done' && e.item?.type === 'image_generation_call'
@@ -934,10 +568,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('the final response.completed output array includes the native image item', async () => {
-      const events = await collectFormatStreamEvents([
-        imageChunkFor(TINY_IMAGE_B64),
-        finishChunk(),
-      ]);
+      const events = await collectFormatStreamEvents(IMAGE_NATIVE_SINGLE_EVENTS);
 
       const completed = events.find((e) => e.type === 'response.completed');
       expect(completed).toBeDefined();
@@ -949,20 +580,10 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('an OVERSIZED result re-emits with the FULL base64 — the native format has no inline cap', async () => {
-      const oversized = 'C'.repeat(2 * 8 * 1024 * 1024);
+      const oversized = NATIVE_OVERSIZED_IMAGE_RESULT;
       // transformStream renders the placeholder on content for oversized
       // items — mirror that pairing here.
-      const events = await collectFormatStreamEvents([
-        {
-          id: 'resp_native_2',
-          model: 'gpt-image-model',
-          created: 1234567890,
-          delta: { content: '[generated image omitted: 12.0 MB exceeds inline limit]' },
-          image_generation_calls: [{ id: 'ig_big', status: 'completed', result: oversized }],
-          finish_reason: null,
-        },
-        finishChunk(),
-      ]);
+      const events = await collectFormatStreamEvents(IMAGE_NATIVE_OVERSIZED_EVENTS);
 
       const doneEvent = events.find(
         (e) => e.type === 'response.output_item.done' && e.item?.type === 'image_generation_call'
@@ -974,17 +595,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('message text on OTHER chunks still streams normally alongside a native image item', async () => {
-      const events = await collectFormatStreamEvents([
-        {
-          id: 'resp_native_3',
-          model: 'gpt-image-model',
-          created: 1234567890,
-          delta: { content: 'Here is your image:' },
-          finish_reason: null,
-        },
-        imageChunkFor(TINY_IMAGE_B64),
-        finishChunk(),
-      ]);
+      const events = await collectFormatStreamEvents(IMAGE_NATIVE_MESSAGE_EVENTS);
 
       const textDeltas = events.filter((e) => e.type === 'response.output_text.delta');
       expect(textDeltas).toHaveLength(1);
@@ -999,26 +610,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('full streaming round-trip (provider SSE -> unified -> client SSE) keeps the item byte-intact', async () => {
-      const unifiedChunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_rt_1', model: 'gpt-image-model', created_at: 1234567890 },
-        },
-        {
-          type: 'response.output_item.done',
-          output_index: 0,
-          item: {
-            id: 'ig_rt',
-            type: 'image_generation_call',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-          },
-        },
-        {
-          type: 'response.completed',
-          response: { usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 } },
-        },
-      ]);
+      const unifiedChunks = await transformEvents(IMAGE_ROUND_TRIP_EVENTS);
 
       const events = await collectFormatStreamEvents(unifiedChunks);
       const doneEvent = events.find(
@@ -1032,28 +624,9 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
 
   describe('formatResponse (unary) re-emits typed items as native output items', () => {
     test('transformResponse attaches the typed items and keeps unified content PURE', async () => {
-      const unified = await new ResponsesTransformer().transformResponse({
-        id: 'resp_unary_typed',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [
-          {
-            type: 'message',
-            id: 'msg_1',
-            status: 'completed',
-            role: 'assistant',
-            content: [{ type: 'output_text', text: 'Here is your image:' }],
-          },
-          {
-            type: 'image_generation_call',
-            id: 'ig_1',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-          },
-        ],
-      });
+      const unified = await new ResponsesTransformer().transformResponse(
+        UNARY_TYPED_IMAGE_RESPONSE
+      );
 
       expect(unified.image_generation_calls).toEqual([
         { id: 'ig_1', status: 'completed', result: TINY_IMAGE_B64 },
@@ -1064,42 +637,14 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('a result-less image item still contributes no typed entry', async () => {
-      const unified = await new ResponsesTransformer().transformResponse({
-        id: 'resp_unary_noresult',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [{ type: 'image_generation_call', id: 'ig_1', status: 'completed' }],
-      });
+      const unified = await new ResponsesTransformer().transformResponse(UNARY_NO_RESULT_RESPONSE);
 
       expect(unified.image_generation_calls).toBeUndefined();
     });
 
     test('formatResponse emits the native item and strips the paired markdown from the message text', async () => {
       const transformer = new ResponsesTransformer();
-      const unified = await transformer.transformResponse({
-        id: 'resp_unary_rt',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [
-          {
-            type: 'message',
-            id: 'msg_1',
-            status: 'completed',
-            role: 'assistant',
-            content: [{ type: 'output_text', text: 'Here is your image:' }],
-          },
-          {
-            type: 'image_generation_call',
-            id: 'ig_1',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-          },
-        ],
-      });
+      const unified = await transformer.transformResponse(UNARY_IMAGE_ROUND_TRIP_RESPONSE);
 
       const formatted = await transformer.formatResponse(unified as any);
 
@@ -1121,21 +666,7 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
 
     test('an image-only unary response round-trips as a native item (no markdown text)', async () => {
       const transformer = new ResponsesTransformer();
-      const unified = await transformer.transformResponse({
-        id: 'resp_unary_imgonly',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [
-          {
-            type: 'image_generation_call',
-            id: 'ig_1',
-            status: 'completed',
-            result: TINY_IMAGE_B64,
-          },
-        ],
-      });
+      const unified = await transformer.transformResponse(UNARY_IMAGE_ONLY_RESPONSE);
 
       // Pure unified content: nothing authored, nothing baked. The typed
       // carry is what keeps the empty-completion detector seeing visible
@@ -1154,18 +685,9 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('an OVERSIZED unary result re-emits byte-intact natively — the placeholder never reaches the client', async () => {
-      const oversized = 'D'.repeat(8 * 1024 * 1024 + 1);
+      const oversized = UNARY_OVERSIZED_IMAGE_RESULT;
       const transformer = new ResponsesTransformer();
-      const unified = await transformer.transformResponse({
-        id: 'resp_unary_big',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [
-          { type: 'image_generation_call', id: 'ig_big', status: 'completed', result: oversized },
-        ],
-      });
+      const unified = await transformer.transformResponse(UNARY_OVERSIZED_IMAGE_RESPONSE);
 
       // Pure unified content (the guarded placeholder exists only in the
       // chat projection)...
@@ -1192,34 +714,9 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     // segment" surgery removes the FIRST occurrence — the authored copy —
     // and leaks the appended rendering: content corruption.
 
-    const authoredWithMarkdown = `Check this markdown I wrote myself:\n${TINY_IMAGE_MARKDOWN}\nNeat, right?`;
-
-    const collisionResponseBody = () => ({
-      id: 'resp_probe_md',
-      object: 'response',
-      model: 'gpt-image-model',
-      created_at: 1234567890,
-      status: 'completed',
-      output: [
-        {
-          type: 'message',
-          id: 'msg_1',
-          status: 'completed',
-          role: 'assistant',
-          content: [{ type: 'output_text', text: authoredWithMarkdown }],
-        },
-        {
-          type: 'image_generation_call',
-          id: 'ig_1',
-          status: 'completed',
-          result: TINY_IMAGE_B64,
-        },
-      ],
-    });
-
     test('authored text containing an exact copy of the image markdown reaches a responses client byte-intact', async () => {
       const transformer = new ResponsesTransformer();
-      const unified = await transformer.transformResponse(collisionResponseBody());
+      const unified = await transformer.transformResponse(createCollisionResponseBody());
       const formatted = await transformer.formatResponse(unified as any);
 
       // The native item is the image's only carrier...
@@ -1232,31 +729,15 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
       // ...and the AUTHORED text — including its own copy of the markdown —
       // survives byte-intact: nothing removed, no appended rendering leaked.
       const messageItem = formatted.output.find((item: any) => item.type === 'message');
-      expect(messageItem.content[0].text).toBe(authoredWithMarkdown);
+      expect(messageItem.content[0].text).toBe(AUTHORED_WITH_MARKDOWN);
     });
 
     test('authored text quoting the oversized-omission placeholder reaches a responses client byte-intact', async () => {
-      const oversized = 'B'.repeat(2 * 8 * 1024 * 1024); // placeholder reads "12.0 MB"
-      const placeholder = '[generated image omitted: 12.0 MB exceeds inline limit]';
-      const authored = `If a file is too large you may see "${placeholder}" instead of the image.`;
+      const oversized = OVERSIZED_IMAGE_RESULT_12_MB;
+      const placeholder = IMAGE_PLACEHOLDER_12_MB;
+      const authored = AUTHORED_WITH_PLACEHOLDER;
       const transformer = new ResponsesTransformer();
-      const unified = await transformer.transformResponse({
-        id: 'resp_probe_ph',
-        object: 'response',
-        model: 'gpt-image-model',
-        created_at: 1234567890,
-        status: 'completed',
-        output: [
-          {
-            type: 'message',
-            id: 'msg_1',
-            status: 'completed',
-            role: 'assistant',
-            content: [{ type: 'output_text', text: authored }],
-          },
-          { type: 'image_generation_call', id: 'ig_big', status: 'completed', result: oversized },
-        ],
-      });
+      const unified = await transformer.transformResponse(createPlaceholderCollisionResponseBody());
 
       const formatted = await transformer.formatResponse(unified as any);
 
@@ -1271,11 +752,13 @@ describe('ResponsesTransformer typed image_generation_call carry (responses -> r
     });
 
     test('the same authored-collision response renders authored text + appended markdown for a CHAT client (duplication is genuine content)', async () => {
-      const unified = await new ResponsesTransformer().transformResponse(collisionResponseBody());
+      const unified = await new ResponsesTransformer().transformResponse(
+        createCollisionResponseBody()
+      );
       const chat = await new OpenAITransformer().formatResponse(unified as any);
 
       expect(chat.choices[0].message.content).toBe(
-        `${authoredWithMarkdown}\n${TINY_IMAGE_MARKDOWN}`
+        `${AUTHORED_WITH_MARKDOWN}\n${TINY_IMAGE_MARKDOWN}`
       );
     });
   });
@@ -1312,27 +795,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
   }
 
   test('emits response.failed (not response.completed) when a unified error chunk arrives', async () => {
-    const events = await collectFormatStreamEvents([
-      {
-        id: 'resp_err_1',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { role: 'assistant', content: 'partial' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_err_1',
-        model: 'gpt-5',
-        created: 1234567890,
-        event: 'error',
-        delta: {},
-        error: {
-          statusCode: 500,
-          code: 'server_error',
-          message: 'The model encountered an error.',
-        },
-      },
-    ]);
+    const events = await collectFormatStreamEvents(CLIENT_FAILED_EVENTS);
 
     expect(events.some((e) => e.type === 'response.completed')).toBe(false);
     const failedEvent = events.find((e) => e.type === 'response.failed');
@@ -1347,29 +810,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
     // incomplete" outcome (incomplete_details present), the Responses-facing
     // client must see the more specific response.incomplete event, not a
     // generic hard failure.
-    const events = await collectFormatStreamEvents([
-      {
-        id: 'resp_err_2',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { role: 'assistant', content: 'partial output' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_err_2',
-        model: 'gpt-5',
-        created: 1234567890,
-        event: 'error',
-        delta: {},
-        finish_reason: 'length',
-        incomplete_details: { reason: 'max_output_tokens' },
-        error: {
-          statusCode: 500,
-          code: 'max_output_tokens',
-          message: 'Response ended incomplete: max_output_tokens',
-        },
-      },
-    ]);
+    const events = await collectFormatStreamEvents(CLIENT_INCOMPLETE_MAX_EVENTS);
 
     expect(events.some((e) => e.type === 'response.completed')).toBe(false);
     expect(events.some((e) => e.type === 'response.failed')).toBe(false);
@@ -1381,37 +822,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
   });
 
   test('emits response.incomplete (content_filter) with incomplete_details and usage for a Responses-format client', async () => {
-    const events = await collectFormatStreamEvents([
-      {
-        id: 'resp_err_cf',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { role: 'assistant', content: 'partial' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_err_cf',
-        model: 'gpt-5',
-        created: 1234567890,
-        event: 'error',
-        delta: {},
-        finish_reason: 'content_filter',
-        incomplete_details: { reason: 'content_filter' },
-        usage: {
-          input_tokens: 10,
-          output_tokens: 5,
-          total_tokens: 15,
-          reasoning_tokens: 0,
-          cached_tokens: 0,
-          cache_creation_tokens: 0,
-        },
-        error: {
-          statusCode: 500,
-          code: 'content_filter',
-          message: 'Response ended incomplete: content_filter',
-        },
-      },
-    ]);
+    const events = await collectFormatStreamEvents(CLIENT_INCOMPLETE_CONTENT_FILTER_EVENTS);
 
     expect(events.some((e) => e.type === 'response.failed')).toBe(false);
     const incompleteEvent = events.find((e) => e.type === 'response.incomplete');
@@ -1427,17 +838,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
     // must keep the event on the incomplete path — without the default, the
     // missing field made formatStream downgrade the outcome to a hard
     // response.failed.
-    const unified = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_nodetails_rt', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'partial output' },
-      {
-        type: 'response.incomplete',
-        response: { id: 'resp_nodetails_rt', status: 'incomplete' },
-      },
-    ]);
+    const unified = await transformEvents(DETAIL_LESS_RESPONSES_EVENTS);
     const events = await collectFormatStreamEvents(unified);
 
     expect(events.some((e) => e.type === 'response.failed')).toBe(false);
@@ -1454,17 +855,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
     // detail-less incomplete as an ordinary finish — the same rendering
     // known-reason (max_output_tokens) incompletes already get — instead of
     // the hard-error payload it produced when finish_reason was absent.
-    const unified = await transformEvents([
-      {
-        type: 'response.created',
-        response: { id: 'resp_nodetails_chat', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'partial output' },
-      {
-        type: 'response.incomplete',
-        response: { id: 'resp_nodetails_chat', status: 'incomplete' },
-      },
-    ]);
+    const unified = await transformEvents(DETAIL_LESS_CHAT_EVENTS);
 
     const reader = new OpenAITransformer()
       .formatStream(unifiedStreamFromChunks(unified))
@@ -1499,52 +890,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
     // the reasoning item, the message item, and the tool call — was never
     // finished, so the finalized items must carry status 'incomplete', not a
     // fabricated 'completed'.
-    const events = await collectFormatStreamEvents([
-      {
-        id: 'resp_inc_items',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { role: 'assistant', reasoning_content: 'thinking...' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_inc_items',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { content: 'partial output' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_inc_items',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: {
-          tool_calls: [
-            {
-              index: 0,
-              id: 'call_1',
-              type: 'function',
-              function: { name: 'lookup', arguments: '{"q":' },
-            },
-          ],
-        },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_inc_items',
-        model: 'gpt-5',
-        created: 1234567890,
-        event: 'error',
-        delta: {},
-        finish_reason: 'length',
-        incomplete_details: { reason: 'max_output_tokens' },
-        error: {
-          statusCode: 500,
-          code: 'max_output_tokens',
-          message: 'Response ended incomplete: max_output_tokens',
-        },
-      },
-    ]);
+    const events = await collectFormatStreamEvents(CLIENT_INCOMPLETE_ITEMS_EVENTS);
 
     const incompleteEvent = events.find((e) => e.type === 'response.incomplete');
     expect(incompleteEvent).toBeDefined();
@@ -1568,23 +914,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
   });
 
   test('response.failed finalization keeps item statuses unchanged (completed)', async () => {
-    const events = await collectFormatStreamEvents([
-      {
-        id: 'resp_failed_items',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { role: 'assistant', content: 'partial' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_failed_items',
-        model: 'gpt-5',
-        created: 1234567890,
-        event: 'error',
-        delta: {},
-        error: { statusCode: 500, code: 'server_error', message: 'boom' },
-      },
-    ]);
+    const events = await collectFormatStreamEvents(CLIENT_FAILED_ITEMS_EVENTS);
 
     const failedEvent = events.find((e) => e.type === 'response.failed');
     expect(failedEvent).toBeDefined();
@@ -1593,23 +923,7 @@ describe('ResponsesTransformer formatStream - error handling (client-facing)', (
   });
 
   test('keeps emitting response.failed exactly as before for a genuine hard error (no incomplete_details)', async () => {
-    const events = await collectFormatStreamEvents([
-      {
-        id: 'resp_hard_err',
-        model: 'gpt-5',
-        created: 1234567890,
-        delta: { role: 'assistant', content: 'partial' },
-        finish_reason: null,
-      },
-      {
-        id: 'resp_hard_err',
-        model: 'gpt-5',
-        created: 1234567890,
-        event: 'error',
-        delta: {},
-        error: { statusCode: 500, code: 'server_error', message: 'The model response failed.' },
-      },
-    ]);
+    const events = await collectFormatStreamEvents(CLIENT_HARD_ERROR_EVENTS);
 
     expect(events.some((e) => e.type === 'response.incomplete')).toBe(false);
     const failedEvent = events.find((e) => e.type === 'response.failed');
@@ -1659,21 +973,7 @@ describe('ResponsesTransformer transformStream -> OpenAITransformer formatStream
   }
 
   test('response.incomplete (content_filter) surfaces as a chat finish_reason "content_filter"', async () => {
-    const chunks = await transformAndFormatAsChat([
-      {
-        type: 'response.created',
-        response: { id: 'resp_cf_chat', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'Partial' },
-      {
-        type: 'response.incomplete',
-        response: {
-          id: 'resp_cf_chat',
-          status: 'incomplete',
-          incomplete_details: { reason: 'content_filter' },
-        },
-      },
-    ]);
+    const chunks = await transformAndFormatAsChat(CHAT_INCOMPLETE_CONTENT_FILTER_EVENTS);
 
     const finishChunk = chunks.find(
       (c) => c !== '[DONE]' && c.choices?.[0]?.finish_reason === 'content_filter'
@@ -1685,22 +985,7 @@ describe('ResponsesTransformer transformStream -> OpenAITransformer formatStream
   });
 
   test('response.failed carrying usage propagates that usage to the chat client', async () => {
-    const chunks = await transformAndFormatAsChat([
-      {
-        type: 'response.created',
-        response: { id: 'resp_fail_usage', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'partial' },
-      {
-        type: 'response.failed',
-        response: {
-          id: 'resp_fail_usage',
-          status: 'failed',
-          error: { code: 'server_error', message: 'boom' },
-          usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
-        },
-      },
-    ]);
+    const chunks = await transformAndFormatAsChat(CHAT_FAILED_USAGE_EVENTS);
 
     const usageChunk = chunks.find((c) => c !== '[DONE]' && c.usage);
     expect(usageChunk).toBeDefined();
@@ -1713,38 +998,7 @@ describe('ResponsesTransformer transformStream -> OpenAITransformer formatStream
   });
 
   test('a streamed completed image_generation_call reaches a chat client as a markdown data-URI content delta', async () => {
-    const chunks = await transformAndFormatAsChat([
-      {
-        type: 'response.created',
-        response: { id: 'resp_img_chat', model: 'gpt-image-model', created_at: 1234567890 },
-      },
-      {
-        type: 'response.output_item.done',
-        output_index: 0,
-        item: {
-          id: 'ig_1',
-          type: 'image_generation_call',
-          status: 'completed',
-          result: TINY_IMAGE_B64,
-        },
-      },
-      {
-        type: 'response.completed',
-        response: {
-          id: 'resp_img_chat',
-          status: 'completed',
-          output: [
-            {
-              id: 'ig_1',
-              type: 'image_generation_call',
-              status: 'completed',
-              result: TINY_IMAGE_B64,
-            },
-          ],
-          usage: { input_tokens: 5, output_tokens: 1, total_tokens: 6 },
-        },
-      },
-    ]);
+    const chunks = await transformAndFormatAsChat(CHAT_IMAGE_EVENTS);
 
     const contentChunks = chunks.filter(
       (c) =>
@@ -1761,22 +1015,7 @@ describe('ResponsesTransformer transformStream -> OpenAITransformer formatStream
   });
 
   test('response.incomplete carrying usage propagates that usage to the chat client alongside the finish_reason', async () => {
-    const chunks = await transformAndFormatAsChat([
-      {
-        type: 'response.created',
-        response: { id: 'resp_incomplete_usage', model: 'gpt-5', created_at: 1234567890 },
-      },
-      { type: 'response.output_text.delta', delta: 'partial' },
-      {
-        type: 'response.incomplete',
-        response: {
-          id: 'resp_incomplete_usage',
-          status: 'incomplete',
-          incomplete_details: { reason: 'max_output_tokens' },
-          usage: { input_tokens: 7, output_tokens: 3, total_tokens: 10 },
-        },
-      },
-    ]);
+    const chunks = await transformAndFormatAsChat(CHAT_INCOMPLETE_USAGE_EVENTS);
 
     const finishChunk = chunks.find(
       (c) => c !== '[DONE]' && c.choices?.[0]?.finish_reason === 'length'
@@ -1799,16 +1038,6 @@ describe('ResponsesTransformer transformStream -> OpenAITransformer formatStream
 // finish_reason for them would send a 'tool_calls' finish with an empty
 // tool_calls array, which SDKs commonly loop or throw on.
 describe('ResponsesTransformer typed client_tool_calls carry (tool_search_call)', () => {
-  const toolSearchItem = (overrides: Partial<Record<string, unknown>> = {}) => ({
-    id: 'tsc_1',
-    type: 'tool_search_call',
-    call_id: 'call_1',
-    execution: 'client',
-    status: 'completed',
-    arguments: { query: 'exec_command' },
-    ...overrides,
-  });
-
   function unifiedStreamFromChunks(chunks: any[]): ReadableStream {
     return new ReadableStream({
       start(controller) {
@@ -1839,51 +1068,23 @@ describe('ResponsesTransformer typed client_tool_calls carry (tool_search_call)'
 
   describe('transformStream (inbound: Responses SSE -> unified chunks)', () => {
     test('a streamed tool_search_call item carries as a chunk-level client_tool_calls entry', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_1', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        { type: 'response.output_item.done', output_index: 0, item: toolSearchItem() },
-        { type: 'response.completed', response: {} },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_STREAM_EVENTS);
 
       const toolChunks = chunks.filter((chunk) => chunk.client_tool_calls);
       expect(toolChunks).toHaveLength(1);
-      expect(toolChunks[0].client_tool_calls).toEqual([toolSearchItem()]);
+      expect(toolChunks[0].client_tool_calls).toEqual([createToolSearchItem()]);
       // Chunk-level, not inside delta — same reason as image_generation_calls.
       expect(toolChunks[0].delta.client_tool_calls).toBeUndefined();
     });
 
     test('the completed-fallback also carries the item, without double-carrying deduped items', async () => {
-      const item = toolSearchItem();
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_2', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        { type: 'response.output_item.done', output_index: 0, item },
-        { type: 'response.completed', response: { id: 'resp_tsc_2', output: [item] } },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_DEDUPLICATION_EVENTS);
 
       expect(chunks.filter((chunk) => chunk.client_tool_calls)).toHaveLength(1);
     });
 
     test('a completed-only item (never streamed via output_item.done) still gets carried', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_3', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        {
-          type: 'response.completed',
-          response: {
-            id: 'resp_tsc_3',
-            status: 'completed',
-            output: [toolSearchItem({ id: 'tsc_9' })],
-          },
-        },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_COMPLETED_ONLY_EVENTS);
 
       const toolChunks = chunks.filter((chunk) => chunk.client_tool_calls);
       expect(toolChunks).toHaveLength(1);
@@ -1891,47 +1092,19 @@ describe('ResponsesTransformer typed client_tool_calls carry (tool_search_call)'
     });
 
     test('finishes with "stop", NOT "tool_calls", when the only output is a client_tool_calls item', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_4', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        { type: 'response.output_item.done', output_index: 0, item: toolSearchItem() },
-        { type: 'response.completed', response: {} },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_STOP_EVENTS);
 
       expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('stop');
     });
 
     test('finishes with "stop" when a client_tool_calls item appears only in the completed response', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_5', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        {
-          type: 'response.completed',
-          response: { output: [toolSearchItem()] },
-        },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_COMPLETED_STOP_EVENTS);
 
       expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('stop');
     });
 
     test('a real function_call alongside a client_tool_calls item still finishes with "tool_calls"', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_6', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        {
-          type: 'response.output_item.added',
-          output_index: 0,
-          item: { type: 'function_call', call_id: 'call_fn', name: 'get_date', arguments: '' },
-        },
-        { type: 'response.output_item.done', output_index: 1, item: toolSearchItem() },
-        { type: 'response.completed', response: {} },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_WITH_FUNCTION_EVENTS);
 
       expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('tool_calls');
     });
@@ -1939,25 +1112,8 @@ describe('ResponsesTransformer typed client_tool_calls carry (tool_search_call)'
 
   describe('formatStream (outbound: unified chunks -> native Responses output)', () => {
     test('re-emits the typed item as a native tool_search_call output item', async () => {
-      const item = toolSearchItem();
-      const chunk = {
-        id: 'resp_native_tsc',
-        model: 'gpt-5.6-luna',
-        created: 1234567890,
-        delta: {},
-        client_tool_calls: [item],
-        finish_reason: null,
-      };
-      const finishChunk = {
-        id: 'resp_native_tsc',
-        model: 'gpt-5.6-luna',
-        created: 1234567890,
-        delta: {},
-        finish_reason: 'stop',
-      };
-
       const events = await collectFormatStreamEvents(
-        [chunk, finishChunk],
+        TOOL_SEARCH_NATIVE_CHUNKS,
         new ResponsesTransformer()
       );
       const completed = events.find((e) => e.type === 'response.completed');
@@ -1976,16 +1132,9 @@ describe('ResponsesTransformer typed client_tool_calls carry (tool_search_call)'
   describe('non-streaming round trip (transformResponse -> formatResponse)', () => {
     test('transformResponse extracts client_tool_calls and formatResponse re-emits it natively', async () => {
       const transformer = new ResponsesTransformer();
-      const unified = await transformer.transformResponse({
-        id: 'resp_tsc_ns',
-        object: 'response',
-        created_at: 1234567890,
-        status: 'completed',
-        model: 'gpt-5.6-luna',
-        output: [toolSearchItem()],
-      });
+      const unified = await transformer.transformResponse(TOOL_SEARCH_UNARY_RESPONSE);
 
-      expect(unified.client_tool_calls).toEqual([toolSearchItem()]);
+      expect(unified.client_tool_calls).toEqual([createToolSearchItem()]);
 
       const formatted = await transformer.formatResponse(unified);
       const native = formatted.output.find((o: any) => o.type === 'tool_search_call');
@@ -1995,14 +1144,7 @@ describe('ResponsesTransformer typed client_tool_calls carry (tool_search_call)'
 
   describe('cross-format (Responses -> Chat Completions): no false "tool_calls" finish', () => {
     test('a chat-format client never receives finish_reason "tool_calls" for a client_tool_calls-only turn', async () => {
-      const chunks = await transformEvents([
-        {
-          type: 'response.created',
-          response: { id: 'resp_tsc_chat', model: 'gpt-5.6-luna', created_at: 1234567890 },
-        },
-        { type: 'response.output_item.done', output_index: 0, item: toolSearchItem() },
-        { type: 'response.completed', response: {} },
-      ]);
+      const chunks = await transformEvents(TOOL_SEARCH_CHAT_EVENTS);
 
       const chatEvents = await collectFormatStreamEvents(chunks, new OpenAITransformer());
       const finishEvent = chatEvents.find((e) => e !== '[DONE]' && e.choices?.[0]?.finish_reason);

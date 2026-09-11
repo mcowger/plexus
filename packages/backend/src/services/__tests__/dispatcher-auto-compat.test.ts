@@ -29,6 +29,50 @@ import {
   stripLiteUnsupportedTools,
   MAX_LITE_TOOL_STRIP_RETRIES,
 } from '../dispatch/dispatcher-auto-compat';
+import {
+  ADVISOR_DROP_PAYLOAD,
+  ADVISOR_INVOCATION,
+  ADVISOR_NO_RESULT_PAYLOAD,
+  ADVISOR_PLACEHOLDER_PAYLOAD,
+  ADVISOR_RESULT,
+  ADVISOR_RESULT_ERROR_RESPONSE_BODY,
+  ADVISOR_RESULT_PLAN_ERROR_BODY,
+  ADVISOR_SEPARATE_MESSAGES_PAYLOAD,
+  ADVISOR_SINGLE_MESSAGE_PAYLOAD,
+  ADVISOR_UNRELATED_TOOL_PAYLOAD,
+  ANTHROPIC_MESSAGES_PAYLOAD,
+  ARRAY_CONTENT_NO_THINKING_PAYLOAD,
+  ARRAY_FIELD_PAYLOAD,
+  ARRAY_INDEX_TOOL_A,
+  ARRAY_INDEX_TOOL_B,
+  ARRAY_INDEX_TOOL_C,
+  ARRAY_INDEX_TOOLS_PAYLOAD,
+  BRACKET_MESSAGE_NAME_PAYLOAD,
+  LITE_MIXED_TOOLS_PAYLOAD,
+  LITE_UNSUPPORTED_TOOLS_ERROR_BODY,
+  MULTIPLE_THINKING_BLOCKS_PAYLOAD,
+  NESTED_ARRAY_PAYLOAD,
+  PLAIN_STRING_MESSAGES_PAYLOAD,
+  PROMPT_CACHE_KEY_PAYLOAD,
+  PROMPT_CACHE_METADATA_PAYLOAD,
+  REDACTED_THINKING_PAYLOAD,
+  RESPONSES_API_PAYLOAD,
+  SHARED_MESSAGES,
+  SHARED_MESSAGES_PAYLOAD,
+  STRUCTURAL_MESSAGE_NAME_PAYLOAD,
+  STRUCTURAL_TOOLS_PAYLOAD,
+  THINKING_COPY_ON_WRITE_PAYLOAD,
+  THINKING_COPY_ON_WRITE_UNTOUCHED_MESSAGE,
+  THINKING_ONLY_ALTERNATION_PAYLOAD,
+  THINKING_ONLY_END_PAYLOAD,
+  THINKING_ORPHAN_TOOL_RESULT_PAYLOAD,
+  THINKING_PAIRED_TOOL_RESULT_PAYLOAD,
+  THINKING_SIGNATURE_ERROR_RESPONSE_BODY,
+  THINKING_SIGNATURE_PLAN_ERROR_BODY,
+  THINKING_TEXT_PAYLOAD,
+  THINKING_TOOL_USE_PAYLOAD,
+  TOP_LEVEL_TOOLS_PAYLOAD,
+} from './dispatcher-auto-compat.fixtures';
 
 function route(overrides: Partial<RouteResult> = {}): RouteResult {
   return {
@@ -949,13 +993,7 @@ describe('deleteDottedPath', () => {
   // payload that every upstream rejects.
   describe('array container preservation', () => {
     test('deleting a field inside an array element keeps the array an array', () => {
-      const payload: Record<string, any> = {
-        model: 'gpt-5.5',
-        messages: [
-          { role: 'user', content: 'hi', some_field: 'x' },
-          { role: 'assistant', content: 'yo' },
-        ],
-      };
+      const payload: Record<string, any> = ARRAY_FIELD_PAYLOAD;
       const snapshot = structuredClone(payload);
 
       const result = deleteDottedPath(payload, 'messages.0.some_field');
@@ -974,10 +1012,10 @@ describe('deleteDottedPath', () => {
     });
 
     test('an array-index leaf removes the element splice-style (no hole, no null)', () => {
-      const t0 = { type: 'function', name: 'a' };
-      const t1 = { type: 'function', name: 'b' };
-      const t2 = { type: 'function', name: 'c' };
-      const payload: Record<string, any> = { model: 'gpt-5.5', tools: [t0, t1, t2] };
+      const t0 = ARRAY_INDEX_TOOL_A;
+      const t1 = ARRAY_INDEX_TOOL_B;
+      const t2 = ARRAY_INDEX_TOOL_C;
+      const payload: Record<string, any> = ARRAY_INDEX_TOOLS_PAYLOAD;
 
       const result = deleteDottedPath(payload, 'tools.2');
 
@@ -1005,10 +1043,7 @@ describe('deleteDottedPath', () => {
     });
 
     test('preserves arrays at intermediate depths of a longer path', () => {
-      const payload: Record<string, any> = {
-        messages: [{ role: 'user', meta: { keep: 1, drop: 2 } }],
-      };
-
+      const payload: Record<string, any> = NESTED_ARRAY_PAYLOAD;
       const result = deleteDottedPath(payload, 'messages.0.meta.drop');
 
       expect(result.deleted).toBe(true);
@@ -1018,10 +1053,10 @@ describe('deleteDottedPath', () => {
     });
 
     test('does not mutate an array shared by reference with another holder', () => {
-      const sharedMessages = [{ role: 'user', content: 'hi', bad_field: 1 }];
+      const sharedMessages = SHARED_MESSAGES;
       const request = { messages: sharedMessages };
       // Mirrors payload.messages = request.messages — same reference.
-      const payload: Record<string, any> = { model: 'claude-x', messages: request.messages };
+      const payload: Record<string, any> = SHARED_MESSAGES_PAYLOAD;
 
       const result = deleteDottedPath(payload, 'messages.0.bad_field');
 
@@ -1193,13 +1228,7 @@ describe('planUnsupportedParamStrip', () => {
 
     test('deeper paths under a structural element (messages.0.name) remain strippable', () => {
       const state = createUnsupportedParamStripState();
-      const payload: Record<string, any> = {
-        model: 'gpt-4o',
-        messages: [
-          { role: 'user', content: 'hi', name: 'bob!' },
-          { role: 'assistant', content: 'yo' },
-        ],
-      };
+      const payload: Record<string, any> = STRUCTURAL_MESSAGE_NAME_PAYLOAD;
 
       const paramToStrip = planUnsupportedParamStrip(
         '{"error":{"message":"Unsupported parameter: \'messages[0].name\'"}}',
@@ -1217,11 +1246,7 @@ describe('planUnsupportedParamStrip', () => {
 
     test('numeric leaves under NON-structural arrays (tools[2]) stay splice-deletable', () => {
       const state = createUnsupportedParamStripState();
-      const payload: Record<string, any> = {
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: 'hi' }],
-        tools: [{ name: 'a' }, { name: 'b' }, { name: 'c' }],
-      };
+      const payload: Record<string, any> = STRUCTURAL_TOOLS_PAYLOAD;
 
       const paramToStrip = planUnsupportedParamStrip(
         '{"detail":"Unsupported parameter: tools[2]"}',
@@ -1246,13 +1271,7 @@ describe('planUnsupportedParamStrip', () => {
 describe('bracket-notation unsupported params (match -> plan -> delete pipeline)', () => {
   test('a 400 naming messages[0].name deletes only that element field — the conversation array survives', () => {
     const state = createUnsupportedParamStripState();
-    const payload: Record<string, any> = {
-      model: 'gpt-4o',
-      messages: [
-        { role: 'user', content: 'hi', name: 'bob!' },
-        { role: 'assistant', content: 'yo' },
-      ],
-    };
+    const payload: Record<string, any> = BRACKET_MESSAGE_NAME_PAYLOAD;
 
     const paramToStrip = planUnsupportedParamStrip(
       '{"error":{"message":"Unsupported parameter: \'messages[0].name\'"}}',
@@ -1275,11 +1294,7 @@ describe('bracket-notation unsupported params (match -> plan -> delete pipeline)
     // a blanket "no whole fields" rule: stripping a whole `tools` (or
     // `safety_identifier`, etc.) leaves a well-formed request.
     const state = createUnsupportedParamStripState();
-    const payload: Record<string, any> = {
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: 'hi' }],
-      tools: [{ type: 'function', function: { name: 'f' } }],
-    };
+    const payload: Record<string, any> = TOP_LEVEL_TOOLS_PAYLOAD;
 
     const paramToStrip = planUnsupportedParamStrip(
       '{"detail":"Unsupported parameter: tools"}',
@@ -1307,11 +1322,7 @@ describe('bracket-notation unsupported params (match -> plan -> delete pipeline)
 describe('reactive strip-and-retry handles prompt_cache_key (not statically stripped)', () => {
   test('strips a plain top-level prompt_cache_key named in a 400', () => {
     const state = createUnsupportedParamStripState();
-    const payload: Record<string, any> = {
-      model: 'openai/gpt-5.5',
-      input: 'hello',
-      prompt_cache_key: 'cache-key-123',
-    };
+    const payload: Record<string, any> = PROMPT_CACHE_KEY_PAYLOAD;
 
     const paramToStrip = planUnsupportedParamStrip(
       '{"detail":"Unsupported parameter: prompt_cache_key"}',
@@ -1326,11 +1337,7 @@ describe('reactive strip-and-retry handles prompt_cache_key (not statically stri
 
   test('strips a dotted-path prompt_cache_key named in a 400', () => {
     const state = createUnsupportedParamStripState();
-    const payload: Record<string, any> = {
-      model: 'openai/gpt-5.5',
-      input: 'hello',
-      metadata: { prompt_cache_key: 'cache-key-123', session: 's1' },
-    };
+    const payload: Record<string, any> = PROMPT_CACHE_METADATA_PAYLOAD;
 
     const paramToStrip = planUnsupportedParamStrip(
       '{"error":{"message":"Unsupported parameter: \'metadata.prompt_cache_key\'"}}',
@@ -1362,14 +1369,7 @@ describe('reactive strip-and-retry handles prompt_cache_key (not statically stri
 
 describe('matchThinkingSignatureError', () => {
   test('matches the exact production error body', () => {
-    const body = JSON.stringify({
-      type: 'error',
-      error: {
-        type: 'invalid_request_error',
-        message: 'messages.3.content.0: Invalid `signature` in `thinking` block',
-      },
-      request_id: 'req_test123',
-    });
+    const body = THINKING_SIGNATURE_ERROR_RESPONSE_BODY;
     expect(matchThinkingSignatureError(body)).toBe(true);
   });
 
@@ -1422,18 +1422,7 @@ describe('isAnthropicMessagesPayload', () => {
 
 describe('stripThinkingSignatureBlocks', () => {
   test('removes a thinking block preceding text, preserving ordering', () => {
-    const payload: Record<string, any> = {
-      model: 'claude-x',
-      messages: [
-        {
-          role: 'assistant',
-          content: [
-            { type: 'thinking', thinking: 'stale reasoning', signature: 'sig-from-model-a' },
-            { type: 'text', text: 'the answer' },
-          ],
-        },
-      ],
-    };
+    const payload: Record<string, any> = THINKING_TEXT_PAYLOAD;
     const snapshot = structuredClone(payload);
 
     const result = stripThinkingSignatureBlocks(payload);
@@ -1447,19 +1436,7 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('removes a thinking block preceding a tool_use, preserving ordering', () => {
-    const payload: Record<string, any> = {
-      model: 'claude-x',
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'do the thing' }] },
-        {
-          role: 'assistant',
-          content: [
-            { type: 'thinking', thinking: 'stale reasoning', signature: 'sig-from-model-a' },
-            { type: 'tool_use', id: 'tool-1', name: 'search', input: { q: 'x' } },
-          ],
-        },
-      ],
-    };
+    const payload: Record<string, any> = THINKING_TOOL_USE_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1475,18 +1452,7 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('removes a redacted_thinking block, preserving sibling content', () => {
-    const payload: Record<string, any> = {
-      model: 'claude-x',
-      messages: [
-        {
-          role: 'assistant',
-          content: [
-            { type: 'redacted_thinking', data: 'opaque-encrypted-payload' },
-            { type: 'text', text: 'the answer' },
-          ],
-        },
-      ],
-    };
+    const payload: Record<string, any> = REDACTED_THINKING_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1497,18 +1463,7 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('removes both thinking and redacted_thinking blocks in the same message', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        {
-          role: 'assistant',
-          content: [
-            { type: 'thinking', thinking: 'a', signature: 'sig-a' },
-            { type: 'redacted_thinking', data: 'b' },
-            { type: 'text', text: 'the answer' },
-          ],
-        },
-      ],
-    };
+    const payload: Record<string, any> = MULTIPLE_THINKING_BLOCKS_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1517,12 +1472,7 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('leaves non-array content (plain string messages) untouched and returns the SAME payload reference', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'user', content: 'hello' },
-        { role: 'assistant', content: 'hi there' },
-      ],
-    };
+    const payload: Record<string, any> = PLAIN_STRING_MESSAGES_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1549,10 +1499,7 @@ describe('stripThinkingSignatureBlocks', () => {
     // chat-completions payloads (they have a `messages` array too). This is
     // the known false-positive shape the dispatch loop must NOT retry on:
     // strippedCount 0 + identical payload reference is the signal.
-    const payload: Record<string, any> = {
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
-    };
+    const payload: Record<string, any> = ARRAY_CONTENT_NO_THINKING_PAYLOAD;
     const snapshot = structuredClone(payload);
 
     const result = stripThinkingSignatureBlocks(payload);
@@ -1563,20 +1510,8 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('copy-on-write: never mutates the input payload, its messages array, or untouched message objects', () => {
-    const untouchedMessage = { role: 'user', content: [{ type: 'text', text: 'hi' }] };
-    const payload: Record<string, any> = {
-      model: 'claude-x',
-      messages: [
-        untouchedMessage,
-        {
-          role: 'assistant',
-          content: [
-            { type: 'thinking', thinking: 'stale', signature: 'sig-a' },
-            { type: 'text', text: 'answer' },
-          ],
-        },
-      ],
-    };
+    const untouchedMessage = THINKING_COPY_ON_WRITE_UNTOUCHED_MESSAGE;
+    const payload: Record<string, any> = THINKING_COPY_ON_WRITE_PAYLOAD;
     const originalMessages = payload.messages;
     const snapshot = structuredClone(payload);
 
@@ -1595,15 +1530,7 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('drops a thinking-only assistant message at the end of the conversation (no alternation break, nothing to orphan)', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'hi' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'stale', signature: 'sig-a' }],
-        },
-      ],
-    };
+    const payload: Record<string, any> = THINKING_ONLY_END_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1614,16 +1541,7 @@ describe('stripThinkingSignatureBlocks', () => {
   });
 
   test('replaces a thinking-only assistant message with a placeholder when dropping it would break user/assistant alternation', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'first' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'stale', signature: 'sig-a' }],
-        },
-        { role: 'user', content: [{ type: 'text', text: 'second' }] },
-      ],
-    };
+    const payload: Record<string, any> = THINKING_ONLY_ALTERNATION_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1641,20 +1559,7 @@ describe('stripThinkingSignatureBlocks', () => {
     // tool_result-orphan guard: `next` carries a tool_result but `prev` does
     // NOT carry the tool_use it would need to correspond to, so dropping the
     // thinking-only message would leave that tool_result dangling.
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'q' }] },
-        { role: 'assistant', content: [{ type: 'text', text: 'partial answer, no tool call' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'stale', signature: 'sig-a' }],
-        },
-        {
-          role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'result' }],
-        },
-      ],
-    };
+    const payload: Record<string, any> = THINKING_ORPHAN_TOOL_RESULT_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1681,22 +1586,7 @@ describe('stripThinkingSignatureBlocks', () => {
   test('drops a thinking-only message when the next tool_result correctly pairs with a preceding tool_use', () => {
     // Here dropping the empty message actually restores correct adjacency
     // between the tool_use and its tool_result, so it is safe to drop.
-    const payload: Record<string, any> = {
-      messages: [
-        {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'tool-1', name: 'search', input: {} }],
-        },
-        {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'stale', signature: 'sig-a' }],
-        },
-        {
-          role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'result' }],
-        },
-      ],
-    };
+    const payload: Record<string, any> = THINKING_PAIRED_TOOL_RESULT_PAYLOAD;
 
     const result = stripThinkingSignatureBlocks(payload);
 
@@ -1715,10 +1605,8 @@ describe('stripThinkingSignatureBlocks', () => {
 });
 
 describe('planThinkingSignatureStrip', () => {
-  const signatureBody = JSON.stringify({
-    error: { message: 'messages.3.content.0: Invalid `signature` in `thinking` block' },
-  });
-  const anthropicPayload = { model: 'claude-x', messages: [] };
+  const signatureBody = THINKING_SIGNATURE_PLAN_ERROR_BODY;
+  const anthropicPayload = ANTHROPIC_MESSAGES_PAYLOAD;
 
   test('MAX_THINKING_SIGNATURE_STRIP_RETRIES is exactly 1 (one strip-retry per target)', () => {
     expect(MAX_THINKING_SIGNATURE_STRIP_RETRIES).toBe(1);
@@ -1784,14 +1672,7 @@ describe('planThinkingSignatureStrip', () => {
 
 describe('matchAdvisorResultError', () => {
   test('matches the exact production error body', () => {
-    const body = JSON.stringify({
-      type: 'error',
-      error: {
-        type: 'invalid_request_error',
-        message: 'Advisor tool result content could not be processed.',
-      },
-      request_id: 'req_test123',
-    });
+    const body = ADVISOR_RESULT_ERROR_RESPONSE_BODY;
     expect(matchAdvisorResultError(body)).toBe(true);
   });
 
@@ -1821,28 +1702,11 @@ describe('matchAdvisorResultError', () => {
 describe('stripAdvisorResultBlocks', () => {
   // Mirrors the echoed on-wire shape: an assistant `server_tool_use` advisor
   // invocation followed by its account-bound (encrypted) `advisor_tool_result`.
-  const advisorInvocation = {
-    type: 'server_tool_use',
-    id: 'srvtoolu_abc',
-    name: 'advisor',
-    input: {},
-  };
-  const advisorResult = {
-    type: 'advisor_tool_result',
-    tool_use_id: 'srvtoolu_abc',
-    content: { type: 'advisor_redacted_result', encrypted_content: 'EqQhCio-sealed-by-account-a' },
-  };
+  const advisorInvocation = ADVISOR_INVOCATION;
+  const advisorResult = ADVISOR_RESULT;
 
   test('strips the advisor result and its paired invocation, preserving sibling text', () => {
-    const payload: Record<string, any> = {
-      model: 'claude-x',
-      messages: [
-        {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'let me consult' }, advisorInvocation, advisorResult],
-        },
-      ],
-    };
+    const payload: Record<string, any> = ADVISOR_SINGLE_MESSAGE_PAYLOAD;
     const snapshot = structuredClone(payload);
 
     const result = stripAdvisorResultBlocks(payload);
@@ -1856,12 +1720,7 @@ describe('stripAdvisorResultBlocks', () => {
   });
 
   test('pairs invocation and result by id even when they sit in separate messages', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'assistant', content: [{ type: 'text', text: 'thinking' }, advisorInvocation] },
-        { role: 'assistant', content: [advisorResult, { type: 'text', text: 'the answer' }] },
-      ],
-    };
+    const payload: Record<string, any> = ADVISOR_SEPARATE_MESSAGES_PAYLOAD;
 
     const result = stripAdvisorResultBlocks(payload);
 
@@ -1873,18 +1732,7 @@ describe('stripAdvisorResultBlocks', () => {
   });
 
   test('leaves an unrelated server_tool_use (no matching advisor result) untouched', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        {
-          role: 'assistant',
-          content: [
-            { type: 'server_tool_use', id: 'srvtoolu_web', name: 'web_search', input: {} },
-            advisorInvocation,
-            advisorResult,
-          ],
-        },
-      ],
-    };
+    const payload: Record<string, any> = ADVISOR_UNRELATED_TOOL_PAYLOAD;
 
     const result = stripAdvisorResultBlocks(payload);
 
@@ -1896,13 +1744,7 @@ describe('stripAdvisorResultBlocks', () => {
   });
 
   test('drops a message emptied by the strip when doing so keeps alternation valid', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'q1' }] },
-        { role: 'assistant', content: [advisorInvocation, advisorResult] },
-        { role: 'user', content: [{ type: 'text', text: 'q2' }] },
-      ],
-    };
+    const payload: Record<string, any> = ADVISOR_PLACEHOLDER_PAYLOAD;
 
     const result = stripAdvisorResultBlocks(payload);
 
@@ -1917,12 +1759,7 @@ describe('stripAdvisorResultBlocks', () => {
   });
 
   test('drops an emptied message entirely when alternation stays valid without it', () => {
-    const payload: Record<string, any> = {
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'q1' }] },
-        { role: 'assistant', content: [advisorInvocation, advisorResult] },
-      ],
-    };
+    const payload: Record<string, any> = ADVISOR_DROP_PAYLOAD;
 
     const result = stripAdvisorResultBlocks(payload);
 
@@ -1934,10 +1771,7 @@ describe('stripAdvisorResultBlocks', () => {
   });
 
   test('returns the payload unchanged (0 strips) when there is no advisor result', () => {
-    const payload: Record<string, any> = {
-      model: 'claude-x',
-      messages: [{ role: 'assistant', content: [{ type: 'text', text: 'hi' }] }],
-    };
+    const payload: Record<string, any> = ADVISOR_NO_RESULT_PAYLOAD;
 
     const result = stripAdvisorResultBlocks(payload);
 
@@ -1955,10 +1789,8 @@ describe('stripAdvisorResultBlocks', () => {
 });
 
 describe('planAdvisorResultStrip', () => {
-  const advisorBody = JSON.stringify({
-    error: { message: 'Advisor tool result content could not be processed.' },
-  });
-  const anthropicPayload = { model: 'claude-x', messages: [] };
+  const advisorBody = ADVISOR_RESULT_PLAN_ERROR_BODY;
+  const anthropicPayload = ANTHROPIC_MESSAGES_PAYLOAD;
 
   test('MAX_ADVISOR_RESULT_STRIP_RETRIES is exactly 1 (one strip-retry per target)', () => {
     expect(MAX_ADVISOR_RESULT_STRIP_RETRIES).toBe(1);
@@ -1980,7 +1812,7 @@ describe('planAdvisorResultStrip', () => {
 
   test('does not plan a retry when the outbound payload is not Anthropic-messages-shaped', () => {
     const state = createAdvisorResultStripState();
-    const responsesPayload = { model: 'gpt-5.5', input: 'hi' };
+    const responsesPayload = RESPONSES_API_PAYLOAD;
     expect(planAdvisorResultStrip(advisorBody, responsesPayload, state)).toBe(false);
     expect(state.attempts).toBe(0);
   });
@@ -2014,16 +1846,7 @@ describe('planAdvisorResultStrip', () => {
 
 describe('matchLiteUnsupportedToolsError', () => {
   test('matches the responses:lite tool-type-restriction 400', () => {
-    expect(
-      matchLiteUnsupportedToolsError(
-        JSON.stringify({
-          error: {
-            message:
-              'X-OpenAI-Internal-Codex-Responses-Lite only supports function tools, custom tools, and client-executed tool search.',
-          },
-        })
-      )
-    ).toBe(true);
+    expect(matchLiteUnsupportedToolsError(LITE_UNSUPPORTED_TOOLS_ERROR_BODY)).toBe(true);
   });
 
   test('is case-insensitive', () => {
@@ -2045,16 +1868,7 @@ describe('matchLiteUnsupportedToolsError', () => {
 
 describe('stripLiteUnsupportedTools', () => {
   test('removes tools whose type is not function/custom/tool_search', () => {
-    const payload = {
-      model: 'gpt-5.6-luna',
-      tools: [
-        { type: 'function', name: 'exec_command' },
-        { type: 'web_search' },
-        { type: 'custom', name: 'apply_patch' },
-        { type: 'tool_search' },
-        { type: 'image_generation' },
-      ],
-    };
+    const payload = LITE_MIXED_TOOLS_PAYLOAD;
 
     const result = stripLiteUnsupportedTools(payload);
     expect(result.strippedCount).toBe(2);
@@ -2093,12 +1907,7 @@ describe('stripLiteUnsupportedTools', () => {
 });
 
 describe('planLiteToolStrip', () => {
-  const liteToolsErrorBody = JSON.stringify({
-    error: {
-      message:
-        'X-OpenAI-Internal-Codex-Responses-Lite only supports function tools, custom tools, and client-executed tool search.',
-    },
-  });
+  const liteToolsErrorBody = LITE_UNSUPPORTED_TOOLS_ERROR_BODY;
 
   test('MAX_LITE_TOOL_STRIP_RETRIES is exactly 1 (one strip-retry per target)', () => {
     expect(MAX_LITE_TOOL_STRIP_RETRIES).toBe(1);
