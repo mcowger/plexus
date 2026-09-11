@@ -61,6 +61,17 @@ When running Drizzle Kit commands, specify the appropriate config file with `--c
 
 Plexus uses **PR Agent Review** (`.github/workflows/pr-agent-review.yml`) for automated code reviews. It is triggered when non-draft pull requests are opened, reopened, marked ready for review, or updated with comments, and is configured via `.pr_agent.toml`.
 
+### Manual Cora review
+
+Cora reviews are optional and are not part of the commit hooks. If Cora is available and a review is useful, run the command matching the changes from the repository root:
+
+- Staged changes: `bun run code:review:staged`
+- Unstaged changes: `bun run code:review:unstaged`
+- Branch against `origin/main`: `bun run code:review:branch`
+- Latest commit: `bun run code:review:commit`
+
+Load the `cora-cli` skill before invoking Cora. If Cora is unavailable, skip the review without installing or configuring it. Do not invoke Cora automatically during commits.
+
 ## Code Style
 
 All code must be formatted with Biome before committing:
@@ -98,6 +109,13 @@ bun run dev
 
 This starts the backend (with file watching) and the frontend builder in parallel.
 
+If you use mise but do not have it activated in your shell, run the same command
+through mise:
+
+```bash
+mise exec -- bun run dev
+```
+
 The port is derived automatically from the worktree directory name, so two
 worktrees can run simultaneously without collision. The port and database are
 printed at startup:
@@ -114,6 +132,60 @@ Override any of these with environment variables:
 ```bash
 PORT=4000 ADMIN_KEY=mysecret bun run dev
 ```
+
+#### Optional FRP tunnel
+
+When `frpc` is available on `PATH` and both `FRPC_SERVER_ADDR` and
+`FRPC_AUTH_TOKEN` are set, the dev server starts an HTTP FRP tunnel after the
+local health check passes. The generated subdomain is based on the repository
+and worktree names, so each worktree gets its own stable route. For direct dev
+processes, the tunnel stops with the dev server; Paseo tears it down when it
+stops the managed dev service.
+
+FRP is optional. If `frpc` is not installed, or the required variables are not
+set, the dev server runs normally without a tunnel. The project `mise.toml`
+declares `frpc` for mise users; run `mise install` once if it is not installed.
+Users who do not use mise can install `frpc` separately and put it on `PATH`.
+
+```bash
+export FRPC_SERVER_ADDR=your-frps-host
+export FRPC_AUTH_TOKEN=your-frps-token
+export FRPC_SUBDOMAIN_HOST=dev.home.cowger.us  # optional, display only
+
+mise exec -- bun run dev
+```
+
+`FRPC_SERVER_PORT` is optional and defaults to `7000`. `FRPC_SUBDOMAIN_HOST`
+is only used to print the full HTTPS URL; frps remains responsible for the
+actual subdomain suffix through its `subDomainHost` setting.
+
+To get the current worktree's FRP URL without scraping startup logs, run:
+
+```bash
+bun run dev:get:frp-url
+```
+
+Use `bun run dev:get:frp-url -- --hostname`, `--subdomain`, or `--json` for a hostname, subdomain, or machine-readable result. The command derives the same deterministic endpoint as the dev lifecycle; it does not check whether the tunnel is reachable.
+
+#### Background dev stack
+
+For a background dev stack, use the agent lifecycle commands. They work with
+Paseo when available and fall back to direct process execution otherwise:
+
+```bash
+bun run dev:agent --detach
+bun run dev:stop
+```
+
+`bun run dev:agent` starts or attaches to a workspace script target, defaulting to `dev:full`, with automatic log streaming. Use `--detach` to return once the stack is healthy and leave it running in the background. Select a target with `bun run dev:agent [target]`, for example `bun run dev:agent dev:pglite --detach`; stop it with `bun run dev:stop [target]`.
+
+Prefix these commands with `mise exec --` when mise is not activated. Paseo
+inherits the environment of the process that launches it. If you want a
+Paseo-managed service to use the mise-managed `frpc` binary, make sure Paseo
+itself runs with the project mise environment.
+
+`dev:stop` stops the dev process and its FRP child. `clear-dev` only resets the
+local data and restarts the backend; it does not replace `dev:stop`.
 
 #### PGlite mode (no external database required)
 

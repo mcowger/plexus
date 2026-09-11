@@ -90,13 +90,13 @@ describe.concurrent('parallel tests', () => {
 })
 ```
 
-### Sequential in Concurrent
+### Opting out of inherited concurrency
 
 ```ts
 describe.concurrent('parallel', () => {
   test('concurrent 1', async () => {})
   
-  describe.sequential('must be sequential', () => {
+  describe('must be sequential', { concurrent: false }, () => {
     test('step 1', async () => {})
     test('step 2', async () => {})
   })

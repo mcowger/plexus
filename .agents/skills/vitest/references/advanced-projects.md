@@ -1,5 +1,5 @@
 ---
-name: projects-workspaces
+name: projects-configuration
 description: Multi-project configuration for monorepos and different test types
 ---
 
@@ -99,6 +99,9 @@ defineConfig({
 ## Browser + Node Projects
 
 ```ts
+import { defineConfig } from 'vitest/config'
+import { playwright } from '@vitest/browser-playwright'
+
 defineConfig({
   test: {
     projects: [
@@ -115,8 +118,8 @@ defineConfig({
           include: ['tests/browser/**/*.test.ts'],
           browser: {
             enabled: true,
-            name: 'chromium',
-            provider: 'playwright',
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
           },
         },
       },
@@ -250,7 +253,7 @@ test('uses injected url', ({ apiUrl }) => {
 
 ## Project Isolation
 
-Each project runs in its own thread pool by default:
+Set the pool and isolation for a project when needed:
 
 ```ts
 defineConfig({
@@ -292,7 +295,7 @@ defineConfig({
 - Use glob patterns for monorepo packages
 - Run specific projects with `--project` flag
 - Use `provide` to inject config values into tests
-- Projects inherit from root config unless overridden
+- Inline projects inherit root options by default in Vitest 5; projects loaded from config files or directories do not
 
 <!-- 
 Source references:

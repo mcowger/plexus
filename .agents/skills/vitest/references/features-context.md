@@ -167,7 +167,7 @@ const test = base.extend({
 })
 
 describe('production tests', () => {
-  test.scoped({ environment: 'production' })
+  test.override({ environment: 'production' })
   
   test('uses production', ({ environment }) => {
     expect(environment).toBe('production')

@@ -112,11 +112,11 @@ test.concurrent('test 2', async ({ expect }) => {
 })
 ```
 
-### Sequential Tests
+### Opting out of concurrency
 
 ```ts
-// Force sequential in concurrent context
-test.sequential('must run alone', async () => {})
+// Opt out of inherited concurrency
+test('must run alone', { concurrent: false }, async () => {})
 ```
 
 ## Parameterized Tests

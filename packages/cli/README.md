@@ -25,7 +25,7 @@ Set the target URL and management key. The local Plexus dev stack defaults to
 `password`; use a real admin key for non-local instances.
 
 ```bash
-export PLEXUS_URL=http://localhost:4000
+export PLEXUS_URL="http://localhost:<PORT>"
 export PLEXUS_ADMIN_KEY=password
 
 plexuscli api call getV0ManagementAuthVerify

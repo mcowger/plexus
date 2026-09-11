@@ -18,87 +18,52 @@ This file is a **guardrail**, not general documentation.
 - **NEVER** commit, push, or create a PR unless the user explicitly asks.
 - **NEVER** treat earlier permission as ongoing permission. Each individual commit/push needs fresh approval in local/interactive sessions.
 - **NEVER** use `--no-verify` or `LEFTHOOK=0` without user permission.
-- **NEVER** edit or manually create migration files.
+- **NEVER** manually create or edit migration artifacts.
 - **NEVER** produce implementation or summary documents unless specifically requested.
 - **DEBUGGING** Plexus instances: read and use the `plexus-cli` skill. The worktree `.env` contains the relevant staging configuration. When the user specifies `staging`, use `PLEXUS_STAGING_URL` for the staging URL and `PLEXUS_ADMIN_KEY` for the admin key.
 - **AVOID** searching library type definitions for documentation. Use context/search skills first when available.
 - **ASK** when requirements are ambiguous.
 - **USE** agents / subtasks aggressively where tools allow for improved cost and performance.
+
 ## Task triggers
 
 ### If the task changes database schema
 
-Before editing schema files:
-
-1. Read the **`db-schema-migrations`** skill.
-2. Update the Drizzle schema.
-3. Generate migrations with:
+Before editing schema files, read the **`db-schema-migrations`** [skill](.agents/skills/db-schema-migrations/SKILL.md).
+Local validation with `bun run generate-migrations` is optional. Leave generated artifacts in place and uncommitted; follow the skill for the full workflow.
 
 ### If the task writes or updates tests
 
-Before editing tests:
+Before editing tests, read [docs/TESTING.md](docs/TESTING.md) for Plexus test placement, mocks, spies, and singleton resets. Load the **`vitest`** skill for framework reference; project rules take precedence over generic examples.
 
-1. Read the **`vitest`** skill.
-2. Follow these project rules:
-   - Unit tests go in `__tests__/` alongside the source file.
-   - Integration tests go in `test/integration/`.
-   - Run tests with `bun run test`.
-   - Do **not** use `bun test`.
-   - Use `registerSpy` from `test/test-utils.ts` instead of raw `vi.spyOn`.
-   - `utils/logger` and `@earendil-works/pi-ai` are globally mocked; do not re-mock them in test files.
-   - Reset singletons via `resetForTesting()` methods in `beforeEach`.
+### If the task changes frontend code
 
+Before editing frontend code, read [packages/frontend/AGENTS.md](packages/frontend/AGENTS.md) for CSS, assets, and component rules.
 
-### If the task touches frontend CSS/assets/Tailwind
-
-Rules:
-- **NEVER** import CSS files with Tailwind directives into `.ts` or `.tsx` files.
-- Build CSS with `@tailwindcss/cli` from `packages/frontend`.
-- Input: `./src/globals.css`
-- Output: `./dist/main.css`
-- Keep this directive in `globals.css`:
-
-    ```css
-    @source "../src/**/*.{tsx,ts,jsx,js}";
-    ```
-
-- Put assets in `packages/frontend/src/assets/`.
-- Import assets with ES6 imports only.
-- Do not use dynamic asset paths.
-
-After editing anything a user sees in the browser (React `.tsx`/`.jsx`, routes, forms,
-Tailwind/CSS, layout, or any file under `packages/frontend/src`), verify it yourself
-instead of handing it back unchecked:
-
-1. Read the **`frontend-testing`** skill.
-2. Boot the worktree-safe dev stack, auto-log into the UI, and drive it with a real
-   browser to confirm your change renders and behaves correctly.
-
+After editing anything a user sees in the browser (React, routes, forms, CSS, layout, or any file under `packages/frontend/src`), use the **`frontend-testing`** [skill](.claude/skills/frontend-testing/SKILL.md). Boot the worktree-safe dev stack, auto-log in, and verify rendering and behavior with a real browser before handing the work back.
 
 ## Canonical project commands
 
-Use these commands exactly:
+Run these commands from the repository root:
 
 - Dev server: `bun run dev`
-- Dev stack for agents (background, worktree-safe): `bun run dev:agent` (or `bun run dev:agent [target]`, e.g. `dev:pglite`, `dev:full`)
-- Stop the agent dev stack: `bun run dev:stop` (or `bun run dev:stop [target]`)
-- Tests: `bun run test`
+- Dev stack for agents (background, worktree-safe): `bun run dev:agent --detach`
+- Stop the agent dev stack: `bun run dev:stop`
+- Tests: `bun run test` (never `bun test`)
 - Type check: `bun run typecheck`
+- Lint check: `bun run lint:check`
 - Format: `bun run format`
 - Format check: `bun run format:check`
-- Cora review of staged changes: `bun run code:review:staged`
-- Cora review of unstaged changes: `bun run code:review:unstaged`
-- Cora review of the branch against `origin/main`: `bun run code:review:branch`
-- Cora review of the latest commit: `bun run code:review:commit`
 
-Notes:
-- `bun run dev` derives the backend port from the worktree name and runs the frontend watcher.
-- `bun run dev:agent` boots or attaches to a workspace script target (defaults to `dev:full`), managed by Paseo when available with automatic log streaming, and falling back seamlessly to direct background process execution for non-Paseo environments. Use `--detach` to return immediately once healthy.
-- `bun test` is intentionally blocked. Use `bun run test`.
-- Cora reviews are manual and are not part of the commit hooks. Use the matching
-  `code:review:*` command when a review is useful if Cora is available. If Cora is
-  unavailable, skip the review without installing or configuring it; do not invoke
-  Cora automatically during commits.
+For lifecycle targets, ports, and FRP tunnels, read [Development](CONTRIBUTING.md#development).
+For optional Cora commands, read [Manual Cora review](CONTRIBUTING.md#manual-cora-review); never invoke Cora automatically during commits or install it just for a review.
+
+## Before handing work back
+
+- After code changes, run relevant tests, typecheck, lint check, and format check using the commands above.
+- For browser-visible changes, also complete the frontend verification workflow.
+- For documentation-only changes, check links, command references, and formatting; don't boot the application or run unrelated tests.
+- Report the checks run and their results. State any failures, skipped checks, or blockers explicitly; blocked verification is not a passing check.
 
 ## Project overview
 

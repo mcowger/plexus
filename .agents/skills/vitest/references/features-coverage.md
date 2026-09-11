@@ -28,7 +28,7 @@ defineConfig({
       // Reporters
       reporter: ['text', 'json', 'html'],
       
-      // Files to include
+      // Include covered and uncovered source files matching this pattern
       include: ['src/**/*.{ts,tsx}'],
       
       // Files to exclude
@@ -38,9 +38,6 @@ defineConfig({
         '**/*.d.ts',
         '**/*.test.ts',
       ],
-      
-      // Report uncovered files
-      all: true,
       
       // Thresholds
       thresholds: {
@@ -197,7 +194,7 @@ vitest --merge-reports --coverage --reporter=json
 
 - V8 is faster, Istanbul is more compatible
 - Use `--coverage` flag or `coverage.enabled: true`
-- Include `all: true` to see uncovered files
+- Set `coverage.include` to report covered and uncovered matching files; without it, only loaded files are reported
 - Set thresholds to enforce minimum coverage
 - Use `@preserve` comment to keep ignore hints
 

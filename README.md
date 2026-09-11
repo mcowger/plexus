@@ -108,9 +108,18 @@ ENCRYPTION_KEY="<current-key>" NEW_ENCRYPTION_KEY="<new-key>" ./plexus rekey
 ## Development
 
 ```bash
-bun run setup:hooks
+bun install
+bun run dev
 bun run test
 ```
+
+The dev port is derived from the worktree directory name. Use
+`mise exec -- bun run dev` when mise is not activated in your shell. For a
+background stack, use `bun run dev:agent --detach` and stop it with
+`bun run dev:stop` (prefix both with `mise exec --` when needed). FRP exposure
+is optional: when `frpc`, `FRPC_SERVER_ADDR`, and `FRPC_AUTH_TOKEN` are
+available, the dev server creates a worktree-specific tunnel and tears it down
+with the server.
 
 `bun test` is intentionally blocked; use `bun run test`. See [Testing](docs/TESTING.md).
 
