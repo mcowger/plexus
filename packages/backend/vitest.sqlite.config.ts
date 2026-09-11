@@ -1,6 +1,6 @@
 import { defineProject } from 'vitest/config';
-import baseConfig from './vitest.config';
-import { DB_TEST_FILES } from './vitest.db-tests';
+import baseConfig from './vitest.config.ts';
+import { DB_TEST_FILES } from './vitest.db-tests.ts';
 
 const baseTestConfig = { ...baseConfig.test };
 delete (baseTestConfig as { projects?: unknown }).projects;
