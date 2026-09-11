@@ -395,3 +395,156 @@ describe('handleResponse cancellation records usage from live captures (no pre-s
     expect(record.costTotal).toBeCloseTo(0.068, 10);
   });
 });
+
+// ---------------------------------------------------------------------------
+// End-to-end: client closes right after the terminal [DONE] frame
+// ---------------------------------------------------------------------------
+//
+// Fastify/Bun destroys the reply pipeline the moment the client closes the
+// socket — BEFORE the 250ms bunHandle.closed poll can run onDisconnect().
+// OpenAI-compatible clients (OMP) close immediately after `data: [DONE]`, so
+// the teardown path used to save the record as 'cancelled' with no tokens and
+// flush the debug trace before the taps were finalized. The terminal frame
+// must finalize usage/captures while the stream is still flowing, exactly
+// like Codex's `response.completed`.
+describe('handleResponse chat terminal finalization (client closes after [DONE])', () => {
+  beforeEach(() => {
+    DebugManager.getInstance().resetForTesting();
+  });
+
+  const makeRequest = () => ({ headers: {}, raw: {} });
+
+  const makeReply = (sendCalls: any[]) => ({
+    header: vi.fn(function (this: any) {
+      return this;
+    }),
+    send: vi.fn((pipeline: any) => {
+      sendCalls.push(pipeline);
+      return pipeline;
+    }),
+    code: vi.fn(function (this: any) {
+      return this;
+    }),
+  });
+
+  const makeStorage = (savedRecords: UsageRecord[]) => ({
+    saveRequest: vi.fn(async (record: UsageRecord) => {
+      savedRecords.push(record);
+    }),
+    updatePerformanceMetrics: vi.fn(async () => {}),
+    saveError: vi.fn(),
+  });
+
+  const makeUnifiedResponse = (providerStream: ReadableStream<Uint8Array>) =>
+    ({
+      id: 'resp-terminal',
+      model: 'gpt-4o',
+      content: null,
+      stream: providerStream,
+      // OMP sends OpenAI-format chat requests to an OpenAI-format provider, so
+      // the raw provider SSE is forwarded to the client verbatim.
+      bypassTransformation: true,
+      plexus: {
+        provider: 'test-provider',
+        model: 'gpt-4o',
+        apiType: 'chat',
+        pricing: { source: 'simple', input: 1000, output: 2000 },
+      },
+    }) as UnifiedChatResponse;
+
+  const usageChunk = `data: ${JSON.stringify({
+    id: 'chatcmpl_terminal',
+    object: 'chat.completion.chunk',
+    model: 'gpt-4o',
+    choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 50, completion_tokens: 9, total_tokens: 59 },
+  })}\n\n`;
+
+  it('records success WITH usage when the transport is destroyed after [DONE]', async () => {
+    const encoder = new TextEncoder();
+    const providerStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'data: {"id":"chatcmpl_terminal","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}\n\n'
+          )
+        );
+        controller.enqueue(encoder.encode(usageChunk));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        // Deliberately NOT closed — the client closes its side first.
+      },
+    });
+
+    const savedRecords: UsageRecord[] = [];
+    const sendCalls: any[] = [];
+    await handleResponse(
+      makeRequest() as any,
+      makeReply(sendCalls) as any,
+      makeUnifiedResponse(providerStream),
+      new OpenAITransformer(),
+      { requestId: 'req-terminal-success' } as Partial<UsageRecord>,
+      makeStorage(savedRecords) as any,
+      Date.now(),
+      'chat'
+    );
+
+    const pipeline = sendCalls.at(-1);
+    pipeline.on('data', () => {});
+    pipeline.on('error', () => {});
+
+    // Let the terminal frame flow through the full pipeline, then simulate
+    // Fastify/Bun tearing the reply stream down when the socket closes.
+    await wait(80);
+    pipeline.destroy();
+    await wait(50);
+
+    expect(savedRecords).toHaveLength(1);
+    const record = savedRecords[0]!;
+    expect(record.responseStatus).toBe('success');
+    expect(record.tokensInput).toBe(50);
+    expect(record.tokensOutput).toBe(9);
+  });
+
+  it('still captures usage when the transport is destroyed mid-stream (no terminal frame)', async () => {
+    const encoder = new TextEncoder();
+    const providerStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            'data: {"id":"chatcmpl_midstream","object":"chat.completion.chunk","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"}}]}\n\n'
+          )
+        );
+        controller.enqueue(encoder.encode(usageChunk));
+        // No [DONE] and the stream stays open: this is a real cancellation.
+      },
+    });
+
+    const savedRecords: UsageRecord[] = [];
+    const sendCalls: any[] = [];
+    await handleResponse(
+      makeRequest() as any,
+      makeReply(sendCalls) as any,
+      makeUnifiedResponse(providerStream),
+      new OpenAITransformer(),
+      { requestId: 'req-terminal-midstream' } as Partial<UsageRecord>,
+      makeStorage(savedRecords) as any,
+      Date.now(),
+      'chat'
+    );
+
+    const pipeline = sendCalls.at(-1);
+    pipeline.on('data', () => {});
+    pipeline.on('error', () => {});
+
+    await wait(80);
+    // No onDisconnect() — the transport teardown runs _destroy directly.
+    pipeline.destroy();
+    await wait(50);
+
+    expect(savedRecords).toHaveLength(1);
+    const record = savedRecords[0]!;
+    expect(record.responseStatus).toBe('cancelled');
+    expect(record.tokensInput).toBe(50);
+    expect(record.tokensOutput).toBe(9);
+  });
+});
