@@ -1,38 +1,28 @@
 import { useEffect, useState, useRef } from 'react';
-import { api, McpServer, McpLogRecord, McpOAuthClientRecord, McpServerKey } from '../lib/api';
+import {
+  api,
+  McpServer,
+  McpLogRecord,
+  McpOAuthClientRecord,
+  McpServerKey,
+  RemoteMcpServer,
+  LocalMcpServer,
+} from '../lib/api';
 import { Button } from '../components/ui/Button';
-import { Modal } from '../components/ui/Modal';
-import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { CopyButton } from '../components/ui/CopyButton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
+import { McpServerTable } from '../components/mcp/McpServerTable';
+import { McpOAuthClientsCard } from '../components/mcp/McpOAuthClientsCard';
+import { McpUsageLogsCard } from '../components/mcp/McpUsageLogsCard';
+import { McpServerEditorModal } from '../components/mcp/McpServerEditorModal';
+import { McpKeyManagementModal } from '../components/mcp/McpKeyManagementModal';
+import { McpDeleteLogsModal } from '../components/mcp/McpDeleteLogsModal';
+import { McpDeleteLogModal } from '../components/mcp/McpDeleteLogModal';
 import { useToast } from '../contexts/ToastContext';
-import {
-  Plus,
-  Trash2,
-  Edit2,
-  PlusCircle,
-  MinusCircle,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  Filter,
-  AlertTriangle,
-  CheckCircle,
-  Zap,
-  ZapOff,
-  Download,
-  Package,
-  Copy,
-  RefreshCw,
-  KeyRound,
-  ShieldOff,
-  ShieldCheck,
-} from 'lucide-react';
-import { Switch } from '../components/ui/Switch';
+import { Plus, Download, Package } from 'lucide-react';
 import { clsx } from 'clsx';
-import { formatMs, formatResetsIn } from '../lib/format';
 import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
 import plexusCliSkill from '../../../../.agents/skills/plexus-cli/SKILL.md' with { type: 'text' };
 import plexusRestApiSkill from '../../../../.agents/skills/plexus-rest-api/SKILL.md' with {
@@ -43,14 +33,14 @@ const LOCAL_MCP_DEFAULT_PORT = 7345;
 const CLI_BUNX_COMMAND = 'bunx @mcowger/plexus-cli';
 const CLI_GLOBAL_INSTALL_COMMAND = 'bun install -g @mcowger/plexus-cli';
 
-const EMPTY_SERVER: McpServer = {
+const EMPTY_SERVER: RemoteMcpServer = {
   mode: 'remote_http',
   upstream_url: '',
   enabled: true,
   headers: {},
 };
 
-const EMPTY_LOCAL_SERVER: McpServer = {
+const EMPTY_LOCAL_SERVER: LocalMcpServer = {
   mode: 'local_http',
   enabled: true,
   launcher: 'bunx',
@@ -601,15 +591,6 @@ export const McpPage: React.FC = () => {
   };
 
   const serverNames = Object.keys(servers);
-  const logsTotalPages = Math.ceil(logsTotal / logsLimit);
-  const logsCurrentPage = Math.floor(logsOffset / logsLimit) + 1;
-
-  const statusColor = (status: number | null): string => {
-    if (status === null) return 'text-text-secondary';
-    if (status >= 200 && status < 300) return 'text-success';
-    if (status >= 400 && status < 500) return 'text-warning';
-    return 'text-danger';
-  };
 
   if (isLoading) {
     return (
@@ -768,1289 +749,109 @@ export const McpPage: React.FC = () => {
       />
       <PageContainer>
         <div className="flex flex-col gap-5">
-          {/* Servers Config Card */}
-          <Card title="MCP Servers">
-            {serverNames.length === 0 ? (
-              <div className="p-4 text-text-secondary text-center">
-                No MCP servers configured. Click "Add MCP Server" to create one.
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3 md:hidden">
-                  {serverNames.map((name) => {
-                    const server = servers[name];
-                    const headerCount = server.headers ? Object.keys(server.headers).length : 0;
+          <McpServerTable
+            servers={servers}
+            serverNames={serverNames}
+            mcpEnabled={mcpEnabled}
+            onEdit={handleEdit}
+            onManageKeys={handleManageKeys}
+            onToggleEnabled={handleToggleEnabled}
+            onToggleMcpEnabled={handleToggleMcpEnabled}
+            onDelete={handleDelete}
+            mcpPathForServer={mcpPathForServer}
+            onCopyMcpPath={handleCopyMcpPath}
+          />
 
-                    return (
-                      <article
-                        key={name}
-                        className="rounded-md border border-border-glass bg-bg-subtle p-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(name)}
-                            className="min-w-0 flex-1 text-left"
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <Edit2 size={12} className="shrink-0 opacity-60" />
-                              <span className="truncate font-heading text-sm font-semibold text-text">
-                                {name}
-                              </span>
-                            </div>
-                            <div className="mt-1 break-all text-xs text-text-muted">
-                              {server.mode === 'local_http'
-                                ? `${server.launcher} ${server.package} → 127.0.0.1:${server.port}${server.path || '/mcp'}`
-                                : server.upstream_url}
-                            </div>
-                          </button>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {server.mode !== 'local_http' && (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleManageKeys(name)}
-                              >
-                                Manage Keys
-                              </Button>
-                            )}
-                            <Switch
-                              checked={server.enabled !== false}
-                              onChange={(val) => handleToggleEnabled(name, val)}
-                              size="sm"
-                            />
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleDelete(name)}
-                              className="text-danger"
-                              aria-label={`Delete ${name}`}
-                            >
-                              <Trash2 size={14} />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-1.5 text-xs">
-                          <span className="text-text-muted">Headers: </span>
-                          <span className="font-medium text-text-secondary">
-                            {headerCount > 0 ? `${headerCount} configured` : '-'}
-                          </span>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
+          <McpOAuthClientsCard
+            oauthClients={oauthClients}
+            oauthClientsLoading={oauthClientsLoading}
+            revokingTokenId={revokingTokenId}
+            updatingClientId={updatingClientId}
+            deletingClientId={deletingClientId}
+            revokingAllClientId={revokingAllClientId}
+            onRefresh={loadOAuthClients}
+            onRevokeToken={handleRevokeOAuthToken}
+            onToggleClientStatus={handleToggleOAuthClientStatus}
+            onRevokeAllTokens={handleRevokeAllOAuthTokens}
+            onDeleteClient={handleDeleteOAuthClient}
+          />
 
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full border-collapse font-body text-[13px]">
-                    <thead>
-                      <tr>
-                        <th
-                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                          style={{ paddingLeft: '24px' }}
-                        >
-                          Name
-                        </th>
-                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Upstream
-                        </th>
-                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Path
-                        </th>
-                        <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th
-                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
-                          style={{ paddingRight: '24px', textAlign: 'right' }}
-                        >
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Plexus Management MCP — fixed row */}
-                      <tr className="bg-primary/5 border-b border-primary/30">
-                        <td
-                          className="px-4 py-3 text-left border-b border-border-glass text-text"
-                          style={{ paddingLeft: '24px' }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ fontWeight: 600 }}>Plexus Management</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
-                          —
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs">/mcp/plexus</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopyMcpPath('/mcp/plexus');
-                              }}
-                              className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text"
-                              title="Copy path"
-                              aria-label="Copy /mcp/plexus"
-                            >
-                              <Copy size={13} />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                          <Switch
-                            checked={mcpEnabled}
-                            onChange={(val) => handleToggleMcpEnabled(val)}
-                            size="sm"
-                          />
-                        </td>
-                        <td
-                          className="px-4 py-3 text-left border-b border-border-glass text-text"
-                          style={{ paddingRight: '24px', textAlign: 'right' }}
-                        />
-                      </tr>
+          <McpUsageLogsCard
+            logs={logs}
+            logsTotal={logsTotal}
+            logsLoading={logsLoading}
+            logsLimit={logsLimit}
+            logsOffset={logsOffset}
+            logsFilters={logsFilters}
+            onFiltersChange={setLogsFilters}
+            onSearch={handleLogSearch}
+            onDeleteAll={handleDeleteAllLogs}
+            onDeleteLog={handleDeleteLog}
+            onOffsetChange={setLogsOffset}
+          />
 
-                      {serverNames.map((name) => {
-                        const server = servers[name];
-                        return (
-                          <tr
-                            key={name}
-                            onClick={() => handleEdit(name)}
-                            style={{ cursor: 'pointer' }}
-                            className="hover:bg-bg-hover"
-                          >
-                            <td
-                              className="px-4 py-3 text-left border-b border-border-glass text-text"
-                              style={{ paddingLeft: '24px' }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Edit2 size={12} style={{ opacity: 0.5 }} />
-                                <div style={{ fontWeight: 600 }}>{name}</div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                              <div
-                                style={{
-                                  maxWidth: '400px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {server.mode === 'local_http'
-                                  ? `${server.launcher} ${server.package} → 127.0.0.1:${server.port}${server.path || '/mcp'}`
-                                  : server.upstream_url}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-left border-b border-border-glass text-text whitespace-nowrap">
-                              <div
-                                className="flex items-center gap-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <span className="font-mono text-xs">{mcpPathForServer(name)}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyMcpPath(mcpPathForServer(name))}
-                                  className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text"
-                                  title="Copy path"
-                                  aria-label={`Copy ${mcpPathForServer(name)}`}
-                                >
-                                  <Copy size={13} />
-                                </button>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <Switch
-                                  checked={server.enabled !== false}
-                                  onChange={(val) => handleToggleEnabled(name, val)}
-                                  size="sm"
-                                />
-                              </div>
-                            </td>
-                            <td
-                              className="px-4 py-3 text-left border-b border-border-glass text-text"
-                              style={{ paddingRight: '24px', textAlign: 'right' }}
-                            >
-                              <div
-                                style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
-                              >
-                                {server.mode !== 'local_http' && (
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleManageKeys(name);
-                                    }}
-                                  >
-                                    Manage Keys
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(name);
-                                  }}
-                                  style={{ color: 'var(--color-danger)' }}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </Card>
-
-          {/* ── OAuth Clients + Tokens Card ── */}
-          <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="font-heading text-lg font-semibold text-text m-0 mb-1">
-                  MCP OAuth Clients
-                </h2>
-                <p className="text-xs text-text-muted">
-                  Registered OAuth clients and their active tokens. Tokens show the bound Plexus API
-                  key name only; raw secrets are never displayed.
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={loadOAuthClients}
-                isLoading={oauthClientsLoading}
-                leftIcon={<RefreshCw size={14} />}
-              >
-                Refresh
-              </Button>
-            </div>
-
-            {oauthClientsLoading ? (
-              <div className="py-8 text-center text-sm text-text-secondary">Loading...</div>
-            ) : oauthClients.length === 0 ? (
-              <div className="rounded-md border border-border-glass bg-bg-subtle p-4 text-sm text-text-secondary">
-                No MCP OAuth clients registered yet.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {oauthClients.map((client) => (
-                  <article
-                    key={client.clientId}
-                    className={`rounded-md border border-border-glass bg-bg-subtle p-3 ${
-                      client.status === 'disabled' ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-text">
-                          <KeyRound size={15} className="text-primary" />
-                          <span>{client.clientName || 'Unnamed client'}</span>
-                          {client.status === 'disabled' ? (
-                            <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-red-500">
-                              Disabled
-                            </span>
-                          ) : (
-                            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-emerald-500">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 font-mono text-xs text-text-secondary break-all">
-                          {client.clientId}
-                        </div>
-                        <div className="mt-2 text-xs text-text-muted">
-                          Created {new Date(client.createdAt).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="min-w-0 lg:max-w-[45%]">
-                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Redirect URIs
-                        </div>
-                        <div className="mt-1 flex flex-col gap-1">
-                          {client.redirectUris.map((uri) => (
-                            <code
-                              key={uri}
-                              className="rounded border border-border-glass bg-bg-glass px-2 py-1 text-[11px] text-text-secondary break-all"
-                            >
-                              {uri}
-                            </code>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 border-t border-border-glass pt-3">
-                      <div className="mb-2 text-[10px] uppercase tracking-wider text-text-muted">
-                        Active tokens
-                      </div>
-                      {client.tokens.length === 0 ? (
-                        <div className="text-xs text-text-muted">
-                          No active tokens for this client.
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse font-body text-[12px]">
-                            <thead>
-                              <tr>
-                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
-                                  Key name
-                                </th>
-                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
-                                  Scope
-                                </th>
-                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
-                                  Access expires
-                                </th>
-                                <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
-                                  Issued
-                                </th>
-                                <th className="px-2 py-2 text-right border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
-                                  Action
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {client.tokens.map((token) => (
-                                <tr key={token.id} className="hover:bg-bg-hover">
-                                  <td className="px-2 py-2 border-b border-border-glass text-text">
-                                    <span className="font-mono">{token.keyName}</span>
-                                  </td>
-                                  <td className="px-2 py-2 border-b border-border-glass text-text-secondary">
-                                    {token.scope || '-'}
-                                  </td>
-                                  <td className="px-2 py-2 border-b border-border-glass text-text-secondary whitespace-nowrap">
-                                    {new Date(token.accessTokenExpiresAt).toLocaleString()}
-                                  </td>
-                                  <td className="px-2 py-2 border-b border-border-glass text-text-secondary whitespace-nowrap">
-                                    {new Date(token.createdAt).toLocaleString()}
-                                  </td>
-                                  <td className="px-2 py-2 border-b border-border-glass text-right">
-                                    <Button
-                                      size="sm"
-                                      variant="danger"
-                                      onClick={() => handleRevokeOAuthToken(token.id)}
-                                      isLoading={revokingTokenId === token.id}
-                                      leftIcon={<ShieldOff size={13} />}
-                                    >
-                                      Revoke
-                                    </Button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2 border-t border-border-glass pt-3">
-                      {client.status === 'disabled' ? (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => handleToggleOAuthClientStatus(client)}
-                          isLoading={updatingClientId === client.clientId}
-                          leftIcon={<ShieldCheck size={13} />}
-                        >
-                          Enable
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleToggleOAuthClientStatus(client)}
-                          isLoading={updatingClientId === client.clientId}
-                          leftIcon={<ShieldOff size={13} />}
-                        >
-                          Disable
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => handleRevokeAllOAuthTokens(client.clientId)}
-                        isLoading={revokingAllClientId === client.clientId}
-                        leftIcon={<KeyRound size={13} />}
-                      >
-                        Revoke all tokens
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => handleDeleteOAuthClient(client.clientId)}
-                        isLoading={deletingClientId === client.clientId}
-                        leftIcon={<Trash2 size={13} />}
-                      >
-                        Delete client
-                      </Button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* ── Usage Logs Card ── */}
-          <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
-            <div className="mb-2">
-              <h2 className="font-heading text-lg font-semibold text-text m-0 mb-3">
-                MCP Usage Logs
-              </h2>
-              <form
-                onSubmit={handleLogSearch}
-                className="flex flex-col gap-2 lg:flex-row lg:justify-between"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <div className="relative w-full sm:w-50">
-                    <Search
-                      size={16}
-                      style={{
-                        position: 'absolute',
-                        left: '10px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    />
-                    <Input
-                      placeholder="Filter by Server..."
-                      value={logsFilters.serverName}
-                      onChange={(e) =>
-                        setLogsFilters({ ...logsFilters, serverName: e.target.value })
-                      }
-                      style={{ paddingLeft: '32px' }}
-                    />
-                  </div>
-                  <div className="relative w-full sm:w-44">
-                    <Filter
-                      size={16}
-                      style={{
-                        position: 'absolute',
-                        left: '10px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    />
-                    <Input
-                      placeholder="Filter by Key..."
-                      value={logsFilters.apiKey}
-                      onChange={(e) => setLogsFilters({ ...logsFilters, apiKey: e.target.value })}
-                      style={{ paddingLeft: '32px' }}
-                    />
-                  </div>
-                  <Button type="submit" variant="primary" className="w-full sm:w-auto">
-                    Search
-                  </Button>
-                </div>
-                <Button
-                  onClick={handleDeleteAllLogs}
-                  variant="danger"
-                  className="flex w-full items-center gap-2 sm:w-auto"
-                  disabled={logs.length === 0}
-                  type="button"
-                >
-                  <Trash2 size={16} />
-                  Delete All
-                </Button>
-              </form>
-            </div>
-
-            <div className="space-y-3 lg:hidden">
-              {logsLoading ? (
-                <div className="py-8 text-center text-sm text-text-secondary">Loading...</div>
-              ) : logs.length === 0 ? (
-                <div className="py-8 text-center text-sm text-text-secondary">
-                  No MCP logs found
-                </div>
-              ) : (
-                logs.map((log) => (
-                  <article
-                    key={log.request_id}
-                    className="rounded-md border border-border-glass bg-bg-subtle p-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-text">
-                          {new Date(log.created_at).toLocaleString()}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-text-muted">
-                          {log.api_key || '-'} {log.attribution ? `(${log.attribution})` : ''}
-                        </div>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeleteLog(log.request_id)}
-                        className="text-danger"
-                        aria-label="Delete MCP log"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Server
-                        </div>
-                        <div className="truncate font-medium text-text-secondary">
-                          {log.server_name}
-                        </div>
-                      </div>
-                      <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Method
-                        </div>
-                        <div className="truncate font-medium text-text-secondary">
-                          {log.method} {log.is_streamed ? 'streamed' : 'buffered'}
-                        </div>
-                      </div>
-                      <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          RPC
-                        </div>
-                        <div className="truncate font-mono text-text">
-                          {log.jsonrpc_method || '-'}
-                        </div>
-                      </div>
-                      <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                        <div className="text-[10px] uppercase tracking-wider text-text-muted">
-                          Duration
-                        </div>
-                        <div className="truncate font-medium text-text">
-                          {log.duration_ms != null ? formatMs(log.duration_ms) : '-'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs">
-                      <span className={clsx('font-semibold', statusColor(log.response_status))}>
-                        Status {log.response_status ?? '?'}
-                      </span>
-                      {log.error_message && (
-                        <span className="min-w-0 truncate text-danger" title={log.error_message}>
-                          {log.error_message}
-                        </span>
-                      )}
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full border-collapse font-body text-[13px]">
-                <thead>
-                  <tr className="text-center border-b border-border">
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Date
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Key
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Server
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Method
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      RPC Method
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Duration
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      Status
-                    </th>
-                    <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
-                      <div className="flex justify-center">
-                        <Trash2 size={12} />
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logsLoading ? (
-                    <tr>
-                      <td colSpan={8} className="p-5 text-center">
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : logs.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="p-5 text-center text-text-secondary">
-                        No MCP logs found
-                      </td>
-                    </tr>
-                  ) : (
-                    logs.map((log) => (
-                      <tr
-                        key={log.request_id}
-                        className="group border-b border-border-glass hover:bg-bg-hover"
-                      >
-                        {/* Date */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {new Date(log.created_at).toLocaleTimeString()}
-                            </span>
-                            <span className="text-text-secondary" style={{ fontSize: '0.85em' }}>
-                              {new Date(log.created_at).toISOString().split('T')[0]}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Key / Attribution */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{log.api_key || '-'}</span>
-                            {log.attribution && (
-                              <span className="text-text-secondary" style={{ fontSize: '0.85em' }}>
-                                {log.attribution}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Server */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{log.server_name}</span>
-                            <span
-                              className="text-text-secondary"
-                              style={{
-                                fontSize: '0.85em',
-                                maxWidth: '200px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {log.upstream_url}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* HTTP Method */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                          <div className="flex flex-col gap-1">
-                            <span
-                              className={clsx(
-                                'text-xs font-semibold',
-                                log.method === 'GET'
-                                  ? 'text-blue-400'
-                                  : log.method === 'POST'
-                                    ? 'text-green-400'
-                                    : 'text-red-400'
-                              )}
-                            >
-                              {log.method}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              {log.is_streamed ? (
-                                <Zap size={11} className="text-blue-400" />
-                              ) : (
-                                <ZapOff size={11} className="text-gray-400" />
-                              )}
-                              <span className="text-text-secondary" style={{ fontSize: '0.8em' }}>
-                                {log.is_streamed ? 'streamed' : 'buffered'}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* JSON-RPC Method + Tool Name */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-mono text-xs">
-                              {log.jsonrpc_method || <span className="text-text-secondary">-</span>}
-                            </span>
-                            {log.tool_name && (
-                              <span className="font-mono text-xs text-info" title={log.tool_name}>
-                                {log.tool_name}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Duration */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                          <span>{log.duration_ms != null ? formatMs(log.duration_ms) : '-'}</span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                          <div className="flex flex-col gap-1">
-                            {log.error_code ? (
-                              <div
-                                className={clsx(
-                                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                                  'text-danger border-danger/30 bg-red-500/15'
-                                )}
-                                style={{ width: '52px' }}
-                              >
-                                <AlertTriangle size={12} />
-                                <span className="font-semibold">{log.response_status ?? '?'}</span>
-                              </div>
-                            ) : (
-                              <div
-                                className={clsx(
-                                  'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
-                                  log.response_status != null &&
-                                    log.response_status >= 200 &&
-                                    log.response_status < 300
-                                    ? 'text-success border-success/30 bg-emerald-500/15'
-                                    : 'text-danger border-danger/30 bg-red-500/15'
-                                )}
-                                style={{ width: '52px' }}
-                              >
-                                <CheckCircle size={12} />
-                                <span
-                                  className={clsx(
-                                    'font-semibold',
-                                    statusColor(log.response_status)
-                                  )}
-                                >
-                                  {log.response_status ?? '?'}
-                                </span>
-                              </div>
-                            )}
-                            {log.error_message && (
-                              <span
-                                className="text-danger"
-                                style={{
-                                  fontSize: '0.78em',
-                                  maxWidth: '160px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  display: 'block',
-                                }}
-                                title={log.error_message}
-                              >
-                                {log.error_message}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Delete */}
-                        <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
-                          <button
-                            onClick={() => handleDeleteLog(log.request_id)}
-                            className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-                            title="Delete log"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-col items-stretch gap-3 mt-3 sm:flex-row sm:items-center sm:justify-end">
-              <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                Page {logsCurrentPage} of {Math.max(1, logsTotalPages)}
-              </span>
-              <div className="flex gap-1">
-                <Button
-                  variant="secondary"
-                  disabled={logsOffset === 0}
-                  onClick={() => setLogsOffset(Math.max(0, logsOffset - logsLimit))}
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={logsOffset + logsLimit >= logsTotal}
-                  onClick={() => setLogsOffset(logsOffset + logsLimit)}
-                >
-                  <ChevronRight size={16} />
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* ── Server Edit/Add Modal ── */}
-          <Modal
+          <McpServerEditorModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title={editingServerName ? `Edit ${editingServerName}` : 'Add MCP Server'}
-            footer={
-              <>
-                <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save'}
-                </Button>
-              </>
+            editingServerName={editingServerName}
+            serverNameInput={serverNameInput}
+            onServerNameInputChange={setServerNameInput}
+            editingServer={editingServer}
+            onEditingServerChange={setEditingServer}
+            argsInput={argsInput}
+            onArgsInputChange={setArgsInput}
+            headerKey={headerKey}
+            onHeaderKeyChange={setHeaderKey}
+            headerValue={headerValue}
+            onHeaderValueChange={setHeaderValue}
+            envKey={envKey}
+            onEnvKeyChange={setEnvKey}
+            envValue={envValue}
+            onEnvValueChange={setEnvValue}
+            emptyServer={EMPTY_SERVER}
+            emptyLocalServer={EMPTY_LOCAL_SERVER}
+            getNextLocalMcpPort={getNextLocalMcpPort}
+            onAddHeader={addHeader}
+            onRemoveHeader={removeHeader}
+            onAddEnv={addEnv}
+            onRemoveEnv={removeEnv}
+            onSave={handleSave}
+            isSaving={isSaving}
+          />
+
+          <McpKeyManagementModal
+            serverName={keyManagementServerName}
+            authScheme={
+              keyManagementServerName ? servers[keyManagementServerName]?.auth_scheme : undefined
             }
-          >
-            <div className="space-y-4">
-              {!editingServerName && (
-                <Input
-                  label="Server Name"
-                  value={serverNameInput}
-                  onChange={(e) =>
-                    setServerNameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ''))
-                  }
-                  placeholder="my-mcp-server"
-                />
-              )}
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-text-secondary">
-                  Server Type
-                </label>
-                <select
-                  className="w-full rounded-md border border-border-glass bg-bg-surface px-3 py-2 text-sm text-text"
-                  value={editingServer.mode === 'local_http' ? 'local_http' : 'remote_http'}
-                  onChange={(e) => {
-                    if (e.target.value === 'local_http') {
-                      setArgsInput((EMPTY_LOCAL_SERVER.args || []).join(' '));
-                      setEditingServer({
-                        ...EMPTY_LOCAL_SERVER,
-                        enabled: editingServer.enabled,
-                        headers: editingServer.headers,
-                        port: getNextLocalMcpPort(),
-                      });
-                    } else {
-                      setEditingServer({
-                        ...EMPTY_SERVER,
-                        enabled: editingServer.enabled,
-                        headers: editingServer.headers,
-                      });
-                    }
-                  }}
-                >
-                  <option value="remote_http">Remote HTTP</option>
-                  <option value="local_http">Local HTTP</option>
-                </select>
-              </div>
-
-              {editingServer.mode === 'local_http' ? (
-                <>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-text-secondary">
-                      Launcher
-                    </label>
-                    <select
-                      className="w-full rounded-md border border-border-glass bg-bg-surface px-3 py-2 text-sm text-text"
-                      value={editingServer.launcher}
-                      onChange={(e) =>
-                        setEditingServer({
-                          ...editingServer,
-                          launcher: e.target.value as 'bunx' | 'uvx',
-                        })
-                      }
-                    >
-                      <option value="bunx">bunx</option>
-                      <option value="uvx">uvx</option>
-                    </select>
-                  </div>
-                  <Input
-                    label="Package"
-                    value={editingServer.package}
-                    onChange={(e) =>
-                      setEditingServer({ ...editingServer, package: e.target.value })
-                    }
-                    placeholder="@example/mcp-server"
-                  />
-                  <Input
-                    label="Arguments"
-                    value={argsInput}
-                    onChange={(e) => setArgsInput(e.target.value)}
-                    placeholder="--port {{PORT}}"
-                  />
-                  <p className="-mt-2 text-xs text-text-muted">
-                    Available interpolations: {'{{PORT}}'} for the configured port and {'{{HOST}}'}
-                    for 127.0.0.1.
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <Input
-                      label="Port"
-                      type="number"
-                      value={editingServer.port}
-                      onChange={(e) =>
-                        setEditingServer({
-                          ...editingServer,
-                          port: parseInt(e.target.value) || 7345,
-                        })
-                      }
-                    />
-                    <Input
-                      label="Path"
-                      value={editingServer.path ?? '/mcp'}
-                      onChange={(e) => setEditingServer({ ...editingServer, path: e.target.value })}
-                    />
-                    <Input
-                      label="Startup Timeout (ms)"
-                      type="number"
-                      value={editingServer.startup_timeout_ms || 30000}
-                      onChange={(e) =>
-                        setEditingServer({
-                          ...editingServer,
-                          startup_timeout_ms: parseInt(e.target.value) || 30000,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2 rounded-md border border-border-glass p-3">
-                    <label className="text-sm font-medium text-text-secondary">
-                      Environment Variables
-                    </label>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                      <div className="min-w-0 flex-1">
-                        <Input
-                          label="Env Key"
-                          value={envKey}
-                          onChange={(e) => setEnvKey(e.target.value)}
-                          placeholder="API_KEY"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <Input
-                          label="Env Value"
-                          value={envValue}
-                          onChange={(e) => setEnvValue(e.target.value)}
-                          placeholder="secret value"
-                        />
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={addEnv}
-                        className="w-full sm:w-auto"
-                      >
-                        <PlusCircle size={16} />
-                      </Button>
-                    </div>
-                    {editingServer.env && Object.keys(editingServer.env).length > 0 && (
-                      <div className="space-y-2">
-                        {Object.entries(editingServer.env).map(([key, value]) => (
-                          <div
-                            key={key}
-                            className="flex flex-col gap-2 p-2 bg-bg-hover rounded-md sm:flex-row sm:items-center"
-                          >
-                            <span className="min-w-0 flex-1 break-all font-mono text-xs">
-                              {key}
-                            </span>
-                            <span className="flex-1 font-mono text-xs text-text-secondary truncate">
-                              {value}
-                            </span>
-                            <button
-                              onClick={() => removeEnv(key)}
-                              className="p-1 hover:bg-bg-surface rounded"
-                            >
-                              <MinusCircle size={14} className="text-danger" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <Input
-                  label="Upstream URL"
-                  value={editingServer.upstream_url}
-                  onChange={(e) =>
-                    setEditingServer({ ...editingServer, upstream_url: e.target.value })
-                  }
-                  placeholder="https://mcp.example.com/mcp"
-                />
-              )}
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Input
-                  label="Auth Scheme"
-                  value={editingServer.auth_scheme ?? ''}
-                  onChange={(e) =>
-                    setEditingServer({ ...editingServer, auth_scheme: e.target.value || null })
-                  }
-                  placeholder="bearer"
-                />
-                <Input
-                  label="Rate Limit Cooldown (ms)"
-                  type="number"
-                  min="0"
-                  value={editingServer.rate_limit_cooldown_ms ?? 60_000}
-                  onChange={(e) =>
-                    setEditingServer({
-                      ...editingServer,
-                      rate_limit_cooldown_ms: Number(e.target.value),
-                    })
-                  }
-                />
-                <Input
-                  label="Quota Cooldown (ms)"
-                  type="number"
-                  min="0"
-                  value={editingServer.quota_cooldown_ms ?? 86_400_000}
-                  onChange={(e) =>
-                    setEditingServer({
-                      ...editingServer,
-                      quota_cooldown_ms: Number(e.target.value),
-                    })
-                  }
-                />
-              </div>
-
-              <div className="mt-4 rounded-md border border-border-glass p-3">
-                <div className="mb-3">
-                  <label className="text-sm font-medium text-text-secondary">
-                    Static Headers (Optional)
-                  </label>
-                  <p className="text-xs text-text-muted mt-1">
-                    These headers are injected into every request. For load-balanced authentication
-                    keys, use the <strong>Auth Scheme</strong> above and the{' '}
-                    <strong>Manage Keys</strong> button.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      label="Header Key"
-                      value={headerKey}
-                      onChange={(e) => setHeaderKey(e.target.value)}
-                      placeholder="X-Custom-Header"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      label="Header Value"
-                      value={headerValue}
-                      onChange={(e) => setHeaderValue(e.target.value)}
-                      placeholder="value..."
-                    />
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={addHeader}
-                    className="w-full sm:w-auto"
-                  >
-                    <PlusCircle size={16} />
-                  </Button>
-                </div>
-
-                {editingServer.headers && Object.keys(editingServer.headers).length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    <label className="text-sm font-medium text-text-secondary">
-                      Configured Static Headers
-                    </label>
-                    {Object.entries(editingServer.headers).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex flex-col gap-2 p-2 bg-bg-hover rounded-md sm:flex-row sm:items-center"
-                      >
-                        <span className="min-w-0 flex-1 break-all font-mono text-xs">{key}</span>
-                        <span className="flex-1 font-mono text-xs text-text-secondary truncate">
-                          {value}
-                        </span>
-                        <button
-                          onClick={() => removeHeader(key)}
-                          className="p-1 hover:bg-bg-surface rounded"
-                        >
-                          <MinusCircle size={14} className="text-danger" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </Modal>
-
-          <Modal
-            isOpen={keyManagementServerName !== null}
+            serverKeys={serverKeys}
+            isLoadingKeys={isLoadingKeys}
+            newServerKey={newServerKey}
+            onNewServerKeyChange={setNewServerKey}
+            isSavingKey={isSavingKey}
             onClose={() => setKeyManagementServerName(null)}
-            title={
-              keyManagementServerName ? `Manage Keys: ${keyManagementServerName}` : 'Manage Keys'
-            }
-            footer={
-              <Button variant="secondary" onClick={() => setKeyManagementServerName(null)}>
-                Close
-              </Button>
-            }
-          >
-            <div className="space-y-4">
-              <div className="rounded-md bg-bg-surface p-3 text-sm text-text-secondary border border-border-subtle">
-                <p>
-                  These keys will be load-balanced (Round Robin) and automatically rotated if a rate
-                  limit or quota is exceeded. They will be injected using the server's configured{' '}
-                  <strong>Auth Scheme</strong>:{' '}
-                  <span className="font-mono text-text bg-bg-subtle px-1 py-0.5 rounded">
-                    {keyManagementServerName && servers[keyManagementServerName]?.auth_scheme
-                      ? servers[keyManagementServerName].auth_scheme
-                      : 'None (keys will not be sent)'}
-                  </span>
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  label="New Key"
-                  value={newServerKey}
-                  onChange={(e) => setNewServerKey(e.target.value)}
-                  placeholder="Paste key value"
-                  className="flex-1"
-                />
-                <Button
-                  className="self-end"
-                  onClick={handleAddServerKey}
-                  disabled={isSavingKey || !newServerKey.trim()}
-                >
-                  {isSavingKey ? 'Adding...' : 'Add Key'}
-                </Button>
-              </div>
+            onAddKey={handleAddServerKey}
+            onDeleteKey={handleDeleteServerKey}
+            onClearCooldown={handleClearServerKeyCooldown}
+          />
 
-              {isLoadingKeys ? (
-                <p className="text-sm text-text-secondary">Loading keys...</p>
-              ) : serverKeys.length === 0 ? (
-                <p className="text-sm text-text-secondary">No keys configured.</p>
-              ) : (
-                <div className="space-y-2">
-                  {serverKeys.map((key) => {
-                    const isExhausted =
-                      key.cooldown_until !== null &&
-                      new Date(key.cooldown_until).getTime() > Date.now();
-                    return (
-                      <div
-                        key={key.id}
-                        className="flex flex-col gap-3 rounded-md border border-border-glass bg-bg-subtle p-3 sm:flex-row sm:items-center"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-mono text-sm text-text" title={key.key}>
-                            {key.key}
-                          </div>
-                          <div
-                            className={clsx(
-                              'mt-1 text-xs font-medium',
-                              !key.is_active || isExhausted ? 'text-warning' : 'text-success'
-                            )}
-                          >
-                            {!key.is_active
-                              ? 'Inactive'
-                              : isExhausted
-                                ? `Exhausted, ${formatResetsIn(key.cooldown_until)}`
-                                : 'Active'}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {isExhausted && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleClearServerKeyCooldown(key.id)}
-                            >
-                              Clear Cooldown
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => handleDeleteServerKey(key.id)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </Modal>
-
-          {/* ── Delete All Logs Modal ── */}
-          <Modal
+          <McpDeleteLogsModal
             isOpen={isDeleteLogsModalOpen}
+            deleteLogsMode={deleteLogsMode}
+            olderThanDays={olderThanDays}
+            isDeletingLogs={isDeletingLogs}
             onClose={() => setIsDeleteLogsModalOpen(false)}
-            title="Confirm Deletion"
-            footer={
-              <>
-                <Button variant="secondary" onClick={() => setIsDeleteLogsModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="danger" onClick={confirmDeleteAllLogs} disabled={isDeletingLogs}>
-                  {isDeletingLogs ? 'Deleting...' : 'Delete Logs'}
-                </Button>
-              </>
-            }
-          >
-            <div className="flex flex-col gap-4">
-              <p>Select which MCP logs you would like to delete:</p>
+            onModeChange={setDeleteLogsMode}
+            onOlderThanDaysChange={setOlderThanDays}
+            onConfirm={confirmDeleteAllLogs}
+          />
 
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="radio"
-                  id="mcp-delete-older"
-                  name="deleteLogsMode"
-                  checked={deleteLogsMode === 'older'}
-                  onChange={() => setDeleteLogsMode('older')}
-                />
-                <label htmlFor="mcp-delete-older">Delete logs older than</label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={olderThanDays}
-                  onChange={(e) => setOlderThanDays(parseInt(e.target.value) || 1)}
-                  style={{ width: '60px', padding: '4px 8px' }}
-                  disabled={deleteLogsMode !== 'older'}
-                />
-                <span>days</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  id="mcp-delete-all"
-                  name="deleteLogsMode"
-                  checked={deleteLogsMode === 'all'}
-                  onChange={() => setDeleteLogsMode('all')}
-                />
-                <label htmlFor="mcp-delete-all" style={{ color: 'var(--color-danger)' }}>
-                  Delete ALL logs (Cannot be undone)
-                </label>
-              </div>
-            </div>
-          </Modal>
-
-          {/* ── Single Log Delete Modal ── */}
-          <Modal
+          <McpDeleteLogModal
             isOpen={isSingleDeleteModalOpen}
+            isDeletingLogs={isDeletingLogs}
             onClose={() => setIsSingleDeleteModalOpen(false)}
-            title="Confirm Deletion"
-            footer={
-              <>
-                <Button variant="secondary" onClick={() => setIsSingleDeleteModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="danger" onClick={confirmDeleteSingleLog} disabled={isDeletingLogs}>
-                  {isDeletingLogs ? 'Deleting...' : 'Delete Log'}
-                </Button>
-              </>
-            }
-          >
-            <p>Are you sure you want to delete this MCP log entry?</p>
-          </Modal>
+            onConfirm={confirmDeleteSingleLog}
+          />
         </div>
       </PageContainer>
     </div>

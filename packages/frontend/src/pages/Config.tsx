@@ -1,145 +1,50 @@
-import { Component, useEffect, useRef, useState, useCallback } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
-import Editor from '@monaco-editor/react';
-import {
-  RotateCcw,
-  AlertTriangle,
-  Download,
-  Upload,
-  RefreshCw,
-  HardDrive,
-  Archive,
-  Shield,
-  Save,
-  Radar,
-  Network,
-  Trash2,
-  LockKeyhole,
-  Info,
-} from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import type { ChangeEvent } from 'react';
 import { api } from '../lib/api';
-import type { CompactionSettings, McpOAuthSettings } from '../lib/api';
-import { formatMinutesToMinSec } from '@plexus/shared';
+import type {
+  CompactionSettings as CompactionConfig,
+  McpOAuthSettings as McpOAuthConfig,
+} from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
-import { useCurrency } from '../lib/CurrencyContext';
-import { SUPPORTED_CURRENCIES } from '../lib/currency';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Switch } from '../components/ui/Switch';
-import { Disclosure } from '../components/ui/Disclosure';
-import { TagSelect } from '../components/ui/TagSelect';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import type { CardLayout } from '../types/card';
 import { DEFAULT_CARD_ORDER, LAYOUT_STORAGE_KEY } from '../types/card';
-
-class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state: { error: Error | null } = { error: null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Monaco Editor failed to load:', error, info);
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="h-[400px] sm:h-[500px] flex items-center justify-center bg-bg-glass/30 text-text-secondary rounded-md">
-          <div className="text-center p-6">
-            <AlertTriangle className="mx-auto mb-3 text-warning" size={32} />
-            <p className="text-sm font-semibold mb-1">Editor failed to load</p>
-            <p className="font-body text-[11px] text-text-muted">{this.state.error.message}</p>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-interface FailoverPolicy {
-  enabled: boolean;
-  retryableStatusCodes: number[];
-  retryableErrors: string[];
-}
-
-interface CooldownPolicy {
-  initialMinutes: number;
-  maxMinutes: number;
-}
-
-interface ExplorationRates {
-  performanceExplorationRate: number;
-  latencyExplorationRate: number;
-  e2ePerformanceExplorationRate: number;
-}
-
-const DEFAULT_EXPLORATION_RATES: ExplorationRates = {
-  performanceExplorationRate: 0.05,
-  latencyExplorationRate: 0.05,
-  e2ePerformanceExplorationRate: 0.05,
-};
-
-interface BackgroundExplorationConfig {
-  enabled: boolean;
-  stalenessThresholdSeconds: number;
-  workerConcurrency: number;
-}
-
-interface TimeoutConfig {
-  defaultSeconds: number;
-}
-
-interface StallConfig {
-  ttfbSeconds: number | null;
-  ttfbBytes: number;
-  minBytesPerSecond: number | null;
-  windowSeconds: number;
-  gracePeriodSeconds: number;
-}
-
-const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig = {
-  defaultSeconds: 300,
-};
-
-const DEFAULT_STALL_CONFIG: StallConfig = {
-  ttfbSeconds: null,
-  ttfbBytes: 100,
-  minBytesPerSecond: null,
-  windowSeconds: 10,
-  gracePeriodSeconds: 30,
-};
-
-const DEFAULT_BACKGROUND_EXPLORATION: BackgroundExplorationConfig = {
-  enabled: false,
-  stalenessThresholdSeconds: 600,
-  workerConcurrency: 2,
-};
-
-const DEFAULT_COMPACTION_CONFIG: CompactionSettings = { enabled: false, strategy: 'native' };
-
-const DEFAULT_FAILOVER_POLICY: FailoverPolicy = {
-  enabled: true,
-  retryableStatusCodes: [],
-  retryableErrors: [],
-};
-
-const DEFAULT_MCP_OAUTH_CONFIG: McpOAuthSettings = {
-  enabled: false,
-  provider: 'plexus-idp',
-};
-
-const DEFAULT_COOLDOWN_POLICY: CooldownPolicy = {
-  initialMinutes: 2,
-  maxMinutes: 300,
-};
+import { DisplayPreferencesCard } from '../components/config/DisplayPreferencesCard';
+import { FailoverSettings } from '../components/config/FailoverSettings';
+import { TraceCaptureSettings } from '../components/config/TraceCaptureSettings';
+import { CooldownSettings } from '../components/config/CooldownSettings';
+import { TimeoutSettings } from '../components/config/TimeoutSettings';
+import { StallDetectionSettings } from '../components/config/StallDetectionSettings';
+import { CompactionSettings } from '../components/config/CompactionSettings';
+import { McpOAuthSettings } from '../components/config/McpOAuthSettings';
+import { ExplorationSettings } from '../components/config/ExplorationSettings';
+import { NetworkSettings } from '../components/config/NetworkSettings';
+import { ModelMetadataCard } from '../components/config/ModelMetadataCard';
+import { BackupRestoreCard } from '../components/config/BackupRestoreCard';
+import { CardLayoutCard } from '../components/config/CardLayoutCard';
+import { ConfigurationSnapshot } from '../components/config/ConfigurationSnapshot';
+import {
+  DEFAULT_BACKGROUND_EXPLORATION,
+  DEFAULT_COMPACTION_CONFIG,
+  DEFAULT_COOLDOWN_POLICY,
+  DEFAULT_EXPLORATION_RATES,
+  DEFAULT_FAILOVER_POLICY,
+  DEFAULT_MCP_OAUTH_CONFIG,
+  DEFAULT_STALL_CONFIG,
+  DEFAULT_TIMEOUT_CONFIG,
+} from '../components/config/types';
+import type {
+  BackgroundExplorationConfig,
+  CooldownPolicy,
+  ExplorationRates,
+  FailoverPolicy,
+  StallConfig,
+  TimeoutConfig,
+} from '../components/config/types';
 
 export const Config = () => {
   const toast = useToast();
-  const { currency, setCurrency, ratesAvailable } = useCurrency();
   const [config, setConfig] = useState('');
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -210,12 +115,12 @@ export const Config = () => {
 
   // Context Compaction settings state
   const [compactionConfig, setCompactionConfig] =
-    useState<CompactionSettings>(DEFAULT_COMPACTION_CONFIG);
+    useState<CompactionConfig>(DEFAULT_COMPACTION_CONFIG);
   const [compactionLoaded, setCompactionLoaded] = useState(false);
   const [compactionSaving, setCompactionSaving] = useState(false);
 
   // MCP OAuth settings state
-  const [mcpOAuthConfig, setMcpOAuthConfig] = useState<McpOAuthSettings>(DEFAULT_MCP_OAUTH_CONFIG);
+  const [mcpOAuthConfig, setMcpOAuthConfig] = useState<McpOAuthConfig>(DEFAULT_MCP_OAUTH_CONFIG);
   const [mcpOAuthLoaded, setMcpOAuthLoaded] = useState(false);
   const [mcpOAuthSaving, setMcpOAuthSaving] = useState(false);
   const [mcpOAuthIssuerInput, setMcpOAuthIssuerInput] = useState('');
@@ -235,7 +140,6 @@ export const Config = () => {
   };
 
   const issuerValidation = validateIssuerInput(mcpOAuthIssuerInput);
-  const isMcpOAuthValid = mcpOAuthLoaded && issuerValidation.valid;
 
   // Validate timeout input
   const validateTimeoutInput = (
@@ -258,7 +162,6 @@ export const Config = () => {
   };
 
   const timeoutDefaultValidation = validateTimeoutInput(timeoutDefaultInput);
-  const isTimeoutValid = timeoutLoaded && timeoutDefaultValidation.valid;
 
   // Validate stall detection inputs
   const validateStallInput = (
@@ -284,17 +187,9 @@ export const Config = () => {
   const stallMinBpsValidation = validateStallInput(stallMinBpsInput, 50, 5000, true);
   const stallWindowValidation = validateStallInput(stallWindowInput, 3, 30, false);
   const stallGraceValidation = validateStallInput(stallGraceInput, 0, 120, false);
-  const isStallValid =
-    stallLoaded &&
-    stallTtfbValidation.valid &&
-    stallTtfbBytesValidation.valid &&
-    stallMinBpsValidation.valid &&
-    stallWindowValidation.valid &&
-    stallGraceValidation.valid;
 
   const initialValidation = validateCooldownInput(cooldownInitialInput);
   const maxValidation = validateCooldownInput(cooldownMaxInput);
-  const isCooldownValid = cooldownLoaded && initialValidation.valid && maxValidation.valid;
 
   // Exploration rate settings state (setter only needed, value derived from inputs)
   const [, setExplorationRates] = useState<ExplorationRates>(DEFAULT_EXPLORATION_RATES);
@@ -575,8 +470,8 @@ export const Config = () => {
   const loadMcpOAuthConfig = useCallback(async () => {
     try {
       const settings = await api.getSystemSettings();
-      const raw = settings.mcpOAuth as Partial<McpOAuthSettings> | undefined;
-      const cfg: McpOAuthSettings = {
+      const raw = settings.mcpOAuth as Partial<McpOAuthConfig> | undefined;
+      const cfg: McpOAuthConfig = {
         enabled: raw?.enabled === true,
         provider: raw?.provider === 'plexus-idp' ? raw.provider : 'plexus-idp',
         ...(typeof raw?.issuer === 'string' && raw.issuer.trim()
@@ -681,7 +576,7 @@ export const Config = () => {
     setMcpOAuthSaving(true);
     try {
       const issuer = mcpOAuthIssuerInput.trim();
-      const next: McpOAuthSettings = {
+      const next: McpOAuthConfig = {
         enabled: mcpOAuthConfig.enabled,
         provider: 'plexus-idp',
         ...(issuer ? { issuer } : {}),
@@ -821,7 +716,7 @@ export const Config = () => {
 
   const handleImportLayout = () => fileInputRef.current?.click();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -898,7 +793,7 @@ export const Config = () => {
 
   const handleRestoreClick = () => restoreInputRef.current?.click();
 
-  const handleRestoreFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRestoreFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -1003,1208 +898,157 @@ export const Config = () => {
 
       <PageContainer>
         <div className="flex flex-col gap-6">
-          <Card title="Display Preferences">
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="displayCurrency"
-                className="font-body text-[12px] font-medium text-text"
-              >
-                Display currency
-              </label>
-              <select
-                id="displayCurrency"
-                value={currency}
-                onChange={(event) => {
-                  const nextCurrency = SUPPORTED_CURRENCIES.find(
-                    ({ code }) => code === event.target.value
-                  );
-                  if (nextCurrency) setCurrency(nextCurrency.code);
-                }}
-                className="w-64 max-w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary"
-              >
-                {SUPPORTED_CURRENCIES.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.label} ({option.code}) — {option.symbol}
-                  </option>
-                ))}
-              </select>
-              {!ratesAvailable && currency !== 'USD' && (
-                <p className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                  <Info size={13} className="text-warning shrink-0" aria-hidden="true" />
-                  <span>Live exchange rates are unavailable; amounts fall back to USD.</span>
-                </p>
-              )}
-            </div>
-          </Card>
+          <DisplayPreferencesCard />
 
-          {/* ─── Failover Settings ──────────────────────────────────── */}
-          <Disclosure
-            title="Failover Settings"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveFailover}
-                isLoading={failoverSaving}
-                disabled={!failoverLoaded}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
+          <FailoverSettings
+            policy={failoverPolicy}
+            loaded={failoverLoaded}
+            saving={failoverSaving}
+            statusCodesText={statusCodesText}
+            errorsText={errorsText}
+            onEnabledChange={(enabled) =>
+              setFailoverPolicy((previous) => ({ ...previous, enabled }))
             }
-          >
-            <div className="flex flex-col gap-3">
-              {/* Enabled toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield size={16} className="text-primary" />
-                  <div>
-                    <p className="font-body text-[12px] font-medium text-text">Enable Failover</p>
-                    <p className="font-body text-[11px] text-text-muted">
-                      When enabled, failed requests are automatically retried on the next available
-                      provider.
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={failoverPolicy.enabled}
-                  onChange={(checked) =>
-                    setFailoverPolicy((prev) => ({ ...prev, enabled: checked }))
-                  }
-                  aria-label="Toggle failover on/off"
-                />
-              </div>
+            onStatusCodesChange={setStatusCodesText}
+            onErrorsChange={setErrorsText}
+            onSave={handleSaveFailover}
+          />
 
-              {/* Retryable Status Codes */}
-              <div>
-                <label
-                  htmlFor="retryableStatusCodes"
-                  className="font-body text-[12px] font-medium text-text"
-                >
-                  Retryable Status Codes
-                </label>
-                <p className="text-xs text-text-muted mb-2">
-                  HTTP status codes that trigger a retry on the next provider. Enter comma-separated
-                  values (100–599). Defaults to all non-2xx codes except 413 and 422 when empty.
-                </p>
-                <textarea
-                  id="retryableStatusCodes"
-                  value={statusCodesText}
-                  onChange={(e) => setStatusCodesText(e.target.value)}
-                  placeholder="e.g. 429, 500, 502, 503"
-                  rows={3}
-                  className="w-full py-1 px-2 font-mono text-[12px] text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted resize-y"
-                />
-              </div>
+          <TraceCaptureSettings
+            enabled={captureTraceOnError}
+            loaded={captureTraceLoaded}
+            saving={captureTraceSaving}
+            onChange={handleToggleCaptureTraceOnError}
+          />
 
-              {/* Retryable Errors */}
-              <div>
-                <label
-                  htmlFor="retryableErrors"
-                  className="font-body text-[12px] font-medium text-text"
-                >
-                  Retryable Network Errors
-                </label>
-                <p className="text-xs text-text-muted mb-2">
-                  Network error codes that trigger a retry on the next provider. Enter
-                  comma-separated values. Defaults to ECONNREFUSED, ETIMEDOUT, ENOTFOUND when empty.
-                </p>
-                <textarea
-                  id="retryableErrors"
-                  value={errorsText}
-                  onChange={(e) => setErrorsText(e.target.value)}
-                  placeholder="e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND"
-                  rows={2}
-                  className="w-full py-1 px-2 font-mono text-[12px] text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted resize-y"
-                />
-              </div>
-            </div>
-          </Disclosure>
+          <CooldownSettings
+            policy={cooldownPolicy}
+            loaded={cooldownLoaded}
+            saving={cooldownSaving}
+            initialInput={cooldownInitialInput}
+            maxInput={cooldownMaxInput}
+            initialValidation={initialValidation}
+            maxValidation={maxValidation}
+            onInitialChange={setCooldownInitialInput}
+            onMaxChange={setCooldownMaxInput}
+            onSave={handleSaveCooldown}
+          />
 
-          {/* ─── Trace Capture ──────────────────────────────────────── */}
-          <Disclosure title="Trace Capture" defaultOpen={false}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={16} className="text-primary" />
-                <div>
-                  <p className="font-body text-[12px] font-medium text-text">
-                    Capture Trace on Error
-                  </p>
-                  <p className="font-body text-[11px] text-text-muted">
-                    When enabled, debug traces are stored for requests that write to the inference
-                    error log or trigger a cooldown, even while global debug tracing is off.
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={captureTraceOnError}
-                onChange={handleToggleCaptureTraceOnError}
-                disabled={!captureTraceLoaded || captureTraceSaving}
-                aria-label="Toggle capture trace on error"
-              />
-            </div>
-          </Disclosure>
+          <TimeoutSettings
+            config={timeoutConfig}
+            loaded={timeoutLoaded}
+            saving={timeoutSaving}
+            defaultInput={timeoutDefaultInput}
+            validation={timeoutDefaultValidation}
+            onDefaultChange={setTimeoutDefaultInput}
+            onSave={handleSaveTimeout}
+          />
 
-          {/* ─── Cooldown Settings ──────────────────────────────────── */}
-          <Disclosure
-            title="Cooldown Settings"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveCooldown}
-                isLoading={cooldownSaving}
-                disabled={!isCooldownValid}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
+          <StallDetectionSettings
+            loaded={stallLoaded}
+            saving={stallSaving}
+            ttfbInput={stallTtfbInput}
+            ttfbBytesInput={stallTtfbBytesInput}
+            minBpsInput={stallMinBpsInput}
+            windowInput={stallWindowInput}
+            graceInput={stallGraceInput}
+            ttfbValidation={stallTtfbValidation}
+            ttfbBytesValidation={stallTtfbBytesValidation}
+            minBpsValidation={stallMinBpsValidation}
+            windowValidation={stallWindowValidation}
+            graceValidation={stallGraceValidation}
+            onTtfbChange={setStallTtfbInput}
+            onTtfbBytesChange={setStallTtfbBytesInput}
+            onMinBpsChange={setStallMinBpsInput}
+            onWindowChange={setStallWindowInput}
+            onGraceChange={setStallGraceInput}
+            onSave={handleSaveStall}
+          />
+
+          <CompactionSettings
+            config={compactionConfig}
+            loaded={compactionLoaded}
+            saving={compactionSaving}
+            onChange={setCompactionConfig}
+            onSave={handleSaveCompaction}
+          />
+
+          <McpOAuthSettings
+            config={mcpOAuthConfig}
+            loaded={mcpOAuthLoaded}
+            saving={mcpOAuthSaving}
+            issuerInput={mcpOAuthIssuerInput}
+            issuerValidation={issuerValidation}
+            onEnabledChange={(enabled) => setMcpOAuthConfig({ ...mcpOAuthConfig, enabled })}
+            onIssuerChange={setMcpOAuthIssuerInput}
+            onSave={handleSaveMcpOAuth}
+          />
+
+          <ExplorationSettings
+            background={bgExploration}
+            saving={explorationSaving}
+            backgroundSaving={bgExplorationSaving}
+            stalenessInput={bgStalenessInput}
+            concurrencyInput={bgConcurrencyInput}
+            performanceInput={explorationPerformanceInput}
+            latencyInput={explorationLatencyInput}
+            e2eInput={explorationE2EInput}
+            stalenessValidation={stalenessValidation}
+            concurrencyValidation={concurrencyValidation}
+            performanceValidation={perfValidation}
+            latencyValidation={latValidation}
+            e2eValidation={e2eValidation}
+            valid={isExplorationValid}
+            onBackgroundEnabledChange={(enabled) =>
+              setBgExploration((previous) => ({ ...previous, enabled }))
             }
-          >
-            <div className="flex flex-col gap-3">
-              {/* Initial + Max in 2-col grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="cooldownInitialMinutes"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Initial Cooldown (min){' '}
-                    <span className="text-text-muted font-normal">— C₀, first failure</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="cooldownInitialMinutes"
-                      type="number"
-                      min={0.1}
-                      step={0.1}
-                      value={cooldownInitialInput}
-                      onChange={(e) => setCooldownInitialInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    <span className="text-[11px] text-text-muted tabular-nums whitespace-nowrap">
-                      {initialValidation.valid && initialValidation.value !== undefined
-                        ? formatMinutesToMinSec(initialValidation.value)
-                        : cooldownLoaded
-                          ? formatMinutesToMinSec(cooldownPolicy.initialMinutes)
-                          : '—'}
-                    </span>
-                  </div>
-                  {!initialValidation.valid && cooldownInitialInput !== '' && (
-                    <span className="text-[11px] text-warning">{initialValidation.error}</span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="cooldownMaxMinutes"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Maximum Cooldown (min){' '}
-                    <span className="text-text-muted font-normal">— C_max, upper limit</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="cooldownMaxMinutes"
-                      type="number"
-                      min={0.1}
-                      step={0.1}
-                      value={cooldownMaxInput}
-                      onChange={(e) => setCooldownMaxInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    <span className="text-[11px] text-text-muted tabular-nums whitespace-nowrap">
-                      {maxValidation.valid && maxValidation.value !== undefined
-                        ? formatMinutesToMinSec(maxValidation.value)
-                        : cooldownLoaded
-                          ? formatMinutesToMinSec(cooldownPolicy.maxMinutes)
-                          : '—'}
-                    </span>
-                  </div>
-                  {!maxValidation.valid && cooldownMaxInput !== '' && (
-                    <span className="text-[11px] text-warning">{maxValidation.error}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Disclosure>
+            onStalenessChange={setBgStalenessInput}
+            onConcurrencyChange={setBgConcurrencyInput}
+            onPerformanceChange={setExplorationPerformanceInput}
+            onLatencyChange={setExplorationLatencyInput}
+            onE2EChange={setExplorationE2EInput}
+            onSave={handleSaveExploration}
+          />
 
-          {/* ─── Timeout Settings ───────────────────────────────────── */}
-          <Disclosure
-            title="Timeout Settings"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveTimeout}
-                isLoading={timeoutSaving}
-                disabled={!isTimeoutValid}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="timeoutDefaultSeconds"
-                  className="font-body text-[12px] font-medium text-text"
-                >
-                  Default Timeout (seconds){' '}
-                  <span className="text-text-muted font-normal">— global default, 1–3600s</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="timeoutDefaultSeconds"
-                    type="number"
-                    min={1}
-                    max={3600}
-                    step={1}
-                    value={timeoutDefaultInput}
-                    onChange={(e) => setTimeoutDefaultInput(e.target.value)}
-                    className="w-48 h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                  <span className="text-[11px] text-text-muted tabular-nums">
-                    {timeoutDefaultValidation.valid && timeoutDefaultValidation.value !== undefined
-                      ? timeoutDefaultValidation.value >= 60
-                        ? `${Math.floor(timeoutDefaultValidation.value / 60)}m ${timeoutDefaultValidation.value % 60}s`
-                        : `${timeoutDefaultValidation.value}s`
-                      : timeoutLoaded
-                        ? timeoutConfig.defaultSeconds >= 60
-                          ? `${Math.floor(timeoutConfig.defaultSeconds / 60)}m ${timeoutConfig.defaultSeconds % 60}s`
-                          : `${timeoutConfig.defaultSeconds}s`
-                        : '—'}
-                  </span>
-                </div>
-                {!timeoutDefaultValidation.valid && timeoutDefaultInput !== '' && (
-                  <span className="text-[11px] text-warning">{timeoutDefaultValidation.error}</span>
-                )}
-              </div>
-            </div>
-          </Disclosure>
+          <NetworkSettings
+            trustedProxies={trustedProxies}
+            loaded={trustedProxiesLoaded}
+            saving={trustedProxiesSaving}
+            onChange={setTrustedProxies}
+            onSave={handleSaveTrustedProxies}
+          />
 
-          {/* ─── Stall Detection Settings ────────────────────────────── */}
-          <Disclosure
-            title="Stall Detection"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveStall}
-                isLoading={stallSaving}
-                disabled={!isStallValid}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="stallTtfbSeconds"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    TTFB Timeout (s){' '}
-                    <span className="text-text-muted font-normal">— 5–120, empty = off</span>
-                  </label>
-                  <input
-                    id="stallTtfbSeconds"
-                    type="number"
-                    min={5}
-                    max={120}
-                    step={1}
-                    placeholder="Disabled"
-                    value={stallTtfbInput}
-                    onChange={(e) => setStallTtfbInput(e.target.value)}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                  {!stallTtfbValidation.valid && stallTtfbInput !== '' && (
-                    <span className="text-[11px] text-warning">{stallTtfbValidation.error}</span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="stallTtfbBytes"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    TTFB Byte Threshold{' '}
-                    <span className="text-text-muted font-normal">— 50–10,000</span>
-                  </label>
-                  <input
-                    id="stallTtfbBytes"
-                    type="number"
-                    min={50}
-                    max={10000}
-                    step={1}
-                    value={stallTtfbBytesInput}
-                    onChange={(e) => setStallTtfbBytesInput(e.target.value)}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                  {!stallTtfbBytesValidation.valid && stallTtfbBytesInput !== '' && (
-                    <span className="text-[11px] text-warning">
-                      {stallTtfbBytesValidation.error}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="stallMinBps"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Min Bytes/sec{' '}
-                    <span className="text-text-muted font-normal">— 50–5,000, empty = off</span>
-                  </label>
-                  <input
-                    id="stallMinBps"
-                    type="number"
-                    min={50}
-                    max={5000}
-                    step={1}
-                    placeholder="Disabled"
-                    value={stallMinBpsInput}
-                    onChange={(e) => setStallMinBpsInput(e.target.value)}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                  {!stallMinBpsValidation.valid && stallMinBpsInput !== '' && (
-                    <span className="text-[11px] text-warning">{stallMinBpsValidation.error}</span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="stallWindowSeconds"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Sliding Window (s) <span className="text-text-muted font-normal">— 3–30</span>
-                  </label>
-                  <input
-                    id="stallWindowSeconds"
-                    type="number"
-                    min={3}
-                    max={30}
-                    step={1}
-                    value={stallWindowInput}
-                    onChange={(e) => setStallWindowInput(e.target.value)}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                  {!stallWindowValidation.valid && stallWindowInput !== '' && (
-                    <span className="text-[11px] text-warning">{stallWindowValidation.error}</span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="stallGraceSeconds"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Grace Period (s){' '}
-                    <span className="text-text-muted font-normal">— 0–120, post-TTFB pause</span>
-                  </label>
-                  <input
-                    id="stallGraceSeconds"
-                    type="number"
-                    min={0}
-                    max={120}
-                    step={1}
-                    value={stallGraceInput}
-                    onChange={(e) => setStallGraceInput(e.target.value)}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                  {!stallGraceValidation.valid && stallGraceInput !== '' && (
-                    <span className="text-[11px] text-warning">{stallGraceValidation.error}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Disclosure>
+          <ModelMetadataCard loading={isMetadataRefreshLoading} onRefresh={handleRefreshMetadata} />
 
-          {/* ─── Context Compaction Settings ────────────────────────────── */}
-          <Disclosure
-            title="Context Compaction"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveCompaction}
-                isLoading={compactionSaving}
-                disabled={!compactionLoaded}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-3">
-              {/* enabled toggle */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-body text-[12px] font-medium text-text">Enabled</p>
-                  <p className="font-body text-[11px] text-text-muted">
-                    Automatically compact context when the trigger threshold is reached.
-                  </p>
-                </div>
-                <Switch
-                  checked={compactionConfig.enabled ?? false}
-                  onChange={(checked) =>
-                    setCompactionConfig({ ...compactionConfig, enabled: checked })
-                  }
-                  aria-label="Toggle context compaction on/off"
-                />
-              </div>
+          <BackupRestoreCard
+            restoreInputRef={restoreInputRef}
+            restoreLoading={isRestoreLoading}
+            fullBackupLoading={isFullBackupLoading}
+            backupLoading={isBackupLoading}
+            resetLogsLoading={isResetLogsLoading}
+            onRestoreClick={handleRestoreClick}
+            onRestoreFileSelect={handleRestoreFileSelect}
+            onFullBackupDownload={handleFullBackupDownload}
+            onBackupDownload={handleBackupDownload}
+            onResetLogs={handleResetLogs}
+          />
 
-              {/* strategy */}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="compactionStrategy"
-                  className="font-body text-[12px] font-medium text-text"
-                >
-                  Strategy
-                </label>
-                <select
-                  id="compactionStrategy"
-                  value={compactionConfig.strategy ?? 'native'}
-                  onChange={(e) =>
-                    setCompactionConfig({
-                      ...compactionConfig,
-                      strategy: e.target.value as 'native' | 'headroom',
-                    })
-                  }
-                  className="w-48 h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary"
-                >
-                  <option value="native">native</option>
-                  <option value="headroom">headroom</option>
-                </select>
-              </div>
+          <CardLayoutCard
+            cardLayout={cardLayout}
+            fileInputRef={fileInputRef}
+            onExport={handleExportLayout}
+            onImport={handleImportLayout}
+            onFileSelect={handleFileSelect}
+          />
 
-              {/* trigger ratio + absoluteTriggerTokens */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="compactionTriggerRatio"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Trigger Ratio{' '}
-                    <span className="text-text-muted font-normal">— fraction 0–1</span>
-                  </label>
-                  <input
-                    id="compactionTriggerRatio"
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    placeholder="e.g. 0.8"
-                    value={compactionConfig.triggerRatio ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? undefined : Number(e.target.value);
-                      setCompactionConfig({ ...compactionConfig, triggerRatio: v });
-                    }}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="compactionAbsoluteTrigger"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Absolute Trigger Tokens{' '}
-                    <span className="text-text-muted font-normal">— empty = off</span>
-                  </label>
-                  <input
-                    id="compactionAbsoluteTrigger"
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="Disabled"
-                    value={compactionConfig.absoluteTriggerTokens ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? null : Number(e.target.value);
-                      setCompactionConfig({ ...compactionConfig, absoluteTriggerTokens: v });
-                    }}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="compactionMinTokens"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Min Tokens
-                  </label>
-                  <input
-                    id="compactionMinTokens"
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="e.g. 1000"
-                    value={compactionConfig.minTokens ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? undefined : Number(e.target.value);
-                      setCompactionConfig({ ...compactionConfig, minTokens: v });
-                    }}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="compactionProtectRecent"
-                    className="font-body text-[12px] font-medium text-text"
-                  >
-                    Protect Recent (messages)
-                  </label>
-                  <input
-                    id="compactionProtectRecent"
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="e.g. 4"
-                    value={compactionConfig.protectRecent ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? undefined : Number(e.target.value);
-                      setCompactionConfig({ ...compactionConfig, protectRecent: v });
-                    }}
-                    className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                  />
-                </div>
-              </div>
-
-              {/* native sub-settings */}
-              {compactionConfig.strategy === 'native' && (
-                <div className="flex flex-col gap-2">
-                  <p className="font-body text-[12px] font-medium text-text">Native Settings</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <label
-                        htmlFor="compactionNativeMaxArrayItems"
-                        className="font-body text-[12px] font-medium text-text"
-                      >
-                        Max Array Items
-                      </label>
-                      <input
-                        id="compactionNativeMaxArrayItems"
-                        type="number"
-                        min={1}
-                        step={1}
-                        placeholder="e.g. 20"
-                        value={compactionConfig.native?.maxArrayItems ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? undefined : Number(e.target.value);
-                          setCompactionConfig({
-                            ...compactionConfig,
-                            native: { ...compactionConfig.native, maxArrayItems: v },
-                          });
-                        }}
-                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label
-                        htmlFor="compactionNativeMaxStringChars"
-                        className="font-body text-[12px] font-medium text-text"
-                      >
-                        Max String Chars
-                      </label>
-                      <input
-                        id="compactionNativeMaxStringChars"
-                        type="number"
-                        min={1}
-                        step={1}
-                        placeholder="e.g. 500"
-                        value={compactionConfig.native?.maxStringChars ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? undefined : Number(e.target.value);
-                          setCompactionConfig({
-                            ...compactionConfig,
-                            native: { ...compactionConfig.native, maxStringChars: v },
-                          });
-                        }}
-                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* headroom sub-settings */}
-              {compactionConfig.strategy === 'headroom' && (
-                <div className="flex flex-col gap-2">
-                  <p className="font-body text-[12px] font-medium text-text">Headroom Settings</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1 col-span-2">
-                      <label
-                        htmlFor="compactionHeadroomBaseUrl"
-                        className="font-body text-[12px] font-medium text-text"
-                      >
-                        Base URL
-                      </label>
-                      <input
-                        id="compactionHeadroomBaseUrl"
-                        type="text"
-                        placeholder="http://localhost:8787"
-                        value={compactionConfig.headroom?.baseUrl ?? ''}
-                        onChange={(e) =>
-                          setCompactionConfig({
-                            ...compactionConfig,
-                            headroom: {
-                              ...compactionConfig.headroom,
-                              baseUrl: e.target.value || undefined,
-                            },
-                          })
-                        }
-                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1 col-span-2">
-                      <label
-                        htmlFor="compactionHeadroomApiKey"
-                        className="font-body text-[12px] font-medium text-text"
-                      >
-                        API Key
-                      </label>
-                      <input
-                        id="compactionHeadroomApiKey"
-                        type="password"
-                        placeholder="••••••••"
-                        value={compactionConfig.headroom?.apiKey ?? ''}
-                        onChange={(e) =>
-                          setCompactionConfig({
-                            ...compactionConfig,
-                            headroom: {
-                              ...compactionConfig.headroom,
-                              apiKey: e.target.value || undefined,
-                            },
-                          })
-                        }
-                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label
-                        htmlFor="compactionHeadroomTargetRatio"
-                        className="font-body text-[12px] font-medium text-text"
-                      >
-                        Target Ratio{' '}
-                        <span className="text-text-muted font-normal">— 0–1, empty = off</span>
-                      </label>
-                      <input
-                        id="compactionHeadroomTargetRatio"
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        placeholder="Disabled"
-                        value={compactionConfig.headroom?.targetRatio ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? null : Number(e.target.value);
-                          setCompactionConfig({
-                            ...compactionConfig,
-                            headroom: { ...compactionConfig.headroom, targetRatio: v },
-                          });
-                        }}
-                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label
-                        htmlFor="compactionHeadroomTimeoutMs"
-                        className="font-body text-[12px] font-medium text-text"
-                      >
-                        Timeout (ms)
-                      </label>
-                      <input
-                        id="compactionHeadroomTimeoutMs"
-                        type="number"
-                        min={0}
-                        step={1}
-                        placeholder="e.g. 30000"
-                        value={compactionConfig.headroom?.timeoutMs ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? undefined : Number(e.target.value);
-                          setCompactionConfig({
-                            ...compactionConfig,
-                            headroom: { ...compactionConfig.headroom, timeoutMs: v },
-                          });
-                        }}
-                        className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Disclosure>
-
-          {/* ─── MCP OAuth Settings ─────────────────────────────────────── */}
-          <Disclosure
-            title="MCP OAuth"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveMcpOAuth}
-                isLoading={mcpOAuthSaving}
-                disabled={!isMcpOAuthValid}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <LockKeyhole size={16} className="text-primary" />
-                  <div>
-                    <p className="font-body text-[12px] font-medium text-text">
-                      Enable OAuth for MCP clients
-                    </p>
-                    <p className="font-body text-[11px] text-text-muted">
-                      Shared OAuth authorization for each configured MCP server.
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={mcpOAuthConfig.enabled}
-                  onChange={(checked) => setMcpOAuthConfig({ ...mcpOAuthConfig, enabled: checked })}
-                  aria-label="Toggle MCP OAuth on/off"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="mcpOAuthIssuer"
-                  className="font-body text-[12px] font-medium text-text"
-                >
-                  External issuer URL
-                </label>
-                <input
-                  id="mcpOAuthIssuer"
-                  type="url"
-                  value={mcpOAuthIssuerInput}
-                  onChange={(e) => setMcpOAuthIssuerInput(e.target.value)}
-                  placeholder="https://your-instance.example.com"
-                  className="w-full h-[32px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                />
-                {!issuerValidation.valid && (
-                  <span className="text-[11px] text-warning">{issuerValidation.error}</span>
-                )}
-                <p className="font-body text-[11px] text-text-muted leading-relaxed">
-                  Use the externally reachable URL for this Plexus instance, such as a Tailscale
-                  Funnel URL. Each MCP server derives its protected resource from this issuer, such
-                  as <code>/mcp/exa</code>. If this does not match the actual external URL, OAuth
-                  discovery metadata will point at the wrong origin and MCP connections can fail.
-                </p>
-              </div>
-            </div>
-          </Disclosure>
-
-          {/* ─── Exploration Settings (inline rates + background mode) ───── */}
-          <Disclosure
-            title="Exploration Settings"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveExploration}
-                isLoading={explorationSaving || bgExplorationSaving}
-                disabled={!isExplorationValid}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-3">
-              {/* Background exploration: master toggle */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Radar size={16} className="text-primary" />
-                  <div>
-                    <p className="font-body text-[12px] font-medium text-text">
-                      Background Exploration
-                    </p>
-                    <p className="font-body text-[11px] text-text-muted">
-                      Fire background probe requests instead of diverting live traffic. Probes use
-                      apiKey="probe".
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={bgExploration.enabled}
-                  onChange={(checked) =>
-                    setBgExploration((prev) => ({ ...prev, enabled: checked }))
-                  }
-                  aria-label="Toggle background exploration on/off"
-                />
-              </div>
-
-              {/* Background tunables — only rendered when background mode is on */}
-              {bgExploration.enabled && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="bgExplorationStaleness"
-                      className="font-body text-[12px] font-medium text-text"
-                    >
-                      Staleness Threshold (s){' '}
-                      <span className="text-text-muted font-normal">— min 1, default 600</span>
-                    </label>
-                    <input
-                      id="bgExplorationStaleness"
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={bgStalenessInput}
-                      onChange={(e) => setBgStalenessInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    {!stalenessValidation.valid && bgStalenessInput !== '' && (
-                      <span className="text-[11px] text-warning">{stalenessValidation.error}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="bgExplorationConcurrency"
-                      className="font-body text-[12px] font-medium text-text"
-                    >
-                      Worker Concurrency{' '}
-                      <span className="text-text-muted font-normal">— 1–16, default 2</span>
-                    </label>
-                    <input
-                      id="bgExplorationConcurrency"
-                      type="number"
-                      min={1}
-                      max={16}
-                      step={1}
-                      value={bgConcurrencyInput}
-                      onChange={(e) => setBgConcurrencyInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    {!concurrencyValidation.valid && bgConcurrencyInput !== '' && (
-                      <span className="text-[11px] text-warning">
-                        {concurrencyValidation.error}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Inline rate tunables — only rendered when background mode is off */}
-              {!bgExploration.enabled && (
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="performanceExplorationRate"
-                      className="font-body text-[12px] font-medium text-text"
-                    >
-                      Performance Rate{' '}
-                      <span className="text-text-muted font-normal">— 0–1, default 0.05</span>
-                    </label>
-                    <input
-                      id="performanceExplorationRate"
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={explorationPerformanceInput}
-                      onChange={(e) => setExplorationPerformanceInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    {!perfValidation.valid && explorationPerformanceInput !== '' && (
-                      <span className="text-[11px] text-warning">{perfValidation.error}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="latencyExplorationRate"
-                      className="font-body text-[12px] font-medium text-text"
-                    >
-                      Latency Rate{' '}
-                      <span className="text-text-muted font-normal">— 0–1, default 0.05</span>
-                    </label>
-                    <input
-                      id="latencyExplorationRate"
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={explorationLatencyInput}
-                      onChange={(e) => setExplorationLatencyInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    {!latValidation.valid && explorationLatencyInput !== '' && (
-                      <span className="text-[11px] text-warning">{latValidation.error}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label
-                      htmlFor="e2ePerformanceExplorationRate"
-                      className="font-body text-[12px] font-medium text-text"
-                    >
-                      E2E Rate{' '}
-                      <span className="text-text-muted font-normal">— 0–1, default 0.05</span>
-                    </label>
-                    <input
-                      id="e2ePerformanceExplorationRate"
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={explorationE2EInput}
-                      onChange={(e) => setExplorationE2EInput(e.target.value)}
-                      className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
-                    />
-                    {!e2eValidation.valid && explorationE2EInput !== '' && (
-                      <span className="text-[11px] text-warning">{e2eValidation.error}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Disclosure>
-
-          {/* ─── Network / Trusted Proxies ──────────────────────────── */}
-          <Disclosure
-            title="Network Settings"
-            defaultOpen={false}
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveTrustedProxies}
-                isLoading={trustedProxiesSaving}
-                disabled={!trustedProxiesLoaded}
-                leftIcon={<Save size={14} />}
-              >
-                Save
-              </Button>
-            }
-          >
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <Network size={16} className="text-primary" />
-                <div>
-                  <p className="font-body text-[12px] font-medium text-text">Trusted Proxies</p>
-                  <p className="font-body text-[11px] text-text-muted">
-                    IPs/CIDRs of reverse proxies whose forwarding headers (X-Forwarded-For,
-                    CF-Connecting-IP, …) are believed when resolving a client&apos;s IP. Requests
-                    arriving directly from any other address use their real connection IP instead,
-                    so spoofed headers cannot defeat per-key IP allowlists.
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <TagSelect
-                  label="Trusted Proxy IPs"
-                  placeholder="e.g. 10.0.0.0/8  172.16.0.0/12  192.168.1.5"
-                  options={[]}
-                  selected={trustedProxies}
-                  allowCustom
-                  splitOnSpace
-                  onChange={setTrustedProxies}
-                />
-                <p className="text-xs text-text-muted mt-2">
-                  Type entries separated by spaces. The default trust-all list is{' '}
-                  <code>0.0.0.0/0</code> plus <code>::/0</code> — keep this only if Plexus is not
-                  publicly reachable except through your proxy. An empty list trusts no proxies.
-                  Accepts IPv4/IPv6, CIDR, and ranges.
-                </p>
-              </div>
-            </div>
-          </Disclosure>
-
-          <Card
-            title="Model Metadata"
-            extra={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleRefreshMetadata}
-                isLoading={isMetadataRefreshLoading}
-                leftIcon={<RefreshCw size={14} />}
-              >
-                Refresh Metadata
-              </Button>
-            }
-          >
-            <p className="text-sm text-text-secondary">
-              Catalog metadata for model aliases auto-refreshes every 60 minutes. Use this to
-              trigger an immediate reload from OpenRouter, models.dev, and Catwalk.
-            </p>
-          </Card>
-
-          <Card title="Backup & Restore">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 mr-1">
-                <AlertTriangle size={13} className="text-warning shrink-0" />
-                <span className="font-body text-[11px] text-text-muted">
-                  Sensitive data — store securely
-                </span>
-              </div>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleRestoreClick}
-                isLoading={isRestoreLoading}
-                leftIcon={<Upload size={14} />}
-              >
-                Restore
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleFullBackupDownload}
-                isLoading={isFullBackupLoading}
-                leftIcon={<Archive size={14} />}
-              >
-                Full Backup
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleBackupDownload}
-                isLoading={isBackupLoading}
-                leftIcon={<HardDrive size={14} />}
-              >
-                Config Backup
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleResetLogs}
-                isLoading={isResetLogsLoading}
-                leftIcon={<Trash2 size={14} />}
-              >
-                Reset All Logs
-              </Button>
-              <input
-                ref={restoreInputRef}
-                type="file"
-                accept=".json,.tar.gz,.tgz,application/gzip,application/x-gzip,application/octet-stream"
-                className="hidden"
-                onChange={handleRestoreFileSelect}
-              />
-            </div>
-          </Card>
-
-          <Card
-            title="Card Layout"
-            extra={
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleExportLayout}
-                  leftIcon={<Download size={14} />}
-                >
-                  Export
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleImportLayout}
-                  leftIcon={<Upload size={14} />}
-                >
-                  Import
-                </Button>
-              </div>
-            }
-          >
-            <p className="text-sm text-text-secondary mb-4">
-              Import or export your Live Metrics card layout configuration.
-            </p>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-
-            <div>
-              <h4 className="font-heading text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
-                Current Card Order
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {cardLayout.length === 0 && (
-                  <p className="text-xs text-text-muted italic">
-                    Default layout — no customizations saved.
-                  </p>
-                )}
-                {cardLayout.map((card, index) => (
-                  <div
-                    key={card.id}
-                    className="px-3 py-1.5 bg-bg-glass rounded-md border border-border-glass text-xs text-text"
-                  >
-                    <span className="text-text-muted mr-2">{index + 1}.</span>
-                    {card.id}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          {/* ─── Configuration Snapshot ─────────────────────────────── */}
-          <Disclosure
-            title="Configuration Snapshot"
-            defaultOpen={false}
-            extra={
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={loadConfig}
-                  leftIcon={<RotateCcw size={14} />}
-                >
-                  Refresh
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleRestart}
-                  isLoading={isRestarting}
-                  leftIcon={<RefreshCw size={14} />}
-                >
-                  Restart
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleExportConfig}
-                  disabled={!isConfigLoaded}
-                  leftIcon={<Download size={14} />}
-                >
-                  Export JSON
-                </Button>
-              </div>
-            }
-          >
-            <div className="h-[400px] sm:h-[500px] lg:h-[600px] rounded-sm overflow-hidden">
-              <EditorErrorBoundary>
-                <Editor
-                  height="100%"
-                  defaultLanguage="json"
-                  value={config}
-                  theme="vs-dark"
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    fontSize: 13,
-                    fontFamily: '"Fira Code", "Fira Mono", monospace',
-                  }}
-                />
-              </EditorErrorBoundary>
-            </div>
-          </Disclosure>
+          <ConfigurationSnapshot
+            config={config}
+            loaded={isConfigLoaded}
+            restarting={isRestarting}
+            onRefresh={loadConfig}
+            onRestart={handleRestart}
+            onExport={handleExportConfig}
+          />
         </div>
       </PageContainer>
     </div>
