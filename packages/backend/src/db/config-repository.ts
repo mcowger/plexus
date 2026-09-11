@@ -1,30 +1,26 @@
-import { eq, and, sql, inArray, isNotNull } from 'drizzle-orm';
-import { getDatabase, getSchema, getCurrentDialect } from './client';
-import { logger } from '../utils/logger';
-import {
-  encrypt,
-  decrypt,
-  encryptField,
-  decryptField,
-  hashSecret,
-  isEncrypted,
-  isEncryptionEnabled,
-} from '../utils/encryption';
+import { and, eq } from 'drizzle-orm';
+import { getDatabase, getSchema } from './client';
+import { decrypt, decryptField, encrypt, encryptField } from '../utils/encryption';
 import type {
-  ProviderConfig,
-  ModelConfig,
-  KeyConfig,
-  QuotaDefinition,
-  McpServerConfig,
-  FailoverPolicy,
-  CooldownPolicy,
   BackgroundExplorationConfig,
-  TimeoutConfig,
-  StallConfigType,
+  CompactionSettingsConfig,
+  CooldownPolicy,
+  FailoverPolicy,
+  KeyConfig,
   McpOAuthConfig,
-  MetadataOverrides,
+  McpServerConfig,
+  ModelConfig,
+  ProviderConfig,
+  QuotaDefinition,
+  StallConfigType,
+  TimeoutConfig,
 } from '../config';
-import { McpOauthRepository } from './mcp-oauth-repository';
+import { decryptJsonField, encryptJsonField, fromBool, now, toBool } from './repository-utils';
+import { AliasRepository } from './alias-repository';
+import { KeyRepository } from './key-repository';
+import { ProviderRepository } from './provider-repository';
+import { QuotaRepository } from './quota-repository';
+import { SystemSettingsRepository } from './system-settings-repository';
 
 export interface CustomCheckerRecord {
   id: string;
@@ -33,224 +29,6 @@ export interface CustomCheckerRecord {
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
-}
-
-// Helper to parse JSON from SQLite text columns (PG jsonb auto-deserializes)
-function parseJson<T>(value: unknown): T | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'object') return value as T;
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value) as T;
-    } catch {
-      // PG jsonb auto-deserializes plain strings (e.g. "oauth://...") before
-      // they reach us, so the value is already the correct T — return it as-is.
-      return value as unknown as T;
-    }
-  }
-  return null;
-}
-
-function toJson(value: unknown): string | unknown {
-  if (value === null || value === undefined) return null;
-  const dialect = getCurrentDialect();
-  if (dialect === 'sqlite') {
-    return JSON.stringify(value);
-  }
-  return value; // PG jsonb handles objects natively
-}
-
-/**
- * Normalize adapter entries from DB storage to the canonical { name, options, enabled } form.
- *
- * Legacy rows stored adapter entries as bare strings (e.g. ["reasoning_content"]).
- * This function converts them to the uniform object form:
- * [{ name: "reasoning_content", options: {}, enabled: true }]
- *
- * Rows are self-healing: on next save through the API, the normalized form
- * is persisted back to the DB.
- */
-function normalizeAdapterEntries(
-  raw: unknown
-): Array<{ name: string; options: Record<string, any>; enabled: boolean }> | null {
-  if (raw === null || raw === undefined) return null;
-  const arr = Array.isArray(raw) ? raw : [raw];
-  if (arr.length === 0) return null;
-
-  return arr
-    .map((entry) => {
-      if (typeof entry === 'string') {
-        // Legacy bare-string form
-        return { name: entry, options: {}, enabled: true };
-      }
-      if (entry && typeof entry === 'object' && 'name' in entry) {
-        // Already in object form
-        return {
-          name: (entry as any).name,
-          options: (entry as any).options ?? {},
-          enabled: (entry as any).enabled ?? true,
-        };
-      }
-      // Malformed entry — skip with a warning (don't crash)
-      logger.warn(`Skipping malformed adapter entry: ${JSON.stringify(entry)}`);
-      return null;
-    })
-    .filter(
-      (e): e is { name: string; options: Record<string, any>; enabled: boolean } => e !== null
-    );
-}
-
-/**
- * Encrypt a JSON value for storage in a TEXT column.
- * JSON-serializes the value, then encrypts the resulting string.
- * If encryption is disabled, returns the JSON string as-is.
- */
-function encryptJsonField(value: unknown): string {
-  if (value === null || value === undefined) return null as unknown as string;
-  const strVal = typeof value === 'string' ? value : JSON.stringify(value);
-  return encrypt(strVal);
-}
-
-/**
- * Decrypt a JSON value read from the database. Handles:
- * - Encrypted strings (enc:v1:...) → decrypt then JSON.parse
- * - Plain strings (SQLite text) → JSON.parse
- * - Already-parsed objects (PG jsonb with unencrypted data) → return as-is
- */
-function decryptJsonField<T>(value: unknown): T | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'string') {
-    const decrypted = decrypt(value);
-    try {
-      return JSON.parse(decrypted) as T;
-    } catch {
-      return decrypted as unknown as T;
-    }
-  }
-  if (typeof value === 'object') return value as T;
-  return null;
-}
-
-function hasAnyOverrideField(o: MetadataOverrides): boolean {
-  if (o.name !== undefined) return true;
-  if (o.description !== undefined) return true;
-  if (o.context_length !== undefined) return true;
-  if (o.pricing && Object.values(o.pricing).some((v) => v !== undefined)) return true;
-  if (o.architecture) {
-    if (o.architecture.tokenizer !== undefined) return true;
-    if (o.architecture.input_modalities !== undefined) return true;
-    if (o.architecture.output_modalities !== undefined) return true;
-  }
-  if (o.supported_parameters !== undefined) return true;
-  if (o.top_provider && Object.values(o.top_provider).some((v) => v !== undefined)) return true;
-  return false;
-}
-
-function overrideRowToOverrides(row: any): MetadataOverrides {
-  const overrides: MetadataOverrides = {};
-  if (row.name != null) overrides.name = row.name;
-  if (row.description != null) overrides.description = row.description;
-  if (row.contextLength != null) overrides.context_length = row.contextLength;
-
-  const pricing: MetadataOverrides['pricing'] = {};
-  if (row.pricingPrompt != null) pricing.prompt = row.pricingPrompt;
-  if (row.pricingCompletion != null) pricing.completion = row.pricingCompletion;
-  if (row.pricingInputCacheRead != null) pricing.input_cache_read = row.pricingInputCacheRead;
-  if (row.pricingInputCacheWrite != null) pricing.input_cache_write = row.pricingInputCacheWrite;
-  if (Object.keys(pricing).length > 0) overrides.pricing = pricing;
-
-  const architecture: MetadataOverrides['architecture'] = {};
-  const inputMods = parseJson<string[]>(row.architectureInputModalities);
-  const outputMods = parseJson<string[]>(row.architectureOutputModalities);
-  if (inputMods && Array.isArray(inputMods)) architecture.input_modalities = inputMods;
-  if (outputMods && Array.isArray(outputMods)) architecture.output_modalities = outputMods;
-  if (row.architectureTokenizer != null) architecture.tokenizer = row.architectureTokenizer;
-  if (Object.keys(architecture).length > 0) overrides.architecture = architecture;
-
-  const supportedParams = parseJson<string[]>(row.supportedParameters);
-  if (supportedParams && Array.isArray(supportedParams))
-    overrides.supported_parameters = supportedParams;
-
-  const topProvider: MetadataOverrides['top_provider'] = {};
-  if (row.topProviderContextLength != null)
-    topProvider.context_length = row.topProviderContextLength;
-  if (row.topProviderMaxCompletionTokens != null)
-    topProvider.max_completion_tokens = row.topProviderMaxCompletionTokens;
-  if (Object.keys(topProvider).length > 0) overrides.top_provider = topProvider;
-
-  return overrides;
-}
-
-function toBool(value: unknown): boolean {
-  if (typeof value === 'boolean') return value;
-  return value === 1 || value === true;
-}
-
-function fromBool(value: boolean): number | boolean {
-  const dialect = getCurrentDialect();
-  if (dialect === 'sqlite') return value ? 1 : 0;
-  return value;
-}
-
-function now(): number {
-  return Date.now();
-}
-
-function parseStringArray(value: string | null | undefined): string[] | undefined {
-  if (!value) return undefined;
-
-  try {
-    const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return undefined;
-
-    const normalized = parsed
-      .filter((entry): entry is string => typeof entry === 'string')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-
-    return normalized.length > 0 ? normalized : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function stringifyStringArray(value: string[] | undefined): string | null {
-  if (!value || value.length === 0) return null;
-
-  const normalized = value.map((entry) => entry.trim()).filter(Boolean);
-  return normalized.length > 0 ? JSON.stringify(normalized) : null;
-}
-
-/**
- * Serialize `config.quotas` for `api_keys.quota_names`. Unlike
- * `stringifyStringArray`, an empty (but DEFINED) array is written as the
- * literal `'[]'` rather than collapsed to NULL — otherwise `saveKey` with
- * `quotas: []` (admin clearing a key's quotas) would write NULL, and the
- * read path would then fall back to the deprecated `quota_name` column,
- * resurrecting a quota the admin just removed. Only an actually-absent
- * (`undefined`) `quotas` field writes NULL, preserving the legacy
- * `quota_name` fallback for rows not yet migrated to `quota_names`.
- */
-function stringifyQuotaNames(value: string[] | undefined): string | null {
-  if (value === undefined) return null;
-  const normalized = value.map((entry) => entry.trim()).filter(Boolean);
-  return JSON.stringify(normalized);
-}
-
-/**
- * Effective `quotas` list for an `api_keys` row. `quota_names` (new, array)
- * is authoritative whenever it's non-NULL — including an explicitly-saved
- * empty array (admin cleared the key's quotas). `quota_name` (deprecated,
- * single) is a read-fallback ONLY for rows where `quota_names` has never
- * been written. Shared by `getAllKeys` and `getKeyBySecret` so the admin
- * listing and live enforcement resolve quotas identically.
- */
-function quotasFromRow(row: {
-  quotaNames: string | null;
-  quotaName: string | null;
-}): string[] | undefined {
-  if (row.quotaNames != null) return parseStringArray(row.quotaNames) ?? [];
-  return row.quotaName ? [row.quotaName] : undefined;
 }
 
 export interface OAuthCredentialsData {
@@ -265,7 +43,27 @@ export interface McpKeyConfig {
   isActive: boolean;
 }
 
+/**
+ * Backwards-compatible facade over the domain-specific configuration repositories.
+ *
+ * Existing services can continue to depend on ConfigRepository while each domain's
+ * persistence logic remains isolated in its own repository.
+ */
+type CustomCheckerRow = {
+  id: string;
+  displayName: string;
+  code: string;
+  enabled: unknown;
+  createdAt: unknown;
+  updatedAt: unknown;
+};
 export class ConfigRepository {
+  private readonly providers = new ProviderRepository();
+  private readonly aliases = new AliasRepository();
+  private readonly keys = new KeyRepository();
+  private readonly quotas = new QuotaRepository();
+  private readonly settings = new SystemSettingsRepository();
+
   private db() {
     return getDatabase();
   }
@@ -275,8 +73,10 @@ export class ConfigRepository {
   }
 
   async getCustomCheckers(): Promise<CustomCheckerRecord[]> {
-    const rows = await this.db().select().from(this.schema().customCheckers);
-    return rows.map((row: any) => ({
+    const rows = (await this.db()
+      .select()
+      .from(this.schema().customCheckers)) as CustomCheckerRow[];
+    return rows.map((row) => ({
       id: row.id,
       displayName: row.displayName,
       code: row.code,
@@ -292,7 +92,7 @@ export class ConfigRepository {
       .from(this.schema().customCheckers)
       .where(eq(this.schema().customCheckers.id, id))
       .limit(1);
-    const row = rows[0] as any;
+    const row = rows[0] as CustomCheckerRow | undefined;
     if (!row) return null;
     return {
       id: row.id,
@@ -360,216 +160,23 @@ export class ConfigRepository {
 
   // ─── Providers ───────────────────────────────────────────────────
 
-  async getAllProviders(): Promise<Record<string, ProviderConfig>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.providers);
-    const result: Record<string, ProviderConfig> = {};
-
-    for (const row of rows) {
-      const models = await this.db()
-        .select()
-        .from(schema.providerModels)
-        .where(eq(schema.providerModels.providerId, row.id))
-        .orderBy(schema.providerModels.sortOrder);
-
-      let oauthAccountId: string | undefined;
-      if (row.oauthCredentialId) {
-        const creds = await this.db()
-          .select({ accountId: schema.oauthCredentials.accountId })
-          .from(schema.oauthCredentials)
-          .where(eq(schema.oauthCredentials.id, row.oauthCredentialId))
-          .limit(1);
-        if (creds.length > 0) oauthAccountId = creds[0]!.accountId;
-      }
-      result[row.slug] = this.rowToProviderConfig(row, models, oauthAccountId);
-    }
-
-    return result;
+  getAllProviders(): Promise<Record<string, ProviderConfig>> {
+    return this.providers.getAllProviders();
   }
 
-  async getProvider(slug: string): Promise<ProviderConfig | null> {
-    const schema = this.schema();
-    const rows = await this.db()
-      .select()
-      .from(schema.providers)
-      .where(eq(schema.providers.slug, slug))
-      .limit(1);
-
-    if (rows.length === 0) return null;
-
-    const row = rows[0]!;
-    const models = await this.db()
-      .select()
-      .from(schema.providerModels)
-      .where(eq(schema.providerModels.providerId, row.id))
-      .orderBy(schema.providerModels.sortOrder);
-
-    let oauthAccountId: string | undefined;
-    if (row.oauthCredentialId) {
-      const creds = await this.db()
-        .select({ accountId: schema.oauthCredentials.accountId })
-        .from(schema.oauthCredentials)
-        .where(eq(schema.oauthCredentials.id, row.oauthCredentialId))
-        .limit(1);
-      if (creds.length > 0) oauthAccountId = creds[0]!.accountId;
-    }
-    return this.rowToProviderConfig(row, models, oauthAccountId);
+  getProvider(slug: string): Promise<ProviderConfig | null> {
+    return this.providers.getProvider(slug);
   }
 
-  async saveProvider(slug: string, config: ProviderConfig): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-
-    // Resolve oauth_credential_id if this is an OAuth provider
-    let oauthCredentialId: number | null = null;
-    if (config.oauth_provider && config.oauth_account) {
-      const creds = await this.db()
-        .select()
-        .from(schema.oauthCredentials)
-        .where(
-          and(
-            eq(schema.oauthCredentials.oauthProviderType, config.oauth_provider),
-            eq(schema.oauthCredentials.accountId, config.oauth_account)
-          )
-        )
-        .limit(1);
-      if (creds.length > 0) {
-        oauthCredentialId = creds[0]!.id;
-      }
-    }
-
-    const providerData = {
-      slug,
-      displayName: config.display_name ?? null,
-      apiBaseUrl: toJson(config.api_base_url),
-      apiKey: encryptField(config.api_key ?? null),
-      oauthProviderType: config.oauth_provider ?? null,
-      oauthCredentialId,
-      enabled: fromBool(config.enabled !== false),
-      disableCooldown: fromBool(config.disable_cooldown === true),
-      stallCooldown: fromBool(config.stall_cooldown === true),
-      allow100PercentUtilization: fromBool(config.allow_100_percent_utilization === true),
-      discount: config.discount ?? null,
-      estimateTokens: fromBool(config.estimateTokens === true),
-      useClaudeMasking: fromBool(config.useClaudeMasking === true),
-      geminiThinkingEnabled: fromBool(config.geminiThinkingEnabled === true),
-      headers: config.headers ? encryptJsonField(config.headers) : null,
-      extraBody: config.extraBody ? toJson(config.extraBody) : null,
-      compaction: config.compaction ? toJson(config.compaction) : null,
-      quotaCheckerType: config.quota_checker?.type ?? null,
-      quotaCheckerId: config.quota_checker?.id ?? null,
-      quotaCheckerEnabled: fromBool(config.quota_checker?.enabled !== false),
-      quotaCheckerInterval: config.quota_checker?.intervalMinutes ?? 30,
-      quotaCheckerOptions: config.quota_checker?.options
-        ? encryptJsonField(config.quota_checker.options)
-        : null,
-      modelAutosyncEnabled: fromBool(config.model_autosync?.enabled === true),
-      modelAutosyncInterval: Math.max(1, config.model_autosync?.intervalMinutes ?? 60),
-      gpuProfile: null,
-      gpuRamGb: null,
-      gpuBandwidthTbS: null,
-      gpuFlopsTflop: null,
-      gpuPowerDrawWatts: null,
-      adapter:
-        config.adapter && Array.isArray(config.adapter) && config.adapter.length > 0
-          ? toJson(config.adapter)
-          : null,
-      autoCompat: fromBool(config.auto_compat === true),
-      timeoutMs: config.timeoutMs ?? null,
-      maxConcurrency: config.maxConcurrency ?? null,
-      piAiProvider: config.pi_ai_provider ?? null,
-      rawPassthrough: config.raw_passthrough ? toJson(config.raw_passthrough) : null,
-      // Per-provider stall detection overrides
-      stallTtfbMs: config.stallTtfbMs ?? null,
-      stallTtfbBytes: config.stallTtfbBytes ?? null,
-      stallMinBps: config.stallMinBps ?? null,
-      stallWindowMs: config.stallWindowMs ?? null,
-      stallGracePeriodMs: config.stallGracePeriodMs ?? null,
-      updatedAt: timestamp,
-    };
-
-    // Upsert provider
-    const existing = await this.db()
-      .select()
-      .from(schema.providers)
-      .where(eq(schema.providers.slug, slug))
-      .limit(1);
-
-    let providerId: number;
-
-    if (existing.length > 0) {
-      providerId = existing[0]!.id;
-      await this.db()
-        .update(schema.providers)
-        .set(providerData)
-        .where(eq(schema.providers.id, providerId));
-    } else {
-      const inserted = await this.db()
-        .insert(schema.providers)
-        .values({ ...providerData, createdAt: timestamp })
-        .returning({ id: schema.providers.id });
-      providerId = inserted[0]!.id;
-    }
-
-    // Replace models
-    await this.db()
-      .delete(schema.providerModels)
-      .where(eq(schema.providerModels.providerId, providerId));
-
-    if (config.models) {
-      if (Array.isArray(config.models)) {
-        // Simple array of model names
-        const modelRows = config.models.map((name: string, idx: number) => ({
-          providerId,
-          modelName: name,
-          sortOrder: idx,
-        }));
-        if (modelRows.length > 0) {
-          await this.db().insert(schema.providerModels).values(modelRows);
-        }
-      } else {
-        // Record<string, ModelProviderConfig>
-        const entries = Object.entries(config.models);
-        const modelRows = entries.map(([name, cfg], idx) => ({
-          providerId,
-          modelName: name,
-          pricingConfig: toJson(cfg.pricing),
-          modelType: cfg.type ?? null,
-          accessVia: cfg.access_via ? toJson(cfg.access_via) : null,
-          extraBody: cfg.extraBody ? toJson(cfg.extraBody) : null,
-          adapter:
-            cfg.adapter && Array.isArray(cfg.adapter) && cfg.adapter.length > 0
-              ? toJson(cfg.adapter)
-              : null,
-          autoCompat: cfg.auto_compat == null ? null : fromBool(cfg.auto_compat === true),
-          maxConcurrency: cfg.maxConcurrency ?? null,
-          piAiModelId: cfg.pi_ai_model_id ?? null,
-          sortOrder: idx,
-        }));
-        if (modelRows.length > 0) {
-          await this.db().insert(schema.providerModels).values(modelRows);
-        }
-      }
-    }
+  saveProvider(slug: string, config: ProviderConfig): Promise<void> {
+    return this.providers.saveProvider(slug, config);
   }
 
-  async deleteProvider(slug: string, cascade: boolean = true): Promise<void> {
-    const schema = this.schema();
-
-    if (cascade) {
-      // Explicitly delete model_alias_targets referencing this provider (keyed by slug, not FK)
-      await this.db()
-        .delete(schema.modelAliasTargets)
-        .where(eq(schema.modelAliasTargets.providerSlug, slug));
-      // FK cascade handles provider_models deletion automatically
-      await this.db().delete(schema.providers).where(eq(schema.providers.slug, slug));
-    } else {
-      // Delete provider and its provider_models, but retain model_alias_targets
-      await this.db().delete(schema.providers).where(eq(schema.providers.slug, slug));
-    }
+  deleteProvider(slug: string, cascade: boolean = true): Promise<void> {
+    return this.providers.deleteProvider(slug, cascade);
   }
 
-  async getProviderModels(providerSlug: string): Promise<
+  getProviderModels(providerSlug: string): Promise<
     Array<{
       modelName: string;
       pricingConfig: unknown;
@@ -577,807 +184,81 @@ export class ConfigRepository {
       accessVia: string[] | null;
     }>
   > {
-    const schema = this.schema();
-    const provider = await this.db()
-      .select()
-      .from(schema.providers)
-      .where(eq(schema.providers.slug, providerSlug))
-      .limit(1);
-
-    if (provider.length === 0) return [];
-
-    const rows = await this.db()
-      .select()
-      .from(schema.providerModels)
-      .where(eq(schema.providerModels.providerId, provider[0]!.id))
-      .orderBy(schema.providerModels.sortOrder);
-
-    return rows.map((r: any) => ({
-      modelName: r.modelName,
-      pricingConfig: parseJson(r.pricingConfig),
-      modelType: r.modelType,
-      accessVia: parseJson<string[]>(r.accessVia),
-    }));
+    return this.providers.getProviderModels(providerSlug);
   }
 
-  async addMissingProviderModels(providerSlug: string, modelNames: string[]): Promise<number> {
-    const schema = this.schema();
-    const normalizedNames = Array.from(
-      new Set(modelNames.map((name) => name.trim()).filter((name) => name.length > 0))
-    );
-    if (normalizedNames.length === 0) return 0;
-
-    const provider = await this.db()
-      .select()
-      .from(schema.providers)
-      .where(eq(schema.providers.slug, providerSlug))
-      .limit(1);
-
-    if (provider.length === 0) return 0;
-
-    const providerId = provider[0]!.id;
-    const existing = await this.db()
-      .select()
-      .from(schema.providerModels)
-      .where(eq(schema.providerModels.providerId, providerId))
-      .orderBy(schema.providerModels.sortOrder);
-
-    const existingNames = new Set(existing.map((row: any) => row.modelName));
-    const missingNames = normalizedNames.filter((name) => !existingNames.has(name));
-    if (missingNames.length === 0) return 0;
-
-    const maxSortOrder = existing.reduce(
-      (max: number, row: any) => Math.max(max, row.sortOrder ?? -1),
-      -1
-    );
-
-    await this.db()
-      .insert(schema.providerModels)
-      .values(
-        missingNames.map((modelName, idx) => ({
-          providerId,
-          modelName,
-          pricingConfig: toJson({ source: 'simple', input: 0, output: 0 }),
-          accessVia: toJson([]),
-          sortOrder: maxSortOrder + idx + 1,
-        }))
-      );
-
-    return missingNames.length;
-  }
-
-  private rowToProviderConfig(row: any, modelRows: any[], oauthAccountId?: string): ProviderConfig {
-    const apiBaseUrl = parseJson<string | Record<string, string>>(row.apiBaseUrl);
-
-    // Reconstruct models
-    let models: string[] | Record<string, any> | undefined;
-    if (modelRows.length > 0) {
-      const hasConfig = modelRows.some((m: any) => m.pricingConfig !== null);
-      if (hasConfig) {
-        models = {};
-        for (const m of modelRows) {
-          (models as Record<string, any>)[m.modelName] = {
-            pricing: parseJson(m.pricingConfig) ?? { source: 'simple', input: 0, output: 0 },
-            ...(m.modelType ? { type: m.modelType } : {}),
-            ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
-            ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
-            ...(m.adapter ? { adapter: normalizeAdapterEntries(parseJson(m.adapter)) } : {}),
-            ...(m.autoCompat != null ? { auto_compat: toBool(m.autoCompat) } : {}),
-            ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
-            ...(m.piAiModelId != null ? { pi_ai_model_id: m.piAiModelId } : {}),
-          };
-        }
-      } else {
-        models = modelRows.map((m: any) => m.modelName);
-      }
-    }
-
-    // Reconstruct quota_checker
-    let quota_checker: any = undefined;
-    if (row.quotaCheckerType) {
-      quota_checker = {
-        type: row.quotaCheckerType,
-        enabled: toBool(row.quotaCheckerEnabled),
-        intervalMinutes: row.quotaCheckerInterval,
-        ...(row.quotaCheckerId ? { id: row.quotaCheckerId } : {}),
-        ...(row.quotaCheckerOptions ? { options: decryptJsonField(row.quotaCheckerOptions) } : {}),
-      };
-    }
-
-    // Decrypt sensitive fields
-    const decryptedApiKey = decryptField(row.apiKey);
-
-    const result: any = {
-      api_base_url: apiBaseUrl ?? '',
-      ...(row.displayName ? { display_name: row.displayName } : {}),
-      ...(decryptedApiKey ? { api_key: decryptedApiKey } : {}),
-      ...(row.oauthProviderType ? { oauth_provider: row.oauthProviderType } : {}),
-      ...(oauthAccountId ? { oauth_account: oauthAccountId } : {}),
-      enabled: toBool(row.enabled),
-      disable_cooldown: toBool(row.disableCooldown),
-      stall_cooldown: toBool(row.stallCooldown),
-      allow_100_percent_utilization: toBool(row.allow100PercentUtilization),
-      ...(row.discount !== null ? { discount: row.discount } : {}),
-      estimateTokens: toBool(row.estimateTokens),
-      useClaudeMasking: toBool(row.useClaudeMasking),
-      gemini_thinking_enabled: toBool(row.geminiThinkingEnabled),
-      auto_compat: toBool(row.autoCompat),
-      ...(models ? { models } : {}),
-      ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),
-      ...(() => {
-        const eb = parseJson<Record<string, unknown>>(row.extraBody);
-        return eb && typeof eb === 'object' && !Array.isArray(eb) ? { extraBody: eb } : {};
-      })(),
-      ...(row.compaction ? { compaction: parseJson(row.compaction) } : {}),
-      ...(quota_checker ? { quota_checker } : {}),
-      model_autosync: {
-        enabled: toBool(row.modelAutosyncEnabled),
-        intervalMinutes: Math.max(1, row.modelAutosyncInterval ?? 60),
-      },
-      ...(() => {
-        const adapterVal = parseJson(row.adapter);
-        const normalized = normalizeAdapterEntries(adapterVal);
-        return normalized && normalized.length > 0 ? { adapter: normalized } : {};
-      })(),
-      ...(row.timeoutMs != null ? { timeoutMs: row.timeoutMs } : {}),
-      ...(row.stallTtfbMs != null ? { stallTtfbMs: row.stallTtfbMs } : {}),
-      ...(row.stallTtfbBytes != null ? { stallTtfbBytes: row.stallTtfbBytes } : {}),
-      ...(row.stallMinBps != null ? { stallMinBps: row.stallMinBps } : {}),
-      ...(row.stallWindowMs != null ? { stallWindowMs: row.stallWindowMs } : {}),
-      ...(row.stallGracePeriodMs != null ? { stallGracePeriodMs: row.stallGracePeriodMs } : {}),
-      ...(row.maxConcurrency != null ? { maxConcurrency: row.maxConcurrency } : {}),
-      ...(row.piAiProvider != null ? { pi_ai_provider: row.piAiProvider } : {}),
-      ...(row.rawPassthrough ? { raw_passthrough: parseJson(row.rawPassthrough) } : {}),
-    };
-
-    return result as ProviderConfig;
+  addMissingProviderModels(providerSlug: string, modelNames: string[]): Promise<number> {
+    return this.providers.addMissingProviderModels(providerSlug, modelNames);
   }
 
   // ─── Model Aliases ───────────────────────────────────────────────
 
-  async getAllAliases(): Promise<Record<string, ModelConfig>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.modelAliases);
-    const result: Record<string, ModelConfig> = {};
-
-    if (rows.length === 0) return result;
-
-    const aliasIds = rows.map((r: any) => r.id);
-
-    // Batch-fetch targets and override rows in parallel, keyed by aliasId —
-    // avoids the 1+2N round-trips a per-alias loop would incur.
-    const [allTargets, allOverrides] = await Promise.all([
-      this.db()
-        .select()
-        .from(schema.modelAliasTargets)
-        .where(inArray(schema.modelAliasTargets.aliasId, aliasIds))
-        .orderBy(schema.modelAliasTargets.sortOrder),
-      this.db()
-        .select()
-        .from(schema.aliasMetadataOverrides)
-        .where(inArray(schema.aliasMetadataOverrides.aliasId, aliasIds)),
-    ]);
-
-    const targetsByAliasId = new Map<number, any[]>();
-    for (const t of allTargets) {
-      const list = targetsByAliasId.get(t.aliasId);
-      if (list) list.push(t);
-      else targetsByAliasId.set(t.aliasId, [t]);
-    }
-
-    const overrideByAliasId = new Map<number, any>();
-    for (const o of allOverrides) overrideByAliasId.set(o.aliasId, o);
-
-    for (const row of rows) {
-      const targets = targetsByAliasId.get(row.id) ?? [];
-      const overrideRow = overrideByAliasId.get(row.id) ?? null;
-      result[row.slug] = this.rowToModelConfig(row, targets, overrideRow);
-    }
-
-    return result;
+  getAllAliases(): Promise<Record<string, ModelConfig>> {
+    return this.aliases.getAllAliases();
   }
 
-  async getAlias(slug: string): Promise<ModelConfig | null> {
-    const schema = this.schema();
-    const rows = await this.db()
-      .select()
-      .from(schema.modelAliases)
-      .where(eq(schema.modelAliases.slug, slug))
-      .limit(1);
-
-    if (rows.length === 0) return null;
-
-    const row = rows[0]!;
-    const targets = await this.db()
-      .select()
-      .from(schema.modelAliasTargets)
-      .where(eq(schema.modelAliasTargets.aliasId, row.id))
-      .orderBy(schema.modelAliasTargets.sortOrder);
-
-    const overrideRow = await this.getMetadataOverrideRow(row.id);
-    return this.rowToModelConfig(row, targets, overrideRow);
+  getAlias(slug: string): Promise<ModelConfig | null> {
+    return this.aliases.getAlias(slug);
   }
 
-  private async getMetadataOverrideRow(aliasId: number): Promise<any | null> {
-    const schema = this.schema();
-    const rows = await this.db()
-      .select()
-      .from(schema.aliasMetadataOverrides)
-      .where(eq(schema.aliasMetadataOverrides.aliasId, aliasId))
-      .limit(1);
-    return rows.length > 0 ? rows[0] : null;
+  migrateLegacyTargetGroups(): Promise<string[]> {
+    return this.aliases.migrateLegacyTargetGroups();
   }
 
-  /**
-   * One-time startup migration: rewrite legacy aliases that have no targetGroups
-   * into the grouped format. Operates at raw row level so no application code
-   * needs to understand the legacy layout.
-   *
-   * TODO(#target-groups-cleanup): remove this whole method after migration period.
-   */
-  async migrateLegacyTargetGroups(): Promise<string[]> {
-    const schema = this.schema();
-
-    // Find aliases that have not yet been migrated
-    const legacyAliases = await this.db()
-      .select()
-      .from(schema.modelAliases)
-      .where(sql`${schema.modelAliases.targetGroups} IS NULL`);
-
-    const migrated: string[] = [];
-
-    for (const row of legacyAliases) {
-      const targets = await this.db()
-        .select()
-        .from(schema.modelAliasTargets)
-        .where(eq(schema.modelAliasTargets.aliasId, row.id));
-
-      const selector = row.selector ?? 'random';
-
-      // Write group definition to alias row
-      await this.db()
-        .update(schema.modelAliases)
-        .set({
-          targetGroups: toJson([{ name: 'default', selector }]),
-          updatedAt: now(),
-        })
-        .where(eq(schema.modelAliases.id, row.id));
-
-      // Tag all targets with the default group name
-      if (targets.length > 0) {
-        await this.db()
-          .update(schema.modelAliasTargets)
-          .set({ groupName: 'default' })
-          .where(eq(schema.modelAliasTargets.aliasId, row.id));
-      }
-
-      migrated.push(row.slug);
-    }
-
-    return migrated;
+  migrateModelTypes(): Promise<number> {
+    return this.aliases.migrateModelTypes();
   }
 
-  /**
-   * One-time startup migration: rewrite legacy model_type values to the
-   * canonical 'text' capability type.
-   *
-   * - 'chat'      → 'text'  (was overloaded to mean both wire protocol and capability)
-   * - 'responses' → 'text'  (was incorrectly stored as a capability type)
-   * - null / other values are left untouched.
-   *
-   * Idempotent: rows already set to 'text' (or any other valid value) are unaffected.
-   */
-  async migrateModelTypes(): Promise<number> {
-    const schema = this.schema();
-    const result = await this.db()
-      .update(schema.modelAliases)
-      .set({ modelType: 'text', updatedAt: now() })
-      .where(sql`${schema.modelAliases.modelType} IN ('chat', 'responses')`);
-    // Both SQLite (bun) and postgres-js drivers expose rowCount/changes on the result
-    const affected =
-      (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0;
-    return Number(affected);
+  repairCorruptedAliasFallbackSlugs(): Promise<number> {
+    return this.aliases.repairCorruptedAliasFallbackSlugs();
   }
 
-  /**
-   * One-time startup repair for databases corrupted by the buggy
-   * `model_alias_targets` table-recreation migration (alias-as-fallback-target).
-   *
-   * Background: the generated SQLite migration added the `target_alias_slug`
-   * column in the same table-recreation step that dropped NOT NULL on
-   * `provider_slug`/`model_name`. drizzle-kit's `INSERT ... SELECT` referenced
-   * the new column name on the source table, where it did not exist. Under
-   * SQLite's double-quoted-string misfeature that identifier was silently
-   * treated as a **string literal**, so every pre-existing concrete target row
-   * ended up with `target_alias_slug = 'target_alias_slug'` instead of NULL.
-   * On load, `rowToModelConfig` then mistook each concrete target for an
-   * alias-reference, discarding its provider/model — breaking every alias.
-   *
-   * This nulls the corrupt literal value, but ONLY for rows that still carry a
-   * concrete provider+model (the signature of a corrupted concrete target, not
-   * a legitimate fallback-alias reference). It is idempotent: a second run finds
-   * nothing to fix.
-   *
-   * Returns the number of rows repaired.
-   */
-  async repairCorruptedAliasFallbackSlugs(): Promise<number> {
-    const schema = this.schema();
-    // Guard: only run when the column exists (it always does post-migration,
-    // but this keeps the repair a no-op on schemas that pre-date the feature).
-    const hasColumn = await this.hasColumn('model_alias_targets', 'target_alias_slug');
-    if (!hasColumn) return 0;
-
-    const result = await this.db()
-      .update(schema.modelAliasTargets)
-      .set({ targetAliasSlug: null })
-      .where(
-        sql`${schema.modelAliasTargets.targetAliasSlug} = 'target_alias_slug'
-          AND ${schema.modelAliasTargets.providerSlug} IS NOT NULL
-          AND ${schema.modelAliasTargets.modelName} IS NOT NULL`
-      );
-    const affected =
-      (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0;
-    return Number(affected);
+  saveAlias(slug: string, config: ModelConfig): Promise<void> {
+    return this.aliases.saveAlias(slug, config);
   }
 
-  /**
-   * Best-effort check for whether a column exists on a table. Returns true if
-   * the column is present (or introspection is unavailable), so callers can
-   * degrade safely to "column exists" rather than failing startup.
-   */
-  private async hasColumn(table: string, column: string): Promise<boolean> {
-    const dialect = getCurrentDialect();
-    try {
-      if (dialect === 'sqlite') {
-        const rows = (await this.db().all(sql`PRAGMA table_info(${sql.raw(table)})`)) as Array<{
-          name?: string;
-        }>;
-        return rows.some((r) => r.name === column);
-      }
-      // Postgres was never affected (its migration used ALTER COLUMN), but keep
-      // the guard symmetric.
-      const rows = (await this.db().all(sql`
-        SELECT column_name AS name
-        FROM information_schema.columns
-        WHERE table_name = ${table} AND column_name = ${column}
-      `)) as Array<{ name?: string }>;
-      return rows.length > 0;
-    } catch {
-      // If introspection fails, assume the column exists so we don't block
-      // startup; the UPDATE simply matches nothing on affected rows.
-      return true;
-    }
+  deleteAlias(slug: string): Promise<void> {
+    return this.aliases.deleteAlias(slug);
   }
 
-  async saveAlias(slug: string, config: ModelConfig): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-    const metadataSourcePath =
-      config.metadata && 'source_path' in config.metadata ? config.metadata.source_path : undefined;
-
-    const aliasData = {
-      slug,
-      selector: config.selector ?? null,
-      priority: config.priority ?? 'selector',
-      modelType: config.type ?? null,
-      additionalAliases: config.additional_aliases ? toJson(config.additional_aliases) : null,
-      advanced: config.advanced ? toJson(config.advanced) : null,
-      metadataSource: config.metadata?.source ?? null,
-      metadataSourcePath: metadataSourcePath ?? null,
-      useImageFallthrough: fromBool(config.use_image_fallthrough === true),
-      modelArchitecture: null,
-      enforceLimits: fromBool(config.enforce_limits === true),
-      stickySession: fromBool(config.sticky_session === true),
-      preferredApi: config.preferred_api ? toJson(config.preferred_api) : null,
-      piModel: config.pi_model ? toJson(config.pi_model) : null,
-      extraBody: config.extraBody ? toJson(config.extraBody) : null,
-      generation: null,
-      compaction: config.compaction ? toJson(config.compaction) : null,
-      targetGroups:
-        config.target_groups && config.target_groups.length > 0
-          ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
-          : null,
-      updatedAt: timestamp,
-    };
-
-    // Wrap the whole save — alias upsert, target replace, override replace —
-    // in one transaction so partial failures don't leave the row inconsistent.
-    await this.db().transaction(async (tx: any) => {
-      const existing = await tx
-        .select()
-        .from(schema.modelAliases)
-        .where(eq(schema.modelAliases.slug, slug))
-        .limit(1);
-
-      let aliasId: number;
-
-      if (existing.length > 0) {
-        aliasId = existing[0]!.id;
-        await tx
-          .update(schema.modelAliases)
-          .set(aliasData)
-          .where(eq(schema.modelAliases.id, aliasId));
-      } else {
-        const inserted = await tx
-          .insert(schema.modelAliases)
-          .values({ ...aliasData, createdAt: timestamp })
-          .returning({ id: schema.modelAliases.id });
-        aliasId = inserted[0]!.id;
-      }
-
-      // Replace targets
-      await tx
-        .delete(schema.modelAliasTargets)
-        .where(eq(schema.modelAliasTargets.aliasId, aliasId));
-
-      if (config.target_groups && config.target_groups.length > 0) {
-        let sortIdx = 0;
-        const targetRows: any[] = [];
-        for (const group of config.target_groups) {
-          for (const t of group.targets) {
-            targetRows.push({
-              aliasId,
-              providerSlug: t.alias ? null : t.provider,
-              modelName: t.alias ? null : t.model,
-              targetAliasSlug: t.alias ?? null,
-              enabled: fromBool(t.enabled !== false),
-              groupName: group.name,
-              sortOrder: sortIdx++,
-            });
-          }
-        }
-        if (targetRows.length > 0) {
-          await tx.insert(schema.modelAliasTargets).values(targetRows);
-        }
-      }
-
-      // Replace metadata overrides
-      await tx
-        .delete(schema.aliasMetadataOverrides)
-        .where(eq(schema.aliasMetadataOverrides.aliasId, aliasId));
-
-      const overrides =
-        config.metadata && 'overrides' in config.metadata ? config.metadata.overrides : undefined;
-      if (overrides && hasAnyOverrideField(overrides)) {
-        await tx.insert(schema.aliasMetadataOverrides).values({
-          aliasId,
-          name: overrides.name ?? null,
-          description: overrides.description ?? null,
-          contextLength: overrides.context_length ?? null,
-          pricingPrompt: overrides.pricing?.prompt ?? null,
-          pricingCompletion: overrides.pricing?.completion ?? null,
-          pricingInputCacheRead: overrides.pricing?.input_cache_read ?? null,
-          pricingInputCacheWrite: overrides.pricing?.input_cache_write ?? null,
-          architectureInputModalities: overrides.architecture?.input_modalities
-            ? toJson(overrides.architecture.input_modalities)
-            : null,
-          architectureOutputModalities: overrides.architecture?.output_modalities
-            ? toJson(overrides.architecture.output_modalities)
-            : null,
-          architectureTokenizer: overrides.architecture?.tokenizer ?? null,
-          supportedParameters: overrides.supported_parameters
-            ? toJson(overrides.supported_parameters)
-            : null,
-          topProviderContextLength: overrides.top_provider?.context_length ?? null,
-          topProviderMaxCompletionTokens: overrides.top_provider?.max_completion_tokens ?? null,
-          updatedAt: timestamp,
-        });
-      }
-    });
-  }
-
-  async deleteAlias(slug: string): Promise<void> {
-    const schema = this.schema();
-    await this.db().delete(schema.modelAliases).where(eq(schema.modelAliases.slug, slug));
-  }
-
-  async deleteAllAliases(): Promise<number> {
-    const schema = this.schema();
-    const count = await this.db().select().from(schema.modelAliases);
-    await this.db().delete(schema.modelAliasTargets);
-    await this.db().delete(schema.modelAliases);
-    return count.length;
-  }
-
-  private rowToModelConfig(row: any, targetRows: any[], overrideRow?: any | null): ModelConfig {
-    const groupDefs = parseJson<Array<{ name: string; selector: string }>>(row.targetGroups);
-
-    // build target_groups from group definitions + target rows
-    const targetGroups: import('../config').ModelTargetGroup[] = [];
-    if (groupDefs && groupDefs.length > 0) {
-      for (const def of groupDefs) {
-        const groupTargets = targetRows
-          .filter((t: any) => t.groupName === def.name)
-          .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-          .map((t: any) =>
-            t.targetAliasSlug
-              ? { alias: t.targetAliasSlug, enabled: toBool(t.enabled) }
-              : { provider: t.providerSlug, model: t.modelName, enabled: toBool(t.enabled) }
-          );
-        targetGroups.push({
-          name: def.name,
-          selector: def.selector as import('../config').SelectorType,
-          targets: groupTargets,
-        });
-      }
-    }
-
-    const result: any = {
-      target_groups: targetGroups,
-      priority: row.priority ?? 'selector',
-      use_image_fallthrough: toBool(row.useImageFallthrough),
-      enforce_limits: toBool(row.enforceLimits),
-      sticky_session: toBool(row.stickySession),
-      ...(row.selector ? { selector: row.selector } : {}),
-      ...(row.modelType ? { type: row.modelType } : {}),
-      ...(row.additionalAliases ? { additional_aliases: parseJson(row.additionalAliases) } : {}),
-      ...(row.advanced ? { advanced: parseJson(row.advanced) } : {}),
-      ...(row.preferredApi ? { preferred_api: parseJson(row.preferredApi) } : {}),
-      ...(row.piModel ? { pi_model: parseJson(row.piModel) } : {}),
-      ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
-      ...(row.compaction ? { compaction: parseJson(row.compaction) } : {}),
-    };
-
-    if (row.metadataSource) {
-      const overrides = overrideRow ? overrideRowToOverrides(overrideRow) : undefined;
-      if (row.metadataSource === 'disabled') {
-        result.metadata = { source: 'disabled' };
-      } else if (row.metadataSource === 'auto') {
-        result.metadata = {
-          source: 'auto',
-          ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
-        };
-      } else if (row.metadataSource === 'custom') {
-        // Custom sources always carry overrides (possibly empty if no row found).
-        result.metadata = {
-          source: 'custom',
-          ...(row.metadataSourcePath ? { source_path: row.metadataSourcePath } : {}),
-          overrides: overrides ?? {},
-        };
-      } else {
-        result.metadata = {
-          source: row.metadataSource,
-          source_path: row.metadataSourcePath,
-          ...(overrides && Object.keys(overrides).length > 0 ? { overrides } : {}),
-        };
-      }
-    }
-
-    return result as ModelConfig;
+  deleteAllAliases(): Promise<number> {
+    return this.aliases.deleteAllAliases();
   }
 
   // ─── API Keys ────────────────────────────────────────────────────
 
-  async getAllKeys(): Promise<Record<string, KeyConfig>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.apiKeys);
-    const result: Record<string, KeyConfig> = {};
-
-    for (const row of rows) {
-      const allowedModels = parseStringArray(row.allowedModels);
-      const allowedProviders = parseStringArray(row.allowedProviders);
-      const excludedModels = parseStringArray(row.excludedModels);
-      const excludedProviders = parseStringArray(row.excludedProviders);
-      const allowedIps = parseStringArray(row.allowedIps);
-      const quotas = quotasFromRow(row);
-
-      result[row.name] = {
-        secret: decrypt(row.secret),
-        ...(row.comment ? { comment: row.comment } : {}),
-        ...(row.expiresAt != null ? { expiresAt: row.expiresAt } : {}),
-        ...(row.disabledAt != null ? { disabledAt: row.disabledAt } : {}),
-        ...(quotas !== undefined ? { quotas } : {}),
-        ...(allowedModels ? { allowedModels } : {}),
-        ...(allowedProviders ? { allowedProviders } : {}),
-        ...(excludedModels ? { excludedModels } : {}),
-        ...(excludedProviders ? { excludedProviders } : {}),
-        allowRawPassthrough: toBool(row.allowRawPassthrough),
-        ...(allowedIps ? { allowedIps } : {}),
-      };
-    }
-
-    return result;
+  getAllKeys(): Promise<Record<string, KeyConfig>> {
+    return this.keys.getAllKeys();
   }
 
-  async getKeyBySecret(secret: string): Promise<{ name: string; config: KeyConfig } | null> {
-    const schema = this.schema();
-    const hash = hashSecret(secret);
-
-    // Try hash-based lookup first (works after encryption migration)
-    let rows = await this.db()
-      .select()
-      .from(schema.apiKeys)
-      .where(eq(schema.apiKeys.secretHash, hash))
-      .limit(1);
-
-    // Fallback to plaintext lookup for backward compatibility (before migration)
-    if (rows.length === 0) {
-      rows = await this.db()
-        .select()
-        .from(schema.apiKeys)
-        .where(eq(schema.apiKeys.secret, secret))
-        .limit(1);
-
-      if (rows.length > 0) {
-        logger.error(
-          'API key matched via plaintext fallback — encryption migration may not have run. ' +
-            'Restart with ENCRYPTION_KEY set to trigger migration.'
-        );
-      }
-    }
-
-    if (rows.length === 0) return null;
-
-    const row = rows[0]!;
-    const allowedModels = parseStringArray(row.allowedModels);
-    const allowedProviders = parseStringArray(row.allowedProviders);
-    const excludedModels = parseStringArray(row.excludedModels);
-    const excludedProviders = parseStringArray(row.excludedProviders);
-    const allowedIps = parseStringArray(row.allowedIps);
-    const quotas = quotasFromRow(row);
-
-    return {
-      name: row.name,
-      config: {
-        secret: decrypt(row.secret),
-        ...(row.comment ? { comment: row.comment } : {}),
-        ...(row.expiresAt != null ? { expiresAt: row.expiresAt } : {}),
-        ...(row.disabledAt != null ? { disabledAt: row.disabledAt } : {}),
-        ...(quotas !== undefined ? { quotas } : {}),
-        ...(allowedModels ? { allowedModels } : {}),
-        ...(allowedProviders ? { allowedProviders } : {}),
-        ...(excludedModels ? { excludedModels } : {}),
-        ...(excludedProviders ? { excludedProviders } : {}),
-        allowRawPassthrough: toBool(row.allowRawPassthrough),
-        ...(allowedIps ? { allowedIps } : {}),
-      },
-    };
+  getKeyBySecret(secret: string): Promise<{ name: string; config: KeyConfig } | null> {
+    return this.keys.getKeyBySecret(secret);
   }
 
-  async saveKey(name: string, config: KeyConfig): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-    const encryptedSecret = encrypt(config.secret);
-    const secretHash = hashSecret(config.secret);
-
-    const existing = await this.db()
-      .select()
-      .from(schema.apiKeys)
-      .where(eq(schema.apiKeys.name, name))
-      .limit(1);
-    const existingKey = existing[0];
-
-    const keyData = {
-      name,
-      secret: encryptedSecret,
-      secretHash,
-      comment: config.comment ?? null,
-      // quota_names only — quota_name (legacy) is never written here so
-      // pre-migration rows keep their fallback value untouched. Writes
-      // '[]' (not NULL) when config.quotas is a defined empty array —
-      // see stringifyQuotaNames.
-      quotaNames: stringifyQuotaNames(config.quotas),
-      allowedModels: stringifyStringArray(config.allowedModels),
-      allowedProviders: stringifyStringArray(config.allowedProviders),
-      excludedModels: stringifyStringArray(config.excludedModels),
-      excludedProviders: stringifyStringArray(config.excludedProviders),
-      allowRawPassthrough: fromBool(config.allowRawPassthrough === true),
-      allowedIps: stringifyStringArray(config.allowedIps),
-      generation: null,
-      expiresAt: existingKey
-        ? existingKey.expiresAt
-        : config.expiresInMinutes
-          ? timestamp + config.expiresInMinutes * 60_000
-          : null,
-      disabledAt: existingKey?.disabledAt ?? null,
-      updatedAt: timestamp,
-    };
-
-    if (existing.length > 0) {
-      const existingSecretHash =
-        existing[0]!.secretHash ?? hashSecret(decrypt(existing[0]!.secret));
-      if (existingSecretHash && existingSecretHash !== secretHash) {
-        await new McpOauthRepository().revokeTokensForKeyName(name);
-      }
-
-      await this.db().update(schema.apiKeys).set(keyData).where(eq(schema.apiKeys.name, name));
-    } else {
-      await this.db()
-        .insert(schema.apiKeys)
-        .values({ ...keyData, createdAt: timestamp });
-    }
+  saveKey(name: string, config: KeyConfig): Promise<void> {
+    return this.keys.saveKey(name, config);
   }
 
-  async deleteKey(name: string): Promise<void> {
-    const schema = this.schema();
-    await new McpOauthRepository().revokeTokensForKeyName(name);
-    await this.db().delete(schema.apiKeys).where(eq(schema.apiKeys.name, name));
+  deleteKey(name: string): Promise<void> {
+    return this.keys.deleteKey(name);
   }
 
-  async disableTimeBoundKey(name: string): Promise<boolean> {
-    const schema = this.schema();
-    const timestamp = now();
-    const result = await this.db()
-      .update(schema.apiKeys)
-      .set({ disabledAt: timestamp, updatedAt: timestamp })
-      .where(and(eq(schema.apiKeys.name, name), isNotNull(schema.apiKeys.expiresAt)));
-    const affected =
-      (result as any)?.rowsAffected ?? (result as any)?.changes ?? (result as any)?.rowCount ?? 0;
-    return Number(affected) > 0;
+  disableTimeBoundKey(name: string): Promise<boolean> {
+    return this.keys.disableTimeBoundKey(name);
   }
 
   // ─── User Quotas ────────────────────────────────────────────────
 
-  async getAllUserQuotas(): Promise<Record<string, QuotaDefinition>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.userQuotaDefinitions);
-    const result: Record<string, QuotaDefinition> = {};
-
-    for (const row of rows) {
-      const allowedModels = parseStringArray(row.allowedModels);
-      const allowedProviders = parseStringArray(row.allowedProviders);
-      const excludedModels = parseStringArray(row.excludedModels);
-      const excludedProviders = parseStringArray(row.excludedProviders);
-
-      result[row.name] = {
-        type: row.quotaType as 'rolling' | 'daily' | 'weekly' | 'monthly',
-        limitType: row.limitType as 'requests' | 'tokens' | 'cost',
-        limit: row.limitValue,
-        ...(row.duration ? { duration: row.duration } : {}),
-        ...(allowedModels ? { allowedModels } : {}),
-        ...(allowedProviders ? { allowedProviders } : {}),
-        ...(excludedModels ? { excludedModels } : {}),
-        ...(excludedProviders ? { excludedProviders } : {}),
-        ...(toBool(row.shared) ? { shared: true } : {}),
-        ...(row.warnAt != null ? { warnAt: row.warnAt } : {}),
-      } as QuotaDefinition;
-    }
-
-    return result;
+  getAllUserQuotas(): Promise<Record<string, QuotaDefinition>> {
+    return this.quotas.getAllUserQuotas();
   }
 
-  async saveUserQuota(name: string, quota: QuotaDefinition): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-
-    const quotaData = {
-      name,
-      quotaType: quota.type,
-      limitType: quota.limitType,
-      limitValue: quota.limit,
-      duration: 'duration' in quota ? quota.duration : null,
-      allowedModels: stringifyStringArray(quota.allowedModels),
-      allowedProviders: stringifyStringArray(quota.allowedProviders),
-      excludedModels: stringifyStringArray(quota.excludedModels),
-      excludedProviders: stringifyStringArray(quota.excludedProviders),
-      shared: quota.shared ?? false,
-      warnAt: quota.warnAt ?? null,
-      updatedAt: timestamp,
-    };
-
-    const existing = await this.db()
-      .select()
-      .from(schema.userQuotaDefinitions)
-      .where(eq(schema.userQuotaDefinitions.name, name))
-      .limit(1);
-
-    if (existing.length > 0) {
-      await this.db()
-        .update(schema.userQuotaDefinitions)
-        .set(quotaData)
-        .where(eq(schema.userQuotaDefinitions.name, name));
-    } else {
-      await this.db()
-        .insert(schema.userQuotaDefinitions)
-        .values({ ...quotaData, createdAt: timestamp });
-    }
+  saveUserQuota(name: string, quota: QuotaDefinition): Promise<void> {
+    return this.quotas.saveUserQuota(name, quota);
   }
 
-  async deleteUserQuota(name: string): Promise<void> {
-    const schema = this.schema();
-    await this.db()
-      .delete(schema.userQuotaDefinitions)
-      .where(eq(schema.userQuotaDefinitions.name, name));
+  deleteUserQuota(name: string): Promise<void> {
+    return this.quotas.deleteUserQuota(name);
   }
 
   // ─── MCP Servers ─────────────────────────────────────────────────
@@ -1632,184 +513,56 @@ export class ConfigRepository {
 
   // ─── System Settings ─────────────────────────────────────────────
 
-  async getSetting<T>(key: string, defaultValue: T): Promise<T> {
-    const schema = this.schema();
-    const rows = await this.db()
-      .select()
-      .from(schema.systemSettings)
-      .where(eq(schema.systemSettings.key, key))
-      .limit(1);
-
-    if (rows.length === 0) return defaultValue;
-
-    const raw = rows[0]!.value;
-    const wrapper = parseJson<{ value: T }>(raw);
-
-    // New format: {"value": <actual value>}
-    if (wrapper !== null && typeof wrapper === 'object' && 'value' in wrapper) {
-      return (wrapper as { value: T }).value ?? defaultValue;
-    }
-
-    // Legacy format: bare primitive or object stored directly (pre-wrapper migration).
-    // Re-save in new format so subsequent reads work correctly.
-    const legacy = parseJson<T>(raw);
-    if (legacy !== null) {
-      await this.setSetting(key, legacy);
-      return legacy;
-    }
-
-    return defaultValue;
+  getSetting<T>(key: string, defaultValue: T): Promise<T> {
+    return this.settings.getSetting(key, defaultValue);
   }
 
-  async setSetting(key: string, value: unknown): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-    const wrapped = toJson({ value });
-
-    const existing = await this.db()
-      .select()
-      .from(schema.systemSettings)
-      .where(eq(schema.systemSettings.key, key))
-      .limit(1);
-
-    if (existing.length > 0) {
-      await this.db()
-        .update(schema.systemSettings)
-        .set({ value: wrapped, updatedAt: timestamp })
-        .where(eq(schema.systemSettings.key, key));
-    } else {
-      await this.db().insert(schema.systemSettings).values({
-        key,
-        value: wrapped,
-        updatedAt: timestamp,
-      });
-    }
+  setSetting(key: string, value: unknown): Promise<void> {
+    return this.settings.setSetting(key, value);
   }
 
-  async setSettingsBulk(entries: Record<string, unknown>): Promise<void> {
-    const schema = this.schema();
-    const timestamp = now();
-
-    await this.db().transaction(async (tx: any) => {
-      for (const [key, value] of Object.entries(entries)) {
-        const wrapped = toJson({ value });
-        const existing = await tx
-          .select()
-          .from(schema.systemSettings)
-          .where(eq(schema.systemSettings.key, key))
-          .limit(1);
-
-        if (existing.length > 0) {
-          await tx
-            .update(schema.systemSettings)
-            .set({ value: wrapped, updatedAt: timestamp })
-            .where(eq(schema.systemSettings.key, key));
-        } else {
-          await tx.insert(schema.systemSettings).values({
-            key,
-            value: wrapped,
-            updatedAt: timestamp,
-          });
-        }
-      }
-    });
+  setSettingsBulk(entries: Record<string, unknown>): Promise<void> {
+    return this.settings.setSettingsBulk(entries);
   }
 
-  async getAllSettings(): Promise<Record<string, unknown>> {
-    const schema = this.schema();
-    const rows = await this.db().select().from(schema.systemSettings);
-    const result: Record<string, unknown> = {};
-    for (const row of rows) {
-      const wrapper = parseJson<{ value: unknown }>(row.value);
-      result[row.key] =
-        wrapper !== null && typeof wrapper === 'object' && 'value' in wrapper
-          ? wrapper.value
-          : parseJson(row.value); // fallback for legacy unwrapped rows
-    }
-    return result;
+  getAllSettings(): Promise<Record<string, unknown>> {
+    return this.settings.getAllSettings();
   }
 
-  async getFailoverPolicy(): Promise<FailoverPolicy> {
-    const enabled = await this.getSetting<boolean>('failover.enabled', true);
-    const retryableStatusCodes = await this.getSetting<number[]>(
-      'failover.retryableStatusCodes',
-      Array.from({ length: 500 }, (_, i) => i + 100).filter(
-        (c) => !(c >= 200 && c <= 299) && c !== 413 && c !== 422
-      )
-    );
-    const retryableErrors = await this.getSetting<string[]>('failover.retryableErrors', [
-      'ECONNREFUSED',
-      'ETIMEDOUT',
-      'ENOTFOUND',
-    ]);
-
-    return { enabled, retryableStatusCodes, retryableErrors };
+  getFailoverPolicy(): Promise<FailoverPolicy> {
+    return this.settings.getFailoverPolicy();
   }
 
-  async getCaptureTraceOnError(): Promise<boolean> {
-    return this.getSetting<boolean>('debug.captureOnError', false);
+  getCaptureTraceOnError(): Promise<boolean> {
+    return this.settings.getCaptureTraceOnError();
   }
 
-  async getCooldownPolicy(): Promise<CooldownPolicy> {
-    const initialMinutes = await this.getSetting<number>('cooldown.initialMinutes', 2);
-    const maxMinutes = await this.getSetting<number>('cooldown.maxMinutes', 300);
-    return { initialMinutes, maxMinutes };
+  getCooldownPolicy(): Promise<CooldownPolicy> {
+    return this.settings.getCooldownPolicy();
   }
 
-  async getTrustedProxies(): Promise<string[]> {
-    return this.getSetting<string[]>('trustedProxies', ['0.0.0.0/0', '::/0']);
+  getTrustedProxies(): Promise<string[]> {
+    return this.settings.getTrustedProxies();
   }
 
-  async getBackgroundExplorationConfig(): Promise<BackgroundExplorationConfig> {
-    const enabled = await this.getSetting<boolean>('backgroundExploration.enabled', false);
-    const stalenessThresholdSeconds = await this.getSetting<number>(
-      'backgroundExploration.stalenessThresholdSeconds',
-      600
-    );
-    const workerConcurrency = await this.getSetting<number>(
-      'backgroundExploration.workerConcurrency',
-      2
-    );
-    return { enabled, stalenessThresholdSeconds, workerConcurrency };
+  getBackgroundExplorationConfig(): Promise<BackgroundExplorationConfig> {
+    return this.settings.getBackgroundExplorationConfig();
   }
 
-  async getMcpOAuthConfig(): Promise<McpOAuthConfig> {
-    const stored = await this.getSetting<Partial<McpOAuthConfig>>('mcpOAuth', {});
-    const enabled = stored?.enabled === true;
-    const provider = stored?.provider === 'plexus-idp' ? stored.provider : 'plexus-idp';
-    return {
-      enabled,
-      provider,
-      ...(typeof stored?.issuer === 'string' && stored.issuer.trim()
-        ? { issuer: stored.issuer.trim() }
-        : {}),
-    };
+  getMcpOAuthConfig(): Promise<McpOAuthConfig> {
+    return this.settings.getMcpOAuthConfig();
   }
 
-  async getTimeoutConfig(): Promise<TimeoutConfig> {
-    const defaultSeconds = await this.getSetting<number>('timeout.defaultSeconds', 300);
-    return { defaultSeconds };
+  getTimeoutConfig(): Promise<TimeoutConfig> {
+    return this.settings.getTimeoutConfig();
   }
 
-  async getCompactionConfig(): Promise<import('../config').CompactionSettingsConfig> {
-    return this.getSetting('compaction', {});
+  getCompactionConfig(): Promise<CompactionSettingsConfig> {
+    return this.settings.getCompactionConfig();
   }
 
-  async getStallConfig(): Promise<import('../config').StallConfigType> {
-    const ttfbSeconds = await this.getSetting<number | null>('stall.ttfbSeconds', null);
-    const ttfbBytes = await this.getSetting<number>('stall.ttfbBytes', 100);
-    const minBytesPerSecond = await this.getSetting<number | null>('stall.minBytesPerSecond', null);
-    const windowSeconds = await this.getSetting<number>('stall.windowSeconds', 10);
-    const gracePeriodSeconds = await this.getSetting<number>('stall.gracePeriodSeconds', 30);
-    const stallCooldown = await this.getSetting<boolean>('stall.stallCooldown', false);
-    return {
-      ttfbSeconds,
-      ttfbBytes,
-      minBytesPerSecond,
-      windowSeconds,
-      gracePeriodSeconds,
-      stallCooldown,
-    };
+  getStallConfig(): Promise<StallConfigType> {
+    return this.settings.getStallConfig();
   }
 
   // ─── OAuth Credentials ──────────────────────────────────────────
