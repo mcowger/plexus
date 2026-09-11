@@ -1,5 +1,7 @@
 # Testing Guide
 
+This is the source of truth for Plexus testing conventions. Follow these rules before using generic Vitest examples. File paths are relative to the repository root unless marked otherwise.
+
 ## Running Tests
 
 ### Standard Run
@@ -35,32 +37,15 @@ bun run test:watch
 
 ### Manual Testing (Dev Environment)
 
-1. Start the development stack:
-   ```bash
-   bun run dev
-   ```
-   Use the startup `PORT` value for the local URL. It is derived from the
-   worktree directory name. If mise is not activated, use `mise exec -- bun run dev`.
-2. Open the Dashboard at `http://localhost:<PORT>`.
-3. Send requests to the API proxy at `http://localhost:<PORT>/v1/...`.
-
-If `frpc`, `FRPC_SERVER_ADDR`, and `FRPC_AUTH_TOKEN` are available, the dev
-server also starts a worktree-specific FRP tunnel after the health check passes.
-Set `FRPC_SUBDOMAIN_HOST` if you want startup output to include the full HTTPS
-URL; otherwise it prints the generated subdomain. The tunnel is optional and
-stops with the direct dev process, or when Paseo stops its managed service.
-
-For a background stack:
+For agent-driven checks, start or reuse the worktree-safe background stack:
 
 ```bash
 bun run dev:agent --detach
-bun run dev:stop
 ```
 
-Use `mise exec --` before these commands when mise is not activated. When
-Paseo manages the stack, make sure Paseo itself runs with the project mise
-environment if you want to use the mise-managed `frpc` binary. The same
-Paseo-managed or direct-process lifecycle is used either way.
+Use the printed port for the UI at `http://localhost:<PORT>/ui/` and API requests at `http://localhost:<PORT>/v1/...`.
+For browser-visible changes, follow the [frontend-testing skill](../.claude/skills/frontend-testing/SKILL.md), including real-browser interaction and persistence checks.
+See [Development](../CONTRIBUTING.md#development) for foreground mode, lifecycle commands, environment setup, and FRP tunnels.
 
 ### Dev Data Management (`prep-dev`)
 
@@ -153,19 +138,19 @@ packages/backend/
 ```
 
 **Rules:**
-- **Unit tests** go in a `__tests__/` subdirectory alongside the source file they test. All imports use relative paths within `src/`.
-- **Integration tests** (tests that exercise multiple services/components together) go in `test/integration/`.
-- **Infrastructure** (setup files, shared utilities) stays in `test/` directly.
-- **Never** put unit tests in the top-level `test/` folder, and never put integration tests inside `src/`.
-- The Vitest `include` globs (`src/**/*.test.ts` and `test/**/*.test.ts`) cover both locations automatically.
+- **Unit tests** go in a `__tests__/` subdirectory alongside the source file they test under `packages/backend/src/`. Use relative imports.
+- **Integration tests** (tests that exercise multiple services/components together) go in `packages/backend/test/integration/`.
+- **Infrastructure** (setup files, shared utilities) stays in `packages/backend/test/` directly.
+- **Never** put unit tests directly in `packages/backend/test/`, and never put integration tests inside `packages/backend/src/`.
+- The backend-relative Vitest `include` globs (`src/**/*.test.ts` and `test/**/*.test.ts`) cover both locations automatically.
 
 ## Mocking Rules
 
 ### Globally Mocked Modules
 
-Registered in `vitest.setup.ts` — **do NOT re-mock in test files**:
+Registered in `packages/backend/test/vitest.setup.ts` — **do NOT re-mock in test files**:
 
-- `../src/utils/logger` — logger, logEmitter, level helpers
+- `packages/backend/src/utils/logger` — logger, logEmitter, level helpers
 - `@earendil-works/pi-ai` — getModels, getModel, complete (`vi.fn`), stream (`vi.fn`)
 
 ### `@earendil-works/pi-ai` Specifics
@@ -180,7 +165,7 @@ If a test needs to mock a module **not** already in `vitest.setup.ts`, it may ad
 
 ### Using `registerSpy`
 
-Always use `registerSpy` from `test/test-utils.ts` instead of raw `vi.spyOn`. It registers the spy in a global tracker that the `test-utils` global `afterEach` automatically restores after every test, preventing leaks across files:
+Always use `registerSpy` from `packages/backend/test/test-utils.ts` instead of raw `vi.spyOn`. It registers the spy in a global tracker that the `test-utils` global `afterEach` automatically restores after every test, preventing leaks across files. Adjust the relative import to the test file's location:
 
 ```typescript
 import { registerSpy } from '../../../test/test-utils';
@@ -203,13 +188,12 @@ This means a global mock's `complete: vi.fn(async () => ({...}))` is safe — af
 
 ## Singletons and Test Isolation
 
-Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `DebugManager`). Always reset them in `beforeEach`/`afterEach` using their provided `resetForTesting()` or equivalent methods. A singleton left in a non-default state in one test can leak into subsequent tests.
+Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `DebugManager`). Reset each singleton used by the test in `beforeEach` using its provided `resetForTesting()` or equivalent helper, such as `ConfigService.resetInstance()`. Use `afterEach` for any additional cleanup the service requires. A singleton left in a non-default state in one test can leak into subsequent tests.
 
 ## Other Rules
 
-- `packages/backend/bunfig.toml` blocks raw `bun test` — use `bun run test` / `bun run test:watch`
-- Root `bunfig.toml` blocks raw `bun test` at repo root — use `cd packages/backend && bun run test`
-- **Prefer `bun run test` (affected only) over `bun run test:force-all`.** Never reach for `test:force-all` out of habit.
+- Both root and backend `bunfig.toml` files block raw `bun test`. Use `bun run test` or `bun run test:watch` from the repository root; those scripts run the backend tests.
+- **Prefer `bun run test` (affected only) over `bun run test:force` (full suite from the repository root).** The backend-local equivalent is `bun run test:force-all`. Only run the full suite when the task warrants it.
 - If you must mock a module, implement its **full public interface**
 - Do not use `__mocks__` directories for `node_modules` mocks — they are not reliably loaded when the real module may already be cached
 - **Test shared mutable state through the system under test, not through direct mutation.** The logger mock in `vitest.setup.ts` closes over shared variables; tests for stateful behaviour must interact exclusively through the API/HTTP layer

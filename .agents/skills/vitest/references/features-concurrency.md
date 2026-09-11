@@ -15,11 +15,10 @@ defineConfig({
     // Run files in parallel (default: true)
     fileParallelism: true,
     
-    // Number of worker threads
+    // Maximum number or percentage of workers
     maxWorkers: 4,
-    minWorkers: 1,
     
-    // Pool type: 'threads', 'forks', 'vmThreads'
+    // Pool type: 'threads', 'forks', 'vmThreads', 'vmForks'
     pool: 'threads',
   },
 })
@@ -48,7 +47,7 @@ describe.concurrent('parallel suite', () => {
 
 **Important:** Use `{ expect }` from context for concurrent tests.
 
-## Sequential in Concurrent Context
+## Opting out of inherited concurrency
 
 Force sequential execution:
 
@@ -57,12 +56,12 @@ describe.concurrent('mostly parallel', () => {
   test('parallel 1', async () => {})
   test('parallel 2', async () => {})
   
-  test.sequential('must run alone 1', async () => {})
-  test.sequential('must run alone 2', async () => {})
+  test('must run alone 1', { concurrent: false }, async () => {})
+  test('must run alone 2', { concurrent: false }, async () => {})
 })
 
 // Or entire suite
-describe.sequential('sequential suite', () => {
+describe('sequential suite', { concurrent: false }, () => {
   test('first', () => {})
   test('second', () => {})
 })
@@ -176,21 +175,16 @@ describe.shuffle('random order', () => {
 })
 ```
 
-## Pool Options
+## Pool settings
 
-### Threads (Default)
+### Threads
 
 ```ts
 defineConfig({
   test: {
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        maxThreads: 8,
-        minThreads: 2,
-        isolate: true,
-      },
-    },
+    maxWorkers: 8,
+    isolate: true,
   },
 })
 ```
@@ -203,12 +197,8 @@ Better isolation, slower:
 defineConfig({
   test: {
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        maxForks: 4,
-        isolate: true,
-      },
-    },
+    maxWorkers: 4,
+    isolate: true,
   },
 })
 ```

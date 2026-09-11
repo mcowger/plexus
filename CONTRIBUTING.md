@@ -61,6 +61,17 @@ When running Drizzle Kit commands, specify the appropriate config file with `--c
 
 Plexus uses **PR Agent Review** (`.github/workflows/pr-agent-review.yml`) for automated code reviews. It is triggered when non-draft pull requests are opened, reopened, marked ready for review, or updated with comments, and is configured via `.pr_agent.toml`.
 
+### Manual Cora review
+
+Cora reviews are optional and are not part of the commit hooks. If Cora is available and a review is useful, run the command matching the changes from the repository root:
+
+- Staged changes: `bun run code:review:staged`
+- Unstaged changes: `bun run code:review:unstaged`
+- Branch against `origin/main`: `bun run code:review:branch`
+- Latest commit: `bun run code:review:commit`
+
+Load the `cora-cli` skill before invoking Cora. If Cora is unavailable, skip the review without installing or configuring it. Do not invoke Cora automatically during commits.
+
 ## Code Style
 
 All code must be formatted with Biome before committing:
@@ -148,6 +159,16 @@ mise exec -- bun run dev
 is only used to print the full HTTPS URL; frps remains responsible for the
 actual subdomain suffix through its `subDomainHost` setting.
 
+To get the current worktree's FRP URL without scraping startup logs, run:
+
+```bash
+bun run dev:get:frp-url
+```
+
+Use `bun run dev:get:frp-url -- --hostname`, `--subdomain`, or `--json` for a hostname, subdomain, or machine-readable result. The command derives the same deterministic endpoint as the dev lifecycle; it does not check whether the tunnel is reachable.
+
+#### Background dev stack
+
 For a background dev stack, use the agent lifecycle commands. They work with
 Paseo when available and fall back to direct process execution otherwise:
 
@@ -155,6 +176,8 @@ Paseo when available and fall back to direct process execution otherwise:
 bun run dev:agent --detach
 bun run dev:stop
 ```
+
+`bun run dev:agent` starts or attaches to a workspace script target, defaulting to `dev:full`, with automatic log streaming. Use `--detach` to return once the stack is healthy and leave it running in the background. Select a target with `bun run dev:agent [target]`, for example `bun run dev:agent dev:pglite --detach`; stop it with `bun run dev:stop [target]`.
 
 Prefix these commands with `mise exec --` when mise is not activated. Paseo
 inherits the environment of the process that launches it. If you want a
