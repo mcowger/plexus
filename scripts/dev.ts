@@ -6,8 +6,7 @@ import { spawn as nodeSpawn, type ChildProcess } from 'child_process';
 import { deriveDevPort } from './dev-port-allocator';
 import {
   buildFrpcArgs,
-  buildFrpcSubdomain,
-  buildFrpcUrl,
+  buildFrpcEndpoint,
   DEFAULT_FRPC_SERVER_PORT,
   getRepositoryName,
   isFrpcAvailable,
@@ -256,8 +255,11 @@ function startFrpc() {
 
   const repositoryName = getRepositoryName(process.cwd());
   const worktreeName = basename(process.cwd());
-  const subdomain = buildFrpcSubdomain(repositoryName, worktreeName);
-  const publicUrl = buildFrpcUrl(subdomain, process.env.FRPC_SUBDOMAIN_HOST);
+  const { subdomain, url: publicUrl } = buildFrpcEndpoint(
+    repositoryName,
+    worktreeName,
+    process.env.FRPC_SUBDOMAIN_HOST
+  );
   const args = buildFrpcArgs({
     serverAddr,
     serverPort,

@@ -26,6 +26,7 @@
     "dev:stop": "bun run scripts/dev-agent.ts stop",
     "dev:get:port": "bun run scripts/dev-config.ts port",
     "dev:get:db_path": "bun run scripts/dev-config.ts db_path",
+    "dev:get:frp-url": "bun run scripts/dev-config.ts frp_url",
     "plexuscli": "bun run packages/cli/src/index.ts",
     "sync:cli-skill": "bun run scripts/sync-cli-skill.ts",
     "build:frontend": "cd packages/frontend && bun run build",

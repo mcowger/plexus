@@ -66,6 +66,20 @@ export function buildFrpcUrl(subdomain: string, subdomainHost?: string): string 
   return host ? `https://${subdomain}.${host}` : undefined;
 }
 
+export interface FrpcEndpoint {
+  subdomain: string;
+  url?: string;
+}
+
+export function buildFrpcEndpoint(
+  repositoryName: string,
+  worktreeName: string,
+  subdomainHost?: string
+): FrpcEndpoint {
+  const subdomain = buildFrpcSubdomain(repositoryName, worktreeName);
+  return { subdomain, url: buildFrpcUrl(subdomain, subdomainHost) };
+}
+
 export interface FrpcProxyOptions {
   serverAddr: string;
   serverPort: number;

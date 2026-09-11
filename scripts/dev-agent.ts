@@ -24,7 +24,7 @@ import { tmpdir } from 'os';
 import { openSync, existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { spawn } from 'child_process';
 import { deriveDevPort } from './dev-port-allocator';
-import { buildFrpcSubdomain, buildFrpcUrl, getRepositoryName, isFrpcAvailable } from './frpc';
+import { buildFrpcEndpoint, getRepositoryName, isFrpcAvailable, type FrpcEndpoint } from './frpc';
 import {
   isPaseoScriptAvailable,
   startPaseoScript,
@@ -70,12 +70,15 @@ function getLogFile(target: string): string {
   return join(tmpdir(), `plexus-dev-${target.replace(/[:/]/g, '_')}-${dirName}.log`);
 }
 
-function getFrpcEndpoint(): { subdomain: string; url?: string } | undefined {
+function getFrpcEndpoint(): FrpcEndpoint | undefined {
   if (!process.env.FRPC_SERVER_ADDR || !process.env.FRPC_AUTH_TOKEN || !isFrpcAvailable()) {
     return undefined;
   }
-  const subdomain = buildFrpcSubdomain(getRepositoryName(process.cwd()), dirName);
-  return { subdomain, url: buildFrpcUrl(subdomain, process.env.FRPC_SUBDOMAIN_HOST) };
+  return buildFrpcEndpoint(
+    getRepositoryName(process.cwd()),
+    dirName,
+    process.env.FRPC_SUBDOMAIN_HOST
+  );
 }
 
 // Standard fallback PID file from previous dev-agent versions
@@ -107,7 +110,7 @@ async function waitForHealthy(port = PORT, timeoutMs = READY_TIMEOUT_MS): Promis
 function printReady(
   target: string,
   port: string | number,
-  frpcEndpoint?: { subdomain: string; url?: string },
+  frpcEndpoint?: FrpcEndpoint,
   prefix = 'Ready.'
 ) {
   const baseUrl = `http://localhost:${port}`;

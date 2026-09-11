@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFrpcArgs,
+  buildFrpcEndpoint,
   buildFrpcSubdomain,
   buildFrpcUrl,
   repositoryNameFromRemote,
@@ -66,5 +67,12 @@ describe('frpc helpers', () => {
       'https://plexus-worktree.dev.home.cowger.us'
     );
     expect(buildFrpcUrl('plexus-worktree')).toBeUndefined();
+  });
+
+  it('builds the same endpoint used by the dev lifecycle', () => {
+    expect(buildFrpcEndpoint('Plexus', 'purple-turtle', 'dev.home.cowger.us')).toEqual({
+      subdomain: 'plexus-purple-turtle',
+      url: 'https://plexus-purple-turtle.dev.home.cowger.us',
+    });
   });
 });
