@@ -2049,6 +2049,15 @@
   │ [function] table (line 226)
   │ [function] yaml (line 205)
 
+📁 packages/frontend/src/components/config/types.ts:
+  │ [interface] BackgroundExplorationConfig (line 20)
+  │ [interface] CooldownPolicy (line 9)
+  │ [interface] ExplorationRates (line 14)
+  │ [interface] FailoverPolicy (line 3)
+  │ [interface] FieldValidation (line 38)
+  │ [interface] StallConfig (line 30)
+  │ [interface] TimeoutConfig (line 26)
+
 📁 packages/frontend/src/components/dashboard/liveTypes.ts:
   │ [interface] EntityStats (line 129)
 
