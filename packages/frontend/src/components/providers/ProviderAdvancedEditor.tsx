@@ -9,38 +9,13 @@ import { Tooltip } from '../ui/Tooltip';
 import type { Provider, CompactionSettings } from '../../lib/api';
 import { api } from '../../lib/api';
 import { ReasoningRewriteRulesEditor } from './ReasoningRewriteRulesEditor';
+import {
+  getAdapterName,
+  KNOWN_ADAPTERS,
+  normalizeAdapterEntries,
+} from './model-editor/adapter-utils';
 
-export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
-  {
-    value: 'reasoning_content',
-    label: 'Reasoning Content',
-    description:
-      'Maps reasoning ↔ reasoning_content on messages and responses (e.g. Fireworks DeepSeek-R1).',
-  },
-  {
-    value: 'suppress_developer_role',
-    label: 'Suppress Developer Role',
-    description: 'Rewrites the "developer" role to "system" for providers that do not support it.',
-  },
-  {
-    value: 'model_override',
-    label: 'Model Override',
-    description:
-      'Conditionally rewrites the model name based on request fields (e.g. switching to a -fast variant when reasoning is disabled).',
-  },
-  {
-    value: 'reasoning_rewrite',
-    label: 'Reasoning Rewrite',
-    description:
-      'Rewrites reasoning/thinking fields to provider-specific formats (e.g. enable_thinking, budget_tokens, thinking.type).',
-  },
-  {
-    value: 'web_search_coercion',
-    label: 'Web Search Coercion',
-    description:
-      'Coerces server-side web search tool entries to the format expected by this provider (Anthropic, OpenAI, or OpenRouter).',
-  },
-];
+export { KNOWN_ADAPTERS } from './model-editor/adapter-utils';
 
 const ANTHROPIC_TOOL_ID_ADAPTER = 'normalize_anthropic_tool_ids';
 
@@ -177,9 +152,9 @@ export function ProviderAdvancedEditor({
               >
                 Provider Adapters
               </label>
-              {(editingProvider.adapter ?? []).length > 0 && (
+              {normalizeAdapterEntries(editingProvider.adapter).length > 0 && (
                 <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
-                  {(editingProvider.adapter ?? []).length}
+                  {normalizeAdapterEntries(editingProvider.adapter).length}
                 </Badge>
               )}
             </div>
@@ -203,10 +178,8 @@ export function ProviderAdvancedEditor({
                   {KNOWN_ADAPTERS.filter(
                     (a) => a.value !== 'model_override' && a.value !== 'web_search_coercion'
                   ).map((a) => {
-                    const adapterEntries: any[] = editingProvider.adapter ?? [];
-                    const active = adapterEntries.some(
-                      (e: any) => (typeof e === 'string' ? e : e.name) === a.value
-                    );
+                    const adapterEntries = normalizeAdapterEntries(editingProvider.adapter);
+                    const active = adapterEntries.some((e: any) => getAdapterName(e) === a.value);
                     return (
                       <label
                         key={a.value}
@@ -226,11 +199,9 @@ export function ProviderAdvancedEditor({
                           checked={active}
                           style={{ marginTop: '2px', flexShrink: 0 }}
                           onChange={() => {
-                            const current: any[] = editingProvider.adapter ?? [];
+                            const current = normalizeAdapterEntries(editingProvider.adapter);
                             const next = active
-                              ? current.filter(
-                                  (e: any) => (typeof e === 'string' ? e : e.name) !== a.value
-                                )
+                              ? current.filter((e: any) => getAdapterName(e) !== a.value)
                               : [...current, { name: a.value, options: {} }];
                             setEditingProvider({ ...editingProvider, adapter: next });
                           }}
@@ -253,7 +224,7 @@ export function ProviderAdvancedEditor({
 
                 {/* Reasoning Rewrite rules editor (shared with per-model UI) */}
                 <ReasoningRewriteRulesEditor
-                  adapters={editingProvider.adapter ?? []}
+                  adapters={normalizeAdapterEntries(editingProvider.adapter)}
                   onChange={(next: any[]) =>
                     setEditingProvider({ ...editingProvider, adapter: next })
                   }
@@ -261,21 +232,22 @@ export function ProviderAdvancedEditor({
 
                 {/* Web Search Coercion — inline options editor */}
                 {(() => {
-                  const adapterEntries: any[] = editingProvider.adapter ?? [];
+                  const adapterEntries = normalizeAdapterEntries(editingProvider.adapter);
                   const entry = adapterEntries.find(
-                    (e: any) => (typeof e === 'string' ? e : e.name) === 'web_search_coercion'
+                    (e: any) => getAdapterName(e) === 'web_search_coercion'
                   );
                   const active = !!entry;
-                  const currentTarget: string = entry?.options?.target ?? '';
+                  const currentTarget: string =
+                    typeof entry === 'string' ? '' : (entry?.options?.target ?? '');
                   const currentMaxUses: string =
-                    entry?.options?.max_uses != null ? String(entry.options.max_uses) : '';
+                    typeof entry === 'string' || entry?.options?.max_uses == null
+                      ? ''
+                      : String(entry.options.max_uses);
 
                   const toggleActive = () => {
-                    const current: any[] = editingProvider.adapter ?? [];
+                    const current = normalizeAdapterEntries(editingProvider.adapter);
                     const next = active
-                      ? current.filter(
-                          (e: any) => (typeof e === 'string' ? e : e.name) !== 'web_search_coercion'
-                        )
+                      ? current.filter((e: any) => getAdapterName(e) !== 'web_search_coercion')
                       : [
                           ...current,
                           {
@@ -287,9 +259,9 @@ export function ProviderAdvancedEditor({
                   };
 
                   const updateOptions = (patch: Record<string, any>) => {
-                    const current: any[] = editingProvider.adapter ?? [];
+                    const current = normalizeAdapterEntries(editingProvider.adapter);
                     const next = current.map((e: any) => {
-                      const name = typeof e === 'string' ? e : e.name;
+                      const name = getAdapterName(e);
                       if (name !== 'web_search_coercion') return e;
                       return { name: 'web_search_coercion', options: { ...e.options, ...patch } };
                     });
@@ -387,9 +359,11 @@ export function ProviderAdvancedEditor({
                                   const raw = e.target.value;
                                   if (raw === '') {
                                     // Remove max_uses from options
-                                    const current: any[] = editingProvider.adapter ?? [];
+                                    const current = normalizeAdapterEntries(
+                                      editingProvider.adapter
+                                    );
                                     const next = current.map((e2: any) => {
-                                      const name = typeof e2 === 'string' ? e2 : e2.name;
+                                      const name = getAdapterName(e2);
                                       if (name !== 'web_search_coercion') return e2;
                                       const { max_uses: _removed, ...rest } = e2.options ?? {};
                                       return { name: 'web_search_coercion', options: rest };
@@ -413,13 +387,13 @@ export function ProviderAdvancedEditor({
 
                 {/* Anthropic Tool-ID Normalization — Auto | Enabled | Disabled */}
                 {(() => {
-                  const entries: any[] = editingProvider.adapter ?? [];
+                  const entries = normalizeAdapterEntries(editingProvider.adapter);
                   // The backend replays adapter entries in order, so a LATER
                   // entry overrides an earlier one — read the last match, not
                   // the first (resolveAdapters, adapter-resolver.ts).
                   let entry: any;
                   for (const candidate of entries) {
-                    const name = typeof candidate === 'string' ? candidate : candidate?.name;
+                    const name = getAdapterName(candidate);
                     if (name === ANTHROPIC_TOOL_ID_ADAPTER) entry = candidate;
                   }
                   const mode: 'auto' | 'on' | 'off' = !entry
@@ -430,8 +404,7 @@ export function ProviderAdvancedEditor({
 
                   const setMode = (value: 'auto' | 'on' | 'off') => {
                     const withoutEntry = entries.filter(
-                      (e: any) =>
-                        (typeof e === 'string' ? e : e?.name) !== ANTHROPIC_TOOL_ID_ADAPTER
+                      (e: any) => getAdapterName(e) !== ANTHROPIC_TOOL_ID_ADAPTER
                     );
                     const next =
                       value === 'auto'

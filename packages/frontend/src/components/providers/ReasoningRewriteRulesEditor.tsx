@@ -2,10 +2,11 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { DebouncedInput } from '../ui/DebouncedInput';
+import { getAdapterName, normalizeAdapterEntries } from './model-editor/adapter-utils';
 
 interface Props {
   /** Current adapter entries for the scope (provider-level or model-level). */
-  adapters: any[];
+  adapters: unknown;
   /** Called with the new adapter entry array whenever a rule changes. */
   onChange: (adapters: any[]) => void;
 }
@@ -21,16 +22,15 @@ interface Props {
  * paths afterward (see backend reasoning-rewrite.adapter.ts for semantics).
  */
 export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
-  const entry = adapters.find(
-    (e: any) => (typeof e === 'string' ? e : e.name) === 'reasoning_rewrite'
-  );
+  const adapterEntries = normalizeAdapterEntries(adapters);
+  const entry = adapterEntries.find((e: any) => getAdapterName(e) === 'reasoning_rewrite');
   if (!entry || typeof entry === 'string') return null;
   const rules: any[] = entry.options?.rules ?? [];
 
   const applyRules = (updated: any[]) => {
     onChange(
-      adapters.map((e: any) =>
-        typeof e !== 'string' && e.name === 'reasoning_rewrite'
+      adapterEntries.map((e: any) =>
+        typeof e !== 'string' && getAdapterName(e) === 'reasoning_rewrite'
           ? { ...e, options: { ...e.options, rules: updated } }
           : e
       )
