@@ -52,6 +52,9 @@ export function inferProviderTypes(apiBaseUrl?: string | Record<string, string>)
   }
 }
 
+const ROLE_ADMIN = 'admin' as const;
+const ROLE_LIMITED = 'limited' as const;
+
 /**
  * Verify a credential against the backend. Returns the resolved principal on
  * success, or null on 401/network error.
@@ -75,10 +78,10 @@ export async function verifyAdminKey(key: string): Promise<Principal | null> {
       comment?: string | null;
     };
     if (!body.ok) return null;
-    if (body.role === 'admin') return { role: 'admin' };
-    if (body.role === 'limited' && typeof body.keyName === 'string') {
+    if (body.role === ROLE_ADMIN) return { role: ROLE_ADMIN };
+    if (body.role === ROLE_LIMITED && typeof body.keyName === 'string') {
       return {
-        role: 'limited',
+        role: ROLE_LIMITED,
         keyName: body.keyName,
         allowedProviders: Array.isArray(body.allowedProviders) ? body.allowedProviders : [],
         allowedModels: Array.isArray(body.allowedModels) ? body.allowedModels : [],
@@ -114,6 +117,10 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   }
   return res;
 };
+export const getAuthCacheKey = (suffix: string): string => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('plexus_admin_key') || '' : '';
+  return `${token}:${suffix}`;
+};
 
 export const CONFIG_CACHE_TTL_MS = 20000;
 export const configRequestCache = new Map<
@@ -122,7 +129,8 @@ export const configRequestCache = new Map<
 >();
 
 export const fetchConfigCached = async (): Promise<Record<string, unknown>> => {
-  const cached = configRequestCache.get('config');
+  const cacheKey = getAuthCacheKey('config');
+  const cached = configRequestCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.promise;
   }
@@ -133,8 +141,8 @@ export const fetchConfigCached = async (): Promise<Record<string, unknown>> => {
     return await res.json();
   })();
 
-  configRequestCache.set('config', { expiresAt: Date.now() + CONFIG_CACHE_TTL_MS, promise });
-  promise.catch(() => configRequestCache.delete('config'));
+  configRequestCache.set(cacheKey, { expiresAt: Date.now() + CONFIG_CACHE_TTL_MS, promise });
+  promise.catch(() => configRequestCache.delete(cacheKey));
   return promise;
 };
 

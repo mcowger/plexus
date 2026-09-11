@@ -1,5 +1,12 @@
 import { formatNumber } from '../format';
-import { API_BASE, fetchWithAuth, fetchConfigCached, formatLargeNumber, STAT_LABELS } from './core';
+import {
+  API_BASE,
+  fetchWithAuth,
+  fetchConfigCached,
+  formatLargeNumber,
+  getAuthCacheKey,
+  STAT_LABELS,
+} from './core';
 import { getCooldowns } from './settings';
 import type {
   BackendResponse,
@@ -28,10 +35,6 @@ export const summaryRequestCache = new Map<
   string,
   { expiresAt: number; promise: Promise<UsageSummaryResponse> }
 >();
-const getAuthCacheKey = (queryString: string): string => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('plexus_admin_key') || '' : '';
-  return `${token}:${queryString}`;
-};
 
 export const USAGE_PAGE_FIELDS: UsageRecordField[] = [
   'date',
