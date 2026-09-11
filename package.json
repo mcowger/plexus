@@ -2,10 +2,10 @@
   "name": "plexus2",
   "module": "index.ts",
   "devDependencies": {
-    "@biomejs/biome": "2.5.12",
-    "@redocly/cli": "^2.51.2",
+    "@biomejs/biome": "2.5.13",
+    "@redocly/cli": "^2.52.0",
     "@vitest/coverage-istanbul": "5.0.0",
-    "agent-browser": "^0.36.0",
+    "agent-browser": "^0.37.1",
     "bun-types": "1.4.2",
     "lefthook": "^2.1.12",
     "octokit": "^5.0.5",
