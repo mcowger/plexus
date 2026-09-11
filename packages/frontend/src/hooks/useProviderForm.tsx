@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
 import { useNavigate } from 'react-router-dom';
 import { api, Provider, OAuthSession, OAuthProviderInfo, fetchQuotaCheckers } from '../lib/api';
@@ -152,18 +152,66 @@ export function useProviderForm() {
     { aliasId: string; targetsCount: number }[]
   >([]);
 
-  const [testStates, setTestStates] = useState<
-    Record<
-      string,
-      {
-        loading: boolean;
-        result?: 'success' | 'error';
-        message?: string;
-        showResult: boolean;
-        showMessage?: boolean;
+  type TestState = {
+    loading: boolean;
+    result?: 'success' | 'error';
+    message?: string;
+    showResult: boolean;
+    showMessage?: boolean;
+  };
+  const [testStates, setTestStates] = useState<Record<string, TestState>>({});
+  const nextTestRequestId = useRef(0);
+  const activeTestRequests = useRef(new Map<number, string>());
+
+  const updateTestState = (testKey: string, update: (state: TestState) => TestState) => {
+    setTestStates((prev) => {
+      const current = prev[testKey];
+      if (!current) return prev;
+      return { ...prev, [testKey]: update(current) };
+    });
+  };
+
+  const updateTestStateForRequest = (
+    requestId: number,
+    update: (state: TestState) => TestState
+  ) => {
+    setTestStates((prev) => {
+      const testKey = activeTestRequests.current.get(requestId);
+      const current = testKey ? prev[testKey] : undefined;
+      if (!testKey || !current) return prev;
+      return { ...prev, [testKey]: update(current) };
+    });
+  };
+
+  const migrateTestStateKey = (oldTestKey: string, newTestKey: string) => {
+    for (const [requestId, testKey] of activeTestRequests.current) {
+      if (testKey === oldTestKey) {
+        activeTestRequests.current.set(requestId, newTestKey);
       }
-    >
-  >({});
+    }
+
+    setTestStates((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, oldTestKey)) return prev;
+      const next = { ...prev, [newTestKey]: prev[oldTestKey] };
+      delete next[oldTestKey];
+      return next;
+    });
+  };
+
+  const removeTestStateKey = (testKey: string) => {
+    for (const [requestId, activeKey] of activeTestRequests.current) {
+      if (activeKey === testKey) {
+        activeTestRequests.current.delete(requestId);
+      }
+    }
+
+    setTestStates((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, testKey)) return prev;
+      const next = { ...prev };
+      delete next[testKey];
+      return next;
+    });
+  };
 
   // Derived
   const isOAuthMode =
@@ -411,6 +459,8 @@ export function useProviderForm() {
 
   const handleTestModel = async (providerId: string, modelId: string, modelType?: string) => {
     const testKey = `${providerId}-${modelId}`;
+    const requestId = ++nextTestRequestId.current;
+    activeTestRequests.current.set(requestId, testKey);
     setTestStates((prev) => ({
       ...prev,
       [testKey]: { loading: true, showResult: true, showMessage: false },
@@ -429,60 +479,47 @@ export function useProviderForm() {
       const firstError = results.find((r) => !r.success);
       const totalDuration = results.reduce((sum, r) => sum + (r.durationMs || 0), 0);
       const avgDuration = Math.round(totalDuration / results.length);
-      setTestStates((prev) => ({
-        ...prev,
-        [testKey]: {
-          loading: false,
-          result: allSuccess ? 'success' : 'error',
-          message: allSuccess
-            ? `Success (${avgDuration}ms avg, ${testApiTypes.length} API${testApiTypes.length > 1 ? 's' : ''})`
-            : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
-          showResult: true,
-          showMessage: true,
-        },
+      updateTestStateForRequest(requestId, (state) => ({
+        ...state,
+        loading: false,
+        result: allSuccess ? 'success' : 'error',
+        message: allSuccess
+          ? `Success (${avgDuration}ms avg, ${testApiTypes.length} API${testApiTypes.length > 1 ? 's' : ''})`
+          : `Failed via ${firstError?.apiType || 'unknown'}: ${firstError?.error || 'Test failed'}`,
+        showResult: true,
+        showMessage: true,
       }));
       setTimeout(
         () => {
-          setTestStates((prev) => ({
-            ...prev,
-            [testKey]: { ...prev[testKey], showResult: false },
-          }));
+          updateTestStateForRequest(requestId, (state) => ({ ...state, showResult: false }));
+          if (!allSuccess) activeTestRequests.current.delete(requestId);
         },
         allSuccess ? 3000 : 1500
       );
       if (allSuccess) {
         setTimeout(() => {
-          setTestStates((prev) => ({
-            ...prev,
-            [testKey]: { ...prev[testKey], showMessage: false },
-          }));
+          updateTestStateForRequest(requestId, (state) => ({ ...state, showMessage: false }));
+          activeTestRequests.current.delete(requestId);
         }, 3000);
       }
     } catch (e) {
-      setTestStates((prev) => ({
-        ...prev,
-        [testKey]: {
-          loading: false,
-          result: 'error',
-          message: String(e),
-          showResult: true,
-          showMessage: true,
-        },
+      updateTestStateForRequest(requestId, (state) => ({
+        ...state,
+        loading: false,
+        result: 'error',
+        message: String(e),
+        showResult: true,
+        showMessage: true,
       }));
       setTimeout(() => {
-        setTestStates((prev) => ({
-          ...prev,
-          [testKey]: { ...prev[testKey], showResult: false },
-        }));
+        updateTestStateForRequest(requestId, (state) => ({ ...state, showResult: false }));
+        activeTestRequests.current.delete(requestId);
       }, 1500);
     }
   };
 
   const dismissTestMessage = (testKey: string) => {
-    setTestStates((prev) => ({
-      ...prev,
-      [testKey]: { ...prev[testKey], showMessage: false },
-    }));
+    updateTestState(testKey, (state) => ({ ...state, showMessage: false }));
   };
 
   // OAuth handlers
@@ -693,6 +730,15 @@ export function useProviderForm() {
     delete models[oldId];
     setEditingProvider({ ...editingProvider, models });
     if (openModelIdx === oldId) setOpenModelIdx(newId);
+    const oldTestKey = `${editingProvider.id}-${oldId}`;
+    const newTestKey = `${editingProvider.id}-${newId}`;
+    setIsModelExtraBodyOpen((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, oldId)) return prev;
+      const next = { ...prev, [newId]: prev[oldId] };
+      delete next[oldId];
+      return next;
+    });
+    migrateTestStateKey(oldTestKey, newTestKey);
   };
 
   const updateModelConfig = (modelId: string, updates: any) => {
@@ -705,6 +751,15 @@ export function useProviderForm() {
     const models = { ...(editingProvider.models as Record<string, any>) };
     delete models[modelId];
     setEditingProvider({ ...editingProvider, models });
+    if (openModelIdx === modelId) setOpenModelIdx(null);
+    const testKey = `${editingProvider.id}-${modelId}`;
+    setIsModelExtraBodyOpen((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, modelId)) return prev;
+      const next = { ...prev };
+      delete next[modelId];
+      return next;
+    });
+    removeTestStateKey(testKey);
   };
 
   // Fetch models helpers
