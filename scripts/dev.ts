@@ -10,6 +10,8 @@ import {
   DEFAULT_FRPC_SERVER_PORT,
   getRepositoryName,
   isFrpcAvailable,
+  removeFrpcUrlFile,
+  writeFrpcUrlFile,
 } from './frpc';
 
 // --- Dev defaults (only applied when not already set in environment) ---
@@ -164,6 +166,7 @@ await new Promise<void>((resolve, reject) => {
 
 const PID_FILE = join(tmpdir(), `plexus-${dirName}.pid`);
 writeFileSync(PID_FILE, String(process.pid));
+removeFrpcUrlFile(dirName);
 
 // --- Startup ---
 
@@ -200,6 +203,7 @@ function spawnManaged(
 function killAll() {
   if (isShuttingDown) return;
   isShuttingDown = true;
+  removeFrpcUrlFile(dirName);
 
   if (frpcProcess?.pid) {
     try {
@@ -269,11 +273,17 @@ function startFrpc() {
     subdomain,
   });
 
+  if (publicUrl) {
+    writeFrpcUrlFile(publicUrl, dirName);
+  }
+
   console.log(`[frpc] Starting tunnel for subdomain: ${subdomain}`);
   const proc = spawnManaged('frpc', args, process.cwd(), { detached: false });
   frpcProcess = proc;
+  proc.on('error', () => removeFrpcUrlFile(dirName));
   proc.on('exit', (code, signal) => {
     if (frpcProcess === proc) frpcProcess = undefined;
+    removeFrpcUrlFile(dirName);
     if (!isShuttingDown && code !== 0) {
       console.error(`[frpc] Tunnel exited with ${signal ? `signal ${signal}` : `code ${code}`}.`);
     }

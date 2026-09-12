@@ -11,7 +11,13 @@
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
 import { deriveDevPort } from './dev-port-allocator';
-import { buildFrpcEndpoint, getRepositoryName, isFrpcAvailable, type FrpcEndpoint } from './frpc';
+import {
+  buildFrpcEndpoint,
+  getFrpcUrlFilePath,
+  getRepositoryName,
+  isFrpcAvailable,
+  type FrpcEndpoint,
+} from './frpc';
 import { getPaseoScriptStatus } from './lib/paseo';
 
 const dirName = basename(process.cwd());
@@ -65,11 +71,17 @@ function getFrpEndpoint(): FrpcEndpoint {
 }
 
 function printFrpEndpoint(args: string[]) {
+  const urlFile = getFrpcUrlFilePath(dirName);
+  if (args.includes('--file')) {
+    console.log(urlFile);
+    return;
+  }
+
   const endpoint = getFrpEndpoint();
   const hostname = endpoint.url ? new URL(endpoint.url).hostname : undefined;
 
   if (args.includes('--json')) {
-    console.log(JSON.stringify({ ...endpoint, hostname: hostname ?? null }));
+    console.log(JSON.stringify({ ...endpoint, hostname: hostname ?? null, urlFile }));
     return;
   }
   if (args.includes('--subdomain')) {
@@ -99,7 +111,7 @@ if (import.meta.main) {
       printFrpEndpoint(process.argv.slice(3));
     } else {
       throw new Error(
-        'Usage: bun run scripts/dev-config.ts <port|db_path|frp_url> [--hostname|--subdomain|--json]'
+        'Usage: bun run scripts/dev-config.ts <port|db_path|frp_url> [--hostname|--subdomain|--json|--file]'
       );
     }
   } catch (error) {

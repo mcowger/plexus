@@ -165,7 +165,7 @@ To get the current worktree's FRP URL without scraping startup logs, run:
 bun run dev:get:frp-url
 ```
 
-Use `bun run dev:get:frp-url -- --hostname`, `--subdomain`, or `--json` for a hostname, subdomain, or machine-readable result. The command derives the same deterministic endpoint as the dev lifecycle; it does not check whether the tunnel is reachable.
+Use `bun run dev:get:frp-url -- --hostname`, `--subdomain`, or `--json` for a hostname, subdomain, or machine-readable result. Use `--file` to print the path of the temporary URL file written while the tunnel is running. The command derives the same deterministic endpoint as the dev lifecycle; it does not check whether the tunnel is reachable.
 
 #### Background dev stack
 

@@ -1,10 +1,13 @@
 import { createHash } from 'crypto';
 import { execFileSync } from 'child_process';
-import { basename } from 'path';
+import { unlinkSync, renameSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { basename, join } from 'path';
 
 export const DEFAULT_FRPC_SERVER_PORT = 7000;
 
 const MAX_DNS_LABEL_LENGTH = 63;
+const FRPC_URL_FILE_SUFFIX = '.frpc-url';
 const LONG_LABEL_HASH_LENGTH = 8;
 
 export function sanitizeDnsLabel(value: string, fallback: string): string {
@@ -69,6 +72,30 @@ export function buildFrpcUrl(subdomain: string, subdomainHost?: string): string 
 export interface FrpcEndpoint {
   subdomain: string;
   url?: string;
+}
+
+export function getFrpcUrlFilePath(worktreeName = basename(process.cwd())): string {
+  return join(tmpdir(), `plexus-${worktreeName}${FRPC_URL_FILE_SUFFIX}`);
+}
+
+export function writeFrpcUrlFile(url: string, worktreeName = basename(process.cwd())): void {
+  const filePath = getFrpcUrlFilePath(worktreeName);
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporaryPath, `${url}\n`, { encoding: 'utf8', mode: 0o600 });
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    try {
+      unlinkSync(temporaryPath);
+    } catch {}
+    throw error;
+  }
+}
+
+export function removeFrpcUrlFile(worktreeName = basename(process.cwd())): void {
+  try {
+    unlinkSync(getFrpcUrlFilePath(worktreeName));
+  } catch {}
 }
 
 export function buildFrpcEndpoint(
