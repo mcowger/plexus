@@ -70,7 +70,7 @@
     "lint:openapi": "bunx @redocly/cli lint docs/openapi/openapi.yaml",
     "bundle:openapi": "bunx @redocly/cli bundle docs/openapi/openapi.yaml -o docs/openapi.yaml",
     "generate:openapi:asset": "bunx @redocly/cli bundle docs/openapi/openapi.yaml -o packages/backend/src/assets/openapi.json",
-    "generate:repomap": "ctags -R --languages=TypeScript,JavaScript --kinds-TypeScript=cifm --fields=+neK --output-format=json --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='*.test.ts' --exclude='*.spec.ts' --exclude='__tests__' --exclude='packages/backend/src/assets/*' --exclude='packages/backend/drizzle/migrations*' -f - packages/ | jq -s -r 'map(select(._type == \"tag\" and .path != null)) | group_by(.path)[] | \"\\n📁 \" + .[0].path + \":\\n\" + (map(\"  │ [\" + (.kind // \"symbol\") + \"] \" + .name + \" (line \" + (.line|tostring) + \")\") | join(\"\\n\"))' > .repomap.txt",
+    "generate:repomap": "ctags -R --languages=TypeScript,JavaScript --kinds-TypeScript=cifm --fields=+neKSZ --output-format=json --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='*.test.ts' --exclude='*.spec.ts' --exclude='__tests__' --exclude='packages/backend/src/assets/*' --exclude='packages/backend/drizzle/migrations*' -f - packages/ | jq -r 'select(._type == \"tag\" and .path != null) | [(.path + \":\" + (.line | tostring)), (\"[\" + (.kind // \"symbol\") + \"]\"), (if .scope then .scope + \".\" + .name else .name end + if .signature then .signature else \"\" end)] | join(\" \")' | sort > .repomap.txt",
     "preview:openapi": "bunx @redocly/cli preview-docs docs/openapi/openapi.yaml",
     "sync:openapi": "bun run scripts/sync-openapi.ts",
     "sync:openapi:write": "bun run scripts/sync-openapi.ts --write",

@@ -8,10 +8,21 @@ This file is a **guardrail**, not general documentation.
 3. Use the listed command/workflow exactly.
 4. If unsure, **ask** instead of guessing.
 
-## 🚨 STOP — MANDATORY FIRST STEP
+A generated symbol index is available at `.repomap.txt`.
 
-> **Before tracing how anything works, you MUST read `.repomap.txt`.**
-> **Do not start by grepping through files.** The repomap is vastly more efficient.
+Do not read `.repomap.txt` sequentially or attempt to load the whole file into context. It is intended as a searchable index.
+
+Use it to quickly locate relevant files, symbols, classes, and functions before opening source files. Prefer targeted searches such as:
+
+```sh
+rg -i '<symbol-or-keyword>' .repomap.txt
+```
+
+When useful, combine multiple likely terms or narrow by package/path.
+
+After identifying likely source files from the map, inspect the source directly. Treat `.repomap.txt` as a navigation aid, not as authoritative implementation context.
+
+For broader architectural or conceptual questions where a symbol name is not known, search the repository itself rather than relying exclusively on the symbol index.
 
 ## Critical rules
 
