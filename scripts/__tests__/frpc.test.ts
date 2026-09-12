@@ -1,12 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildFrpcArgs,
   buildFrpcEndpoint,
   buildFrpcSubdomain,
   buildFrpcUrl,
+  getFrpcUrlFilePath,
+  removeFrpcUrlFile,
   repositoryNameFromRemote,
   sanitizeDnsLabel,
+  writeFrpcUrlFile,
 } from '../frpc';
+
+const TEST_WORKTREE_NAME = `frpc-test-${process.pid}`;
+
+afterEach(() => {
+  removeFrpcUrlFile(TEST_WORKTREE_NAME);
+});
 
 describe('frpc helpers', () => {
   it('extracts repository names from common git remote formats', () => {
@@ -74,5 +84,16 @@ describe('frpc helpers', () => {
       subdomain: 'plexus-purple-turtle',
       url: 'https://plexus-purple-turtle.dev.home.cowger.us',
     });
+  });
+
+  it('writes and removes the URL file for later tools', () => {
+    const url = 'https://plexus-purple-turtle.dev.home.cowger.us';
+    const filePath = getFrpcUrlFilePath(TEST_WORKTREE_NAME);
+
+    writeFrpcUrlFile(url, TEST_WORKTREE_NAME);
+    expect(readFileSync(filePath, 'utf8')).toBe(`${url}\n`);
+
+    removeFrpcUrlFile(TEST_WORKTREE_NAME);
+    expect(() => readFileSync(filePath, 'utf8')).toThrow();
   });
 });

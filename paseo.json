@@ -1,44 +1,40 @@
 {
   "worktree": {
     "setup": ["cp \"$PASEO_SOURCE_CHECKOUT_PATH/.env\" .env", "bun run scripts/init_worktree.ts"],
-    "teardown": "bun run dev:stop",
-    "servicePorts": {
-      "portScript": "scripts/dev-port-allocator.ts",
-      "range": "10000-19999"
-    }
+    "teardown": "bun run dev:stop"
   },
   "scripts": {
     "dev": {
-      "type": "service",
-      "command": "PORT=$PASEO_PORT bun run dev --no-open"
+      "type": "task",
+      "command": "bun run dev --no-open"
     },
     "dev:full": {
-      "type": "service",
-      "command": "PORT=$PASEO_PORT bun run dev:full --no-open"
+      "type": "task",
+      "command": "bun run dev:full --no-open"
     },
     "dev:pglite": {
-      "type": "service",
-      "command": "PORT=$PASEO_PORT bun run dev:pglite --no-open"
+      "type": "task",
+      "command": "bun run dev:pglite --no-open"
     },
     "prep-dev": {
-      "type": "service",
-      "command": "PLEXUS_URL=http://localhost PLEXUS_PORT=$PASEO_SERVICE_DEV_PORT bun run prep-dev"
+      "type": "task",
+      "command": "PLEXUS_URL=http://localhost bun run prep-dev"
     },
     "prep-dev:save": {
-      "type": "service",
-      "command": "PLEXUS_URL=http://localhost PLEXUS_PORT=$PASEO_SERVICE_DEV_PORT bun run prep-dev --save"
+      "type": "task",
+      "command": "PLEXUS_URL=http://localhost bun run prep-dev --save"
     },
     "prep-dev:live": {
-      "type": "service",
-      "command": "PLEXUS_URL=http://localhost PLEXUS_PORT=$PASEO_SERVICE_DEV_PORT bun run prep-dev --live"
+      "type": "task",
+      "command": "PLEXUS_URL=http://localhost bun run prep-dev --live"
     },
     "prep-dev:clear": {
-      "type": "service",
-      "command": "PLEXUS_URL=http://localhost PLEXUS_PORT=$PASEO_SERVICE_DEV_PORT bun run prep-dev --clear"
+      "type": "task",
+      "command": "PLEXUS_URL=http://localhost bun run prep-dev --clear"
     },
     "prep-dev:reset": {
-      "type": "service",
-      "command": "PLEXUS_URL=http://localhost PLEXUS_PORT=$PASEO_SERVICE_DEV_PORT bun run prep-dev --reset"
+      "type": "task",
+      "command": "PLEXUS_URL=http://localhost bun run prep-dev --reset"
     },
     "deploy:staging": {
       "type": "command",
