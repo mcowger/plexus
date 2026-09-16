@@ -36,6 +36,7 @@ import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.l
 import { ArrowDown, Copy, Paperclip, SendHorizontal, Square, Wrench, X } from 'lucide-react';
 import { memo, useMemo, useRef } from 'react';
 import type { KeyConfig } from '../../lib/api';
+import { generateUUID } from '../../lib/clipboard';
 
 export type PlaygroundApi =
   | 'openai-completions'
@@ -352,11 +353,11 @@ const makeAdapter = ({
     const completedParts: ThreadAssistantMessagePart[] = [];
     const generatedMessages: Message[] = [];
     const requestTrace: Array<Record<string, unknown>> = [];
-    const firstRequestId = crypto.randomUUID();
+    const firstRequestId = generateUUID();
     onRoutingPending(firstRequestId);
 
     for (let round = 0; round < 8; round++) {
-      const clientRequestId = round === 0 ? firstRequestId : crypto.randomUUID();
+      const clientRequestId = round === 0 ? firstRequestId : generateUUID();
       let finalMessage: AssistantMessage | undefined;
 
       const stream = streamsByApi[selectedApi].stream(model, context, {

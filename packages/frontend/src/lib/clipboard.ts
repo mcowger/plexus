@@ -8,10 +8,15 @@
 
 /**
  * Check if clipboard operations are available in the current context.
- * Requires secure context (HTTPS or localhost) for modern Clipboard API.
+ * True when the modern Clipboard API exists, or when the legacy
+ * document.execCommand('copy') fallback can be used (covers non-secure
+ * HTTP contexts where navigator.clipboard is undefined).
  */
 export const isClipboardAvailable = (): boolean => {
-  return typeof navigator !== 'undefined' && !!navigator.clipboard;
+  if (typeof navigator !== 'undefined' && !!navigator.clipboard) {
+    return true;
+  }
+  return typeof document !== 'undefined' && typeof document.execCommand === 'function';
 };
 
 /**
@@ -33,20 +38,52 @@ export const getClipboardUnavailableMessage = (): string => {
 };
 
 /**
- * Attempt to copy text to clipboard.
- * Returns success status. Falls back gracefully in non-secure contexts.
+ * Legacy copy path for non-secure contexts (plain HTTP) where
+ * navigator.clipboard is unavailable. Uses a temporary off-screen textarea
+ * with document.execCommand('copy'), which is not restricted to secure
+ * contexts. Must be called from a user gesture in most browsers.
  */
-export const copyToClipboard = async (text: string): Promise<boolean> => {
-  if (!isClipboardAvailable()) {
-    return false;
-  }
-
+const legacyCopyToClipboard = (text: string): boolean => {
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '0';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    // Needed for iOS Safari, which ignores select() alone.
+    textarea.setSelectionRange(0, textarea.value.length);
+    const success = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return success;
   } catch {
     return false;
   }
+};
+
+/**
+ * Attempt to copy text to clipboard.
+ * Tries the modern Clipboard API first, then falls back to
+ * document.execCommand('copy') which also works in non-secure (HTTP) contexts.
+ * Returns success status.
+ */
+export const copyToClipboard = async (text: string): Promise<boolean> => {
+  if (typeof navigator !== 'undefined' && !!navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to the legacy path below.
+    }
+  }
+
+  if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
+    return legacyCopyToClipboard(text);
+  }
+
+  return false;
 };
 
 /**
