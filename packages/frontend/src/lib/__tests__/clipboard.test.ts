@@ -7,14 +7,15 @@ afterEach(() => {
 });
 
 function stubLegacyDocument(execResult = true) {
+  const body = { appendChild: vi.fn(), removeChild: vi.fn() };
   const textarea = {
     value: '',
     style: {} as Record<string, string>,
+    parentNode: body as unknown as Node,
     setAttribute: vi.fn(),
     select: vi.fn(),
     setSelectionRange: vi.fn(),
   };
-  const body = { appendChild: vi.fn(), removeChild: vi.fn() };
   const execCommand = vi.fn().mockReturnValue(execResult);
   vi.stubGlobal('document', {
     createElement: vi.fn().mockReturnValue(textarea),
