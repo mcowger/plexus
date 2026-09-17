@@ -85,6 +85,94 @@ export const TEXT_COMPLETION_EVENTS = [
   { type: 'response.completed', response: {} },
 ];
 
+// Reproduces debug trace 755ef44a (and 3 siblings): a raw Responses stream
+// with a reasoning item's summary streamed as deltas, followed by a
+// function_call, mirroring genuine gpt-5-class reasoning output.
+export const REASONING_SUMMARY_FUNCTION_CALL_EVENTS = [
+  {
+    type: 'response.created',
+    response: { id: 'resp_reasoning_1', model: 'gpt-5', created_at: 1234567890 },
+  },
+  {
+    type: 'response.output_item.added',
+    output_index: 0,
+    item: { id: 'rs_1', type: 'reasoning', content: [], summary: [] },
+  },
+  {
+    type: 'response.reasoning_summary_part.added',
+    output_index: 0,
+    item_id: 'rs_1',
+    summary_index: 0,
+    part: { type: 'summary_text', text: '' },
+  },
+  {
+    type: 'response.reasoning_summary_text.delta',
+    output_index: 0,
+    item_id: 'rs_1',
+    summary_index: 0,
+    delta: 'Checking the ',
+  },
+  {
+    type: 'response.reasoning_summary_text.delta',
+    output_index: 0,
+    item_id: 'rs_1',
+    summary_index: 0,
+    delta: 'file listing',
+  },
+  {
+    type: 'response.reasoning_summary_text.done',
+    output_index: 0,
+    item_id: 'rs_1',
+    summary_index: 0,
+    text: 'Checking the file listing',
+  },
+  {
+    type: 'response.reasoning_summary_part.done',
+    output_index: 0,
+    item_id: 'rs_1',
+    summary_index: 0,
+    part: { type: 'summary_text', text: 'Checking the file listing' },
+  },
+  {
+    type: 'response.output_item.done',
+    output_index: 0,
+    item: { id: 'rs_1', type: 'reasoning', content: [], summary: [] },
+  },
+  {
+    type: 'response.output_item.added',
+    output_index: 1,
+    item: { id: 'fc_1', type: 'function_call', call_id: 'call_1', name: 'ls', arguments: '' },
+  },
+  {
+    type: 'response.function_call_arguments.delta',
+    output_index: 1,
+    item_id: 'fc_1',
+    delta: '{"path":"."}',
+  },
+  {
+    type: 'response.output_item.done',
+    output_index: 1,
+    item: {
+      id: 'fc_1',
+      type: 'function_call',
+      call_id: 'call_1',
+      name: 'ls',
+      arguments: '{"path":"."}',
+    },
+  },
+  {
+    type: 'response.completed',
+    response: {
+      usage: {
+        input_tokens: 10,
+        output_tokens: 20,
+        total_tokens: 30,
+        output_tokens_details: { reasoning_tokens: 12 },
+      },
+    },
+  },
+];
+
 export const COMPLETED_FUNCTION_CALL_EVENTS = [
   {
     type: 'response.created',

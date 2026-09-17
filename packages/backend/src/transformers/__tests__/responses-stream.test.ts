@@ -47,6 +47,7 @@ import {
   OVERSIZED_IMAGE_RESULT_12_MB,
   OVERSIZED_IMAGE_RESULT_6_MB,
   PARALLEL_FUNCTION_CALL_EVENTS,
+  REASONING_SUMMARY_FUNCTION_CALL_EVENTS,
   TEXT_COMPLETION_EVENTS,
   TEXT_ONLY_RESPONSE,
   TINY_IMAGE_B64,
@@ -176,6 +177,70 @@ describe('ResponsesTransformer stream transformation', () => {
     const chunks = await transformEvents(COMPLETED_FUNCTION_CALL_EVENTS);
 
     expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('tool_calls');
+  });
+
+  test('carries reasoning summary deltas as unified thinking-content chunks (debug trace 755ef44a)', async () => {
+    const chunks = await transformEvents(REASONING_SUMMARY_FUNCTION_CALL_EVENTS);
+
+    const thinkingChunks = chunks.filter((chunk) => chunk.delta?.thinking?.content);
+    expect(thinkingChunks.map((chunk) => chunk.delta.thinking.content)).toEqual([
+      'Checking the ',
+      'file listing',
+    ]);
+  });
+});
+
+describe('ResponsesTransformer stream round trip (raw SSE -> unified -> SSE)', () => {
+  function unifiedStreamFromChunks(chunks: any[]): ReadableStream {
+    return new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+  }
+
+  async function collectFormatStreamEvents(chunks: any[]): Promise<any[]> {
+    const reader = new ResponsesTransformer()
+      .formatStream(unifiedStreamFromChunks(chunks))
+      .getReader();
+    const decoder = new TextDecoder();
+    let output = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      output += decoder.decode(value);
+    }
+    return output
+      .split('\n\n')
+      .filter((block) => block.trim().length > 0)
+      .map((block) => {
+        const dataLine = block.split('\n').find((line) => line.startsWith('data: '));
+        return JSON.parse((dataLine as string).replace(/^data:\s*/, ''));
+      });
+  }
+
+  test('reasoning summary text survives transformStream -> formatStream intact (debug trace 755ef44a)', async () => {
+    const unifiedChunks = await transformEvents(REASONING_SUMMARY_FUNCTION_CALL_EVENTS);
+    const events = await collectFormatStreamEvents(unifiedChunks);
+
+    const summaryDeltaEvents = events.filter(
+      (e) => e.type === 'response.reasoning_summary_text.delta'
+    );
+    expect(summaryDeltaEvents.map((e) => e.delta)).toEqual(['Checking the ', 'file listing']);
+
+    const completed = events.find((e) => e.type === 'response.completed');
+    const outputTypes = completed.response.output.map((item: any) => item.type);
+    expect(outputTypes).toEqual(['reasoning', 'function_call']);
+
+    const reasoningItem = completed.response.output.find((item: any) => item.type === 'reasoning');
+    expect(reasoningItem.summary).toEqual([
+      { type: 'summary_text', text: 'Checking the file listing' },
+    ]);
+
+    // Usage accounting was never the problem — confirm it still survives
+    // alongside the now-preserved reasoning content.
+    expect(completed.response.usage.output_tokens_details.reasoning_tokens).toBe(12);
   });
 });
 

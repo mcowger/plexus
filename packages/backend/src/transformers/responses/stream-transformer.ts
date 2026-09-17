@@ -91,6 +91,35 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
                 },
                 finish_reason: null,
               });
+            } else if (data.type === 'response.reasoning_summary_text.delta') {
+              // Reasoning summary delta (the human-readable "thinking"
+              // narration OpenAI streams alongside encrypted reasoning).
+              // formatResponsesStream reconstructs the reasoning item's
+              // lifecycle (output_item.added/done, summary_part.added/done)
+              // purely from these deltas — same pattern as
+              // response.output_text.delta above, no .done handling needed.
+              controller.enqueue({
+                id: responseId,
+                model: responseModel,
+                created: Math.floor(Date.now() / 1000),
+                delta: {
+                  thinking: { content: data.delta },
+                },
+                finish_reason: null,
+              });
+            } else if (data.type === 'response.reasoning_text.delta') {
+              // Raw reasoning text delta (present when the model streams
+              // unsummarized reasoning content rather than/in addition to a
+              // summary).
+              controller.enqueue({
+                id: responseId,
+                model: responseModel,
+                created: Math.floor(Date.now() / 1000),
+                delta: {
+                  reasoning_content: data.delta,
+                },
+                finish_reason: null,
+              });
             } else if (data.type === 'response.function_call_arguments.delta') {
               // Tool call arguments delta
               hasFunctionCall = true;
