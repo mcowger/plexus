@@ -217,6 +217,43 @@ describe('Dispatcher API subtypes', () => {
     );
   });
 
+  test('keeps pass-through for a base (non-lite) Responses target that only declares a bare custom tool (debug trace 755ef44a)', async () => {
+    // A `type: 'custom'` (freeform/grammar) tool declaration alone used to
+    // trip hasCodexResponsesExtensions and force the full transform
+    // pipeline even for a plain OpenAI-target request — real OpenAI
+    // understands `custom` tools natively, so this incorrectly routed every
+    // request using pi's `apply_patch` tool through
+    // transformResponsesStream/formatResponsesStream, which silently drops
+    // reasoning output items (no branch for response.reasoning_* events).
+    // Declaring the tool is not a Codex-CLI-only signal; only actual
+    // custom_tool_call history (checked separately below) is.
+    const dispatcher = new Dispatcher() as any;
+    const route = makeRoute(['responses']);
+    const originalBody = {
+      model: 'gpt-5.6-luna',
+      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+      tools: [
+        { type: 'function', name: 'ls' },
+        { type: 'custom', name: 'apply_patch', description: 'Apply a patch' },
+      ],
+    };
+
+    const clientTransformer = new ResponsesTransformer();
+    const unifiedRequest = await clientTransformer.parseRequest(originalBody);
+    unifiedRequest.incomingApiType = 'responses';
+    unifiedRequest.originalBody = originalBody;
+
+    const result = await dispatcher.transformRequestPayload(
+      unifiedRequest,
+      route,
+      TransformerFactory.getTransformer('responses'),
+      'responses'
+    );
+
+    expect(result.bypassTransformation).toBe(true);
+    expect(result.payload.tools).toEqual(originalBody.tools);
+  });
+
   test('end-to-end: Codex "lite" mode additional_tools pass through untouched for an exact responses:lite target (staging trace b672ebbd)', async () => {
     // Originally reproduced as "staging trace d3a2b5f6" on the (unverified)
     // assumption that the upstream provider would receive `tools: []` and

@@ -14,22 +14,27 @@ function hasOwn(value: Record<string, any>, key: string): boolean {
 }
 
 /**
- * Detects Codex CLI Responses API extensions (namespace tools, custom/freeform
- * tools, and their corresponding input items) that most Responses-API-compatible
- * upstream providers don't understand. When present, the raw body cannot be
- * forwarded as-is (pass-through) — it must go through ResponsesTransformer's
- * namespace-flattening/custom-tool-normalization so the upstream provider only
- * ever sees plain function tools.
+ * Detects Codex CLI Responses API extensions (namespace tools and their
+ * corresponding input items) that most Responses-API-compatible upstream
+ * providers don't understand. When present, the raw body cannot be forwarded
+ * as-is (pass-through) — it must go through ResponsesTransformer's
+ * namespace-flattening so the upstream provider only ever sees plain function
+ * tools.
+ *
+ * NOTE: a bare `type: 'custom'` tool declaration is deliberately NOT treated
+ * as a Codex-only extension — `custom` (freeform/grammar) tools are a plain
+ * OpenAI Responses API tool type that real OpenAI (and any spec-compliant
+ * Responses provider) understands natively. Only `custom_tool_call`/
+ * `custom_tool_call_output` items in the conversation history (checked below)
+ * are a genuine Codex-CLI-shaped signal, since those items only ever exist if
+ * a prior turn already invoked a custom tool through the pi-ai/Codex-CLI IR.
  */
 export function hasCodexResponsesExtensions(body: any): boolean {
   if (!body || typeof body !== 'object') {
     return false;
   }
 
-  if (
-    Array.isArray(body.tools) &&
-    body.tools.some((t: any) => t?.type === 'namespace' || t?.type === 'custom')
-  ) {
+  if (Array.isArray(body.tools) && body.tools.some((t: any) => t?.type === 'namespace')) {
     return true;
   }
 
