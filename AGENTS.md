@@ -43,6 +43,10 @@ For broader architectural or conceptual questions where a symbol name is not kno
 Before editing schema files, read the **`db-schema-migrations`** [skill](.agents/skills/db-schema-migrations/SKILL.md).
 Local validation with `bun run generate-migrations` is optional. Leave generated artifacts in place and uncommitted; follow the skill for the full workflow.
 
+### If the task adds an OAuth provider
+
+Before writing code, read [packages/backend/AGENTS.md](packages/backend/AGENTS.md) for the end-to-end checklist (auth module, facade registration, dispatch, quota checker, model discovery, live-server verification). A working auth flow alone does not surface the provider anywhere.
+
 ### If the task writes or updates tests
 
 Before editing tests, read [docs/TESTING.md](docs/TESTING.md) for Plexus test placement, mocks, spies, and singleton resets. Load the **`vitest`** skill for framework reference; project rules take precedence over generic examples.
