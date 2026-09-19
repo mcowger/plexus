@@ -339,4 +339,76 @@ describe('OAuth management routes', () => {
       expect(json.data.map((model) => model.id)).toContain('gpt-image-2');
     });
   });
+
+  describe('Muse Code live model discovery', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('forwards accountId to the Muse backend and reports the live source', async () => {
+      const getApiKey = registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
+        'mk_live_abc'
+      );
+      const fetchSpy = registerSpy(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          object: 'list',
+          data: [
+            { id: 'muse-spark-1.3', object: 'model' },
+            { id: 'muse-spark-1.2', object: 'model' },
+          ],
+        }),
+      } as any);
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/v0/management/oauth/models?providerId=muse-code&accountId=work',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(getApiKey).toHaveBeenCalledWith('muse-code', 'work');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0]!;
+      expect(url).toBe('https://api.meta.ai/v1/models');
+      expect((init?.headers as Record<string, string>)['x-api-version']).toBe('1.0.0');
+
+      const json = response.json() as {
+        data: Array<{ id: string }>;
+        source: string;
+        warning?: string;
+      };
+      expect(json.source).toBe('muse-backend');
+      expect(json.warning).toBeUndefined();
+      expect(json.data.map((model) => model.id)).toEqual([
+        'muse-spark-1.2',
+        'muse-spark-1.3',
+      ]);
+    });
+
+    it('degrades to the static catalog with a warning when discovery fails', async () => {
+      registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockRejectedValue(
+        new Error('OAuth: Not authenticated for provider')
+      );
+      const fetchSpy = registerSpy(globalThis, 'fetch');
+
+      const response = await fastify.inject({
+        method: 'GET',
+        url: '/v0/management/oauth/models?providerId=muse-code',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      const json = response.json() as {
+        data: Array<{ id: string }>;
+        source: string;
+        warning?: string;
+      };
+      expect(json.source).toBe('catalog');
+      expect(json.warning).toEqual(expect.stringContaining('static catalog'));
+      expect(json.data.map((model) => model.id)).toContain('muse-spark-1.3-contributor');
+    });
+  });
 });

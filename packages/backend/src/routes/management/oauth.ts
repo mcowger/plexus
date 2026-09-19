@@ -6,7 +6,9 @@ import type { OAuthProvider, OAuthProviderId } from '../../services/oauth/oauth-
 import {
   getOAuthProviderModels,
   listCodexOAuthModels,
+  listMuseOAuthModels,
 } from '../../services/providers/provider-model-discovery';
+import { MUSE_CODE_PROVIDER_ID } from '../../services/oauth/muse-code';
 
 const startSessionSchema = z.object({
   providerId: z.string().min(1),
@@ -29,8 +31,8 @@ const credentialStatusQuerySchema = z.object({
 
 const getModelsQuerySchema = z.object({
   providerId: z.string().min(1),
-  // Which OAuth account to ask. Only Codex live discovery uses it; a blank
-  // value means "the provider's default account".
+  // Which OAuth account to ask. Only Codex and Muse Code live discovery use
+  // it; a blank value means "the provider's default account".
   accountId: z.string().optional(),
 });
 
@@ -179,10 +181,20 @@ export async function registerOAuthRoutes(
     }
 
     try {
-      // Codex is the one OAuth provider whose real model list is account-
-      // scoped, so it is fetched live (with a catalog fallback + warning).
+      // Codex and Muse Code are the OAuth providers whose real model lists
+      // are account-scoped, so they are fetched live (with a catalog
+      // fallback + warning).
       if (parsed.data.providerId === 'openai-codex') {
         const discovery = await listCodexOAuthModels(parsed.data.accountId || undefined);
+        return reply.send({
+          data: discovery.models,
+          source: discovery.source,
+          ...(discovery.warning ? { warning: discovery.warning } : {}),
+        });
+      }
+
+      if (parsed.data.providerId === MUSE_CODE_PROVIDER_ID) {
+        const discovery = await listMuseOAuthModels(parsed.data.accountId || undefined);
         return reply.send({
           data: discovery.models,
           source: discovery.source,
