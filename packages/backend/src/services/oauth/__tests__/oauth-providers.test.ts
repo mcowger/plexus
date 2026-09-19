@@ -23,6 +23,14 @@ describe('oauth-providers facade', () => {
     }
   });
 
+  it('recognizes the Plexus-owned muse-code subscription provider', () => {
+    expect(isKnownOAuthProviderId('muse-code')).toBe(true);
+    const descriptor = getOAuthProviderAuth('muse-code');
+    expect(descriptor?.id).toBe('muse-code');
+    expect(descriptor?.usesCallbackServer).toBe(false);
+    expect(listOAuthProviders().some((p) => p.id === 'muse-code')).toBe(true);
+  });
+
   it('blocks radius', () => {
     expect(isKnownOAuthProviderId('radius')).toBe(false);
     expect(getOAuthProviderAuth('radius')).toBeUndefined();
