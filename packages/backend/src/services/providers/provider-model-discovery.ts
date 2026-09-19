@@ -146,6 +146,85 @@ export async function fetchModelsFromUrl(
   }
 }
 
+// ─── Muse OAuth: live model discovery ─────────────────────────────────────
+
+/**
+ * Static fallback when the Muse model list is unreachable. The muse-spark
+ * family from CLIProxyAPI's native `meta` provider catalog.
+ */
+export const MUSE_STATIC_MODELS: readonly DiscoveredModel[] = [
+  'muse-spark-1.1',
+  'muse-spark-1.2',
+  'muse-spark-1.2-contributor',
+  'muse-spark-1.3',
+  'muse-spark-1.3-contributor',
+].map((id) => ({ id, name: id }));
+
+const MUSE_MODELS_URL = 'https://api.meta.ai/v1/models';
+const MUSE_MODELS_TIMEOUT_MS = 15_000;
+
+/**
+ * List the muse-spark models the signed-in Meta account may use.
+ *
+ * Meta exposes a standard OpenAI-style `GET /v1/models`, but it requires
+ * the subscription-minted key (resolved through the stored login, like
+ * inference) plus the `x-api-version` header — which the generic
+ * `fetchModelsFromUrl` cannot send, hence this dedicated path (the same
+ * reason Codex has `listCodexOAuthModels`).
+ *
+ * Best-effort: every failure degrades to the static catalog with a warning
+ * the UI can show, so a Fetch Models click never comes back empty because
+ * the account is logged out.
+ */
+export async function listMuseOAuthModels(oauthAccountId?: string | null): Promise<{
+  models: DiscoveredModel[];
+  source: 'muse-backend' | 'catalog';
+  warning?: string;
+}> {
+  try {
+    const apiKey = await OAuthAuthManager.getInstance().getApiKey(
+      'muse-code',
+      oauthAccountId
+    );
+
+    const response = await fetch(MUSE_MODELS_URL, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'x-api-version': '1.0.0',
+      },
+      signal: AbortSignal.timeout(MUSE_MODELS_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Muse model list returned ${response.status} ${response.statusText}`);
+    }
+
+    const { data } = normalizeModelsResponse(await response.json());
+    const ids = data
+      .map((model) => model.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    if (ids.length === 0) {
+      throw new Error('Muse model list response had no model ids');
+    }
+    return {
+      models: [...ids].sort((a, b) => a.localeCompare(b)).map((id) => ({ id, name: id })),
+      source: 'muse-backend',
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.warn(`Muse model discovery failed (${reason}); falling back to the static catalog.`);
+    return {
+      models: [...MUSE_STATIC_MODELS],
+      source: 'catalog',
+      warning:
+        `Could not reach the Muse model list (${reason}); showing the static catalog. ` +
+        "Log in with OAuth to see your account's models.",
+    };
+  }
+}
+
 export function getOAuthProviderModels(providerId: string): DiscoveredModel[] {
   return getCatalogModels(providerId).map((model) => ({
     id: model.id,
@@ -300,6 +379,9 @@ export async function discoverProviderModels(provider: ProviderConfig): Promise<
   if (provider.oauth_provider) {
     if (provider.oauth_provider === 'openai-codex') {
       return (await listCodexOAuthModels(provider.oauth_account)).models;
+    }
+    if (provider.oauth_provider === 'muse-code') {
+      return (await listMuseOAuthModels(provider.oauth_account)).models;
     }
     return getOAuthProviderModels(provider.oauth_provider);
   }
