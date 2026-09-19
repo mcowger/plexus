@@ -155,4 +155,43 @@ describe('muse-code quota checker', () => {
     const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'muse-code' });
     await expect(checker.check(ctx)).rejects.toThrow(/no stored login/);
   });
+
+  it('handles the live key-endpoint shape (numeric resets_at, no user_id)', async () => {
+    // Regression fixture from a real account (2026-09-19): resets_at
+    // arrives as epoch seconds, there is no user_id field, and extra
+    // subscription/billing fields are present but carry no PAYG usage.
+    stubFetch(async () =>
+      jsonResponse(200, {
+        api_key: 'mk_live_abc',
+        base_url: 'https://api.meta.ai/v1',
+        has_payment_method: true,
+        require_payment: false,
+        is_subs_active: true,
+        can_subscribe: false,
+        show_subs_upsell: true,
+        user_full_name: 'Test User',
+        user_email: 'user@example.com',
+        payment_method: 'Visa **** 1234',
+        action_url: null,
+        subs_tier_id: 'muse_high_usage',
+        subs_tier_name: 'High Usage Plan Name Here!',
+        is_subs_upgrade_available: true,
+        subs_usage: {
+          window: { used_percent: 0, window_duration_mins: 300, resets_at: 1789879524 },
+          weekly: { used_percent: 0, resets_at: 1789948800 },
+          tier: 'muse_high_usage',
+        },
+      })
+    );
+    const ctx = createMeterContext(CHECKER_ID, 'meta', { apiKey: 'dca_tok' });
+
+    const meters = await checker.check(ctx);
+    expect(meters).toHaveLength(2);
+    expect(meters.find((m) => m.key === 'rolling')?.resetsAt).toBe(
+      new Date(1789879524 * 1000).toISOString()
+    );
+    expect(meters.find((m) => m.key === 'weekly')?.resetsAt).toBe(
+      new Date(1789948800 * 1000).toISOString()
+    );
+  });
 });
