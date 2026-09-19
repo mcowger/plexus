@@ -6,7 +6,7 @@ import type { RouteResult } from '../routing/router';
  *
  * The pi-ai `Context` IR + `OAuthDispatcher` executor were removed.
  * ALL OAuth providers now run through the standard dispatch path, via either
- * the hand-ported native OAuth builders (Anthropic, Codex, Copilot — see
+ * the hand-ported native OAuth builders (Anthropic, Codex, Copilot, Muse Code — see
  * `oauth-native-request.ts`'s `isNativeOAuthProvider`) or the generic OAuth
  * builder for every other pi-ai OAuth provider (same file,
  * `prepareGenericOAuthDispatch`). What remains here are the pure routing

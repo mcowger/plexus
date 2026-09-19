@@ -40,6 +40,7 @@ import {
 } from '../../transformers/oauth/masking';
 import type { RenamePair } from '../../transformers/oauth/masking/types';
 import { CodexVersionService } from './codex-version-service';
+import { MUSE_CODE_PROVIDER_ID } from './muse-code';
 import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 
@@ -74,6 +75,9 @@ export interface PreparedOAuthRequest {
 const OAUTH_PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: 'https://api.anthropic.com',
   'openai-codex': 'https://chatgpt.com/backend-api',
+  // Muse Code has no pi-ai registry entry at all (see services/oauth/muse-code.ts),
+  // so its base URL always comes from here.
+  [MUSE_CODE_PROVIDER_ID]: 'https://api.meta.ai/v1',
 };
 
 /**
@@ -592,9 +596,36 @@ function prepareCopilotOAuthRequest(
 }
 
 /**
+ * Prepare a native Muse Code subscription request. The standard-path
+ * transformer has already built the correct Chat Completions body; this only
+ * targets Meta's Model API with the subscription-minted key (never the
+ * account token) plus the required `x-api-version` header. No masking, no
+ * tool renames — the wire contract matches direct Meta API keys.
+ */
+function prepareMuseCodeOAuthRequest(
+  token: string,
+  nativeBody: any,
+  streaming: boolean
+): PreparedOAuthRequest {
+  const baseUrl = resolveOAuthBaseUrl(MUSE_CODE_PROVIDER_ID, 'muse-spark').replace(/\/$/, '');
+  return {
+    url: `${baseUrl}/chat/completions`,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: streaming ? 'text/event-stream' : 'application/json',
+      Authorization: `Bearer ${token}`,
+      'x-api-version': '1.0.0',
+    },
+    body: nativeBody,
+    // Muse applies no request-side tool renames, so nothing to reverse.
+    reverseResponseFrame: (frame) => frame,
+  };
+}
+
+/**
  * Prepare a native OAuth request for the standard dispatch path.
  *
- * @param provider  OAuth provider id (`anthropic`, `openai-codex`, or `github-copilot`).
+ * @param provider  OAuth provider id (`anthropic`, `openai-codex`, `github-copilot`, or `muse-code`).
  * @param modelId   Upstream model id.
  * @param auth      Resolved OAuth access token / masking API key.
  * @param nativeBody The provider-native wire body from the entry transformer.
@@ -636,6 +667,12 @@ export function prepareOAuthNativeRequest(
       options?.apiType ?? 'chat'
     );
   }
+  if (provider === MUSE_CODE_PROVIDER_ID) {
+    if (auth.mode !== 'oauth') {
+      throw new Error('Muse Code OAuth requires an OAuth token (apiKey mode unsupported).');
+    }
+    return prepareMuseCodeOAuthRequest(auth.token, nativeBody, streaming);
+  }
   // The caller gates on isNativeOAuthProvider; reaching here is a programming error.
   logger.error(`OAuth native path not implemented for provider '${provider}'`);
   throw new Error(`OAuth native request preparation not implemented for provider '${provider}'`);
@@ -643,10 +680,17 @@ export function prepareOAuthNativeRequest(
 
 /**
  * Whether an OAuth provider is served by the native (non-pi-ai-executor) path.
- * All ported providers: Anthropic (M1), Codex (M2), and GitHub Copilot (M3).
+ * All ported providers: Anthropic (M1), Codex (M2), GitHub Copilot (M3), and
+ * Muse Code (subscription key transport — no pi-ai registry entry, so the
+ * base URL always resolves from OAUTH_PROVIDER_BASE_URLS).
  */
 export function isNativeOAuthProvider(provider: string | undefined): boolean {
-  return provider === 'anthropic' || provider === 'openai-codex' || provider === 'github-copilot';
+  return (
+    provider === 'anthropic' ||
+    provider === 'openai-codex' ||
+    provider === 'github-copilot' ||
+    provider === MUSE_CODE_PROVIDER_ID
+  );
 }
 
 /**
@@ -663,6 +707,8 @@ export function isNativeOAuthProvider(provider: string | undefined): boolean {
 const NATIVE_OAUTH_API_TYPES: Record<string, string> = {
   anthropic: 'messages',
   'openai-codex': 'responses',
+  // Meta's Model API speaks OpenAI Chat Completions on /v1.
+  [MUSE_CODE_PROVIDER_ID]: 'chat',
 };
 
 /** Map a pi-ai model `api` field to the plexus transformer/api-type name. */
