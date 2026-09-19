@@ -7,6 +7,7 @@ import { webSearchCoercionAdapter } from './web-search-coercion.adapter';
 import { stripUnsupportedToolSearchAdapter } from './strip-unsupported-tool-search.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from './suppress-unsupported-gpt5-options.adapter';
 import { normalizeAnthropicToolIdsAdapter } from './normalize-anthropic-tool-ids.adapter';
+import { museCodeCompatAdapter } from './muse-code-compat.adapter';
 
 /**
  * Registry of all built-in provider adapters.
@@ -21,4 +22,5 @@ export const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   [stripUnsupportedToolSearchAdapter.name]: stripUnsupportedToolSearchAdapter,
   [suppressUnsupportedGpt5OptionsAdapter.name]: suppressUnsupportedGpt5OptionsAdapter,
   [normalizeAnthropicToolIdsAdapter.name]: normalizeAnthropicToolIdsAdapter,
+  [museCodeCompatAdapter.name]: museCodeCompatAdapter,
 };

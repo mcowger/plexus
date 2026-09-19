@@ -24,7 +24,10 @@ required; verify each against the **live** server, not just unit tests.
    wire-type mapping, `prepare{Id}OAuthRequest`, and
    `isNativeOAuthProvider` membership. Add same-format bypass in
    `src/services/dispatch/request-payload-builder.ts` when the wire type
-   needs it.
+   needs it. Provider-specific wire quirks (dropped/rejected fields, tool
+   coercions) go in an implicit adapter
+   (`src/transformers/adapters/`, registered in `index.ts`, injected in
+   `adapter-resolver.ts`) — never in the native prep function.
 4. **Quota checker**: follow the **`add-quota-checker`** skill
    (`.agents/skills/add-quota-checker/SKILL.md`), then map the provider id
    to the checker type in `getOAuthCheckerType`

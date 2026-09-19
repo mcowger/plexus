@@ -4,6 +4,7 @@ import { isOAuthPlaceholderUrl, type AdapterEntry } from '../../config';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
 import { normalizeAnthropicToolIdsAdapter } from '../../transformers/adapters/normalize-anthropic-tool-ids.adapter';
 import { stripUnsupportedToolSearchAdapter } from '../../transformers/adapters/strip-unsupported-tool-search.adapter';
+import { museCodeCompatAdapter, isMuseTarget } from '../../transformers/adapters/muse-code-compat.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
@@ -14,7 +15,8 @@ import { logger } from '../../utils/logger';
  * Resolution order:
  *   1. Implicit adapters automatically injected for the route's target
  *      provider (currently: tool-search stripping for `pi_ai_provider ===
- *      'openrouter'`), its model (GPT-5 option suppression) and its
+ *      'openrouter'`, Muse wire compat for `muse-code` OAuth routes and
+ *      `api.meta.ai` targets), its model (GPT-5 option suppression) and its
  *      provider+wire-format pair (Anthropic tool-id normalization, gated on
  *      BOTH the outbound wire format being Anthropic Messages AND the target
  *      looking like an Anthropic provider — an `anthropic.com` base URL,
@@ -119,6 +121,9 @@ function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string):
   }
   if (route.config.pi_ai_provider === 'openrouter') {
     adapters.push({ name: stripUnsupportedToolSearchAdapter.name, options: {}, enabled: true });
+  }
+  if (isMuseTarget(route)) {
+    adapters.push({ name: museCodeCompatAdapter.name, options: {}, enabled: true });
   }
   if (
     effectiveApiType &&
