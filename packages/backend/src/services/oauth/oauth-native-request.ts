@@ -597,10 +597,11 @@ function prepareCopilotOAuthRequest(
 
 /**
  * Prepare a native Muse Code subscription request. The standard-path
- * transformer has already built the correct Chat Completions body; this only
+ * transformer has already built the correct Responses body; this only
  * targets Meta's Model API with the subscription-minted key (never the
  * account token) plus the required `x-api-version` header. No masking, no
- * tool renames — the wire contract matches direct Meta API keys.
+ * tool renames — the wire contract matches direct Meta API keys (oh-my-pi
+ * seeds muse-code as `openai-responses` on this same base URL).
  */
 function prepareMuseCodeOAuthRequest(
   token: string,
@@ -609,7 +610,7 @@ function prepareMuseCodeOAuthRequest(
 ): PreparedOAuthRequest {
   const baseUrl = resolveOAuthBaseUrl(MUSE_CODE_PROVIDER_ID, 'muse-spark').replace(/\/$/, '');
   return {
-    url: `${baseUrl}/chat/completions`,
+    url: `${baseUrl}/responses`,
     headers: {
       'Content-Type': 'application/json',
       Accept: streaming ? 'text/event-stream' : 'application/json',
@@ -707,8 +708,9 @@ export function isNativeOAuthProvider(provider: string | undefined): boolean {
 const NATIVE_OAUTH_API_TYPES: Record<string, string> = {
   anthropic: 'messages',
   'openai-codex': 'responses',
-  // Meta's Model API speaks OpenAI Chat Completions on /v1.
-  [MUSE_CODE_PROVIDER_ID]: 'chat',
+  // Meta's Model API speaks the Responses API on /v1 (oh-my-pi seeds
+  // muse-code as `openai-responses`); same fixed mapping as Codex.
+  [MUSE_CODE_PROVIDER_ID]: 'responses',
 };
 
 /** Map a pi-ai model `api` field to the plexus transformer/api-type name. */

@@ -310,17 +310,16 @@ export async function buildRequestPayload(
     // (Messages) clients — chat/responses clients get the response
     // translated by the standard pipeline (mirrors the identical Codex fix,
     // commit 4f74c1c6). Copilot honors its computed same-format decision.
-    // Muse Code bypasses only for same-format (chat) clients.
+    // Muse Code bypasses only for same-format (responses) clients.
     const incomingBaseType = getApiBaseType(request.incomingApiType?.toLowerCase() ?? '');
     const incomingIsResponses = incomingBaseType === 'responses';
     const incomingIsMessages = incomingBaseType === 'messages';
-    const incomingIsChat = incomingBaseType === 'chat';
     const nativeBypass = codexNative
       ? codexCliPassthrough || incomingIsResponses
       : copilotNative
         ? bypassTransformation
         : museNative
-          ? incomingIsChat
+          ? incomingIsResponses
           : incomingIsMessages;
     return { payload: prepared.body, bypassTransformation: nativeBypass };
   }
