@@ -8,7 +8,6 @@ import {
   listCodexOAuthModels,
   listMuseOAuthModels,
 } from '../../services/providers/provider-model-discovery';
-import { MUSE_CODE_PROVIDER_ID } from '../../services/oauth/muse-code';
 
 const startSessionSchema = z.object({
   providerId: z.string().min(1),
@@ -193,7 +192,7 @@ export async function registerOAuthRoutes(
         });
       }
 
-      if (parsed.data.providerId === MUSE_CODE_PROVIDER_ID) {
+      if (parsed.data.providerId === 'meta') {
         const discovery = await listMuseOAuthModels(parsed.data.accountId || undefined);
         return reply.send({
           data: discovery.models,

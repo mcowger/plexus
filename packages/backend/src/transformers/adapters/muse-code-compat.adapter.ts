@@ -71,16 +71,14 @@ export function isCustomTool(tool: any): boolean {
 
 /**
  * Whether a dispatch targets Meta's Model API — judged on the provider slug
- * for `muse-code` subscription routes, or on the host for direct Meta API-key
- * providers (the 400s come from the endpoint, not the auth method).
+ * for `meta` (Muse subscription) OAuth routes, or on the host for direct
+ * Meta API-key providers (the 400s come from the endpoint, not the auth method).
  */
 export function isMuseTarget(route: RouteResult): boolean {
-  if ((route.config.oauth_provider || route.provider) === 'muse-code') return true;
+  if ((route.config.oauth_provider || route.provider) === 'meta') return true;
   const urls =
     typeof route.config.api_base_url === 'string'
       ? [route.config.api_base_url]
       : Object.values(route.config.api_base_url ?? {});
-  return urls.some(
-    (url) => typeof url === 'string' && url.toLowerCase().includes('api.meta.ai')
-  );
+  return urls.some((url) => typeof url === 'string' && url.toLowerCase().includes('api.meta.ai'));
 }

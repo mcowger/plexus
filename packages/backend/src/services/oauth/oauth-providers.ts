@@ -17,7 +17,6 @@
 
 import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type { OAuthAuth } from '@earendil-works/pi-ai';
-import { MUSE_CODE_DISPLAY_NAME, MUSE_CODE_PROVIDER_ID, museCodeOAuth } from './muse-code';
 
 /** Provider id of an OAuth provider (e.g. 'anthropic', 'openai-codex'). */
 export type OAuthProvider = string;
@@ -36,15 +35,16 @@ export interface OAuthProviderDescriptor {
 /**
  * Plexus-owned OAuth implementations for providers pi-ai does not ship.
  * Checked before the pi-ai registry in `toDescriptor`, so these ids resolve
- * even with no pi-ai catalog entry, baseUrl, or model list: `muse-code`
- * (Meta Muse Code subscription) is the first such provider. Entries here
+ * even with no pi-ai catalog entry, baseUrl, or model list. Entries here
  * automatically flow into config validation (`isKnownOAuthProviderId`), the
  * management UI (`listOAuthProviders`), and login sessions — the same
  * single-place guarantee the pi-ai side of the facade provides.
+ *
+ * Currently empty: Meta Muse subscriptions (`meta`) used to live here as
+ * `muse-code` until pi-ai 0.86 shipped a native `meta` provider with the
+ * same device-flow OAuth, so the facade resolves it from pi-ai directly.
  */
-const CUSTOM_OAUTH_PROVIDERS: Readonly<Record<string, { name: string; oauth: OAuthAuth }>> = {
-  [MUSE_CODE_PROVIDER_ID]: { name: MUSE_CODE_DISPLAY_NAME, oauth: museCodeOAuth },
-};
+const CUSTOM_OAUTH_PROVIDERS: Readonly<Record<string, { name: string; oauth: OAuthAuth }>> = {};
 
 /** Providers whose login flow runs a local callback server. */
 const CALLBACK_SERVER_PROVIDERS = new Set(['anthropic', 'openai-codex']);

@@ -17,18 +17,19 @@ describe('oauth-providers facade', () => {
       'xai',
       'kimi-coding',
       'openrouter',
+      'meta',
     ]) {
       expect(isKnownOAuthProviderId(id)).toBe(true);
       expect(getOAuthProviderAuth(id)).toBeDefined();
     }
   });
 
-  it('recognizes the Plexus-owned muse-code subscription provider', () => {
-    expect(isKnownOAuthProviderId('muse-code')).toBe(true);
-    const descriptor = getOAuthProviderAuth('muse-code');
-    expect(descriptor?.id).toBe('muse-code');
+  it('recognizes pi-ai\u2019s native meta (Muse subscription) provider', () => {
+    expect(isKnownOAuthProviderId('meta')).toBe(true);
+    const descriptor = getOAuthProviderAuth('meta');
+    expect(descriptor?.id).toBe('meta');
     expect(descriptor?.usesCallbackServer).toBe(false);
-    expect(listOAuthProviders().some((p) => p.id === 'muse-code')).toBe(true);
+    expect(listOAuthProviders().some((p) => p.id === 'meta')).toBe(true);
   });
 
   it('blocks radius', () => {

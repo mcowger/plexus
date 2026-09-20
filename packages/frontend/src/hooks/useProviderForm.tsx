@@ -30,7 +30,7 @@ const getOAuthCheckerType = (oauthProvider?: string): string | null => {
     anthropic: 'claude-code',
     'claude-code': 'claude-code',
     'github-copilot': 'copilot',
-    'muse-code': 'muse-code',
+    meta: 'muse-code',
   };
   return map[oauthProvider] ?? null;
 };
@@ -600,6 +600,26 @@ export function useProviderForm() {
     }
   };
 
+  const handleDeleteOAuthCredential = async () => {
+    const providerId = editingProvider.oauthProvider || (OAUTH_PROVIDERS[0]?.value ?? '');
+    const accountId = editingProvider.oauthAccount?.trim();
+    if (!accountId) {
+      setOauthError('OAuth account is required');
+      return;
+    }
+    setOauthBusy(true);
+    setOauthError(null);
+    try {
+      await api.deleteOAuthCredentials(providerId, accountId);
+      setOauthCredentialReady(false);
+      resetOAuthState();
+    } catch (error) {
+      setOauthError(error instanceof Error ? error.message : 'Failed to delete OAuth credentials');
+    } finally {
+      setOauthBusy(false);
+    }
+  };
+
   // API URL helpers
   const getApiBaseUrlMap = (): Record<string, string> => {
     if (
@@ -1061,6 +1081,7 @@ export function useProviderForm() {
     handleSubmitPrompt,
     handleSubmitManualCode,
     handleCancelOAuth,
+    handleDeleteOAuthCredential,
     // API URLs
     getApiBaseUrlMap,
     getApiUrlValue,

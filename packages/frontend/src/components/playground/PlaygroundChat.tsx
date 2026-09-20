@@ -17,9 +17,11 @@ import {
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown';
 import {
   Type,
+  normalizeContext,
   type Api,
   type AssistantMessage,
   type Context,
+  type JsonObject,
   type Message,
   type Model,
   type ProviderStreams,
@@ -217,7 +219,7 @@ const toPiContext = (messages: readonly ThreadMessage[], tools: Tool[] | undefin
           type: 'toolCall',
           id: part.toolCallId,
           name: part.toolName,
-          arguments: part.args as Record<string, unknown>,
+          arguments: part.args as JsonObject,
         });
       }
     }
@@ -360,7 +362,7 @@ const makeAdapter = ({
       const clientRequestId = round === 0 ? firstRequestId : generateUUID();
       let finalMessage: AssistantMessage | undefined;
 
-      const stream = streamsByApi[selectedApi].stream(model, context, {
+      const stream = streamsByApi[selectedApi].stream(model, normalizeContext(context), {
         apiKey: selectedKey.secret,
         signal: abortSignal,
         maxRetries: 0,

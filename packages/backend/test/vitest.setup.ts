@@ -214,7 +214,9 @@ const mockGetModel = (provider: string, modelId: string) => {
   };
 };
 
-const mockGetProviders = () => ['anthropic', 'openai-codex', 'openai', 'google'];
+// Mirrors pi-ai's builtin provider ids (subset). 'meta' is pi-ai 0.86's native
+// Muse subscription provider.
+const mockGetProviders = () => ['anthropic', 'openai-codex', 'openai', 'google', 'meta'];
 
 // Faithful port of pi-ai's getSupportedThinkingLevels: honours model.reasoning
 // and thinkingLevelMap ('null' = unsupported; xhigh/max require an explicit
@@ -284,7 +286,8 @@ const MOCK_BUILTIN_PROVIDER_IDS = new Set(['anthropic', 'openai-codex', 'openai'
 // sync with services/oauth/oauth-providers.ts's expectations so config
 // validation and OAuth provider listing behave the same under test as in
 // production. 'radius' is deliberately omitted (see that module's doc
-// comment); it must resolve as OAuth-less here too.
+// comment); it must resolve as OAuth-less here too. 'meta' is pi-ai 0.86's
+// native Muse subscription provider.
 const MOCK_OAUTH_PROVIDER_IDS = new Set([
   'anthropic',
   'openai-codex',
@@ -292,6 +295,7 @@ const MOCK_OAUTH_PROVIDER_IDS = new Set([
   'xai',
   'kimi-coding',
   'openrouter',
+  'meta',
 ]);
 
 const mockModels = {
@@ -299,7 +303,11 @@ const mockModels = {
   stream: mockStream,
   getModel: mockGetModel,
   getModels: mockGetModels,
-  getProviders: mockGetProviders,
+  // The real `Models.getProviders()` returns Provider objects; the shared
+  // string-id mock is kept for `getBuiltinProviders` (a string list upstream).
+  // Mapping to `{ id }` stubs here keeps OAuth provider listing faithful
+  // without disturbing the other consumers.
+  getProviders: () => mockGetProviders().map((id) => ({ id })),
   // Returns a truthy stub for known builtin provider ids, undefined otherwise.
   // Mirrors the real piAiModels.getProvider() (used internally by pi-ai routing).
   getProvider: (id: string) =>

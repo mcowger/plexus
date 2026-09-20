@@ -24,6 +24,7 @@ import type {
   ToolCall,
   Message,
   Usage,
+  JsonObject,
 } from '@earendil-works/pi-ai';
 import type {
   CompactionStrategy,
@@ -74,10 +75,10 @@ const ZERO_USAGE: Usage = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-function parseToolArguments(raw: string): Record<string, unknown> {
+function parseToolArguments(raw: string): JsonObject {
   const parsed = JSON.parse(raw);
   if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    return parsed as Record<string, unknown>;
+    return parsed as JsonObject;
   }
   throw new Error('HeadroomCompactor: invalid tool arguments in headroom output');
 }

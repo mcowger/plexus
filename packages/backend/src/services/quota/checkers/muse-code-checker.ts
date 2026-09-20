@@ -3,13 +3,13 @@
  *
  * Subscription state lives on the same key endpoint as the login mint:
  * re-`POST https://api.meta.ai/muse-code/key` with the account's OAuth
- * access token (no `onboard` flag) returns `subs_usage` with a rolling
- * `window` and a `weekly` window, each carrying `used_percent` and
- * `resets_at`. The minted `api_key` itself carries no quota identity, so the
- * checker always resolves the OAuth token — either the explicitly configured
- * `apiKey` (a raw account access token, paralleling the Codex checker) or the
- * `oauthAccessToken` inside the stored `{oauthAccessToken, apiKey}` login
- * credential — and strips `api_key` from anything logged.
+ * identity token returns `subs_usage` with a rolling `window` and a
+ * `weekly` window, each carrying `used_percent` and `resets_at`. The minted
+ * `api_key` itself carries no quota identity, so the checker always resolves
+ * the identity token — either the explicitly configured `apiKey` (a raw
+ * account token, paralleling the Codex checker) or the `refresh` field of
+ * pi-ai's `meta` OAuth credential (which stores the identity token there and
+ * the minted key in `access`) — and strips `api_key` from anything logged.
  *
  * Failure contract (agreed: keep last good): every failure throws and the
  * scheduler records a sentinel, leaving the last successful snapshot in
@@ -23,7 +23,6 @@
 import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
-import { parseMuseCodeCredential } from '../../oauth/muse-code';
 import type { OAuthProvider } from '../../oauth/oauth-providers';
 import { logger } from '../../../utils/logger';
 import type { Meter } from '../../../types/meter';
@@ -60,26 +59,20 @@ function resolveOAuthToken(ctx: {
   const configured = ctx.getOption<string>('apiKey', '').trim();
   if (configured) return configured;
 
-  const provider = ctx.getOption<string>('oauthProvider', 'muse-code').trim() || 'muse-code';
+  const provider = ctx.getOption<string>('oauthProvider', 'meta').trim() || 'meta';
   const oauthAccountId = ctx.getOption<string>('oauthAccountId', '').trim();
   const credentials = (
     oauthAccountId
       ? OAuthAuthManager.getInstance().getCredentials(provider as OAuthProvider, oauthAccountId)
       : OAuthAuthManager.getInstance().getCredentials(provider as OAuthProvider)
-  ) as { access?: string } | null;
-  const access = credentials?.access?.trim();
-  if (!access) {
+  ) as { refresh?: string } | null;
+  const identityToken = credentials?.refresh?.trim();
+  if (!identityToken) {
     throw new Error(
       `Muse Code quota checker '${ctx.checkerId}' has no stored login; run OAuth login for provider '${provider}'.`
     );
   }
-  try {
-    return parseMuseCodeCredential(access).oauthAccessToken;
-  } catch {
-    throw new Error(
-      `Muse Code quota checker '${ctx.checkerId}' found an unusable stored credential; sign in again.`
-    );
-  }
+  return identityToken;
 }
 
 function parseResetsAt(value: string | number | undefined): string | undefined {

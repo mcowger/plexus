@@ -7,6 +7,7 @@ import type {
   ImageContent,
   ThinkingContent,
   ToolCall,
+  JsonObject,
 } from '@earendil-works/pi-ai';
 import type {
   CompactionStrategy,
@@ -106,7 +107,7 @@ function compactAssistantMessage(
         return { ...block, text: newText };
       }
       if (block.type === 'toolCall') {
-        const newArgs = compactJsonValue(block.arguments, maxArrayItems) as Record<string, unknown>;
+        const newArgs = compactJsonValue(block.arguments, maxArrayItems) as JsonObject;
         // compactJsonValue always returns a new object for object inputs, but
         // if no items were truncated the values are reference-equal; we still
         // replace so the result is always a fresh object (no mutation guarantee).

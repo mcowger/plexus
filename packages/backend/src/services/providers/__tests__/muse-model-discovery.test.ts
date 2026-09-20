@@ -40,7 +40,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function museProvider(): ProviderConfig {
   return {
-    oauth_provider: 'muse-code',
+    oauth_provider: 'meta',
     oauth_account: 'work-account',
   } as unknown as ProviderConfig;
 }
@@ -65,7 +65,7 @@ describe('listMuseOAuthModels', () => {
   it('sends the minted key plus api version to the Meta model list', async () => {
     const { models, source } = await listMuseOAuthModels('work-account');
     expect(source).toBe('muse-backend');
-    expect(getApiKey).toHaveBeenCalledWith('muse-code', 'work-account');
+    expect(getApiKey).toHaveBeenCalledWith('meta', 'work-account');
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('https://api.meta.ai/v1/models');
@@ -75,7 +75,7 @@ describe('listMuseOAuthModels', () => {
   });
 
   it('falls back to the static catalog when logged out', async () => {
-    getApiKey.mockRejectedValue(new Error("OAuth: Not authenticated for provider 'muse-code'."));
+    getApiKey.mockRejectedValue(new Error("OAuth: Not authenticated for provider 'meta'."));
     const { models, source, warning } = await listMuseOAuthModels('work-account');
     expect(source).toBe('catalog');
     expect(models.map((m) => m.id)).toEqual(MUSE_STATIC_MODELS.map((m) => m.id));
@@ -96,7 +96,7 @@ describe('listMuseOAuthModels', () => {
   });
 });
 
-describe('discoverProviderModels — muse-code', () => {
+describe('discoverProviderModels — meta', () => {
   let getApiKey: ReturnType<typeof registerSpy>;
   let fetchSpy: ReturnType<typeof registerSpy>;
 
@@ -113,10 +113,10 @@ describe('discoverProviderModels — muse-code', () => {
     OAuthAuthManager.resetForTesting();
   });
 
-  it('discovers live models for a muse-code OAuth provider', async () => {
+  it('discovers live models for a meta OAuth provider', async () => {
     const models = await discoverProviderModels(museProvider());
     expect(models.map((m) => m.id)).toEqual(['muse-spark-1.2', 'muse-spark-1.3']);
-    expect(getApiKey).toHaveBeenCalledWith('muse-code', 'work-account');
+    expect(getApiKey).toHaveBeenCalledWith('meta', 'work-account');
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

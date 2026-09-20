@@ -6,8 +6,8 @@
  *     meters with reset times (rolling label derived from
  *     `window_duration_mins`);
  *   - the request re-POSTs the key endpoint with the account OAuth token as
- *     Bearer plus `x-api-version` — resolving that token from the stored
- *     `{oauthAccessToken, apiKey}` login credential, or from an explicitly
+ *     Bearer plus `x-api-version` — resolving that token from the `refresh`
+ *     field of pi-ai's `meta` OAuth credential, or from an explicitly
  *     configured raw token;
  *   - inactive subscriptions, auth failures, and unusable payloads throw
  *     (the scheduler keeps the last good snapshot) instead of publishing
@@ -16,7 +16,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
-import { encodeMuseCodeCredential } from '../../oauth/muse-code';
 import { createMeterContext } from '../checker-registry';
 import checker from '../checkers/muse-code-checker';
 
@@ -57,10 +56,10 @@ async function seedLogin(): Promise<void> {
   // initialize() must settle first: the constructor's async DB load rebuilds
   // authData when it lands and would otherwise wipe an earlier seed.
   await manager.initialize();
-  await manager.setCredentials('muse-code', 'default', {
+  await manager.setCredentials('meta', 'default', {
     type: 'oauth',
-    access: encodeMuseCodeCredential('dca_tok', 'mk_live_abc'),
-    refresh: '',
+    access: 'mk_live_abc',
+    refresh: 'dca_tok',
     expires: Date.now() + 3600_000,
   } as never);
 }
@@ -78,7 +77,7 @@ describe('muse-code quota checker', () => {
 
   it('maps rolling + weekly windows to percentage meters', async () => {
     stubFetch(async () => jsonResponse(200, QUOTA_BODY));
-    const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'muse-code' });
+    const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'meta' });
     await seedLogin();
 
     const meters = await checker.check(ctx);
@@ -104,7 +103,7 @@ describe('muse-code quota checker', () => {
       seen.push({ url, init });
       return jsonResponse(200, QUOTA_BODY);
     });
-    const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'muse-code' });
+    const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'meta' });
     await seedLogin();
 
     await checker.check(ctx);
@@ -152,7 +151,7 @@ describe('muse-code quota checker', () => {
 
   it('throws a login error with no stored credential', async () => {
     stubFetch(async () => jsonResponse(200, QUOTA_BODY));
-    const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'muse-code' });
+    const ctx = createMeterContext(CHECKER_ID, 'meta', { oauthProvider: 'meta' });
     await expect(checker.check(ctx)).rejects.toThrow(/no stored login/);
   });
 

@@ -40,7 +40,6 @@ import {
 } from '../../transformers/oauth/masking';
 import type { RenamePair } from '../../transformers/oauth/masking/types';
 import { CodexVersionService } from './codex-version-service';
-import { MUSE_CODE_PROVIDER_ID } from './muse-code';
 import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 
@@ -75,9 +74,8 @@ export interface PreparedOAuthRequest {
 const OAUTH_PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: 'https://api.anthropic.com',
   'openai-codex': 'https://chatgpt.com/backend-api',
-  // Muse Code has no pi-ai registry entry at all (see services/oauth/muse-code.ts),
-  // so its base URL always comes from here.
-  [MUSE_CODE_PROVIDER_ID]: 'https://api.meta.ai/v1',
+  // Meta's Model API base URL (normally resolved from pi-ai's registry entry).
+  meta: 'https://api.meta.ai/v1',
 };
 
 /**
@@ -596,19 +594,19 @@ function prepareCopilotOAuthRequest(
 }
 
 /**
- * Prepare a native Muse Code subscription request. The standard-path
+ * Prepare a native Meta (Muse subscription) request. The standard-path
  * transformer has already built the correct Responses body; this only
- * targets Meta's Model API with the subscription-minted key (never the
- * account token) plus the required `x-api-version` header. No masking, no
- * tool renames — the wire contract matches direct Meta API keys (oh-my-pi
- * seeds muse-code as `openai-responses` on this same base URL).
+ * targets Meta's Model API with the subscription-minted key (resolved from
+ * pi-ai's OAuth credential) plus the required `x-api-version` header. No
+ * masking, no tool renames — the wire contract matches direct Meta API keys
+ * (pi-ai seeds `meta` as `openai-responses` on this same base URL).
  */
-function prepareMuseCodeOAuthRequest(
+function prepareMetaOAuthRequest(
   token: string,
   nativeBody: any,
   streaming: boolean
 ): PreparedOAuthRequest {
-  const baseUrl = resolveOAuthBaseUrl(MUSE_CODE_PROVIDER_ID, 'muse-spark').replace(/\/$/, '');
+  const baseUrl = resolveOAuthBaseUrl('meta', 'muse-spark').replace(/\/$/, '');
   return {
     url: `${baseUrl}/responses`,
     headers: {
@@ -626,7 +624,7 @@ function prepareMuseCodeOAuthRequest(
 /**
  * Prepare a native OAuth request for the standard dispatch path.
  *
- * @param provider  OAuth provider id (`anthropic`, `openai-codex`, `github-copilot`, or `muse-code`).
+ * @param provider  OAuth provider id (`anthropic`, `openai-codex`, `github-copilot`, or `meta`).
  * @param modelId   Upstream model id.
  * @param auth      Resolved OAuth access token / masking API key.
  * @param nativeBody The provider-native wire body from the entry transformer.
@@ -668,11 +666,11 @@ export function prepareOAuthNativeRequest(
       options?.apiType ?? 'chat'
     );
   }
-  if (provider === MUSE_CODE_PROVIDER_ID) {
+  if (provider === 'meta') {
     if (auth.mode !== 'oauth') {
-      throw new Error('Muse Code OAuth requires an OAuth token (apiKey mode unsupported).');
+      throw new Error('Meta OAuth requires an OAuth token (apiKey mode unsupported).');
     }
-    return prepareMuseCodeOAuthRequest(auth.token, nativeBody, streaming);
+    return prepareMetaOAuthRequest(auth.token, nativeBody, streaming);
   }
   // The caller gates on isNativeOAuthProvider; reaching here is a programming error.
   logger.error(`OAuth native path not implemented for provider '${provider}'`);
@@ -682,15 +680,15 @@ export function prepareOAuthNativeRequest(
 /**
  * Whether an OAuth provider is served by the native (non-pi-ai-executor) path.
  * All ported providers: Anthropic (M1), Codex (M2), GitHub Copilot (M3), and
- * Muse Code (subscription key transport — no pi-ai registry entry, so the
- * base URL always resolves from OAUTH_PROVIDER_BASE_URLS).
+ * Meta Muse subscriptions (subscription key transport over pi-ai's registry
+ * entry, with OAUTH_PROVIDER_BASE_URLS as fallback).
  */
 export function isNativeOAuthProvider(provider: string | undefined): boolean {
   return (
     provider === 'anthropic' ||
     provider === 'openai-codex' ||
     provider === 'github-copilot' ||
-    provider === MUSE_CODE_PROVIDER_ID
+    provider === 'meta'
   );
 }
 
@@ -708,9 +706,9 @@ export function isNativeOAuthProvider(provider: string | undefined): boolean {
 const NATIVE_OAUTH_API_TYPES: Record<string, string> = {
   anthropic: 'messages',
   'openai-codex': 'responses',
-  // Meta's Model API speaks the Responses API on /v1 (oh-my-pi seeds
-  // muse-code as `openai-responses`); same fixed mapping as Codex.
-  [MUSE_CODE_PROVIDER_ID]: 'responses',
+  // Meta's Model API speaks the Responses API on /v1 (pi-ai seeds `meta`
+  // as `openai-responses`); same fixed mapping as Codex.
+  meta: 'responses',
 };
 
 /** Map a pi-ai model `api` field to the plexus transformer/api-type name. */

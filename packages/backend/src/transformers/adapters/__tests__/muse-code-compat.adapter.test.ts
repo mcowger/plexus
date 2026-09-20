@@ -3,7 +3,7 @@
  *
  * Meta's Model API (`api.meta.ai/v1`) 400s on `tool_choice` values other
  * than `"auto"` and on `custom` tool declarations (verified against the
- * endpoint; see oh-my-pi's muse-code provider notes).
+ * endpoint; see oh-my-pi's meta provider notes).
  *
  * What must hold:
  *   - `tool_choice` is omitted in all cases (`"auto"` is the default when
@@ -11,16 +11,12 @@
  *   - `custom` tools are stripped (function and other tools untouched),
  *     preserving an emptied `tools` array rather than deleting it;
  *   - payloads needing no work return by reference;
- *   - the adapter auto-injects for `muse-code` OAuth routes and direct
+ *   - the adapter auto-injects for `meta` OAuth routes and direct
  *     `api.meta.ai` targets, and a tombstone opts out.
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  isCustomTool,
-  isMuseTarget,
-  museCodeCompatAdapter,
-} from '../muse-code-compat.adapter';
+import { isCustomTool, isMuseTarget, museCodeCompatAdapter } from '../muse-code-compat.adapter';
 import { resolveAdapters } from '../../../services/dispatch/adapter-resolver';
 import type { RouteResult } from '../../../services/routing/router';
 
@@ -104,8 +100,8 @@ describe('museCodeCompatAdapter.preDispatch', () => {
 });
 
 describe('muse_code_compat implicit injection', () => {
-  it('auto-injects for muse-code OAuth routes', () => {
-    const route = makeRoute({ api_base_url: 'oauth://plexus', oauth_provider: 'muse-code' });
+  it('auto-injects for meta OAuth routes', () => {
+    const route = makeRoute({ api_base_url: 'oauth://plexus', oauth_provider: 'meta' });
     expect(isMuseTarget(route)).toBe(true);
     expect(resolveAdapters(route).map((r) => r.adapter.name)).toEqual(['muse_code_compat']);
   });
@@ -123,7 +119,7 @@ describe('muse_code_compat implicit injection', () => {
   it('honors the opt-out tombstone', () => {
     const route = makeRoute({
       api_base_url: 'oauth://plexus',
-      oauth_provider: 'muse-code',
+      oauth_provider: 'meta',
       adapter: [{ name: 'muse_code_compat', enabled: false }],
     });
     expect(resolveAdapters(route)).toHaveLength(0);

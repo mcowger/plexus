@@ -364,11 +364,11 @@ describe('OAuth management routes', () => {
 
       const response = await fastify.inject({
         method: 'GET',
-        url: '/v0/management/oauth/models?providerId=muse-code&accountId=work',
+        url: '/v0/management/oauth/models?providerId=meta&accountId=work',
       });
 
       expect(response.statusCode).toBe(200);
-      expect(getApiKey).toHaveBeenCalledWith('muse-code', 'work');
+      expect(getApiKey).toHaveBeenCalledWith('meta', 'work');
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [url, init] = fetchSpy.mock.calls[0]!;
       expect(url).toBe('https://api.meta.ai/v1/models');
@@ -381,10 +381,7 @@ describe('OAuth management routes', () => {
       };
       expect(json.source).toBe('muse-backend');
       expect(json.warning).toBeUndefined();
-      expect(json.data.map((model) => model.id)).toEqual([
-        'muse-spark-1.2',
-        'muse-spark-1.3',
-      ]);
+      expect(json.data.map((model) => model.id)).toEqual(['muse-spark-1.2', 'muse-spark-1.3']);
     });
 
     it('degrades to the static catalog with a warning when discovery fails', async () => {
@@ -395,7 +392,7 @@ describe('OAuth management routes', () => {
 
       const response = await fastify.inject({
         method: 'GET',
-        url: '/v0/management/oauth/models?providerId=muse-code',
+        url: '/v0/management/oauth/models?providerId=meta',
       });
 
       expect(response.statusCode).toBe(200);

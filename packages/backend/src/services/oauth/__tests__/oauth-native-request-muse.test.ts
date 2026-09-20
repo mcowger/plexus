@@ -2,9 +2,9 @@
  * Muse Code subscription dispatch.
  *
  * What must hold:
- *   - `muse-code` resolves through the native OAuth path with the `responses`
+ *   - `meta` resolves through the native OAuth path with the `responses`
  *     wire type (Meta's Model API speaks the Responses API on /v1 —
- *     oh-my-pi seeds muse-code as `openai-responses`);
+ *     oh-my-pi seeds meta as `openai-responses`);
  *   - preparation targets `https://api.meta.ai/v1/responses` with the
  *     subscription-minted key as Bearer plus `x-api-version: 1.0.0`, passing
  *     the standard-path body through untouched (no masking, no renames);
@@ -25,15 +25,15 @@ const RESPONSES_BODY = {
   input: [{ role: 'user', content: 'hello' }],
 };
 
-describe('muse-code native OAuth dispatch', () => {
+describe('meta native OAuth dispatch', () => {
   it('is a native provider speaking the responses wire API', () => {
-    expect(isNativeOAuthProvider('muse-code')).toBe(true);
-    expect(nativeOAuthApiType('muse-code')).toBe('responses');
+    expect(isNativeOAuthProvider('meta')).toBe(true);
+    expect(nativeOAuthApiType('meta')).toBe('responses');
   });
 
   it('targets Meta responses with the minted key + api version', () => {
     const prepared = prepareOAuthNativeRequest(
-      'muse-code',
+      'meta',
       'muse-spark-1.3',
       AUTH,
       RESPONSES_BODY,
@@ -48,7 +48,7 @@ describe('muse-code native OAuth dispatch', () => {
 
   it('requests event-stream Accept when streaming', () => {
     const prepared = prepareOAuthNativeRequest(
-      'muse-code',
+      'meta',
       'muse-spark-1.3',
       AUTH,
       RESPONSES_BODY,
@@ -60,7 +60,7 @@ describe('muse-code native OAuth dispatch', () => {
   it('rejects apiKey mode', () => {
     expect(() =>
       prepareOAuthNativeRequest(
-        'muse-code',
+        'meta',
         'muse-spark-1.3',
         { mode: 'apiKey', apiKey: 'sk-ant-x' },
         RESPONSES_BODY,

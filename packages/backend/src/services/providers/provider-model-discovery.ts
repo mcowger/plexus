@@ -150,7 +150,7 @@ export async function fetchModelsFromUrl(
 
 /**
  * Static fallback when the Muse model list is unreachable. The muse-spark
- * family from CLIProxyAPI's native `meta` provider catalog.
+ * family from pi-ai's native `meta` provider catalog.
  */
 export const MUSE_STATIC_MODELS: readonly DiscoveredModel[] = [
   'muse-spark-1.1',
@@ -182,10 +182,7 @@ export async function listMuseOAuthModels(oauthAccountId?: string | null): Promi
   warning?: string;
 }> {
   try {
-    const apiKey = await OAuthAuthManager.getInstance().getApiKey(
-      'muse-code',
-      oauthAccountId
-    );
+    const apiKey = await OAuthAuthManager.getInstance().getApiKey('meta', oauthAccountId);
 
     const response = await fetch(MUSE_MODELS_URL, {
       method: 'GET',
@@ -380,7 +377,7 @@ export async function discoverProviderModels(provider: ProviderConfig): Promise<
     if (provider.oauth_provider === 'openai-codex') {
       return (await listCodexOAuthModels(provider.oauth_account)).models;
     }
-    if (provider.oauth_provider === 'muse-code') {
+    if (provider.oauth_provider === 'meta') {
       return (await listMuseOAuthModels(provider.oauth_account)).models;
     }
     return getOAuthProviderModels(provider.oauth_provider);

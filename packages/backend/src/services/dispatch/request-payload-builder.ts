@@ -125,7 +125,7 @@ export async function buildRequestPayload(
     : route.config.oauth_provider || route.provider;
   const codexNative = nativeOAuth && oauthProviderForNative === 'openai-codex';
   const copilotNative = nativeOAuth && oauthProviderForNative === 'github-copilot';
-  const museNative = nativeOAuth && oauthProviderForNative === 'muse-code';
+  const museNative = nativeOAuth && oauthProviderForNative === 'meta';
   const codexCliPassthrough = codexNative && isCodexCliShapedBody(request.originalBody);
 
   let bypassTransformation: boolean;

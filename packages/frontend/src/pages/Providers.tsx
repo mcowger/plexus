@@ -171,6 +171,7 @@ export const Providers = () => {
                 onSubmitPrompt={f.handleSubmitPrompt}
                 onSubmitManualCode={f.handleSubmitManualCode}
                 onCancel={f.handleCancelOAuth}
+                onDeleteCredential={f.handleDeleteOAuthCredential}
               />
             )}
 
