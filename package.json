@@ -87,6 +87,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "overrides": {
+    "zod": "^4.6.5"
+  },
   "dependencies": {
     "@earendil-works/pi-ai": "0.85.1"
   }
