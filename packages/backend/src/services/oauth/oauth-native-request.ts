@@ -369,6 +369,10 @@ function prepareCodexOAuthRequest(
   const body = stripUnsupportedGpt5Options(
     passthrough ? nativeBody : adornCodexResponsesBody(nativeBody)
   );
+  // The Codex backend rejects `service_tier: 'flex'` (`priority` is
+  // supported), so strip flex here as the final gate covering passthrough,
+  // adorned, extraBody, and auto-compat paths.
+  if (body.service_tier === 'flex') delete body.service_tier;
 
   const baseUrl = resolveOAuthBaseUrl('openai-codex' as OAuthProvider, modelId);
   const url = `${baseUrl}/codex/responses`;
