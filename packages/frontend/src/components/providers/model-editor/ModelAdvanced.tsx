@@ -54,11 +54,17 @@ export function ModelAdvanced({
           }}
         >
           <div className="flex flex-col gap-0.5">
-            <label className="flex items-start gap-2 py-1 cursor-pointer">
+            <label
+              className="flex items-start gap-2 py-1 cursor-pointer"
+              title={
+                !mappingReady && modelConfig.auto_compat !== true
+                  ? 'Select a pi-ai Provider first'
+                  : undefined
+              }
+            >
               <input
                 type="checkbox"
-                disabled={!mappingReady}
-                title={mappingReady ? undefined : 'Select a pi-ai Provider first'}
+                disabled={!mappingReady && modelConfig.auto_compat !== true}
                 checked={modelConfig.auto_compat === true}
                 onChange={(e) =>
                   updateModelConfig(modelId, {

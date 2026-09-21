@@ -1227,7 +1227,7 @@ export function ProviderAdvancedEditor({
                 <label className="flex items-start gap-2 py-1 cursor-pointer">
                   <Switch
                     checked={editingProvider.auto_compat || false}
-                    disabled={!editingProvider.pi_ai_provider}
+                    disabled={!editingProvider.pi_ai_provider && !editingProvider.auto_compat}
                     onChange={(checked) =>
                       setEditingProvider({ ...editingProvider, auto_compat: checked })
                     }
