@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { logger } from '../../utils/logger';
 import {
   ModelMetadataManager,
@@ -9,6 +10,7 @@ import {
 import { getConfig, ModelConfigSchema } from '../../config';
 import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
 import { getCatalogModel, getCatalogModels } from '../../services/pi-ai/catalog';
+import { resolvePiAiProvider } from '../../services/pi-ai/provider-endpoint-match';
 
 export async function registerModelRoutes(fastify: FastifyInstance) {
   fastify.post('/v0/management/models/metadata/refresh', async (_request, reply) => {
@@ -92,5 +94,31 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
       ? merged.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
       : merged;
     return reply.send({ data: filtered });
+  });
+
+  /**
+   * POST /v0/management/pi/resolve-provider
+   * Resolves the pi-ai provider id matching a new provider config: an
+   * `oauthProvider` singularly identifies its pi-ai provider, otherwise the
+   * `urls` are matched against pi-ai builtin base URLs (exact, then longest
+   * prefix). Returns `{ provider: string | null }` — null when nothing
+   * matches. The UI uses this to pre-select `pi_ai_provider` + `auto_compat`
+   * for new providers and to back the pi-ai dropdown's `- auto -` entry.
+   */
+  fastify.post('/v0/management/pi/resolve-provider', async (request, reply) => {
+    const parsed = z
+      .object({
+        urls: z.array(z.string()).optional(),
+        oauthProvider: z.string().optional(),
+      })
+      .safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
+    }
+    const provider = resolvePiAiProvider({
+      urls: parsed.data.urls,
+      oauthProvider: parsed.data.oauthProvider,
+    });
+    return reply.send({ data: { provider } });
   });
 }

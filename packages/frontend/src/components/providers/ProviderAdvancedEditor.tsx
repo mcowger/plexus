@@ -8,6 +8,11 @@ import { Badge } from '../ui/Badge';
 import { Tooltip } from '../ui/Tooltip';
 import type { Provider, CompactionSettings } from '../../lib/api';
 import { api } from '../../lib/api';
+import {
+  collectProviderEndpointUrls,
+  isOAuthProviderDraft,
+  PI_AI_AUTO_VALUE,
+} from '../../lib/piAiProvider';
 import { ReasoningRewriteRulesEditor } from './ReasoningRewriteRulesEditor';
 import {
   getAdapterName,
@@ -51,6 +56,7 @@ export function ProviderAdvancedEditor({
   // pi-ai provider dropdown
   const [piProviders, setPiProviders] = useState<string[]>([]);
   const [piProviderCustom, setPiProviderCustom] = useState(false);
+  const [piProviderResolving, setPiProviderResolving] = useState(false);
 
   useEffect(() => {
     api
@@ -68,6 +74,32 @@ export function ProviderAdvancedEditor({
       setPiProviderCustom(true);
     }
   }, [editingProvider.pi_ai_provider, piProviders]);
+
+  // Resolve `- auto -` to the concrete pi-ai provider matching the current
+  // endpoint URLs / OAuth provider (same lookup as new-provider auto-detect).
+  // `- auto -` is never a stored selection: it immediately becomes the
+  // resolved entry (or stays unchanged when nothing matches).
+  const resolvePiAiAuto = async () => {
+    const urls = collectProviderEndpointUrls(editingProvider.apiBaseUrl);
+    const oauthProvider = isOAuthProviderDraft(editingProvider.apiBaseUrl)
+      ? editingProvider.oauthProvider?.trim() || undefined
+      : undefined;
+    setPiProviderResolving(true);
+    try {
+      const resolved = await api.resolvePiAiProvider({ urls, oauthProvider });
+      if (resolved) {
+        setEditingProvider((prev) => ({
+          ...prev,
+          pi_ai_provider: resolved,
+          auto_compat: true,
+        }));
+      }
+    } catch {
+      // non-fatal — leave the previous selection in place
+    } finally {
+      setPiProviderResolving(false);
+    }
+  };
 
   return (
     <div className="border border-border-glass rounded-sm overflow-hidden">
@@ -1361,10 +1393,20 @@ export function ProviderAdvancedEditor({
                     <select
                       className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                       value={editingProvider.pi_ai_provider ?? ''}
+                      disabled={piProviderResolving}
+                      title={
+                        piProviderResolving
+                          ? 'Resolving pi-ai provider…'
+                          : 'Pick - auto - to detect from the endpoint URLs or OAuth provider'
+                      }
                       onChange={(e) => {
                         const raw = e.target.value;
                         if (raw === '__custom__') {
                           setPiProviderCustom(true);
+                          return;
+                        }
+                        if (raw === PI_AI_AUTO_VALUE) {
+                          void resolvePiAiAuto();
                           return;
                         }
                         setEditingProvider({
@@ -1374,6 +1416,7 @@ export function ProviderAdvancedEditor({
                       }}
                     >
                       <option value="">— none —</option>
+                      <option value={PI_AI_AUTO_VALUE}>- auto -</option>
                       {piProviders.map((p) => (
                         <option key={p} value={p}>
                           {p}

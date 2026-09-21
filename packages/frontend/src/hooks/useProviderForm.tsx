@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
 import { useNavigate } from 'react-router-dom';
 import { api, Provider, OAuthSession, OAuthProviderInfo, fetchQuotaCheckers } from '../lib/api';
+import {
+  collectProviderEndpointUrls,
+  isOAuthProviderDraft,
+  PI_AI_AUTO_VALUE,
+} from '../lib/piAiProvider';
 import type { QuotaCheckerInfo } from '../types/quota';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
@@ -342,6 +347,50 @@ export function useProviderForm() {
     resetOAuthState();
   }, [editingProvider.oauthProvider, isOAuthMode]);
 
+  // Auto-detect the pi-ai provider for NEW providers only. A known API
+  // endpoint (matched against pi-ai builtin base URLs) or an OAuth provider
+  // (which singularly identifies its pi-ai provider) pre-selects the pi-ai
+  // dropdown and enables auto-compat. Existing configs are never touched,
+  // and a manual pi-ai selection is never overridden: we only fill when the
+  // field is empty/`- auto -` or still holds our previous suggestion.
+  const lastAutoSuggestion = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      lastAutoSuggestion.current = null;
+      return;
+    }
+    if (originalId !== null) return;
+    const urls = collectProviderEndpointUrls(editingProvider.apiBaseUrl);
+    const oauthProvider = isOAuthProviderDraft(editingProvider.apiBaseUrl)
+      ? editingProvider.oauthProvider?.trim() || undefined
+      : undefined;
+    if (urls.length === 0 && !oauthProvider) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      let suggestion: string | null = null;
+      try {
+        suggestion = await api.resolvePiAiProvider({ urls, oauthProvider });
+      } catch {
+        return; // non-fatal — the user can still pick manually
+      }
+      if (cancelled || !suggestion) return;
+      const previous = lastAutoSuggestion.current;
+      lastAutoSuggestion.current = suggestion;
+      setEditingProvider((prev) => {
+        const current = prev.pi_ai_provider;
+        const untouched = !current || current === PI_AI_AUTO_VALUE || current === previous;
+        if (!untouched) return prev;
+        if (current === suggestion && prev.auto_compat === true) return prev;
+        return { ...prev, pi_ai_provider: suggestion, auto_compat: true };
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isModalOpen, originalId, editingProvider.apiBaseUrl, editingProvider.oauthProvider]);
+
   // OAuth session polling
   useEffect(() => {
     if (!oauthSessionId) return;
@@ -413,6 +462,11 @@ export function useProviderForm() {
     setIsSaving(true);
     try {
       let providerToSave = editingProvider;
+      // `- auto -` resolves to a concrete id on select and should never be
+      // saved; drop it defensively if it ever lingers in the draft.
+      if (providerToSave.pi_ai_provider === PI_AI_AUTO_VALUE) {
+        providerToSave = { ...providerToSave, pi_ai_provider: undefined };
+      }
       if (isOAuthMode && !providerToSave.oauthProvider) {
         providerToSave = { ...providerToSave, oauthProvider: OAUTH_PROVIDERS[0]?.value ?? '' };
       }

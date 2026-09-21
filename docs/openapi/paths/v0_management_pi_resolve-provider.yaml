@@ -1,0 +1,60 @@
+post:
+  tags:
+    - Management — PI (Plexus Internal)
+  summary: Resolve the pi-ai provider for a new provider config (admin only)
+  description: |
+    Resolves the pi-ai provider ID matching a prospective provider config, so
+    the management UI can pre-select `ProviderConfig.pi_ai_provider` and enable
+    `auto_compat` when creating a provider — and so the pi-ai dropdown's
+    `- auto -` entry can resolve to a concrete provider.
+
+    Resolution rules (shared with the UI's auto-detect):
+
+    - An `oauthProvider` that names a known pi-ai builtin provider wins outright:
+      an OAuth provider singularly identifies its compatible pi-ai provider.
+    - Otherwise `urls` (values from the provider's `api_base_url`) are matched
+      against pi-ai builtin base URLs — exact match first, then longest prefix —
+      so known API endpoints resolve even with extra path segments.
+    - Returns `{ "provider": null }` when nothing matches.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            urls:
+              type: array
+              items:
+                type: string
+              description: Endpoint URL(s) from the provider's api_base_url.
+            oauthProvider:
+              type: string
+              description: OAuth provider ID when the provider uses oauth://.
+  responses:
+    '200':
+      description: Resolution result; provider is null when nothing matches.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  provider:
+                    type:
+                      - string
+                      - 'null'
+                    description: Matching pi-ai provider ID, or null.
+    '400':
+      description: Invalid request body.
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Admin privileges required.
+  operationId: postV0ManagementPiResolveProvider

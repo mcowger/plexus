@@ -113,6 +113,7 @@ export const api = {
   refreshModelMetadata: aliasesApi.refreshModelMetadata,
   getPiProviders: aliasesApi.getPiProviders,
   getPiModels: aliasesApi.getPiModels,
+  resolvePiAiProvider: aliasesApi.resolvePiAiProvider,
   getOAuthProviderModels: settingsApi.getOAuthProviderModels,
 
   // MCP Servers

@@ -447,6 +447,8 @@ paths:
     $ref: paths/v0_management_pi_providers.yaml
   /v0/management/pi/models:
     $ref: paths/v0_management_pi_models.yaml
+  /v0/management/pi/resolve-provider:
+    $ref: paths/v0_management_pi_resolve-provider.yaml
   /v0/management/aliases:
     $ref: paths/v0_management_aliases.yaml
   /v0/management/aliases/{slug}:

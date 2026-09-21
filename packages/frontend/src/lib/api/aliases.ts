@@ -376,6 +376,27 @@ export const getPiProviders = async (): Promise<string[]> => {
   return json.data;
 };
 
+/**
+ * Resolve the pi-ai provider id matching a prospective provider config.
+ * An `oauthProvider` that names a known pi-ai builtin wins outright;
+ * otherwise `urls` are matched against pi-ai builtin base URLs. Returns
+ * null when nothing matches. Backs new-provider auto-detect and the pi-ai
+ * dropdown's `- auto -` entry.
+ */
+export const resolvePiAiProvider = async (input: {
+  urls?: string[];
+  oauthProvider?: string;
+}): Promise<string | null> => {
+  const res = await fetchWithAuth(`${API_BASE}/v0/management/pi/resolve-provider`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error('Failed to resolve pi-ai provider');
+  const json = (await res.json()) as { data: { provider: string | null } };
+  return json.data.provider;
+};
+
 export const getPiModels = async (
   provider: string,
   q?: string
