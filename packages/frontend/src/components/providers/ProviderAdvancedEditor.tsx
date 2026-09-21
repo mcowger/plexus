@@ -1227,6 +1227,7 @@ export function ProviderAdvancedEditor({
                 <label className="flex items-start gap-2 py-1 cursor-pointer">
                   <Switch
                     checked={editingProvider.auto_compat || false}
+                    disabled={!editingProvider.pi_ai_provider}
                     onChange={(checked) =>
                       setEditingProvider({ ...editingProvider, auto_compat: checked })
                     }
@@ -1237,7 +1238,10 @@ export function ProviderAdvancedEditor({
                       className="font-body text-[11px] text-text-muted"
                       style={{ lineHeight: 1.35 }}
                     >
-                      Use pi-ai registry reasoning and generation compatibility.
+                      Translates reasoning and generation options into each target's upstream
+                      dialect — clamping thinking levels and dropping unsupported fields — using its
+                      mapped pi-ai model. Does nothing unless the pi-ai Provider and per-model pi-ai
+                      Model IDs are set.
                     </div>
                   </div>
                 </label>

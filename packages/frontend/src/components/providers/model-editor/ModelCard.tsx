@@ -199,6 +199,7 @@ export function ModelCard({
             isOpen={modelAdvancedOpen}
             setIsOpen={setModelAdvancedOpen}
             updateModelConfig={updateModelConfig}
+            piAiProvider={piAiProvider}
           />
         </div>
       )}
