@@ -34,7 +34,7 @@
  * TO UPDATE: check the npm registry (`npm view @anthropic-ai/claude-code
  * version`) or install the real `claude` CLI and run `claude --version`.
  */
-export const CC_VERSION = '2.1.258';
+export const CC_VERSION = '2.1.280';
 
 /**
  * Billing fingerprint salt + character-index selection, used to compute the
