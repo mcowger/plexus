@@ -62,7 +62,7 @@ import {
   DESKTOP_PERF_COLUMN_WIDTH,
   DESKTOP_DELETE_COLUMN_WIDTH,
 } from './constants';
-import { formatDateSafely, formatReasoningEffort } from './helpers';
+import { formatDateSafely, formatReasoningEffort, getAttemptIndicatorLabel } from './helpers';
 import type { DesktopLogRowProps } from './types';
 
 export const DesktopLogRow = React.memo(
@@ -181,7 +181,8 @@ export const DesktopLogRow = React.memo(
             {(() => {
               const routeModel = log.finalAttemptModel ?? log.selectedModelName;
               const hasRewrite = Boolean(log.upstreamModel) && log.upstreamModel !== routeModel;
-              if (!((log.attemptCount && log.attemptCount > 1) || hasRewrite)) return null;
+              const indicatorLabel = getAttemptIndicatorLabel(log.attemptCount);
+              if (!indicatorLabel) return null;
               return (
                 <button
                   type="button"
@@ -192,10 +193,10 @@ export const DesktopLogRow = React.memo(
                       ? 'View retry history (model rewritten upstream)'
                       : 'View retry history'
                   }
-                  aria-label={`View retry history (${log.attemptCount ?? 1} attempts${hasRewrite ? ', model rewritten upstream' : ''})`}
+                  aria-label={`View retry history (${log.attemptCount} attempts${hasRewrite ? ', model rewritten upstream' : ''})`}
                 >
                   <RotateCcw size={10} />
-                  <span className="text-[8px] font-medium">{log.attemptCount ?? 1}x</span>
+                  <span className="text-[8px] font-medium">{indicatorLabel}</span>
                 </button>
               );
             })()}

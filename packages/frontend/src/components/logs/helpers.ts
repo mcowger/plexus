@@ -3,6 +3,11 @@ export const formatReasoningEffort = (effort?: string | null): string | null => 
   return effort.charAt(0).toUpperCase() + effort.slice(1);
 };
 
+export const getAttemptIndicatorLabel = (attemptCount?: number | null): string | null => {
+  if (attemptCount && attemptCount > 1) return `${attemptCount}x`;
+  return null;
+};
+
 export const formatDateSafely = (dateStr: string | undefined | null) => {
   if (!dateStr) return { time: '-', date: '-' };
   try {
