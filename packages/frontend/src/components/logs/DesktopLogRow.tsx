@@ -62,7 +62,12 @@ import {
   DESKTOP_PERF_COLUMN_WIDTH,
   DESKTOP_DELETE_COLUMN_WIDTH,
 } from './constants';
-import { formatDateSafely, formatReasoningEffort, getAttemptIndicatorLabel } from './helpers';
+import {
+  formatDateSafely,
+  formatReasoningEffort,
+  getAttemptIndicatorLabel,
+  hasUpstreamRewrite,
+} from './helpers';
 import type { DesktopLogRowProps } from './types';
 
 export const DesktopLogRow = React.memo(
@@ -179,8 +184,7 @@ export const DesktopLogRow = React.memo(
               </span>
             )}
             {(() => {
-              const routeModel = log.finalAttemptModel ?? log.selectedModelName;
-              const hasRewrite = Boolean(log.upstreamModel) && log.upstreamModel !== routeModel;
+              const hasRewrite = hasUpstreamRewrite(log);
               const indicatorLabel = getAttemptIndicatorLabel(log.attemptCount);
               if (!indicatorLabel) return null;
               return (
@@ -394,7 +398,7 @@ export const DesktopLogRow = React.memo(
               {(() => {
                 const routeModel = log.finalAttemptModel ?? log.selectedModelName ?? '-';
                 const upstream = log.upstreamModel;
-                const hasRewrite = Boolean(upstream) && upstream !== routeModel;
+                const hasRewrite = hasUpstreamRewrite(log);
                 const label = hasRewrite
                   ? `${log.provider || '-'}:${routeModel} → ${upstream}`
                   : `${log.provider || '-'}:${routeModel}`;

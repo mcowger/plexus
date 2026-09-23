@@ -1,6 +1,15 @@
+import type { UsageRecord } from '../../types/usage';
+
 export const formatReasoningEffort = (effort?: string | null): string | null => {
   if (!effort) return null;
   return effort.charAt(0).toUpperCase() + effort.slice(1);
+};
+
+export const hasUpstreamRewrite = (
+  log: Pick<UsageRecord, 'finalAttemptModel' | 'selectedModelName' | 'upstreamModel'>
+): boolean => {
+  const routeModel = log.finalAttemptModel ?? log.selectedModelName;
+  return Boolean(log.upstreamModel) && log.upstreamModel !== routeModel;
 };
 
 export const getAttemptIndicatorLabel = (attemptCount?: number | null): string | null => {
