@@ -44,6 +44,7 @@ export interface MeterCheckResult {
   provider: string;
   checkedAt: string; // ISO-8601
   success: boolean;
+  stale?: boolean;
   error?: string;
   meters: Meter[];
 }

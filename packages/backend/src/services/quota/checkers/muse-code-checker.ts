@@ -49,6 +49,7 @@ const MUSE_RESPONSES_URL = 'https://api.meta.ai/v1/responses';
 const MUSE_DEFAULT_MODEL = 'muse-spark-1.3';
 /** The Responses API rejects `max_output_tokens` below 16. */
 const MUSE_PROBE_MAX_OUTPUT_TOKENS = 16;
+const MUSE_PROBE_REASONING_EFFORT = 'minimal';
 const MUSE_PROBE_INPUT = 'ping';
 /** Successful readings are reused for this long; one probe per window is costly. */
 const MUSE_DEFAULT_PROBE_TTL_MS = 60 * 60 * 1000;
@@ -332,6 +333,7 @@ async function probeSubscription(
         input: MUSE_PROBE_INPUT,
         stream: true,
         max_output_tokens: MUSE_PROBE_MAX_OUTPUT_TOKENS,
+        reasoning: { effort: MUSE_PROBE_REASONING_EFFORT },
       }),
       signal: abortController.signal,
     });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
 import { getCheckerDisplayName } from './checker-presentation';
@@ -53,6 +54,14 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
             ) : formattedBalance !== undefined ? (
               <span className="text-xs font-semibold text-text-secondary tabular-nums flex-shrink-0 ml-2">
                 {formattedBalance}
+                {quota.stale && (
+                  <span
+                    className="inline-block ml-1 text-warning"
+                    title={quota.error ?? 'Showing last successful reading'}
+                  >
+                    <AlertTriangle size={12} />
+                  </span>
+                )}
               </span>
             ) : (
               <span className="text-xs text-text-muted flex-shrink-0">—</span>

@@ -26,6 +26,7 @@ export interface QuotaCheckerInfo {
   provider?: string;
   checkedAt?: string;
   success: boolean;
+  stale?: boolean;
   error?: string;
   meters: Meter[];
   oauthAccountId?: string;

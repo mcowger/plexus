@@ -115,6 +115,7 @@ describe('muse-code quota checker', () => {
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     expect(body.stream).toBe(true);
     expect(body.max_output_tokens).toBe(16);
+    expect(body.reasoning).toEqual({ effort: 'minimal' });
     expect(typeof body.input).toBe('string');
     expect(body.model).toBe('muse-spark-1.3');
   });

@@ -107,6 +107,10 @@ describe('QuotaScheduler persistence', () => {
     initializeDatabase(process.env.DATABASE_URL);
     await runMigrations();
 
+    const scheduler = QuotaScheduler.getInstance() as any;
+    scheduler.db = null;
+    scheduler.schema = null;
+
     const db = getDatabase() as any;
     const schema = getSchema() as any;
     await db.delete(schema.meterSnapshots);
@@ -164,6 +168,32 @@ describe('QuotaScheduler persistence', () => {
     expect(rows[0]?.success).toBe(true);
     expect(rows[0]?.utilizationState).toBe('reported');
     expect(rows[0]?.utilizationPercent).toBeCloseTo(15);
+  });
+
+  it('keeps the last successful quota visible after a failed check', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    const successfulResult = makeMeterResult(42);
+    successfulResult.checkedAt = new Date(Date.now() - 60_000).toISOString();
+    await scheduler.persistResult(successfulResult);
+
+    await scheduler.persistResult({
+      checkerId: CHECKER_ID,
+      checkerType: 'synthetic',
+      provider: 'test-provider',
+      checkedAt: new Date().toISOString(),
+      success: false,
+      error: 'Upstream timed out',
+      meters: [],
+    });
+
+    const latest = await scheduler.getLatestQuota(CHECKER_ID);
+    expect(latest).toMatchObject({
+      success: true,
+      stale: true,
+      error: 'Upstream timed out',
+      meters: [{ utilizationPercent: 42 }],
+    });
+    expect(latest?.checkedAt).toBe(successfulResult.checkedAt);
   });
 
   it('marks scheduler initialized when initialize receives no quota configs', async () => {

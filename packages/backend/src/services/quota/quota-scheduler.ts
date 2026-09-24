@@ -398,21 +398,42 @@ export class QuotaScheduler {
 
       const latestMs = toMs(rows[0].checkedAt);
       const latestRows = rows.filter((r: any) => toMs(r.checkedAt) === latestMs);
-
       const errorRow = latestRows.find((r: any) => !r.success);
+      let resultRows = latestRows;
+
       if (errorRow) {
-        return {
-          checkerId,
-          checkerType: config?.type ?? errorRow.checkerType,
-          provider: config?.provider ?? errorRow.provider,
-          checkedAt: toIso(errorRow.checkedAt),
-          success: false,
-          error: errorRow.errorMessage ?? 'Unknown error',
-          meters: [],
-        };
+        const successfulRows = (await db
+          .select()
+          .from(schema.meterSnapshots)
+          .where(
+            and(
+              eq(schema.meterSnapshots.checkerId, checkerId),
+              eq(schema.meterSnapshots.success, true)
+            )
+          )
+          .orderBy(desc(schema.meterSnapshots.checkedAt))
+          .limit(200)) as any[];
+        const priorMeterRows = successfulRows.filter(
+          (row) => row.meterKey !== '_empty' && row.meterKey !== '_error'
+        );
+
+        if (priorMeterRows.length === 0) {
+          return {
+            checkerId,
+            checkerType: config?.type ?? errorRow.checkerType,
+            provider: config?.provider ?? errorRow.provider,
+            checkedAt: toIso(errorRow.checkedAt),
+            success: false,
+            error: errorRow.errorMessage ?? 'Unknown error',
+            meters: [],
+          };
+        }
+
+        const priorSuccessMs = toMs(priorMeterRows[0].checkedAt);
+        resultRows = priorMeterRows.filter((row) => toMs(row.checkedAt) === priorSuccessMs);
       }
 
-      const meters: Meter[] = latestRows
+      const meters: Meter[] = resultRows
         .filter((r: any) => r.meterKey !== '_empty' && r.meterKey !== '_error')
         .map((row: any) => {
           const util: Meter['utilizationPercent'] =
@@ -440,13 +461,19 @@ export class QuotaScheduler {
           };
         });
 
-      const firstRow = latestRows[0];
+      const firstRow = resultRows[0];
       return {
         checkerId,
         checkerType: config?.type ?? firstRow.checkerType,
         provider: config?.provider ?? firstRow.provider,
         checkedAt: toIso(firstRow.checkedAt),
         success: true,
+        ...(errorRow
+          ? {
+              stale: true,
+              error: errorRow.errorMessage ?? 'Unknown error',
+            }
+          : {}),
         meters,
       };
     } catch (error) {

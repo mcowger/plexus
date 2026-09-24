@@ -122,23 +122,38 @@ export const Quotas = () => {
                 <span className="text-xs text-text-muted truncate">{quota.error}</span>
               )}
             </div>
-          ) : allowances.length === 0 ? (
-            <span className="text-xs text-text-muted">No data yet</span>
           ) : (
             <div className="space-y-2">
-              {allowances.map((meter) => (
-                <AllowanceMeterRow
-                  key={meter.key}
-                  meter={meter}
-                  onClick={() =>
-                    setHistoryTarget({
-                      quota,
-                      meter,
-                      displayName: _groupDisplayName,
-                    })
-                  }
-                />
-              ))}
+              {quota.stale && (
+                <div
+                  className="flex items-center gap-1.5 text-xs text-warning"
+                  role="status"
+                  title={quota.error}
+                >
+                  <AlertTriangle size={13} />
+                  <span className="truncate">
+                    Showing last successful reading
+                    {quota.error ? ` — ${quota.error}` : ''}
+                  </span>
+                </div>
+              )}
+              {allowances.length === 0 ? (
+                <span className="text-xs text-text-muted">No data yet</span>
+              ) : (
+                allowances.map((meter) => (
+                  <AllowanceMeterRow
+                    key={meter.key}
+                    meter={meter}
+                    onClick={() =>
+                      setHistoryTarget({
+                        quota,
+                        meter,
+                        displayName: _groupDisplayName,
+                      })
+                    }
+                  />
+                ))
+              )}
             </div>
           )}
         </div>

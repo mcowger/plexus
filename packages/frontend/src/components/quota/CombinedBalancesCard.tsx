@@ -61,23 +61,38 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
               <span className="text-xs">Error</span>
             </div>
           ) : balanceMeters.length > 0 ? (
-            balanceMeters.map((meter) => (
-              <BalanceMeterRow
-                key={meter.key}
-                meter={meter}
-                onClick={() =>
-                  setHistoryTarget({
-                    quota,
-                    meter,
-                    displayName: getCheckerDisplayName(
-                      quota.checkerType,
-                      quota.checkerId,
-                      displayNameMap
-                    ),
-                  })
-                }
-              />
-            ))
+            <div>
+              {quota.stale && (
+                <div
+                  className="mb-1 flex items-center gap-1.5 text-xs text-warning"
+                  role="status"
+                  title={quota.error}
+                >
+                  <AlertTriangle size={13} />
+                  <span className="truncate">
+                    Showing last successful reading
+                    {quota.error ? ` — ${quota.error}` : ''}
+                  </span>
+                </div>
+              )}
+              {balanceMeters.map((meter) => (
+                <BalanceMeterRow
+                  key={meter.key}
+                  meter={meter}
+                  onClick={() =>
+                    setHistoryTarget({
+                      quota,
+                      meter,
+                      displayName: getCheckerDisplayName(
+                        quota.checkerType,
+                        quota.checkerId,
+                        displayNameMap
+                      ),
+                    })
+                  }
+                />
+              ))}
+            </div>
           ) : (
             <span className="text-xs text-text-muted">No data</span>
           )}
