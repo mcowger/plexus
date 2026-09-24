@@ -330,6 +330,12 @@ await registerOpenApiRoute(fastify);
 const responsesStorage = new ResponsesStorageService();
 responsesStorage.startCleanupJob(1, 7);
 
+// --- Observability Retention ---
+// Prune request usage, debug, error, and MCP logs older than
+// PLEXUS_USAGE_RETENTION_DAYS (default 365 days) once a day.
+usageStorage.startCleanupJob();
+mcpUsageStorage.startCleanupJob();
+
 // --- Management API (v0) ---
 await registerManagementRoutes(
   fastify,
@@ -459,6 +465,9 @@ const start = async () => {
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
       quotaScheduler.stop();
+      usageStorage.stopCleanupJob();
+      mcpUsageStorage.stopCleanupJob();
+      responsesStorage.stopCleanupJob();
       await mcpProcessManager.stopAll();
       await fastify.close();
       const { closeDatabase } = await import('./db/client');

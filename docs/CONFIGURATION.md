@@ -17,6 +17,7 @@ Plexus stores all configuration in the database and manages it via the **Admin U
 | `ENCRYPTION_KEY` | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32` | No |
 | `DATA_DIR` | Directory for SQLite database. | No |
 | `LOG_LEVEL` | Verbosity: `error`, `warn`, `info`, `debug`, `silly` | No |
+| `PLEXUS_USAGE_RETENTION_DAYS` | Retention for request usage, debug, error, MCP, and quota meter-snapshot logs in days (default 365). Older rows are pruned daily. | No |
 | `PORT` | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`). | No |
 | `HOST` | Address to bind to. | No |
 | `FRPC_SERVER_ADDR` | Development-only LAN address of the frps server. | No |

@@ -9,8 +9,9 @@ import {
 } from './checker-registry';
 import type { MeterCheckResult, Meter } from '../../types/meter';
 import { toDbTimestampMs } from '../../utils/normalize';
-import { eq, desc, gte, and } from 'drizzle-orm';
+import { eq, desc, gte, and, lt, sql } from 'drizzle-orm';
 import { CooldownManager } from '../runtime/cooldown-manager';
+import { getUsageRetentionDays } from '../observability/usage-storage';
 import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
 
 const DEFAULT_EXHAUSTION_THRESHOLD = 99;
@@ -55,6 +56,7 @@ export class QuotaScheduler {
   private intervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private checkerRunTails: Map<string, Promise<void>> = new Map();
   private lastCheckerRunAt: Map<string, number> = new Map();
+  private retentionInterval: ReturnType<typeof setInterval> | null = null;
   private checkersLoaded = false;
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: ReturnType<typeof getSchema> | null = null;
@@ -108,6 +110,13 @@ export class QuotaScheduler {
       this.runCheckNow(id).catch((error) => {
         logger.error(`Initial quota check failed for '${id}': ${error}`);
       });
+    }
+
+    // Prune meter snapshots older than PLEXUS_USAGE_RETENTION_DAYS (default
+    // 30 days) once a day. Guarded so repeated initialize() calls reuse the
+    // existing timer.
+    if (!this.retentionInterval) {
+      this.startRetentionJob();
     }
   }
 
@@ -548,7 +557,90 @@ export class QuotaScheduler {
     }
   }
 
+  /**
+   * Delete `meter_snapshots` rows older than `ttlDays`. Returns the deletion
+   * count. Latest-snapshot reads (`getLatestQuota`) are unaffected; history
+   * queries beyond the TTL return fewer rows.
+   */
+  async cleanupOldSnapshots(
+    ttlDays: number = getUsageRetentionDays()
+  ): Promise<{ deletedSnapshots: number }> {
+    try {
+      const { db, schema } = this.ensureDb();
+      const dialect = getCurrentDialect();
+      const cutoffMs = Date.now() - ttlDays * 24 * 60 * 60 * 1000;
+      const cutoff = toDbTimestampMs(cutoffMs, dialect) as any;
+      const condition = lt(schema.meterSnapshots.checkedAt, cutoff);
+
+      const rows = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(schema.meterSnapshots)
+        .where(condition);
+      const deletedSnapshots = Number(rows[0]?.count ?? 0);
+
+      if (deletedSnapshots > 0) {
+        await db.delete(schema.meterSnapshots).where(condition);
+        logger.debug(
+          `Quota retention cleanup: deleted ${deletedSnapshots} meter snapshots older than ${ttlDays} days`
+        );
+      }
+
+      return { deletedSnapshots };
+    } catch (error) {
+      logger.error('Failed to clean up old meter snapshots', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start the scheduled retention job that prunes meter snapshots older than
+   * `ttlDays`. Runs an initial sweep immediately, then repeats every
+   * `intervalHours`.
+   */
+  startRetentionJob(intervalHours: number = 24, ttlDays: number = getUsageRetentionDays()): void {
+    if (this.retentionInterval) {
+      logger.warn('Quota retention job already running');
+      return;
+    }
+
+    // Run initial cleanup
+    this.cleanupOldSnapshots(ttlDays).catch((err) =>
+      logger.error('Initial quota retention cleanup failed:', err)
+    );
+
+    // Schedule periodic cleanup
+    this.retentionInterval = setInterval(
+      async () => {
+        try {
+          const result = await this.cleanupOldSnapshots(ttlDays);
+          if (result.deletedSnapshots > 0) {
+            logger.debug(
+              `Scheduled quota retention cleanup: deleted ${result.deletedSnapshots} meter snapshots`
+            );
+          }
+        } catch (err) {
+          logger.error('Scheduled quota retention cleanup failed:', err);
+        }
+      },
+      intervalHours * 60 * 60 * 1000
+    );
+
+    logger.debug(`Quota retention job started (every ${intervalHours}h, TTL ${ttlDays} days)`);
+  }
+
+  /**
+   * Stop the retention job.
+   */
+  stopRetentionJob(): void {
+    if (this.retentionInterval) {
+      clearInterval(this.retentionInterval);
+      this.retentionInterval = null;
+      logger.debug('Quota retention job stopped');
+    }
+  }
+
   stop(): void {
+    this.stopRetentionJob();
     for (const [id, intervalId] of this.intervals) {
       clearInterval(intervalId);
       logger.info(`Stopped quota checker '${id}'`);

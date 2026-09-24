@@ -2,8 +2,9 @@ import { logger } from '../../utils/logger';
 import { getDatabase, getCurrentDialect } from '../../db/client';
 import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
 import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
-import { desc, eq, sql, and, like } from 'drizzle-orm';
+import { desc, eq, sql, and, like, lt } from 'drizzle-orm';
 import { toDbTimestamp } from '../../utils/normalize';
+import { getUsageRetentionDays } from '../observability/usage-storage';
 
 interface McpRequestUsageRecord {
   request_id: string;
@@ -36,6 +37,7 @@ interface McpDebugLogRecord {
 
 export class McpUsageStorageService {
   private db: ReturnType<typeof getDatabase> | null = null;
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {}
 
@@ -198,6 +200,108 @@ export class McpUsageStorageService {
     } catch (error) {
       logger.error('Failed to delete MCP logs', error);
       return false;
+    }
+  }
+
+  /**
+   * Delete `mcp_request_usage` and `mcp_debug_logs` rows older than `ttlDays`.
+   * Returns per-table deletion counts.
+   */
+  async cleanupOldLogs(
+    ttlDays: number = getUsageRetentionDays()
+  ): Promise<{ deletedLogs: number; deletedDebugLogs: number }> {
+    const cutoffMs = Date.now() - ttlDays * 24 * 60 * 60 * 1000;
+    try {
+      const schema = this.getMcpSchema();
+      const db = this.ensureDb();
+      const dialect = getCurrentDialect();
+
+      const logRows = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(schema.mcpRequestUsage)
+        .where(sql`${schema.mcpRequestUsage.startTime} < ${cutoffMs}`);
+      const deletedLogs = Number(logRows[0]?.count ?? 0);
+
+      // created_at is an ISO string in SQLite but a timestamp in Postgres.
+      const debugCutoff =
+        dialect === 'sqlite' ? new Date(cutoffMs).toISOString() : new Date(cutoffMs);
+      const debugRows = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(schema.mcpDebugLogs)
+        .where(lt(schema.mcpDebugLogs.createdAt, debugCutoff as any));
+      const deletedDebugLogs = Number(debugRows[0]?.count ?? 0);
+
+      if (deletedLogs > 0) {
+        await this.deleteAllLogs(new Date(cutoffMs));
+      }
+      if (deletedDebugLogs > 0) {
+        await db
+          .delete(schema.mcpDebugLogs)
+          .where(lt(schema.mcpDebugLogs.createdAt, debugCutoff as any));
+      }
+
+      if (deletedLogs > 0 || deletedDebugLogs > 0) {
+        logger.debug(
+          `MCP retention cleanup: deleted ${deletedLogs} logs and ` +
+            `${deletedDebugLogs} debug logs older than ${ttlDays} days`
+        );
+      }
+
+      return { deletedLogs, deletedDebugLogs };
+    } catch (error) {
+      logger.error('Failed to clean up old MCP logs', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start the scheduled retention job that prunes MCP request logs and debug
+   * logs older than `ttlDays`. Runs an initial sweep immediately, then
+   * repeats every `intervalHours`.
+   */
+  startCleanupJob(intervalHours: number = 24, ttlDays: number = getUsageRetentionDays()): void {
+    if (this.cleanupInterval) {
+      logger.warn('MCP retention cleanup job already running');
+      return;
+    }
+
+    // Run initial cleanup
+    this.cleanupOldLogs(ttlDays).catch((err) =>
+      logger.error('Initial MCP retention cleanup failed:', err)
+    );
+
+    // Schedule periodic cleanup
+    this.cleanupInterval = setInterval(
+      async () => {
+        try {
+          const result = await this.cleanupOldLogs(ttlDays);
+          const total = result.deletedLogs + result.deletedDebugLogs;
+          if (total > 0) {
+            logger.debug(
+              `Scheduled MCP retention cleanup: deleted ${result.deletedLogs} logs, ` +
+                `${result.deletedDebugLogs} debug logs`
+            );
+          }
+        } catch (err) {
+          logger.error('Scheduled MCP retention cleanup failed:', err);
+        }
+      },
+      intervalHours * 60 * 60 * 1000
+    );
+
+    logger.debug(
+      `MCP retention cleanup job started (every ${intervalHours}h, TTL ${ttlDays} days)`
+    );
+  }
+
+  /**
+   * Stop the retention cleanup job.
+   */
+  stopCleanupJob(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      logger.debug('MCP retention cleanup job stopped');
     }
   }
 }

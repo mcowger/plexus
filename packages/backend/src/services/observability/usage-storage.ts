@@ -3,7 +3,7 @@ import { UsageRecord } from '../../types/usage';
 import { getDatabase, getSchema } from '../../db/client';
 import { NewRequestUsage } from '../../db/types';
 import { EventEmitter } from 'node:events';
-import { eq, and, gte, lte, like, desc, asc, sql, getTableName } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, like, desc, asc, sql, getTableName } from 'drizzle-orm';
 import { DebugLogRecord, DebugManager } from './debug-manager';
 import { getCurrentKeyName } from './request-context';
 import type { StallInspector } from '../inspectors/stall-inspector';
@@ -61,10 +61,30 @@ export type UsageSortField =
 
 export type UsageSortDirection = 'asc' | 'desc';
 
+/**
+ * Default retention for observability tables (`request_usage`, `debug_logs`,
+ * `inference_errors`): rows older than this are pruned by the scheduled
+ * cleanup job. Overridden by the `PLEXUS_USAGE_RETENTION_DAYS` environment
+ * variable.
+ */
+export const DEFAULT_USAGE_RETENTION_DAYS = 365;
+
+export function getUsageRetentionDays(): number {
+  const envValue = process.env.PLEXUS_USAGE_RETENTION_DAYS;
+  const parsed = envValue ? parseInt(envValue, 10) : DEFAULT_USAGE_RETENTION_DAYS;
+
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return DEFAULT_USAGE_RETENTION_DAYS;
+  }
+
+  return parsed;
+}
+
 export class UsageStorageService extends EventEmitter {
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: any = null;
   private readonly defaultPerformanceRetentionLimit = 100;
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private telemetryQueue: Promise<void> = Promise.resolve();
   private inFlightRegistry = new Map<
     string,
@@ -111,6 +131,100 @@ export class UsageStorageService extends EventEmitter {
 
   getDb() {
     return this.ensureDb();
+  }
+
+  /**
+   * Start the scheduled retention job that prunes `request_usage`,
+   * `debug_logs`, and `inference_errors` rows older than `ttlDays`.
+   * Runs an initial sweep immediately, then repeats every `intervalHours`.
+   */
+  startCleanupJob(intervalHours: number = 24, ttlDays: number = getUsageRetentionDays()): void {
+    if (this.cleanupInterval) {
+      logger.warn('Usage retention cleanup job already running');
+      return;
+    }
+
+    // Run initial cleanup
+    this.cleanupOldRecords(ttlDays).catch((err) =>
+      logger.error('Initial usage retention cleanup failed:', err)
+    );
+
+    // Schedule periodic cleanup
+    this.cleanupInterval = setInterval(
+      async () => {
+        try {
+          const result = await this.cleanupOldRecords(ttlDays);
+          const total = result.deletedUsage + result.deletedDebugLogs + result.deletedErrors;
+          if (total > 0) {
+            logger.debug(
+              `Scheduled usage retention cleanup: deleted ${result.deletedUsage} usage logs, ` +
+                `${result.deletedDebugLogs} debug logs, ${result.deletedErrors} error logs`
+            );
+          }
+        } catch (err) {
+          logger.error('Scheduled usage retention cleanup failed:', err);
+        }
+      },
+      intervalHours * 60 * 60 * 1000
+    );
+
+    logger.debug(
+      `Usage retention cleanup job started (every ${intervalHours}h, TTL ${ttlDays} days)`
+    );
+  }
+
+  /**
+   * Stop the retention cleanup job.
+   */
+  stopCleanupJob(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      logger.debug('Usage retention cleanup job stopped');
+    }
+  }
+
+  /**
+   * Delete `request_usage`, `debug_logs`, and `inference_errors` rows older
+   * than `ttlDays`. Returns per-table deletion counts.
+   */
+  async cleanupOldRecords(
+    ttlDays: number = getUsageRetentionDays()
+  ): Promise<{ deletedUsage: number; deletedDebugLogs: number; deletedErrors: number }> {
+    const cutoffMs = Date.now() - ttlDays * 24 * 60 * 60 * 1000;
+    const cutoffIso = new Date(cutoffMs).toISOString();
+    const db = this.ensureDb();
+    const schema = this.schema!;
+
+    const countOlder = async (table: any, condition: any): Promise<number> => {
+      const rows = await db.select({ count: sql<number>`COUNT(*)` }).from(table).where(condition);
+      return Number(rows[0]?.count ?? 0);
+    };
+
+    const usageCondition = lte(schema.requestUsage.date, cutoffIso);
+    const debugCondition = lt(schema.debugLogs.createdAt, cutoffMs);
+    const errorCondition = lte(schema.inferenceErrors.date, cutoffIso);
+
+    const [usageCount, debugCount, errorCount] = await Promise.all([
+      countOlder(schema.requestUsage, usageCondition),
+      countOlder(schema.debugLogs, debugCondition),
+      countOlder(schema.inferenceErrors, errorCondition),
+    ]);
+
+    await Promise.all([
+      usageCount > 0 ? db.delete(schema.requestUsage).where(usageCondition) : null,
+      debugCount > 0 ? db.delete(schema.debugLogs).where(debugCondition) : null,
+      errorCount > 0 ? db.delete(schema.inferenceErrors).where(errorCondition) : null,
+    ]);
+
+    if (usageCount > 0 || debugCount > 0 || errorCount > 0) {
+      logger.debug(
+        `Usage retention cleanup: deleted ${usageCount} usage logs, ` +
+          `${debugCount} debug logs, ${errorCount} error logs older than ${ttlDays} days`
+      );
+    }
+
+    return { deletedUsage: usageCount, deletedDebugLogs: debugCount, deletedErrors: errorCount };
   }
 
   private getPerformanceRetentionLimit(): number {
@@ -450,10 +564,17 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async deleteAllErrors(): Promise<boolean> {
+  async deleteAllErrors(beforeDate?: Date): Promise<boolean> {
     try {
-      await this.ensureDb().delete(this.schema.inferenceErrors);
-      logger.debug('Deleted all error logs');
+      if (beforeDate) {
+        await this.ensureDb()
+          .delete(this.schema.inferenceErrors)
+          .where(lte(this.schema.inferenceErrors.date, beforeDate.toISOString()));
+        logger.debug(`Deleted error logs older than ${beforeDate.toISOString()}`);
+      } else {
+        await this.ensureDb().delete(this.schema.inferenceErrors);
+        logger.debug('Deleted all error logs');
+      }
       return true;
     } catch (error) {
       logger.error('Failed to delete all error logs', error);
@@ -544,10 +665,17 @@ export class UsageStorageService extends EventEmitter {
     }
   }
 
-  async deleteAllDebugLogs(): Promise<boolean> {
+  async deleteAllDebugLogs(beforeDate?: Date): Promise<boolean> {
     try {
-      await this.ensureDb().delete(this.schema.debugLogs);
-      logger.debug('Deleted all debug logs');
+      if (beforeDate) {
+        await this.ensureDb()
+          .delete(this.schema.debugLogs)
+          .where(lt(this.schema.debugLogs.createdAt, beforeDate.getTime()));
+        logger.debug(`Deleted debug logs older than ${beforeDate.toISOString()}`);
+      } else {
+        await this.ensureDb().delete(this.schema.debugLogs);
+        logger.debug('Deleted all debug logs');
+      }
       return true;
     } catch (error) {
       logger.error('Failed to delete all debug logs', error);
