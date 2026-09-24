@@ -76,8 +76,21 @@ describe('getReasoningLogValue', () => {
     [{ generationConfig: { thinkingConfig: { thinkingLevel: 'HIGH' } } }, undefined, 'high'],
     [{ reasoning: { enabled: true } }, undefined, 'on'],
     [{ reasoning: { enabled: false } }, undefined, 'off'],
+    // A bare `thinking: { type: 'enabled' }` must not shadow an explicit effort.
+    [{ thinking: { type: 'enabled' }, reasoning_effort: 'medium' }, undefined, 'medium'],
+    [{ thinking: { type: 'enabled' }, reasoning: { effort: 'high' } }, undefined, 'high'],
+    [{ thinking: { type: 'enabled' } }, undefined, 'on'],
+    [{ thinking: { type: 'adaptive' } }, undefined, 'on'],
+    // Explicitly disabling thinking still wins over a conflicting effort.
+    [{ thinking: { type: 'disabled' }, reasoning_effort: 'medium' }, undefined, 'off'],
   ] as const)('extracts %s as %s', (payload, request, expected) => {
     expect(getReasoningLogValue(request, payload)).toBe(expected);
+  });
+
+  it('prefers an explicit effort over a generic enabled signal from the request', () => {
+    expect(
+      getReasoningLogValue({ reasoning: { effort: 'medium' } }, { thinking: { type: 'enabled' } })
+    ).toBe('medium');
   });
 
   it('falls back to the normalized request', () => {
