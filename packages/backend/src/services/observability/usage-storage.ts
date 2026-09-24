@@ -62,12 +62,22 @@ export type UsageSortField =
 export type UsageSortDirection = 'asc' | 'desc';
 
 /**
- * Default retention for observability tables (`request_usage`, `debug_logs`,
- * `inference_errors`): rows older than this are pruned by the scheduled
- * cleanup job. Overridden by the `PLEXUS_USAGE_RETENTION_DAYS` environment
- * variable.
+ * Default retention for observability and quota-history tables
+ * (`request_usage`, `debug_logs`, `inference_errors`, `mcp_request_usage`,
+ * `mcp_debug_logs`, `meter_snapshots`): rows older than this are pruned by
+ * the scheduled cleanup jobs. Overridden by the
+ * `PLEXUS_USAGE_RETENTION_DAYS` environment variable.
  */
 export const DEFAULT_USAGE_RETENTION_DAYS = 365;
+
+/**
+ * Minimum retention that keeps monthly user-quota windows intact. Values
+ * below this still apply (operator's choice) but trigger a warning, because
+ * `QuotaEnforcer` recomputes usage from `request_usage` over windows up to
+ * ~31 days (monthly) or longer (rolling durations) — pruning inside an
+ * active window undercounts usage and over-grants quota.
+ */
+export const MIN_RECOMMENDED_RETENTION_DAYS = 31;
 
 export function getUsageRetentionDays(): number {
   const envValue = process.env.PLEXUS_USAGE_RETENTION_DAYS;
@@ -75,6 +85,14 @@ export function getUsageRetentionDays(): number {
 
   if (Number.isNaN(parsed) || parsed < 1) {
     return DEFAULT_USAGE_RETENTION_DAYS;
+  }
+
+  if (parsed < MIN_RECOMMENDED_RETENTION_DAYS) {
+    logger.warn(
+      `PLEXUS_USAGE_RETENTION_DAYS=${parsed} is below the recommended minimum of ` +
+        `${MIN_RECOMMENDED_RETENTION_DAYS} days: user-quota recompute reads up to a monthly ` +
+        `window back from request_usage, so shorter retention can undercount usage and over-grant quota.`
+    );
   }
 
   return parsed;

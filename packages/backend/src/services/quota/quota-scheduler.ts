@@ -113,7 +113,7 @@ export class QuotaScheduler {
     }
 
     // Prune meter snapshots older than PLEXUS_USAGE_RETENTION_DAYS (default
-    // 30 days) once a day. Guarded so repeated initialize() calls reuse the
+    // 365 days) once a day. Guarded so repeated initialize() calls reuse the
     // existing timer.
     if (!this.retentionInterval) {
       this.startRetentionJob();

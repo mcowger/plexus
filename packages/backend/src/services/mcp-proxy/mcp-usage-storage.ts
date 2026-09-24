@@ -232,7 +232,10 @@ export class McpUsageStorageService {
       const deletedDebugLogs = Number(debugRows[0]?.count ?? 0);
 
       if (deletedLogs > 0) {
-        await this.deleteAllLogs(new Date(cutoffMs));
+        const ok = await this.deleteAllLogs(new Date(cutoffMs));
+        if (!ok) {
+          throw new Error('Failed to delete old MCP request logs');
+        }
       }
       if (deletedDebugLogs > 0) {
         await db
