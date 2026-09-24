@@ -17,10 +17,17 @@ get:
       - `displayName` — Human-readable name
       - `pending` — Whether initial check is pending
       - `meters` — Current quota meter readings
-      - `success` — Whether last check succeeded
-      - `error` — Error message if last check failed (optional)
+      - `checkedAt` — Timestamp represented by the result; older when stale
+      - `success` — Whether a successful quota snapshot is available
+      - `stale` — Whether the returned meters are from an earlier successful check
+      - `error` — Latest check error; can be present when `success` is true and `stale` is true
       - `oauthAccountId` — OAuth account ID if using OAuth (optional)
       - `oauthProvider` — OAuth provider if using OAuth (optional)
+
+    If a check fails after a successful reading is available, the configured
+    entry includes the last successful reading with `success: true`,
+    `stale: true`, and the latest check error. If there is no successful
+    reading to reuse, `success` is false and `meters` is empty.
 
     ## Use case
 
@@ -62,11 +69,16 @@ get:
                       type: string
                     pending:
                       type: boolean
+                    checkedAt:
+                      type: string
+                      format: date-time
                     meters:
                       type: array
                       items:
                         $ref: ../components/schemas/Meter.yaml
                     success:
+                      type: boolean
+                    stale:
                       type: boolean
                     error:
                       type: string

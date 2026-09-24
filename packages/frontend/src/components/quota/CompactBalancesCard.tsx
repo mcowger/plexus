@@ -4,6 +4,7 @@ import { AlertTriangle } from 'lucide-react';
 import type { QuotaCheckerInfo } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
 import { getCheckerDisplayName } from './checker-presentation';
+import { getStaleReadingMessage } from './StaleReadingNotice';
 import { useCurrency } from '../../lib/CurrencyContext';
 
 interface CompactBalancesCardProps {
@@ -56,10 +57,12 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
                 {formattedBalance}
                 {quota.stale && (
                   <span
-                    className="inline-block ml-1 text-warning"
-                    title={quota.error ?? 'Showing last successful reading'}
+                    className="ml-1 inline-flex text-warning"
+                    role="img"
+                    title={getStaleReadingMessage(quota.error)}
+                    aria-label={getStaleReadingMessage(quota.error)}
                   >
-                    <AlertTriangle size={12} />
+                    <AlertTriangle size={12} aria-hidden="true" />
                   </span>
                 )}
               </span>

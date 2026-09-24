@@ -42,9 +42,9 @@ export interface MeterCheckResult {
   checkerId: string;
   checkerType: string;
   provider: string;
-  checkedAt: string; // ISO-8601
-  success: boolean;
-  stale?: boolean;
-  error?: string;
+  checkedAt: string; // ISO-8601 timestamp represented by this result.
+  success: boolean; // A successful snapshot is available; it may be stale.
+  stale?: boolean; // The most recent check failed; meters are from the last successful check.
+  error?: string; // Latest check error; can be present alongside success when stale.
   meters: Meter[];
 }

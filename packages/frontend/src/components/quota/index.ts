@@ -13,6 +13,11 @@ export { ClineQuotaConfig } from './ClineQuotaConfig';
 export { CombinedBalancesCard } from './CombinedBalancesCard';
 export { CompactBalancesCard } from './CompactBalancesCard';
 export { CompactQuotasCard } from './CompactQuotasCard';
+export {
+  StaleReadingNotice,
+  getStaleReadingMessage,
+  STALE_READING_MESSAGE,
+} from './StaleReadingNotice';
 export { BalanceMeterRow } from './BalanceMeterRow';
 export { AllowanceMeterRow } from './AllowanceMeterRow';
 export { MeterValue, formatMeterValue } from './MeterValue';

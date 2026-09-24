@@ -5991,7 +5991,7 @@
           "Management — Quotas (Provider)"
         ],
         "summary": "List quota checker types and configured checkers (admin only)",
-        "description": "Returns both the available quota checker types and the status of\ncurrently configured quota checkers.\n\n## Response structure\n\n- `knownTypes` — Array of available quota checker types:\n  - `type` — Checker type identifier\n  - `displayName` — Human-readable name\n- `configured` — Array of configured checker instances:\n  - `checkerId` — Unique checker ID (`{provider}:{account}`)\n  - `checkerType` — Type of checker\n  - `displayName` — Human-readable name\n  - `pending` — Whether initial check is pending\n  - `meters` — Current quota meter readings\n  - `success` — Whether last check succeeded\n  - `error` — Error message if last check failed (optional)\n  - `oauthAccountId` — OAuth account ID if using OAuth (optional)\n  - `oauthProvider` — OAuth provider if using OAuth (optional)\n\n## Use case\n\nUse this endpoint to:\n1. Discover available quota checker types\n2. See which providers have quota tracking configured\n3. Check the health status of each quota checker\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Returns both the available quota checker types and the status of\ncurrently configured quota checkers.\n\n## Response structure\n\n- `knownTypes` — Array of available quota checker types:\n  - `type` — Checker type identifier\n  - `displayName` — Human-readable name\n- `configured` — Array of configured checker instances:\n  - `checkerId` — Unique checker ID (`{provider}:{account}`)\n  - `checkerType` — Type of checker\n  - `displayName` — Human-readable name\n  - `pending` — Whether initial check is pending\n  - `meters` — Current quota meter readings\n  - `checkedAt` — Timestamp represented by the result; older when stale\n  - `success` — Whether a successful quota snapshot is available\n  - `stale` — Whether the returned meters are from an earlier successful check\n  - `error` — Latest check error; can be present when `success` is true and `stale` is true\n  - `oauthAccountId` — OAuth account ID if using OAuth (optional)\n  - `oauthProvider` — OAuth provider if using OAuth (optional)\n\nIf a check fails after a successful reading is available, the configured\nentry includes the last successful reading with `success: true`,\n`stale: true`, and the latest check error. If there is no successful\nreading to reuse, `success` is false and `meters` is empty.\n\n## Use case\n\nUse this endpoint to:\n1. Discover available quota checker types\n2. See which providers have quota tracking configured\n3. Check the health status of each quota checker\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -6036,6 +6036,10 @@
                           "pending": {
                             "type": "boolean"
                           },
+                          "checkedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
                           "meters": {
                             "type": "array",
                             "items": {
@@ -6043,6 +6047,9 @@
                             }
                           },
                           "success": {
+                            "type": "boolean"
+                          },
+                          "stale": {
                             "type": "boolean"
                           },
                           "error": {
@@ -14401,7 +14408,7 @@
       },
       "QuotaCheckerSnapshot": {
         "type": "object",
-        "description": "Latest quota snapshot for a single provider checker, returned by `GET /v0/management/quotas` and `GET /v0/management/quotas/{checkerId}`.\n\nA checker reports its current readings as an array of `Meter` objects (one per quota dimension). When the last check failed, `success` is false, `meters` is empty, and `error` carries the failure message.\n",
+        "description": "Latest quota snapshot for a single provider checker, returned by `GET /v0/management/quotas` and `GET /v0/management/quotas/{checkerId}`.\n\nA checker reports readings as an array of `Meter` objects (one per quota dimension). If a check fails after a successful reading is available, the response includes that last successful reading with `success: true`, `stale: true`, and the failed check's message in `error`. In that case, `checkedAt` is the timestamp of the returned reading, not the failed attempt. If there is no successful reading to reuse, `success` is false, `meters` is empty, and `error` carries the failure message.\n",
         "properties": {
           "checkerId": {
             "type": "string",
@@ -14423,20 +14430,29 @@
             "type": "string",
             "description": "OAuth provider identifier (e.g. `openai-codex`, `anthropic-claude-code`). Present when credentials are stored via OAuth flow.\n"
           },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp represented by this result. For a stale fallback, this is the timestamp of the older successful reading; without a successful reading, it is the failed attempt's timestamp.\n"
+          },
           "success": {
             "type": "boolean",
-            "description": "Whether the most recent quota check succeeded."
+            "description": "Whether a successful quota snapshot is available. A stale snapshot can have `success: true` even though the most recent check failed.\n"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "Whether the returned meters come from an earlier successful check because the most recent check failed. Omitted for a current result.\n"
           },
           "error": {
             "type": "string",
-            "description": "Error message when the most recent check failed. Omitted on success."
+            "description": "Error from the most recent failed check. Can be present with `success: true` when `stale` is true.\n"
           },
           "meters": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Meter"
             },
-            "description": "Current meter readings for this checker (one `Meter` per quota dimension). Empty when the last check failed.\n"
+            "description": "Current meter readings for this checker (one `Meter` per quota dimension). For a stale result, these are the meters from the last successful reading. Can be empty when that reading reported no meters, or when there is no successful reading to reuse.\n"
           }
         }
       },

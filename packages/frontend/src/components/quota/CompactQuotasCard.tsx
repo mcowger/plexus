@@ -5,6 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 import type { QuotaCheckerInfo, Meter } from '../../types/quota';
 import { getCheckerDisplayName } from './checker-presentation';
 import { AllowanceMeterRow } from './AllowanceMeterRow';
+import { getStaleReadingMessage } from './StaleReadingNotice';
 
 interface CompactQuotasCardProps {
   allowanceQuotas: QuotaCheckerInfo[];
@@ -79,13 +80,20 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
         return (
           <div
             key={quota.checkerId}
-            className={clsx('py-1', !isLast && 'border-b border-border pb-1.5')}
+            className={clsx('min-w-0 py-1', !isLast && 'border-b border-border pb-1.5')}
           >
-            <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-[11px] text-text-muted pl-0 block truncate">{displayName}</span>
+            <div className="flex min-w-0 items-center gap-1 mb-0.5">
+              <span className="min-w-0 flex-1 truncate text-[11px] text-text-muted pl-0">
+                {displayName}
+              </span>
               {quota.stale && (
-                <span title={quota.error ?? 'Showing last successful reading'}>
-                  <AlertTriangle className="w-3 h-3 text-warning flex-shrink-0" />
+                <span
+                  className="flex-shrink-0"
+                  role="img"
+                  title={getStaleReadingMessage(quota.error)}
+                  aria-label={getStaleReadingMessage(quota.error)}
+                >
+                  <AlertTriangle className="w-3 h-3 text-warning" aria-hidden="true" />
                 </span>
               )}
             </div>

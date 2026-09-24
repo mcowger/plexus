@@ -12,6 +12,7 @@ import { CombinedBalancesCard } from '../components/quota/CombinedBalancesCard';
 import { AllowanceMeterRow } from '../components/quota/AllowanceMeterRow';
 import { MeterHistoryModal } from '../components/quota/MeterHistoryModal';
 import { getCheckerDisplayName } from '../components/quota/checker-presentation';
+import { StaleReadingNotice } from '../components/quota/StaleReadingNotice';
 
 export const Quotas = () => {
   const [quotas, setQuotas] = useState<(QuotaCheckerInfo & { pending?: boolean })[]>([]);
@@ -92,6 +93,44 @@ export const Quotas = () => {
     _groupDisplayName: string
   ) => {
     const allowances = quota.meters.filter((m) => m.kind === 'allowance');
+    const renderCheckerStatus = () => {
+      if (quota.pending) {
+        return <span className="text-xs text-text-muted">Pending first check...</span>;
+      }
+      if (!quota.success) {
+        return (
+          <div className="flex items-center gap-2 text-danger">
+            <AlertTriangle size={14} />
+            <span className="text-xs">Check failed</span>
+            {quota.error && <span className="text-xs text-text-muted truncate">{quota.error}</span>}
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-2">
+          {quota.stale && (
+            <StaleReadingNotice error={quota.error} hasReading={allowances.length > 0} />
+          )}
+          {allowances.length === 0 && !quota.stale && (
+            <span className="text-xs text-text-muted">No data yet</span>
+          )}
+          {allowances.map((meter) => (
+            <AllowanceMeterRow
+              key={meter.key}
+              meter={meter}
+              onClick={() =>
+                setHistoryTarget({
+                  quota,
+                  meter,
+                  displayName: _groupDisplayName,
+                })
+              }
+            />
+          ))}
+        </div>
+      );
+    };
 
     return (
       <div
@@ -111,52 +150,7 @@ export const Quotas = () => {
           />
         </button>
 
-        <div className="pr-8">
-          {quota.pending ? (
-            <span className="text-xs text-text-muted">Pending first check...</span>
-          ) : !quota.success ? (
-            <div className="flex items-center gap-2 text-danger">
-              <AlertTriangle size={14} />
-              <span className="text-xs">Check failed</span>
-              {quota.error && (
-                <span className="text-xs text-text-muted truncate">{quota.error}</span>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {quota.stale && (
-                <div
-                  className="flex items-center gap-1.5 text-xs text-warning"
-                  role="status"
-                  title={quota.error}
-                >
-                  <AlertTriangle size={13} />
-                  <span className="truncate">
-                    Showing last successful reading
-                    {quota.error ? ` — ${quota.error}` : ''}
-                  </span>
-                </div>
-              )}
-              {allowances.length === 0 ? (
-                <span className="text-xs text-text-muted">No data yet</span>
-              ) : (
-                allowances.map((meter) => (
-                  <AllowanceMeterRow
-                    key={meter.key}
-                    meter={meter}
-                    onClick={() =>
-                      setHistoryTarget({
-                        quota,
-                        meter,
-                        displayName: _groupDisplayName,
-                      })
-                    }
-                  />
-                ))
-              )}
-            </div>
-          )}
-        </div>
+        <div className="pr-8">{renderCheckerStatus()}</div>
       </div>
     );
   };
