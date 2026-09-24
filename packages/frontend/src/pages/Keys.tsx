@@ -142,7 +142,7 @@ export const Keys = () => {
 
         {activeTab === 'quotas' && (
           <>
-            <Card title="Default quotas" className="mb-6">
+            <Card title="Default quotas" className="mb-6 !overflow-visible">
               <p className="text-xs text-text-muted mb-3">
                 Applied to any key with no quotas of its own (non-stacking — a key's own{' '}
                 <code>quotas</code> always wins over this fallback when set).
