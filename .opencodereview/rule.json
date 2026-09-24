@@ -1,4 +1,10 @@
 {
   "exclude": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
-  "rules": []
+  "rules": [
+    {
+      "path": "**/*",
+      "rule": "Only report actionable findings with medium, high, or critical severity. Never report low-severity findings; omit them entirely rather than including them in inline comments or summaries.",
+      "merge_system_rule": true
+    }
+  ]
 }

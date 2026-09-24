@@ -10,10 +10,10 @@
 #   `llm_reasoning_effort` is NOT used: the action rejects it on the Anthropic
 #   protocol, since the Anthropic API drops unknown body fields.
 # - Blocking gate is custom (OCR has no `should_block`): critical/high severities fail
-#   the job in "Check for blocking OCR findings" below. Medium/low stay advisory.
-# - Severity focus and secret-noise suppression from `.cora.yaml` are enforced by that
-#   gate plus `.opencodereview/rule.json` excludes, not by prompt rules (a catch-all
-#   prompt rule would shadow OCR's language-specific system rules).
+#   the job in "Check for blocking OCR findings" below. Medium stays advisory.
+# - Low-severity suppression is best-effort: the project rule asks OCR to omit lows,
+#   and the detailed summary filters them again. The action's built-in publisher has
+#   no option to drop findings by severity.
 
 name: OpenCodeReview PR Review
 run-name: "OCR Review: PR #${{ github.event.pull_request.number || github.event.issue.number }}"
@@ -203,7 +203,9 @@ jobs:
                 '⚠️ **Review output was unreadable, so the OCR Review check failed. See the run logs for details.**',
               ].join('\n');
             } else {
-              const findings = review.comments;
+              const findings = review.comments.filter((c) =>
+                String(c.severity ?? '').toLowerCase() !== 'low',
+              );
               const blocking = findings.filter((c) =>
                 ['critical', 'high'].includes(String(c.severity ?? '').toLowerCase()),
               );
