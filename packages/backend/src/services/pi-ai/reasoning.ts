@@ -198,6 +198,9 @@ export function getReasoningLogValue(
       genericOn = true;
       return undefined;
     }
+    // Once a higher-priority source has enabled thinking, a lower-priority
+    // 'off' must not override it — only an explicit magnitude may refine it.
+    if (value === 'off' && genericOn) return undefined;
     return value;
   };
 

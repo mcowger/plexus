@@ -83,6 +83,16 @@ describe('getReasoningLogValue', () => {
     [{ thinking: { type: 'adaptive' } }, undefined, 'on'],
     // Explicitly disabling thinking still wins over a conflicting effort.
     [{ thinking: { type: 'disabled' }, reasoning_effort: 'medium' }, undefined, 'off'],
+    // A higher-priority enable must not be overridden by a lower-priority 'off'.
+    [{ thinking: { type: 'enabled' }, reasoning: { enabled: false } }, undefined, 'on'],
+    [
+      {
+        thinking: { type: 'enabled' },
+        generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+      },
+      undefined,
+      'on',
+    ],
   ] as const)('extracts %s as %s', (payload, request, expected) => {
     expect(getReasoningLogValue(request, payload)).toBe(expected);
   });
@@ -91,6 +101,12 @@ describe('getReasoningLogValue', () => {
     expect(
       getReasoningLogValue({ reasoning: { effort: 'medium' } }, { thinking: { type: 'enabled' } })
     ).toBe('medium');
+  });
+
+  it('does not let a fallback off override an explicit enable', () => {
+    expect(
+      getReasoningLogValue({ reasoning: { enabled: false } }, { thinking: { type: 'enabled' } })
+    ).toBe('on');
   });
 
   it('falls back to the normalized request', () => {
