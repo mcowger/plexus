@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { setConfigForTesting } from '../../config';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
-import { genericOAuthApiType } from '../oauth/oauth-native-request';
+import { genericOAuthApiType, prepareGenericOAuthDispatch } from '../oauth/oauth-native-request';
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedChatRequest } from '../../types/unified';
 
@@ -21,9 +21,10 @@ import type { UnifiedChatRequest } from '../../types/unified';
 
 vi.mock('../pi-ai/catalog', () => ({
   getCatalogModel: vi.fn(),
+  getCatalogModels: vi.fn(),
 }));
 
-const { getCatalogModel } = await import('../pi-ai/catalog');
+const { getCatalogModel, getCatalogModels } = await import('../pi-ai/catalog');
 const { Dispatcher } = await import('../dispatch/dispatcher');
 
 const GENERIC_TOKEN = 'oauth-access-token-for-test';
@@ -82,7 +83,10 @@ function chatRequest(): UnifiedChatRequest {
 }
 
 describe('genericOAuthApiType', () => {
-  afterEach(() => vi.mocked(getCatalogModel).mockReset());
+  afterEach(() => {
+    vi.mocked(getCatalogModel).mockReset();
+    vi.mocked(getCatalogModels).mockReset();
+  });
 
   test('maps a pi-ai openai-completions model to the chat wire type', () => {
     vi.mocked(getCatalogModel).mockReturnValue({ api: 'openai-completions' } as any);
@@ -98,9 +102,30 @@ describe('genericOAuthApiType', () => {
 
   test('returns undefined for an unknown model or unsupported wire api', () => {
     vi.mocked(getCatalogModel).mockReturnValue(null);
+    vi.mocked(getCatalogModels).mockReturnValue([]);
     expect(genericOAuthApiType('xai', 'unknown-model')).toBeUndefined();
     vi.mocked(getCatalogModel).mockReturnValue({ api: 'gemini' } as any);
     expect(genericOAuthApiType('some-provider', 'gemini-model')).toBeUndefined();
+  });
+
+  test('infers a missing model API from the provider catalog', () => {
+    vi.mocked(getCatalogModel).mockReturnValue(null);
+    vi.mocked(getCatalogModels).mockReturnValue([
+      { api: 'openai-responses', baseUrl: 'https://api.x.ai/v1' },
+      { api: 'openai-responses', baseUrl: 'https://api.x.ai/v1' },
+    ] as any);
+
+    expect(genericOAuthApiType('xai', 'grok-4.7')).toBe('responses');
+  });
+
+  test('does not infer an API when the provider catalog is ambiguous', () => {
+    vi.mocked(getCatalogModel).mockReturnValue(null);
+    vi.mocked(getCatalogModels).mockReturnValue([
+      { api: 'openai-responses', baseUrl: 'https://api.x.ai/v1' },
+      { api: 'openai-completions', baseUrl: 'https://api.x.ai/v1' },
+    ] as any);
+
+    expect(genericOAuthApiType('xai', 'grok-4.7')).toBeUndefined();
   });
 });
 
@@ -127,6 +152,7 @@ describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
     vi.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
     vi.mocked(getCatalogModel).mockReset();
+    vi.mocked(getCatalogModels).mockReset();
   });
 
   test('does NOT throw "OAuth provider is not supported" — dispatches successfully', async () => {
@@ -155,6 +181,37 @@ describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
     const getApiKeySpy = registerSpy(OAuthAuthManager.getInstance(), 'getApiKey');
     await new Dispatcher().dispatch(chatRequest());
     expect(getApiKeySpy).toHaveBeenCalledWith('xai', 'test-account');
+  });
+
+  test('uses a cataloged provider model API and base URL when the requested model is missing', async () => {
+    vi.mocked(getCatalogModel).mockReturnValue(null);
+    vi.mocked(getCatalogModels).mockReturnValue([
+      {
+        id: 'grok-4.5',
+        api: 'openai-responses',
+        baseUrl: 'https://api.x.ai/v1/',
+      },
+      {
+        id: 'grok-4.6',
+        api: 'openai-responses',
+        baseUrl: 'https://api.x.ai/v1',
+      },
+    ] as any);
+
+    const resolvedApi = genericOAuthApiType('xai', 'grok-4.7');
+    expect(resolvedApi).toBe('responses');
+
+    const prepared = await prepareGenericOAuthDispatch({
+      provider: 'xai',
+      modelId: 'grok-4.7',
+      body: { model: 'grok-4.7' },
+      streaming: false,
+      apiType: resolvedApi!,
+      oauthAccountId: 'test-account',
+    });
+
+    expect(prepared.url).toBe('https://api.x.ai/v1/responses');
+    expect(prepared.body.model).toBe('grok-4.7');
   });
 
   test('raises a clear error when the model has no known wire API, instead of mis-routing', async () => {

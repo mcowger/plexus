@@ -24,7 +24,7 @@
  * translation.
  */
 
-import { getCatalogModel } from '../pi-ai/catalog';
+import { getCatalogModel, getCatalogModels } from '../pi-ai/catalog';
 import type { OAuthProvider } from './oauth-providers';
 import { logger } from '../../utils/logger';
 import { OAuthAuthManager } from './oauth-auth-manager';
@@ -951,17 +951,60 @@ const GENERIC_OAUTH_ENDPOINTS: Record<string, string> = {
   messages: '/messages',
 };
 
+function genericOAuthProviderProfile(provider: string): {
+  apiType?: string;
+  baseUrl?: string;
+} {
+  const models = getCatalogModels(provider);
+  if (models.length === 0) return {};
+
+  const apiTypes = new Set<string>();
+  const baseUrls = new Set<string>();
+  let hasUnsupportedApi = false;
+
+  for (const model of models) {
+    const apiType = PIAI_API_TO_PLEXUS[model.api];
+    if (apiType) {
+      apiTypes.add(apiType);
+    } else {
+      hasUnsupportedApi = true;
+    }
+
+    if (model.baseUrl) {
+      baseUrls.add(String(model.baseUrl).replace(/\/+$/, ''));
+    }
+  }
+
+  return {
+    ...(!hasUnsupportedApi && apiTypes.size === 1 ? { apiType: [...apiTypes][0] } : {}),
+    ...(baseUrls.size === 1 ? { baseUrl: [...baseUrls][0] } : {}),
+  };
+}
+
 /**
- * Resolve the plexus wire api type for a generic (non-native) OAuth
- * provider/model from pi-ai's own `model.api` field. Returns undefined when
- * the model isn't in pi-ai's catalog, or resolves to a wire api generic
- * OAuth dispatch doesn't support (e.g. `gemini`) — callers surface this as a
- * clear per-model error rather than silently mis-routing.
+ * Resolve the Plexus wire API type for a generic OAuth model. When the model
+ * is absent from the catalog, infer it from the provider's catalog only when
+ * every model agrees on one supported API.
  */
 export function genericOAuthApiType(provider: string, modelId: string): string | undefined {
   const model = getCatalogModel(provider, modelId);
-  const api = (model as any)?.api as string | undefined;
-  return api ? PIAI_API_TO_PLEXUS[api] : undefined;
+  if (model) return PIAI_API_TO_PLEXUS[model.api];
+  return genericOAuthProviderProfile(provider).apiType;
+}
+
+function resolveGenericOAuthBaseUrl(provider: string, modelId: string): string {
+  const model = getCatalogModel(provider, modelId);
+  const baseUrl =
+    model?.baseUrl ||
+    OAUTH_PROVIDER_BASE_URLS[provider] ||
+    genericOAuthProviderProfile(provider).baseUrl;
+  if (!baseUrl) {
+    throw new Error(
+      `OAuth: no baseUrl for provider '${provider}' model '${modelId}'. ` +
+        `Cannot resolve upstream endpoint.`
+    );
+  }
+  return String(baseUrl).replace(/\/+$/, '');
 }
 
 /**
@@ -1007,7 +1050,7 @@ export async function prepareGenericOAuthDispatch(params: {
           signal,
         })
       : await OAuthAuthManager.getInstance().getApiKey(provider, oauthAccountId);
-  const baseUrl = resolveOAuthBaseUrl(provider, modelId);
+  const baseUrl = resolveGenericOAuthBaseUrl(provider, modelId);
   const url = `${baseUrl}${endpoint}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

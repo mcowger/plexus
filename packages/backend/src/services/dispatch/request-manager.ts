@@ -207,7 +207,7 @@ export class RequestManager {
           if (!resolved) {
             throw new Error(
               `OAuth provider '${provider}' model '${route.model}' has no known wire API for ` +
-                `dispatch. Check that the model id matches pi-ai's catalog for this provider.`
+                `dispatch. Check that this provider's catalog has a model with a supported API.`
             );
           }
           effectiveApiType = resolved;
