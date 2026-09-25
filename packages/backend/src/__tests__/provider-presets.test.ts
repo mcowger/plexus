@@ -103,10 +103,11 @@ describe('built-in presets catalog (data/provider-presets.json)', () => {
   });
 
   test('gateway providers without a pi-ai builtin map to the openrouter catalog', () => {
-    // pi-ai ships no kilocode/neuralwatt builtins; the multi-protocol
+    // pi-ai ships no kilocode/neuralwatt/requesty builtins; the multi-protocol
     // openrouter catalog is the closest match for compat mapping.
     expect(presetOrThrow('kilocode').piAiProvider).toBe('openrouter');
     expect(presetOrThrow('neuralwatt').piAiProvider).toBe('openrouter');
+    expect(presetOrThrow('requesty').piAiProvider).toBe('openrouter');
   });
 
   test('spot-checks on researched endpoint maps', () => {
