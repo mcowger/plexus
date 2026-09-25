@@ -35,6 +35,16 @@ function toIso(val: unknown): string {
   return new Date(toMs(val)).toISOString();
 }
 
+// Snapshot rows from one check come back in index (meter-key) order, so apply
+// the checker's declared order. The sort is stable for unlisted keys.
+function orderMeters(meters: Meter[], order: readonly string[]): Meter[] {
+  const rank = (key: string) => {
+    const index = order.indexOf(key);
+    return index < 0 ? order.length : index;
+  };
+  return [...meters].sort((a, b) => rank(a.key) - rank(b.key));
+}
+
 function withQuotaDbQueryTimeout<T>(query: PromiseLike<T>): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
@@ -483,9 +493,11 @@ export class QuotaScheduler {
       });
 
       const firstRow = resultRows[0];
+      const checkerType = config?.type ?? firstRow.checkerType;
+      const meterOrder = getCheckerDefinition(checkerType)?.meterOrder;
       return {
         checkerId,
-        checkerType: config?.type ?? firstRow.checkerType,
+        checkerType,
         provider: config?.provider ?? firstRow.provider,
         checkedAt: toIso(firstRow.checkedAt),
         success: true,
@@ -495,7 +507,7 @@ export class QuotaScheduler {
               error: errorRow.errorMessage ?? 'Unknown error',
             }
           : {}),
-        meters,
+        meters: meterOrder ? orderMeters(meters, meterOrder) : meters,
       };
     } catch (error) {
       logger.error(`Failed to get latest quota for '${checkerId}': ${error}`);

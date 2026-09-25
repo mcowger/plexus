@@ -183,6 +183,7 @@ export interface CacheRoutingHeaders {
   'x-session-id'?: string;
   'x-prompt-cache-isolation-key'?: string;
   'x-multi-turn-session-id'?: string;
+  'x-opencode-session'?: string;
 }
 
 // Unified Response

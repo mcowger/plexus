@@ -56,6 +56,8 @@ export interface CheckerDefinition<TOptions extends z.ZodTypeAny = z.ZodTypeAny>
   type: string;
   displayName: string;
   optionsSchema: TOptions;
+  /** Display order for meter keys; unlisted meters follow in their stored order. */
+  meterOrder?: readonly string[];
   check(ctx: MeterContext): Promise<Meter[]>;
 }
 

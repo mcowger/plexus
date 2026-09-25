@@ -36,7 +36,7 @@ import { googleGenerativeAIApi } from '@earendil-works/pi-ai/api/google-generati
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy';
 import { ArrowDown, Copy, Paperclip, SendHorizontal, Square, Wrench, X } from 'lucide-react';
-import { memo, useMemo, useRef } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import type { KeyConfig } from '../../lib/api';
 import { generateUUID } from '../../lib/clipboard';
 
@@ -343,9 +343,10 @@ const makeAdapter = ({
   selectedApi,
   toolMode,
   tasks,
+  sessionId,
   onRoutingPending,
   onToolCalls,
-}: PlaygroundChatProps & { tasks: string[] }): ChatModelAdapter => ({
+}: PlaygroundChatProps & { tasks: string[]; sessionId: string }): ChatModelAdapter => ({
   async *run({ messages, abortSignal }) {
     const model = createModel(selectedApi, selectedModel);
     const context = toPiContext(
@@ -366,7 +367,7 @@ const makeAdapter = ({
         apiKey: selectedKey.secret,
         signal: abortSignal,
         maxRetries: 0,
-        headers: { 'x-client-request-id': clientRequestId },
+        headers: { 'x-client-request-id': clientRequestId, 'x-opencode-session': sessionId },
         onPayload: (payload) => {
           const outgoingPayload =
             selectedApi === 'openai-responses' ? makeResponsesPayloadStateless(payload) : payload;
@@ -671,8 +672,10 @@ const PlaygroundThread = ({
 
 export const PlaygroundChat = memo((props: PlaygroundChatProps) => {
   const tasksRef = useRef<string[]>([]);
+  // One session per chat thread; the parent remounts this component for a new thread.
+  const [sessionId] = useState(generateUUID);
   const adapter = useMemo(
-    () => makeAdapter({ ...props, tasks: tasksRef.current }),
+    () => makeAdapter({ ...props, tasks: tasksRef.current, sessionId }),
     [
       props.selectedKey,
       props.selectedModel,

@@ -14,6 +14,7 @@ import type { MeterCheckResult, Meter } from '../../../types/meter';
 import type { QuotaConfig } from '../../../config';
 import { registerSpy } from '../../../../test/test-utils';
 import claudeChecker from '../checkers/claude-code-checker';
+import '../checkers/opencode-go-checker';
 
 const CHECKER_ID = 'quota-persistence-checker';
 
@@ -194,6 +195,24 @@ describe('QuotaScheduler persistence', () => {
       meters: [{ utilizationPercent: 42 }],
     });
     expect(latest?.checkedAt).toBe(successfulResult.checkedAt);
+  });
+
+  it('returns OpenCode Go meters in its declared order: 5h, weekly, monthly', async () => {
+    const scheduler = QuotaScheduler.getInstance() as any;
+    await scheduler.persistResult({
+      checkerId: 'opencode-go-order-checker',
+      checkerType: 'opencode-go',
+      provider: 'opencode-go-provider',
+      checkedAt: new Date().toISOString(),
+      success: true,
+      meters: (['rolling_5h', 'weekly', 'monthly'] as const).map((key) => ({
+        ...makeMeter(10),
+        key,
+      })),
+    });
+
+    const latest = await scheduler.getLatestQuota('opencode-go-order-checker');
+    expect(latest?.meters.map((m: Meter) => m.key)).toEqual(['rolling_5h', 'weekly', 'monthly']);
   });
 
   it('does not restore older meters past a successful empty snapshot', async () => {

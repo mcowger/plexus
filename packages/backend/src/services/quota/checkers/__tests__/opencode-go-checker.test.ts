@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { registerSpy } from '../../../../../test/test-utils';
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../opencode-go-checker';
 
@@ -28,14 +29,52 @@ function mockDashboardHtml(
   return html + '</body></html>';
 }
 
+function mockCardHtml(
+  cards: Array<{
+    name: string;
+    percent: number;
+    resetTitle?: string;
+    resetRelative?: string;
+    wrapperClass?: string;
+    badgePercent?: number | null;
+    ariaValueNow?: number | null;
+    ariaValueText?: number | null;
+    ariaValueBeforeLabel?: boolean;
+  }>
+): string {
+  let html = '<!DOCTYPE html><html><head></head><body>';
+  for (const c of cards) {
+    const reset =
+      c.resetTitle !== undefined && c.resetRelative !== undefined
+        ? `<span class="shrink-0 text-[0.75rem] text-muted" title="${c.resetTitle}">Resets in ${c.resetRelative}</span>`
+        : '';
+    const badgePercent = c.badgePercent === undefined ? c.percent : c.badgePercent;
+    const ariaValueNow = c.ariaValueNow === undefined ? c.percent : c.ariaValueNow;
+    const ariaValueText = c.ariaValueText === undefined ? c.percent : c.ariaValueText;
+    const valueNowAttribute = ariaValueNow === null ? '' : ` aria-valuenow="${ariaValueNow}"`;
+    html +=
+      `<div class="${c.wrapperClass ?? 'flex flex-col rounded-md border px-4 py-3'}">` +
+      `<div class="mb-3 flex flex-wrap items-center justify-between gap-2">` +
+      `<p class="flex min-w-0 items-center gap-1"><span class="truncate">${c.name} usage</span>` +
+      (badgePercent === null
+        ? ''
+        : `<span class="rounded-sm px-1 tabular-nums">${badgePercent}%</span>`) +
+      `</p>${reset}</div>` +
+      `<div class="mt-auto"><div class="flex h-2 w-full gap-1" role="progressbar" ` +
+      `aria-valuemin="0" aria-valuemax="100"` +
+      (c.ariaValueBeforeLabel ? valueNowAttribute : '') +
+      ` aria-label="${c.name} usage used"` +
+      (c.ariaValueBeforeLabel ? '' : valueNowAttribute) +
+      (ariaValueText === null ? '' : ` aria-valuetext="${ariaValueText}% used"`) +
+      `></div></div></div>`;
+  }
+  return html + '</body></html>';
+}
+
 describe('opencode-go checker', () => {
   const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
-    global.fetch = vi.fn(impl) as unknown as typeof fetch;
+    registerSpy(global, 'fetch').mockImplementation(impl);
   };
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
 
   it('is registered under opencode-go', () => {
     expect(isCheckerRegistered('opencode-go')).toBe(true);
@@ -103,6 +142,31 @@ describe('opencode-go checker', () => {
     expect(weekly.remaining).toBe(75);
   });
 
+  it('preserves exact legacy reset times, including zero seconds', async () => {
+    const now = Date.parse('2026-09-24T12:00:00.000Z');
+    registerSpy(Date, 'now').mockReturnValue(now);
+    setFetchMock(
+      async () =>
+        new Response(
+          mockDashboardHtml([
+            { field: 'rollingUsage', usagePercent: 0, resetInSec: 0 },
+            { field: 'weeklyUsage', usagePercent: 25, resetInSec: 3600, resetFirst: true },
+            { field: 'monthlyUsage', usagePercent: 70, resetInSec: 86400 },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(3);
+    expect(meters.find((m) => m.key === 'rolling_5h')).toMatchObject({
+      used: 0,
+      resetsAt: '2026-09-24T12:00:00.000Z',
+    });
+    expect(meters.find((m) => m.key === 'weekly')?.resetsAt).toBe('2026-09-24T13:00:00.000Z');
+    expect(meters.find((m) => m.key === 'monthly')?.resetsAt).toBe('2026-09-25T12:00:00.000Z');
+  });
+
   it('returns partial meters when only some windows are available', async () => {
     setFetchMock(
       async () =>
@@ -136,6 +200,310 @@ describe('opencode-go checker', () => {
     await checkerDef.check(makeCtx());
     expect(capturedCookie).toBe('auth=test-cookie');
     expect(capturedUA).toContain('Firefox');
+  });
+
+  it('parses server-rendered usage cards with resets from title timestamps', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            { name: 'Rolling', percent: 0 },
+            {
+              name: 'Weekly',
+              percent: 0,
+              resetTitle: '2026-09-20T20:00:00Z',
+              resetRelative: '7h 58m',
+            },
+            {
+              name: 'Monthly',
+              percent: 70,
+              resetTitle: '2026-09-24T21:24:56-04:00',
+              resetRelative: '4d 9h',
+            },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(3);
+
+    const rolling = meters.find((m) => m.key === 'rolling_5h')!;
+    expect(rolling.used).toBe(0);
+    expect(rolling.remaining).toBe(100);
+    expect(rolling.resetsAt).toBeUndefined();
+
+    const weekly = meters.find((m) => m.key === 'weekly')!;
+    expect(weekly.used).toBe(0);
+    expect(weekly.resetsAt).toBe('2026-09-20T20:00:00.000Z');
+
+    const monthly = meters.find((m) => m.key === 'monthly')!;
+    expect(monthly.used).toBe(70);
+    expect(monthly.remaining).toBe(30);
+    expect(monthly.resetsAt).toBe('2026-09-25T01:24:56.000Z');
+  });
+
+  it('falls back to the relative reset duration when the title is unparseable', async () => {
+    const now = Date.parse('2026-09-24T12:00:00.000Z');
+    registerSpy(Date, 'now').mockReturnValue(now);
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            { name: 'Weekly', percent: 12.5, resetTitle: 'not-a-date', resetRelative: '7h 58m' },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(1);
+    expect(meters[0]!.resetsAt).toBe('2026-09-24T19:58:00.000Z');
+  });
+
+  it.each([
+    ['2026-09-24T21:00:00', '5h', '2026-09-24T17:00:00.000Z'],
+    ['9/24/2026, 9:00:00 PM', '2h', '2026-09-24T14:00:00.000Z'],
+  ])('uses the relative reset for timezone-free title %s', async (title, relative, expected) => {
+    registerSpy(Date, 'now').mockReturnValue(Date.parse('2026-09-24T12:00:00.000Z'));
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            { name: 'Weekly', percent: 12, resetTitle: title, resetRelative: relative },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters[0]!.resetsAt).toBe(expected);
+  });
+
+  it('accepts a timezone-explicit ISO reset title without a colon in the offset', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            {
+              name: 'Weekly',
+              percent: 12,
+              resetTitle: '2026-09-24T21:00:00+0530',
+              resetRelative: '5h',
+            },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters[0]!.resetsAt).toBe('2026-09-24T15:30:00.000Z');
+  });
+
+  it.each([
+    ['5 hours 30 minutes', '2026-09-24T17:30:00.000Z'],
+    ['2 days 4 hours', '2026-09-26T16:00:00.000Z'],
+    ['1d, 2h, 3m', '2026-09-25T14:03:00.000Z'],
+    ['5 hrs 30 min 15 sec', '2026-09-24T17:30:15.000Z'],
+    ['1 hr 5 mins 15 secs', '2026-09-24T13:05:15.000Z'],
+    ['4d9h', '2026-09-28T21:00:00.000Z'],
+    ['about 5h', '2026-09-24T17:00:00.000Z'],
+  ])('parses the complete relative reset %s', async (relative, expected) => {
+    registerSpy(Date, 'now').mockReturnValue(Date.parse('2026-09-24T12:00:00.000Z'));
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            { name: 'Weekly', percent: 12, resetTitle: 'not-an-ISO-date', resetRelative: relative },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters[0]!.resetsAt).toBe(expected);
+  });
+
+  it.each(['2 months', '2 months 4 hours', '5 hours nonsense'])(
+    'does not parse a partial or unsupported relative reset %s',
+    async (relative) => {
+      registerSpy(Date, 'now').mockReturnValue(Date.parse('2026-09-24T12:00:00.000Z'));
+      setFetchMock(
+        async () =>
+          new Response(
+            mockCardHtml([
+              {
+                name: 'Weekly',
+                percent: 12,
+                resetTitle: 'not-an-ISO-date',
+                resetRelative: relative,
+              },
+            ]),
+            { status: 200 }
+          )
+      );
+
+      const meters = await checkerDef.check(makeCtx());
+      expect(meters[0]!.resetsAt).toBeUndefined();
+    }
+  );
+
+  it('does not leak a preceding card reset into a card without reset metadata', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            {
+              name: 'Weekly',
+              percent: 10,
+              resetTitle: '2026-09-20T20:00:00Z',
+              resetRelative: '7h 58m',
+            },
+            { name: 'Monthly', percent: 70 },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(2);
+
+    const weekly = meters.find((m) => m.key === 'weekly')!;
+    expect(weekly.resetsAt).toBe('2026-09-20T20:00:00.000Z');
+
+    const monthly = meters.find((m) => m.key === 'monthly')!;
+    expect(monthly.used).toBe(70);
+    expect(monthly.resetsAt).toBeUndefined();
+  });
+
+  it('keeps badge-only percentages within adjacent cards when wrapper classes change order', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            {
+              name: 'Weekly',
+              percent: 17,
+              ariaValueNow: null,
+              ariaValueText: null,
+              wrapperClass: 'rounded-md flex border flex-col px-4 py-3',
+            },
+            {
+              name: 'Monthly',
+              percent: 71,
+              ariaValueNow: null,
+              ariaValueText: null,
+              wrapperClass: 'rounded-md border px-4 flex py-3 flex-col',
+            },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(2);
+    expect(meters.find((m) => m.key === 'weekly')?.used).toBe(17);
+    expect(meters.find((m) => m.key === 'monthly')?.used).toBe(71);
+  });
+
+  it('omits a card with no badge, aria value, or wrapper class instead of using a neighbor', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            { name: 'Weekly', percent: 17, ariaValueNow: null, ariaValueText: null },
+            {
+              name: 'Monthly',
+              percent: 71,
+              badgePercent: null,
+              ariaValueNow: null,
+              ariaValueText: null,
+              wrapperClass: '',
+            },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters.map((m) => m.key)).toEqual(['weekly']);
+    expect(meters[0]!.used).toBe(17);
+  });
+
+  it('keeps reset metadata within its card when wrapper classes change order', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            {
+              name: 'Weekly',
+              percent: 17,
+              resetTitle: '2026-09-24T21:00:00Z',
+              resetRelative: '5h',
+            },
+            {
+              name: 'Monthly',
+              percent: 71,
+              wrapperClass: 'rounded-md flex border flex-col px-4 py-3',
+            },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters.find((m) => m.key === 'weekly')?.resetsAt).toBe('2026-09-24T21:00:00.000Z');
+    expect(meters.find((m) => m.key === 'monthly')?.resetsAt).toBeUndefined();
+  });
+
+  it('reads aria-valuenow before aria-label in the same progressbar opening tag', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockCardHtml([
+            {
+              name: 'Weekly',
+              percent: 42,
+              badgePercent: null,
+              ariaValueText: null,
+              ariaValueBeforeLabel: true,
+            },
+          ]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters.map((m) => [m.key, m.used])).toEqual([['weekly', 42]]);
+  });
+
+  it('does not read aria values from the following progressbar opening tag', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          '<div role="progressbar" aria-label="Weekly usage used"></div>' +
+            '<div role="progressbar" aria-label="Monthly usage used" aria-valuenow="63"></div>',
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters.map((m) => [m.key, m.used])).toEqual([['monthly', 63]]);
+  });
+
+  it('prefers usage cards over flight data when both are present', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          mockDashboardHtml([{ field: 'rollingUsage', usagePercent: 99, resetInSec: 5 }]) +
+            mockCardHtml([{ name: 'Rolling', percent: 3 }]),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+    expect(meters).toHaveLength(1);
+    expect(meters[0]!.used).toBe(3);
   });
 
   it('throws when no windows can be parsed from HTML', async () => {
