@@ -5,6 +5,7 @@
  */
 export const DB_TEST_FILES = [
   'src/db/**/*.test.ts',
+  'test/integration/config-service-oauth-credential-cache.test.ts',
   'src/routes/management/__tests__/usage-summary.test.ts',
   'src/services/__tests__/usage-storage-performance.test.ts',
   'src/services/__tests__/usage-retention.test.ts',

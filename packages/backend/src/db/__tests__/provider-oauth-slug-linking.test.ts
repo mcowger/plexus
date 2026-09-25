@@ -1,35 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { closeDatabase, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
+import {
+  creds,
+  oauthProvider,
+  resetOAuthDatabase,
+} from '../../../test/oauth-credential-test-utils';
+import { closeDatabase } from '../client';
 import { ConfigRepository } from '../config-repository';
 import type { ProviderConfig } from '../../config';
-
-const oauthProvider = (account?: string): ProviderConfig =>
-  ({
-    api_base_url: 'oauth://',
-    api_key: 'oauth',
-    oauth_provider: 'meta',
-    ...(account ? { oauth_account: account } : {}),
-    disable_cooldown: false,
-    stall_cooldown: false,
-    allow_100_percent_utilization: false,
-    estimateTokens: false,
-    useClaudeMasking: false,
-  }) as ProviderConfig;
-
-const creds = { accessToken: 'access', refreshToken: 'refresh', expiresAt: 2000000000 };
 
 describe('provider OAuth slug linking', () => {
   let repo: ConfigRepository;
 
   beforeEach(async () => {
-    await closeDatabase();
-    process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
-    initializeDatabase(process.env.DATABASE_URL);
-    await runMigrations();
-
-    repo = new ConfigRepository();
-    await repo.clearAllData();
+    repo = await resetOAuthDatabase();
   });
 
   afterEach(async () => {

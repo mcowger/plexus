@@ -3565,6 +3565,13 @@ export interface paths {
      *
      *     - `ready: true` — Credentials exist and the provider can be used
      *     - `ready: false` — No credentials found; user needs to start OAuth flow
+     *     - `connectedAt` — When the credential was first stored (epoch ms)
+     *     - `refreshedAt` — When the credential was last saved, by login or token
+     *       refresh (epoch ms)
+     *     - `expiresAt` — When the current access token expires (epoch ms)
+     *
+     *     The timestamps are present only when `ready` is true and never include
+     *     token values.
      *
      *     ## Note
      *
@@ -12346,6 +12353,12 @@ export interface operations {
           'application/json': {
             data?: {
               ready?: boolean;
+              /** @description First stored (epoch ms). */
+              connectedAt?: number;
+              /** @description Last saved by login or refresh (epoch ms). */
+              refreshedAt?: number;
+              /** @description Current access token expiry (epoch ms). */
+              expiresAt?: number;
             };
           };
         };

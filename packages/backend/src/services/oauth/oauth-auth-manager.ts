@@ -153,7 +153,8 @@ export class OAuthAuthManager {
   private async saveToDatabase(
     provider: OAuthProvider,
     accountId: string,
-    credentials: OAuthCredentials
+    credentials: OAuthCredentials,
+    requirePersistence = false
   ): Promise<void> {
     try {
       const configService = ConfigService.getInstance();
@@ -170,6 +171,7 @@ export class OAuthAuthManager {
       });
     } catch (error: any) {
       logger.error('OAuth: Failed to save credentials to database:', error);
+      if (requirePersistence) throw error;
     }
   }
 
@@ -205,6 +207,10 @@ export class OAuthAuthManager {
       throw new Error('OAuth: accountId is required to store credentials');
     }
 
+    // A completed login must survive a restart before the account becomes
+    // visible in memory (and before the session reports success).
+    await this.saveToDatabase(provider, accountId, credentials, true);
+
     if (!this.authData[provider]) {
       this.authData[provider] = { accounts: {} };
     }
@@ -216,8 +222,6 @@ export class OAuthAuthManager {
     const refreshKey = `${provider}/${accountId}`;
     this.lastRefreshAt.set(refreshKey, Date.now());
     this.refreshBackoffs.delete(refreshKey);
-
-    await this.saveToDatabase(provider, accountId, credentials);
   }
 
   async getApiKey(

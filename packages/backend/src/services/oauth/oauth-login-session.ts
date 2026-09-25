@@ -48,6 +48,7 @@ type SessionInternal = OAuthSession & {
   abortController: AbortController;
   completion: Promise<void>;
   expiresAt: number;
+  savingCredentials: boolean;
 };
 
 type ProviderResolver = (id: OAuthProviderId) => OAuthProviderDescriptor | undefined;
@@ -137,10 +138,14 @@ export class OAuthLoginSessionManager {
     if (provider.usesCallbackServer) {
       const active = this.findActiveSession(providerId);
       if (active) {
-        active.status = 'cancelled';
-        active.error = 'Superseded by a new login';
-        this.releaseSession(active, 'Superseded by a new login');
-        this.touch(active);
+        if (!active.savingCredentials) {
+          active.status = 'cancelled';
+          active.error = 'Superseded by a new login';
+          this.releaseSession(active, 'Superseded by a new login');
+          this.touch(active);
+        }
+        // A completed OAuth flow cannot cancel persistence. Wait for its real
+        // outcome before starting the replacement login.
         await active.completion;
       }
     }
@@ -160,6 +165,7 @@ export class OAuthLoginSessionManager {
       abortController,
       completion: Promise.resolve(),
       expiresAt: now + DEFAULT_SESSION_TTL_MS,
+      savingCredentials: false,
     };
 
     session.completion = this.runLogin(provider, session).catch(() => undefined);
@@ -201,6 +207,12 @@ export class OAuthLoginSessionManager {
   async cancel(sessionId: string): Promise<OAuthSession> {
     const session = this.getInternal(sessionId);
     if (session.status === 'success' || session.status === 'error') {
+      return this.stripInternal(session);
+    }
+    if (session.savingCredentials) {
+      // Once persistence starts it cannot be cancelled. Return the committed
+      // outcome rather than claiming cancellation while a credential is saved.
+      await session.completion;
       return this.stripInternal(session);
     }
     session.status = 'cancelled';
@@ -334,7 +346,13 @@ export class OAuthLoginSessionManager {
 
     try {
       const credentials: OAuthCredentials = await provider.oauth.login(interaction);
-      authManager.setCredentials(session.providerId, session.accountId, credentials);
+      if (session.status === 'cancelled') return;
+      session.savingCredentials = true;
+      try {
+        await authManager.setCredentials(session.providerId, session.accountId, credentials);
+      } finally {
+        session.savingCredentials = false;
+      }
       session.status = 'success';
       session.error = undefined;
       session.prompt = undefined;

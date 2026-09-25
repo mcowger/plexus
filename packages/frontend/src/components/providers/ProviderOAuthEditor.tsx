@@ -3,6 +3,44 @@ import { Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import type { Provider, OAuthSession } from '../../lib/api';
+import type { OAuthCredentialStatus } from '../../types/settings';
+import { formatResetsIn, formatTimeAgo } from '../../lib/format';
+
+function describeAge(epochMs: number, nowMs: number): string {
+  return formatTimeAgo(Math.max(0, Math.floor((nowMs - epochMs) / 1000)));
+}
+
+/**
+ * "connected 1d ago · key refreshed 3m ago · expires in 23h 12m" — makes a
+ * stale or soon-expiring login visible without opening the database.
+ */
+function describeCredentialAge(status: OAuthCredentialStatus, nowMs: number): string | null {
+  const parts: string[] = [];
+  if (status.connectedAt) parts.push(`connected ${describeAge(status.connectedAt, nowMs)}`);
+  if (status.refreshedAt && status.refreshedAt !== status.connectedAt) {
+    parts.push(`key refreshed ${describeAge(status.refreshedAt, nowMs)}`);
+  }
+  if (status.expiresAt) {
+    parts.push(
+      status.expiresAt <= nowMs
+        ? 'key expired'
+        : `expires ${formatResetsIn(new Date(status.expiresAt).toISOString())}`
+    );
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function describeCredentialDates(status: OAuthCredentialStatus): string {
+  const line = (label: string, epochMs?: number) =>
+    epochMs ? `${label}: ${new Date(epochMs).toLocaleString()}` : null;
+  return [
+    line('Connected', status.connectedAt),
+    line('Key refreshed', status.refreshedAt),
+    line('Expires', status.expiresAt),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 interface Props {
   editingProvider: Provider;
@@ -16,6 +54,8 @@ interface Props {
   oauthBusy: boolean;
   oauthCredentialReady: boolean;
   oauthCredentialChecking: boolean;
+  /** Credential age for the status line; null until a ready credential is found. */
+  oauthCredentialStatus?: OAuthCredentialStatus | null;
   oauthStatus: string | undefined;
   oauthIsTerminal: boolean;
   oauthStatusLabel: string;
@@ -38,6 +78,7 @@ export function ProviderOAuthEditor({
   oauthBusy,
   oauthCredentialReady,
   oauthCredentialChecking,
+  oauthCredentialStatus,
   oauthStatus,
   oauthIsTerminal,
   oauthStatusLabel,
@@ -50,6 +91,10 @@ export function ProviderOAuthEditor({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const hasActiveSession = !!oauthSessionId && !oauthIsTerminal;
   const showDelete = oauthCredentialReady && !hasActiveSession;
+  const credentialAge =
+    oauthCredentialReady && !hasActiveSession && oauthCredentialStatus
+      ? describeCredentialAge(oauthCredentialStatus, Date.now())
+      : null;
 
   const handleDeleteClick = async () => {
     if (!confirmingDelete) {
@@ -102,6 +147,16 @@ export function ProviderOAuthEditor({
           </span>
         </div>
       </div>
+
+      {credentialAge && oauthCredentialStatus && (
+        <div
+          className="text-[11px] text-text-secondary"
+          style={{ marginBottom: '8px' }}
+          title={describeCredentialDates(oauthCredentialStatus)}
+        >
+          {credentialAge}
+        </div>
+      )}
 
       {oauthError && (
         <div className="text-[11px] text-danger" style={{ marginBottom: '8px' }}>

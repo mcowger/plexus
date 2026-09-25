@@ -351,11 +351,29 @@ export class ConfigService {
     accountId: string,
     creds: OAuthCredentialsData
   ): Promise<void> {
-    await this.repo.setOAuthCredentials(providerType, accountId, creds);
+    const { created, linkedProviderSlugs } = await this.repo.setOAuthCredentials(
+      providerType,
+      accountId,
+      creds
+    );
+    // A new login (or a slug backfill link) changes how providers hydrate
+    // `oauth_account`; routine token rotations of an existing row do not.
+    if (created || linkedProviderSlugs.length > 0) {
+      this.rebuildCache();
+    }
   }
 
   async deleteOAuthCredentials(providerType: string, accountId: string): Promise<void> {
     await this.repo.deleteOAuthCredentials(providerType, accountId);
+    // The FK nulls linked providers, which re-hydrate through the fallbacks.
+    this.rebuildCache();
+  }
+
+  async getOAuthCredentialTimestamps(
+    providerType: string,
+    accountId: string
+  ): Promise<{ createdAt: number; updatedAt: number; expiresAt: number } | null> {
+    return this.repo.getOAuthCredentialTimestamps(providerType, accountId);
   }
 
   async getAllOAuthProviders(): Promise<Array<{ providerType: string; accountId: string }>> {

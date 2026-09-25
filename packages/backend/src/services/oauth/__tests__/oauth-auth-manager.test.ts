@@ -353,6 +353,37 @@ describe('OAuthAuthManager', () => {
     expect(manager.evictCredentials('anthropic', '')).toBe(false);
   });
 
+  it('rejects a login save that fails and keeps the previous in-memory credential', async () => {
+    const manager = await createManager();
+    mocks.configService.setOAuthCredentials.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      manager.setCredentials('anthropic', 'personal', {
+        access: 'replacement',
+        refresh: 'replacement-refresh',
+        expires: Date.now() + 3600 * 1000,
+      })
+    ).rejects.toThrow('database unavailable');
+
+    expect(manager.getCredentials('anthropic', 'personal')?.access).toBe('old-access');
+    expect(manager.hasProvider('anthropic', 'personal')).toBe(true);
+  });
+
+  it('does not expose a new account when its login save fails', async () => {
+    const manager = await createManager();
+    mocks.configService.setOAuthCredentials.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      manager.setCredentials('anthropic', 'work', {
+        access: 'new-access',
+        refresh: 'new-refresh',
+        expires: Date.now() + 3600 * 1000,
+      })
+    ).rejects.toThrow('database unavailable');
+
+    expect(manager.hasProvider('anthropic', 'work')).toBe(false);
+  });
+
   it('deleteCredentials persists then evicts through the shared path', async () => {
     const manager = await createManager();
     await manager.setCredentials('anthropic', 'personal', {

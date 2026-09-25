@@ -171,6 +171,12 @@ export interface OAuthSession {
 
 export interface OAuthCredentialStatus {
   ready: boolean;
+  /** When the credential was first stored (epoch ms). */
+  connectedAt?: number;
+  /** When the credential was last saved by login or token refresh (epoch ms). */
+  refreshedAt?: number;
+  /** When the current access token expires (epoch ms). */
+  expiresAt?: number;
 }
 
 /**

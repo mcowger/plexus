@@ -606,11 +606,17 @@ export class ConfigRepository {
     };
   }
 
+  /**
+   * Upsert a credential. Reports whether the row was newly created and which
+   * providers the slug backfill linked to it, so callers can tell a new login
+   * (which changes how providers hydrate `oauth_account`) from a routine
+   * token rotation of an existing row.
+   */
   async setOAuthCredentials(
     providerType: string,
     accountId: string,
     creds: OAuthCredentialsData
-  ): Promise<void> {
+  ): Promise<{ created: boolean; linkedProviderSlugs: string[] }> {
     const schema = this.schema();
     const timestamp = now();
 
@@ -660,7 +666,7 @@ export class ConfigRepository {
     // are supported from the provider form) gets linked once the credential
     // named after its slug arrives. Only touches unlinked rows whose type
     // matches, so grandfathered legacy links are never disturbed.
-    await this.db()
+    const linked = (await this.db()
       .update(schema.providers)
       .set({ oauthCredentialId: credentialId, updatedAt: timestamp })
       .where(
@@ -669,7 +675,13 @@ export class ConfigRepository {
           eq(schema.providers.oauthProviderType, providerType),
           isNull(schema.providers.oauthCredentialId)
         )
-      );
+      )
+      .returning({ slug: schema.providers.slug })) as Array<{ slug: string }>;
+
+    return {
+      created: existing.length === 0,
+      linkedProviderSlugs: linked.map((row) => row.slug),
+    };
   }
 
   async deleteOAuthCredentials(providerType: string, accountId: string): Promise<void> {
@@ -682,6 +694,35 @@ export class ConfigRepository {
           eq(schema.oauthCredentials.accountId, accountId)
         )
       );
+  }
+
+  /** Credential lifecycle timestamps (epoch ms) without reading any tokens. */
+  async getOAuthCredentialTimestamps(
+    providerType: string,
+    accountId: string
+  ): Promise<{ createdAt: number; updatedAt: number; expiresAt: number } | null> {
+    const schema = this.schema();
+    const rows = (await this.db()
+      .select({
+        createdAt: schema.oauthCredentials.createdAt,
+        updatedAt: schema.oauthCredentials.updatedAt,
+        expiresAt: schema.oauthCredentials.expiresAt,
+      })
+      .from(schema.oauthCredentials)
+      .where(
+        and(
+          eq(schema.oauthCredentials.oauthProviderType, providerType),
+          eq(schema.oauthCredentials.accountId, accountId)
+        )
+      )
+      .limit(1)) as Array<{ createdAt: number; updatedAt: number; expiresAt: number }>;
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      createdAt: Number(row.createdAt),
+      updatedAt: Number(row.updatedAt),
+      expiresAt: Number(row.expiresAt),
+    };
   }
 
   async getAllOAuthProviders(): Promise<Array<{ providerType: string; accountId: string }>> {

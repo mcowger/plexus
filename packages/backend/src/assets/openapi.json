@@ -8436,7 +8436,7 @@
           "Management — OAuth"
         ],
         "summary": "Check whether OAuth credentials exist (admin only)",
-        "description": "Polls whether credentials exist for a provider/account combination.\n\n## Use case\n\nUsed by the UI to determine if a provider is \"connected\" (can make\nrequests) or needs re-authentication.\n\n## Response\n\n- `ready: true` — Credentials exist and the provider can be used\n- `ready: false` — No credentials found; user needs to start OAuth flow\n\n## Note\n\nThis endpoint requires both `providerId` and `accountId` as query\nparameters. The credentials are keyed by both values.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Polls whether credentials exist for a provider/account combination.\n\n## Use case\n\nUsed by the UI to determine if a provider is \"connected\" (can make\nrequests) or needs re-authentication.\n\n## Response\n\n- `ready: true` — Credentials exist and the provider can be used\n- `ready: false` — No credentials found; user needs to start OAuth flow\n- `connectedAt` — When the credential was first stored (epoch ms)\n- `refreshedAt` — When the credential was last saved, by login or token\n  refresh (epoch ms)\n- `expiresAt` — When the current access token expires (epoch ms)\n\nThe timestamps are present only when `ready` is true and never include\ntoken values.\n\n## Note\n\nThis endpoint requires both `providerId` and `accountId` as query\nparameters. The credentials are keyed by both values.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -8475,6 +8475,18 @@
                       "properties": {
                         "ready": {
                           "type": "boolean"
+                        },
+                        "connectedAt": {
+                          "type": "integer",
+                          "description": "First stored (epoch ms)."
+                        },
+                        "refreshedAt": {
+                          "type": "integer",
+                          "description": "Last saved by login or refresh (epoch ms)."
+                        },
+                        "expiresAt": {
+                          "type": "integer",
+                          "description": "Current access token expiry (epoch ms)."
                         }
                       }
                     }

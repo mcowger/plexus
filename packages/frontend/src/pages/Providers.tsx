@@ -173,6 +173,7 @@ export const Providers = () => {
                 oauthBusy={f.oauthBusy}
                 oauthCredentialReady={f.oauthCredentialReady}
                 oauthCredentialChecking={f.oauthCredentialChecking}
+                oauthCredentialStatus={f.oauthCredentialStatus}
                 oauthStatus={f.oauthStatus}
                 oauthIsTerminal={f.oauthIsTerminal}
                 oauthStatusLabel={f.oauthStatusLabel}

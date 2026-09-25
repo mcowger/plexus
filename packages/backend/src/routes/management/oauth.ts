@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { OAuthLoginSessionManager } from '../../services/oauth/oauth-login-session';
 import { OAuthAuthManager } from '../../services/oauth/oauth-auth-manager';
+import { ConfigService } from '../../services/configuration/config-service';
 import type { OAuthProvider, OAuthProviderId } from '../../services/oauth/oauth-providers';
 import {
   getOAuthProviderModels,
@@ -108,12 +109,28 @@ export async function registerOAuthRoutes(
     }
 
     const authManager = OAuthAuthManager.getInstance();
-    const ready = authManager.hasProvider(
-      parsed.data.providerId as OAuthProvider,
-      parsed.data.accountId
-    );
+    const providerId = parsed.data.providerId as OAuthProvider;
+    const accountId = parsed.data.accountId.trim();
+    const ready = authManager.hasProvider(providerId, accountId);
+    if (!ready) {
+      return reply.send({ data: { ready } });
+    }
 
-    return reply.send({ data: { ready } });
+    // Credential age, so a stale login is visible on the provider form. The
+    // in-memory expiry is authoritative; the row may still be mid-write right
+    // after a login, in which case only the expiry is known.
+    const timestamps = await ConfigService.getInstance()
+      .getOAuthCredentialTimestamps(providerId, accountId)
+      .catch(() => null);
+    const expiresAt = authManager.getCredentials(providerId, accountId)?.expires;
+    return reply.send({
+      data: {
+        ready,
+        ...(timestamps?.createdAt ? { connectedAt: timestamps.createdAt } : {}),
+        ...(timestamps?.updatedAt ? { refreshedAt: timestamps.updatedAt } : {}),
+        ...(typeof expiresAt === 'number' && expiresAt > 0 ? { expiresAt } : {}),
+      },
+    });
   });
 
   fastify.get('/v0/management/oauth/sessions/:id', async (request, reply) => {
