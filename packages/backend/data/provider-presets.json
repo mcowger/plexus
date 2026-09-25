@@ -113,21 +113,6 @@
       "notes": "Only /chat/completions is documented upstream; the other protocols proxy through the same base in production use."
     },
     {
-      "id": "neuralwatt",
-      "name": "Neuralwatt",
-      "description": "Neuralwatt Cloud — OpenAI protocols plus Anthropic-compatible messages.",
-      "docsUrl": "https://docs.neuralwatt.com/quickstart",
-      "suggestedProviderId": "neuralwatt",
-      "suggestedName": "Neuralwatt",
-      "apiBaseUrl": {
-        "chat": "https://api.neuralwatt.com/v1",
-        "messages": "https://api.neuralwatt.com/v1",
-        "responses": "https://api.neuralwatt.com/v1"
-      },
-      "piAiProvider": "openrouter",
-      "autoCompat": true
-    },
-    {
       "id": "cloudflare",
       "name": "Cloudflare AI Gateway",
       "description": "Cloudflare AI Gateway REST API — needs your Cloudflare account ID.",
@@ -260,6 +245,57 @@
       },
       "piAiProvider": "zai",
       "autoCompat": true
+    },
+    {
+      "id": "neuralwatt",
+      "name": "Neuralwatt",
+      "description": "Neuralwatt Cloud — OpenAI-compatible chat, Anthropic messages, and responses with energy metering.",
+      "docsUrl": "https://docs.neuralwatt.com/quickstart",
+      "suggestedProviderId": "neuralwatt",
+      "suggestedName": "Neuralwatt",
+      "apiBaseUrl": {
+        "chat": "https://api.neuralwatt.com/v1",
+        "messages": "https://api.neuralwatt.com/v1",
+        "responses": "https://api.neuralwatt.com/v1"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Authenticate with a Neuralwatt sk- Bearer key. Effort levels collapse server-side per model; glm-5.3 and kimi-k2.7-code reason mandatorily and -fast aliases never reason. Discover models via GET /v1/models."
     }
   ]
 }
