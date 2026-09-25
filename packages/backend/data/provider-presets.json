@@ -51,6 +51,22 @@
       "notes": "Optional attribution headers (HTTP-Referer, X-Title) can be added under headers."
     },
     {
+      "id": "requesty",
+      "name": "Requesty",
+      "description": "Requesty LLM gateway, OpenAI chat and responses plus Anthropic messages.",
+      "docsUrl": "https://docs.requesty.ai",
+      "suggestedProviderId": "requesty",
+      "suggestedName": "Requesty",
+      "apiBaseUrl": {
+        "chat": "https://router.requesty.ai/v1",
+        "messages": "https://router.requesty.ai/v1",
+        "responses": "https://router.requesty.ai/v1"
+      },
+      "piAiProvider": "openrouter",
+      "autoCompat": true,
+      "notes": "Get a key at https://app.requesty.ai/api-keys. Model ids look like openai/gpt-4o-mini. For EU routing use https://router.eu.requesty.ai/v1."
+    },
+    {
       "id": "meta",
       "name": "Meta",
       "description": "Meta Model API — chat, responses, and Anthropic-compatible messages.",
