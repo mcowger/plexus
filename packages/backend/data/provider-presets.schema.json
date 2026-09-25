@@ -1,0 +1,1200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://raw.githubusercontent.com/mcowger/plexus/main/packages/backend/data/provider-presets.schema.json"
+    },
+    "$comment": {
+      "type": "string"
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "docsUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^[hH][tT][tT][pP][sS]://"
+          },
+          "suggestedProviderId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggestedName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "apiBaseUrl": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[hH][tT][tT][pP][sS]://"
+            },
+            "minProperties": 1
+          },
+          "experimentalApis": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "templateVars": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "placeholder": {
+                  "type": "string"
+                }
+              },
+              "required": ["key", "label"]
+            }
+          },
+          "piAiProvider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "piAiQuirks": {
+            "type": "object",
+            "properties": {
+              "chat": {
+                "type": "object",
+                "properties": {
+                  "reasoning": {
+                    "type": "boolean"
+                  },
+                  "thinkingLevelMap": {
+                    "type": "object",
+                    "properties": {
+                      "off": {
+                        "type": ["string", "null"]
+                      },
+                      "minimal": {
+                        "type": ["string", "null"]
+                      },
+                      "low": {
+                        "type": ["string", "null"]
+                      },
+                      "medium": {
+                        "type": ["string", "null"]
+                      },
+                      "high": {
+                        "type": ["string", "null"]
+                      },
+                      "xhigh": {
+                        "type": ["string", "null"]
+                      },
+                      "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxTokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "compat": {
+                    "type": "object",
+                    "properties": {
+                      "thinkingFormat": {
+                        "type": "string",
+                        "enum": [
+                          "zai",
+                          "qwen",
+                          "qwen-chat-template",
+                          "deepseek",
+                          "openrouter",
+                          "ant-ling",
+                          "together",
+                          "string-thinking"
+                        ]
+                      },
+                      "supportsTemperature": {
+                        "type": "boolean"
+                      },
+                      "maxTokensField": {
+                        "type": "string",
+                        "enum": ["max_tokens", "max_completion_tokens"]
+                      },
+                      "forceAdaptiveThinking": {
+                        "type": "boolean"
+                      },
+                      "supportsReasoningEffort": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "api": {
+                    "type": "string",
+                    "const": "openai-completions"
+                  },
+                  "models": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "type": "boolean"
+                        },
+                        "thinkingLevelMap": {
+                          "type": "object",
+                          "properties": {
+                            "off": {
+                              "type": ["string", "null"]
+                            },
+                            "minimal": {
+                              "type": ["string", "null"]
+                            },
+                            "low": {
+                              "type": ["string", "null"]
+                            },
+                            "medium": {
+                              "type": ["string", "null"]
+                            },
+                            "high": {
+                              "type": ["string", "null"]
+                            },
+                            "xhigh": {
+                              "type": ["string", "null"]
+                            },
+                            "max": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxTokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "compat": {
+                          "type": "object",
+                          "properties": {
+                            "thinkingFormat": {
+                              "type": "string",
+                              "enum": [
+                                "zai",
+                                "qwen",
+                                "qwen-chat-template",
+                                "deepseek",
+                                "openrouter",
+                                "ant-ling",
+                                "together",
+                                "string-thinking"
+                              ]
+                            },
+                            "supportsTemperature": {
+                              "type": "boolean"
+                            },
+                            "maxTokensField": {
+                              "type": "string",
+                              "enum": ["max_tokens", "max_completion_tokens"]
+                            },
+                            "forceAdaptiveThinking": {
+                              "type": "boolean"
+                            },
+                            "supportsReasoningEffort": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "type": "object",
+                            "required": ["thinkingLevelMap"]
+                          },
+                          "then": {
+                            "type": "object",
+                            "properties": {
+                              "reasoning": {
+                                "const": true
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": ["api"],
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "required": ["thinkingLevelMap"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "const": true
+                        }
+                      },
+                      "required": ["reasoning"]
+                    }
+                  }
+                ]
+              },
+              "completions": {
+                "type": "object",
+                "properties": {
+                  "reasoning": {
+                    "type": "boolean"
+                  },
+                  "thinkingLevelMap": {
+                    "type": "object",
+                    "properties": {
+                      "off": {
+                        "type": ["string", "null"]
+                      },
+                      "minimal": {
+                        "type": ["string", "null"]
+                      },
+                      "low": {
+                        "type": ["string", "null"]
+                      },
+                      "medium": {
+                        "type": ["string", "null"]
+                      },
+                      "high": {
+                        "type": ["string", "null"]
+                      },
+                      "xhigh": {
+                        "type": ["string", "null"]
+                      },
+                      "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxTokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "compat": {
+                    "type": "object",
+                    "properties": {
+                      "thinkingFormat": {
+                        "type": "string",
+                        "enum": [
+                          "zai",
+                          "qwen",
+                          "qwen-chat-template",
+                          "deepseek",
+                          "openrouter",
+                          "ant-ling",
+                          "together",
+                          "string-thinking"
+                        ]
+                      },
+                      "supportsTemperature": {
+                        "type": "boolean"
+                      },
+                      "maxTokensField": {
+                        "type": "string",
+                        "enum": ["max_tokens", "max_completion_tokens"]
+                      },
+                      "forceAdaptiveThinking": {
+                        "type": "boolean"
+                      },
+                      "supportsReasoningEffort": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "api": {
+                    "type": "string",
+                    "const": "openai-completions"
+                  },
+                  "models": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "type": "boolean"
+                        },
+                        "thinkingLevelMap": {
+                          "type": "object",
+                          "properties": {
+                            "off": {
+                              "type": ["string", "null"]
+                            },
+                            "minimal": {
+                              "type": ["string", "null"]
+                            },
+                            "low": {
+                              "type": ["string", "null"]
+                            },
+                            "medium": {
+                              "type": ["string", "null"]
+                            },
+                            "high": {
+                              "type": ["string", "null"]
+                            },
+                            "xhigh": {
+                              "type": ["string", "null"]
+                            },
+                            "max": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxTokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "compat": {
+                          "type": "object",
+                          "properties": {
+                            "thinkingFormat": {
+                              "type": "string",
+                              "enum": [
+                                "zai",
+                                "qwen",
+                                "qwen-chat-template",
+                                "deepseek",
+                                "openrouter",
+                                "ant-ling",
+                                "together",
+                                "string-thinking"
+                              ]
+                            },
+                            "supportsTemperature": {
+                              "type": "boolean"
+                            },
+                            "maxTokensField": {
+                              "type": "string",
+                              "enum": ["max_tokens", "max_completion_tokens"]
+                            },
+                            "forceAdaptiveThinking": {
+                              "type": "boolean"
+                            },
+                            "supportsReasoningEffort": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "type": "object",
+                            "required": ["thinkingLevelMap"]
+                          },
+                          "then": {
+                            "type": "object",
+                            "properties": {
+                              "reasoning": {
+                                "const": true
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": ["api"],
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "required": ["thinkingLevelMap"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "const": true
+                        }
+                      },
+                      "required": ["reasoning"]
+                    }
+                  }
+                ]
+              },
+              "messages": {
+                "type": "object",
+                "properties": {
+                  "reasoning": {
+                    "type": "boolean"
+                  },
+                  "thinkingLevelMap": {
+                    "type": "object",
+                    "properties": {
+                      "off": {
+                        "type": ["string", "null"]
+                      },
+                      "minimal": {
+                        "type": ["string", "null"]
+                      },
+                      "low": {
+                        "type": ["string", "null"]
+                      },
+                      "medium": {
+                        "type": ["string", "null"]
+                      },
+                      "high": {
+                        "type": ["string", "null"]
+                      },
+                      "xhigh": {
+                        "type": ["string", "null"]
+                      },
+                      "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxTokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "compat": {
+                    "type": "object",
+                    "properties": {
+                      "thinkingFormat": {
+                        "type": "string",
+                        "enum": [
+                          "zai",
+                          "qwen",
+                          "qwen-chat-template",
+                          "deepseek",
+                          "openrouter",
+                          "ant-ling",
+                          "together",
+                          "string-thinking"
+                        ]
+                      },
+                      "supportsTemperature": {
+                        "type": "boolean"
+                      },
+                      "maxTokensField": {
+                        "type": "string",
+                        "enum": ["max_tokens", "max_completion_tokens"]
+                      },
+                      "forceAdaptiveThinking": {
+                        "type": "boolean"
+                      },
+                      "supportsReasoningEffort": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "api": {
+                    "type": "string",
+                    "const": "anthropic-messages"
+                  },
+                  "models": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "type": "boolean"
+                        },
+                        "thinkingLevelMap": {
+                          "type": "object",
+                          "properties": {
+                            "off": {
+                              "type": ["string", "null"]
+                            },
+                            "minimal": {
+                              "type": ["string", "null"]
+                            },
+                            "low": {
+                              "type": ["string", "null"]
+                            },
+                            "medium": {
+                              "type": ["string", "null"]
+                            },
+                            "high": {
+                              "type": ["string", "null"]
+                            },
+                            "xhigh": {
+                              "type": ["string", "null"]
+                            },
+                            "max": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxTokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "compat": {
+                          "type": "object",
+                          "properties": {
+                            "thinkingFormat": {
+                              "type": "string",
+                              "enum": [
+                                "zai",
+                                "qwen",
+                                "qwen-chat-template",
+                                "deepseek",
+                                "openrouter",
+                                "ant-ling",
+                                "together",
+                                "string-thinking"
+                              ]
+                            },
+                            "supportsTemperature": {
+                              "type": "boolean"
+                            },
+                            "maxTokensField": {
+                              "type": "string",
+                              "enum": ["max_tokens", "max_completion_tokens"]
+                            },
+                            "forceAdaptiveThinking": {
+                              "type": "boolean"
+                            },
+                            "supportsReasoningEffort": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "type": "object",
+                            "required": ["thinkingLevelMap"]
+                          },
+                          "then": {
+                            "type": "object",
+                            "properties": {
+                              "reasoning": {
+                                "const": true
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": ["api"],
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "required": ["thinkingLevelMap"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "const": true
+                        }
+                      },
+                      "required": ["reasoning"]
+                    }
+                  }
+                ]
+              },
+              "responses": {
+                "type": "object",
+                "properties": {
+                  "reasoning": {
+                    "type": "boolean"
+                  },
+                  "thinkingLevelMap": {
+                    "type": "object",
+                    "properties": {
+                      "off": {
+                        "type": ["string", "null"]
+                      },
+                      "minimal": {
+                        "type": ["string", "null"]
+                      },
+                      "low": {
+                        "type": ["string", "null"]
+                      },
+                      "medium": {
+                        "type": ["string", "null"]
+                      },
+                      "high": {
+                        "type": ["string", "null"]
+                      },
+                      "xhigh": {
+                        "type": ["string", "null"]
+                      },
+                      "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxTokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "compat": {
+                    "type": "object",
+                    "properties": {
+                      "thinkingFormat": {
+                        "type": "string",
+                        "enum": [
+                          "zai",
+                          "qwen",
+                          "qwen-chat-template",
+                          "deepseek",
+                          "openrouter",
+                          "ant-ling",
+                          "together",
+                          "string-thinking"
+                        ]
+                      },
+                      "supportsTemperature": {
+                        "type": "boolean"
+                      },
+                      "maxTokensField": {
+                        "type": "string",
+                        "enum": ["max_tokens", "max_completion_tokens"]
+                      },
+                      "forceAdaptiveThinking": {
+                        "type": "boolean"
+                      },
+                      "supportsReasoningEffort": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "api": {
+                    "type": "string",
+                    "const": "openai-responses"
+                  },
+                  "models": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "type": "boolean"
+                        },
+                        "thinkingLevelMap": {
+                          "type": "object",
+                          "properties": {
+                            "off": {
+                              "type": ["string", "null"]
+                            },
+                            "minimal": {
+                              "type": ["string", "null"]
+                            },
+                            "low": {
+                              "type": ["string", "null"]
+                            },
+                            "medium": {
+                              "type": ["string", "null"]
+                            },
+                            "high": {
+                              "type": ["string", "null"]
+                            },
+                            "xhigh": {
+                              "type": ["string", "null"]
+                            },
+                            "max": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxTokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "compat": {
+                          "type": "object",
+                          "properties": {
+                            "thinkingFormat": {
+                              "type": "string",
+                              "enum": [
+                                "zai",
+                                "qwen",
+                                "qwen-chat-template",
+                                "deepseek",
+                                "openrouter",
+                                "ant-ling",
+                                "together",
+                                "string-thinking"
+                              ]
+                            },
+                            "supportsTemperature": {
+                              "type": "boolean"
+                            },
+                            "maxTokensField": {
+                              "type": "string",
+                              "enum": ["max_tokens", "max_completion_tokens"]
+                            },
+                            "forceAdaptiveThinking": {
+                              "type": "boolean"
+                            },
+                            "supportsReasoningEffort": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "type": "object",
+                            "required": ["thinkingLevelMap"]
+                          },
+                          "then": {
+                            "type": "object",
+                            "properties": {
+                              "reasoning": {
+                                "const": true
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": ["api"],
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "required": ["thinkingLevelMap"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "const": true
+                        }
+                      },
+                      "required": ["reasoning"]
+                    }
+                  }
+                ]
+              },
+              "gemini": {
+                "type": "object",
+                "properties": {
+                  "reasoning": {
+                    "type": "boolean"
+                  },
+                  "thinkingLevelMap": {
+                    "type": "object",
+                    "properties": {
+                      "off": {
+                        "type": ["string", "null"]
+                      },
+                      "minimal": {
+                        "type": ["string", "null"]
+                      },
+                      "low": {
+                        "type": ["string", "null"]
+                      },
+                      "medium": {
+                        "type": ["string", "null"]
+                      },
+                      "high": {
+                        "type": ["string", "null"]
+                      },
+                      "xhigh": {
+                        "type": ["string", "null"]
+                      },
+                      "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxTokens": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "compat": {
+                    "type": "object",
+                    "properties": {
+                      "thinkingFormat": {
+                        "type": "string",
+                        "enum": [
+                          "zai",
+                          "qwen",
+                          "qwen-chat-template",
+                          "deepseek",
+                          "openrouter",
+                          "ant-ling",
+                          "together",
+                          "string-thinking"
+                        ]
+                      },
+                      "supportsTemperature": {
+                        "type": "boolean"
+                      },
+                      "maxTokensField": {
+                        "type": "string",
+                        "enum": ["max_tokens", "max_completion_tokens"]
+                      },
+                      "forceAdaptiveThinking": {
+                        "type": "boolean"
+                      },
+                      "supportsReasoningEffort": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "api": {
+                    "type": "string",
+                    "const": "google-generative-ai"
+                  },
+                  "models": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "type": "boolean"
+                        },
+                        "thinkingLevelMap": {
+                          "type": "object",
+                          "properties": {
+                            "off": {
+                              "type": ["string", "null"]
+                            },
+                            "minimal": {
+                              "type": ["string", "null"]
+                            },
+                            "low": {
+                              "type": ["string", "null"]
+                            },
+                            "medium": {
+                              "type": ["string", "null"]
+                            },
+                            "high": {
+                              "type": ["string", "null"]
+                            },
+                            "xhigh": {
+                              "type": ["string", "null"]
+                            },
+                            "max": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxTokens": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "compat": {
+                          "type": "object",
+                          "properties": {
+                            "thinkingFormat": {
+                              "type": "string",
+                              "enum": [
+                                "zai",
+                                "qwen",
+                                "qwen-chat-template",
+                                "deepseek",
+                                "openrouter",
+                                "ant-ling",
+                                "together",
+                                "string-thinking"
+                              ]
+                            },
+                            "supportsTemperature": {
+                              "type": "boolean"
+                            },
+                            "maxTokensField": {
+                              "type": "string",
+                              "enum": ["max_tokens", "max_completion_tokens"]
+                            },
+                            "forceAdaptiveThinking": {
+                              "type": "boolean"
+                            },
+                            "supportsReasoningEffort": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {
+                            "type": "object",
+                            "required": ["thinkingLevelMap"]
+                          },
+                          "then": {
+                            "type": "object",
+                            "properties": {
+                              "reasoning": {
+                                "const": true
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": ["api"],
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "required": ["thinkingLevelMap"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "properties": {
+                        "reasoning": {
+                          "const": true
+                        }
+                      },
+                      "required": ["reasoning"]
+                    }
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "minProperties": 1
+          },
+          "autoCompat": {
+            "default": false,
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name", "suggestedProviderId", "suggestedName", "apiBaseUrl"],
+        "allOf": [
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "piAiQuirks": {
+                  "type": "object",
+                  "required": ["chat"]
+                }
+              },
+              "required": ["piAiQuirks"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "apiBaseUrl": {
+                  "type": "object",
+                  "required": ["chat"]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "piAiQuirks": {
+                  "type": "object",
+                  "required": ["completions"]
+                }
+              },
+              "required": ["piAiQuirks"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "apiBaseUrl": {
+                  "type": "object",
+                  "required": ["completions"]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "piAiQuirks": {
+                  "type": "object",
+                  "required": ["messages"]
+                }
+              },
+              "required": ["piAiQuirks"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "apiBaseUrl": {
+                  "type": "object",
+                  "required": ["messages"]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "piAiQuirks": {
+                  "type": "object",
+                  "required": ["responses"]
+                }
+              },
+              "required": ["piAiQuirks"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "apiBaseUrl": {
+                  "type": "object",
+                  "required": ["responses"]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "piAiQuirks": {
+                  "type": "object",
+                  "required": ["gemini"]
+                }
+              },
+              "required": ["piAiQuirks"]
+            },
+            "then": {
+              "type": "object",
+              "properties": {
+                "apiBaseUrl": {
+                  "type": "object",
+                  "required": ["gemini"]
+                }
+              }
+            }
+          },
+          {
+            "not": {
+              "type": "object",
+              "required": ["piAiProvider", "piAiQuirks"]
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "autoCompat": {
+                  "const": true
+                }
+              },
+              "required": ["autoCompat"]
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": ["piAiProvider"]
+                },
+                {
+                  "type": "object",
+                  "required": ["piAiQuirks"]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": ["$schema", "presets"],
+  "additionalProperties": false,
+  "$id": "https://raw.githubusercontent.com/mcowger/plexus/main/packages/backend/data/provider-presets.schema.json",
+  "title": "Plexus provider presets catalog"
+}

@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/mcowger/plexus/main/packages/backend/data/provider-presets.schema.json",
   "$comment": "Pre-configured provider presets served by GET /v0/management/provider-presets, which defaults to this file's raw GitHub URL and falls back to this built-in copy when the remote is unreachable. Everything is validated against ProviderPresetSchema from @plexus/shared. URL convention: values are the base stored in apiBaseUrl[type] — Plexus appends the per-type suffix (/chat/completions, /messages, /responses, ...), so Anthropic-compatible bases include the /v1 segment.",
   "presets": [
     {
@@ -112,21 +113,6 @@
       "notes": "Only /chat/completions is documented upstream; the other protocols proxy through the same base in production use."
     },
     {
-      "id": "neuralwatt",
-      "name": "Neuralwatt",
-      "description": "Neuralwatt Cloud — OpenAI protocols plus Anthropic-compatible messages.",
-      "docsUrl": "https://docs.neuralwatt.com/quickstart",
-      "suggestedProviderId": "neuralwatt",
-      "suggestedName": "Neuralwatt",
-      "apiBaseUrl": {
-        "chat": "https://api.neuralwatt.com/v1",
-        "messages": "https://api.neuralwatt.com/v1",
-        "responses": "https://api.neuralwatt.com/v1"
-      },
-      "piAiProvider": "openrouter",
-      "autoCompat": true
-    },
-    {
       "id": "cloudflare",
       "name": "Cloudflare AI Gateway",
       "description": "Cloudflare AI Gateway REST API — needs your Cloudflare account ID.",
@@ -157,10 +143,9 @@
         "messages": "https://api.deepseek.com/anthropic/v1",
         "responses": "https://api.deepseek.com"
       },
-      "experimentalApis": ["responses"],
       "piAiProvider": "deepseek",
       "autoCompat": true,
-      "notes": "The responses endpoint is listed in the API reference but its schema is unverified."
+      "notes": "DeepSeek Responses is stateless: previous_response_id and store are unsupported; send full history in input."
     },
     {
       "id": "fireworks",
@@ -203,10 +188,8 @@
         "chat": "https://api.minimax.io/v1",
         "messages": "https://api.minimax.io/anthropic/v1"
       },
-      "experimentalApis": ["messages"],
       "piAiProvider": "minimax",
-      "autoCompat": true,
-      "notes": "The Anthropic-compatible base is inferred from the pi-ai catalog, not yet probed."
+      "autoCompat": true
     },
     {
       "id": "minimax-cn",
@@ -219,10 +202,8 @@
         "chat": "https://api.minimaxi.com/v1",
         "messages": "https://api.minimaxi.com/anthropic/v1"
       },
-      "experimentalApis": ["messages"],
       "piAiProvider": "minimax-cn",
-      "autoCompat": true,
-      "notes": "The Anthropic-compatible base is inferred from the pi-ai catalog, not yet probed."
+      "autoCompat": true
     },
     {
       "id": "mistral",
@@ -249,10 +230,8 @@
         "messages": "https://ai-gateway.vercel.sh/v1",
         "responses": "https://ai-gateway.vercel.sh/v1"
       },
-      "experimentalApis": ["messages", "responses"],
       "piAiProvider": "vercel-ai-gateway",
-      "autoCompat": true,
-      "notes": "Upstream confirms all three protocols; the messages/responses paths follow convention."
+      "autoCompat": true
     },
     {
       "id": "zai",
@@ -266,6 +245,57 @@
       },
       "piAiProvider": "zai",
       "autoCompat": true
+    },
+    {
+      "id": "neuralwatt",
+      "name": "Neuralwatt",
+      "description": "Neuralwatt Cloud — OpenAI-compatible chat, Anthropic messages, and responses with energy metering.",
+      "docsUrl": "https://docs.neuralwatt.com/quickstart",
+      "suggestedProviderId": "neuralwatt",
+      "suggestedName": "Neuralwatt",
+      "apiBaseUrl": {
+        "chat": "https://api.neuralwatt.com/v1",
+        "messages": "https://api.neuralwatt.com/v1",
+        "responses": "https://api.neuralwatt.com/v1"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Authenticate with a Neuralwatt sk- Bearer key. Effort levels collapse server-side per model; glm-5.3 and kimi-k2.7-code reason mandatorily and -fast aliases never reason. Discover models via GET /v1/models."
     }
   ]
 }

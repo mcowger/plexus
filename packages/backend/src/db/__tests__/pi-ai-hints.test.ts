@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeDatabase, initializeDatabase } from '../client';
 import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
-import type { ProviderConfig } from '../../config';
+import { ProviderConfigSchema, type ProviderConfig } from '../../config';
 
-describe('pi_ai_provider and pi_ai_model_id persistence', () => {
+describe('pi-ai quirk source persistence', () => {
   let repo: ConfigRepository;
 
   beforeEach(async () => {
@@ -81,6 +81,45 @@ describe('pi_ai_provider and pi_ai_model_id persistence', () => {
     expect(loaded?.pi_ai_provider).toBeUndefined();
     const models = loaded?.models as Record<string, any>;
     expect(models?.['gpt-4']?.pi_ai_model_id).toBeUndefined();
+  });
+
+  it('round-trips inline target and exact-model overrides independently of the builtin source', async () => {
+    const quirks = {
+      chat: {
+        api: 'openai-completions' as const,
+        compat: { maxTokensField: 'max_completion_tokens' as const },
+        models: {
+          'upstream/special': { maxTokens: 64, compat: { supportsTemperature: false } },
+        },
+      },
+      responses: { api: 'openai-responses' as const, maxTokens: 128 },
+    };
+    const provider = ProviderConfigSchema.parse({
+      api_base_url: {
+        chat: 'https://api.example.com/v1',
+        responses: 'https://api.example.com/v1',
+      },
+      api_key: 'sk-test',
+      auto_compat: true,
+      pi_ai_quirks: quirks,
+      models: { 'upstream/special': { pricing: { source: 'simple', input: 0, output: 0 } } },
+    });
+
+    await repo.saveProvider('inline-test', provider);
+    const loaded = await repo.getProvider('inline-test');
+    expect(loaded?.pi_ai_quirks).toEqual(quirks);
+    expect(loaded?.pi_ai_provider).toBeUndefined();
+    expect(loaded?.auto_compat).toBe(true);
+
+    // A complete replacement must clear the previous quirk source, including its model map.
+    await repo.saveProvider('inline-test', {
+      ...provider,
+      pi_ai_quirks: undefined,
+      pi_ai_provider: 'openai',
+    });
+    const builtin = await repo.getProvider('inline-test');
+    expect(builtin?.pi_ai_quirks).toBeUndefined();
+    expect(builtin?.pi_ai_provider).toBe('openai');
   });
 
   it('overwrites pi_ai_provider and pi_ai_model_id on update', async () => {

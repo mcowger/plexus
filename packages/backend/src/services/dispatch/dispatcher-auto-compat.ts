@@ -1,3 +1,4 @@
+import type { PiAiQuirks } from '@plexus/shared';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { logger } from '../../utils/logger';
 import type { RouteResult } from '../routing/router';
@@ -8,6 +9,7 @@ import type { ReasoningIntent, ReasoningVisibility } from '../pi-ai/reasoning';
 import { clampEffortToWindow, normalizeEffort, normalizeVisibility } from '../pi-ai/reasoning';
 import { projectReasoningForResponses } from '../../transformers/utils';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
+import { getApiBaseType } from '../../utils/api-format';
 
 function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -368,7 +370,8 @@ function projectAnthropicAutoCompat(
   payload: Record<string, any>,
   model: any,
   intent: GenerationIntent,
-  options: Record<string, any>
+  options: Record<string, any>,
+  inline = false
 ): Record<string, any> {
   const next = { ...payload };
   if (options.maxTokens != null) next.max_tokens = options.maxTokens;
@@ -398,7 +401,7 @@ function projectAnthropicAutoCompat(
     }
   }
 
-  return clampAnthropicEffortAndThinking(next, model.id);
+  return inline ? next : clampAnthropicEffortAndThinking(next, model.id);
 }
 
 function projectGeminiAutoCompat(
@@ -426,6 +429,49 @@ function projectGeminiAutoCompat(
   return next;
 }
 
+type InlineQuirk = NonNullable<PiAiQuirks[keyof PiAiQuirks]>;
+
+/** Resolve only declared traits; a model map replaces the common map, not its entries. */
+export function resolveInlineQuirks(
+  quirks: PiAiQuirks | undefined,
+  targetApiType: string,
+  modelId: string
+): Omit<InlineQuirk, 'models'> | undefined {
+  const common = quirks?.[getApiBaseType(targetApiType) as keyof PiAiQuirks];
+  if (!common) return undefined;
+  const { models, ...traits } = common;
+  const model = models?.[modelId];
+  if (!model) return traits;
+  const merged = { ...traits, ...model, compat: { ...traits.compat, ...model.compat } };
+  if (model.reasoning === false) delete merged.thinkingLevelMap;
+  return merged;
+}
+
+function selectInlineGenerationIntent(
+  traits: Omit<InlineQuirk, 'models'>,
+  intent: GenerationIntent
+): GenerationIntent {
+  const canMapReasoning =
+    traits.reasoning === true &&
+    traits.thinkingLevelMap !== undefined &&
+    (traits.api !== 'openai-completions' ||
+      traits.compat?.thinkingFormat !== undefined ||
+      traits.compat?.supportsReasoningEffort !== undefined);
+  const explicitOff = intent.reasoning.enabled === false;
+  const mapOff = traits.thinkingLevelMap && Object.hasOwn(traits.thinkingLevelMap, 'off');
+  return {
+    reasoning:
+      canMapReasoning && (!explicitOff || mapOff) ? intent.reasoning : { source: 'client' },
+    ...((traits.maxTokens !== undefined || traits.compat?.maxTokensField !== undefined) &&
+    intent.maxTokens !== undefined
+      ? { maxTokens: intent.maxTokens }
+      : {}),
+    ...(traits.compat?.supportsTemperature !== undefined && intent.temperature !== undefined
+      ? { temperature: intent.temperature }
+      : {}),
+  };
+}
+
 export function applyRegistryAutoCompat(
   providerPayload: any,
   request: UnifiedChatRequest,
@@ -437,9 +483,21 @@ export function applyRegistryAutoCompat(
 
   const piAiProvider = route.config.pi_ai_provider;
   const piAiModelId = route.modelConfig?.pi_ai_model_id;
-  if (!piAiProvider || !piAiModelId) return providerPayload;
+  const inline = !piAiProvider
+    ? resolveInlineQuirks(route.config.pi_ai_quirks, targetApiType, route.model)
+    : undefined;
+  if (!inline && (!piAiProvider || !piAiModelId)) return providerPayload;
 
-  const piAiModel = resolvePiAiModel(piAiProvider, piAiModelId);
+  const piAiModel = inline
+    ? {
+        id: route.model,
+        api: inline.api,
+        reasoning: inline.reasoning === true && inline.thinkingLevelMap !== undefined,
+        thinkingLevelMap: inline.thinkingLevelMap ?? {},
+        maxTokens: inline.maxTokens,
+        compat: inline.compat ?? {},
+      }
+    : resolvePiAiModel(piAiProvider!, piAiModelId!);
   if (!piAiModel) {
     logger.debug(
       `Registry auto-compat skipped: ${route.provider}/${route.model} references unresolved ` +
@@ -449,8 +507,13 @@ export function applyRegistryAutoCompat(
   }
 
   const intent = extractGenerationIntent(providerPayload, request);
-  const options = buildGenerationOptions(piAiModel, intent);
-
+  const selectedIntent = inline ? selectInlineGenerationIntent(inline, intent) : intent;
+  const options = buildGenerationOptions(piAiModel, selectedIntent);
+  // An inline API declaration alone carries no model capabilities. Leave the
+  // payload untouched unless a declared trait actually requests a projection.
+  if (inline && Object.keys(options).length === 0 && inline.compat?.supportsTemperature !== false) {
+    return providerPayload;
+  }
   const api = (piAiModel.api as string | undefined) ?? targetApiType;
   let nextPayload: any;
   if (
@@ -458,24 +521,29 @@ export function applyRegistryAutoCompat(
     api === 'openai-codex-responses' ||
     api === 'azure-openai-responses'
   ) {
-    nextPayload = projectResponsesAutoCompat(providerPayload, piAiModel, intent, options);
+    nextPayload = projectResponsesAutoCompat(providerPayload, piAiModel, selectedIntent, options);
   } else if (api === 'anthropic-messages') {
-    nextPayload = projectAnthropicAutoCompat(providerPayload, piAiModel, intent, options);
+    nextPayload = projectAnthropicAutoCompat(
+      providerPayload,
+      piAiModel,
+      selectedIntent,
+      options,
+      !!inline
+    );
   } else if (api === 'google-generative-ai' || api === 'google-generative-ai-vertex') {
-    nextPayload = projectGeminiAutoCompat(providerPayload, intent, options);
+    nextPayload = projectGeminiAutoCompat(providerPayload, selectedIntent, options);
   } else {
     nextPayload = projectOpenAiCompletionsAutoCompat(
       providerPayload,
       request,
       piAiModel,
-      intent,
+      selectedIntent,
       options
     );
   }
 
   logger.debug(`Registry auto-compat applied for ${route.provider}/${route.model}`, {
-    piAiProvider,
-    piAiModelId,
+    ...(inline ? { inline: true } : { piAiProvider, piAiModelId }),
     api,
     optionKeys: Object.keys(options),
   });

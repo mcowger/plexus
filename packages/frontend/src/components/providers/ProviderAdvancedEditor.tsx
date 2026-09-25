@@ -91,6 +91,7 @@ export function ProviderAdvancedEditor({
         setEditingProvider((prev) => ({
           ...prev,
           pi_ai_provider: resolved,
+          pi_ai_quirks: undefined,
           auto_compat: true,
         }));
       }
@@ -1259,7 +1260,11 @@ export function ProviderAdvancedEditor({
                 <label className="flex items-start gap-2 py-1 cursor-pointer">
                   <Switch
                     checked={editingProvider.auto_compat || false}
-                    disabled={!editingProvider.pi_ai_provider && !editingProvider.auto_compat}
+                    disabled={
+                      !editingProvider.pi_ai_provider &&
+                      !editingProvider.pi_ai_quirks &&
+                      !editingProvider.auto_compat
+                    }
                     onChange={(checked) =>
                       setEditingProvider({ ...editingProvider, auto_compat: checked })
                     }
@@ -1270,10 +1275,9 @@ export function ProviderAdvancedEditor({
                       className="font-body text-[11px] text-text-muted"
                       style={{ lineHeight: 1.35 }}
                     >
-                      Translates reasoning and generation options into each target's upstream
-                      dialect — clamping thinking levels and dropping unsupported fields — using its
-                      mapped pi-ai model. Does nothing unless the pi-ai Provider and per-model pi-ai
-                      Model IDs are set.
+                      Translates reasoning and generation options using a mapped pi-ai model or
+                      declared inline quirks. A pi-ai provider also needs per-model pi-ai Model IDs;
+                      inline quirks do not.
                     </div>
                   </div>
                 </label>
@@ -1388,6 +1392,11 @@ export function ProviderAdvancedEditor({
                 <div className="flex flex-col gap-0.5">
                   <label className="font-body text-[11px] font-medium text-text-secondary">
                     pi-ai Provider
+                    {editingProvider.pi_ai_quirks && (
+                      <span className="font-normal text-[10px] text-text-muted ml-1">
+                        inline quirks active
+                      </span>
+                    )}
                   </label>
                   {!piProviderCustom ? (
                     <select
@@ -1412,6 +1421,11 @@ export function ProviderAdvancedEditor({
                         setEditingProvider({
                           ...editingProvider,
                           pi_ai_provider: raw || undefined,
+                          pi_ai_quirks: raw ? undefined : editingProvider.pi_ai_quirks,
+                          auto_compat:
+                            raw || editingProvider.pi_ai_quirks
+                              ? editingProvider.auto_compat
+                              : false,
                         });
                       }}
                     >
@@ -1436,6 +1450,11 @@ export function ProviderAdvancedEditor({
                           setEditingProvider({
                             ...editingProvider,
                             pi_ai_provider: raw || undefined,
+                            pi_ai_quirks: raw ? undefined : editingProvider.pi_ai_quirks,
+                            auto_compat:
+                              raw || editingProvider.pi_ai_quirks
+                                ? editingProvider.auto_compat
+                                : false,
                           });
                         }}
                         autoFocus

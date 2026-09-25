@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `pi_ai_quirks` text;

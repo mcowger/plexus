@@ -12319,6 +12319,363 @@
           }
         }
       },
+      "thinkingLevelMap": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "off": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minimal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "low": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "medium": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "high": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "xhigh": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "compat": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "thinkingFormat": {
+            "type": "string",
+            "enum": [
+              "zai",
+              "qwen",
+              "qwen-chat-template",
+              "deepseek",
+              "openrouter",
+              "ant-ling",
+              "together",
+              "string-thinking"
+            ]
+          },
+          "supportsTemperature": {
+            "type": "boolean"
+          },
+          "maxTokensField": {
+            "type": "string",
+            "enum": [
+              "max_tokens",
+              "max_completion_tokens"
+            ]
+          },
+          "forceAdaptiveThinking": {
+            "type": "boolean"
+          },
+          "supportsReasoningEffort": {
+            "type": "boolean"
+          }
+        }
+      },
+      "traits": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reasoning": {
+            "type": "boolean"
+          },
+          "thinkingLevelMap": {
+            "$ref": "#/components/schemas/thinkingLevelMap"
+          },
+          "maxTokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "compat": {
+            "$ref": "#/components/schemas/compat"
+          }
+        }
+      },
+      "target": {
+        "type": "object",
+        "required": [
+          "api"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "api": {
+            "type": "string",
+            "enum": [
+              "openai-completions",
+              "openai-responses",
+              "anthropic-messages",
+              "google-generative-ai"
+            ]
+          },
+          "reasoning": {
+            "type": "boolean"
+          },
+          "thinkingLevelMap": {
+            "$ref": "#/components/schemas/thinkingLevelMap"
+          },
+          "maxTokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "compat": {
+            "$ref": "#/components/schemas/compat"
+          },
+          "models": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/traits"
+            }
+          }
+        }
+      },
+      "PiAiQuirks": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": false,
+        "properties": {
+          "chat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/target"
+              },
+              {
+                "properties": {
+                  "api": {
+                    "const": "openai-completions"
+                  }
+                }
+              }
+            ]
+          },
+          "completions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/target"
+              },
+              {
+                "properties": {
+                  "api": {
+                    "const": "openai-completions"
+                  }
+                }
+              }
+            ]
+          },
+          "messages": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/target"
+              },
+              {
+                "properties": {
+                  "api": {
+                    "const": "anthropic-messages"
+                  }
+                }
+              }
+            ]
+          },
+          "responses": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/target"
+              },
+              {
+                "properties": {
+                  "api": {
+                    "const": "openai-responses"
+                  }
+                }
+              }
+            ]
+          },
+          "gemini": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/target"
+              },
+              {
+                "properties": {
+                  "api": {
+                    "const": "google-generative-ai"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "$defs": {
+          "thinkingLevelMap": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "off": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "minimal": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "low": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "medium": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "high": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "xhigh": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "compat": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "thinkingFormat": {
+                "type": "string",
+                "enum": [
+                  "zai",
+                  "qwen",
+                  "qwen-chat-template",
+                  "deepseek",
+                  "openrouter",
+                  "ant-ling",
+                  "together",
+                  "string-thinking"
+                ]
+              },
+              "supportsTemperature": {
+                "type": "boolean"
+              },
+              "maxTokensField": {
+                "type": "string",
+                "enum": [
+                  "max_tokens",
+                  "max_completion_tokens"
+                ]
+              },
+              "forceAdaptiveThinking": {
+                "type": "boolean"
+              },
+              "supportsReasoningEffort": {
+                "type": "boolean"
+              }
+            }
+          },
+          "traits": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "reasoning": {
+                "type": "boolean"
+              },
+              "thinkingLevelMap": {
+                "$ref": "#/components/schemas/thinkingLevelMap"
+              },
+              "maxTokens": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "compat": {
+                "$ref": "#/components/schemas/compat"
+              }
+            }
+          },
+          "target": {
+            "type": "object",
+            "required": [
+              "api"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "api": {
+                "type": "string",
+                "enum": [
+                  "openai-completions",
+                  "openai-responses",
+                  "anthropic-messages",
+                  "google-generative-ai"
+                ]
+              },
+              "reasoning": {
+                "type": "boolean"
+              },
+              "thinkingLevelMap": {
+                "$ref": "#/components/schemas/thinkingLevelMap"
+              },
+              "maxTokens": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "compat": {
+                "$ref": "#/components/schemas/compat"
+              },
+              "models": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/traits"
+                }
+              }
+            }
+          }
+        }
+      },
       "ProviderConfig": {
         "type": "object",
         "description": "Provider configuration. Used to define upstream LLM providers that Plexus can route requests to. Stored in the database. `providers` section.\n",
@@ -12457,7 +12814,7 @@
                     "auto_compat": {
                       "type": "boolean",
                       "default": false,
-                      "description": "When true, enables registry-aware compatibility mapping for this model. Requires `pi_ai_model_id` to resolve to a builtin pi-ai model. Overrides are opt-in; omitted/false means no automatic reasoning/thinking/generation compatibility fields are injected.\n"
+                      "description": "Enables compatibility mapping for this model when the provider links to a builtin pi-ai model or declares inline quirks for the target API. Omitted/false leaves provider-level opt-in in effect; it does not disable an enabled provider setting.\n"
                     },
                     "pi_ai_model_id": {
                       "type": "string",
@@ -12542,11 +12899,15 @@
           "auto_compat": {
             "type": "boolean",
             "default": false,
-            "description": "When true, enables registry-aware compatibility mapping for all models under this provider that have a resolvable `pi_ai_model_id`. Plexus uses pi-ai builtin registry metadata to map client reasoning/thinking and generation intent to provider-specific request fields. The step is opt-in and skipped for models without a registry link.\n"
+            "description": "Opts into compatibility mapping from either `pi_ai_provider` plus a resolvable per-model `pi_ai_model_id`, or `pi_ai_quirks` for the target API and exact upstream model ID. Without either source, requests pass through unchanged.\n"
           },
           "pi_ai_provider": {
             "type": "string",
-            "description": "Builtin pi-ai provider ID used to validate `models[*].pi_ai_model_id` links and populate registry-backed model selectors. Custom pi-ai providers/models are not managed through Plexus; this field links only to pi-ai's builtin registry.\n"
+            "description": "Builtin pi-ai provider ID used with `models[*].pi_ai_model_id`. Mutually exclusive with `pi_ai_quirks`.\n"
+          },
+          "pi_ai_quirks": {
+            "$ref": "#/components/schemas/PiAiQuirks",
+            "description": "Inline compatibility traits, keyed by target API type. Model overrides use exact upstream model IDs; `thinkingLevelMap` replaces the common map and named `compat` flags merge. No builtin pi-ai provider or per-model pi-ai ID is needed. Mutually exclusive with `pi_ai_provider`. Send null in PATCH to clear a previously saved source.\n"
           },
           "useClaudeMasking": {
             "type": "boolean",

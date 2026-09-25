@@ -470,6 +470,13 @@
       "when": 1790031350788,
       "tag": "0066_add_synthetic_safeguard_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "6",
+      "when": 1790364479014,
+      "tag": "0067_add_provider_pi_ai_quirks",
+      "breakpoints": true
     }
   ]
 }

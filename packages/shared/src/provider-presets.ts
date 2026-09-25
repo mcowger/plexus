@@ -3,10 +3,10 @@ import { z } from 'zod';
 /**
  * Pre-configured provider presets for the Add Provider flow.
  *
- * Each preset pre-fills the endpoint map (`apiBaseUrl`), the pi-ai provider
- * id, and auto-compat, so adding a known provider is pick-a-preset plus an
- * API key instead of hand-typing base URLs. Endpoint research (docs URLs,
- * verification status) lives with the project history; per-preset `notes`
+ * Each preset pre-fills the endpoint map and optionally selects a pi-ai
+ * builtin or explicit inline quirks. Auto-compat is opt-in for either source;
+ * presets without a source leave request payloads unchanged.
+ * Endpoint research lives with the project history; per-preset `notes`
  * capture only what an operator needs at setup time.
  *
  * URL convention: values are the base to store in `apiBaseUrl[type]` —
@@ -43,6 +43,99 @@ const PresetTemplateVarSchema = z.object({
   placeholder: z.string().optional(),
 });
 
+const ThinkingLevelMapSchema = z
+  .object({
+    off: z.string().nullable().optional(),
+    minimal: z.string().nullable().optional(),
+    low: z.string().nullable().optional(),
+    medium: z.string().nullable().optional(),
+    high: z.string().nullable().optional(),
+    xhigh: z.string().nullable().optional(),
+    max: z.string().nullable().optional(),
+  })
+  .strict();
+
+const PiAiCompatSchema = z
+  .object({
+    thinkingFormat: z
+      .enum([
+        'zai',
+        'qwen',
+        'qwen-chat-template',
+        'deepseek',
+        'openrouter',
+        'ant-ling',
+        'together',
+        'string-thinking',
+      ])
+      .optional(),
+    supportsTemperature: z.boolean().optional(),
+    maxTokensField: z.enum(['max_tokens', 'max_completion_tokens']).optional(),
+    forceAdaptiveThinking: z.boolean().optional(),
+    supportsReasoningEffort: z.boolean().optional(),
+  })
+  .strict();
+
+const PiAiQuirkTraitsSchema = z
+  .object({
+    reasoning: z.boolean().optional(),
+    thinkingLevelMap: ThinkingLevelMapSchema.optional(),
+    maxTokens: z.number().int().positive().optional(),
+    compat: PiAiCompatSchema.optional(),
+  })
+  .strict();
+
+const PiAiQuirkTargetSchema = <
+  T extends
+    | 'openai-completions'
+    | 'openai-responses'
+    | 'anthropic-messages'
+    | 'google-generative-ai',
+>(
+  api: T
+) =>
+  PiAiQuirkTraitsSchema.extend({
+    api: z.literal(api),
+    models: z.record(z.string().min(1), PiAiQuirkTraitsSchema).optional(),
+  });
+
+/** Only protocols for which dispatch has explicit quirk projections. */
+export const PiAiQuirksSchema = z
+  .object({
+    chat: PiAiQuirkTargetSchema('openai-completions').optional(),
+    completions: PiAiQuirkTargetSchema('openai-completions').optional(),
+    messages: PiAiQuirkTargetSchema('anthropic-messages').optional(),
+    responses: PiAiQuirkTargetSchema('openai-responses').optional(),
+    gemini: PiAiQuirkTargetSchema('google-generative-ai').optional(),
+  })
+  .strict()
+  .refine((quirks) => Object.keys(quirks).length > 0, {
+    message: 'piAiQuirks must define at least one target API',
+  })
+  .superRefine((quirks, ctx) => {
+    for (const [target, definition] of Object.entries(quirks)) {
+      if (!definition) continue;
+      if (definition.thinkingLevelMap && definition.reasoning !== true) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [target, 'thinkingLevelMap'],
+          message: 'thinkingLevelMap requires reasoning: true on this target',
+        });
+      }
+      for (const [modelId, model] of Object.entries(definition.models ?? {})) {
+        if (model.thinkingLevelMap && (model.reasoning ?? definition.reasoning) !== true) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [target, 'models', modelId, 'thinkingLevelMap'],
+            message: 'thinkingLevelMap requires reasoning: true for this model',
+          });
+        }
+      }
+    }
+  });
+
+export type PiAiQuirks = z.infer<typeof PiAiQuirksSchema>;
+
 export const ProviderPresetSchema = z
   .object({
     /** Stable preset key, e.g. `openai`, `moonshot-cn`. */
@@ -70,11 +163,25 @@ export const ProviderPresetSchema = z
     /** Setup-time values embedded as `{key}` placeholders in the URLs. */
     templateVars: z.array(PresetTemplateVarSchema).default([]),
     /** pi-ai builtin provider id used for catalog lookups and compat mapping. */
-    piAiProvider: z.string().trim().min(1),
-    autoCompat: z.boolean(),
+    piAiProvider: z.string().trim().min(1).optional(),
+    /** Explicit quirks, keyed by configured target API type and upstream model ID. */
+    piAiQuirks: PiAiQuirksSchema.optional(),
+    autoCompat: z.boolean().default(false),
     /** Operator-facing caveats shown in the picker (auth quirks, docs gaps). */
     notes: z.string().optional(),
   })
+  .refine((preset) => !(preset.piAiProvider && preset.piAiQuirks), {
+    message: 'piAiProvider and piAiQuirks are mutually exclusive',
+  })
+  .refine((preset) => !preset.autoCompat || !!(preset.piAiProvider || preset.piAiQuirks), {
+    message: 'autoCompat requires piAiProvider or piAiQuirks',
+  })
+  .refine(
+    (preset) =>
+      !preset.piAiQuirks ||
+      Object.keys(preset.piAiQuirks).every((api) => Object.hasOwn(preset.apiBaseUrl, api)),
+    { message: 'piAiQuirks targets must be present in apiBaseUrl' }
+  )
   .refine((preset) => Object.keys(preset.apiBaseUrl).length > 0, {
     message: 'preset must define at least one endpoint',
   })
@@ -157,17 +264,14 @@ export interface ProviderPresetDraft {
   oauthProvider?: string;
   type: string | string[];
   pi_ai_provider?: string;
+  pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
 }
 
 /**
- * Apply a preset to a provider draft: endpoint map, derived API types, pi-ai
- * provider (`pi_ai_provider`), and auto-compat (`auto_compat`). The id/name
- * suggestions only fill empty fields so re-applying never clobbers operator
- * input — pass the previously applied preset so switching presets overwrites
- * fields that still hold its suggestions instead of stranding them under the
- * new preset's endpoints. Presets are API-key providers, so any OAuth-mode
- * leftovers are cleared.
+ * Apply endpoints, quirk source and auto-compat to a provider draft. Switching
+ * sources clears the alternative; id/name suggestions only replace blank or
+ * previously suggested fields, and OAuth-mode leftovers are cleared.
  */
 export function applyProviderPreset<T extends ProviderPresetDraft>(
   draft: T,
@@ -186,6 +290,7 @@ export function applyProviderPreset<T extends ProviderPresetDraft>(
     oauthProvider: '',
     type: Object.keys(preset.apiBaseUrl),
     pi_ai_provider: preset.piAiProvider,
+    pi_ai_quirks: preset.piAiQuirks ? structuredClone(preset.piAiQuirks) : undefined,
     auto_compat: preset.autoCompat,
   };
 }

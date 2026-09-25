@@ -32,6 +32,7 @@ interface Props {
   updateModelKV: (modelId: string, oldKey: string, newKey: string, value: any) => void;
   removeModelKV: (modelId: string, key: string) => void;
   piAiProvider?: string;
+  inlineQuirksAvailable: boolean;
   piModels: PiAiModel[];
   piModelCustom: Record<string, boolean>;
   setPiModelCustom: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
@@ -62,6 +63,7 @@ export function ModelCard({
   updateModelKV,
   removeModelKV,
   piAiProvider,
+  inlineQuirksAvailable,
   piModels,
   piModelCustom,
   setPiModelCustom,
@@ -210,6 +212,7 @@ export function ModelCard({
             setIsOpen={setModelAdvancedOpen}
             updateModelConfig={updateModelConfig}
             piAiProvider={piAiProvider}
+            inlineQuirksAvailable={inlineQuirksAvailable}
           />
         </div>
       )}

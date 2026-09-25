@@ -49,6 +49,7 @@ export const providers = sqliteTable(
     stallGracePeriodMs: integer('stall_grace_period_ms'), // Grace period in ms before throughput enforcement
     maxConcurrency: integer('max_concurrency'), // Max concurrent requests for this provider (NULL = no limit)
     piAiProvider: text('pi_ai_provider'), // pi-ai provider name (e.g. 'anthropic', 'openai', 'google')
+    piAiQuirks: text('pi_ai_quirks'), // JSON: inline target API compatibility traits
     rawPassthrough: text('raw_passthrough'), // JSON: { enabled, base_url, auth }
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

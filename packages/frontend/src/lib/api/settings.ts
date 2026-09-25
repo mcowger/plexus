@@ -1,5 +1,5 @@
 import { API_BASE, encodePathPreservingSlashes, fetchWithAuth, inferProviderTypes } from './core';
-import type { ProviderPreset } from '@plexus/shared';
+import type { PiAiQuirks, ProviderPreset } from '@plexus/shared';
 import type {
   CompactionSettings,
   Cooldown,
@@ -374,6 +374,7 @@ interface RawBackendProvider {
   stallWindowMs?: number;
   stallGracePeriodMs?: number;
   pi_ai_provider?: string;
+  pi_ai_quirks?: PiAiQuirks;
   raw_passthrough?: {
     enabled?: boolean;
     base_url?: string;
@@ -438,6 +439,7 @@ export const getProviders = async (): Promise<Provider[]> => {
         stallGracePeriodMs:
           typeof val.stallGracePeriodMs === 'number' ? val.stallGracePeriodMs : undefined,
         pi_ai_provider: typeof val.pi_ai_provider === 'string' ? val.pi_ai_provider : undefined,
+        pi_ai_quirks: val.pi_ai_quirks,
         rawPassthrough: val.raw_passthrough
           ? {
               enabled: val.raw_passthrough.enabled === true,
@@ -466,6 +468,7 @@ export const getProviderPresets = async (): Promise<ProviderPreset[]> => {
 };
 
 export const saveProvider = async (provider: Provider, oldId?: string): Promise<void> => {
+  const isExistingProvider = oldId === provider.id;
   const body: Record<string, unknown> = {
     api_base_url: provider.apiBaseUrl,
     display_name: provider.name,
@@ -514,10 +517,12 @@ export const saveProvider = async (provider: Provider, oldId?: string): Promise<
           },
         }
       : {}),
-    ...(provider.pi_ai_provider ? { pi_ai_provider: provider.pi_ai_provider } : {}),
+    // PATCH merges with the saved provider. Explicit null clears a previous source;
+    // omitted fields would leave its old pi-ai provider/inline quirks in place.
+    pi_ai_provider: provider.pi_ai_provider ?? (isExistingProvider ? null : undefined),
+    pi_ai_quirks: provider.pi_ai_quirks ?? (isExistingProvider ? null : undefined),
   };
 
-  const isExistingProvider = oldId === provider.id;
   const res = await fetchWithAuth(
     `${API_BASE}/v0/management/providers/${encodePathPreservingSlashes(provider.id)}`,
     {

@@ -57,6 +57,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate published provider preset schema
+        run: bun run check:provider-presets-schema
+
       - name: Generate server OpenAPI asset
         run: bun run generate:openapi:asset
 

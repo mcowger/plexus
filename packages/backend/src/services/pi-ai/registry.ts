@@ -281,7 +281,8 @@ function buildEnabledOptions(
 //   - serviceTier → OpenAI-family / responses only.
 
 export function buildGenerationOptions(
-  model: Pick<PiAiModel<any>, 'api' | 'reasoning' | 'thinkingLevelMap' | 'compat' | 'maxTokens'> & {
+  model: Pick<PiAiModel<any>, 'api' | 'reasoning' | 'thinkingLevelMap' | 'compat'> & {
+    maxTokens?: number;
     id?: string;
   },
   intent: GenerationIntent | undefined

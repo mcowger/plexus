@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isOAuthPlaceholderUrl, McpServerConfigSchema } from '@plexus/shared';
+import { isOAuthPlaceholderUrl, McpServerConfigSchema, PiAiQuirksSchema } from '@plexus/shared';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
@@ -322,8 +322,12 @@ export const ProviderConfigSchema = z
     stallWindowMs: z.number().int().min(3000).max(30000).nullable().optional(),
     stallGracePeriodMs: z.number().int().min(0).max(120000).nullable().optional(),
     pi_ai_provider: z.string().optional(),
+    pi_ai_quirks: PiAiQuirksSchema.optional(),
     compaction: CompactionOverrideSchema.optional(),
     raw_passthrough: RawPassthroughConfigSchema.optional(),
+  })
+  .refine((data) => !data.pi_ai_provider || !data.pi_ai_quirks, {
+    message: "'pi_ai_provider' and 'pi_ai_quirks' are mutually exclusive",
   })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",

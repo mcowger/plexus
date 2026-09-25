@@ -1,3 +1,5 @@
+import type { PiAiQuirks } from '@plexus/shared';
+
 export * from './quota';
 
 /**
@@ -69,6 +71,7 @@ export interface Provider {
   stallWindowMs?: number | null;
   stallGracePeriodMs?: number | null;
   pi_ai_provider?: string;
+  pi_ai_quirks?: PiAiQuirks;
   compaction?: CompactionSettings;
   rawPassthrough?: {
     enabled: boolean;

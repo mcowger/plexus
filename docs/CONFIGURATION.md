@@ -133,7 +133,8 @@ A **provider** represents an upstream AI service that Plexus routes requests to.
 | **Allow 100% Utilization** | Allow quota usage to reach 100% instead of cooling down at 99% | No (default: false) |
 | **Stall Detection Overrides** | Optional per-provider overrides for TTFB/throughput stall detection. Empty = inherit global setting for that field. | No |
 | **pi-ai Provider** | Builtin pi-ai provider ID used for registry model lookup (for example, `anthropic`, `openai`, `google`) | No |
-| **Auto Compat** | Use pi-ai registry metadata to automatically map reasoning/thinking and generation options for models with a `pi_ai_model_id` | No (default: false) |
+| **pi-ai Quirks** | Inline compatibility traits by API and model, an alternative to pi-ai Provider. | No |
+| **Auto Compat** | Opt-in reasoning and generation mapping from either a pi-ai model link or inline quirks. With neither, no registry-driven quirk handling occurs. | No (default: false) |
 | **Adapters** | Request/response rewrite hooks applied to every model under this provider (see [Provider Adapters](#provider-adapters)) | No |
 
 ### Multi-Protocol Providers
@@ -248,18 +249,27 @@ ordinary chat model is unaffected — detection never reads the request's tools.
 
 ### Registry-Aware Compatibility
 
-Plexus can use pi-ai's builtin model registry as compatibility metadata while still
-preserving v1 pass-through request fidelity. This is separate from OAuth execution and
-does not re-enable the removed `inference-v2` path.
+Plexus maps client reasoning and generation options using either a builtin pi-ai
+model link or explicit inline quirks. This preserves the v1 pass-through path
+and does not re-enable the removed `inference-v2` path.
 
-Enable it with `auto_compat: true` at the provider level or on an individual provider
-model. A model must also have `pi_ai_model_id` set to a builtin pi-ai model ID. When the
-provider has `pi_ai_provider`, Plexus validates that the pair resolves in the builtin
-registry and warns rather than failing if it does not.
+With a builtin link, set `pi_ai_provider` on the provider and `pi_ai_model_id` on
+each configured provider model. Enable `auto_compat: true` on the provider or
+model. If the pair is missing or unresolved, the registry rewrite does nothing;
+unresolved configured pairs produce a startup warning.
 
-When enabled, Plexus extracts the client's reasoning/thinking intent from the incoming
-request and maps it to the provider fields supported by the resolved registry model. If
-the model has no resolvable `pi_ai_model_id`, the compatibility step is skipped.
+For providers without pi-ai definitions, use `pi_ai_quirks` instead of
+`pi_ai_provider`. Keys are configured target APIs (`chat`, `completions`,
+`messages`, `responses`, `gemini`). Each entry specifies its pi-ai API dialect
+and only known traits: `reasoning`, `thinkingLevelMap`, `maxTokens`, and a
+bounded `compat` object. Optional `models` entries use exact upstream model IDs
+and override the common traits. Model-specific maps replace the common
+thinking-level map; individual `compat` flags merge. No `pi_ai_model_id` is
+needed. Unknown traits remain unknown and are not advertised or rewritten.
+
+With neither source, requests use ordinary routing. Existing provider configs
+with `auto_compat: true` but no source remain valid and inert; new presets
+cannot enable auto-compat without a quirk source.
 
 ```json
 PUT /v0/management/providers/anthropic_oauth
@@ -293,9 +303,32 @@ You can also enable compatibility only for selected models:
 }
 ```
 
-`reasoning_rewrite` remains available as a manual escape hatch, but it overlaps with
-`auto_compat`. Prefer `auto_compat` for registry-backed models, and revisit existing
-custom rewrites before running both surfaces in parallel.
+For example, an OpenAI-compatible chat API that requires
+`max_completion_tokens` instead of `max_tokens` can declare just that quirk:
+
+```json
+{
+  "api_base_url": { "chat": "https://example.test/v1" },
+  "api_key": "sk-example",
+  "auto_compat": true,
+  "pi_ai_quirks": {
+    "chat": {
+      "api": "openai-completions",
+      "compat": { "maxTokensField": "max_completion_tokens" }
+    }
+  },
+  "models": { "upstream/model-id": {} }
+}
+```
+
+The preset catalog at [`provider-presets.json`](../packages/backend/data/provider-presets.json)
+uses camelCase (`piAiProvider` or `piAiQuirks`) and publishes an
+[editor JSON Schema](../packages/backend/data/provider-presets.schema.json). An inline
+profile is saved into the provider config, so later remote catalog edits do not
+change configured behavior. Model discovery and model-listing URLs are separate work.
+
+`reasoning_rewrite` remains a manual escape hatch but overlaps with auto-compat.
+Avoid enabling both for the same model and field.
 
 ### Raw Provider Passthrough
 
