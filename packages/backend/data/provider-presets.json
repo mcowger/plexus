@@ -158,10 +158,9 @@
         "messages": "https://api.deepseek.com/anthropic/v1",
         "responses": "https://api.deepseek.com"
       },
-      "experimentalApis": ["responses"],
       "piAiProvider": "deepseek",
       "autoCompat": true,
-      "notes": "The responses endpoint is listed in the API reference but its schema is unverified."
+      "notes": "DeepSeek Responses is stateless: previous_response_id and store are unsupported; send full history in input."
     },
     {
       "id": "fireworks",
@@ -204,10 +203,8 @@
         "chat": "https://api.minimax.io/v1",
         "messages": "https://api.minimax.io/anthropic/v1"
       },
-      "experimentalApis": ["messages"],
       "piAiProvider": "minimax",
-      "autoCompat": true,
-      "notes": "The Anthropic-compatible base is inferred from the pi-ai catalog, not yet probed."
+      "autoCompat": true
     },
     {
       "id": "minimax-cn",
@@ -220,10 +217,8 @@
         "chat": "https://api.minimaxi.com/v1",
         "messages": "https://api.minimaxi.com/anthropic/v1"
       },
-      "experimentalApis": ["messages"],
       "piAiProvider": "minimax-cn",
-      "autoCompat": true,
-      "notes": "The Anthropic-compatible base is inferred from the pi-ai catalog, not yet probed."
+      "autoCompat": true
     },
     {
       "id": "mistral",
@@ -250,10 +245,8 @@
         "messages": "https://ai-gateway.vercel.sh/v1",
         "responses": "https://ai-gateway.vercel.sh/v1"
       },
-      "experimentalApis": ["messages", "responses"],
       "piAiProvider": "vercel-ai-gateway",
-      "autoCompat": true,
-      "notes": "Upstream confirms all three protocols; the messages/responses paths follow convention."
+      "autoCompat": true
     },
     {
       "id": "zai",
