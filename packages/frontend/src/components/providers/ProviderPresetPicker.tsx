@@ -5,6 +5,7 @@ import {
   findProviderPreset,
   findUnresolvedPresetVars,
   substitutePresetVars,
+  type PiAiQuirks,
   type ProviderPreset,
 } from '@plexus/shared';
 import { api, type Provider } from '../../lib/api';
@@ -17,14 +18,14 @@ const INPUT_CLASS =
 interface Props {
   editingProvider: Provider;
   setEditingProvider: React.Dispatch<React.SetStateAction<Provider>>;
+  onSelectionChange: (selected: boolean) => void;
 }
 
 /**
  * Preset picker shown at the top of the Add Provider modal. Selecting a
- * preset fills the id/name suggestions, endpoint map, pi-ai provider, and
- * auto-compat — the operator only adds an API key. Rendered for new
- * providers only; never offered on edit, where applying would clobber a
- * working config.
+ * preset fills endpoint and compatibility settings; the operator adds an API
+ * key. Rendered for new providers only; never offered on edit, where applying
+ * would clobber a working config.
  */
 /** Draft fields a preset apply touches — snapshotted so Custom can undo it. */
 interface PresetTouchedFields {
@@ -35,6 +36,7 @@ interface PresetTouchedFields {
   oauthProvider?: string;
   type: string | string[];
   pi_ai_provider?: string;
+  pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
 }
 
@@ -48,6 +50,7 @@ function blankPresetDraftBase() {
     oauthProvider: '' as string | undefined,
     type: [] as string | string[],
     pi_ai_provider: undefined as string | undefined,
+    pi_ai_quirks: undefined as PiAiQuirks | undefined,
     auto_compat: undefined as boolean | undefined,
   };
 }
@@ -66,7 +69,7 @@ function isEqualValue(a: unknown, b: unknown): boolean {
     const aRecord = a as Record<string, unknown>;
     const bRecord = b as Record<string, unknown>;
     const keys = new Set([...Object.keys(aRecord), ...Object.keys(bRecord)]);
-    return [...keys].every((key) => aRecord[key] === bRecord[key]);
+    return [...keys].every((key) => isEqualValue(aRecord[key], bRecord[key]));
   }
   return a === b;
 }
@@ -80,10 +83,15 @@ const RESTORABLE_KEYS = [
   'oauthProvider',
   'type',
   'pi_ai_provider',
+  'pi_ai_quirks',
   'auto_compat',
 ] as const;
 
-export function ProviderPresetPicker({ editingProvider, setEditingProvider }: Props) {
+export function ProviderPresetPicker({
+  editingProvider,
+  setEditingProvider,
+  onSelectionChange,
+}: Props) {
   const [presets, setPresets] = useState<ProviderPreset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -119,6 +127,7 @@ export function ProviderPresetPicker({ editingProvider, setEditingProvider }: Pr
 
   const handleSelect = (presetId: string) => {
     setSelectedPresetId(presetId);
+    onSelectionChange(!!presetId);
     setVarValues({});
     if (!presetId) {
       // Back to Custom: restore the pre-preset values, but only for fields
@@ -163,11 +172,25 @@ export function ProviderPresetPicker({ editingProvider, setEditingProvider }: Pr
           ? [...editingProvider.type]
           : editingProvider.type,
         pi_ai_provider: editingProvider.pi_ai_provider,
+        pi_ai_quirks: editingProvider.pi_ai_quirks,
         auto_compat: editingProvider.auto_compat,
       });
     }
     setAppliedPreset(preset);
-    setEditingProvider((prev) => applyProviderPreset(prev, preset, {}, previous ?? undefined));
+    setEditingProvider((prev) => {
+      const applied = applyProviderPreset(prev, preset, {}, previous ?? undefined);
+      if (!previous) return applied;
+      const sourceEdited =
+        prev.pi_ai_provider !== previous.piAiProvider ||
+        !isEqualValue(prev.pi_ai_quirks, previous.piAiQuirks);
+      if (!sourceEdited) return applied;
+      return {
+        ...applied,
+        pi_ai_provider: prev.pi_ai_provider,
+        pi_ai_quirks: prev.pi_ai_quirks,
+        auto_compat: prev.pi_ai_provider || prev.pi_ai_quirks ? prev.auto_compat : false,
+      };
+    });
   };
 
   const handleVarChange = (preset: ProviderPreset, key: string, value: string) => {
@@ -275,9 +298,21 @@ export function ProviderPresetPicker({ editingProvider, setEditingProvider }: Pr
           )}
 
           <div className="text-[11px] text-text-secondary">
-            Pre-fills {Object.keys(selectedPreset.apiBaseUrl).join(', ')} endpoints, pi-ai provider{' '}
-            <code className="text-primary">{selectedPreset.piAiProvider}</code>, and auto-compat.
-            Just add your API key.
+            Pre-fills {Object.keys(selectedPreset.apiBaseUrl).join(', ')} endpoints.{' '}
+            {selectedPreset.piAiProvider ? (
+              <>
+                Uses the pi-ai <code className="text-primary">{selectedPreset.piAiProvider}</code>{' '}
+                catalog; auto-compat requires a matching model ID.
+              </>
+            ) : selectedPreset.piAiQuirks ? (
+              <>
+                Uses inline pi-ai-style quirks
+                {selectedPreset.autoCompat ? '.' : ' (auto-compat is off).'}
+              </>
+            ) : (
+              <>No automatic quirk handling.</>
+            )}{' '}
+            Add your API key.
             {selectedPreset.docsUrl && (
               <>
                 {' '}

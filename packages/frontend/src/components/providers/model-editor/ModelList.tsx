@@ -30,6 +30,7 @@ interface Props {
   modelAdvancedOpen: Record<string, boolean>;
   setModelAdvancedOpen: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   piAiProvider?: string;
+  inlineQuirksAvailable: boolean;
   piModels: PiAiModel[];
   piModelCustom: Record<string, boolean>;
   setPiModelCustom: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
@@ -62,6 +63,7 @@ export function ModelList({
   modelAdvancedOpen,
   setModelAdvancedOpen,
   piAiProvider,
+  inlineQuirksAvailable,
   piModels,
   piModelCustom,
   setPiModelCustom,
@@ -136,6 +138,7 @@ export function ModelList({
                   updateModelKV={updateModelKV}
                   removeModelKV={removeModelKV}
                   piAiProvider={piAiProvider}
+                  inlineQuirksAvailable={inlineQuirksAvailable}
                   piModels={piModels}
                   piModelCustom={piModelCustom}
                   setPiModelCustom={setPiModelCustom}

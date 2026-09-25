@@ -114,6 +114,7 @@ export function useProviderForm() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider>(EMPTY_PROVIDER);
   const [originalId, setOriginalId] = useState<string | null>(null);
+  const [presetSelected, setPresetSelected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [quotaCheckerTypes, setQuotaCheckerTypes] = useState<string[]>([]);
   // Populated from the backend, which surfaces every OAuth-capable provider
@@ -343,12 +344,10 @@ export function useProviderForm() {
     resetOAuthState();
   }, [editingProvider.oauthProvider, isOAuthMode]);
 
-  // Auto-detect the pi-ai provider for NEW providers only. A known API
-  // endpoint (matched against pi-ai builtin base URLs) or an OAuth provider
-  // (which singularly identifies its pi-ai provider) pre-selects the pi-ai
-  // dropdown and enables auto-compat. Existing configs are never touched,
-  // and a manual pi-ai selection is never overridden: we only fill when the
-  // field is empty/`- auto -` or still holds our previous suggestion.
+  // Auto-detect the pi-ai provider for new Custom drafts only. A preset
+  // explicitly chooses builtin, inline quirks, or neither; URL matching must
+  // not override that choice. Existing configs and manual selections are
+  // never changed.
   const lastAutoSuggestion = useRef<string | null>(null);
 
   useEffect(() => {
@@ -357,6 +356,7 @@ export function useProviderForm() {
       return;
     }
     if (originalId !== null) return;
+    if (presetSelected) return;
     const urls = collectProviderEndpointUrls(editingProvider.apiBaseUrl);
     const oauthProvider = isOAuthProviderDraft(editingProvider.apiBaseUrl)
       ? editingProvider.oauthProvider?.trim() || undefined
@@ -374,6 +374,7 @@ export function useProviderForm() {
       const previous = lastAutoSuggestion.current;
       lastAutoSuggestion.current = suggestion;
       setEditingProvider((prev) => {
+        if (prev.pi_ai_quirks) return prev;
         const current = prev.pi_ai_provider;
         const untouched = !current || current === PI_AI_AUTO_VALUE || current === previous;
         if (!untouched) return prev;
@@ -385,7 +386,13 @@ export function useProviderForm() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [isModalOpen, originalId, editingProvider.apiBaseUrl, editingProvider.oauthProvider]);
+  }, [
+    isModalOpen,
+    originalId,
+    presetSelected,
+    editingProvider.apiBaseUrl,
+    editingProvider.oauthProvider,
+  ]);
 
   // OAuth session polling
   useEffect(() => {
@@ -419,12 +426,14 @@ export function useProviderForm() {
 
   // Handlers
   const handleEdit = (provider: Provider) => {
+    setPresetSelected(false);
     setOriginalId(provider.id);
     setEditingProvider(JSON.parse(JSON.stringify(provider)));
     setIsModalOpen(true);
   };
 
   const handleAddNew = () => {
+    setPresetSelected(false);
     setOriginalId(null);
     setEditingProvider(JSON.parse(JSON.stringify(EMPTY_PROVIDER)));
     setIsModalOpen(true);
@@ -1096,6 +1105,7 @@ export function useProviderForm() {
     setIsModalOpen,
     editingProvider,
     setEditingProvider,
+    setPresetSelected,
     originalId,
     isSaving,
     quotaCheckerTypes,

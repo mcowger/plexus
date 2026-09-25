@@ -45,6 +45,7 @@ type ProviderRow = {
   timeoutMs: number | null;
   maxConcurrency: number | null;
   piAiProvider: string | null;
+  piAiQuirks: unknown;
   rawPassthrough: unknown;
   stallTtfbMs: number | null;
   stallTtfbBytes: number | null;
@@ -236,6 +237,7 @@ export class ProviderRepository {
       timeoutMs: config.timeoutMs ?? null,
       maxConcurrency: config.maxConcurrency ?? null,
       piAiProvider: config.pi_ai_provider ?? null,
+      piAiQuirks: config.pi_ai_quirks ? toJson(config.pi_ai_quirks) : null,
       rawPassthrough: config.raw_passthrough ? toJson(config.raw_passthrough) : null,
       // Per-provider stall detection overrides
       stallTtfbMs: config.stallTtfbMs ?? null,
@@ -586,6 +588,7 @@ export class ProviderRepository {
       ...(row.stallGracePeriodMs != null ? { stallGracePeriodMs: row.stallGracePeriodMs } : {}),
       ...(row.maxConcurrency != null ? { maxConcurrency: row.maxConcurrency } : {}),
       ...(row.piAiProvider != null ? { pi_ai_provider: row.piAiProvider } : {}),
+      ...(row.piAiQuirks != null ? { pi_ai_quirks: parseJson(row.piAiQuirks) } : {}),
       ...(row.rawPassthrough ? { raw_passthrough: parseJson(row.rawPassthrough) } : {}),
     };
 

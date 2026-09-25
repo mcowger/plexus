@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/mcowger/plexus/main/packages/backend/data/provider-presets.schema.json",
   "$comment": "Pre-configured provider presets served by GET /v0/management/provider-presets, which defaults to this file's raw GitHub URL and falls back to this built-in copy when the remote is unreachable. Everything is validated against ProviderPresetSchema from @plexus/shared. URL convention: values are the base stored in apiBaseUrl[type] — Plexus appends the per-type suffix (/chat/completions, /messages, /responses, ...), so Anthropic-compatible bases include the /v1 segment.",
   "presets": [
     {

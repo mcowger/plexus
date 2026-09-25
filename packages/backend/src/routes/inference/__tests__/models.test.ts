@@ -207,6 +207,101 @@ describe('GET /v1/models – reasoning_options', () => {
   });
 });
 
+describe('GET /v1/models – inline compatibility metadata', () => {
+  it('uses exact target model quirks without fabricating pi-ai identities', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({
+      providers: {
+        proxy: {
+          api_base_url: { chat: 'https://example.test/v1', responses: 'https://example.test/v1' },
+          api_key: 'sk-test',
+          pi_ai_quirks: {
+            chat: {
+              api: 'openai-completions',
+              reasoning: true,
+              thinkingLevelMap: { off: 'none', high: 'high' },
+              compat: { supportsTemperature: false },
+              models: {
+                'upstream/special': {
+                  reasoning: false,
+                  compat: { maxTokensField: 'max_completion_tokens' },
+                },
+              },
+            },
+            responses: { api: 'openai-responses', maxTokens: 128 },
+          },
+        },
+      },
+      models: {
+        'gpt-5.6-luna': {
+          preferred_api: ['chat_completions'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'proxy', model: 'upstream/special' }],
+            },
+          ],
+        },
+        'custom-reasoning': {
+          preferred_api: ['chat_completions'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'proxy', model: 'upstream/other' }],
+            },
+          ],
+        },
+        'ambiguous-api': {
+          preferred_api: ['chat_completions', 'responses'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'proxy', model: 'upstream/other' }],
+            },
+          ],
+        },
+        'explicit-link': {
+          pi_model: { provider: 'anthropic', model_id: 'claude-test' },
+          preferred_api: ['chat_completions'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'proxy', model: 'upstream/other' }],
+            },
+          ],
+        },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+    const listed = new Map(response.json().data.map((model: { id: string }) => [model.id, model]));
+    expect(listed.get('gpt-5.6-luna')).toMatchObject({
+      pi_options: { supportsTemperature: false, maxTokensField: 'max_completion_tokens' },
+    });
+    expect(listed.get('gpt-5.6-luna')).not.toHaveProperty('pi_provider');
+    expect(listed.get('gpt-5.6-luna')).not.toHaveProperty('pi_model');
+    expect(listed.get('gpt-5.6-luna')).not.toHaveProperty('reasoning_options');
+    expect(listed.get('custom-reasoning')).toMatchObject({
+      reasoning_options: [{ type: 'effort', values: ['off', 'high'] }],
+      pi_options: { supportsTemperature: false },
+    });
+    expect(listed.get('custom-reasoning')).not.toHaveProperty('pi_provider');
+    expect(listed.get('ambiguous-api')).not.toHaveProperty('pi_options');
+    expect(listed.get('ambiguous-api')).not.toHaveProperty('reasoning_options');
+    expect(listed.get('explicit-link')).toMatchObject({
+      pi_provider: 'anthropic',
+      pi_model: 'claude-test',
+    });
+    await fastify.close();
+  });
+});
+
 // ─── Vision fallthrough modality injection ──────────────
 
 describe('GET /v1/models – vision fallthrough modalities', () => {

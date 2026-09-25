@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { Dispatcher } from '../dispatch/dispatcher';
+import { ProviderConfigSchema } from '../../config';
+import { applyRegistryAutoCompat } from '../dispatch/dispatcher-auto-compat';
 import * as piAiRegistry from '../pi-ai/registry';
 import type { RouteResult } from '../routing/router';
 import type { UnifiedChatRequest } from '../../types/unified';
@@ -278,6 +280,182 @@ describe('Dispatcher registry auto-compat', () => {
 
     expect(result.payload.thinking).toEqual({ type: 'adaptive' });
     expect(result.payload.output_config).toEqual({ effort: 'low' });
+  });
+
+  test('applies inline chat quirks by exact upstream model without pi-ai IDs', async () => {
+    const dispatcher = new Dispatcher() as any;
+    const config = {
+      api_base_url: { chat: 'https://example.test/v1', responses: 'https://example.test/v1' },
+      api_key: 'test-key',
+      auto_compat: true,
+      pi_ai_quirks: {
+        chat: {
+          api: 'openai-completions',
+          reasoning: true,
+          thinkingLevelMap: { off: 'none', high: 'high' },
+          compat: {
+            thinkingFormat: 'openrouter',
+            maxTokensField: 'max_completion_tokens',
+            supportsTemperature: false,
+          },
+          models: {
+            'upstream/special': {
+              thinkingLevelMap: { high: 'hard' },
+              compat: { supportsTemperature: true },
+              maxTokens: 64,
+            },
+          },
+        },
+        responses: { api: 'openai-responses', maxTokens: 128 },
+      },
+    } as any;
+    const originalBody = {
+      model: 'alias-model',
+      messages: [{ role: 'user', content: 'hello' }],
+      reasoning: { effort: 'high' },
+      temperature: 0.4,
+      max_tokens: 256,
+    };
+    const dispatch = (model: string, targetApiType = 'chat') =>
+      dispatcher.transformRequestPayload(
+        request({ originalBody }),
+        route({
+          model,
+          config,
+          modelConfig: { pricing: { source: 'simple', input: 0, output: 0 } } as any,
+        }),
+        { transformRequest: vi.fn(async () => ({ ...originalBody, model })) },
+        targetApiType,
+        []
+      );
+
+    const special = (await dispatch('upstream/special')).payload;
+    expect(special).toMatchObject({
+      model: 'upstream/special',
+      max_completion_tokens: 64,
+      reasoning: { effort: 'hard' },
+      temperature: 0.4,
+    });
+    expect(special.max_tokens).toBeUndefined();
+    const other = (await dispatch('upstream/other')).payload;
+    expect(other).toMatchObject({
+      max_completion_tokens: 256,
+      reasoning: { effort: 'high' },
+    });
+    expect(other.temperature).toBeUndefined();
+    const responses = (await dispatch('upstream/special', 'responses')).payload;
+    expect(responses.max_output_tokens).toBe(128);
+    expect(responses.max_completion_tokens).toBeUndefined();
+    expect(piAiRegistry.resolvePiAiModel).not.toHaveBeenCalled();
+  });
+
+  test('model reasoning:false removes inherited map without suppressing unrelated quirks', async () => {
+    const body = {
+      model: 'alias-model',
+      messages: [{ role: 'user', content: 'hello' }],
+      reasoning: { effort: 'high' },
+      max_tokens: 256,
+      temperature: 0.5,
+    };
+    const config = ProviderConfigSchema.parse({
+      api_base_url: { chat: 'https://example.test/v1' },
+      api_key: 'test-key',
+      auto_compat: true,
+      pi_ai_quirks: {
+        chat: {
+          api: 'openai-completions',
+          reasoning: true,
+          thinkingLevelMap: { high: 'mapped' },
+          compat: { maxTokensField: 'max_completion_tokens', thinkingFormat: 'openrouter' },
+          models: {
+            'upstream/no-reasoning': { reasoning: false, compat: { supportsTemperature: false } },
+          },
+        },
+      },
+    });
+    const dispatch = (model: string) =>
+      applyRegistryAutoCompat(
+        { ...body, model },
+        request({ originalBody: body }),
+        route({ model, config, modelConfig: undefined }),
+        'chat'
+      );
+
+    const disabled = dispatch('upstream/no-reasoning');
+    expect(disabled).toMatchObject({
+      model: 'upstream/no-reasoning',
+      reasoning: { effort: 'high' },
+      max_completion_tokens: 256,
+    });
+    expect(disabled.reasoning_effort).toBeUndefined();
+    expect(disabled.temperature).toBeUndefined();
+    expect(disabled.max_tokens).toBeUndefined();
+
+    const unknown = dispatch('upstream/unknown');
+    expect(unknown).toMatchObject({
+      reasoning: { effort: 'mapped' },
+      max_completion_tokens: 256,
+      temperature: 0.5,
+    });
+    expect(unknown.reasoning_effort).toBeUndefined();
+  });
+
+  test('does not infer Anthropic limits from an inline model name without declared traits', () => {
+    const payload = {
+      model: 'claude-opus-5',
+      messages: [{ role: 'user', content: 'hello' }],
+      thinking: { type: 'disabled' },
+      output_config: { effort: 'off' },
+    };
+    const config = ProviderConfigSchema.parse({
+      api_base_url: { messages: 'https://example.test/v1' },
+      api_key: 'test-key',
+      auto_compat: true,
+      pi_ai_quirks: { messages: { api: 'anthropic-messages' } },
+    });
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ incomingApiType: 'messages', originalBody: payload }),
+      route({ model: 'claude-opus-5', config, modelConfig: undefined }),
+      'messages'
+    );
+    expect(outbound).toBe(payload);
+    expect(outbound.thinking).toEqual({ type: 'disabled' });
+    expect(outbound.output_config).toEqual({ effort: 'off' });
+  });
+
+  test('leaves inline requests unchanged when auto-compat is off or no traits match target', async () => {
+    const payload = {
+      model: 'alias-model',
+      messages: [{ role: 'user', content: 'hello' }],
+      max_tokens: 256,
+      temperature: 0.4,
+    };
+    const config = {
+      api_base_url: 'https://example.test/v1',
+      api_key: 'test-key',
+      pi_ai_quirks: {
+        chat: { api: 'openai-completions', compat: { maxTokensField: 'max_completion_tokens' } },
+      },
+    } as any;
+    const transformer = { transformRequest: vi.fn(async () => payload) };
+    const dispatch = (
+      auto_compat: boolean,
+      targetApiType: string,
+      quirks?: typeof config.pi_ai_quirks
+    ) =>
+      (new Dispatcher() as any).transformRequestPayload(
+        request({ originalBody: payload }),
+        route({ config: { ...config, pi_ai_quirks: quirks, auto_compat }, modelConfig: undefined }),
+        transformer,
+        targetApiType,
+        []
+      );
+    expect((await dispatch(false, 'chat', config.pi_ai_quirks)).payload.max_tokens).toBe(256);
+    expect((await dispatch(true, 'messages', config.pi_ai_quirks)).payload.max_tokens).toBe(256);
+    expect((await dispatch(true, 'chat', undefined)).payload.max_tokens).toBe(256);
+    expect(piAiRegistry.resolvePiAiModel).not.toHaveBeenCalled();
   });
 
   test('skips auto-compat when the model has no pi_ai_model_id', async () => {

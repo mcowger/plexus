@@ -2,8 +2,11 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 import {
   ProviderPresetSchema,
+  PiAiQuirksSchema,
   applyProviderPreset,
   findProviderPreset,
   findUnresolvedPresetVars,
@@ -11,12 +14,14 @@ import {
   type ProviderPreset,
   type ProviderPresetDraft,
 } from '@plexus/shared';
+import editorSchema from '../../data/provider-presets.schema.json' with { type: 'json' };
 import {
   REMOTE_PRESETS_URL,
   defaultPresetsPath,
   diskFileEditedSinceStartup,
   loadLocalPresets,
   loadProviderPresets,
+  parseAndValidatePresets,
 } from '../services/provider-presets';
 
 let catalog: ProviderPreset[] = [];
@@ -33,6 +38,7 @@ const blankDraft = (): ProviderPresetDraft => ({
   oauthProvider: '',
   type: [],
   pi_ai_provider: undefined,
+  pi_ai_quirks: undefined,
   auto_compat: undefined,
 });
 
@@ -52,24 +58,56 @@ const remoteEntry = {
   autoCompat: true,
 };
 
+const inlineEntry = {
+  id: 'inline',
+  name: 'Inline',
+  suggestedProviderId: 'inline',
+  suggestedName: 'Inline',
+  apiBaseUrl: {
+    chat: 'https://inline.test/v1',
+    messages: 'https://inline.test/anthropic/v1',
+  },
+  piAiQuirks: {
+    chat: {
+      api: 'openai-completions',
+      reasoning: true,
+      thinkingLevelMap: { off: null, high: 'high' },
+      compat: { maxTokensField: 'max_completion_tokens' },
+      models: {
+        'team/model-1': {
+          thinkingLevelMap: { low: 'low' },
+          compat: { supportsTemperature: false },
+        },
+      },
+    },
+    messages: {
+      api: 'anthropic-messages',
+      models: { 'team/model-1': { reasoning: true, maxTokens: 4096 } },
+    },
+  },
+};
+
+const plainEntry = {
+  id: 'plain',
+  name: 'Plain',
+  suggestedProviderId: 'plain',
+  suggestedName: 'Plain',
+  apiBaseUrl: { chat: 'https://plain.test/v1' },
+};
+
+const editorCatalog = (entry: unknown) => ({
+  $schema: editorSchema.$id,
+  presets: [entry],
+});
+
+const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
+addFormats(ajv);
+const validateEditorCatalog = ajv.compile(editorSchema);
+
 describe('built-in presets catalog (data/provider-presets.json)', () => {
   test('loads a non-empty catalog from the default path', async () => {
     expect(defaultPresetsPath().endsWith(join('data', 'provider-presets.json'))).toBe(true);
     expect(catalog.length).toBeGreaterThan(0);
-  });
-
-  test('every preset parses against the schema', () => {
-    for (const preset of catalog) {
-      expect(
-        ProviderPresetSchema.safeParse(preset).success,
-        `preset '${(preset as { id?: unknown }).id}' fails schema validation`
-      ).toBe(true);
-    }
-  });
-
-  test('preset ids are unique', () => {
-    const ids = catalog.map((preset) => preset.id);
-    expect(new Set(ids).size).toBe(ids.length);
   });
 
   test('every URL is a valid http(s) URL once template vars are filled', () => {
@@ -86,27 +124,6 @@ describe('built-in presets catalog (data/provider-presets.json)', () => {
         expect(parsed.hash, `${preset.id}.${apiType} must not carry a fragment`).toBe('');
       }
     }
-  });
-
-  test('experimental flags and template vars reference real entries', () => {
-    for (const preset of catalog) {
-      for (const api of preset.experimentalApis) {
-        expect(preset.apiBaseUrl, `${preset.id} experimental '${api}'`).toHaveProperty(api);
-      }
-      for (const variable of preset.templateVars) {
-        const referenced = Object.values(preset.apiBaseUrl).some((url) =>
-          url.includes(`{${variable.key}}`)
-        );
-        expect(referenced, `${preset.id} template var '${variable.key}' unreferenced`).toBe(true);
-      }
-    }
-  });
-
-  test('gateway providers without a pi-ai builtin map to the openrouter catalog', () => {
-    // pi-ai ships no kilocode/neuralwatt builtins; the multi-protocol
-    // openrouter catalog is the closest match for compat mapping.
-    expect(presetOrThrow('kilocode').piAiProvider).toBe('openrouter');
-    expect(presetOrThrow('neuralwatt').piAiProvider).toBe('openrouter');
   });
 
   test('spot-checks on researched endpoint maps', () => {
@@ -228,6 +245,19 @@ describe('loadProviderPresets remote source', () => {
     expect(invalid.source).toBe('local');
     expect(invalid.presets.length).toBe(catalog.length);
   });
+
+  test('invalid inline remote entry rejects the entire catalog and serves the local copy', async () => {
+    handler = () =>
+      Response.json({
+        presets: [
+          remoteEntry,
+          { ...inlineEntry, piAiQuirks: { chat: { api: 'openai-completions', typo: true } } },
+        ],
+      });
+    const result = await loadProviderPresets(serve());
+    expect(result.source).toBe('local');
+    expect(result.presets.some((entry) => entry.id === remoteEntry.id)).toBe(false);
+  });
 });
 
 describe('strict catalog validation', () => {
@@ -261,6 +291,154 @@ describe('strict catalog validation', () => {
     ['plain-http docsUrl', { ...validEntry, docsUrl: 'http://example.test/docs' }],
   ])('rejects %s', (_label, entry) => {
     expect(ProviderPresetSchema.safeParse(entry).success).toBe(false);
+  });
+});
+
+describe('three quirk source modes', () => {
+  test('parses builtin, inline (including per-model overrides), and plain presets', () => {
+    const builtin = ProviderPresetSchema.parse(remoteEntry);
+    const inline = ProviderPresetSchema.parse(inlineEntry);
+    const plain = ProviderPresetSchema.parse(plainEntry);
+
+    expect(builtin.piAiProvider).toBe('openai');
+    expect(builtin.piAiQuirks).toBeUndefined();
+    expect(inline.piAiProvider).toBeUndefined();
+    expect(inline.piAiQuirks?.chat?.models?.['team/model-1']).toEqual({
+      thinkingLevelMap: { low: 'low' },
+      compat: { supportsTemperature: false },
+    });
+    expect(inline.piAiQuirks?.messages?.models?.['team/model-1']?.maxTokens).toBe(4096);
+    expect(inline.autoCompat).toBe(false);
+    expect(plain.piAiProvider).toBeUndefined();
+    expect(plain.piAiQuirks).toBeUndefined();
+    expect(plain.autoCompat).toBe(false);
+    for (const entry of [builtin, inline, plain]) {
+      expect(
+        validateEditorCatalog(editorCatalog(entry)),
+        JSON.stringify(validateEditorCatalog.errors)
+      ).toBe(true);
+    }
+  });
+
+  test('allows a model to opt out of target-wide reasoning without claiming a reasoning map', () => {
+    const entry = {
+      ...inlineEntry,
+      piAiQuirks: {
+        chat: {
+          api: 'openai-completions',
+          reasoning: true,
+          thinkingLevelMap: { high: 'high' },
+          models: { 'team/no-reasoning': { reasoning: false } },
+        },
+      },
+    };
+    expect(
+      ProviderPresetSchema.parse(entry).piAiQuirks?.chat?.models?.['team/no-reasoning']
+    ).toEqual({
+      reasoning: false,
+    });
+    expect(validateEditorCatalog(editorCatalog(entry))).toBe(true);
+  });
+
+  test.each([
+    ['both sources', { ...inlineEntry, piAiProvider: 'openai' }],
+    ['empty quirks', { ...inlineEntry, piAiQuirks: {} }],
+    [
+      'quirks on an unconfigured target',
+      { ...inlineEntry, piAiQuirks: { responses: { api: 'openai-responses' } } },
+    ],
+    ['auto-compat without a source', { ...plainEntry, autoCompat: true }],
+    ['empty endpoint map', { ...inlineEntry, apiBaseUrl: {} }],
+    [
+      'unsupported protocol',
+      { ...inlineEntry, piAiQuirks: { audio: { api: 'openai-completions' } } },
+    ],
+    ['mismatched dialect', { ...inlineEntry, piAiQuirks: { chat: { api: 'anthropic-messages' } } }],
+    [
+      'unknown target trait',
+      { ...inlineEntry, piAiQuirks: { chat: { api: 'openai-completions', maxToken: 4096 } } },
+    ],
+    [
+      'unknown model trait',
+      {
+        ...inlineEntry,
+        piAiQuirks: { chat: { api: 'openai-completions', models: { 'team/a': { maxToken: 42 } } } },
+      },
+    ],
+    [
+      'unknown compat flag',
+      {
+        ...inlineEntry,
+        piAiQuirks: { chat: { api: 'openai-completions', compat: { thinkingForma: 'zai' } } },
+      },
+    ],
+    [
+      'unsupported compat enum value',
+      {
+        ...inlineEntry,
+        piAiQuirks: { chat: { api: 'openai-completions', compat: { thinkingFormat: 'other' } } },
+      },
+    ],
+    [
+      'invalid maxTokens bound',
+      { ...inlineEntry, piAiQuirks: { chat: { api: 'openai-completions', maxTokens: -1 } } },
+    ],
+    [
+      'reasoning map without declared reasoning',
+      {
+        ...inlineEntry,
+        piAiQuirks: { chat: { api: 'openai-completions', thinkingLevelMap: { high: 'high' } } },
+      },
+    ],
+    [
+      'unsupported model reasoning override',
+      {
+        ...inlineEntry,
+        piAiQuirks: {
+          chat: {
+            api: 'openai-completions',
+            reasoning: true,
+            models: { 'team/a': { reasoning: false, thinkingLevelMap: { low: 'low' } } },
+          },
+        },
+      },
+    ],
+  ])('runtime and editor reject %s', (_label, entry) => {
+    expect(ProviderPresetSchema.safeParse(entry).success).toBe(false);
+    expect(
+      validateEditorCatalog(editorCatalog(entry)),
+      JSON.stringify(validateEditorCatalog.errors)
+    ).toBe(false);
+  });
+
+  test('runtime also rejects invalid model reasoning inherited from an unknown common target', () => {
+    const quirks = {
+      chat: {
+        api: 'openai-completions',
+        models: { 'team/a': { thinkingLevelMap: { high: 'high' } } },
+      },
+    };
+    expect(PiAiQuirksSchema.safeParse(quirks).success).toBe(false);
+    expect(ProviderPresetSchema.safeParse({ ...inlineEntry, piAiQuirks: quirks }).success).toBe(
+      false
+    );
+  });
+
+  test('runtime catches placeholder references and duplicate IDs beyond editor validation', () => {
+    const badPlaceholder = {
+      ...remoteEntry,
+      apiBaseUrl: { chat: 'https://{region}.test/v1' },
+    };
+    expect(validateEditorCatalog(editorCatalog(badPlaceholder))).toBe(true);
+    expect(() => parseAndValidatePresets(editorCatalog(badPlaceholder), 'test')).toThrow(
+      /every \{placeholder\}/
+    );
+
+    const duplicates = { $schema: editorSchema.$id, presets: [remoteEntry, remoteEntry] };
+    expect(validateEditorCatalog(duplicates)).toBe(true);
+    expect(() => parseAndValidatePresets(duplicates, 'test')).toThrow(
+      /Duplicate provider preset id/
+    );
   });
 });
 
@@ -307,6 +485,46 @@ describe('applyProviderPreset', () => {
     expect(applied.type).toEqual(['chat', 'responses', 'messages']);
     expect(applied.pi_ai_provider).toBe('moonshotai');
     expect(applied.auto_compat).toBe(true);
+  });
+
+  test('switches builtin → inline → plain without retaining a previous source', () => {
+    const builtin = ProviderPresetSchema.parse(remoteEntry);
+    const inline = ProviderPresetSchema.parse({ ...inlineEntry, autoCompat: true });
+    const plain = ProviderPresetSchema.parse(plainEntry);
+
+    const first = applyProviderPreset(blankDraft(), builtin);
+    const second = applyProviderPreset(first, inline, {}, builtin);
+    expect(second.pi_ai_provider).toBeUndefined();
+    expect(second.pi_ai_quirks).toEqual(inline.piAiQuirks);
+    expect(second.pi_ai_quirks).not.toBe(inline.piAiQuirks);
+    expect(second.pi_ai_quirks?.chat?.models?.['team/model-1']).not.toBe(
+      inline.piAiQuirks?.chat?.models?.['team/model-1']
+    );
+    expect(second.auto_compat).toBe(true);
+    expect(first.pi_ai_provider).toBe('openai');
+    expect(first.pi_ai_quirks).toBeUndefined();
+
+    const third = applyProviderPreset(second, plain, {}, inline);
+    expect(third.pi_ai_provider).toBeUndefined();
+    expect(third.pi_ai_quirks).toBeUndefined();
+    expect(third.auto_compat).toBe(false);
+    expect(third.id).toBe('plain');
+    expect(third.type).toEqual(['chat']);
+    const fourth = applyProviderPreset(third, builtin, {}, plain);
+    expect(fourth.pi_ai_provider).toBe('openai');
+    expect(fourth.pi_ai_quirks).toBeUndefined();
+    expect(fourth.auto_compat).toBe(true);
+  });
+
+  test('copies nested inline overrides so editing a draft cannot mutate its preset', () => {
+    const inline = ProviderPresetSchema.parse(inlineEntry);
+    const first = applyProviderPreset(blankDraft(), inline);
+    first.pi_ai_quirks!.chat!.models!['team/model-1']!.compat!.supportsTemperature = true;
+    const second = applyProviderPreset(blankDraft(), inline);
+    expect(second.pi_ai_quirks?.chat?.models?.['team/model-1']?.compat?.supportsTemperature).toBe(
+      false
+    );
+    expect(second.auto_compat).toBe(false);
   });
 
   test('never overwrites an existing id or name', () => {

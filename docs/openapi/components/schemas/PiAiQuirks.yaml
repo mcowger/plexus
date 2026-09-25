@@ -1,0 +1,81 @@
+type: object
+minProperties: 1
+additionalProperties: false
+properties:
+  chat:
+    allOf:
+      - $ref: '#/$defs/target'
+      - properties:
+          api:
+            const: openai-completions
+  completions:
+    allOf:
+      - $ref: '#/$defs/target'
+      - properties:
+          api:
+            const: openai-completions
+  messages:
+    allOf:
+      - $ref: '#/$defs/target'
+      - properties:
+          api:
+            const: anthropic-messages
+  responses:
+    allOf:
+      - $ref: '#/$defs/target'
+      - properties:
+          api:
+            const: openai-responses
+  gemini:
+    allOf:
+      - $ref: '#/$defs/target'
+      - properties:
+          api:
+            const: google-generative-ai
+$defs:
+  thinkingLevelMap:
+    type: object
+    additionalProperties: false
+    properties:
+      off: { type: [string, 'null'] }
+      minimal: { type: [string, 'null'] }
+      low: { type: [string, 'null'] }
+      medium: { type: [string, 'null'] }
+      high: { type: [string, 'null'] }
+      xhigh: { type: [string, 'null'] }
+      max: { type: [string, 'null'] }
+  compat:
+    type: object
+    additionalProperties: false
+    properties:
+      thinkingFormat:
+        type: string
+        enum: [zai, qwen, qwen-chat-template, deepseek, openrouter, ant-ling, together, string-thinking]
+      supportsTemperature: { type: boolean }
+      maxTokensField: { type: string, enum: [max_tokens, max_completion_tokens] }
+      forceAdaptiveThinking: { type: boolean }
+      supportsReasoningEffort: { type: boolean }
+  traits:
+    type: object
+    additionalProperties: false
+    properties:
+      reasoning: { type: boolean }
+      thinkingLevelMap: { $ref: '#/$defs/thinkingLevelMap' }
+      maxTokens: { type: integer, minimum: 1 }
+      compat: { $ref: '#/$defs/compat' }
+  target:
+    type: object
+    required: [api]
+    additionalProperties: false
+    properties:
+      api:
+        type: string
+        enum: [openai-completions, openai-responses, anthropic-messages, google-generative-ai]
+      reasoning: { type: boolean }
+      thinkingLevelMap: { $ref: '#/$defs/thinkingLevelMap' }
+      maxTokens: { type: integer, minimum: 1 }
+      compat: { $ref: '#/$defs/compat' }
+      models:
+        type: object
+        additionalProperties:
+          $ref: '#/$defs/traits'

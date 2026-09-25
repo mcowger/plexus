@@ -14,12 +14,14 @@ export { isOAuthPlaceholderUrl } from './provider';
 
 export {
   ProviderPresetSchema,
+  PiAiQuirksSchema,
   applyProviderPreset,
   findProviderPreset,
   findUnresolvedPresetVars,
   substitutePresetVars,
 } from './provider-presets';
 export type {
+  PiAiQuirks,
   ProviderPreset,
   ProviderPresetDraft,
   ProviderPresetTemplateVar,

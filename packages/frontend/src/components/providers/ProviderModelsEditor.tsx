@@ -110,6 +110,7 @@ export function ProviderModelsEditor({
       modelAdvancedOpen={modelAdvancedOpen}
       setModelAdvancedOpen={setModelAdvancedOpen}
       piAiProvider={editingProvider.pi_ai_provider}
+      inlineQuirksAvailable={!!editingProvider.pi_ai_quirks}
       piModels={piAiModels.piModels}
       piModelCustom={piAiModels.piModelCustom}
       setPiModelCustom={piAiModels.setPiModelCustom}

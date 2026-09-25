@@ -59,6 +59,7 @@ export const providers = pgTable(
     stallGracePeriodMs: integer('stall_grace_period_ms'), // Grace period in ms before throughput enforcement
     maxConcurrency: integer('max_concurrency'), // Max concurrent requests for this provider (NULL = no limit)
     piAiProvider: text('pi_ai_provider'), // pi-ai provider name (e.g. 'anthropic', 'openai', 'google')
+    piAiQuirks: jsonb('pi_ai_quirks'), // Inline target API compatibility traits
     rawPassthrough: jsonb('raw_passthrough'), // { enabled, base_url, auth }
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),

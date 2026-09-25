@@ -45,6 +45,18 @@ describe('config schema: pi_ai_provider and pi_ai_model_id', () => {
     expect(config.providers['test-provider']?.pi_ai_provider).toBeUndefined();
   });
 
+  it('retains legacy auto_compat opt-in without a source as inert config', () => {
+    const config = validateConfig(
+      JSON.stringify({
+        providers: { 'test-provider': { ...BASE_PROVIDER, auto_compat: true } },
+        models: {},
+        keys: {},
+      })
+    );
+    expect(config.providers['test-provider']?.auto_compat).toBe(true);
+    expect(config.providers['test-provider']?.pi_ai_quirks).toBeUndefined();
+  });
+
   it('ModelProviderConfigSchema accepts pi_ai_model_id as optional string', () => {
     const config = validateConfig(
       JSON.stringify({

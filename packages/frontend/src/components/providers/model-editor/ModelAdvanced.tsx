@@ -10,6 +10,7 @@ interface Props {
   setIsOpen: (open: boolean) => void;
   updateModelConfig: (modelId: string, updates: any) => void;
   piAiProvider?: string;
+  inlineQuirksAvailable: boolean;
 }
 
 export function ModelAdvanced({
@@ -19,8 +20,9 @@ export function ModelAdvanced({
   setIsOpen,
   updateModelConfig,
   piAiProvider,
+  inlineQuirksAvailable,
 }: Props) {
-  const mappingReady = !!piAiProvider;
+  const mappingReady = !!piAiProvider || inlineQuirksAvailable;
   return (
     <div className="border border-border-glass rounded-md overflow-hidden">
       <div
@@ -58,7 +60,7 @@ export function ModelAdvanced({
               className="flex items-start gap-2 py-1 cursor-pointer"
               title={
                 !mappingReady && modelConfig.auto_compat !== true
-                  ? 'Select a pi-ai Provider first'
+                  ? 'Select a pi-ai provider or inline quirks first'
                   : undefined
               }
             >
@@ -75,8 +77,9 @@ export function ModelAdvanced({
               <div>
                 <div className="font-body text-[12px] text-text">Auto Compat</div>
                 <div className="font-body text-[11px] text-text-muted" style={{ lineHeight: 1.35 }}>
-                  Translates this model's reasoning options using its mapped pi-ai Model ID.
-                  Requires Auto Compat here or on the provider.
+                  Translates this model's reasoning and generation options using its mapped pi-ai
+                  model or the provider's inline quirks. Requires Auto Compat here or on the
+                  provider.
                 </div>
               </div>
             </label>

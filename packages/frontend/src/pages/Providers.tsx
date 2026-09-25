@@ -82,6 +82,7 @@ export const Providers = () => {
               <ProviderPresetPicker
                 editingProvider={f.editingProvider}
                 setEditingProvider={f.setEditingProvider}
+                onSelectionChange={f.setPresetSelected}
               />
             )}
 
