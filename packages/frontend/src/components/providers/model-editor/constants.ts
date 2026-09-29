@@ -23,8 +23,7 @@ export const CODEX_IMAGE_API_ACCESS_OPTIONS: readonly ApiAccessOption[] = [
 ];
 
 export const DECISIONS_API_ACCESS_OPTIONS: readonly ApiAccessOption[] = [
-  { type: 'openrouter-decisions', label: 'OpenRouter Decisions' },
-  { type: 'typesafe-decisions', label: 'TypeSafe Decisions' },
+  { type: 'systemone', label: 'System One' },
 ];
 
 export const CODEX_OAUTH_PROVIDER = 'openai-codex';
@@ -63,6 +62,8 @@ export function getApiBadgeStyle(apiType: string): CSSProperties {
       return { backgroundColor: '#7c3aed', color: 'white', border: 'none' };
     case 'codex-images':
       return { backgroundColor: '#10a37f', color: 'white', border: 'none' };
+    case 'systemone':
+      return { backgroundColor: '#0284c7', color: 'white', border: 'none' };
     case 'openrouter-decisions':
       return { backgroundColor: '#0ea5e9', color: 'white', border: 'none' };
     case 'typesafe-decisions':

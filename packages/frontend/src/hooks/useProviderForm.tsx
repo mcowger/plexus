@@ -9,6 +9,11 @@ import {
 } from '../lib/piAiProvider';
 import type { QuotaCheckerInfo } from '../types/quota';
 import type { OAuthCredentialStatus } from '../types/settings';
+import {
+  isDecisionsTargetAccess,
+  migrateLegacyDecisionsAccess,
+  migrateLegacyDecisionsBaseUrls,
+} from '../lib/apiFormats';
 import { formatMeterValue } from '../components/quota/MeterValue';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../contexts/ToastContext';
@@ -25,8 +30,7 @@ const KNOWN_APIS = [
   'openai-images',
   'openrouter-images',
   'codex-images',
-  'openrouter-decisions',
-  'typesafe-decisions',
+  'systemone',
   'responses',
   'ollama',
 ];
@@ -448,7 +452,27 @@ export function useProviderForm() {
   const handleEdit = (provider: Provider) => {
     setPresetSelected(false);
     setOriginalId(provider.id);
-    setEditingProvider(JSON.parse(JSON.stringify(provider)));
+    const cloned: Provider = JSON.parse(JSON.stringify(provider));
+    // Collapse legacy Decisions config onto `systemone` when the form loads
+    // so saving persists the migration (the backend normalizes at runtime
+    // regardless). Both halves migrate together: models without a matching
+    // base URL (or vice versa) would leave the row internally inconsistent.
+    const migratedBaseUrls = migrateLegacyDecisionsBaseUrls(cloned.apiBaseUrl);
+    if (migratedBaseUrls !== cloned.apiBaseUrl) cloned.apiBaseUrl = migratedBaseUrls;
+    if (cloned.models && !Array.isArray(cloned.models)) {
+      for (const [modelId, modelConfig] of Object.entries(cloned.models)) {
+        const access = (modelConfig as { access_via?: unknown })?.access_via;
+        if (!Array.isArray(access)) continue;
+        const migrated = migrateLegacyDecisionsAccess(access);
+        if (migrated && JSON.stringify(migrated) !== JSON.stringify(access)) {
+          (cloned.models as Record<string, unknown>)[modelId] = {
+            ...(modelConfig as Record<string, unknown>),
+            access_via: migrated,
+          };
+        }
+      }
+    }
+    setEditingProvider(cloned);
     setIsModalOpen(true);
   };
 
@@ -560,9 +584,7 @@ export function useProviderForm() {
       ? undefined
       : provider?.models?.[modelId]?.access_via;
     const availableTypes = accessVia?.length ? accessVia : inferProviderTypes(provider?.apiBaseUrl);
-    const usesDecisions = availableTypes.some(
-      (type) => type === 'openrouter-decisions' || type === 'typesafe-decisions'
-    );
+    const usesDecisions = availableTypes.some((type) => isDecisionsTargetAccess(type));
     let testApiTypes: string[] = ['chat'];
     if (usesDecisions) testApiTypes = ['decisions'];
     else if (modelType === 'embeddings') testApiTypes = ['embeddings'];

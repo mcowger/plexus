@@ -7,6 +7,7 @@ describe('isDecisionsApiType', () => {
   });
 
   it('recognizes decisions target protocols', () => {
+    expect(isDecisionsApiType('systemone')).toBe(true);
     expect(isDecisionsApiType('openrouter-decisions')).toBe(true);
     expect(isDecisionsApiType('typesafe-decisions')).toBe(true);
   });

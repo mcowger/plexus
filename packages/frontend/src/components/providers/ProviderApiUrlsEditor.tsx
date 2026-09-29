@@ -14,8 +14,7 @@ const KNOWN_APIS = [
   'openai-images',
   'openrouter-images',
   'codex-images',
-  'openrouter-decisions',
-  'typesafe-decisions',
+  'systemone',
   'responses',
   'ollama',
 ];
@@ -165,7 +164,9 @@ export function ProviderApiUrlsEditor({
                 e.stopPropagation();
                 addApiBaseUrlEntry();
               }}
-              disabled={Object.keys(getApiBaseUrlMap()).length >= KNOWN_APIS.length}
+              disabled={KNOWN_APIS.every((t) =>
+                Object.prototype.hasOwnProperty.call(getApiBaseUrlMap(), t)
+              )}
             >
               <Plus size={14} />
             </Button>
@@ -219,6 +220,15 @@ export function ProviderApiUrlsEditor({
                             {t}
                           </option>
                         ))}
+                        {/* Stored configs can carry types no longer offered
+                            (e.g. pre-collapse Decisions names): show the
+                            current value so the select never misrepresents
+                            the config. */}
+                        {!KNOWN_APIS.includes(apiType) && (
+                          <option key={apiType} value={apiType} className="bg-bg-surface text-text">
+                            {apiType} (legacy)
+                          </option>
+                        )}
                       </select>
                       <input
                         className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"

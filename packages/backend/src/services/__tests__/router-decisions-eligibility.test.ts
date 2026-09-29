@@ -9,11 +9,11 @@ function decisionsConfig() {
       openrouter: {
         api_base_url: {
           chat: 'https://openrouter.ai/api/v1',
-          'openrouter-decisions': 'https://openrouter.ai/api/alpha',
+          systemone: 'https://openrouter.ai/api/v1',
         },
         api_key: 'openrouter-key',
         models: {
-          'typesafe/jev-1.13': { access_via: ['openrouter-decisions'] },
+          'typesafe/jev-1.13': { access_via: ['systemone'] },
           'some-chat-model': { access_via: ['chat'] },
         },
       },
@@ -21,7 +21,7 @@ function decisionsConfig() {
         api_base_url: 'https://api.typesafe.ai/v1',
         api_key: 'typesafe-key',
         models: {
-          'jev-latest': { access_via: ['typesafe-decisions'] },
+          'jev-latest': { access_via: ['systemone'] },
         },
       },
     },

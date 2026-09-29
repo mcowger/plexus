@@ -36,7 +36,7 @@
     {
       "id": "openrouter",
       "name": "OpenRouter",
-      "description": "OpenRouter unified gateway — all protocols plus the decisions alpha.",
+      "description": "OpenRouter unified gateway — all protocols plus System One.",
       "docsUrl": "https://openrouter.ai/docs/api-reference/overview",
       "suggestedProviderId": "openrouter",
       "suggestedName": "OpenRouter",
@@ -45,7 +45,7 @@
         "completions": "https://openrouter.ai/api/v1",
         "messages": "https://openrouter.ai/api/v1",
         "responses": "https://openrouter.ai/api/v1",
-        "openrouter-decisions": "https://openrouter.ai/api/alpha"
+        "systemone": "https://openrouter.ai/api/v1"
       },
       "piAiProvider": "openrouter",
       "autoCompat": true,

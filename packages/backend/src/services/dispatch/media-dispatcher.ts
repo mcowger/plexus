@@ -34,9 +34,9 @@ import {
 import { admitProvider } from '../runtime/provider-admission';
 import {
   OPENROUTER_DECISIONS_API_TYPE,
-  OPENROUTER_DECISIONS_ENDPOINT,
+  SYSTEMONE_API_TYPE,
+  SYSTEMONE_ENDPOINT,
   TYPESAFE_DECISIONS_API_TYPE,
-  TYPESAFE_DECISIONS_ENDPOINT,
   parseDecisionsUpstreamResponse,
 } from '../../types/decisions';
 
@@ -55,10 +55,13 @@ function decisionsRoutingError(message: string): Error {
 /** Upstream path for a decisions target; anything else is misconfiguration. */
 function decisionsEndpointForTarget(targetApiType: string | undefined): string {
   switch (getApiBaseType(targetApiType ?? '')) {
+    case SYSTEMONE_API_TYPE:
+    // Deprecated aliases route to the same System One endpoint. Stored
+    // configs are normalized onto `systemone` at load time (see
+    // normalizeSystemOneProviderConfig), so these cases are a safety net.
     case OPENROUTER_DECISIONS_API_TYPE:
-      return OPENROUTER_DECISIONS_ENDPOINT;
     case TYPESAFE_DECISIONS_API_TYPE:
-      return TYPESAFE_DECISIONS_ENDPOINT;
+      return SYSTEMONE_ENDPOINT;
     default:
       throw decisionsRoutingError(
         `Target API type '${targetApiType}' cannot serve decisions requests`
@@ -67,29 +70,22 @@ function decisionsEndpointForTarget(targetApiType: string | undefined): string {
 }
 
 /**
- * Builds the upstream Decisions body. Core fields (`model`, `state`,
- * `questions`) go to both upstreams; the OpenRouter-only routing and
- * observability fields go to OpenRouter alone. The routed model always wins:
- * neither the client body nor operator `extraBody` may override it, and the
- * client's upstream `provider` preferences win over `extraBody` defaults.
+ * Builds the upstream Decisions body. Only the core fields (`model`,
+ * `state`, `questions`) are sent: every upstream serves the same System One
+ * protocol. The routed model always wins: neither the client body nor
+ * operator `extraBody` may override it, and the legacy OpenRouter-only
+ * routing/observability fields (`provider`, `session_id`, `trace`, `user`)
+ * are stripped even when an operator extra introduces them.
  */
 function buildDecisionsUpstreamPayload(
   request: UnifiedDecisionsRequest,
-  route: RouteResult,
-  targetApiType: string | undefined
+  route: RouteResult
 ): Record<string, any> {
-  const isOpenRouter = getApiBaseType(targetApiType ?? '') === OPENROUTER_DECISIONS_API_TYPE;
-  let payload: Record<string, any> = {
+  const payload: Record<string, any> = {
     model: route.model,
     state: request.state,
     questions: request.questions,
   };
-  if (isOpenRouter) {
-    if (request.upstreamProvider !== undefined) payload.provider = request.upstreamProvider;
-    if (request.sessionId !== undefined) payload.session_id = request.sessionId;
-    if (request.trace !== undefined) payload.trace = request.trace;
-    if (request.user !== undefined) payload.user = request.user;
-  }
 
   const extraBodies = [
     route.config.extraBody,
@@ -99,17 +95,21 @@ function buildDecisionsUpstreamPayload(
   for (const extraBody of extraBodies) {
     if (!extraBody) continue;
     // Operator extras may carry defaults, but never the caller's core
-    // fields: `model` is the routed model, `state`/`questions` are the
-    // caller's evaluation input, and `provider` is the caller's upstream
-    // routing preference (restored below when present).
+    // fields (`model` is the routed model; `state`/`questions` are the
+    // caller's evaluation input) nor the removed OpenRouter-only
+    // routing/observability fields (`provider`, `session_id`, `trace`,
+    // `user`), which no upstream receives anymore.
     const {
       model: _model,
       provider: _provider,
       state: _state,
       questions: _questions,
+      session_id: _sessionId,
+      trace: _trace,
+      user: _user,
       ...rest
     } = extraBody;
-    payload = { ...payload, ...rest };
+    Object.assign(payload, rest);
   }
 
   // The routed model and the caller's evaluation input always win over
@@ -117,17 +117,6 @@ function buildDecisionsUpstreamPayload(
   payload.model = route.model;
   payload.state = request.state;
   payload.questions = request.questions;
-  if (isOpenRouter && request.upstreamProvider !== undefined) {
-    payload.provider = request.upstreamProvider;
-  }
-  if (!isOpenRouter) {
-    // TypeSafe receives only the core payload: drop any OpenRouter-only
-    // routing/observability fields an operator extra may have introduced.
-    delete payload.provider;
-    delete payload.session_id;
-    delete payload.trace;
-    delete payload.user;
-  }
   return payload;
 }
 
@@ -1408,11 +1397,8 @@ export class MediaDispatcher {
    * Dispatches buffered Jev-style Decisions requests.
    *
    * Same failover/timeout/admission machinery as the image loop, but the
-   * payload is forwarded nearly verbatim: `{model, state, questions}` plus
-   * the OpenRouter-only routing/observability fields (`provider`,
-   * `session_id`, `trace`, `user`). `request.upstreamProvider` is an
-   * OpenRouter upstream preference, never a Plexus slug — it is sent to
-   * OpenRouter only and never influences local candidate selection.
+   * payload is forwarded nearly verbatim: `{model, state, questions}` on the
+   * single System One protocol every upstream serves.
    */
   async dispatchDecisions(
     request: UnifiedDecisionsRequest,
@@ -1477,7 +1463,7 @@ export class MediaDispatcher {
         const url = `${baseUrl}${endpoint}`;
 
         attemptTimeout.signal.throwIfAborted();
-        const payload = buildDecisionsUpstreamPayload(request, route, targetApiType);
+        const payload = buildDecisionsUpstreamPayload(request, route);
         attemptTimeout.signal.throwIfAborted();
 
         const headers: Record<string, string> = {

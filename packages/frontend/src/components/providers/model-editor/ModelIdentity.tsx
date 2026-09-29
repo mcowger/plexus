@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
-import { apiAccessToKey, hasApiAccess, toggleApiAccess } from '../../../lib/apiFormats';
+import {
+  apiAccessToKey,
+  hasApiAccess,
+  isDecisionsTargetAccess,
+  toggleApiAccess,
+} from '../../../lib/apiFormats';
+import type { ApiAccess } from '../../../lib/apiFormats';
 import { Tooltip } from '../../ui/Tooltip';
 import type { PiAiModel } from './usePiAiModels';
 import {
@@ -78,20 +84,17 @@ export function ModelIdentity({
   const imageAccessOptions = isCodexOAuthProvider
     ? CODEX_IMAGE_API_ACCESS_OPTIONS
     : IMAGE_API_ACCESS_OPTIONS;
-  // Decisions protocols are offered on text models once the provider has a
-  // Decisions base URL (or one is already selected), so existing chat-model
+  // The System One protocol is offered on text models once the provider has a
+  // System One base URL (or one is already selected), so existing chat-model
   // forms stay unchanged. Provider models cannot carry a `decisions` type
   // (Postgres persists it into a pgEnum without that value); they advertise
   // Decisions capability via `access_via` instead.
   const providerApiTypes = Object.keys(getApiBaseUrlMap());
-  const hasDecisionsAccess = (mCfg.access_via ?? []).some(
-    (entry: any) =>
-      apiAccessToKey(entry) === 'openrouter-decisions' ||
-      apiAccessToKey(entry) === 'typesafe-decisions'
+  const hasDecisionsAccess = (mCfg.access_via ?? []).some((entry: ApiAccess) =>
+    isDecisionsTargetAccess(entry)
   );
   const showDecisionsAccess =
-    hasDecisionsAccess ||
-    providerApiTypes.some((t) => t === 'openrouter-decisions' || t === 'typesafe-decisions');
+    hasDecisionsAccess || providerApiTypes.some((t) => isDecisionsTargetAccess(t));
   const textAccessOptions =
     mCfg.type !== 'image' && showDecisionsAccess
       ? [...API_ACCESS_OPTIONS, ...DECISIONS_API_ACCESS_OPTIONS]

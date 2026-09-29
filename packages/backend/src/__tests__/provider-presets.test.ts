@@ -135,8 +135,8 @@ describe('built-in presets catalog (data/provider-presets.json)', () => {
     expect(presetOrThrow('moonshot').apiBaseUrl.messages).toBe(
       'https://api.moonshot.ai/anthropic/v1'
     );
-    expect(presetOrThrow('openrouter').apiBaseUrl['openrouter-decisions']).toBe(
-      'https://openrouter.ai/api/alpha'
+    expect(presetOrThrow('openrouter').apiBaseUrl['systemone']).toBe(
+      'https://openrouter.ai/api/v1'
     );
     // DeepSeek chat has no /v1 segment upstream.
     expect(presetOrThrow('deepseek').apiBaseUrl.chat).toBe('https://api.deepseek.com');

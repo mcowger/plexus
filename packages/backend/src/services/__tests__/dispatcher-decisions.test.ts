@@ -12,17 +12,17 @@ function decisionsConfig(extra: Record<string, any> = {}) {
   return {
     providers: {
       openrouter: {
-        api_base_url: { 'openrouter-decisions': 'https://openrouter.ai/api/alpha' },
+        api_base_url: { systemone: 'https://openrouter.ai/api/v1' },
         api_key: 'openrouter-key',
         models: {
-          'typesafe/jev-1.13': { access_via: ['openrouter-decisions'] },
+          'typesafe/jev-1.13': { access_via: ['systemone'] },
         },
       },
       typesafe: {
         api_base_url: 'https://api.typesafe.ai/v1',
         api_key: 'typesafe-key',
         models: {
-          'jev-latest': { access_via: ['typesafe-decisions'] },
+          'jev-latest': { access_via: ['systemone'] },
         },
       },
     },
@@ -94,36 +94,26 @@ describe('Dispatcher decisions translation', () => {
     ConcurrencyTracker.resetForTesting();
   });
 
-  test('dispatches to the OpenRouter decisions endpoint with auth and OR-only fields', async () => {
+  test('dispatches to the System One endpoint with auth and the core payload', async () => {
     setConfigForTesting(decisionsConfig());
     fetchMock.mockResolvedValue(okResponse(openRouterBody));
 
-    const response = await new Dispatcher().dispatchDecisions({
-      ...request,
-      upstreamProvider: { only: ['TypeSafe'] },
-      sessionId: 'session-1234',
-      trace: { trace_id: 't' },
-      user: 'end-user',
-    });
+    const response = await new Dispatcher().dispatchDecisions({ ...request });
 
     expect(response.model).toBe('typesafe/jev-1.13-20260917');
     expect(response.id).toBe('gen-dec-1');
     expect(response.provider).toBe('TypeSafe');
     expect(response.usage?.cost).toBe(0.000019992);
-    expect(response.plexus?.targetApiType).toBe('openrouter-decisions');
+    expect(response.plexus?.targetApiType).toBe('systemone');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0]!;
-    expect(url).toBe('https://openrouter.ai/api/alpha/decisions');
+    expect(url).toBe('https://openrouter.ai/api/v1/systemone');
     expect(options.headers.Authorization).toBe('Bearer openrouter-key');
     expect(JSON.parse(options.body)).toEqual({
       model: 'typesafe/jev-1.13',
       state: request.state,
       questions: request.questions,
-      provider: { only: ['TypeSafe'] },
-      session_id: 'session-1234',
-      trace: { trace_id: 't' },
-      user: 'end-user',
     });
   });
 
@@ -150,16 +140,12 @@ describe('Dispatcher decisions translation', () => {
     const response = await new Dispatcher().dispatchDecisions({
       ...request,
       model: 'direct_alias',
-      upstreamProvider: { only: ['TypeSafe'] },
-      sessionId: 'session-1234',
-      trace: { trace_id: 't' },
-      user: 'end-user',
     });
 
     const [url, options] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://api.typesafe.ai/v1/systemone');
     expect(options.headers.Authorization).toBe('Bearer typesafe-key');
-    // Upstream routing/observability fields never leak to TypeSafe direct.
+    // Only the core payload is ever sent.
     expect(JSON.parse(options.body)).toEqual({
       model: 'jev-latest',
       state: request.state,
@@ -167,7 +153,7 @@ describe('Dispatcher decisions translation', () => {
     });
     expect(response.id).toBeUndefined();
     expect(response.provider).toBeUndefined();
-    expect(response.plexus?.targetApiType).toBe('typesafe-decisions');
+    expect(response.plexus?.targetApiType).toBe('systemone');
   });
 
   test('neither the client nor extraBody can override the routed model', async () => {
@@ -175,12 +161,18 @@ describe('Dispatcher decisions translation', () => {
       decisionsConfig({
         providers: {
           openrouter: {
-            api_base_url: { 'openrouter-decisions': 'https://openrouter.ai/api/alpha' },
+            api_base_url: { systemone: 'https://openrouter.ai/api/v1' },
             api_key: 'openrouter-key',
-            extraBody: { model: 'operator-model', provider: { only: ['Evil'] } },
+            extraBody: {
+              model: 'operator-model',
+              provider: { only: ['Evil'] },
+              session_id: 'operator-session',
+              trace: { a: 1 },
+              user: 'evil-user',
+            },
             models: {
               'typesafe/jev-1.13': {
-                access_via: ['openrouter-decisions'],
+                access_via: ['systemone'],
                 extraBody: { model: 'model-level-override' },
               },
             },
@@ -188,23 +180,60 @@ describe('Dispatcher decisions translation', () => {
           typesafe: {
             api_base_url: 'https://api.typesafe.ai/v1',
             api_key: 'typesafe-key',
-            models: { 'jev-latest': { access_via: ['typesafe-decisions'] } },
+            models: { 'jev-latest': { access_via: ['systemone'] } },
           },
         },
       })
     );
     fetchMock.mockResolvedValue(okResponse(openRouterBody));
 
-    await new Dispatcher().dispatchDecisions({
-      ...request,
-      upstreamProvider: { only: ['TypeSafe'] },
-    });
+    await new Dispatcher().dispatchDecisions({ ...request });
 
     const [, options] = fetchMock.mock.calls[0]!;
     const body = JSON.parse(options.body);
     expect(body.model).toBe('typesafe/jev-1.13');
-    // The client's upstream preferences win over operator extraBody defaults.
-    expect(body.provider).toEqual({ only: ['TypeSafe'] });
+    // Legacy OpenRouter-only fields are stripped even from operator extras.
+    expect(body.provider).toBeUndefined();
+    expect(body.session_id).toBeUndefined();
+    expect(body.trace).toBeUndefined();
+    expect(body.user).toBeUndefined();
+  });
+
+  test('migrates a legacy stored config to System One at load time', async () => {
+    // Stored rows still carry the pre-collapse names; setConfigForTesting
+    // applies the same load-time normalization as production, so dispatch
+    // resolves the canonical endpoint.
+    setConfigForTesting({
+      providers: {
+        openrouter: {
+          api_base_url: { 'openrouter-decisions': 'https://openrouter.ai/api/alpha' },
+          api_key: 'openrouter-key',
+          models: {
+            'typesafe/jev-1.13': { access_via: ['openrouter-decisions'] },
+          },
+        },
+      },
+      models: {
+        legacy_alias: {
+          selector: 'in_order',
+          type: 'decisions',
+          targets: [{ provider: 'openrouter', model: 'typesafe/jev-1.13' }],
+        },
+      },
+      keys: {},
+      failover: { enabled: true, retryableStatusCodes: [], retryableErrors: [] },
+      quotas: [],
+    } as any);
+    fetchMock.mockResolvedValue(okResponse(openRouterBody));
+
+    const response = await new Dispatcher().dispatchDecisions({
+      ...request,
+      model: 'legacy_alias',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://openrouter.ai/api/v1/systemone');
+    expect(response.plexus?.targetApiType).toBe('systemone');
   });
 
   test('fails over to the second target on a retryable upstream error', async () => {
@@ -216,7 +245,7 @@ describe('Dispatcher decisions translation', () => {
     const response = await new Dispatcher().dispatchDecisions(request);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://openrouter.ai/api/alpha/decisions');
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://openrouter.ai/api/v1/systemone');
     expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.typesafe.ai/v1/systemone');
     expect(response.plexus?.provider).toBe('typesafe');
     expect((response.plexus as any)?.attemptCount).toBe(2);

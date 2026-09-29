@@ -560,20 +560,13 @@ export interface UnifiedSpeechResponse {
 
 // Unified Decisions Request
 //
-// Buffered Jev-style evaluations served by `openrouter-decisions` and
-// `typesafe-decisions` targets. `upstreamProvider` carries OpenRouter
-// provider-routing preferences verbatim (it is NOT a Plexus provider slug
-// and never influences local routing); it is forwarded to OpenRouter only.
-// Local failover follows the alias target order, never upstream preferences.
+// Buffered Jev-style evaluations served by `systemone` targets (TypeSafe's
+// System One protocol). Local failover follows the alias target order.
 export interface UnifiedDecisionsRequest {
   requestId?: string;
   model: string;
   state: string | Record<string, any> | any[];
   questions: Record<string, DecisionsQuestion>;
-  upstreamProvider?: any;
-  sessionId?: string;
-  trace?: any;
-  user?: string;
   // Internal tracking
   incomingApiType?: string;
   originalBody?: any;

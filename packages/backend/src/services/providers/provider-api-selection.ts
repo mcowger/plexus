@@ -53,10 +53,10 @@ export function selectTargetApiType(
 
   let targetApiType = availableTypes[0]; // Default to first one
 
-  // Decisions requests prefer an explicitly decisions-capable protocol even
+  // Decisions requests prefer the explicitly decisions-capable protocol even
   // when the target also advertises other protocols (e.g. a shared
   // OpenRouter provider): the Decisions payload is only valid on the
-  // Decisions endpoints, so defaulting to the first available type could
+  // System One endpoint, so defaulting to the first available type could
   // send it to a chat base URL.
   if (incomingApiType && incomingApiType.toLowerCase() === 'decisions') {
     const decisionsMatch = availableTypes.find((t: string) => isDecisionsTargetApiType(t));

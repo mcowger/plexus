@@ -3,10 +3,11 @@ import { z } from 'zod';
 /**
  * Shared Jev-style Decisions contract.
  *
- * Both upstreams (TypeSafe `/v1/systemone` directly and OpenRouter
- * `/api/alpha/decisions`, which proxies TypeSafe's jev model) share the same
- * core shape: a `state` evaluated against a caller-keyed map of typed
- * `questions`, with one typed answer returned per question id.
+ * All upstreams serve TypeSafe's System One protocol at `/systemone` —
+ * TypeSafe directly and OpenRouter at `/api/v1/systemone` (bare model ids
+ * map onto the `typesafe/` namespace). Plexus therefore exposes a single
+ * `systemone` target: `{model, state, questions}` with one typed answer
+ * returned per question id.
  *
  * Limits below mirror the upstream docs, using the intersection both
  * upstreams accept: score levels 2-10, at most 255 choice options.
@@ -16,11 +17,13 @@ export const MAX_DECISIONS_CHOICE_OPTIONS = 255;
 export const MIN_DECISIONS_SCORE_LEVELS = 2;
 export const MAX_DECISIONS_SCORE_LEVELS = 10;
 
-/** Target protocols able to serve an incoming `decisions` request. */
+/** Target protocol able to serve an incoming `decisions` request. */
+export const SYSTEMONE_API_TYPE = 'systemone';
+export const SYSTEMONE_ENDPOINT = '/systemone';
+/** @deprecated Use SYSTEMONE_API_TYPE. Normalized onto it at load time; kept for reads. */
 export const OPENROUTER_DECISIONS_API_TYPE = 'openrouter-decisions';
+/** @deprecated Use SYSTEMONE_API_TYPE. Normalized onto it at load time; kept for reads. */
 export const TYPESAFE_DECISIONS_API_TYPE = 'typesafe-decisions';
-export const OPENROUTER_DECISIONS_ENDPOINT = '/decisions';
-export const TYPESAFE_DECISIONS_ENDPOINT = '/systemone';
 
 /** Structured guidance: a plain string, or a JSON object/array of context. */
 export const DecisionsStructuredSchema = z.union([
@@ -78,11 +81,15 @@ export type DecisionsQuestion = z.infer<typeof DecisionsQuestionSchema>;
 /**
  * Ingress validator for POST /v1/decisions.
  *
- * `provider`, `session_id`, `trace`, and `user` are OpenRouter upstream
- * routing/observability fields: `provider` is OpenRouter provider-routing
- * preferences (NOT a Plexus provider slug) and is forwarded to OpenRouter
- * only. `stream` is explicitly rejected — Decisions is a buffered API and
- * stripping the flag would silently change request semantics.
+ * Accepts `{model, state, questions}` only. `stream` is explicitly rejected —
+ * Decisions is a buffered API and stripping the flag would silently change
+ * request semantics.
+ *
+ * Breaking change: the OpenRouter-only routing/observability fields
+ * (`provider`, `session_id`, `trace`, `user`) were removed when both
+ * upstreams converged on the System One protocol. Unknown keys are stripped,
+ * so clients still sending them get a 200 with those settings ignored —
+ * remove them from client code.
  */
 export const DecisionsIngressSchema = z.object({
   model: z.string().trim().min(1, 'model must be a non-empty string'),
@@ -92,10 +99,6 @@ export const DecisionsIngressSchema = z.object({
     .refine((questions) => Object.keys(questions).length >= 1, {
       message: 'questions must define at least one question',
     }),
-  provider: z.any().optional(),
-  session_id: z.string().max(256).optional(),
-  trace: z.any().optional(),
-  user: z.string().max(256).optional(),
   // Declared (rather than caught in superRefine) because unknown keys are
   // stripped before superRefine runs. Decisions is buffered-only; silently
   // dropping the flag would change request semantics.

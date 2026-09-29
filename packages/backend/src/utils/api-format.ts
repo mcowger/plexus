@@ -1,3 +1,9 @@
+import {
+  OPENROUTER_DECISIONS_API_TYPE,
+  SYSTEMONE_API_TYPE,
+  TYPESAFE_DECISIONS_API_TYPE,
+} from '../types/decisions';
+
 export interface ApiFormat {
   type: string;
   subtype?: string;
@@ -58,8 +64,18 @@ export function isImageTargetApiType(apiType: string): boolean {
  * advertise these through `access_via`; the router and the per-target API
  * type selection both filter against this single list. Decisions-only
  * targets are excluded from every other incoming API type.
+ *
+ * `systemone` is the canonical target (TypeSafe's System One protocol at
+ * `/systemone`, served by TypeSafe directly and OpenRouter at
+ * `/api/v1/systemone`). `openrouter-decisions` and `typesafe-decisions`
+ * are deprecated aliases kept so stored configs keep routing; presets and
+ * the UI only offer `systemone`.
  */
-export const DECISIONS_TARGET_API_TYPES = ['openrouter-decisions', 'typesafe-decisions'] as const;
+export const DECISIONS_TARGET_API_TYPES = [
+  SYSTEMONE_API_TYPE,
+  OPENROUTER_DECISIONS_API_TYPE,
+  TYPESAFE_DECISIONS_API_TYPE,
+] as const;
 
 const DECISIONS_TARGET_API_TYPE_SET: ReadonlySet<string> = new Set(DECISIONS_TARGET_API_TYPES);
 

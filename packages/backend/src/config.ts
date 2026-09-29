@@ -645,7 +645,7 @@ export const ModelConfigSchema = z
       .array(z.enum(['chat_completions', 'messages', 'gemini', 'responses']))
       .optional(),
     // Alias capability type. `decisions` marks a buffered Jev-style alias
-    // (served through `openrouter-decisions` / `typesafe-decisions` targets).
+    // (served through `systemone` targets).
     // Provider-model `type` intentionally has no `decisions` value: on
     // Postgres it persists into a pgEnum without that value, so provider
     // models advertise Decisions capability through `access_via` instead.
@@ -771,6 +771,123 @@ export function normalizeKeyConfig<T extends { quota?: unknown; quotas?: unknown
     return { ...data, quotas: [data.quota] };
   }
   return data;
+}
+
+/** Pre-collapse Decisions target names. Still accepted (see below), never written. */
+const LEGACY_DECISIONS_TARGET_TYPES: ReadonlySet<string> = new Set([
+  'openrouter-decisions',
+  'typesafe-decisions',
+]);
+
+/** The only base URL the old preset ever shipped for the legacy OpenRouter target. */
+const LEGACY_OPENROUTER_ALPHA_BASE = 'https://openrouter.ai/api/alpha';
+
+/** Replacement base: OpenRouter serves System One at `/api/v1/systemone`. */
+const OPENROUTER_V1_BASE = 'https://openrouter.ai/api/v1';
+
+function isLegacyDecisionsTargetType(value: unknown): boolean {
+  return typeof value === 'string' && LEGACY_DECISIONS_TARGET_TYPES.has(value.trim().toLowerCase());
+}
+
+function apiAccessEntryKey(entry: unknown): string {
+  if (typeof entry === 'string') return entry.trim().toLowerCase();
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    const record = entry as Record<string, unknown>;
+    const type = typeof record.type === 'string' ? record.type.trim().toLowerCase() : '';
+    const subtype =
+      typeof record.subtype === 'string' && record.subtype.trim().length > 0
+        ? record.subtype.trim().toLowerCase()
+        : undefined;
+    return subtype ? `${type}:${subtype}` : type;
+  }
+  return '';
+}
+
+/** Map one `access_via` entry onto the single `systemone` target, preserving subtypes. */
+function systemOneAccessEntry(entry: unknown): unknown {
+  if (typeof entry === 'string') {
+    return isLegacyDecisionsTargetType(entry) ? 'systemone' : entry;
+  }
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    const record = entry as Record<string, unknown>;
+    if (isLegacyDecisionsTargetType(record.type)) {
+      return { ...record, type: 'systemone' };
+    }
+  }
+  return entry;
+}
+
+/**
+ * Collapse legacy Decisions targets onto the single `systemone` target at
+ * load time. `openrouter-decisions` / `typesafe-decisions` `api_base_url`
+ * keys become `systemone` (an explicit `systemone` entry always wins); a
+ * base URL of exactly the old preset value (`/api/alpha`) is rewritten to
+ * `/api/v1`, while custom bases are kept verbatim. Model-level `access_via`
+ * entries are mapped the same way and deduped. Returns a new object unless
+ * nothing needed changing.
+ *
+ * Applied in `hydrateConfig` (file/test configs) and `ConfigService`
+ * rebuilds (database configs) so every runtime read sees the canonical
+ * form; stored rows are left untouched.
+ */
+export function normalizeSystemOneProviderConfig(data: ProviderConfig): ProviderConfig {
+  let apiBaseUrl = data.api_base_url;
+  if (apiBaseUrl && typeof apiBaseUrl === 'object' && !Array.isArray(apiBaseUrl)) {
+    const urlMap = apiBaseUrl as Record<string, string>;
+    const legacyKeys = Object.keys(urlMap).filter((key) =>
+      LEGACY_DECISIONS_TARGET_TYPES.has(key.trim().toLowerCase())
+    );
+    if (legacyKeys.length > 0) {
+      const next: Record<string, string> = { ...urlMap };
+      for (const key of legacyKeys) {
+        const base = next[key] as string;
+        delete next[key];
+        if (next['systemone'] === undefined) {
+          next['systemone'] =
+            base.replace(/\/+$/, '').toLowerCase() === LEGACY_OPENROUTER_ALPHA_BASE
+              ? OPENROUTER_V1_BASE
+              : base;
+        }
+      }
+      apiBaseUrl = next;
+    }
+  }
+
+  let models = data.models;
+  if (models && typeof models === 'object' && !Array.isArray(models)) {
+    const record = models as Record<string, unknown>;
+    const nextModels: Record<string, unknown> = {};
+    let changed = false;
+    for (const [modelId, modelCfg] of Object.entries(record)) {
+      const access = (modelCfg as { access_via?: unknown } | null)?.access_via;
+      if (!Array.isArray(access)) {
+        nextModels[modelId] = modelCfg;
+        continue;
+      }
+      // Map legacy entries, drop empties, collapse duplicates.
+      const seen = new Set<string>();
+      const mapped: unknown[] = [];
+      for (const entry of access) {
+        const next = systemOneAccessEntry(entry);
+        const key = apiAccessEntryKey(next);
+        if (key.length === 0 || seen.has(key)) continue;
+        seen.add(key);
+        mapped.push(next);
+      }
+      if (JSON.stringify(mapped) === JSON.stringify(access)) {
+        nextModels[modelId] = modelCfg;
+      } else {
+        changed = true;
+        nextModels[modelId] = { ...(modelCfg as Record<string, unknown>), access_via: mapped };
+      }
+    }
+    if (changed) {
+      models = nextModels as ProviderConfig['models'];
+    }
+  }
+
+  if (apiBaseUrl === data.api_base_url && models === data.models) return data;
+  return { ...data, api_base_url: apiBaseUrl, models };
 }
 
 const QuotaConfigSchema = z.object({
@@ -1006,9 +1123,19 @@ function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusCon
     ])
   );
 
+  // Collapse legacy Decisions targets onto `systemone` (see
+  // normalizeSystemOneProviderConfig): stored configs keep working without
+  // a data migration.
+  const normalizedProviders = Object.fromEntries(
+    Object.entries(config.providers).map(([providerId, providerConfig]) => [
+      providerId,
+      normalizeSystemOneProviderConfig(providerConfig as ProviderConfig),
+    ])
+  );
+
   return {
     ...config,
-    providers: config.providers,
+    providers: normalizedProviders,
     keys: normalizedKeys,
     failover: FailoverPolicySchema.parse(config.failover ?? {}),
     cooldown: CooldownPolicySchema.parse(config.cooldown ?? {}),
@@ -1188,6 +1315,16 @@ export function setConfigForTesting(config: PlexusConfig) {
         }
         return [slug, modelCfg];
       })
+    );
+  }
+  // Mirror production load-time normalization so legacy Decisions targets
+  // collapse onto `systemone` in tests too (see hydrateConfig).
+  if (normalised.providers) {
+    normalised.providers = Object.fromEntries(
+      Object.entries(normalised.providers).map(([providerId, providerConfig]) => [
+        providerId,
+        normalizeSystemOneProviderConfig(providerConfig as ProviderConfig),
+      ])
     );
   }
 

@@ -30,9 +30,7 @@ export async function registerDecisionsRoute(
   /**
    * POST /v1/decisions
    * Buffered Jev-style Decisions endpoint (questions and answers).
-   * Accepts `{model, state, questions}` plus the OpenRouter-only routing and
-   * observability fields (`provider`, `session_id`, `trace`, `user`).
-   * `provider` is an upstream OpenRouter preference, never a Plexus slug.
+   * Accepts `{model, state, questions}` on the System One protocol.
    */
   fastify.post('/v1/decisions', async (request: any, reply: any) => {
     const requestId = crypto.randomUUID();
@@ -86,10 +84,6 @@ export async function registerDecisionsRoute(
         model: parsed.data.model,
         state: parsed.data.state,
         questions: parsed.data.questions,
-        ...(parsed.data.provider !== undefined ? { upstreamProvider: parsed.data.provider } : {}),
-        ...(parsed.data.session_id !== undefined ? { sessionId: parsed.data.session_id } : {}),
-        ...(parsed.data.trace !== undefined ? { trace: parsed.data.trace } : {}),
-        ...(parsed.data.user !== undefined ? { user: parsed.data.user } : {}),
         requestId,
         incomingApiType: 'decisions',
         originalBody: body,

@@ -1,6 +1,10 @@
 import { ConfigRepository, OAuthCredentialsData } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
-import { assertNoAliasRefCycles, isOAuthPlaceholderUrl } from '../../config';
+import {
+  assertNoAliasRefCycles,
+  isOAuthPlaceholderUrl,
+  normalizeSystemOneProviderConfig,
+} from '../../config';
 import type {
   PlexusConfig,
   ProviderConfig,
@@ -513,7 +517,16 @@ export class ConfigService {
    * Core rebuild logic — loads the full config graph from the database.
    */
   private async doRebuild(): Promise<void> {
-    const providers = await this.repo.getAllProviders();
+    const rawProviders = await this.repo.getAllProviders();
+    // Collapse legacy Decisions targets onto `systemone` at load time so
+    // stored configs keep routing without a data migration (mirrors
+    // hydrateConfig for file-based configs).
+    const providers = Object.fromEntries(
+      Object.entries(rawProviders).map(([slug, cfg]) => [
+        slug,
+        normalizeSystemOneProviderConfig(cfg),
+      ])
+    );
     const models = await this.repo.getAllAliases();
     assertNoAliasRefCycles(models);
     const keys = await this.repo.getAllKeys();

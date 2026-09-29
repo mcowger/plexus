@@ -15,17 +15,17 @@ function decisionsConfig() {
   return {
     providers: {
       openrouter: {
-        api_base_url: { 'openrouter-decisions': 'https://openrouter.ai/api/alpha' },
+        api_base_url: { systemone: 'https://openrouter.ai/api/v1' },
         api_key: 'openrouter-key',
         models: {
-          'typesafe/jev-1.13': { access_via: ['openrouter-decisions'] },
+          'typesafe/jev-1.13': { access_via: ['systemone'] },
         },
       },
       typesafe: {
         api_base_url: 'https://api.typesafe.ai/v1',
         api_key: 'typesafe-key',
         models: {
-          'jev-latest': { access_via: ['typesafe-decisions'] },
+          'jev-latest': { access_via: ['systemone'] },
         },
       },
     },
@@ -134,7 +134,7 @@ describe('POST /v1/decisions', () => {
     return response;
   }
 
-  test('serves an OpenRouter decisions request end to end', async () => {
+  test('serves a System One request end to end', async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify(upstreamBody()), {
         status: 200,
@@ -146,9 +146,6 @@ describe('POST /v1/decisions', () => {
       model: 'decisions_alias',
       state: { customer_tier: 'enterprise', ticket: 'My checkout shows a blank screen.' },
       questions,
-      provider: { only: ['TypeSafe'] },
-      session_id: 'session-1234',
-      user: 'end-user',
     });
 
     expect(response.statusCode).toBe(200);
@@ -158,12 +155,14 @@ describe('POST /v1/decisions', () => {
     expect(client.plexus).toBeUndefined();
 
     const [url, options] = fetchMock.mock.calls[0]!;
-    expect(url).toBe('https://openrouter.ai/api/alpha/decisions');
+    expect(url).toBe('https://openrouter.ai/api/v1/systemone');
     expect(options.headers.Authorization).toBe('Bearer openrouter-key');
     const sent = JSON.parse(options.body);
-    expect(sent.model).toBe('typesafe/jev-1.13');
-    expect(sent.provider).toEqual({ only: ['TypeSafe'] });
-    expect(sent.session_id).toBe('session-1234');
+    expect(sent).toEqual({
+      model: 'typesafe/jev-1.13',
+      state: { customer_tier: 'enterprise', ticket: 'My checkout shows a blank screen.' },
+      questions,
+    });
 
     expect(savedRequests).toHaveLength(1);
     const record = savedRequests[0]!;
@@ -172,7 +171,7 @@ describe('POST /v1/decisions', () => {
       incomingModelAlias: 'decisions_alias',
       provider: 'openrouter',
       selectedModelName: 'typesafe/jev-1.13',
-      outgoingApiType: 'openrouter-decisions',
+      outgoingApiType: 'systemone',
       tokensInput: 476,
       tokensOutput: 70,
       providerReportedCost: 0.000019992,
@@ -197,9 +196,6 @@ describe('POST /v1/decisions', () => {
       model: 'direct_alias',
       state: 'Just asking about pricing.',
       questions: { is_bug: questions.is_bug },
-      provider: { only: ['TypeSafe'] },
-      session_id: 'session-1234',
-      user: 'end-user',
     });
 
     expect(response.statusCode).toBe(200);
@@ -310,16 +306,17 @@ describe('POST /v1/decisions policy hardening', () => {
       ...decisionsConfig(),
       providers: {
         openrouter: {
-          api_base_url: { 'openrouter-decisions': 'https://openrouter.ai/api/alpha' },
+          api_base_url: { systemone: 'https://openrouter.ai/api/v1' },
           api_key: 'openrouter-key',
           extraBody: {
             model: 'attacker-model',
             state: 'attacker-state',
             questions: { evil: { type: 'noul', instructions: 'evil' } },
             provider: { only: ['Evil'] },
+            session_id: 'attacker-session',
           },
           models: {
-            'typesafe/jev-1.13': { access_via: ['openrouter-decisions'] },
+            'typesafe/jev-1.13': { access_via: ['systemone'] },
           },
         },
       },
@@ -341,9 +338,10 @@ describe('POST /v1/decisions policy hardening', () => {
     expect(sent.state).toEqual(validBody().state);
     expect(sent.questions).toEqual({ is_bug: questions.is_bug });
     expect(sent.provider).toBeUndefined();
+    expect(sent.session_id).toBeUndefined();
   });
 
-  test('TypeSafe direct strips OpenRouter-only fields from operator extraBody', async () => {
+  test('legacy operator extras carrying removed fields are stripped', async () => {
     setConfigForTesting({
       ...decisionsConfig(),
       providers: {
@@ -352,7 +350,7 @@ describe('POST /v1/decisions policy hardening', () => {
           api_key: 'typesafe-key',
           extraBody: { session_id: 'operator-session', trace: { a: 1 } },
           models: {
-            'jev-latest': { access_via: ['typesafe-decisions'] },
+            'jev-latest': { access_via: ['systemone'] },
           },
         },
       },

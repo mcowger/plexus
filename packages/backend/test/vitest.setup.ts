@@ -262,6 +262,8 @@ vi.mock('@earendil-works/pi-ai', async (importOriginal) => {
     // real createProvider — keep it real so catalog tests exercise genuine
     // library semantics.
     createProvider: actual.createProvider,
+    isModelType: actual.isModelType,
+    getModelType: actual.getModelType,
   };
 });
 

@@ -1,11 +1,14 @@
 import type { UsageRecord } from '../../types/usage';
-import { getApiBaseType } from '../../lib/apiFormats';
+import { getApiBaseType, isDecisionsTargetAccess } from '../../lib/apiFormats';
 
-const DECISIONS_API_TYPES = new Set(['decisions', 'openrouter-decisions', 'typesafe-decisions']);
-
-/** True when `apiType` is a Decisions ingress or target protocol. */
-export const isDecisionsApiType = (apiType?: string | null): boolean =>
-  apiType ? DECISIONS_API_TYPES.has(getApiBaseType(apiType)) : false;
+/** True when `apiType` is the Decisions ingress type or a Decisions target protocol. */
+export const isDecisionsApiType = (apiType?: string | null): boolean => {
+  if (!apiType) return false;
+  const base = getApiBaseType(apiType);
+  // Logs predate the collapse; the shared helper still recognizes the
+  // legacy `openrouter-decisions` / `typesafe-decisions` target names.
+  return base === 'decisions' || isDecisionsTargetAccess(base);
+};
 
 export const formatReasoningEffort = (effort?: string | null): string | null => {
   if (!effort) return null;
