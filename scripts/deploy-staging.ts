@@ -268,6 +268,7 @@ step(7, 'Health check');
 console.log(`  Polling ${STAGING_URL}/healthz (timeout: ${HEALTH_TIMEOUT}s)...`);
 let healthy = false;
 let elapsed = 0;
+let reportedVersion: string | null = null;
 for (let attempt = 0; attempt < HEALTH_TIMEOUT; attempt++) {
   await sleep(1000);
   elapsed = attempt + 1;
@@ -276,6 +277,7 @@ for (let attempt = 0; attempt < HEALTH_TIMEOUT; attempt++) {
     const body = await response.json();
     if (response.ok && body?.ok === true) {
       healthy = true;
+      reportedVersion = typeof body.version === 'string' ? body.version : null;
       break;
     }
   } catch {
@@ -290,6 +292,23 @@ if (!healthy) {
   console.error(`\n  Rollback: docker --context ${CTX} tag ${previousImageRef} ${LATEST_TAG}`);
   process.exit(1);
 }
+
+// The image bakes APP_VERSION at build time, so a healthy container must
+// report exactly the tag we just built. A mismatch means something is
+// overriding APP_VERSION in the container's runtime environment — most often
+// a stale literal in the host's Compose file, which silently pins the
+// reported version (and the UI's update prompt) to an old build.
+if (reportedVersion !== TIMESTAMP) {
+  console.error(
+    `\n❌ /healthz reports version "${reportedVersion ?? '(missing)'}" but the image was built as "${TIMESTAMP}".\n`
+  );
+  console.error('  The container environment is overriding the APP_VERSION baked into the image.');
+  console.error('  Remove the APP_VERSION entry from the Compose environment, e.g.:');
+  console.error(`    ${workingDir}/compose.yaml`);
+  console.error('  The image already carries the correct value as an ENV.');
+  process.exit(1);
+}
+console.log(`  ✓ /healthz reports ${reportedVersion}`);
 
 console.log('\n╔══════════════════════════════════════════════════════╗');
 console.log('║                 ✅ Deploy Complete                   ║');
