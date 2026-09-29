@@ -1,7 +1,4 @@
-import {
-  ModelMetadataManager,
-  type NormalizedModelMetadata,
-} from '../models/model-metadata-manager';
+import { ModelMetadataManager } from '../models/model-metadata-manager';
 
 interface OpenRouterPricing {
   prompt: string;
@@ -39,11 +36,15 @@ export class PricingManager {
   }
 
   public getPricing(slug: string): OpenRouterPricing | undefined {
-    const pricing: NormalizedModelMetadata['pricing'] = this.metadataManager.getMetadata(
-      'openrouter',
-      slug
-    )?.pricing;
-    return pricing as OpenRouterPricing | undefined;
+    const pricing = this.metadataManager.getMetadata('openrouter', slug)?.pricing as
+      | OpenRouterPricing
+      | undefined;
+    // OpenRouter uses "-1" for routers/variable-priced models (e.g. typesafe/jev-router)
+    // to mean "price unknown". Treat those as having no pricing rather than a negative rate.
+    if (pricing && (parseFloat(pricing.prompt) < 0 || parseFloat(pricing.completion) < 0)) {
+      return undefined;
+    }
+    return pricing;
   }
 
   public isInitialized(): boolean {

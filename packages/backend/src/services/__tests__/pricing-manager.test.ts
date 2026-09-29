@@ -2,6 +2,9 @@ import { describe, expect, test, beforeEach } from 'vitest';
 import { PricingManager } from '../observability/pricing-manager';
 import { ModelMetadataManager } from '../models/model-metadata-manager';
 import path from 'path';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { calculateCosts } from '../../utils/calculate-costs';
 
 const FIXTURES = path.join(__dirname, '../../utils/__tests__/fixtures');
 const pricingFixture = path.join(FIXTURES, 'openrouter-models.json');
@@ -101,6 +104,33 @@ describe('PricingManager - Shared Catalog', () => {
 
   test('getPricing returns undefined for unknown slugs', () => {
     expect(PricingManager.getInstance().getPricing('nonexistent/model')).toBeUndefined();
+  });
+
+  test('getPricing treats negative (variable) OpenRouter pricing as unknown', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'plexus-pricing-'));
+    const fixture = path.join(dir, 'openrouter-variable.json');
+    writeFileSync(
+      fixture,
+      JSON.stringify({
+        data: [
+          { id: 'typesafe/jev-router', pricing: { prompt: '-1', completion: '-1' } },
+          { id: 'openai/gpt-4', pricing: { prompt: '0.00003', completion: '0.00006' } },
+        ],
+      })
+    );
+    try {
+      await loadCatalog(fixture);
+      const pricingManager = PricingManager.getInstance();
+      expect(pricingManager.getPricing('typesafe/jev-router')).toBeUndefined();
+      expect(pricingManager.getPricing('openai/gpt-4')?.prompt).toBe('0.00003');
+
+      const usage: Record<string, any> = { tokensInput: 2327, tokensOutput: 259 };
+      calculateCosts(usage, { source: 'openrouter', slug: 'typesafe/jev-router' });
+      expect(usage.costTotal).toBeUndefined();
+      expect(usage.costSource).toBe('default');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test('catalog refreshes are visible without reloading the PricingManager', async () => {
