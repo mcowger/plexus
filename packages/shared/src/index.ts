@@ -13,6 +13,7 @@ export type { QuotaRatioFields } from './quota-ranking';
 export {
   isOAuthPlaceholderUrl,
   isBodyCacheKeyInjectionField,
+  getDefaultCacheKeyInjection,
   PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
   PROVIDER_CACHE_KEY_INJECTION_VALUES,
   ProviderCacheKeyInjectionSchema,

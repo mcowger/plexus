@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   isOAuthPlaceholderUrl,
+  getDefaultCacheKeyInjection,
   PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
   type ProviderCacheKeyInjection,
 } from '@plexus/shared';
@@ -1291,7 +1292,8 @@ export function ProviderAdvancedEditor({
                     className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                     value={
                       editingProvider.cacheKeyInjection ??
-                      (editingProvider.oauthProvider === 'meta' ? 'prompt_cache_key' : 'off')
+                      getDefaultCacheKeyInjection(editingProvider.oauthProvider) ??
+                      'off'
                     }
                     onChange={(e) =>
                       setEditingProvider({

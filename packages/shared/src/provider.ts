@@ -39,6 +39,20 @@ export function isBodyCacheKeyInjectionField(value: string): boolean {
   return CACHE_KEY_INJECTION_BODY_FIELDS.has(value);
 }
 
+/**
+ * Default injection destination for a provider's OAuth id, or `undefined` to
+ * leave the client request untouched. Shared by the backend resolver and the
+ * frontend editor so the two cannot drift.
+ *
+ * Meta (Muse) OAuth defaults to `prompt_cache_key` because its Responses
+ * prompt caching depends on a routing key clients may omit or vary.
+ */
+export function getDefaultCacheKeyInjection(
+  oauthProvider: string | undefined
+): ProviderCacheKeyInjection | undefined {
+  return oauthProvider === 'meta' ? 'prompt_cache_key' : undefined;
+}
+
 export interface ProviderCacheKeyInjectionOption {
   value: ProviderCacheKeyInjection;
   label: string;

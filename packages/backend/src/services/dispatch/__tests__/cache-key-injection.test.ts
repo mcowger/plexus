@@ -69,9 +69,18 @@ describe('deriveCacheInjectionKey', () => {
     expect(deriveCacheInjectionKey(request({ prompt_cache_key: 'body-key' }))).toBe('body-key');
   });
 
-  it('falls back to the Plexus conversation key when the client sends nothing', () => {
-    const req = request({ previousResponseId: 'resp-1' });
-    expect(deriveCacheInjectionKey(req)).toBe('r:resp-1');
+  it('excludes the previousResponseId chain so the key stays stable across turns', () => {
+    const req = request({
+      previousResponseId: 'resp-1',
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'hi' },
+      ] as any,
+    });
+    expect(deriveCacheInjectionKey(req)).toBe(
+      StickySessionManager.computeSessionKey({ ...req, previousResponseId: undefined })
+    );
+    expect(deriveCacheInjectionKey(req)).not.toBe('r:resp-1');
   });
 
   it('uses the first-two-messages hash for a client without a response chain', () => {
@@ -150,5 +159,14 @@ describe('applyHeaderCacheKeyInjection', () => {
     );
     expect(out['prompt_cache_key']).toBeUndefined();
     expect(out['x-client-request-id']).toBeUndefined();
+  });
+
+  it('hashes an unsafe client body key before using it as a header value', () => {
+    const out = applyHeaderCacheKeyInjection(
+      { Authorization: 'Bearer x' },
+      route({ oauth_provider: 'meta', cache_key_injection: 'x-session-affinity' }),
+      request({ prompt_cache_key: 'bad\r\nvalue' })
+    );
+    expect(out['x-session-affinity']).toMatch(/^[0-9a-f]{64}$/);
   });
 });
