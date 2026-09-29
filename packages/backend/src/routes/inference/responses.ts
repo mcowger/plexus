@@ -6,6 +6,7 @@ import {
   normalizeCompositeResponsesCallIds,
   normalizeResponsesFunctionCallItemIds,
   normalizeResponsesReasoningContent,
+  normalizeResponsesNullEntries,
 } from '../../transformers/responses';
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { ResponsesStorageService } from '../../services/responses/responses-storage';
@@ -184,6 +185,12 @@ export async function registerResponsesRoute(
         rawBodyForDebug,
         sanitizeHeaders(request.headers as any)
       );
+      const removedNullEntries = normalizeResponsesNullEntries(body);
+      if (removedNullEntries > 0) {
+        logger.warn(
+          `Removed ${removedNullEntries} null Responses input/content entr(ies) for request ${requestId}`
+        );
+      }
       const normalizedCallIds = normalizeCompositeResponsesCallIds(body);
       const normalizedItemIds = normalizeResponsesFunctionCallItemIds(body);
       const normalizedReasoningItems = normalizeResponsesReasoningContent(body);

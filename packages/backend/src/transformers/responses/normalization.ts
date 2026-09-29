@@ -106,3 +106,35 @@ export function normalizeResponsesReasoningContent(body: unknown): number {
 
   return normalizedCount;
 }
+
+// Some Responses clients (observed: opencode) send null entries in `input`,
+// in message `content` arrays, or in reasoning `summary` arrays. Providers
+// reject these (e.g. "`input[0].content` did not match any supported type"),
+// and pass-through dispatch forwards the body verbatim, so remove them here.
+export function normalizeResponsesNullEntries(body: unknown): number {
+  if (!body || typeof body !== 'object' || !('input' in body) || !Array.isArray(body.input)) {
+    return 0;
+  }
+
+  const mutableBody = body as { input: unknown[] };
+  let removedCount = 0;
+  const withoutNulls = (entries: unknown[]): unknown[] => {
+    const kept = entries.filter((entry) => entry !== null && entry !== undefined);
+    removedCount += entries.length - kept.length;
+    return kept;
+  };
+
+  mutableBody.input = withoutNulls(mutableBody.input);
+  for (const item of mutableBody.input) {
+    if (typeof item !== 'object') continue;
+    const mutableItem = item as Record<string, unknown>;
+    if (Array.isArray(mutableItem.content)) {
+      mutableItem.content = withoutNulls(mutableItem.content);
+    }
+    if (Array.isArray(mutableItem.summary)) {
+      mutableItem.summary = withoutNulls(mutableItem.summary);
+    }
+  }
+
+  return removedCount;
+}

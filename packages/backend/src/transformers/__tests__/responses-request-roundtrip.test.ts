@@ -4,6 +4,7 @@ import {
   normalizeCompositeResponsesCallIds,
   normalizeResponsesFunctionCallItemIds,
   normalizeResponsesReasoningContent,
+  normalizeResponsesNullEntries,
 } from '../responses';
 import { OpenAITransformer } from '../openai';
 import { parseAnthropicRequest } from '../anthropic/request-parser';
@@ -731,5 +732,34 @@ describe('Responses request parsing tolerates null entries', () => {
         ],
       },
     ]);
+  });
+});
+
+describe('normalizeResponsesNullEntries', () => {
+  it('removes null input items, content parts, and summary parts from the dispatch body', () => {
+    const body = {
+      model: 'gpt-4o',
+      input: [
+        null,
+        { type: 'message', role: 'user', content: [null, { type: 'input_text', text: 'hi' }] },
+        { type: 'reasoning', summary: [null, { type: 'summary_text', text: 't' }] },
+      ],
+    };
+
+    expect(normalizeResponsesNullEntries(body)).toBe(3);
+    expect(body.input).toEqual([
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+      { type: 'reasoning', summary: [{ type: 'summary_text', text: 't' }] },
+    ]);
+  });
+
+  it('leaves string input and clean bodies untouched', () => {
+    const stringBody = { model: 'gpt-4o', input: 'hi' };
+    expect(normalizeResponsesNullEntries(stringBody)).toBe(0);
+    expect(stringBody.input).toBe('hi');
+
+    const clean = { input: [{ type: 'message', role: 'user', content: 'hi' }] };
+    expect(normalizeResponsesNullEntries(clean)).toBe(0);
+    expect(clean.input).toEqual([{ type: 'message', role: 'user', content: 'hi' }]);
   });
 });
