@@ -4,8 +4,9 @@
  * The backend reports its build id as `version` on `GET /healthz`
  * (see `packages/backend/src/index.ts`); the frontend bakes the same id
  * in as `process.env.APP_VERSION` at build time
- * (see `packages/frontend/build.ts`). When they differ, the server has
- * been redeployed since this tab loaded.
+ * (see `packages/frontend/build.ts`). The tab should reload only when the
+ * server is running a *newer* build — a mere difference is not enough, see
+ * `isServerVersionNewer`.
  */
 
 /** How often to poll /healthz for a new build id. */
@@ -35,17 +36,83 @@ export const parseHealthzVersion = (body: unknown): string | null => {
   return typeof version === 'string' && version.length > 0 ? version : null;
 };
 
+/** Build-id formats Plexus has shipped. */
+export type VersionKind = 'timestamp' | 'calver' | 'dev-sha';
+
+export interface ParsedVersion {
+  kind: VersionKind;
+  /** Numeric fields, most-significant first. Empty for `dev-sha`. */
+  parts: number[];
+}
+
+// Staging deploys: YYYYMMDD-HHMMSS (scripts/deploy-staging.ts).
+const TIMESTAMP_RE = /^(\d{8})-(\d{6})$/;
+// Release tags: YYYY.MM.DD.N (.github/workflows/release.yml).
+const CALVER_RE = /^(\d{4})\.(\d{2})\.(\d{2})\.(\d+)$/;
+// Dev pre-releases: dev-<commit sha> (.github/workflows/dev-release.yml).
+const DEV_SHA_RE = /^dev-[0-9a-f]{7,40}$/i;
+
 /**
- * True when the server is running a different build than this tab.
- * A null server version means an old backend without the field, and `dev`
- * on either side means the build id is unknown — neither is comparable,
- * so neither is ever treated as stale.
+ * Parse a build id into a comparable form, or null when it carries no
+ * ordering information (`dev` and anything unrecognized). Ids of different
+ * kinds are not comparable against each other.
  */
-export const isVersionStale = (current: string, server: string | null): boolean => {
-  if (!server || !current) return false;
-  if (current === server) return false;
-  if (current === DEV_VERSION || server === DEV_VERSION) return false;
-  return true;
+export const parseVersion = (version: string): ParsedVersion | null => {
+  const timestamp = version.match(TIMESTAMP_RE);
+  if (timestamp) {
+    return { kind: 'timestamp', parts: timestamp.slice(1).map(Number) };
+  }
+  const calver = version.match(CALVER_RE);
+  if (calver) {
+    return { kind: 'calver', parts: calver.slice(1).map(Number) };
+  }
+  if (DEV_SHA_RE.test(version)) {
+    return { kind: 'dev-sha', parts: [] };
+  }
+  return null;
+};
+
+/** Element-wise numeric compare, treating missing fields as zero. */
+const compareParts = (a: number[], b: number[]): number => {
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i++) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    if (av !== bv) return av - bv;
+  }
+  return 0;
+};
+
+/**
+ * True only when the server is running a strictly newer build than this tab.
+ *
+ * A plain inequality is not enough: in mixed-replica or load-balanced
+ * deploys a poll can land on an older replica, and saying "a new version is
+ * available" there is backwards — refreshing would hand the user an older
+ * build. The server's id must be newer, not merely different.
+ *
+ * Ids that cannot be ordered are never treated as newer:
+ * - A missing server version, `dev` (unset APP_VERSION), or anything
+ *   unrecognized carries no ordering information.
+ * - Two different kinds (e.g. a timestamp bundle against a CalVer server
+ *   during a format migration) are not comparable.
+ *
+ * `dev-<sha>` pre-releases are the exception: commit shas cannot be ordered,
+ * so any change is treated as the server moving on. Those are single-instance
+ * dev builds with no mixed-replica concern.
+ */
+export const isServerVersionNewer = (bundled: string, server: string | null): boolean => {
+  if (!bundled || !server) return false;
+  if (bundled === server) return false;
+  if (bundled === DEV_VERSION || server === DEV_VERSION) return false;
+
+  const bundledParsed = parseVersion(bundled);
+  const serverParsed = parseVersion(server);
+  if (!bundledParsed || !serverParsed) return false;
+  if (bundledParsed.kind !== serverParsed.kind) return false;
+  if (bundledParsed.kind === 'dev-sha') return true;
+
+  return compareParts(serverParsed.parts, bundledParsed.parts) > 0;
 };
 
 /**

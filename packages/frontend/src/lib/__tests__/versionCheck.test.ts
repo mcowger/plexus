@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   hasBlockingForm,
   hashText,
-  isVersionStale,
+  isServerVersionNewer,
   parseHealthzVersion,
+  parseVersion,
   type BlockingFormDocument,
 } from '../versionCheck';
 
@@ -24,23 +25,77 @@ describe('parseHealthzVersion', () => {
   });
 });
 
-describe('isVersionStale', () => {
-  it('detects a redeploy', () => {
-    expect(isVersionStale('a', 'b')).toBe(true);
+describe('parseVersion', () => {
+  it('parses staging timestamps', () => {
+    expect(parseVersion('20260929-203041')).toEqual({
+      kind: 'timestamp',
+      parts: [20260929, 203041],
+    });
   });
 
-  it('matches identical versions', () => {
-    expect(isVersionStale('a', 'a')).toBe(false);
+  it('parses CalVer release tags', () => {
+    expect(parseVersion('2026.09.29.3')).toEqual({
+      kind: 'calver',
+      parts: [2026, 9, 29, 3],
+    });
+  });
+
+  it('parses dev pre-release shas', () => {
+    expect(parseVersion('dev-1a2b3c4d5e6f')).toEqual({ kind: 'dev-sha', parts: [] });
+  });
+
+  it('returns null for unorderable or unknown ids', () => {
+    expect(parseVersion('dev')).toBeNull();
+    expect(parseVersion('')).toBeNull();
+    expect(parseVersion('not-a-version')).toBeNull();
+  });
+});
+
+describe('isServerVersionNewer', () => {
+  it('detects a newer staging deploy', () => {
+    expect(isServerVersionNewer('20260929-203041', '20260929-210000')).toBe(true);
+  });
+
+  it('ignores an older server build (does not prompt to downgrade)', () => {
+    // The reported bug: a poll landing on an older replica must not claim a
+    // new version is available.
+    expect(isServerVersionNewer('20260929-203041', '20260717-155329')).toBe(false);
+  });
+
+  it('ignores identical versions', () => {
+    expect(isServerVersionNewer('20260929-203041', '20260929-203041')).toBe(false);
+  });
+
+  it('compares CalVer tags numerically', () => {
+    expect(isServerVersionNewer('2026.09.29.2', '2026.09.29.10')).toBe(true);
+    expect(isServerVersionNewer('2026.09.29.9', '2026.09.30.1')).toBe(true);
+    expect(isServerVersionNewer('2026.09.29.10', '2026.09.29.2')).toBe(false);
   });
 
   it('ignores a missing server version (old backend)', () => {
-    expect(isVersionStale('a', null)).toBe(false);
+    expect(isServerVersionNewer('20260929-203041', null)).toBe(false);
   });
 
-  it('treats dev as unknown, never stale', () => {
-    expect(isVersionStale('dev', 'dev')).toBe(false);
-    expect(isVersionStale('dev', '2026.09.29.1')).toBe(false);
-    expect(isVersionStale('2026.09.29.1', 'dev')).toBe(false);
+  it('treats dev as unknown, never newer', () => {
+    expect(isServerVersionNewer('dev', 'dev')).toBe(false);
+    expect(isServerVersionNewer('dev', '20260929-203041')).toBe(false);
+    expect(isServerVersionNewer('20260929-203041', 'dev')).toBe(false);
+  });
+
+  it('never treats unrecognized ids as newer', () => {
+    expect(isServerVersionNewer('20260929-203041', 'not-a-version')).toBe(false);
+    expect(isServerVersionNewer('not-a-version', '20260929-203041')).toBe(false);
+  });
+
+  it('does not compare across id formats', () => {
+    expect(isServerVersionNewer('2026.09.29.1', '20260929-203041')).toBe(false);
+    expect(isServerVersionNewer('20260929-203041', '2026.09.29.1')).toBe(false);
+  });
+
+  it('treats a changed dev sha as a move (shas are unordered)', () => {
+    expect(isServerVersionNewer('dev-1a2b3c4d5e6f', 'dev-abcdef012345')).toBe(true);
+    expect(isServerVersionNewer('dev-1a2b3c4d5e6f', 'dev-1a2b3c4d5e6f')).toBe(false);
+    expect(isServerVersionNewer('dev-1a2b3c4d5e6f', '20260929-203041')).toBe(false);
   });
 });
 

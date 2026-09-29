@@ -8,7 +8,7 @@ import {
   getBundledVersion,
   hasBlockingForm,
   hashText,
-  isVersionStale,
+  isServerVersionNewer,
   parseHealthzVersion,
 } from '../lib/versionCheck';
 
@@ -39,6 +39,10 @@ interface PendingUpdate {
  *   comes back for it.
  * - Dev mode (`dev` build ids are not comparable): polls the served bundle
  *   content hash instead, so `bun run dev` tabs still reload on rebuild.
+ *
+ * Only a strictly *newer* server build triggers any of this; see
+ * `isServerVersionNewer`. A poll that lands on an older replica is ignored
+ * rather than prompting the user to refresh into a downgrade.
  */
 export const VersionReloader: React.FC = () => {
   const bundledRef = useRef<string | null>(null);
@@ -103,7 +107,7 @@ export const VersionReloader: React.FC = () => {
     }
     const bundled = bundledRef.current ?? '';
     const server = parseHealthzVersion(body);
-    if (isVersionStale(bundled, server)) {
+    if (isServerVersionNewer(bundled, server)) {
       handleStale(server ?? '', server ?? '');
       return;
     }
