@@ -123,7 +123,8 @@
         "responses": "https://api.meta.ai/v1"
       },
       "piAiProvider": "meta",
-      "autoCompat": true
+      "autoCompat": true,
+      "cacheKeyInjection": "prompt_cache_key"
     },
     {
       "id": "moonshot",

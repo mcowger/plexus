@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { isOAuthPlaceholderUrl } from '@plexus/shared';
+import {
+  isOAuthPlaceholderUrl,
+  PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
+  type ProviderCacheKeyInjection,
+} from '@plexus/shared';
 import { ChevronDown, ChevronRight, Info, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { DebouncedInput } from '../ui/DebouncedInput';
@@ -1281,6 +1285,36 @@ export function ProviderAdvancedEditor({
                     </div>
                   </div>
                 </label>
+                <div className="flex flex-col gap-1 py-1">
+                  <label className="font-body text-[12px] text-text">Cache Key Injection</label>
+                  <select
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    value={
+                      editingProvider.cacheKeyInjection ??
+                      (editingProvider.oauthProvider === 'meta' ? 'prompt_cache_key' : 'off')
+                    }
+                    onChange={(e) =>
+                      setEditingProvider({
+                        ...editingProvider,
+                        cacheKeyInjection: e.target.value as ProviderCacheKeyInjection,
+                      })
+                    }
+                  >
+                    {PROVIDER_CACHE_KEY_INJECTION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div
+                    className="font-body text-[11px] text-text-muted"
+                    style={{ lineHeight: 1.35 }}
+                  >
+                    Inject Plexus's derived per-run cache/session key into this field so upstream
+                    prompt-cache routing doesn't depend on the client. Meta OAuth defaults to
+                    prompt_cache_key.
+                  </div>
+                </div>
               </div>
 
               {/* Right: inputs */}

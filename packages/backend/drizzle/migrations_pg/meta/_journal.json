@@ -603,6 +603,13 @@
       "when": 1790364479522,
       "tag": "0085_add_provider_pi_ai_quirks",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1790695603872,
+      "tag": "0086_add_provider_cache_key_injection",
+      "breakpoints": true
     }
   ]
 }

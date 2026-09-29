@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "cache_key_injection" text;

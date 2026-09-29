@@ -10,7 +10,17 @@ export {
 export { constrainedRatio, mostConstrained, sortMostConstrainedFirst } from './quota-ranking';
 export type { QuotaRatioFields } from './quota-ranking';
 
-export { isOAuthPlaceholderUrl } from './provider';
+export {
+  isOAuthPlaceholderUrl,
+  isBodyCacheKeyInjectionField,
+  PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
+  PROVIDER_CACHE_KEY_INJECTION_VALUES,
+  ProviderCacheKeyInjectionSchema,
+} from './provider';
+export type {
+  ProviderCacheKeyInjection,
+  ProviderCacheKeyInjectionOption,
+} from './provider';
 
 export {
   ProviderPresetSchema,

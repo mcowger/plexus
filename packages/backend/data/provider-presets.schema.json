@@ -1049,6 +1049,19 @@
             "default": false,
             "type": "boolean"
           },
+          "cacheKeyInjection": {
+            "type": "string",
+            "enum": [
+              "off",
+              "prompt_cache_key",
+              "session_id",
+              "x-client-request-id",
+              "x-session-affinity",
+              "x-session-id",
+              "x-prompt-cache-isolation-key",
+              "x-multi-turn-session-id"
+            ]
+          },
           "notes": {
             "type": "string"
           }

@@ -351,6 +351,7 @@ interface RawBackendProvider {
   stall_cooldown?: boolean;
   allow_100_percent_utilization?: boolean;
   auto_compat?: boolean;
+  cache_key_injection?: string;
   discount?: number;
   headers?: Record<string, string>;
   extraBody?: Record<string, unknown>;
@@ -415,6 +416,7 @@ export const getProviders = async (): Promise<Provider[]> => {
         stallCooldown: val.stall_cooldown === true,
         allow100PercentUtilization: val.allow_100_percent_utilization === true,
         auto_compat: val.auto_compat === true,
+        cacheKeyInjection: val.cache_key_injection as Provider['cacheKeyInjection'],
         discount: typeof val.discount === 'number' ? val.discount : undefined,
         headers: val.headers,
         extraBody:
@@ -482,6 +484,7 @@ export const saveProvider = async (provider: Provider, oldId?: string): Promise<
     stall_cooldown: provider.stallCooldown === true,
     allow_100_percent_utilization: provider.allow100PercentUtilization === true,
     auto_compat: provider.auto_compat === true,
+    cache_key_injection: provider.cacheKeyInjection,
     discount: provider.discount,
     headers: provider.headers,
     extraBody: provider.extraBody,

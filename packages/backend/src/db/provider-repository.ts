@@ -30,6 +30,7 @@ type ProviderRow = {
   estimateTokens: unknown;
   useClaudeMasking: unknown;
   geminiThinkingEnabled: unknown;
+  cacheKeyInjection: string | null;
   headers: unknown;
   extraBody: unknown;
   compaction: unknown;
@@ -212,6 +213,7 @@ export class ProviderRepository {
       estimateTokens: fromBool(config.estimateTokens === true),
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
       geminiThinkingEnabled: fromBool(config.geminiThinkingEnabled === true),
+      cacheKeyInjection: config.cache_key_injection ?? null,
       headers: config.headers ? encryptJsonField(config.headers) : null,
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
       compaction: config.compaction ? toJson(config.compaction) : null,
@@ -562,6 +564,7 @@ export class ProviderRepository {
       estimateTokens: toBool(row.estimateTokens),
       useClaudeMasking: toBool(row.useClaudeMasking),
       gemini_thinking_enabled: toBool(row.geminiThinkingEnabled),
+      ...(row.cacheKeyInjection ? { cache_key_injection: row.cacheKeyInjection } : {}),
       auto_compat: toBool(row.autoCompat),
       ...(models ? { models } : {}),
       ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),

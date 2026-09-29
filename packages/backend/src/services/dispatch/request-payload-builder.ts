@@ -28,6 +28,7 @@ import { appendUserAfterTextOnlyModelTail } from '../../transformers/gemini/util
 import { isAnthropicTargetProvider } from './adapter-resolver';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 import { applyEagerToolInputStreaming } from './eager-tool-streaming';
+import { applyBodyCacheKeyInjection } from './cache-key-injection';
 
 /** Symbol stash for the native OAuth prep, read by the standard dispatch seams. */
 export const NATIVE_OAUTH_STASH = Symbol('nativeOAuthPrep');
@@ -222,6 +223,11 @@ export async function buildRequestPayload(
     targetApiType,
     bypassTransformation
   );
+
+  // Inject the provider's configured cache/session key before the extraBody
+  // merges so an explicit admin extraBody value still wins. Runs before the
+  // native OAuth preparation below so Meta's Responses body carries it.
+  payload = applyBodyCacheKeyInjection(payload, route, request, targetApiType);
 
   if (route.config.extraBody) payload = { ...payload, ...route.config.extraBody };
   if (route.modelConfig?.extraBody) payload = { ...payload, ...route.modelConfig.extraBody };

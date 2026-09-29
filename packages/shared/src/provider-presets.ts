@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProviderCacheKeyInjectionSchema, type ProviderCacheKeyInjection } from './provider';
 
 /**
  * Pre-configured provider presets for the Add Provider flow.
@@ -167,6 +168,8 @@ export const ProviderPresetSchema = z
     /** Explicit quirks, keyed by configured target API type and upstream model ID. */
     piAiQuirks: PiAiQuirksSchema.optional(),
     autoCompat: z.boolean().default(false),
+    /** Cache/session key injection destination applied to the provider draft. */
+    cacheKeyInjection: ProviderCacheKeyInjectionSchema.optional(),
     /** Operator-facing caveats shown in the picker (auth quirks, docs gaps). */
     notes: z.string().optional(),
   })
@@ -266,6 +269,7 @@ export interface ProviderPresetDraft {
   pi_ai_provider?: string;
   pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
+  cacheKeyInjection?: ProviderCacheKeyInjection;
 }
 
 /**
@@ -292,5 +296,6 @@ export function applyProviderPreset<T extends ProviderPresetDraft>(
     pi_ai_provider: preset.piAiProvider,
     pi_ai_quirks: preset.piAiQuirks ? structuredClone(preset.piAiQuirks) : undefined,
     auto_compat: preset.autoCompat,
+    cacheKeyInjection: preset.cacheKeyInjection,
   };
 }

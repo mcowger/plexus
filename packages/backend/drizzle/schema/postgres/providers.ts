@@ -31,6 +31,7 @@ export const providers = pgTable(
     estimateTokens: boolean('estimate_tokens').notNull().default(false),
     useClaudeMasking: boolean('use_claude_masking').notNull().default(false),
     geminiThinkingEnabled: boolean('gemini_thinking_enabled').notNull().default(false),
+    cacheKeyInjection: text('cache_key_injection'), // enum: cache/session key injection destination
     headers: text('headers'), // JSON or encrypted string — text for encryption compatibility
     extraBody: text('extra_body'), // JSON — not encrypted, text for consistency
     compaction: jsonb('compaction'), // compaction config

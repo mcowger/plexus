@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { isOAuthPlaceholderUrl, McpServerConfigSchema, PiAiQuirksSchema } from '@plexus/shared';
+import {
+  isOAuthPlaceholderUrl,
+  McpServerConfigSchema,
+  PiAiQuirksSchema,
+  ProviderCacheKeyInjectionSchema,
+} from '@plexus/shared';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
@@ -308,6 +313,12 @@ export const ProviderConfigSchema = z
     extraBody: z.record(z.string(), z.any()).optional(),
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
+    /**
+     * Inject Plexus's derived per-run cache/session key into this field on
+     * upstream requests. `undefined` leaves the client's request unchanged,
+     * except Meta OAuth routes which default to `prompt_cache_key`.
+     */
+    cache_key_injection: ProviderCacheKeyInjectionSchema.optional(),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
     model_autosync: ModelAutosyncSchema.optional(),
     geminiThinkingEnabled: z.boolean().optional(),

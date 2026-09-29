@@ -46,6 +46,7 @@ import {
 } from './upstream-execution';
 import { isPiAiRoute } from '../oauth/oauth-dispatcher';
 import { setupProviderHeaders } from '../providers/provider-request-headers';
+import { applyHeaderCacheKeyInjection } from './cache-key-injection';
 import {
   applyGeminiThinkingConfig,
   getApiMetadata,
@@ -574,10 +575,13 @@ export class Dispatcher {
     // Native OAuth routes carry fully-built wire headers (Bearer token + CC
     // fingerprint headers) stashed during payload preparation.
     const nativeOAuth = (route as any)[NATIVE_OAUTH_STASH];
-    if (nativeOAuth?.headers) {
-      return { ...nativeOAuth.headers };
-    }
-    return setupProviderHeaders(route, apiType, request);
+    const headers = nativeOAuth?.headers
+      ? { ...nativeOAuth.headers }
+      : setupProviderHeaders(route, apiType, request);
+    // Inject the provider's configured cache/session key header, if any. Runs
+    // after both paths so it also covers native OAuth (e.g. Meta), which builds
+    // its headers from scratch and never calls setupProviderHeaders.
+    return applyHeaderCacheKeyInjection(headers, route, request);
   }
 
   private getApiMetadata(metadata: Record<string, any>): Record<string, any> {

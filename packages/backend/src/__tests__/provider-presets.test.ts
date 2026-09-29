@@ -521,6 +521,11 @@ describe('applyProviderPreset', () => {
     expect(applied.auto_compat).toBe(true);
   });
 
+  test('meta preset enables prompt_cache_key injection by default', () => {
+    const applied = applyProviderPreset(blankDraft(), presetOrThrow('meta'));
+    expect(applied.cacheKeyInjection).toBe('prompt_cache_key');
+  });
+
   test('switches builtin → inline → plain without retaining a previous source', () => {
     const builtin = ProviderPresetSchema.parse(remoteEntry);
     const inline = ProviderPresetSchema.parse({ ...inlineEntry, autoCompat: true });
