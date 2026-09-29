@@ -67,6 +67,8 @@ export async function registerMessagesRoute(
       });
 
       logger.silly('Incoming Anthropic Request', body);
+      // Start debug capture before parsing so malformed payloads are still traced.
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
       const transformer = new AnthropicTransformer();
       let unifiedRequest = await transformer.parseRequest(body);
       unifiedRequest.incomingApiType = 'messages';
@@ -95,8 +97,6 @@ export async function registerMessagesRoute(
           },
         };
       }
-
-      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       // Check quota before processing
       if (quotaEnforcer) {

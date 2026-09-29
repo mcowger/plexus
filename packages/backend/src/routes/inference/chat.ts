@@ -69,6 +69,8 @@ export async function registerChatRoute(
       });
 
       logger.silly('Incoming OpenAI Request', body);
+      // Start debug capture before parsing so malformed payloads are still traced.
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
       const transformer = new OpenAITransformer();
       let unifiedRequest = await transformer.parseRequest(body);
       unifiedRequest.incomingApiType = 'chat';
@@ -94,8 +96,6 @@ export async function registerChatRoute(
           },
         };
       }
-
-      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       // Check quota before processing
       if (quotaEnforcer) {

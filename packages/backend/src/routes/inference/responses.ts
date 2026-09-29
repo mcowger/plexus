@@ -178,6 +178,12 @@ export async function registerResponsesRoute(
       // dispatch body so strict Responses providers don't reject composite
       // tool call IDs observed in replayed Codex CLI conversations.
       const rawBodyForDebug = JSON.parse(JSON.stringify(body));
+      // Start debug capture before parsing so malformed payloads are still traced.
+      DebugManager.getInstance().startLog(
+        requestId,
+        rawBodyForDebug,
+        sanitizeHeaders(request.headers as any)
+      );
       const normalizedCallIds = normalizeCompositeResponsesCallIds(body);
       const normalizedItemIds = normalizeResponsesFunctionCallItemIds(body);
       const normalizedReasoningItems = normalizeResponsesReasoningContent(body);
@@ -225,12 +231,6 @@ export async function registerResponsesRoute(
           },
         };
       }
-
-      DebugManager.getInstance().startLog(
-        requestId,
-        rawBodyForDebug,
-        sanitizeHeaders(request.headers as any)
-      );
 
       // Check quota before processing
       if (quotaEnforcer) {

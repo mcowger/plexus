@@ -60,6 +60,8 @@ export async function registerCompletionsRoute(
       });
 
       logger.silly('Incoming Completions Request', body);
+      // Start debug capture before parsing so malformed payloads are still traced.
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
       const transformer = new OpenAICompletionTransformer();
       let unifiedRequest = await transformer.parseRequest(body);
       unifiedRequest.incomingApiType = 'completions';
@@ -86,8 +88,6 @@ export async function registerCompletionsRoute(
           },
         };
       }
-
-      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
 
       if (quotaEnforcer) {
         const quotaCheck = await checkQuotaMiddleware(request, reply, quotaEnforcer);

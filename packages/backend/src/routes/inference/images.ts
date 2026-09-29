@@ -174,6 +174,9 @@ export async function registerImagesRoute(
 
       logger.silly('Incoming Image Generation Request', body);
 
+      // Start debug capture before parsing so malformed payloads are still traced.
+      DebugManager.getInstance().startLog(requestId, body, sanitizeHeaders(request.headers as any));
+
       const transformer = new ImageTransformer();
 
       let unifiedRequest: UnifiedImageGenerationRequest = isOpenRouterImageRoute
@@ -197,14 +200,6 @@ export async function registerImagesRoute(
             originalBody: body,
           };
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
-
-      DebugManager.getInstance().startLog(
-        requestId,
-        {
-          ...body,
-        },
-        sanitizeHeaders(request.headers as any)
-      );
 
       const unifiedResponse = await dispatcher.dispatchImageGenerations(
         unifiedRequest,
