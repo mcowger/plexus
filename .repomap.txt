@@ -1776,6 +1776,7 @@ packages/frontend/src/lib/piAiProvider.ts:35 [function] isOAuthProviderDraft
 packages/frontend/src/lib/quota.ts:18 [function] statusForPercent
 packages/frontend/src/lib/quota.ts:30 [function] formatQuotaValue
 packages/frontend/src/lib/quota.ts:50 [function] quotaUsagePercent
+packages/frontend/src/lib/versionCheck.ts:66 [interface] BlockingFormDocument
 packages/frontend/src/pages/detailed-usage/types.ts:25 [interface] MetricConfig
 packages/frontend/src/pages/detailed-usage/types.ts:33 [interface] AggregatedPoint
 packages/frontend/src/pages/detailed-usage/types.ts:47 [interface] CostDisplay

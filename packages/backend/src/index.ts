@@ -347,9 +347,14 @@ await registerManagementRoutes(
   quotaEnforcer
 );
 
-// Health check endpoint for container orchestration
+// Health check endpoint for container orchestration.
+// `version` lets the frontend detect a new deploy and reload itself
+// instead of sitting on a stale bundle. APP_VERSION is baked in at
+// Docker build time (release tag, dev sha, or staging timestamp).
 fastify.get('/health', (request, reply) => reply.send('OK'));
-fastify.get('/healthz', (request, reply) => reply.send({ ok: true }));
+fastify.get('/healthz', (request, reply) =>
+  reply.send({ ok: true, version: process.env.APP_VERSION || 'dev' })
+);
 
 // --- Static File Serving ---
 // `indexHtmlPath` is a string path — the filesystem path in dev, or a $bunfs/ path in a
