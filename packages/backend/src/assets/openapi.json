@@ -12137,6 +12137,18 @@
             "const": "plexus",
             "description": "Fixed value indicating Plexus-managed."
           },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "embeddings",
+              "transcriptions",
+              "speech",
+              "image",
+              "decisions"
+            ],
+            "description": "Alias capability type — what the model produces. Defaults to `text` when the alias has no explicit `type`.\n"
+          },
           "name": {
             "type": "string",
             "description": "Display name (e.g. \"OpenAI: GPT-4.1 Nano\").\n"

@@ -149,6 +149,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         object: 'model' as const,
         created,
         owned_by: 'plexus',
+        type: modelConfig.type ?? 'text',
         ...(preferredApi !== undefined && { preferred_api: preferredApi }),
         ...(piModelConfig && { pi_provider: piModelConfig.provider }),
         ...(piModelConfig && { pi_model: piModelConfig.model_id }),

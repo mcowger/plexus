@@ -22,6 +22,12 @@ properties:
     type: string
     const: plexus
     description: Fixed value indicating Plexus-managed.
+  type:
+    type: string
+    enum: [text, embeddings, transcriptions, speech, image, decisions]
+    description: >
+      Alias capability type — what the model produces. Defaults to `text`
+      when the alias has no explicit `type`.
   name:
     type: string
     description: >
