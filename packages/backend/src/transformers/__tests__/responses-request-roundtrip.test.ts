@@ -702,3 +702,34 @@ describe('transformRequest tool strict-field hygiene', () => {
     expect(Object.hasOwn(chatPayload.tools[0].function, 'strict')).toBe(false);
   });
 });
+
+describe('Responses request parsing tolerates null entries', () => {
+  it('drops null content parts, input items, and reasoning summary parts', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({
+      model: 'gpt-4o',
+      input: [
+        null,
+        { type: 'message', role: 'user', content: [null, { type: 'input_text', text: 'Hi' }] },
+        { type: 'reasoning', summary: [null, { type: 'summary_text', text: 'thinking' }] },
+        {
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'a' }, null, { type: 'output_text', text: 'b' }],
+        },
+      ],
+    });
+
+    expect(unified.messages).toEqual([
+      { role: 'user', content: 'Hi' },
+      { role: 'assistant', content: 'thinking' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'a' },
+          { type: 'text', text: 'b' },
+        ],
+      },
+    ]);
+  });
+});

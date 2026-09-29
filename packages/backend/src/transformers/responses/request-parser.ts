@@ -51,7 +51,11 @@ export function mapInputRole(role?: string): UnifiedMessage['role'] {
 /**
  * Converts Responses API content parts to Chat Completions format
  */
-export function convertContentParts(parts: any[]): string | any[] {
+export function convertContentParts(rawParts: any[]): string | any[] {
+  // Some clients (e.g. opencode) replay history with null entries in the
+  // content array; drop anything that isn't a part object.
+  const parts = rawParts.filter((part) => part !== null && typeof part === 'object');
+
   if (parts.length === 1 && (parts[0].type === 'input_text' || parts[0].type === 'output_text')) {
     return parts[0].text;
   }
@@ -103,6 +107,7 @@ export function convertInputItemsToMessages(
   const messages: UnifiedMessage[] = [];
 
   for (const item of items) {
+    if (item === null || typeof item !== 'object') continue;
     switch (item.type) {
       case 'message':
         messages.push({
@@ -173,7 +178,10 @@ export function convertInputItemsToMessages(
       case 'reasoning':
         // Convert reasoning to assistant message (limited support)
         if (item.summary && item.summary.length > 0) {
-          const reasoningText = item.summary.map((part: any) => part.text).join('\n');
+          const reasoningText = item.summary
+            .filter((part: any) => part !== null && typeof part === 'object')
+            .map((part: any) => part.text)
+            .join('\n');
           messages.push({
             role: 'assistant',
             content: reasoningText,
