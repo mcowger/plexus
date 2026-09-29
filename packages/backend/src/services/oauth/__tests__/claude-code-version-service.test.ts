@@ -12,6 +12,14 @@ describe('ClaudeCodeVersionService', () => {
     expect(service.getVersion()).toBe(CC_VERSION);
   });
 
+  it('reports the auto-refresh interval', () => {
+    const service = ClaudeCodeVersionService.getInstance();
+    expect(service.getAutoRefreshIntervalMinutes()).toBe(60);
+    service.startAutoRefresh(30);
+    expect(service.getAutoRefreshIntervalMinutes()).toBe(30);
+    service.stopAutoRefresh();
+  });
+
   it('fetches and stores the latest dist-tag from the npm registry', async () => {
     vi.stubGlobal(
       'fetch',
@@ -46,9 +54,10 @@ describe('ClaudeCodeVersionService', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
 
     const service = ClaudeCodeVersionService.getInstance();
-    await service.fetchVersion();
+    const error = await service.fetchVersion();
 
     expect(service.getVersion()).toBe(CC_VERSION);
+    expect(error).toContain('network error');
   });
 
   it('falls back to the previous version on non-ok response', async () => {
@@ -61,9 +70,10 @@ describe('ClaudeCodeVersionService', () => {
     );
 
     const service = ClaudeCodeVersionService.getInstance();
-    await service.fetchVersion();
+    const error = await service.fetchVersion();
 
     expect(service.getVersion()).toBe(CC_VERSION);
+    expect(error).toBe('npm registry returned status 403');
   });
 
   it('falls back to the previous version when latest is missing', async () => {

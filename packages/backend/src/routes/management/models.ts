@@ -9,7 +9,15 @@ import {
 } from '../../services/models/model-metadata-manager';
 import { getConfig, ModelConfigSchema } from '../../config';
 import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
-import { getCatalogModel, getCatalogModels } from '../../services/pi-ai/catalog';
+import {
+  getCatalogAllModels,
+  getCatalogModel,
+  getCatalogModels,
+  getModelCatalog,
+  REMOTE_CATALOG_REFRESH_INTERVAL_MS,
+} from '../../services/pi-ai/catalog';
+import { CodexVersionService } from '../../services/oauth/codex-version-service';
+import { ClaudeCodeVersionService } from '../../services/oauth/claude-code-version-service';
 import { resolvePiAiProvider } from '../../services/pi-ai/provider-endpoint-match';
 
 export async function registerModelRoutes(fastify: FastifyInstance) {
@@ -120,5 +128,111 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
       oauthProvider: parsed.data.oauthProvider,
     });
     return reply.send({ data: { provider } });
+  });
+
+  /**
+   * GET /v0/management/catalog/status
+   * Returns the refresh cadence and current state of every interval-fetched
+   * resource: model metadata catalogs (OpenRouter / models.dev / Catwalk),
+   * the pi.dev model catalog overlay, and the Codex / Claude Code CLI
+   * versions. Backs the System Settings refresh UI.
+   */
+  fastify.get('/v0/management/catalog/status', async (_request, reply) => {
+    const manager = ModelMetadataManager.getInstance();
+    const sourceStatus = (id: 'openrouter' | 'models.dev' | 'catwalk') => ({
+      initialized: manager.isInitialized(id),
+      count: manager.getAllIds(id).length,
+    });
+    return reply.send({
+      intervals: {
+        metadataMinutes: manager.getAutoRefreshIntervalMinutes(),
+        piCatalogMs: REMOTE_CATALOG_REFRESH_INTERVAL_MS,
+        // Codex and Claude Code versions share the same cadence as the
+        // metadata manager (all wired with 60 minutes in index.ts).
+        versionMinutes: CodexVersionService.getInstance().getAutoRefreshIntervalMinutes(),
+      },
+      versions: {
+        codex: CodexVersionService.getInstance().getVersion(),
+        claudeCode: ClaudeCodeVersionService.getInstance().getVersion(),
+      },
+      metadata: {
+        openrouter: sourceStatus('openrouter'),
+        modelsDev: sourceStatus('models.dev'),
+        catwalk: sourceStatus('catwalk'),
+      },
+      piCatalog: { modelCount: getCatalogAllModels().length },
+    });
+  });
+
+  /**
+   * POST /v0/management/catalog/refresh-all
+   * Forces an immediate reload of every interval-fetched resource, bypassing
+   * throttle checks: model metadata (OpenRouter / models.dev / Catwalk),
+   * the pi.dev catalog overlay (forced), and the Codex / Claude Code CLI
+   * versions. Per-source failures are reported, never thrown.
+   */
+  fastify.post('/v0/management/catalog/refresh-all', async (_request, reply) => {
+    const startedAt = Date.now();
+    const refreshedAt = new Date(startedAt).toISOString();
+    const codexService = CodexVersionService.getInstance();
+    const claudeCodeService = ClaudeCodeVersionService.getInstance();
+    const codexPrevious = codexService.getVersion();
+    const claudeCodePrevious = claudeCodeService.getVersion();
+    // Honor the same opt-out as startup: PLEXUS_MODEL_CATALOG_REFRESH=false
+    // disables pi.dev network refresh (the persisted overlay still loads).
+    const allowCatalogNetwork = process.env.PLEXUS_MODEL_CATALOG_REFRESH !== 'false';
+
+    const [metadata, piCatalog] = await Promise.all([
+      ModelMetadataManager.getInstance().refreshAll(undefined, 'manual'),
+      getModelCatalog().refresh({ force: true, allowNetwork: allowCatalogNetwork }),
+    ]);
+    // Version fetches keep the last-known version on failure and return the
+    // error string — run after the catalog work so a slow registry can't
+    // delay it.
+    const [codexError, claudeCodeError] = await Promise.all([
+      codexService.fetchVersion(),
+      claudeCodeService.fetchVersion(),
+    ]);
+
+    const durationMs = Date.now() - startedAt;
+    const piCatalogErrorCount = Object.keys(piCatalog.errors).length;
+    const hadErrors =
+      metadata.hadErrors ||
+      piCatalogErrorCount > 0 ||
+      codexError !== undefined ||
+      claudeCodeError !== undefined;
+    if (hadErrors) {
+      logger.warn('Catalog refresh-all (manual) completed with errors', {
+        piCatalogErrors: piCatalog.errors,
+        ...(codexError ? { codexError } : {}),
+        ...(claudeCodeError ? { claudeCodeError } : {}),
+      });
+    } else {
+      logger.info(`Catalog refresh-all (manual) completed in ${durationMs}ms`);
+    }
+    return reply.send({
+      success: !hadErrors,
+      message: hadErrors
+        ? 'Catalog refresh completed with errors'
+        : 'All catalogs refreshed successfully',
+      trigger: 'manual',
+      refreshedAt,
+      durationMs,
+      hadErrors,
+      metadata,
+      piCatalog,
+      versions: {
+        codex: {
+          previous: codexPrevious,
+          current: codexService.getVersion(),
+          ...(codexError ? { error: codexError } : {}),
+        },
+        claudeCode: {
+          previous: claudeCodePrevious,
+          current: claudeCodeService.getVersion(),
+          ...(claudeCodeError ? { error: claudeCodeError } : {}),
+        },
+      },
+    });
   });
 }

@@ -11,6 +11,14 @@ describe('CodexVersionService', () => {
     expect(service.getVersion()).toBe('0.155.1');
   });
 
+  it('reports the auto-refresh interval', () => {
+    const service = CodexVersionService.getInstance();
+    expect(service.getAutoRefreshIntervalMinutes()).toBe(60);
+    service.startAutoRefresh(30);
+    expect(service.getAutoRefreshIntervalMinutes()).toBe(30);
+    service.stopAutoRefresh();
+  });
+
   it('returns default user-agent before fetch', () => {
     const service = CodexVersionService.getInstance();
     expect(service.getUserAgent()).toBe(
@@ -70,9 +78,10 @@ describe('CodexVersionService', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
 
     const service = CodexVersionService.getInstance();
-    await service.fetchVersion();
+    const error = await service.fetchVersion();
 
     expect(service.getVersion()).toBe('0.155.1');
+    expect(error).toContain('network error');
   });
 
   it('falls back to default on non-ok response', async () => {
@@ -85,9 +94,10 @@ describe('CodexVersionService', () => {
     );
 
     const service = CodexVersionService.getInstance();
-    await service.fetchVersion();
+    const error = await service.fetchVersion();
 
     expect(service.getVersion()).toBe('0.155.1');
+    expect(error).toBe('GitHub API returned status 403');
   });
 
   it('falls back to default when tag_name is missing', async () => {

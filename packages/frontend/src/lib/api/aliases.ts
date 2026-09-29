@@ -5,6 +5,8 @@ import type {
   Alias,
   AliasTargetGroup,
   CatalogMetadataSource,
+  CatalogRefreshAllResult,
+  CatalogStatus,
   Model,
   ModelMetadataRefreshResult,
   ModelResolutionPreview,
@@ -370,6 +372,25 @@ export const refreshModelMetadata = async (): Promise<ModelMetadataRefreshResult
     throw new Error(err.error || 'Failed to refresh model metadata');
   }
   return (await res.json()) as ModelMetadataRefreshResult;
+};
+
+export const getCatalogStatus = async (): Promise<CatalogStatus> => {
+  const res = await fetchWithAuth(`${API_BASE}/v0/management/catalog/status`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch catalog status');
+  }
+  return (await res.json()) as CatalogStatus;
+};
+
+export const refreshAllCatalogs = async (): Promise<CatalogRefreshAllResult> => {
+  const res = await fetchWithAuth(`${API_BASE}/v0/management/catalog/refresh-all`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error || 'Failed to refresh catalogs');
+  }
+  return (await res.json()) as CatalogRefreshAllResult;
 };
 
 export const getPiProviders = async (): Promise<string[]> => {

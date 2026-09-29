@@ -214,6 +214,11 @@ export async function handleOperationsTool(
         input.operation,
         await callManagementRoute(shimContext, 'POST', '/v0/management/models/metadata/refresh')
       );
+    case 'refresh_catalog':
+      return successResponse(
+        input.operation,
+        await callManagementRoute(shimContext, 'POST', '/v0/management/catalog/refresh-all')
+      );
     case 'list_cooldowns':
       return successResponse(
         input.operation,
@@ -246,6 +251,7 @@ export async function handleOperationsTool(
         'restore',
         'restart',
         'refresh_metadata',
+        'refresh_catalog',
         'list_cooldowns',
         'clear_cooldowns',
         'reset_logs',

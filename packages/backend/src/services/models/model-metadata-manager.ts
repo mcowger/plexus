@@ -469,6 +469,11 @@ export class ModelMetadataManager {
     }
   }
 
+  /** Current auto-refresh cadence in minutes (default 60). */
+  public getAutoRefreshIntervalMinutes(): number {
+    return this.autoRefreshIntervalMinutes;
+  }
+
   // ─── Loaders ────────────────────────────────────
 
   private async loadOpenRouter(source: string): Promise<MetadataSourceRefreshSummary> {

@@ -112,6 +112,8 @@ export const api = {
   searchModelMetadata: aliasesApi.searchModelMetadata,
   getModelMetadata: aliasesApi.getModelMetadata,
   refreshModelMetadata: aliasesApi.refreshModelMetadata,
+  getCatalogStatus: aliasesApi.getCatalogStatus,
+  refreshAllCatalogs: aliasesApi.refreshAllCatalogs,
   getPiProviders: aliasesApi.getPiProviders,
   getPiModels: aliasesApi.getPiModels,
   resolvePiAiProvider: aliasesApi.resolvePiAiProvider,

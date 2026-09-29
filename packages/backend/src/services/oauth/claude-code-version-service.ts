@@ -15,6 +15,7 @@ const SEMVER = /^\d+\.\d+\.\d+$/;
 export class ClaudeCodeVersionService {
   private static instance: ClaudeCodeVersionService;
   private version: string;
+  private autoRefreshIntervalMinutes = 60;
   private autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
   private constructor() {
@@ -45,15 +46,27 @@ export class ClaudeCodeVersionService {
   startAutoRefresh(intervalMinutes = 60): void {
     this.stopAutoRefresh();
     const minutes = Math.max(1, intervalMinutes);
+    this.autoRefreshIntervalMinutes = minutes;
     this.autoRefreshTimer = setInterval(
       () => {
-        this.fetchVersion().catch((error) => {
-          logger.error('Scheduled claude-code version refresh failed', error);
-        });
+        this.fetchVersion()
+          .then((error) => {
+            if (error) {
+              logger.error('Scheduled claude-code version refresh failed', error);
+            }
+          })
+          .catch((error) => {
+            logger.error('Scheduled claude-code version refresh failed', error);
+          });
       },
       minutes * 60 * 1000
     );
     logger.info(`Scheduled claude-code version auto-refresh every ${minutes} minutes`);
+  }
+
+  /** Current auto-refresh cadence in minutes (default 60). */
+  getAutoRefreshIntervalMinutes(): number {
+    return this.autoRefreshIntervalMinutes;
   }
 
   stopAutoRefresh(): void {
@@ -63,7 +76,7 @@ export class ClaudeCodeVersionService {
     }
   }
 
-  async fetchVersion(): Promise<void> {
+  async fetchVersion(): Promise<string | undefined> {
     try {
       const response = await fetch(NPM_DIST_TAGS_URL, {
         method: 'GET',
@@ -75,23 +88,26 @@ export class ClaudeCodeVersionService {
       });
 
       if (!response.ok) {
-        logger.debug(`npm registry returned status ${response.status}`);
-        return;
+        const error = `npm registry returned status ${response.status}`;
+        logger.debug(error);
+        return error;
       }
 
       const data = (await response.json()) as NpmDistTags;
       const latest = data.latest;
       if (typeof latest !== 'string' || !SEMVER.test(latest)) {
-        logger.debug(`Unexpected dist-tags payload, ignoring: ${JSON.stringify(data)}`);
-        return;
+        const error = 'npm dist-tags response missing a valid latest tag';
+        logger.debug(`${error}, ignoring: ${JSON.stringify(data)}`);
+        return error;
       }
 
       this.version = latest;
       logger.debug(`Resolved claude-code version: ${latest}`);
+      return undefined;
     } catch (error) {
-      logger.warn(
-        `Failed to fetch claude-code version from npm: ${String(error)}. Using fallback: ${this.version}`
-      );
+      const message = `Failed to fetch claude-code version from npm: ${String(error)}. Using fallback: ${this.version}`;
+      logger.warn(message);
+      return message;
     }
   }
 

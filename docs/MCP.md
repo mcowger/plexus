@@ -87,7 +87,7 @@ All normal responses redact sensitive fields (API keys, secrets, tokens, cookies
 | `plexus_mcp_gateway` | `servers_list`, `list`, `get`, `put`, `create`, `update`, `delete` | Inspect and manage upstream MCP gateway server configuration. |
 | `plexus_settings` | `get` | Get settings by category (failover, cooldown, timeout, stall, exploration, etc.) |
 | `plexus_system_logs` | `recent`, `level`, `set_level`, `reset_level` | Inspect recent in-memory Plexus system logs from the bounded ring buffer and control the runtime logging level. |
-| `plexus_operations` | `backup`, `restore`, `restart`, `list_cooldowns`, `clear_cooldowns`, `reset_logs` | High-impact operational actions, backups/restores, cooldown inspection, and log resets. |
+| `plexus_operations` | `backup`, `restore`, `restart`, `refresh_metadata`, `refresh_catalog`, `list_cooldowns`, `clear_cooldowns`, `reset_logs` | High-impact operational actions, backups/restores, catalog refreshes, cooldown inspection, and log resets. |
 
 ### Prompt Resource
 
