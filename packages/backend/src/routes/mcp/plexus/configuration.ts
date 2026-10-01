@@ -152,6 +152,16 @@ export async function handleModelAliasTool(
           input.body ?? {}
         )
       );
+    case 'preview_auto_routing':
+      return successResponse(
+        input.operation,
+        await callManagementRoute(
+          shimContext,
+          'POST',
+          '/v0/management/models/auto-routing/preview',
+          input.body ?? {}
+        )
+      );
     case 'delete':
       return successResponse(
         input.operation,

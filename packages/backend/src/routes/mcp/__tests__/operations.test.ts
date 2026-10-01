@@ -139,4 +139,61 @@ describe('Plexus management MCP routes - operations', () => {
     expect(body.result.structuredContent.data.message).toContain('refresh completed');
     expect(body.result.structuredContent.data.sources.modelsDev.count).toBe(20);
   });
+
+  test('previews an auto-routing draft with a simulated scenario', async () => {
+    const previewBody = {
+      alias: {
+        target_groups: [
+          {
+            name: 'main',
+            selector: 'auto',
+            targets: [
+              {
+                alias: 'gpt-5',
+                auto_profile: {
+                  capability: 'premium',
+                  specialties: ['plan'],
+                  reasoning: 'preferred',
+                },
+              },
+            ],
+          },
+        ],
+        auto_routing: { mode: 'active', classifier_alias: 'jev-1.13' },
+      },
+      alias_name: 'auto-draft',
+      prompt: 'Plan the migration.',
+      scenario: {
+        incumbent: { provider: 'openrouter', model: 'openai/gpt-5' },
+        input_tokens: 12000,
+        cache_state: 'warm',
+      },
+    };
+
+    const response = await fixture.postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 4,
+        params: {
+          name: 'plexus_model_alias',
+          arguments: { operation: 'preview_auto_routing', body: previewBody },
+        },
+      },
+      fixture.adminHeaders()
+    );
+    const body = fixture.parseJsonRpcResponse(response);
+
+    expect(body.result.structuredContent).toMatchObject({
+      ok: true,
+      operation: 'preview_auto_routing',
+      data: { judgment_handle: 'preview-handle', analysis: { source: 'fresh' } },
+    });
+    expect(fixture.fastify.inject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: '/v0/management/models/auto-routing/preview',
+        payload: previewBody,
+      })
+    );
+  });
 });

@@ -80,18 +80,14 @@ describe('Plexus management MCP routes - protocol', () => {
     expect(aliasTool.description).toContain('auto_profile.specialties');
     expect(aliasTool.description).toContain('there is no use_case field');
     expect(aliasTool.inputSchema.properties.id.description).toContain('Required for put/create');
-    expect(aliasTool.inputSchema.properties.body.properties.type.enum).toContain('decisions');
-    expect(
-      aliasTool.inputSchema.properties.body.properties.auto_routing.properties.classifier_alias
-    ).toBeDefined();
-    expect(
-      aliasTool.inputSchema.properties.body.properties.metadata.properties.overrides.properties
-        .top_provider.properties.max_completion_tokens
-    ).toBeDefined();
-    expect(
-      aliasTool.inputSchema.properties.body.properties.target_groups.items.properties.targets.items
-        .properties.auto_profile.properties.specialties.items.enum
-    ).toContain('review');
+    expect(aliasTool.inputSchema.properties.operation.enum).toContain('preview_auto_routing');
+    const inputSchema = JSON.stringify(aliasTool.inputSchema);
+    expect(inputSchema).toContain('decisions');
+    expect(inputSchema).toContain('classifier_alias');
+    expect(inputSchema).toContain('max_completion_tokens');
+    expect(inputSchema).toContain('specialties');
+    expect(inputSchema).toContain('judgment_handle');
+    expect(inputSchema).toContain('cache_state');
   });
 
   test('ignores unsupported x-forwarded-proto values', async () => {

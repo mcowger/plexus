@@ -193,17 +193,73 @@ const ModelAliasBodyInputSchema = z
     'Model alias configuration. Fields are optional for PATCH/update. Unknown fields pass through to the management API.'
   );
 
+const AutoRoutingPreviewBodyInputSchema = z
+  .object({
+    alias: ModelAliasBodyInputSchema.describe('Unsaved model alias draft to simulate.'),
+    alias_name: z.string().min(1).max(512).optional(),
+    prompt: z.string().min(1).max(32000).describe('Sample prompt to classify and route.'),
+    judgment_handle: z
+      .string()
+      .min(1)
+      .max(256)
+      .optional()
+      .describe('Reuse a prior preview judgment instead of classifying the prompt again.'),
+    scenario: z
+      .object({
+        incumbent: z
+          .object({
+            provider: z.string().min(1).max(256),
+            model: z.string().min(1).max(512),
+          })
+          .strict()
+          .optional()
+          .describe('Simulated current provider/model for continuation or switching decisions.'),
+        input_tokens: z
+          .number()
+          .int()
+          .min(0)
+          .max(10_000_000)
+          .optional()
+          .describe('Simulated input-token count; omitted values are estimated from the prompt.'),
+        cache_state: z
+          .enum(['cold', 'warm', 'unknown'])
+          .optional()
+          .describe('Assumed cache state for cost and routing calculations.'),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .describe(
+    'Inputs for a side-effect-free auto-routing preview. The preview does not dispatch generation or save the draft.'
+  );
+
 export const ModelAliasToolInputSchema = {
   ...ToolInputSchema,
+  operation: z
+    .enum([
+      'list',
+      'get',
+      'put',
+      'create',
+      'update',
+      'delete',
+      'delete_all',
+      'preview_auto_routing',
+    ])
+    .describe('Alias operation. preview_auto_routing simulates an unsaved auto-routing draft.'),
   id: z
     .string()
     .optional()
     .describe(
       'Alias slug. Required for put/create/update/delete; for put/create it becomes the new alias ID. Also required for get.'
     ),
-  body: ModelAliasBodyInputSchema.optional().describe(
-    'Alias configuration. Targets may be concrete provider/model pairs or references to other aliases.'
-  ),
+  body: z
+    .union([ModelAliasBodyInputSchema, AutoRoutingPreviewBodyInputSchema])
+    .optional()
+    .describe(
+      'Alias configuration for mutations, or a preview request with alias, prompt, and optional scenario.'
+    ),
 };
 
 export type ToolInput = {

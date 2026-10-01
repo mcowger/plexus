@@ -550,6 +550,14 @@ export function createPlexusMcpTestFixture(): PlexusMcpTestFixture {
           },
         });
       }
+      if (method === 'POST' && path === '/v0/management/models/auto-routing/preview') {
+        return json({
+          judgment_handle: 'preview-handle',
+          analysis: { source: 'fresh', latencyMs: 3 },
+          groups: [],
+          assumptions: ['Cache state is simulated'],
+        });
+      }
 
       return json({ error: `Unhandled management route in test: ${method} ${url}` }, 404);
     });

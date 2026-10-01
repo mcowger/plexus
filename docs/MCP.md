@@ -78,7 +78,7 @@ All normal responses redact sensitive fields (API keys, secrets, tokens, cookies
 |------|-----------|-------------|
 | `plexus_config` | `get`, `export`, `status` | Inspect full Plexus configuration or summary status. |
 | `plexus_provider` | `list`, `get`, `put`, `create`, `update`, `delete`, `fetch_models` | Inspect and manage providers and routing configuration. |
-| `plexus_model_alias` | `list`, `get`, `put`, `create`, `update`, `delete`, `delete_all` | Inspect and manage model aliases, targets, and target groups. |
+| `plexus_model_alias` | `list`, `get`, `put`, `create`, `update`, `delete`, `delete_all`, `preview_auto_routing` | Inspect and manage model aliases, or simulate an unsaved auto-routing draft. |
 | `plexus_key` | `list`, `get`, `put`, `create`, `update`, `delete` | Inspect and manage inference keys (secrets redacted). |
 | `plexus_quota` | `list`, `get`, `put`, `create`, `update`, `delete` | Inspect and manage user quota definitions. |
 | `plexus_quota_checker` | `types`, `list`, `get` | Inspect upstream quota checker configuration. |
@@ -133,6 +133,45 @@ For `auto` routing, set task/use-case mappings on each target's `auto_profile.sp
 Set `type: "decisions"` on the classifier alias itself, not on the auto-routed alias.
 
 Published model metadata is configured with `metadata`. Use `source: "auto"` with optional `overrides` for catalog-derived metadata, or `source: "custom"` with `overrides.name` for a custom model card. Other catalog sources require a `source_path`.
+
+### Test routing preview
+
+Use `plexus_model_alias` with `operation: "preview_auto_routing"` to simulate an unsaved alias draft. Supply a sample `prompt` and the draft `alias`; optional `scenario` values let you simulate specific routing conditions:
+
+```json
+{
+  "operation": "preview_auto_routing",
+  "body": {
+    "alias": {
+      "target_groups": [{
+        "name": "main",
+        "selector": "auto",
+        "targets": [{
+          "alias": "gpt-6.1-sol",
+          "auto_profile": {
+            "capability": "premium",
+            "specialties": ["plan", "debug"],
+            "reasoning": "preferred"
+          }
+        }]
+      }],
+      "auto_routing": {
+        "mode": "active",
+        "classifier_alias": "jev-1.13"
+      }
+    },
+    "alias_name": "auto-draft",
+    "prompt": "Plan a migration and debug the failing test.",
+    "scenario": {
+      "incumbent": { "provider": "openai-s", "model": "gpt-6.1-sol" },
+      "input_tokens": 12000,
+      "cache_state": "warm"
+    }
+  }
+}
+```
+
+`scenario.incumbent` supplies the current provider/model, `input_tokens` sets simulated input size (otherwise estimated from the prompt), and `cache_state` is one of `cold`, `warm`, or `unknown`. These are simulation assumptions, not observed provider cache state. The preview never sends a generation request or saves the draft. Reuse the returned `judgment_handle` in a later preview to tune settings without classifying the prompt again.
 
 ### Prompt Resource
 
