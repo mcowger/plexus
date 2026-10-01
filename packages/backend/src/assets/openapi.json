@@ -13529,9 +13529,10 @@
               "embeddings",
               "transcriptions",
               "speech",
-              "image"
+              "image",
+              "decisions"
             ],
-            "description": "Model capability type — what the model produces. This is distinct from the wire protocol (which is configured via `preferred_api` or `access_via` on each provider model).\n- **text** — Text generation (LLM). Supports all text wire protocols:\n  chat completions, messages, gemini, responses, ollama.\n- **embeddings** — Vector embeddings, including Gemini backends via\n  automatic request/response transformation.\n- **transcriptions** — Audio to text. - **speech** — Text to audio. - **image** — Image generation/editing.\n"
+            "description": "Model capability type — what the model produces. This is distinct from the wire protocol (which is configured via `preferred_api` or `access_via` on each provider model).\n- **text** — Text generation (LLM). Supports all text wire protocols:\n  chat completions, messages, gemini, responses, ollama.\n- **embeddings** — Vector embeddings, including Gemini backends via\n  automatic request/response transformation.\n- **transcriptions** — Audio to text. - **speech** — Text to audio. - **image** — Image generation/editing. - **decisions** — Marks the alias as usable for Decisions API calls through\n  compatible targets. It does not classify requests or select models; use\n  a target group with `selector: auto` for classifier-based model selection.\n"
           },
           "priority": {
             "type": "string",

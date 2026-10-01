@@ -66,6 +66,34 @@ describe('Plexus management MCP routes - protocol', () => {
     );
   });
 
+  test('describes model alias payloads, Decisions routing, alias refs, and auto specialties', async () => {
+    const response = await fixture.postPlexusMcp(
+      { method: 'tools/list', id: 1 },
+      fixture.adminHeaders()
+    );
+    const body = fixture.parseJsonRpcResponse(response);
+    const aliasTool = body.result.tools.find(
+      (tool: { name: string }) => tool.name === 'plexus_model_alias'
+    );
+
+    expect(aliasTool.description).toContain('type: "decisions"');
+    expect(aliasTool.description).toContain('auto_profile.specialties');
+    expect(aliasTool.description).toContain('there is no use_case field');
+    expect(aliasTool.inputSchema.properties.id.description).toContain('Required for put/create');
+    expect(aliasTool.inputSchema.properties.body.properties.type.enum).toContain('decisions');
+    expect(
+      aliasTool.inputSchema.properties.body.properties.auto_routing.properties.classifier_alias
+    ).toBeDefined();
+    expect(
+      aliasTool.inputSchema.properties.body.properties.metadata.properties.overrides.properties
+        .top_provider.properties.max_completion_tokens
+    ).toBeDefined();
+    expect(
+      aliasTool.inputSchema.properties.body.properties.target_groups.items.properties.targets.items
+        .properties.auto_profile.properties.specialties.items.enum
+    ).toContain('review');
+  });
+
   test('ignores unsupported x-forwarded-proto values', async () => {
     const response = await fixture.postPlexusMcp(
       { method: 'tools/list', id: 1 },

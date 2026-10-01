@@ -9,7 +9,12 @@ import { createPlexusMcpRequestContext, handlePlexusMcpHttpRequest } from './htt
 import { buildShimHeaders } from './management';
 import { PLEXUS_MANAGEMENT_PROMPT, TOOL_NAMES, getToolDescription } from './metadata';
 import { toToolResult } from './responses';
-import { ToolInputSchema, type ManagementShimContext, type ToolInput } from './types';
+import {
+  ModelAliasToolInputSchema,
+  ToolInputSchema,
+  type ManagementShimContext,
+  type ToolInput,
+} from './types';
 
 export async function registerPlexusMcpRoutes(
   fastify: FastifyInstance,
@@ -152,9 +157,11 @@ function createPlexusMcpServer(shimContext: ManagementShimContext) {
       {
         title: toolName,
         description: getToolDescription(toolName),
-        inputSchema: ToolInputSchema,
+        inputSchema:
+          toolName === 'plexus_model_alias' ? ModelAliasToolInputSchema : ToolInputSchema,
       },
-      async (input) => toToolResult(await handleToolCall(toolName, input as ToolInput, shimContext))
+      async (input: ToolInput) =>
+        toToolResult(await handleToolCall(toolName, input as ToolInput, shimContext))
     );
   }
 

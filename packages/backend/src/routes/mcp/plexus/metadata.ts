@@ -12,7 +12,9 @@ Common workflows:
 - Review request activity with plexus_usage list or summary.
 - Inspect or update provider setup with plexus_provider list, get, put, update, delete, or fetch_models.
 - Raw provider access uses provider raw_passthrough { enabled, base_url, auth } plus key allowRawPassthrough. It is provider-wide, bypasses model restrictions/routing/failover/transformation, and should be treated as high-impact.
-- Inspect or update model routing with plexus_model_alias list, get, put, update, delete, or delete_all.
+- Inspect or update model aliases with plexus_model_alias. Alias put/create/update payloads use body; put/create require the alias slug in id. Targets may use { provider, model } or { alias } to reference another alias. type: "decisions" marks an alias as usable for Decisions API calls; it does not select underlying models. Use selector: "auto" with auto_routing for classifier-based model selection.
+- For selector: "auto", auto_profile.specialties is the supported task/use-case field. Use specialty values such as plan, implement, debug, refactor, review, research, explain, operate, write, or chat. There is no use_case field.
+- Alias metadata controls the published model card. Use metadata.source: "auto" with overrides for catalog-derived metadata, or source: "custom" with overrides.name for a custom card.
 - Inspect or update inference keys with plexus_key list, get, put, update, or delete; normal responses redact secrets.
 - Check upstream quota state with plexus_quota_checker types, list, or get.
 - Inspect or update user quota definitions with plexus_quota list, get, put, update, or delete; check or repair a key's quota usage with plexus_quota status, clear, or recompute.
@@ -51,7 +53,7 @@ export function getToolDescription(toolName: string) {
     case 'plexus_provider':
       return 'Inspect and manage providers and provider routing configuration. Operations: list, get, put, create, update, delete, fetch_models. Static API-key providers may define raw_passthrough { enabled, base_url, auth } to expose /raw/{provider}/* without routing, failover, adapters, or payload transformation.';
     case 'plexus_model_alias':
-      return 'Inspect and manage model aliases, targets, and target groups. Operations: list, get, put, create, update, delete, delete_all.';
+      return 'Inspect and manage model aliases. Operations: list, get, put, create, update, delete, delete_all. For put/create/update, pass the alias configuration in body; id is the alias slug and is required for put/create/update/delete (also get). A target is either { provider, model } or { alias } to reference another alias. type: "decisions" marks an alias usable for Decisions API calls; it does not select underlying models. Use target_groups[].selector: "auto" with alias-level auto_routing for classifier-based model selection. For auto routing, put task/use-case mappings in target_groups[].targets[].auto_profile.specialties (e.g. plan, implement, debug, refactor, review, research, explain, operate, write, chat); there is no use_case field. Published model-card metadata is configured with metadata.source and optional metadata.overrides.';
     case 'plexus_key':
       return 'Inspect and manage inference keys with secrets redacted. Operations: list, get, put, create, update, delete. Keys carry quotas: string[] to assign one or more quota definitions (legacy singular quota field is still accepted on input and folded into quotas). allowRawPassthrough grants provider-wide raw access to raw-enabled providers permitted by the key provider policy; model restrictions do not apply.';
     case 'plexus_quota':

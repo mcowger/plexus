@@ -89,6 +89,51 @@ All normal responses redact sensitive fields (API keys, secrets, tokens, cookies
 | `plexus_system_logs` | `recent`, `level`, `set_level`, `reset_level` | Inspect recent in-memory Plexus system logs from the bounded ring buffer and control the runtime logging level. |
 | `plexus_operations` | `backup`, `restore`, `restart`, `refresh_metadata`, `refresh_catalog`, `list_cooldowns`, `clear_cooldowns`, `reset_logs` | High-impact operational actions, backups/restores, catalog refreshes, cooldown inspection, and log resets. |
 
+### Model aliases
+
+`plexus_model_alias` accepts an alias configuration in `body`. The `id` argument is the alias slug and is required for `put`, `create`, `update`, and `delete` (and for `get`). `put` and `create` both write the complete alias configuration at that slug; `update` applies a partial patch.
+
+Targets can point directly to a provider model or reference another alias:
+
+`type: "decisions"` marks an alias as usable for Decisions API calls. It does **not** choose an underlying model. For classifier-based model selection, configure a target group with `selector: "auto"` and an alias-level `auto_routing` policy. The policy's `classifier_alias` should point to a Decisions-capable alias.
+
+For `auto` routing, set task/use-case mappings on each target's `auto_profile.specialties`. The supported specialties are `plan`, `implement`, `debug`, `refactor`, `review`, `research`, `explain`, `operate`, `write`, and `chat`; there is no `use_case` property. For example:
+
+```json
+{
+  "target_groups": [{
+    "name": "main",
+    "selector": "auto",
+    "targets": [
+      {
+        "alias": "gpt-6.1-sol",
+        "auto_profile": {
+          "capability": "premium",
+          "specialties": ["plan", "debug"],
+          "reasoning": "preferred"
+        }
+      },
+      {
+        "alias": "deepseek-v4.1-flash",
+        "auto_profile": {
+          "capability": "economy",
+          "specialties": ["implement", "research", "chat"],
+          "reasoning": "normal"
+        }
+      }
+    ]
+  }],
+  "auto_routing": {
+    "mode": "active",
+    "classifier_alias": "jev-1.13"
+  }
+}
+```
+
+Set `type: "decisions"` on the classifier alias itself, not on the auto-routed alias.
+
+Published model metadata is configured with `metadata`. Use `source: "auto"` with optional `overrides` for catalog-derived metadata, or `source: "custom"` with `overrides.name` for a custom model card. Other catalog sources require a `source_path`.
+
 ### Prompt Resource
 
 The management MCP server registers a `plexus_management_guide` prompt that MCP clients can request. It describes Plexus, the tool design, destructive acknowledgement, secret redaction, and recommended workflows.

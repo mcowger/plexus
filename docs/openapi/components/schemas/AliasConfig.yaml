@@ -89,6 +89,7 @@ properties:
       - transcriptions
       - speech
       - image
+      - decisions
     description: >
       Model capability type — what the model produces. This is distinct from
       the wire protocol (which is configured via `preferred_api` or
@@ -101,6 +102,9 @@ properties:
       - **transcriptions** — Audio to text.
       - **speech** — Text to audio.
       - **image** — Image generation/editing.
+      - **decisions** — Marks the alias as usable for Decisions API calls through
+        compatible targets. It does not classify requests or select models; use
+        a target group with `selector: auto` for classifier-based model selection.
   priority:
     type: string
     enum:
