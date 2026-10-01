@@ -347,11 +347,10 @@ Agent clients such as Codex CLI and Muse Code send OpenAI Responses API extensio
 
 Plexus forwards a Responses request verbatim only when the target accepts every extension the request carries. Otherwise it flattens them: namespace tools become `namespace__name` function tools, custom tools become functions with a single string `input`, and tool calls are split back into the client's original shape on the response. Any client can use any Responses or Chat target this way.
 
-The accepted set comes from the first of:
+The accepted set depends on the target:
 
-1. The provider's **Native Responses Extensions** setting (`responses_extensions`). An empty list flattens everything.
-2. The `responses:lite` API subtype: every extension except top-level `namespace` tools and dotted names.
-3. The provider default, from its OAuth provider or the host of its Responses endpoint:
+- **`responses:lite` targets** use the fixed lite contract: every extension except top-level `namespace` tools and dotted names. The upstream enforces it, so the provider setting doesn't change it.
+- **Plain `responses` targets** use the provider's **Native Responses Extensions** setting (`responses_extensions`) when set (an empty list flattens everything), otherwise the provider default, from its OAuth provider or the host of its Responses endpoint:
 
 | Provider | Default |
 |----------|---------|

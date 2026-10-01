@@ -94,19 +94,21 @@ export function detectResponsesExtensions(body: unknown): Set<ResponsesExtension
 }
 
 /**
- * Extensions the route's target accepts verbatim. First match wins:
- *   1. the provider's explicit `responses_extensions` (`[]` accepts none);
- *   2. the `responses:lite` wire contract;
- *   3. the provider default from its OAuth provider or Responses endpoint
- *      host (see getDefaultResponsesExtensions).
+ * Extensions the route's target accepts verbatim:
+ *   - `responses:lite` targets: the fixed lite wire contract, which the
+ *     upstream enforces whatever the provider setting says;
+ *   - plain `responses` targets: the provider's explicit
+ *     `responses_extensions` (`[]` accepts none), else the default from its
+ *     OAuth provider or Responses endpoint host (see
+ *     getDefaultResponsesExtensions).
  */
 export function resolveSupportedResponsesExtensions(
   route: RouteResult,
   targetApiType: string
 ): ReadonlySet<ResponsesExtension> {
+  if (getApiSubtype(targetApiType) === 'lite') return new Set(RESPONSES_LITE_EXTENSIONS);
   const explicit = route.config.responses_extensions;
   if (explicit) return new Set(explicit);
-  if (getApiSubtype(targetApiType) === 'lite') return new Set(RESPONSES_LITE_EXTENSIONS);
   return new Set(
     getDefaultResponsesExtensions({
       oauthProvider: route.config.oauth_provider,

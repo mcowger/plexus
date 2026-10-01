@@ -1373,10 +1373,12 @@ export function ProviderAdvancedEditor({
                     className="font-body text-[11px] text-text-muted"
                     style={{ lineHeight: 1.35 }}
                   >
-                    Responses API extensions this provider accepts verbatim. Requests using any
-                    other extension are flattened to plain function tools and split back on the
-                    response. The default follows the OAuth provider or Responses endpoint (Codex,
-                    api.openai.com, api.meta.ai); other endpoints accept custom tools only.
+                    Responses API extensions this provider's Responses endpoint accepts verbatim.
+                    Requests using any other extension are flattened to plain function tools and
+                    split back on the response. The default follows the OAuth provider or Responses
+                    endpoint (Codex, api.openai.com, api.meta.ai); other endpoints accept custom
+                    tools only. Models routed via the responses:lite subtype always use the fixed
+                    lite contract instead.
                   </div>
                 </div>
               </div>

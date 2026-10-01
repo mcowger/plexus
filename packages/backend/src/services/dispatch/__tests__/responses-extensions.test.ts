@@ -143,7 +143,7 @@ describe('resolveSupportedResponsesExtensions', () => {
     ).toBe(false);
   });
 
-  test('an explicit provider list wins, and [] accepts nothing', () => {
+  test('an explicit provider list overrides the default, and [] accepts nothing', () => {
     expect(
       resolveSupportedResponsesExtensions(
         route({ oauth_provider: 'meta', responses_extensions: ['custom_tools'] }),
@@ -151,9 +151,17 @@ describe('resolveSupportedResponsesExtensions', () => {
       )
     ).toEqual(new Set(['custom_tools']));
     expect(
-      resolveSupportedResponsesExtensions(route({ responses_extensions: [] }), 'responses:lite')
-        .size
+      resolveSupportedResponsesExtensions(route({ responses_extensions: [] }), 'responses').size
     ).toBe(0);
+  });
+
+  test('an explicit provider list never narrows the responses:lite contract', () => {
+    expect(
+      resolveSupportedResponsesExtensions(
+        route({ responses_extensions: ['custom_tools'] }),
+        'responses:lite'
+      )
+    ).toEqual(resolveSupportedResponsesExtensions(route(), 'responses:lite'));
   });
 });
 
