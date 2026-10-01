@@ -10,6 +10,7 @@ import { isClaudeMaskingApiKeyRoute, isOAuthRoute, isPiAiRoute } from '../oauth/
 import {
   copilotEndpoint,
   extractChatgptAccountId,
+  hasMetaNamespaceExtensions,
   isCodexCliShapedBody,
   isGenuineClaudeCodeRequest,
   isNativeOAuthProvider,
@@ -131,10 +132,29 @@ export async function buildRequestPayload(
   const museNative = nativeOAuth && oauthProviderForNative === 'meta';
   const codexCliPassthrough = codexNative && isCodexCliShapedBody(request.originalBody);
   const anthropicNative = nativeOAuth && oauthProviderForNative === 'anthropic';
+  const incomingBaseType = getApiBaseType(request.incomingApiType?.toLowerCase() ?? '');
+  const incomingIsResponses = incomingBaseType === 'responses';
+
+  // Muse Code (Meta's own client) sends Meta's native Responses body —
+  // including its `type: "namespace"` tool grouping and namespace-qualified
+  // `function_call` history — to api.meta.ai, the exact endpoint Muse talks to
+  // directly. Forward it verbatim (the `meta` analogue of
+  // `codexCliPassthrough`) rather than flattening namespace tools to
+  // `${namespace}__${name}`: this route returns raw upstream SSE (`nativeBypass`),
+  // so a flattened request's calls would never be split back and the client
+  // would reject them as unknown tools.
+  const museNativePassthrough =
+    museNative && incomingIsResponses && hasMetaNamespaceExtensions(request.originalBody);
 
   let bypassTransformation: boolean;
   if (codexNative) {
     bypassTransformation = codexCliPassthrough;
+  } else if (museNative) {
+    // Same-format Responses bodies already pass through; also pass through
+    // when Meta's native namespace extensions are present so the tool grouping
+    // survives (see museNativePassthrough).
+    bypassTransformation =
+      shouldUsePassThrough(request, targetApiType, route) || museNativePassthrough;
   } else {
     // Anthropic and Copilot: standard same-format pass-through detection. For
     // Copilot this is authoritative (multi-API: a client may send a format the
@@ -347,18 +367,18 @@ export async function buildRequestPayload(
     // incoming client format. Anthropic bypasses only for same-format
     // (Messages) clients — chat/responses clients get the response
     // translated by the standard pipeline (mirrors the identical Codex fix,
-    // commit 4f74c1c6). Copilot honors its computed same-format decision.
-    // Muse Code bypasses only for same-format (responses) clients.
-    const incomingBaseType = getApiBaseType(request.incomingApiType?.toLowerCase() ?? '');
-    const incomingIsResponses = incomingBaseType === 'responses';
+    // commit 4f74c1c6). Copilot and Muse honor their computed request-side
+    // pass-through decision.
     const incomingIsMessages = incomingBaseType === 'messages';
+    // Muse mirrors the request decision rather than assuming a raw response:
+    // if the request went through the transformer (e.g. a `responses:lite`
+    // body Meta doesn't natively parse), the response must too, so the client
+    // transformer's namespaceMap can split flattened tool calls back.
     const nativeBypass = codexNative
       ? codexCliPassthrough || incomingIsResponses
-      : copilotNative
+      : copilotNative || museNative
         ? bypassTransformation
-        : museNative
-          ? incomingIsResponses
-          : incomingIsMessages;
+        : incomingIsMessages;
     return { payload: prepared.body, bypassTransformation: nativeBypass };
   }
 

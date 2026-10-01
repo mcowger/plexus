@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  hasMetaNamespaceExtensions,
   isNativeOAuthProvider,
   nativeOAuthApiType,
   prepareOAuthNativeRequest,
@@ -67,5 +68,49 @@ describe('meta native OAuth dispatch', () => {
         false
       )
     ).toThrow(/OAuth token/);
+  });
+});
+
+describe('hasMetaNamespaceExtensions', () => {
+  it('detects a `type: "namespace"` tool declaration', () => {
+    expect(
+      hasMetaNamespaceExtensions({
+        tools: [{ type: 'namespace', name: 'muse', tools: [] }],
+      })
+    ).toBe(true);
+  });
+
+  it('detects namespace-qualified function_call history', () => {
+    expect(
+      hasMetaNamespaceExtensions({
+        input: [{ type: 'function_call', name: 'read_file', namespace: 'muse' }],
+      })
+    ).toBe(true);
+  });
+
+  it('ignores plain function tools and un-namespaced calls', () => {
+    expect(hasMetaNamespaceExtensions({ tools: [{ type: 'function', name: 'read_file' }] })).toBe(
+      false
+    );
+    expect(
+      hasMetaNamespaceExtensions({
+        input: [{ type: 'function_call', name: 'read_file' }],
+      })
+    ).toBe(false);
+  });
+
+  it('stays narrower than isCodexCliShapedBody: Codex-lite extensions are not Meta-native', () => {
+    expect(
+      hasMetaNamespaceExtensions({
+        input: [{ type: 'additional_tools', role: 'developer', tools: [] }],
+        tools: [{ type: 'tool_search' }],
+      })
+    ).toBe(false);
+  });
+
+  it('tolerates malformed bodies', () => {
+    expect(hasMetaNamespaceExtensions(null)).toBe(false);
+    expect(hasMetaNamespaceExtensions('nope')).toBe(false);
+    expect(hasMetaNamespaceExtensions({ tools: [null, 'x'] })).toBe(false);
   });
 });

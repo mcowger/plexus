@@ -473,6 +473,37 @@ export function isCodexCliShapedBody(body: any): boolean {
   return false;
 }
 
+/**
+ * Detect the Meta/Muse namespace-tool extensions. Muse Code — Meta's own
+ * Responses client — declares its entire tool set as one `type: "namespace"`
+ * tool and replays namespace-qualified `function_call` history. api.meta.ai is
+ * the exact endpoint Muse talks to directly and accepts both shapes, so a
+ * native Meta route must forward them VERBATIM rather than flattening them to
+ * `${namespace}__${name}` (which the raw-SSE response path never splits back).
+ *
+ * Deliberately narrower than `isCodexCliShapedBody`: `additional_tools`,
+ * `tool_search`, and `custom_tool_call` are Codex-lite extensions Meta does
+ * NOT advertise, so those still take the transform pipeline.
+ */
+export function hasMetaNamespaceExtensions(body: any): boolean {
+  if (!body || typeof body !== 'object') return false;
+
+  if (Array.isArray(body.tools) && body.tools.some((tool: any) => tool?.type === 'namespace')) {
+    return true;
+  }
+
+  return (
+    Array.isArray(body.input) &&
+    body.input.some(
+      (item: any) =>
+        item &&
+        typeof item === 'object' &&
+        item.type === 'function_call' &&
+        typeof item.namespace === 'string'
+    )
+  );
+}
+
 /** Extract the ChatGPT account id from the Codex OAuth token's JWT claim. */
 export function extractChatgptAccountId(token: string): string | undefined {
   try {
