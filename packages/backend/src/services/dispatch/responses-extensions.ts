@@ -59,6 +59,17 @@ function isDottedCall(item: Record<string, any>, namespaces: Set<string>): boole
   return dot > 0 && namespaces.has(item.name.slice(0, dot));
 }
 
+/** A `custom` tool declaration, directly or nested in a namespace (Codex lite nests `exec`). */
+function declaresCustomTool(tool: unknown): boolean {
+  if (!isObject(tool)) return false;
+  if (tool.type === 'custom') return true;
+  return (
+    tool.type === 'namespace' &&
+    Array.isArray(tool.tools) &&
+    tool.tools.some((sub: unknown) => isObject(sub) && sub.type === 'custom')
+  );
+}
+
 /** Every Responses extension present on a request body. */
 export function detectResponsesExtensions(body: unknown): Set<ResponsesExtension> {
   const found = new Set<ResponsesExtension>();
@@ -68,8 +79,8 @@ export function detectResponsesExtensions(body: unknown): Set<ResponsesExtension
     for (const tool of body.tools) {
       if (!isObject(tool)) continue;
       if (tool.type === 'namespace') found.add('namespace_tools');
-      else if (tool.type === 'custom') found.add('custom_tools');
       else if (tool.type === 'tool_search') found.add('tool_search');
+      if (declaresCustomTool(tool)) found.add('custom_tools');
     }
   }
 
@@ -84,6 +95,9 @@ export function detectResponsesExtensions(body: unknown): Set<ResponsesExtension
         found.add('custom_calls');
       } else if (item.type === 'additional_tools') {
         found.add('additional_tools');
+        if (Array.isArray(item.tools) && item.tools.some(declaresCustomTool)) {
+          found.add('custom_tools');
+        }
       } else if (item.type.startsWith('tool_search')) {
         found.add('tool_search');
       }

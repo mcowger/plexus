@@ -42,6 +42,21 @@ describe('detectResponsesExtensions', () => {
     ).toEqual(new Set(['additional_tools', 'custom_calls', 'tool_search', 'namespaced_calls']));
   });
 
+  test('detects custom tools nested in a namespace or declared in additional_tools', () => {
+    expect(
+      detectResponsesExtensions({
+        tools: [
+          { type: 'namespace', name: 'functions', tools: [{ type: 'custom', name: 'exec' }] },
+        ],
+      })
+    ).toEqual(new Set(['namespace_tools', 'custom_tools']));
+    expect(
+      detectResponsesExtensions({
+        input: [{ type: 'additional_tools', tools: [{ type: 'custom', name: 'exec' }] }],
+      })
+    ).toEqual(new Set(['additional_tools', 'custom_tools']));
+  });
+
   test('detects Muse dotted history separately, only against a declared namespace', () => {
     const tools = [{ type: 'namespace', name: 'muse', tools: [] }];
     expect(
