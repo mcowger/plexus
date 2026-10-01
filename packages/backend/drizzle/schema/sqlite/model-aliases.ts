@@ -23,6 +23,7 @@ export const modelAliases = sqliteTable('model_aliases', {
   generation: text('generation'), // JSON: { reasoning?, maxTokens?, verbosity?, serviceTier? }
   syntheticSafeguardApproval: integer('synthetic_safeguard_approval').notNull().default(0),
   compaction: text('compaction'), // JSON: compaction config
+  autoRouting: text('auto_routing'), // JSON: AutoRoutingConfig for the `auto` policy
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

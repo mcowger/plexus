@@ -551,4 +551,154 @@ describe('UsageInspector', () => {
       expect(capturedRecord!.tokensInput).toBe(50);
     });
   });
+
+  describe('auto-routing usage observation', () => {
+    function makeInspectorWithRecorder(
+      requestId: string,
+      record: Partial<UsageRecord>,
+      recorder: (usage: any) => void,
+      options: { estimate?: boolean; providerApiType?: string } = {}
+    ) {
+      return new UsageInspector(
+        requestId,
+        mockStorage,
+        { requestId, ...record } as Partial<UsageRecord>,
+        mockPricing,
+        undefined,
+        Date.now() - 100,
+        options.estimate ?? false,
+        options.providerApiType ?? 'chat',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        recorder
+      );
+    }
+
+    async function runInspector(inspector: UsageInspector) {
+      const src = new PassThrough();
+      src.pipe(inspector);
+      src.end();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    it('forwards provider-reported cache read/write and the final attempt identity on success', async () => {
+      const requestId = 'test-auto-usage-success';
+      const recorder = vi.fn();
+      const inspector = makeInspectorWithRecorder(
+        requestId,
+        {
+          responseStatus: 'success',
+          finalAttemptProvider: 'provider-a',
+          finalAttemptModel: 'premium',
+        },
+        recorder
+      );
+
+      const debugManager = DebugManager.getInstance();
+      debugManager.setEnabled(true);
+      debugManager.startLog(requestId, { messages: [] });
+      debugManager.addReconstructedRawResponse(requestId, {
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 20,
+          total_tokens: 120,
+          prompt_tokens_details: { cached_tokens: 40 },
+        },
+      });
+
+      await runInspector(inspector);
+
+      expect(recorder).toHaveBeenCalledTimes(1);
+      expect(recorder).toHaveBeenCalledWith({
+        provider: 'provider-a',
+        model: 'premium',
+        cachedTokens: 40,
+        cacheWriteTokens: 0,
+      });
+    });
+
+    it('forwards zero cache counts so a real no-cache result can invalidate optimistic warmth', async () => {
+      const requestId = 'test-auto-usage-zero-cache';
+      const recorder = vi.fn();
+      const inspector = makeInspectorWithRecorder(
+        requestId,
+        {
+          responseStatus: 'success',
+          finalAttemptProvider: 'provider-a',
+          finalAttemptModel: 'premium',
+        },
+        recorder
+      );
+
+      const debugManager = DebugManager.getInstance();
+      debugManager.setEnabled(true);
+      debugManager.startLog(requestId, { messages: [] });
+      debugManager.addReconstructedRawResponse(requestId, {
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      });
+
+      await runInspector(inspector);
+
+      expect(recorder).toHaveBeenCalledTimes(1);
+      expect(recorder).toHaveBeenCalledWith(
+        expect.objectContaining({ cachedTokens: 0, cacheWriteTokens: 0 })
+      );
+    });
+
+    it('does not fire when the provider reported no usage and the record was estimated', async () => {
+      const requestId = 'test-auto-usage-estimated';
+      const recorder = vi.fn();
+      const inspector = makeInspectorWithRecorder(
+        requestId,
+        {
+          responseStatus: 'success',
+          finalAttemptProvider: 'provider-a',
+          finalAttemptModel: 'premium',
+        },
+        recorder,
+        { estimate: true }
+      );
+
+      const debugManager = DebugManager.getInstance();
+      debugManager.setEnabled(true);
+      debugManager.startLog(requestId, { messages: [] });
+      debugManager.addReconstructedRawResponse(requestId, {
+        choices: [{ delta: { content: 'hello' }, finish_reason: 'stop' }],
+      });
+
+      await runInspector(inspector);
+
+      expect(recorder).not.toHaveBeenCalled();
+    });
+
+    it('does not fire for a non-success finalization even when usage is present', async () => {
+      const requestId = 'test-auto-usage-error';
+      const recorder = vi.fn();
+      const inspector = makeInspectorWithRecorder(
+        requestId,
+        {
+          responseStatus: 'error',
+          finalAttemptProvider: 'provider-a',
+          finalAttemptModel: 'premium',
+        },
+        recorder
+      );
+
+      const debugManager = DebugManager.getInstance();
+      debugManager.setEnabled(true);
+      debugManager.startLog(requestId, { messages: [] });
+      debugManager.addReconstructedRawResponse(requestId, {
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      });
+
+      await runInspector(inspector);
+
+      expect(recorder).not.toHaveBeenCalled();
+    });
+  });
 });

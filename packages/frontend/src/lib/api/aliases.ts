@@ -4,6 +4,8 @@ import { API_BASE, fetchWithAuth, inferProviderTypes } from './core';
 import type {
   Alias,
   AliasTargetGroup,
+  AutoRoutingPreviewRequest,
+  AutoRoutingPreviewResponse,
   CatalogMetadataSource,
   CatalogRefreshAllResult,
   CatalogStatus,
@@ -25,6 +27,7 @@ export function aliasToConfigPayload(alias: Alias): Record<string, unknown> {
     synthetic_safeguard_approval: alias.synthetic_safeguard_approval || false,
     ...(alias.preferred_api?.length ? { preferred_api: alias.preferred_api } : {}),
     ...(alias.type && { type: alias.type }),
+    ...(alias.auto_routing && { auto_routing: alias.auto_routing }),
     ...(alias.advanced?.length ? { advanced: alias.advanced } : {}),
     ...(alias.metadata && { metadata: alias.metadata }),
     ...(alias.pi_model && { pi_model: alias.pi_model }),
@@ -38,11 +41,13 @@ export function aliasToConfigPayload(alias: Alias): Record<string, unknown> {
         target.alias
           ? {
               alias: target.alias,
+              ...(target.auto_profile && { auto_profile: target.auto_profile }),
               ...(target.enabled === false && { enabled: false }),
             }
           : {
               provider: target.provider,
               model: target.model,
+              ...(target.auto_profile && { auto_profile: target.auto_profile }),
               ...(target.enabled === false && { enabled: false }),
             }
       ),
@@ -134,6 +139,50 @@ export const previewModelResolution = async (alias: Alias): Promise<ModelResolut
   return res.json();
 };
 
+export interface PreviewAutoRoutingOptions {
+  prompt: string;
+  /** Retained judgment handle; reuses the prior classification. */
+  judgmentHandle?: string;
+  scenario?: AutoRoutingPreviewRequest['scenario'];
+  signal?: AbortSignal;
+}
+
+/**
+ * Simulate the auto routing policy against an unsaved alias draft. The backend
+ * never dispatches a generation request; classifier calls still cost money.
+ */
+export const previewAutoRouting = async (
+  alias: Alias,
+  options: PreviewAutoRoutingOptions
+): Promise<AutoRoutingPreviewResponse> => {
+  const body: AutoRoutingPreviewRequest = {
+    alias: aliasToConfigPayload(alias),
+    alias_name: alias.id,
+    prompt: options.prompt,
+    ...(options.judgmentHandle ? { judgment_handle: options.judgmentHandle } : {}),
+    ...(options.scenario ? { scenario: options.scenario } : {}),
+  };
+
+  const res = await fetchWithAuth(`${API_BASE}/v0/management/models/auto-routing/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options.signal,
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      details?: Array<{ message?: string }>;
+    };
+    const detail =
+      Array.isArray(err.details) && err.details[0]?.message ? `: ${err.details[0].message}` : '';
+    throw new Error(`${err.error || 'Auto routing preview failed'}${detail}`);
+  }
+
+  return (await res.json()) as AutoRoutingPreviewResponse;
+};
+
 export const getModels = async (): Promise<Model[]> => {
   try {
     const res = await fetchWithAuth(`${API_BASE}/v0/management/providers`);
@@ -199,6 +248,7 @@ export const getAliases = async (): Promise<Alias[]> => {
       provider?: string;
       model?: string;
       enabled?: boolean;
+      auto_profile?: AliasTargetGroup['targets'][number]['auto_profile'];
     }
 
     interface RawTargetGroup {
@@ -216,6 +266,7 @@ export const getAliases = async (): Promise<Alias[]> => {
       enforce_limits?: boolean;
       sticky_session?: boolean;
       synthetic_safeguard_approval?: boolean;
+      auto_routing?: Alias['auto_routing'];
       advanced?: Alias['advanced'];
       metadata?: Alias['metadata'];
       preferred_api?: Alias['preferred_api'];
@@ -239,6 +290,7 @@ export const getAliases = async (): Promise<Alias[]> => {
           return {
             alias: t.alias as string,
             enabled: t.enabled !== false,
+            ...(t.auto_profile && { auto_profile: t.auto_profile }),
           };
         }
 
@@ -257,6 +309,7 @@ export const getAliases = async (): Promise<Alias[]> => {
           model: t.model,
           apiType: Array.isArray(apiType) ? apiType : [apiType],
           enabled: t.enabled !== false,
+          ...(t.auto_profile && { auto_profile: t.auto_profile }),
         };
       };
 
@@ -276,6 +329,7 @@ export const getAliases = async (): Promise<Alias[]> => {
         enforce_limits: val.enforce_limits || false,
         sticky_session: val.sticky_session ?? true,
         synthetic_safeguard_approval: val.synthetic_safeguard_approval || false,
+        auto_routing: val.auto_routing,
         advanced: val.advanced || [],
         metadata: val.metadata,
         preferred_api: val.preferred_api || [],

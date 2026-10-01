@@ -8,6 +8,7 @@ import { logger } from '../../utils/logger';
 import { calculateCosts, type CostAttribution } from '../../utils/calculate-costs';
 import { TransformerFactory } from '../dispatch/transformer-factory';
 import { DebugLoggingInspector, UsageInspector } from '../inspectors/index';
+import type { AutoRoutingUsageRecorder } from '../inspectors/index';
 import { Readable } from 'stream';
 import { DebugManager } from '../observability/debug-manager';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
@@ -112,7 +113,14 @@ export async function handleResponse(
       stallWindowMs?: number | null;
       stallGracePeriodMs?: number | null;
     }) => void;
-  } | null
+  } | null,
+  /**
+   * Optional auto-routing observation hook. Invoked once on a successful,
+   * provider-reported finalization with the actual final attempt's cache
+   * read/write counts (zeros included). The caller binds the server-side
+   * unified request and winning route so the inspector stays routing-agnostic.
+   */
+  autoRoutingUsageRecorder?: AutoRoutingUsageRecorder
 ) {
   // Populate usage record with metadata from the dispatcher's selection
   usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
@@ -494,7 +502,8 @@ export async function handleResponse(
       keyName,
       rawDebugLogging,
       transformedDebugLogging,
-      costAttribution
+      costAttribution,
+      autoRoutingUsageRecorder ?? unifiedResponse.plexus?.autoRoutingUsageRecorder
     );
 
     // Standard SSE headers to prevent buffering and timeouts

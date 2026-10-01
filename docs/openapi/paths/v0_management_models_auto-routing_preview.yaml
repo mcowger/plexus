@@ -1,0 +1,44 @@
+post:
+  tags:
+    - Management — Models
+  summary: Preview auto routing decisions (admin only)
+  description: |
+    Recomputes the `auto` routing policy for an unsaved alias draft and a
+    bounded sample context. Uses the same scoring, suitability, and
+    cache-economic policy as production, but never dispatches a generation
+    request and never mutates production incumbent, warmth, or budget state.
+
+    A fresh judgment may call the alias's administrator-authorized Decisions
+    classifier and costs money. A retained `judgment_handle` reuses a prior
+    judgment so that tuning scoring weights or switching margins does not
+    reclassify. Handles are bound to the authenticated admin and to the
+    context/rubric; client-supplied judgments are not accepted as routing
+    authority.
+
+    Preview state is scoped to the authenticated admin identity. The
+    classifier alias must be authorized by an administrator and must not
+    reach an `auto` group.
+
+    **Admin only** — limited principals receive 403.
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/AutoRoutingPreviewRequest.yaml
+  responses:
+    '200':
+      description: Recomputed policy result.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/AutoRoutingPreviewResponse.yaml
+    '400':
+      description: Invalid alias draft or preview input.
+    '401':
+      description: Authentication required or invalid credentials.
+    '403':
+      description: Admin access required.
+  operationId: postV0ManagementModelsAutoRoutingPreview

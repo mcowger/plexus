@@ -1,15 +1,29 @@
-import React, { useState } from 'react';
-import { GripVertical, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import React, { Fragment, useState } from 'react';
+import { GripVertical, ChevronUp, ChevronDown, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/Switch';
 import { Button } from '../ui/Button';
+import { TagSelect } from '../ui/TagSelect';
 import { AliasTargetGroup } from '../../lib/api';
 import { dedupeModels, getModelOptionKey } from '../../lib/modelOptions';
+import {
+  AUTO_CAPABILITY_LABELS,
+  AUTO_REASONING_LABELS,
+  getAutoTargetLabel,
+  isAutoProfileComplete,
+} from '../../lib/autoRouting';
+import { AUTO_CAPABILITY_TIERS, AUTO_REASONING_SUITABILITY, AUTO_TASK_KINDS } from '@plexus/shared';
+import type { AutoCapabilityTier, AutoReasoningSuitability, AutoTaskKind } from '@plexus/shared';
 
 interface TargetGroupEditorProps {
   groups: AliasTargetGroup[];
   providers: Array<{ id: string; name: string }>;
   availableModels: Array<{ id: string; providerId: string; name: string }>;
   availableAliases: string[];
+  /**
+   * UI-only feature flag for the auto routing controls. When false, `auto` is
+   * not offered for ordinary groups and per-target profile editors are hidden.
+   */
+  autoRoutingEnabled: boolean;
   onChange: (groups: AliasTargetGroup[]) => void;
 }
 
@@ -20,6 +34,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   providers,
   availableModels,
   availableAliases,
+  autoRoutingEnabled,
   onChange,
 }) => {
   const [dragState, setDragState] = useState<{
@@ -94,7 +109,11 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
       if (field === 'provider') {
         targets[targetIdx] = { provider: value as string, model: '', enabled: true };
       } else if (field === 'model') {
-        targets[targetIdx] = { ...targets[targetIdx], model: value as string };
+        const nextTarget = { ...targets[targetIdx], model: value as string };
+        // Changing the model requires re-reviewing the qualification rather
+        // than silently carrying it over to an unrelated model.
+        delete nextTarget.auto_profile;
+        targets[targetIdx] = nextTarget;
       } else {
         targets[targetIdx] = { ...targets[targetIdx], enabled: value as boolean };
       }
@@ -108,6 +127,28 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
       const next = [...prev];
       const targets = [...next[groupIdx].targets];
       targets[targetIdx] = { alias, enabled: true };
+      next[groupIdx] = { ...next[groupIdx], targets };
+      return next;
+    });
+  };
+
+  const updateTargetProfile = (
+    groupIdx: number,
+    targetIdx: number,
+    patch: {
+      capability?: AutoCapabilityTier;
+      reasoning?: AutoReasoningSuitability;
+      specialties?: AutoTaskKind[];
+    }
+  ) => {
+    setGroups((prev) => {
+      const next = [...prev];
+      const targets = [...next[groupIdx].targets];
+      const current = targets[targetIdx].auto_profile ?? { specialties: [] };
+      const merged = { ...current, ...patch };
+      if (!merged.capability) delete merged.capability;
+      if (!merged.reasoning) delete merged.reasoning;
+      targets[targetIdx] = { ...targets[targetIdx], auto_profile: merged };
       next[groupIdx] = { ...next[groupIdx], targets };
       return next;
     });
@@ -263,11 +304,15 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                 value={group.selector}
                 onChange={(e) => updateGroupField(groupIdx, 'selector', e.target.value)}
               >
-                {Object.entries(SELECTOR_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
+                {Object.entries(SELECTOR_LABELS)
+                  .filter(
+                    ([key]) => key !== 'auto' || autoRoutingEnabled || group.selector === 'auto'
+                  )
+                  .map(([key, label]) => (
+                    <option key={key} value={key} disabled={key === 'auto' && !autoRoutingEnabled}>
+                      {label}
+                    </option>
+                  ))}
               </select>
               <div className="flex items-center gap-0.5">
                 <button
@@ -336,135 +381,208 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                     );
 
                 return (
-                  <div
-                    key={targetIdx}
-                    draggable={true}
-                    onDragStart={(e) => {
-                      e.stopPropagation();
-                      handleDragStart(e, 'target', groupIdx, targetIdx);
-                    }}
-                    onDragOver={(e) => {
-                      e.stopPropagation();
-                      handleDragOver(e, 'target', groupIdx, targetIdx);
-                    }}
-                    onDrop={(e) => {
-                      e.stopPropagation();
-                      handleDrop(e, 'target', groupIdx, targetIdx);
-                    }}
-                    onDragEnd={handleDragEnd}
-                    className="flex items-center gap-2 rounded px-2 py-1.5 transition-all duration-150"
-                    style={{
-                      backgroundColor: isTargetDrag
-                        ? 'transparent'
-                        : isTargetDragOver
-                          ? 'rgba(245, 158, 11, 0.05)'
-                          : 'var(--color-bg-glass)',
-                      border: isTargetDrag
-                        ? '1px dashed var(--color-border-glass)'
-                        : isTargetDragOver
-                          ? '1px solid var(--color-primary)'
-                          : '1px solid transparent',
-                      opacity: isTargetDrag ? 0.5 : 1,
-                      cursor: 'grab',
-                    }}
-                  >
-                    <div className="text-text-secondary opacity-50">
-                      <GripVertical size={13} />
-                    </div>
-                    <div className="flex items-center gap-0.5 opacity-60">
-                      <button
-                        type="button"
-                        onClick={() => moveTarget(groupIdx, targetIdx, 'up')}
-                        disabled={targetIdx === 0}
-                        className="hover:text-primary disabled:opacity-20 transition-colors p-0.5"
-                      >
-                        <ChevronUp size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveTarget(groupIdx, targetIdx, 'down')}
-                        disabled={targetIdx === group.targets.length - 1}
-                        className="hover:text-primary disabled:opacity-20 transition-colors p-0.5"
-                      >
-                        <ChevronDown size={13} />
-                      </button>
-                    </div>
-                    <select
-                      className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      style={{ padding: '3px 6px', height: '26px' }}
-                      value={isAliasTarget ? 'alias' : 'model'}
-                      onChange={(e) =>
-                        setTargetType(groupIdx, targetIdx, e.target.value as 'model' | 'alias')
-                      }
+                  <Fragment key={targetIdx}>
+                    <div
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        handleDragStart(e, 'target', groupIdx, targetIdx);
+                      }}
+                      onDragOver={(e) => {
+                        e.stopPropagation();
+                        handleDragOver(e, 'target', groupIdx, targetIdx);
+                      }}
+                      onDrop={(e) => {
+                        e.stopPropagation();
+                        handleDrop(e, 'target', groupIdx, targetIdx);
+                      }}
+                      onDragEnd={handleDragEnd}
+                      className="flex items-center gap-2 rounded px-2 py-1.5 transition-all duration-150"
+                      style={{
+                        backgroundColor: isTargetDrag
+                          ? 'transparent'
+                          : isTargetDragOver
+                            ? 'rgba(245, 158, 11, 0.05)'
+                            : 'var(--color-bg-glass)',
+                        border: isTargetDrag
+                          ? '1px dashed var(--color-border-glass)'
+                          : isTargetDragOver
+                            ? '1px solid var(--color-primary)'
+                            : '1px solid transparent',
+                        opacity: isTargetDrag ? 0.5 : 1,
+                        cursor: 'grab',
+                      }}
                     >
-                      <option value="model">Model</option>
-                      <option value="alias">Alias</option>
-                    </select>
-                    {isAliasTarget ? (
+                      <div className="text-text-secondary opacity-50">
+                        <GripVertical size={13} />
+                      </div>
+                      <div className="flex items-center gap-0.5 opacity-60">
+                        <button
+                          type="button"
+                          onClick={() => moveTarget(groupIdx, targetIdx, 'up')}
+                          disabled={targetIdx === 0}
+                          className="hover:text-primary disabled:opacity-20 transition-colors p-0.5"
+                        >
+                          <ChevronUp size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTarget(groupIdx, targetIdx, 'down')}
+                          disabled={targetIdx === group.targets.length - 1}
+                          className="hover:text-primary disabled:opacity-20 transition-colors p-0.5"
+                        >
+                          <ChevronDown size={13} />
+                        </button>
+                      </div>
                       <select
-                        className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                         style={{ padding: '3px 6px', height: '26px' }}
-                        value={target.alias ?? ''}
-                        onChange={(e) => setTargetAlias(groupIdx, targetIdx, e.target.value)}
+                        value={isAliasTarget ? 'alias' : 'model'}
+                        onChange={(e) =>
+                          setTargetType(groupIdx, targetIdx, e.target.value as 'model' | 'alias')
+                        }
                       >
-                        <option value="">Alias...</option>
-                        {availableAliases.map((aliasSlug) => (
-                          <option key={aliasSlug} value={aliasSlug}>
-                            {aliasSlug}
-                          </option>
-                        ))}
+                        <option value="model">Model</option>
+                        <option value="alias">Alias</option>
                       </select>
-                    ) : (
-                      <>
+                      {isAliasTarget ? (
                         <select
                           className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                           style={{ padding: '3px 6px', height: '26px' }}
-                          value={target.provider ?? ''}
-                          onChange={(e) =>
-                            updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
-                          }
+                          value={target.alias ?? ''}
+                          onChange={(e) => setTargetAlias(groupIdx, targetIdx, e.target.value)}
                         >
-                          <option value="">Provider...</option>
-                          {providers.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
+                          <option value="">Alias...</option>
+                          {availableAliases.map((aliasSlug) => (
+                            <option key={aliasSlug} value={aliasSlug}>
+                              {aliasSlug}
                             </option>
                           ))}
                         </select>
-                        <select
-                          className="flex-[2] min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                          style={{ padding: '3px 6px', height: '26px' }}
-                          value={target.model ?? ''}
-                          onChange={(e) =>
-                            updateTarget(groupIdx, targetIdx, 'model', e.target.value)
-                          }
-                          disabled={!target.provider}
-                        >
-                          <option value="">Model...</option>
-                          {modelOptions.map((model) => (
-                            <option
-                              key={getModelOptionKey(model.providerId, model.id)}
-                              value={model.id}
+                      ) : (
+                        <>
+                          <select
+                            className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                            style={{ padding: '3px 6px', height: '26px' }}
+                            value={target.provider ?? ''}
+                            onChange={(e) =>
+                              updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
+                            }
+                          >
+                            <option value="">Provider...</option>
+                            {providers.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            className="flex-[2] min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                            style={{ padding: '3px 6px', height: '26px' }}
+                            value={target.model ?? ''}
+                            onChange={(e) =>
+                              updateTarget(groupIdx, targetIdx, 'model', e.target.value)
+                            }
+                            disabled={!target.provider}
+                          >
+                            <option value="">Model...</option>
+                            {modelOptions.map((model) => (
+                              <option
+                                key={getModelOptionKey(model.providerId, model.id)}
+                                value={model.id}
+                              >
+                                {model.name}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                      <Switch
+                        checked={target.enabled !== false}
+                        onChange={(val) => updateTarget(groupIdx, targetIdx, 'enabled', val)}
+                        size="sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeTarget(groupIdx, targetIdx)}
+                        className="hover:text-danger text-text-secondary transition-colors p-1"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+
+                    {group.selector === 'auto' && autoRoutingEnabled && (
+                      <div className="ml-6 mr-1 mb-1 rounded-sm border border-border-glass bg-bg-glass/40 px-2 py-2 flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            aria-label="Capability tier"
+                            className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                            style={{ padding: '3px 6px', height: '26px' }}
+                            value={target.auto_profile?.capability ?? ''}
+                            onChange={(e) =>
+                              updateTargetProfile(groupIdx, targetIdx, {
+                                capability: (e.target.value || undefined) as
+                                  | AutoCapabilityTier
+                                  | undefined,
+                              })
+                            }
+                          >
+                            <option value="">Capability...</option>
+                            {AUTO_CAPABILITY_TIERS.map((tier) => (
+                              <option key={tier} value={tier}>
+                                {AUTO_CAPABILITY_LABELS[tier]}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label="Reasoning suitability"
+                            className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                            style={{ padding: '3px 6px', height: '26px' }}
+                            value={target.auto_profile?.reasoning ?? ''}
+                            onChange={(e) =>
+                              updateTargetProfile(groupIdx, targetIdx, {
+                                reasoning: (e.target.value || undefined) as
+                                  | AutoReasoningSuitability
+                                  | undefined,
+                              })
+                            }
+                          >
+                            <option value="">Reasoning...</option>
+                            {AUTO_REASONING_SUITABILITY.map((value) => (
+                              <option key={value} value={value}>
+                                {AUTO_REASONING_LABELS[value]}
+                              </option>
+                            ))}
+                          </select>
+                          {!isAutoProfileComplete(target.auto_profile) && (
+                            <span
+                              className="inline-flex items-center gap-1 font-body text-[11px]"
+                              style={{ color: 'var(--color-warning)' }}
                             >
-                              {model.name}
-                            </option>
-                          ))}
-                        </select>
-                      </>
+                              <AlertTriangle size={12} />
+                              Capability required for active auto routing
+                            </span>
+                          )}
+                        </div>
+                        <TagSelect
+                          label="Specialties"
+                          placeholder="General purpose"
+                          options={[...AUTO_TASK_KINDS]}
+                          selected={target.auto_profile?.specialties ?? []}
+                          onChange={(specialties) =>
+                            updateTargetProfile(groupIdx, targetIdx, {
+                              specialties: specialties as AutoTaskKind[],
+                            })
+                          }
+                        />
+                        <p className="font-body text-[11px] text-text-muted">
+                          {isAliasTarget
+                            ? `Outer profile for ${getAutoTargetLabel(target)}. Plexus cannot verify the administrator's capability claim; qualify it conservatively for every leaf the child may dispatch or fail over to.`
+                            : 'Administrator qualification for this logical target. Empty specialties mean general-purpose.'}
+                        </p>
+                      </div>
                     )}
-                    <Switch
-                      checked={target.enabled !== false}
-                      onChange={(val) => updateTarget(groupIdx, targetIdx, 'enabled', val)}
-                      size="sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeTarget(groupIdx, targetIdx)}
-                      className="hover:text-danger text-text-secondary transition-colors p-1"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
+                  </Fragment>
                 );
               })}
 

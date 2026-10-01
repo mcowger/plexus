@@ -7,4 +7,5 @@ export const SELECTOR_LABELS: Record<string, string> = {
   quota: 'Quota Burn-down',
   performance: 'Best Performance',
   e2e_performance: 'E2E Performance',
+  auto: 'Auto',
 };

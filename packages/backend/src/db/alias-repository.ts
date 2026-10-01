@@ -1,6 +1,12 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { getCurrentDialect, getDatabase, getSchema } from './client';
-import type { MetadataOverrides, ModelConfig, ModelTargetGroup, SelectorType } from '../config';
+import type {
+  MetadataOverrides,
+  ModelConfig,
+  ModelTarget,
+  ModelTargetGroup,
+  SelectorType,
+} from '../config';
 import {
   fromBool,
   hasAnyOverrideField,
@@ -53,6 +59,7 @@ interface AliasRow {
   extraBody: unknown;
   generation: unknown;
   compaction: unknown;
+  autoRouting: unknown;
   createdAt: number;
   updatedAt: number;
 }
@@ -66,6 +73,7 @@ interface AliasTargetRow {
   enabled: unknown;
   groupName: string | null;
   sortOrder: number;
+  autoProfile: unknown;
 }
 
 interface AliasMetadataOverrideRow {
@@ -348,6 +356,7 @@ export class AliasRepository {
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
       generation: null,
       compaction: config.compaction ? toJson(config.compaction) : null,
+      autoRouting: config.auto_routing ? toJson(config.auto_routing) : null,
       targetGroups:
         config.target_groups && config.target_groups.length > 0
           ? toJson(
@@ -398,6 +407,7 @@ export class AliasRepository {
           enabled: number | boolean;
           groupName: string;
           sortOrder: number;
+          autoProfile: unknown;
         }> = [];
         for (const group of config.target_groups) {
           for (const target of group.targets) {
@@ -409,6 +419,7 @@ export class AliasRepository {
               enabled: fromBool(target.enabled !== false),
               groupName: group.name,
               sortOrder: sortIdx++,
+              autoProfile: target.auto_profile ? toJson(target.auto_profile) : null,
             });
           }
         }
@@ -479,15 +490,23 @@ export class AliasRepository {
         const groupTargets = targetRows
           .filter((target) => target.groupName === definition.name)
           .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((target) =>
-            target.targetAliasSlug
-              ? { alias: target.targetAliasSlug, enabled: toBool(target.enabled) }
+          .map((target): ModelTarget => {
+            const autoProfile = target.autoProfile
+              ? parseJson<NonNullable<ModelTarget['auto_profile']>>(target.autoProfile)
+              : undefined;
+            return target.targetAliasSlug
+              ? {
+                  alias: target.targetAliasSlug,
+                  enabled: toBool(target.enabled),
+                  ...(autoProfile ? { auto_profile: autoProfile } : {}),
+                }
               : {
                   provider: target.providerSlug!,
                   model: target.modelName!,
                   enabled: toBool(target.enabled),
-                }
-          );
+                  ...(autoProfile ? { auto_profile: autoProfile } : {}),
+                };
+          });
         targetGroups.push({
           name: definition.name,
           selector: definition.selector as SelectorType,
@@ -511,6 +530,7 @@ export class AliasRepository {
       ...(row.piModel ? { pi_model: parseJson(row.piModel) } : {}),
       ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
       ...(row.compaction ? { compaction: parseJson(row.compaction) } : {}),
+      ...(row.autoRouting ? { auto_routing: parseJson(row.autoRouting) } : {}),
     };
 
     if (row.metadataSource) {

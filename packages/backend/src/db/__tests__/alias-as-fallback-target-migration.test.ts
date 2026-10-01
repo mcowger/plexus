@@ -27,6 +27,7 @@ import { toDbBoolean } from '../../utils/normalize';
  */
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../drizzle/migrations');
+const PRE_FEATURE_CUTOFF = '0061';
 
 interface Journal {
   entries: Array<{ tag: string }>;
@@ -145,7 +146,7 @@ function buildPreFeatureDb(path_: string): void {
   const journal = JSON.parse(
     fs.readFileSync(path.join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8')
   ) as Journal;
-  const preFeature = journal.entries.filter((e) => !e.tag.startsWith('0061'));
+  const preFeature = journal.entries.filter((e) => e.tag < PRE_FEATURE_CUTOFF);
 
   for (const entry of preFeature) {
     const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8');
@@ -183,11 +184,21 @@ function buildPreFeatureDb(path_: string): void {
   sqlite.close();
 }
 
-/** Apply a migration SQL file to the DB (process one statement at a time). */
+/**
+ * Apply migration `tag` and every later migration in journal order. The 0061
+ * table recreation drops columns added by migrations generated after 0061, so
+ * the catch-up migrations must run afterward to keep the local DB in sync with
+ * the Drizzle schema (e.g. `auto_profile`, migration 0070).
+ */
 function applyMigrationFile(path_: string, tag: string): void {
   const sqlite = new Database(path_);
-  const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, `${tag}.sql`), 'utf8');
-  for (const stmt of splitStatements(sql)) sqlite.run(stmt);
+  const journal = JSON.parse(
+    fs.readFileSync(path.join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8')
+  ) as Journal;
+  for (const entry of journal.entries.filter((e) => e.tag >= tag)) {
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, `${entry.tag}.sql`), 'utf8');
+    for (const stmt of splitStatements(sql)) sqlite.run(stmt);
+  }
   sqlite.close();
 }
 

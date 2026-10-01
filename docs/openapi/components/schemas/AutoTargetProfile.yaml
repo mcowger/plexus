@@ -1,0 +1,50 @@
+type: object
+description: >
+  Local capability qualification for one logical target in an `auto` group.
+  The administrator attests to this, it is not inferred from model names.
+  Applies to both concrete `provider`/`model` targets and `alias` references.
+  All fields are optional so a structurally valid incomplete profile can be
+  saved in `off` mode; activating `auto` requires a capability on every
+  enabled target.
+properties:
+  capability:
+    type: string
+    enum:
+      - economy
+      - standard
+      - high
+      - premium
+    description: >
+      Administrator qualification, ordered lowest to highest (ordinal 0-3).
+      Suitability compares this against the inferred required tier.
+      For an `alias` reference this qualifies the whole logical target,
+      including every leaf the child alias may dispatch or fail over to.
+  specialties:
+    type: array
+    default: []
+    items:
+      type: string
+      enum:
+        - plan
+        - implement
+        - debug
+        - refactor
+        - review
+        - research
+        - explain
+        - operate
+        - write
+        - chat
+    description: >
+      Task kinds this target is preferred for. Empty means general-purpose,
+      not unsupported for every task. A match adds `specialty_bonus` to the
+      target's preference score and cannot make an unsuitable target eligible.
+  reasoning:
+    type: string
+    enum:
+      - normal
+      - preferred
+    description: >
+      Whether extended reasoning materially helps this target. `preferred`
+      adds `reasoning_bonus` when the judgment indicates deep reasoning.
+      It never overrides actual model support or client generation settings.

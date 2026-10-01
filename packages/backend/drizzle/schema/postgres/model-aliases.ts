@@ -8,6 +8,7 @@ export const selectorStrategyEnum = pgEnum('selector_strategy', [
   'usage',
   'quota',
   'performance',
+  'auto',
 ]);
 
 export const aliasPriorityEnum = pgEnum('alias_priority', ['selector', 'api_match']);
@@ -42,6 +43,7 @@ export const modelAliases = pgTable('model_aliases', {
   generation: jsonb('generation'), // { reasoning?, maxTokens?, verbosity?, serviceTier? }
   syntheticSafeguardApproval: boolean('synthetic_safeguard_approval').notNull().default(false),
   compaction: jsonb('compaction'), // compaction config
+  autoRouting: jsonb('auto_routing'), // AutoRoutingConfig for the `auto` policy
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

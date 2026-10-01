@@ -1,6 +1,6 @@
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
 import { formatNumber, formatPoints } from '../format';
-import type { Principal } from '../../types/settings';
+import type { Principal, UiFeatures } from '../../types/settings';
 
 export const API_BASE = ''; // Proxied via server.ts
 
@@ -56,6 +56,16 @@ const ROLE_ADMIN = 'admin' as const;
 const ROLE_LIMITED = 'limited' as const;
 
 /**
+ * Map the raw uiFeatures payload to a typed, fail-closed shape. Any missing or
+ * malformed flag resolves to false so the UI never enables a feature the
+ * backend did not explicitly advertise.
+ */
+const readUiFeatures = (value: unknown): UiFeatures => {
+  const source = (value ?? {}) as { autoRouting?: unknown };
+  return { autoRouting: source.autoRouting === true };
+};
+
+/**
  * Verify a credential against the backend. Returns the resolved principal on
  * success, or null on 401/network error.
  */
@@ -76,9 +86,11 @@ export async function verifyAdminKey(key: string): Promise<Principal | null> {
       excludedModels?: string[];
       quotaName?: string | null;
       comment?: string | null;
+      uiFeatures?: unknown;
     };
     if (!body.ok) return null;
-    if (body.role === ROLE_ADMIN) return { role: ROLE_ADMIN };
+    const uiFeatures = readUiFeatures(body.uiFeatures);
+    if (body.role === ROLE_ADMIN) return { role: ROLE_ADMIN, uiFeatures };
     if (body.role === ROLE_LIMITED && typeof body.keyName === 'string') {
       return {
         role: ROLE_LIMITED,
@@ -89,6 +101,7 @@ export async function verifyAdminKey(key: string): Promise<Principal | null> {
         excludedModels: Array.isArray(body.excludedModels) ? body.excludedModels : [],
         quotaName: typeof body.quotaName === 'string' ? body.quotaName : null,
         comment: typeof body.comment === 'string' ? body.comment : null,
+        uiFeatures,
       };
     }
     return null;

@@ -1,6 +1,7 @@
 import { ConfigRepository, OAuthCredentialsData } from '../../db/config-repository';
 import { logger } from '../../utils/logger';
 import {
+  assertAutoRoutingConfigValid,
   assertNoAliasRefCycles,
   isOAuthPlaceholderUrl,
   normalizeSystemOneProviderConfig,
@@ -529,6 +530,7 @@ export class ConfigService {
     );
     const models = await this.repo.getAllAliases();
     assertNoAliasRefCycles(models);
+    assertAutoRoutingConfigValid(models);
     const keys = await this.repo.getAllKeys();
     const userQuotas = await this.repo.getAllUserQuotas();
     const mcpServers = await this.repo.getAllMcpServers();

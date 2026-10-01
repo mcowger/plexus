@@ -24,6 +24,27 @@ export interface ExtractedObservedUsage {
   reasoningTokens: number;
 }
 
+/**
+ * Narrow provider-reported cache facts for the auto-routing hook. `provider`
+ * and `model` identify the actual final attempt; `cachedTokens` and
+ * `cacheWriteTokens` are the reported cache read/write counts. Zeros are
+ * meaningful and must be delivered: they invalidate a prior optimistic warmth
+ * observation for the same scope rather than leaving it unset.
+ */
+export interface ObservedAutoRoutingUsage {
+  provider: string | null;
+  model: string | null;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+}
+
+/**
+ * Records provider-reported cache facts for auto routing. Supplied by the
+ * caller (response handler / route) so the inspector never imports the router;
+ * invoked only on a successful, non-estimated finalization.
+ */
+export type AutoRoutingUsageRecorder = (usage: ObservedAutoRoutingUsage) => void;
+
 export function extractUsageFromReconstructed(
   reconstructed: any,
   apiType: string
@@ -111,6 +132,7 @@ export class UsageInspector extends PassThrough {
   private rawDebugCapture?: DebugLoggingInspector;
   private transformedDebugCapture?: DebugLoggingInspector;
   private costAttribution?: CostAttribution;
+  private autoRoutingUsageRecorder?: AutoRoutingUsageRecorder;
   private _flushed = false;
 
   constructor(
@@ -128,7 +150,8 @@ export class UsageInspector extends PassThrough {
     keyName?: string,
     rawDebugCapture?: DebugLoggingInspector,
     transformedDebugCapture?: DebugLoggingInspector,
-    costAttribution?: CostAttribution
+    costAttribution?: CostAttribution,
+    autoRoutingUsageRecorder?: AutoRoutingUsageRecorder
   ) {
     super();
     this.usageStorage = usageStorage;
@@ -145,6 +168,7 @@ export class UsageInspector extends PassThrough {
     this.rawDebugCapture = rawDebugCapture;
     this.transformedDebugCapture = transformedDebugCapture;
     this.costAttribution = costAttribution;
+    this.autoRoutingUsageRecorder = autoRoutingUsageRecorder;
   }
 
   override _transform(chunk: any, encoding: BufferEncoding, callback: Function) {
@@ -236,6 +260,8 @@ export class UsageInspector extends PassThrough {
         this.usageRecord.tokensCacheWrite = stats.cacheWriteTokens;
         this.usageRecord.tokensReasoning = stats.reasoningTokens;
       }
+
+      this.notifyAutoRoutingUsage(usage);
 
       this.usageRecord.durationMs = Date.now() - this.startTime;
       const totalOutputTokens = stats.outputTokens + stats.reasoningTokens;
@@ -432,6 +458,35 @@ export class UsageInspector extends PassThrough {
       usage = extractUsageFromReconstructed(transformedSnapshot, this.incomingApiType);
     }
     return usage;
+  }
+
+  /**
+   * Hand provider-reported cache facts to the auto-routing recorder. The
+   * provider/model are the FINAL attempt's resolved identity (set by the
+   * response handler before the stream flows), and only a successful,
+   * non-estimated finalization qualifies — an estimated or absent usage block
+   * must never be recorded as a cache fact. Zeros are forwarded so a real
+   * "no cache" result overwrites stale optimistic warmth.
+   */
+  private notifyAutoRoutingUsage(usage: ExtractedObservedUsage | null): void {
+    if (!this.autoRoutingUsageRecorder) return;
+    if (!usage) return;
+    if (this.usageRecord.responseStatus !== 'success') return;
+    if (this.usageRecord.tokensEstimated === 1) return;
+
+    const provider = this.usageRecord.finalAttemptProvider ?? this.usageRecord.provider ?? null;
+    const model = this.usageRecord.finalAttemptModel ?? this.usageRecord.selectedModelName ?? null;
+
+    try {
+      this.autoRoutingUsageRecorder({
+        provider,
+        model,
+        cachedTokens: usage.cachedTokens ?? 0,
+        cacheWriteTokens: usage.cacheWriteTokens ?? 0,
+      });
+    } catch (err) {
+      logger.error(`Failed to record auto-routing usage for ${this.usageRecord.requestId}:`, err);
+    }
   }
 
   private extractResponseMetadataFromReconstructed(

@@ -1,5 +1,53 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, type Provider } from '../api';
+import { api, verifyAdminKey, type Provider } from '../api';
+
+describe('verifyAdminKey uiFeatures mapping', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const stubVerify = (body: Record<string, unknown>) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
+  };
+
+  it('preserves an enabled autoRouting flag for admins', async () => {
+    stubVerify({ ok: true, role: 'admin', uiFeatures: { autoRouting: true } });
+    await expect(verifyAdminKey('key')).resolves.toEqual({
+      role: 'admin',
+      uiFeatures: { autoRouting: true },
+    });
+  });
+
+  it('defaults autoRouting to false when the field is missing', async () => {
+    stubVerify({ ok: true, role: 'admin' });
+    await expect(verifyAdminKey('key')).resolves.toEqual({
+      role: 'admin',
+      uiFeatures: { autoRouting: false },
+    });
+  });
+
+  it('preserves the flag for limited principals', async () => {
+    stubVerify({
+      ok: true,
+      role: 'limited',
+      keyName: 'scoped',
+      uiFeatures: { autoRouting: true },
+    });
+    await expect(verifyAdminKey('key')).resolves.toMatchObject({
+      role: 'limited',
+      keyName: 'scoped',
+      uiFeatures: { autoRouting: true },
+    });
+  });
+});
 
 describe('provider auto-compat persistence', () => {
   afterEach(() => {

@@ -91,6 +91,9 @@ export interface KeyAccessPolicy {
 // Unified Request
 
 export interface PlexusMetadata {
+  plexus_key_id?: string;
+  plexus_auto_purpose?: 'preview';
+  auto_routing_decision?: Record<string, unknown>;
   oauthProvider?: string;
   oauthAccount?: string;
   clientHeaders?: Record<string, unknown>;
@@ -286,6 +289,7 @@ export interface UnifiedChatResponse {
     pricingFallback?: boolean;
     allAttemptedProviders?: string;
     retryHistory?: string;
+    autoRoutingUsageRecorder?: import('../services/inspectors/usage-logging').AutoRoutingUsageRecorder;
   };
   reasoning_content?: string | null;
   thinking?: {

@@ -1,0 +1,134 @@
+type: object
+description: >
+  Recomputed `auto` policy result for the supplied draft and sample context.
+  No provider cache hit is measured here; cost and warmth are estimates.
+required:
+  - analysis
+  - groups
+properties:
+  assumptions:
+    type: array
+    items:
+      type: string
+    description: Explicit simulation assumptions and limitations, not measured cache facts.
+  judgment_handle:
+    type: string
+    description: >
+      Opaque handle for reusing this judgment on a later preview call. Present
+      only when a valid judgment is available.
+  analysis:
+    type: object
+    required:
+      - source
+      - latencyMs
+    properties:
+      judgment:
+        $ref: ./AutoJudgment.yaml
+      source:
+        type: string
+        enum:
+          - fresh
+          - cache
+          - continuation
+          - unavailable
+        description: >
+          Where the judgment came from. `cache` means exact judgment reuse.
+          `unavailable` means baseline ordering
+          is shown.
+      reason:
+        type: string
+        description: Human-readable explanation when no usable judgment is available.
+      latencyMs:
+        type: number
+        minimum: 0
+        description: Classifier latency in milliseconds, or 0 when no call was made.
+      cost:
+        type: [number, 'null']
+        description: >
+          Classifier cost in USD. Null when unknown, never treated as zero.
+  groups:
+    type: array
+    description: One entry per target group, in configured priority order.
+    items:
+      type: object
+      required:
+        - name
+        - decision
+        - targets
+      properties:
+        name:
+          type: string
+        decision:
+          type: string
+          description: >
+            Reason code for the group's ordering, for example `cold_start`,
+            `quality_upgrade`, `economic_switch`, `cache_hold`,
+            `specialist_switch`, `preference_switch`, `continuation_locked`,
+            or `no_suitable_target_first_option`.
+        targets:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+            properties:
+              id:
+                type: string
+                description: Logical target identifier.
+              provider:
+                type: string
+              model:
+                type: string
+              alias:
+                type: string
+                description: Set when this logical target is an alias reference.
+              profile:
+                description: >
+                  The target's `auto_profile` as interpreted for this run, or
+                  null when none was configured.
+                oneOf:
+                  - $ref: ./AutoTargetProfile.yaml
+                  - type: 'null'
+              rank:
+                type: integer
+                description: Position in the recomputed eligible/suitable ordering.
+              eligible:
+                type: boolean
+                description: Passed access, quota, health, and API filtering.
+              suitable:
+                type: boolean
+                description: Profile capability meets the required tier.
+              reason:
+                type: string
+                description: >
+                  Explanation for an exclusion, for example
+                  `capability_below_required`, `below_uncertainty_floor`, or
+                  `continuation_target_not_eligible`.
+              decision:
+                type: string
+                description: Per-target outcome, for example `chosen`, `hold`, or `fallback`.
+              requiredTier:
+                type: string
+                enum:
+                  - economy
+                  - standard
+                  - high
+                  - premium
+              demand:
+                type: number
+                minimum: 0
+                maximum: 3
+                description: Composed demand before task floors.
+              preference:
+                type: [number, 'null']
+                description: 0-1 preference score, null outside the confident path.
+              estimatedCostUsd:
+                type: [number, 'null']
+                description: Estimated request cost in USD, null when unknown.
+              cacheState:
+                type: string
+                enum:
+                  - cold
+                  - warm
+                  - unknown
+                description: Assumed or observed cache state used for the estimate.

@@ -1,4 +1,12 @@
 import type { CompactionSettings } from './settings';
+import type {
+  AutoCapabilityTier,
+  AutoReasoningSuitability,
+  AutoRoutingConfig,
+  AutoTargetProfile,
+} from '@plexus/shared';
+
+export type { AutoCapabilityTier, AutoReasoningSuitability, AutoRoutingConfig, AutoTargetProfile };
 
 export interface Model {
   id: string;
@@ -174,6 +182,8 @@ export interface AliasTargetGroup {
     alias?: string;
     apiType?: string[];
     enabled?: boolean;
+    /** Local capability qualification for the `auto` policy. */
+    auto_profile?: AutoTargetProfile;
   }>;
 }
 
@@ -185,6 +195,8 @@ export interface Alias {
   priority?: 'selector' | 'api_match';
   type?: 'text' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'decisions';
   target_groups: AliasTargetGroup[];
+  /** Alias-scoped scoring/switching policy for the `auto` selector. */
+  auto_routing?: AutoRoutingConfig;
   advanced?: AliasBehavior[];
   metadata?: AliasMetadata;
   use_image_fallthrough?: boolean;
@@ -195,6 +207,118 @@ export interface Alias {
   pi_model?: { provider: string; model_id: string };
   extraBody?: Record<string, unknown>;
   compaction?: CompactionSettings;
+}
+
+// ─── Auto routing preview API ─────────────────────────────────
+// Proposed parent backend contract:
+//   POST /v0/management/models/auto-routing/preview
+// The response shape below is intentionally lenient; the parent backend aligns
+// the exact fields and the UI renders whatever it receives.
+
+export type AutoJudgmentSource = 'fresh' | 'exact_cache' | 'cache' | 'continuation' | 'unavailable';
+
+/**
+ * Typed judgment answers produced by the classifier. Fields are optional so a
+ * partial or provider-specific answer can still be displayed without trusting
+ * it as routing authority.
+ */
+export interface AutoJudgment {
+  task_kind?: string;
+  task_kind_confidence?: number;
+  complexity?: number;
+  complexity_confidence?: number;
+  capability_required?: number;
+  capability_required_confidence?: number;
+  /** Noul likelihood; normalized to 0–1 by the backend only when verifiable. */
+  deep_reasoning?: number;
+  /** Optional uncalibrated confidence; missing is neutral. */
+  confidence?: number;
+  [key: string]: unknown;
+}
+
+export interface AutoRoutingPreviewAnalysis {
+  judgment?: AutoJudgment;
+  source: AutoJudgmentSource;
+  reason?: string;
+  latencyMs: number;
+  /** Classifier cost in USD; absent or null when unknown (never treated as zero). */
+  cost?: number | null;
+}
+
+/**
+ * One expanded provider/model leaf reachable from a logical target, in the
+ * order the ordinary child policy would dispatch it. Alias-reference targets
+ * carry these so the preview can show what the outer profile actually covers.
+ */
+export interface AutoRoutingPreviewLeaf {
+  id: string;
+  provider?: string;
+  model?: string;
+  eligible?: boolean;
+  reason?: string | null;
+  /** Alias chain that produced this leaf, outer-most first. */
+  provenance?: string[];
+  rank?: number;
+  /** Estimated leaf cost in USD; absent or null when unknown. */
+  estimatedCostUsd?: number | null;
+  cacheState?: 'cold' | 'warm' | 'unknown' | string;
+  [key: string]: unknown;
+}
+
+export interface AutoRoutingPreviewTarget {
+  id: string;
+  provider?: string;
+  model?: string;
+  alias?: string;
+  profile?: AutoTargetProfile | null;
+  rank?: number;
+  eligible?: boolean;
+  suitable?: boolean;
+  reason?: string;
+  decision?: string;
+  requiredTier?: AutoCapabilityTier;
+  demand?: number;
+  preference?: number;
+  /** Estimated cost in USD; absent or null when unknown. */
+  estimatedCostUsd?: number | null;
+  cacheState?: 'cold' | 'warm' | 'unknown' | string;
+  /** Expanded alias-reference leaves, in ordinary child policy order. */
+  leaves?: AutoRoutingPreviewLeaf[];
+  [key: string]: unknown;
+}
+
+export interface AutoRoutingPreviewGroup {
+  name: string;
+  decision: string;
+  targets: AutoRoutingPreviewTarget[];
+}
+
+export interface AutoRoutingPreviewResponse {
+  judgment_handle?: string;
+  analysis: AutoRoutingPreviewAnalysis;
+  groups: AutoRoutingPreviewGroup[];
+  /** Explicit simulation assumptions; null/absent when the backend omits them. */
+  assumptions?: string[];
+}
+
+/**
+ * Simulation scenario supplied to the preview. All cache observations are
+ * assumptions, never measured provider cache hits.
+ */
+export interface AutoRoutingPreviewScenario {
+  incumbent?: { provider: string; model: string };
+  input_tokens?: number;
+  cache_state?: 'cold' | 'warm' | 'unknown';
+}
+
+export interface AutoRoutingPreviewRequest {
+  /** Validated draft model config. */
+  alias: Record<string, unknown>;
+  alias_name?: string;
+  prompt: string;
+  /** Retained judgment handle so tuning weights does not reclassify. */
+  judgment_handle?: string;
+  scenario?: AutoRoutingPreviewScenario;
 }
 
 export interface ModelResolutionPreview {

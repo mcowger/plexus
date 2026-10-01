@@ -1,0 +1,58 @@
+type: object
+description: >
+  Simulation request for the `auto` routing policy. Recomputes ordering
+  without dispatching a generation request. A fresh judgment may still call
+  the classifier and costs money; retained judgment handles avoid reclassifying
+  when only scoring or switching margins changed.
+required:
+  - alias
+  - prompt
+properties:
+  alias:
+    description: >
+      Unsaved, validated alias draft to simulate. It is never persisted or
+      dispatched.
+    allOf:
+      - $ref: ./AliasConfig.yaml
+  alias_name:
+    type: string
+    description: Existing alias slug this draft is being edited from, if any.
+  prompt:
+    type: string
+    minLength: 1
+    description: >
+      Bounded sample request/context. Treated as untrusted evidence. A preview
+      does not receive the production prompt.
+  judgment_handle:
+    type: string
+    description: >
+      Retained judgment from a previous preview call. Bound to the
+      authenticated admin and the context/rubric; a mismatched handle is not
+      trusted. Reuse avoids another classifier call.
+  scenario:
+    type: object
+    description: Explicit simulation inputs. Cache observations here are assumptions.
+    properties:
+      incumbent:
+        type: object
+        required:
+          - provider
+          - model
+        properties:
+          provider:
+            type: string
+          model:
+            type: string
+      input_tokens:
+        type: integer
+        minimum: 0
+        description: Assumed input size when no measured value exists.
+      cache_state:
+        type: string
+        enum:
+          - cold
+          - warm
+          - unknown
+        description: >
+          Assumed prefix cache state. `unknown` never becomes a zero-cost or
+          warm assumption.

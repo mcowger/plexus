@@ -31,6 +31,21 @@ describe('DebugManager target capture', () => {
     });
   });
 
+  test('persists auto routing decisions without modifying the upstream payload', () => {
+    debugManager.setEnabled(true);
+    const payload = { model: 'magic', messages: [{ role: 'user', content: 'hello' }] };
+    const decision = { reasons: ['quality_upgrade'], requiredTier: 2 };
+    debugManager.startLog('auto-request', payload);
+    debugManager.addTransformedRequest('auto-request', payload);
+    debugManager.addRoutingDecision('auto-request', decision);
+    debugManager.flush('auto-request');
+    expect(saveDebugLog.mock.calls[0]?.[0]).toMatchObject({
+      rawRequest: { plexus_auto_routing: decision },
+      transformedRequest: payload,
+    });
+    expect(payload).not.toHaveProperty('plexus_auto_routing');
+  });
+
   test('persists when the incoming alias is enabled', () => {
     debugManager.enableForAlias('tracked-alias');
 

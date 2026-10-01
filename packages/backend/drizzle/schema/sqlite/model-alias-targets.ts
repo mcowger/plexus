@@ -14,6 +14,7 @@ export const modelAliasTargets = sqliteTable(
     enabled: integer('enabled').notNull().default(1),
     groupName: text('group_name'), // target group label
     sortOrder: integer('sort_order').notNull().default(0),
+    autoProfile: text('auto_profile'), // JSON: AutoTargetProfile qualification
   },
   (table) => ({
     aliasProviderModelUnique: unique('uq_alias_targets').on(

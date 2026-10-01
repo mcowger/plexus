@@ -67,6 +67,7 @@ export const api = {
   // Aliases & Models
   saveAlias: aliasesApi.saveAlias,
   previewModelResolution: aliasesApi.previewModelResolution,
+  previewAutoRouting: aliasesApi.previewAutoRouting,
   getModels: aliasesApi.getModels,
   getAliases: aliasesApi.getAliases,
 

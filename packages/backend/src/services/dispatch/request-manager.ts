@@ -16,6 +16,7 @@ import { enforceContextLimit } from '../models/enforce-limits';
 import { getGlobalStallConfig, resolveStallConfig } from '../../utils/stall';
 import { preprocessVisionRequest } from '../vision/vision-request-preprocessor';
 import { resolveRouteCandidates } from '../routing/route-candidates';
+import { autoObservedUsageFromResponse, recordAutoRoutingOutcome } from '../routing/auto-router';
 import { bridgeChatToImageGeneration, isImageModelRoute } from './image-model-bridge';
 import { executeStandardAttempt } from './standard-attempt-request';
 import { isNativeOAuthRoute } from './request-payload-builder';
@@ -95,8 +96,13 @@ export class RequestManager {
       request,
       retryHistory,
       sessionKey,
-      host.appendSkippedAttempt.bind(host)
+      host.appendSkippedAttempt.bind(host),
+      signal
     );
+    const autoDecision = request.metadata?.plexus_metadata?.auto_routing_decision;
+    if (request.requestId && autoDecision) {
+      DebugManager.getInstance().addRoutingDecision(request.requestId, autoDecision);
+    }
 
     // A chat-shaped request that names an IMAGE model is served through the
     // image pipeline instead (see image-model-bridge.ts). This sits here —
@@ -310,6 +316,31 @@ export class RequestManager {
         if (result.outcome === 'retry') {
           lastError = result.error;
           continue;
+        }
+        // Record the actually-dispatched target (and reported cache usage,
+        // when present) so auto incumbent/warmth reflect reality, never the
+        // proposed first choice. Streaming usage arrives later in the stream,
+        // so this is affinity-only where the response carries no usage yet.
+        try {
+          recordAutoRoutingOutcome(
+            currentRequest,
+            route,
+            autoObservedUsageFromResponse(result.response)
+          );
+          if (
+            result.response.stream &&
+            currentRequest.metadata?.plexus_metadata?.auto_routing_decision
+          ) {
+            result.response.plexus ??= {};
+            result.response.plexus.autoRoutingUsageRecorder = (usage) => {
+              recordAutoRoutingOutcome(currentRequest, route, {
+                cachedTokens: usage.cachedTokens,
+                cacheWriteTokens: usage.cacheWriteTokens,
+              });
+            };
+          }
+        } catch (error) {
+          logger.warn('Could not record auto routing outcome', error);
         }
         return result.response;
       } catch (error: any) {

@@ -19,8 +19,11 @@ import {
 import { CodexVersionService } from '../../services/oauth/codex-version-service';
 import { ClaudeCodeVersionService } from '../../services/oauth/claude-code-version-service';
 import { resolvePiAiProvider } from '../../services/pi-ai/provider-endpoint-match';
+import { registerAutoRoutingRoutes } from './auto-routing';
 
 export async function registerModelRoutes(fastify: FastifyInstance) {
+  await registerAutoRoutingRoutes(fastify);
+
   fastify.post('/v0/management/models/metadata/refresh', async (_request, reply) => {
     const result = await ModelMetadataManager.getInstance().refreshAll(undefined, 'manual');
     return reply.send(result);

@@ -39,6 +39,11 @@ get:
                   role:
                     type: string
                     const: admin
+                  uiFeatures:
+                    type: object
+                    properties:
+                      autoRouting:
+                        type: boolean
                 required:
                   - ok
                   - role
@@ -68,6 +73,11 @@ get:
                     type:
                       - string
                       - 'null'
+                  uiFeatures:
+                    type: object
+                    properties:
+                      autoRouting:
+                        type: boolean
                 required:
                   - ok
                   - role

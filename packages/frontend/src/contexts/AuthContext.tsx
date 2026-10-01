@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { verifyAdminKey, type Principal } from '../lib/api';
+import { isAutoRoutingEnabled } from '../lib/uiFeatures';
 
 interface AuthContextType {
   /**
@@ -10,6 +11,11 @@ interface AuthContextType {
   adminKey: string | null;
   /** Principal returned by the backend's verify endpoint, or null if unauthenticated. */
   principal: Principal | null;
+  /**
+   * UI-only feature flag for the auto-routing controls. Fail-closed: true only
+   * when the backend's auth/verify response explicitly enabled it.
+   */
+  autoRoutingEnabled: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLimited: boolean;
@@ -79,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         adminKey,
         principal,
+        autoRoutingEnabled: isAutoRoutingEnabled(principal),
         isAuthenticated: !!adminKey,
         isAdmin: principal?.role === 'admin',
         isLimited: principal?.role === 'limited',

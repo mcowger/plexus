@@ -1,6 +1,8 @@
 import type { UnifiedChatRequest } from '../../types/unified';
+import { getConfig } from '../../config';
 import { applyKeyAccessPolicy } from './key-access-policy';
 import { Router, type RouteResult } from './router';
+import { applyAutoRouting } from './auto-router';
 import { QuotaEnforcer } from '../quota/quota-enforcer';
 import { buildQuotaExceededError } from '../quota/quota-middleware';
 import type { RetryAttemptRecord } from '../dispatch/dispatcher-types';
@@ -12,12 +14,43 @@ export type AppendSkippedAttempt = (
   apiType?: string
 ) => void;
 
+/**
+ * Apply the `auto` policy after access/quota eligibility is known. Ordinary
+ * aliases (and direct groups to non-auto groups) are returned untouched, so
+ * existing selector behavior is unaffected.
+ */
+async function applyAutoRoutingIfConfigured(
+  request: UnifiedChatRequest,
+  candidates: RouteResult[],
+  signal?: AbortSignal
+): Promise<RouteResult[]> {
+  const hasAutoCandidate = candidates.some(
+    (candidate) => candidate.autoProvenance?.groupSelector === 'auto'
+  );
+  if (!hasAutoCandidate) return candidates;
+
+  const canonicalModel = candidates[0]?.canonicalModel;
+  if (!canonicalModel) return candidates;
+  const alias = getConfig().models?.[canonicalModel];
+  if (!alias?.target_groups?.some((group) => group.selector === 'auto')) return candidates;
+
+  const { candidates: ordered } = await applyAutoRouting({
+    request,
+    alias,
+    canonicalModel,
+    candidates,
+    signal,
+  });
+  return ordered;
+}
+
 /** Resolves usable targets for a request, including access and quota filtering. */
 export async function resolveRouteCandidates(
   request: UnifiedChatRequest,
   retryHistory: RetryAttemptRecord[],
   sessionKey: string | null,
-  appendSkippedAttempt: AppendSkippedAttempt
+  appendSkippedAttempt: AppendSkippedAttempt,
+  signal?: AbortSignal
 ): Promise<RouteResult[]> {
   let candidates = await Router.resolveCandidates(
     request.model,
@@ -38,7 +71,9 @@ export async function resolveRouteCandidates(
   candidates = applyKeyAccessPolicy(request, candidates, apiType);
 
   const quotaContext = request.metadata?.plexus_metadata?.plexus_quota_context ?? null;
-  if (!quotaContext) return candidates;
+  if (!quotaContext) {
+    return applyAutoRoutingIfConfigured(request, candidates, signal);
+  }
 
   const { allowed, blocked } = QuotaEnforcer.filterCandidates(quotaContext, candidates);
   for (const { candidate, quota } of blocked) {
@@ -52,5 +87,5 @@ export async function resolveRouteCandidates(
     );
   }
 
-  return allowed;
+  return applyAutoRoutingIfConfigured(request, allowed, signal);
 }

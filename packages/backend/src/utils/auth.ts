@@ -10,6 +10,23 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
   request: FastifyRequest,
   unifiedRequest: T
 ): T {
+  const {
+    plexus_key_id: _untrustedKeyId,
+    auto_routing_decision: _untrustedDecision,
+    plexus_auto_purpose: _untrustedPurpose,
+    ...metadata
+  } = unifiedRequest.metadata?.plexus_metadata || {};
+  const keyName = (request as FastifyRequest & { keyName?: string }).keyName;
+  unifiedRequest = {
+    ...unifiedRequest,
+    metadata: {
+      ...unifiedRequest.metadata,
+      plexus_metadata: {
+        ...metadata,
+        ...(keyName ? { plexus_key_id: keyName } : {}),
+      },
+    },
+  };
   const keyConfig = (request as any).keyConfig as
     | {
         allowedModels?: string[];

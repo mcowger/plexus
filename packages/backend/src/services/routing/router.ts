@@ -21,6 +21,31 @@ import {
   isImageTargetApiType,
   normalizeApiAccessList,
 } from '../../utils/api-format';
+import type { AutoTargetProfile } from '@plexus/shared';
+
+/**
+ * Group/logical-target provenance for a resolved candidate leaf.
+ *
+ * The `auto` policy must rank whole logical targets (a concrete target or an
+ * alias reference) while ordinary selectors rank individual concrete targets.
+ * These fields are optional so ordinary routing and direct routes are
+ * unaffected; the auto runtime reads them to reconstruct logical targets and
+ * write a ranked order back into the flat candidate list.
+ */
+export interface RouteAutoProvenance {
+  /** Index of the owning group within the alias's `target_groups`. */
+  groupIndex: number;
+  groupName: string;
+  groupSelector: string;
+  /** Index of the logical target within `group.targets` declaration order. */
+  targetIndex: number;
+  /** Stable logical-target id: `<provider>/<model>` or `alias:<name>`. */
+  targetKey: string;
+  /** Outer administrator qualification for the logical target, when declared. */
+  profile?: AutoTargetProfile;
+  /** 0-based leaf position within the logical target's resolved order. */
+  leafIndex: number;
+}
 
 export interface RouteResult {
   provider: string;
@@ -29,6 +54,8 @@ export interface RouteResult {
   modelConfig?: ModelProviderConfig;
   incomingModelAlias?: string;
   canonicalModel?: string;
+  /** Present when resolved through an alias target group. */
+  autoProvenance?: RouteAutoProvenance;
 }
 
 function tryParseDirectGroup(modelName: string): { aliasName: string; groupName: string } | null {
@@ -454,6 +481,143 @@ function dedupeCandidates(candidates: RouteResult[]): RouteResult[] {
   return result;
 }
 
+function makeAutoProvenance(params: {
+  group: ModelTargetGroup;
+  groupIndex: number;
+  targetIndex: number;
+  targetKey: string;
+  profile?: AutoTargetProfile;
+  leafIndex: number;
+}): RouteAutoProvenance {
+  return {
+    groupIndex: params.groupIndex,
+    groupName: params.group.name,
+    groupSelector: params.group.selector,
+    targetIndex: params.targetIndex,
+    targetKey: params.targetKey,
+    profile: params.profile,
+    leafIndex: params.leafIndex,
+  };
+}
+
+function buildRouteResult(params: {
+  provider: string;
+  model: string;
+  config: ReturnType<typeof getConfig>;
+  incomingModelAlias: string | undefined;
+  canonicalModel: string;
+  autoProvenance?: RouteAutoProvenance;
+}): RouteResult {
+  const providerConfig = params.config.providers[params.provider];
+  let modelConfig = undefined;
+  if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
+    modelConfig = providerConfig.models[params.model];
+  }
+  return {
+    provider: params.provider,
+    model: params.model,
+    config: providerConfig!,
+    modelConfig,
+    incomingModelAlias: params.incomingModelAlias,
+    canonicalModel: params.canonicalModel,
+    autoProvenance: params.autoProvenance,
+  };
+}
+
+/**
+ * Resolve an `auto` group's candidates without running a selector.
+ *
+ * Logical targets are emitted in configured declaration order, each alias
+ * reference expanded through the child alias's own ordinary policy so its
+ * leaf order is preserved. Health/API admission filtering still applies to
+ * concrete targets (and again per attempt); access/quota filtering and the
+ * final auto ranking run later in `route-candidates.ts`.
+ */
+async function buildAutoGroupCandidates(
+  group: ModelTargetGroup,
+  config: ReturnType<typeof getConfig>,
+  alias: ModelConfig,
+  incomingApiType: string | undefined,
+  logModelName: string | undefined,
+  canonicalModel: string,
+  sessionKey: string | null | undefined,
+  visited: Set<string>,
+  groupIndex: number
+): Promise<RouteResult[]> {
+  const concreteTargets = group.targets.filter((t) => !t.alias);
+  const enriched = await filterGroupTargets(
+    concreteTargets,
+    config,
+    alias,
+    incomingApiType,
+    logModelName
+  );
+  const enrichedByKey = new Map<string, EnrichedModelTarget>();
+  for (const target of enriched) {
+    enrichedByKey.set(`${target.provider}\u0000${target.model}`, target);
+  }
+
+  const results: RouteResult[] = [];
+  for (let targetIndex = 0; targetIndex < group.targets.length; targetIndex++) {
+    const target = group.targets[targetIndex]!;
+    if (target.enabled === false) continue;
+
+    if (target.alias) {
+      if (visited.has(target.alias)) {
+        logger.warn(
+          `Router: alias-ref cycle detected while expanding '${target.alias}'; skipping to avoid infinite recursion.`
+        );
+        continue;
+      }
+      const nested = await Router.resolveCandidates(
+        target.alias,
+        incomingApiType,
+        sessionKey,
+        visited
+      );
+      nested.forEach((candidate, leafIndex) => {
+        results.push({
+          ...candidate,
+          canonicalModel,
+          incomingModelAlias: logModelName,
+          autoProvenance: makeAutoProvenance({
+            group,
+            groupIndex,
+            targetIndex,
+            targetKey: `alias:${target.alias}`,
+            profile: target.auto_profile,
+            leafIndex,
+          }),
+        });
+      });
+      continue;
+    }
+
+    if (!target.provider || !target.model) continue;
+    const enrichedTarget = enrichedByKey.get(`${target.provider}\u0000${target.model}`);
+    if (!enrichedTarget) continue;
+    results.push(
+      buildRouteResult({
+        provider: target.provider,
+        model: target.model,
+        config,
+        incomingModelAlias: logModelName,
+        canonicalModel,
+        autoProvenance: makeAutoProvenance({
+          group,
+          groupIndex,
+          targetIndex,
+          targetKey: `${target.provider}/${target.model}`,
+          profile: target.auto_profile,
+          leafIndex: 0,
+        }),
+      })
+    );
+  }
+
+  return results;
+}
+
 async function buildGroupCandidates(
   group: ModelTargetGroup,
   config: ReturnType<typeof getConfig>,
@@ -462,8 +626,25 @@ async function buildGroupCandidates(
   logModelName: string | undefined,
   canonicalModel: string,
   sessionKey: string | null | undefined,
-  visited: Set<string>
+  visited: Set<string>,
+  groupIndex: number
 ): Promise<RouteResult[]> {
+  if (group.selector === 'auto') {
+    const autoResults = await buildAutoGroupCandidates(
+      group,
+      config,
+      alias,
+      incomingApiType,
+      logModelName,
+      canonicalModel,
+      sessionKey,
+      visited,
+      groupIndex
+    );
+    BackgroundExplorer.getInstance()?.maybeTrigger(group, alias.type);
+    return autoResults;
+  }
+
   const concreteTargets = group.targets.filter((t) => !t.alias);
 
   const enriched = await filterGroupTargets(
@@ -475,20 +656,31 @@ async function buildGroupCandidates(
   );
   const ordered = await selectOrderedTargets(group.selector, enriched);
 
-  const results: RouteResult[] = ordered.map((target) => {
-    const providerConfig = config.providers[target.provider!];
-    let modelConfig = undefined;
-    if (providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models) {
-      modelConfig = providerConfig.models[target.model!];
+  const targetIndexByKey = new Map<string, number>();
+  group.targets.forEach((target, index) => {
+    if (target.provider && target.model) {
+      targetIndexByKey.set(`${target.provider}\u0000${target.model}`, index);
     }
-    return {
+  });
+
+  const results: RouteResult[] = ordered.map((target) => {
+    const key = `${target.provider}\u0000${target.model}`;
+    const targetIndex = targetIndexByKey.get(key) ?? -1;
+    return buildRouteResult({
       provider: target.provider!,
       model: target.model!,
-      config: providerConfig!,
-      modelConfig,
+      config,
       incomingModelAlias: logModelName,
       canonicalModel,
-    };
+      autoProvenance: makeAutoProvenance({
+        group,
+        groupIndex,
+        targetIndex,
+        targetKey: `${target.provider}/${target.model}`,
+        profile: targetIndex >= 0 ? group.targets[targetIndex]?.auto_profile : undefined,
+        leafIndex: 0,
+      }),
+    });
   });
 
   // Selector order is authoritative for concrete targets. Alias-ref
@@ -498,7 +690,8 @@ async function buildGroupCandidates(
   // as fallback chains.
   const merged: RouteResult[] = [...results];
 
-  for (const target of group.targets) {
+  for (let targetIndex = 0; targetIndex < group.targets.length; targetIndex++) {
+    const target = group.targets[targetIndex]!;
     if (!target.alias) continue;
     if (target.enabled === false) continue;
     if (visited.has(target.alias)) {
@@ -517,13 +710,21 @@ async function buildGroupCandidates(
     // advanced behaviors, context limits, vision fallthrough, compaction,
     // sticky sessions) treats the request as the outer alias, not the
     // referenced one.
-    for (const candidate of nested) {
+    nested.forEach((candidate, leafIndex) => {
       merged.push({
         ...candidate,
         canonicalModel,
         incomingModelAlias: logModelName,
+        autoProvenance: makeAutoProvenance({
+          group,
+          groupIndex,
+          targetIndex,
+          targetKey: `alias:${target.alias}`,
+          profile: target.auto_profile,
+          leafIndex,
+        }),
       });
-    }
+    });
   }
 
   BackgroundExplorer.getInstance()?.maybeTrigger(group, alias.type);
@@ -557,9 +758,16 @@ export class Router {
             modelName,
             canonicalModel,
             sessionKey,
-            withVisited(visited, canonicalModel)
+            withVisited(visited, canonicalModel),
+            alias.target_groups.indexOf(group)
           );
-          return dedupeCandidates(results);
+          // Auto aliases keep duplicate provider/model leaves until the auto
+          // runtime ranks logical targets, so a shared leaf reached by two
+          // paths retains each path's local profile. Only an active auto
+          // policy defers dedupe; off-mode direct groups dedupe as before.
+          return group.selector === 'auto' && alias.auto_routing?.mode === 'active'
+            ? results
+            : dedupeCandidates(results);
         }
         // Alias exists but group doesn't → fall through to resolve() which throws 404
         return [];
@@ -587,8 +795,16 @@ export class Router {
     // provider:model used last turn. We don't return early — we still build
     // the full candidate list so failover works — but we hoist the sticky
     // pick to position 0 if it's still a healthy candidate.
+    //
+    // Aliases with an active `auto` policy are excluded: auto owns incumbent
+    // preference and cache economics, and an unconditional hoist must not
+    // cross the policy's suitability rules (it would also undo the ranked
+    // order written by the auto runtime). An alias whose auto policy is off
+    // keeps ordinary sticky and dedupe behavior.
+    const hasAutoGroup = alias.target_groups.some((g) => g.selector === 'auto');
+    const activeAuto = hasAutoGroup && alias.auto_routing?.mode === 'active';
     let stickyPick: { provider: string; model: string } | null = null;
-    if (alias.sticky_session && sessionKey) {
+    if (alias.sticky_session && sessionKey && !activeAuto) {
       stickyPick = StickySessionManager.getInstance().get(
         canonicalModel,
         incomingApiType || 'chat',
@@ -596,7 +812,8 @@ export class Router {
       );
     }
 
-    for (const group of alias.target_groups) {
+    for (let groupIndex = 0; groupIndex < alias.target_groups.length; groupIndex++) {
+      const group = alias.target_groups[groupIndex]!;
       const results = await buildGroupCandidates(
         group,
         config,
@@ -605,12 +822,15 @@ export class Router {
         modelName,
         canonicalModel,
         sessionKey,
-        nextVisited
+        nextVisited,
+        groupIndex
       );
       orderedCandidates.push(...results);
     }
 
-    orderedCandidates = dedupeCandidates(orderedCandidates);
+    if (!activeAuto) {
+      orderedCandidates = dedupeCandidates(orderedCandidates);
+    }
 
     if (stickyPick) {
       const idx = orderedCandidates.findIndex(
@@ -653,7 +873,8 @@ export class Router {
               modelName,
               canonicalModel,
               null,
-              withVisited(new Set(), canonicalModel)
+              withVisited(new Set(), canonicalModel),
+              alias.target_groups.indexOf(group)
             );
 
             const [target] = dedupeCandidates(candidates);
@@ -689,7 +910,8 @@ export class Router {
 
     if (alias && alias.target_groups && alias.target_groups.length > 0) {
       const visited = withVisited(new Set(), canonicalModel);
-      for (const group of alias.target_groups) {
+      for (let groupIndex = 0; groupIndex < alias.target_groups.length; groupIndex++) {
+        const group = alias.target_groups[groupIndex]!;
         const candidates = await buildGroupCandidates(
           group,
           config,
@@ -698,7 +920,8 @@ export class Router {
           modelName,
           canonicalModel,
           null,
-          visited
+          visited,
+          groupIndex
         );
 
         if (candidates.length === 0) continue;

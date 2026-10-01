@@ -41,6 +41,7 @@ import { Dispatcher } from './services/dispatch/dispatcher';
 import { UsageStorageService } from './services/observability/usage-storage';
 import { ProbeService } from './services/probes/probe-service';
 import { BackgroundExplorer } from './services/routing/background-explorer';
+import { configureAutoClassifier } from './services/routing/auto-classifier';
 import { CooldownManager } from './services/runtime/cooldown-manager';
 import { DebugManager } from './services/observability/debug-manager';
 import { ModelMetadataManager } from './services/models/model-metadata-manager';
@@ -265,6 +266,12 @@ try {
 } catch (e) {
   logger.error('Failed to initialize user quota enforcer', e);
 }
+
+configureAutoClassifier({
+  createDispatcher: async () => dispatcher,
+  getUsageRecorder: () => usageStorage,
+  getQuotaRecorder: () => quotaEnforcer,
+});
 
 // --- Hooks & Global Logic ---
 

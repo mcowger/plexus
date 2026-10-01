@@ -29,6 +29,7 @@ import { ProbeService } from '../services/probes/probe-service';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { McpUsageStorageService } from '../services/mcp-proxy/mcp-usage-storage';
+import { getUiFeatures } from '../utils/ui-features';
 
 export async function registerManagementRoutes(
   fastify: FastifyInstance,
@@ -57,8 +58,9 @@ export async function registerManagementRoutes(
     // principal info (role + key metadata for limited users) on success.
     mgmt.get('/v0/management/auth/verify', { preHandler: authenticate }, async (request, reply) => {
       const p = request.principal!;
+      const uiFeatures = getUiFeatures();
       if (p.role === 'admin') {
-        return reply.send({ ok: true, role: 'admin' });
+        return reply.send({ ok: true, role: 'admin', uiFeatures });
       }
       return reply.send({
         ok: true,
@@ -71,6 +73,7 @@ export async function registerManagementRoutes(
         quotaNames: p.quotaNames,
         quotaName: p.quotaName ?? null,
         comment: p.comment ?? null,
+        uiFeatures,
       });
     });
 

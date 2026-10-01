@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  AutoRoutingConfigSchema,
+  AutoTargetProfileSchema,
   isOAuthPlaceholderUrl,
   McpServerConfigSchema,
   PiAiQuirksSchema,
@@ -367,6 +369,9 @@ const ModelTargetSchema = z
     model: z.string().optional(),
     alias: z.string().min(1).optional(),
     enabled: z.boolean().default(true).optional(),
+    // Local capability qualification for the `auto` policy. Optional so
+    // non-auto targets and off-mode drafts stay unchanged.
+    auto_profile: AutoTargetProfileSchema.optional(),
   })
   .refine(
     (data) => (data.alias ? !data.provider && !data.model : !!data.provider && !!data.model),
@@ -384,6 +389,7 @@ const SelectorTypeSchema = z.enum([
   'quota',
   'performance',
   'e2e_performance',
+  'auto',
 ]);
 
 const ModelTargetGroupSchema = z.object({
@@ -471,6 +477,103 @@ export function assertNoAliasRefCycles(models: Record<string, ModelConfig> | und
   }
 }
 
+/**
+ * Hard validation for the `auto` routing policy that needs the whole alias graph.
+ *
+ * Enforced when an alias is written through the management API and on config
+ * load/rebuild. Only aliases with an `auto` group in `active` mode are checked,
+ * so old configs and off-mode drafts keep loading unchanged.
+ */
+export function assertAutoRoutingConfigValid(
+  models: Record<string, ModelConfig> | undefined
+): void {
+  if (!models) return;
+
+  // target.alias may reference a canonical key or an additional_alias nickname,
+  // matching how the router resolves references at request time.
+  const canonicalBySlug = new Map<string, string>();
+  for (const key of Object.keys(models)) {
+    canonicalBySlug.set(key, key);
+    for (const nickname of models[key]?.additional_aliases ?? []) {
+      if (!canonicalBySlug.has(nickname)) canonicalBySlug.set(nickname, key);
+    }
+  }
+
+  const autoGroupsOf = (model: ModelConfig | undefined): ModelTargetGroup[] =>
+    (model?.target_groups ?? []).filter((group) => group.selector === 'auto');
+
+  // True when an alias's ordinary graph reaches any alias that declares an auto
+  // group (including itself). Used to reject a classifier that would itself need
+  // classification.
+  const reachesAutoGroup = (startSlug: string, seen = new Set<string>()): boolean => {
+    const canonical = canonicalBySlug.get(startSlug) ?? startSlug;
+    if (seen.has(canonical)) return false;
+    seen.add(canonical);
+    const model = models[canonical];
+    if (!model) return false;
+    for (const group of model.target_groups ?? []) {
+      for (const target of group.targets) {
+        if (target.enabled === false || !target.alias) continue;
+        const child = canonicalBySlug.get(target.alias) ?? target.alias;
+        const childModel = models[child];
+        if (childModel && autoGroupsOf(childModel).length > 0) return true;
+        if (reachesAutoGroup(child, seen)) return true;
+      }
+    }
+    return false;
+  };
+
+  for (const [slug, model] of Object.entries(models)) {
+    if (!model) continue;
+    const autoGroups = autoGroupsOf(model);
+    if (autoGroups.length === 0) continue;
+    if (model.type !== undefined && model.type !== 'text') {
+      throw new Error(`Auto routing for alias '${slug}' only supports text aliases`);
+    }
+    const policy = model.auto_routing;
+    if (!policy || policy.mode !== 'active') continue;
+
+    const classifierAlias = policy.classifier_alias.trim();
+    if (classifierAlias.length === 0) {
+      throw new Error(`Auto routing for alias '${slug}' requires a classifier_alias`);
+    }
+
+    const classifierCanonical = canonicalBySlug.get(classifierAlias) ?? classifierAlias;
+    const classifier = models[classifierCanonical];
+    if (!classifier) {
+      throw new Error(
+        `Auto routing for alias '${slug}' references unknown classifier alias '${classifierAlias}'`
+      );
+    }
+    if (classifier.type !== 'decisions') {
+      throw new Error(
+        `Auto routing for alias '${slug}' requires a Decisions classifier alias; ` +
+          `'${classifierAlias}' has type '${classifier.type ?? 'text'}'`
+      );
+    }
+    if (autoGroupsOf(classifier).length > 0 || reachesAutoGroup(classifierCanonical)) {
+      throw new Error(
+        `Auto routing classifier alias '${classifierAlias}' for alias '${slug}' must not use auto routing`
+      );
+    }
+
+    // v1 supports references to ordinary aliases only; reject nested auto refs.
+    for (const group of autoGroups) {
+      for (const target of group.targets) {
+        if (target.enabled === false || !target.alias) continue;
+        const childCanonical = canonicalBySlug.get(target.alias) ?? target.alias;
+        const child = models[childCanonical];
+        if (child && (autoGroupsOf(child).length > 0 || reachesAutoGroup(childCanonical))) {
+          throw new Error(
+            `Auto routing alias '${slug}' references '${target.alias}', which uses auto routing; ` +
+              'nested auto aliases are not supported'
+          );
+        }
+      }
+    }
+  }
+}
+
 export function findDuplicateAdditionalAliases(additionalAliases: string[] | undefined): string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
@@ -482,7 +585,6 @@ export function findDuplicateAdditionalAliases(additionalAliases: string[] | und
 
   return Array.from(duplicates);
 }
-
 // Shared scope/limit fields applied to every quota-type union member below:
 //  - allowed*/excluded* restrict which provider/model pairs the quota counts
 //    against (see services/scope-match.ts for matching semantics; all-empty
@@ -678,10 +780,16 @@ export const ModelConfigSchema = z
     // `safeguards`. Opt-in, default off: no real classifier runs.
     synthetic_safeguard_approval: z.boolean().default(false).optional(),
     compaction: CompactionOverrideSchema.optional(),
+    // Alias-scoped `auto` routing policy. Null/absent leaves ordinary
+    // selectors unchanged. Structurally valid incomplete policies may be
+    // saved in off mode; active mode requires a classifier and complete
+    // enabled-target profiles.
+    auto_routing: AutoRoutingConfigSchema.optional(),
   })
   .superRefine((data, context) => {
     const targetGroups =
-      data.target_groups ?? (data.targets ? [{ targets: data.targets }] : undefined);
+      data.target_groups ??
+      (data.targets ? [{ selector: data.selector ?? 'random', targets: data.targets }] : undefined);
 
     for (const target of findDuplicateAliasTargets(targetGroups)) {
       context.addIssue({
@@ -699,6 +807,44 @@ export const ModelConfigSchema = z
         path: ['additional_aliases'],
         message: `Duplicate additional alias '${alias}' is not allowed`,
       });
+    }
+
+    if (
+      targetGroups?.some((group) => group.selector === 'auto') &&
+      data.type !== undefined &&
+      data.type !== 'text'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['type'],
+        message: 'Auto routing only supports text aliases',
+      });
+    }
+
+    if (data.auto_routing?.mode === 'active') {
+      if (data.auto_routing.classifier_alias.trim().length === 0) {
+        context.addIssue({
+          code: 'custom',
+          path: ['auto_routing', 'classifier_alias'],
+          message: "Active auto routing requires a non-empty 'classifier_alias'",
+        });
+      }
+      for (const group of targetGroups ?? []) {
+        if (group.selector !== 'auto') continue;
+        for (const target of group.targets) {
+          if (target.enabled === false) continue;
+          if (!target.auto_profile?.capability) {
+            const label = target.alias
+              ? `alias:${target.alias}`
+              : `${target.provider}/${target.model}`;
+            context.addIssue({
+              code: 'custom',
+              path: ['target_groups'],
+              message: `Active auto routing requires a capability profile for target '${label}'`,
+            });
+          }
+        }
+      }
     }
   })
   .transform((data) => {
@@ -1092,6 +1238,7 @@ export function validateConfig(configJson: string): PlexusConfig {
 
 function hydrateConfig(config: z.infer<typeof RawPlexusConfigSchema>): PlexusConfig {
   assertNoAliasRefCycles(config.models);
+  assertAutoRoutingConfigValid(config.models);
 
   // Startup registry validation: warn (non-fatally) for any configured
   // (pi_ai_provider, pi_ai_model_id) pair that does not resolve via the

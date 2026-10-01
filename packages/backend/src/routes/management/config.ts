@@ -8,6 +8,8 @@ import {
   CompactionConfigSchema,
   normalizeKeyConfig,
   assertNoAliasRefCycles,
+  assertAutoRoutingConfigValid,
+  type ModelConfig,
 } from '../../config';
 import { validateRawProviderSlug } from '../../services/dispatch/raw-passthrough';
 import { ConfigService } from '../../services/configuration/config-service';
@@ -97,6 +99,27 @@ function mergeCompactionPatch(
   }
 
   return merged;
+}
+
+/**
+ * Runs the whole-graph alias validations (ref cycles + active auto-routing
+ * policy) that need the complete alias set. Returns the explicit validation
+ * message on failure so alias PUT/PATCH can reject with 400; a null return
+ * means the merged graph is valid. DB read/write errors stay outside this
+ * helper so they keep returning the generic 500.
+ */
+function getAliasGraphValidationError(
+  models: Record<string, ModelConfig>,
+  slug: string,
+  model: ModelConfig
+): string | null {
+  try {
+    assertNoAliasRefCycles({ ...models, [slug]: model });
+    assertAutoRoutingConfigValid({ ...models, [slug]: model });
+    return null;
+  } catch (e: any) {
+    return e instanceof Error && e.message ? e.message : 'Invalid alias configuration';
+  }
 }
 
 export async function registerConfigRoutes(
@@ -294,7 +317,10 @@ export async function registerConfigRoutes(
     }
     try {
       const currentModels = await configService.getRepository().getAllAliases();
-      assertNoAliasRefCycles({ ...currentModels, [slug]: result.data });
+      const graphError = getAliasGraphValidationError(currentModels, slug, result.data);
+      if (graphError) {
+        return reply.code(400).send({ error: graphError });
+      }
 
       await configService.saveAlias(slug, result.data);
 
@@ -325,7 +351,10 @@ export async function registerConfigRoutes(
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
       }
       const currentModels = await configService.getRepository().getAllAliases();
-      assertNoAliasRefCycles({ ...currentModels, [slug]: result.data });
+      const graphError = getAliasGraphValidationError(currentModels, slug, result.data);
+      if (graphError) {
+        return reply.code(400).send({ error: graphError });
+      }
 
       await configService.saveAlias(slug, result.data);
 

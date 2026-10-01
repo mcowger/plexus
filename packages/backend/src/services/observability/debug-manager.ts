@@ -284,6 +284,12 @@ export class DebugManager {
     log.transformedRequest = payload;
   }
 
+  addRoutingDecision(requestId: string, decision: Record<string, unknown>) {
+    if (!this.isCaptureEnabled()) return;
+    const log = this.ensureLog(requestId);
+    log.rawRequest = { ...log.rawRequest, plexus_auto_routing: decision };
+  }
+
   addRawResponse(requestId: string, payload: any) {
     if (!this.isCaptureEnabled()) return;
     if (!this.shouldCapturePayloadForRequest(requestId)) return;

@@ -2,9 +2,12 @@ import { useState, useCallback, useMemo } from 'react';
 import { Alias } from '../lib/api';
 import { getModelOptionKey } from '../lib/modelOptions';
 import { useModels } from '../hooks/useModels';
+import { hasAutoGroup, validateAutoRoutingDraft } from '../lib/autoRouting';
 import { AliasTableRow } from '../components/models/AliasTableRow';
 import { AliasMobileCard } from '../components/models/AliasMobileCard';
 import { TargetGroupEditor } from '../components/models/TargetGroupEditor';
+import { AutoRoutingPanel } from '../components/models/AutoRoutingPanel';
+import { AutoRoutingPreview } from '../components/models/AutoRoutingPreview';
 import { ModelBehaviorsEditor } from '../components/models/ModelBehaviorsEditor';
 import { ModelMetadataEditor } from '../components/models/ModelMetadataEditor';
 import { AutoAddModal } from '../components/models/AutoAddModal';
@@ -20,6 +23,7 @@ import { Disclosure } from '../components/ui/Disclosure';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import {
   filterAndSortAliasesForModelsPage,
   getDefaultModelListSortDirection,
@@ -58,6 +62,7 @@ const MODEL_TYPE_GROUPS: ModelTypeGroup[] = [
 
 export const Models = () => {
   const toast = useToast();
+  const { autoRoutingEnabled } = useAuth();
   const {
     aliases,
     allAliases,
@@ -137,6 +142,22 @@ export const Models = () => {
     [aliases, providers, selectedProviderFilters, sortField, sortDirection]
   );
 
+  // Decisions aliases eligible as an auto classifier: authorized Decisions type,
+  // not the alias being edited, and not itself using auto routing (nested auto
+  // aliases are rejected by the backend).
+  const decisionsAliases = useMemo(
+    () =>
+      allAliases
+        .filter(
+          (alias) =>
+            alias.type === 'decisions' && alias.id !== editingAlias.id && !hasAutoGroup(alias)
+        )
+        .map((alias) => alias.id),
+    [allAliases, editingAlias.id]
+  );
+
+  const showAutoRouting = autoRoutingEnabled && hasAutoGroup(editingAlias);
+
   const handleSort = (field: ModelListSortField) => {
     if (sortField === field) {
       setSortDirection((currentDirection) => (currentDirection === 'asc' ? 'desc' : 'asc'));
@@ -163,6 +184,23 @@ export const Models = () => {
       const name = editingAlias.metadata.overrides?.name;
       if (!name || name.trim() === '') {
         toast.error('Custom metadata requires a non-empty Name.');
+        return;
+      }
+    }
+    // Auto-routing validation only applies when its controls are visible. When
+    // the flag is off, hidden existing settings must not block saving unrelated
+    // fields; the backend still validates auto routing on write.
+    if (autoRoutingEnabled) {
+      const validation = validateAutoRoutingDraft(editingAlias, { decisionsAliases });
+      if (!validation.valid) {
+        toast.error(validation.issues[0] ?? 'Fix the auto routing settings before saving.');
+        return;
+      }
+      if (
+        editingAlias.auto_routing?.mode === 'active' &&
+        validation.activationBlockers.length > 0
+      ) {
+        toast.error(validation.activationBlockers[0]);
         return;
       }
     }
@@ -619,9 +657,26 @@ export const Models = () => {
                 providers={providers}
                 availableModels={availableModels}
                 availableAliases={availableAliasSlugs}
+                autoRoutingEnabled={autoRoutingEnabled}
                 onChange={(groups) => setEditingAlias({ ...editingAlias, target_groups: groups })}
               />
             </div>
+
+            {showAutoRouting && (
+              <>
+                <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+                <AutoRoutingPanel
+                  editingAlias={editingAlias}
+                  setEditingAlias={setEditingAlias}
+                  decisionsAliases={decisionsAliases}
+                />
+                <AutoRoutingPreview
+                  editingAlias={editingAlias}
+                  providers={providers}
+                  availableModels={availableModels}
+                />
+              </>
+            )}
           </div>
         </Modal>
 

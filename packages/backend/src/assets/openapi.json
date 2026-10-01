@@ -1593,6 +1593,14 @@
                         "role": {
                           "type": "string",
                           "const": "admin"
+                        },
+                        "uiFeatures": {
+                          "type": "object",
+                          "properties": {
+                            "autoRouting": {
+                              "type": "boolean"
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -1637,6 +1645,14 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "uiFeatures": {
+                          "type": "object",
+                          "properties": {
+                            "autoRouting": {
+                              "type": "boolean"
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -4980,6 +4996,52 @@
             "description": "Admin access required."
           }
         }
+      }
+    },
+    "/v0/management/models/auto-routing/preview": {
+      "post": {
+        "tags": [
+          "Management — Models"
+        ],
+        "summary": "Preview auto routing decisions (admin only)",
+        "description": "Recomputes the `auto` routing policy for an unsaved alias draft and a\nbounded sample context. Uses the same scoring, suitability, and\ncache-economic policy as production, but never dispatches a generation\nrequest and never mutates production incumbent, warmth, or budget state.\n\nA fresh judgment may call the alias's administrator-authorized Decisions\nclassifier and costs money. A retained `judgment_handle` reuses a prior\njudgment so that tuning scoring weights or switching margins does not\nreclassify. Handles are bound to the authenticated admin and to the\ncontext/rubric; client-supplied judgments are not accepted as routing\nauthority.\n\nPreview state is scoped to the authenticated admin identity. The\nclassifier alias must be authorized by an administrator and must not\nreach an `auto` group.\n\n**Admin only** — limited principals receive 403.\n",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoRoutingPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recomputed policy result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoRoutingPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid alias draft or preview input."
+          },
+          "401": {
+            "description": "Authentication required or invalid credentials."
+          },
+          "403": {
+            "description": "Admin access required."
+          }
+        },
+        "operationId": "postV0ManagementModelsAutoRoutingPreview"
       }
     },
     "/v0/management/keys": {
@@ -13038,6 +13100,246 @@
           }
         }
       },
+      "AutoTargetProfile": {
+        "type": "object",
+        "description": "Local capability qualification for one logical target in an `auto` group. The administrator attests to this, it is not inferred from model names. Applies to both concrete `provider`/`model` targets and `alias` references. All fields are optional so a structurally valid incomplete profile can be saved in `off` mode; activating `auto` requires a capability on every enabled target.\n",
+        "properties": {
+          "capability": {
+            "type": "string",
+            "enum": [
+              "economy",
+              "standard",
+              "high",
+              "premium"
+            ],
+            "description": "Administrator qualification, ordered lowest to highest (ordinal 0-3). Suitability compares this against the inferred required tier. For an `alias` reference this qualifies the whole logical target, including every leaf the child alias may dispatch or fail over to.\n"
+          },
+          "specialties": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string",
+              "enum": [
+                "plan",
+                "implement",
+                "debug",
+                "refactor",
+                "review",
+                "research",
+                "explain",
+                "operate",
+                "write",
+                "chat"
+              ]
+            },
+            "description": "Task kinds this target is preferred for. Empty means general-purpose, not unsupported for every task. A match adds `specialty_bonus` to the target's preference score and cannot make an unsuitable target eligible.\n"
+          },
+          "reasoning": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "preferred"
+            ],
+            "description": "Whether extended reasoning materially helps this target. `preferred` adds `reasoning_bonus` when the judgment indicates deep reasoning. It never overrides actual model support or client generation settings.\n"
+          }
+        }
+      },
+      "AutoRoutingConfig": {
+        "type": "object",
+        "description": "Alias-scoped policy for the `auto` routing selector. Thresholds here are shared by every `auto` group on the alias. Settings belong to the alias, not to a group or a global router.\nOnly `off` and `active` modes exist. In `active` mode the alias needs a complete policy, qualified enabled targets, and an administrator-authorized Decisions classifier alias. In `off` mode structurally valid incomplete drafts can be saved; malformed or out-of-range values cannot be saved in any mode.\nApplies to all supported text routes, including Responses requests that carry `previous_response_id`. There is no Responses-specific routing exception or forced baseline. Adaptive state is scoped to the authenticated API-key identity, alias, API contract, and conversation branch; a client-supplied session ID is a hint only.\nDefaults below are the provisional starting values from the implementation plan, not claims about classifier accuracy.\n",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "active"
+            ],
+            "default": "off",
+            "description": "`active` enables classification and policy evaluation before dispatch. `off` uses the declared baseline ordering without classification.\n"
+          },
+          "classifier_alias": {
+            "type": "string",
+            "default": "",
+            "description": "Administrator-authorized Decisions-capable model alias used to classify the request. The caller's own access is never used, and the classifier alias must not reach an `auto` group. Empty is allowed only while `off`. Calls are charged and linked to the parent request trace.\n"
+          },
+          "classifier_deadline_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 500,
+            "description": "Total deadline in milliseconds across classification and the single hot-path attempt. Provisional default is 500 ms; revise from observed latency.\n"
+          },
+          "rubric_version": {
+            "type": "integer",
+            "enum": [
+              1
+            ],
+            "default": 1,
+            "description": "Server-shipped classification rubric. Unknown versions are rejected. Changing the rubric, not the scoring weights, invalidates cached judgments.\n"
+          },
+          "baseline_policy": {
+            "type": "string",
+            "enum": [
+              "in_order",
+              "cost"
+            ],
+            "default": "in_order",
+            "description": "Deterministic ordering used in `off` mode and when classification fails or times out. `in_order` uses the declared target order. `cost` uses qualified targets with a documented unknown-price fallback; unknown pricing is never treated as free.\n"
+          },
+          "uncertainty_minimum_tier": {
+            "type": "string",
+            "enum": [
+              "economy",
+              "standard",
+              "high",
+              "premium"
+            ],
+            "default": "high",
+            "description": "Minimum capability tier an incumbent must meet to be retained when the judgment is unknown or below the confidence threshold. If no auto target qualifies, the first eligible configured option is selected and the unmet qualification is disclosed.\n"
+          },
+          "scoring": {
+            "type": "object",
+            "description": "Demand composition and tier mapping. `complexity_weight` and `capability_weight` must be nonnegative and sum to 1.\n",
+            "properties": {
+              "complexity_weight": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.55
+              },
+              "capability_weight": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.45
+              },
+              "reasoning_threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.65,
+                "description": "Deep-reasoning likelihood at or above which `reasoning_boost` applies."
+              },
+              "reasoning_boost": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 3,
+                "default": 0.5,
+                "description": "Demand added when the reasoning likelihood clears the threshold."
+              },
+              "confidence_threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.6,
+                "description": "Below this, any present confidence triggers uncertainty handling. Confidence is not calibrated; this is a caution trigger only.\n"
+              },
+              "tier_boundaries": {
+                "type": "object",
+                "description": "Boundaries that map composed demand (0-3) to a scored tier. Must be strictly increasing inside 0-3; equality advances to the higher tier. Change these to retune without reclassifying.\n",
+                "properties": {
+                  "standard": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3,
+                    "default": 0.75
+                  },
+                  "high": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3,
+                    "default": 1.75
+                  },
+                  "premium": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 3,
+                    "default": 2.5
+                  }
+                }
+              },
+              "task_minimum_tiers": {
+                "type": "object",
+                "default": {
+                  "plan": "high",
+                  "review": "high"
+                },
+                "description": "Per-task capability floor. The required tier is the maximum of the scored tier and this floor. Applies only to the listed task kinds.\n",
+                "propertyNames": {
+                  "enum": [
+                    "plan",
+                    "implement",
+                    "debug",
+                    "refactor",
+                    "review",
+                    "research",
+                    "explain",
+                    "operate",
+                    "write",
+                    "chat"
+                  ]
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "economy",
+                    "standard",
+                    "high",
+                    "premium"
+                  ]
+                }
+              }
+            }
+          },
+          "preferences": {
+            "type": "object",
+            "description": "Preference bonuses on the 0-1 preference scale. Bonuses cannot make an unsuitable target eligible.\n",
+            "properties": {
+              "specialty_bonus": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1
+              },
+              "reasoning_bonus": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1
+              }
+            }
+          },
+          "switching": {
+            "type": "object",
+            "description": "Cache-economic and hysteresis margins. Required capability upgrades are not blocked by these margins.\n",
+            "properties": {
+              "score_deadband": {
+                "type": "number",
+                "minimum": 0,
+                "default": 0.2,
+                "description": "Hysteresis on the 0-3 demand scale. Delays marginal downgrades and never lowers the current request's required tier.\n"
+              },
+              "minimum_savings_usd": {
+                "type": "number",
+                "minimum": 0,
+                "default": 0.01
+              },
+              "minimum_savings_fraction": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1,
+                "description": "Minimum savings as a fraction of the incumbent's estimated cost."
+              },
+              "preference_margin": {
+                "type": "number",
+                "minimum": 0,
+                "default": 0.05,
+                "description": "Width of the comparable preference band. A preference improvement greater than this may switch without savings.\n"
+              }
+            }
+          }
+        }
+      },
       "MetadataOverrides": {
         "type": "object",
         "description": "Override fields for model metadata. Used within alias `metadata` to override individual fields resolved automatically or sourced from an external catalog, or to provide all fields when `source` is `custom`.\n",
@@ -13158,33 +13460,62 @@
                     "usage",
                     "quota",
                     "performance",
-                    "e2e_performance"
+                    "e2e_performance",
+                    "auto"
                   ],
-                  "description": "Selection strategy for this group."
+                  "description": "Selection strategy for this group. `auto` classifies the request once, ranks eligible logical targets by suitability and cache economics, and falls back to the first eligible configured option when none is suitable. Ordinary selectors keep their current behavior and do not classify.\n"
                 },
                 "targets": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "required": [
-                      "provider",
-                      "model"
-                    ],
-                    "properties": {
-                      "provider": {
-                        "type": "string",
-                        "description": "Provider slug this target routes to."
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "provider",
+                          "model"
+                        ],
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "description": "Provider slug this target routes to."
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Model ID to request from the provider."
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "When false, this target is skipped during dispatch."
+                          },
+                          "auto_profile": {
+                            "$ref": "#/components/schemas/AutoTargetProfile"
+                          }
+                        }
                       },
-                      "model": {
-                        "type": "string",
-                        "description": "Model ID to request from the provider."
-                      },
-                      "enabled": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "When false, this target is skipped during dispatch."
+                      {
+                        "type": "object",
+                        "required": [
+                          "alias"
+                        ],
+                        "properties": {
+                          "alias": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Slug of another alias to expand as this logical target. For `auto`, the outer `auto_profile` qualifies the whole logical target, including every leaf the child may dispatch or fail over to. Nested `auto` aliases are rejected during activation. Cycles are rejected.\n"
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "When false, this target is skipped during dispatch."
+                          },
+                          "auto_profile": {
+                            "$ref": "#/components/schemas/AutoTargetProfile"
+                          }
+                        }
                       }
-                    }
+                    ]
                   }
                 }
               }
@@ -13249,7 +13580,10 @@
           "sticky_session": {
             "type": "boolean",
             "default": false,
-            "description": "When enabled, multi-turn conversations prefer the same provider/model from the previous turn (when still healthy) for better prompt-cache hit rates.\n"
+            "description": "When enabled, multi-turn conversations prefer the same provider/model from the previous turn (when still healthy) for better prompt-cache hit rates. For `auto` groups this preference is conditional and never overrides capability suitability.\n"
+          },
+          "auto_routing": {
+            "$ref": "#/components/schemas/AutoRoutingConfig"
           },
           "synthetic_safeguard_approval": {
             "type": "boolean",
@@ -13899,6 +14233,317 @@
         "required": [
           "success"
         ]
+      },
+      "AutoRoutingPreviewRequest": {
+        "type": "object",
+        "description": "Simulation request for the `auto` routing policy. Recomputes ordering without dispatching a generation request. A fresh judgment may still call the classifier and costs money; retained judgment handles avoid reclassifying when only scoring or switching margins changed.\n",
+        "required": [
+          "alias",
+          "prompt"
+        ],
+        "properties": {
+          "alias": {
+            "description": "Unsaved, validated alias draft to simulate. It is never persisted or dispatched.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AliasConfig"
+              }
+            ]
+          },
+          "alias_name": {
+            "type": "string",
+            "description": "Existing alias slug this draft is being edited from, if any."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounded sample request/context. Treated as untrusted evidence. A preview does not receive the production prompt.\n"
+          },
+          "judgment_handle": {
+            "type": "string",
+            "description": "Retained judgment from a previous preview call. Bound to the authenticated admin and the context/rubric; a mismatched handle is not trusted. Reuse avoids another classifier call.\n"
+          },
+          "scenario": {
+            "type": "object",
+            "description": "Explicit simulation inputs. Cache observations here are assumptions.",
+            "properties": {
+              "incumbent": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "model"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  }
+                }
+              },
+              "input_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Assumed input size when no measured value exists."
+              },
+              "cache_state": {
+                "type": "string",
+                "enum": [
+                  "cold",
+                  "warm",
+                  "unknown"
+                ],
+                "description": "Assumed prefix cache state. `unknown` never becomes a zero-cost or warm assumption.\n"
+              }
+            }
+          }
+        }
+      },
+      "AutoJudgment": {
+        "type": "object",
+        "description": "Validated classifier output for one request. Malformed judgments are rejected, never silently replaced. Scores are finite and in range before they influence routing.\n",
+        "required": [
+          "task_kind",
+          "complexity",
+          "capability_required",
+          "deep_reasoning"
+        ],
+        "properties": {
+          "task_kind": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "implement",
+              "debug",
+              "refactor",
+              "review",
+              "research",
+              "explain",
+              "operate",
+              "write",
+              "chat",
+              "unknown"
+            ],
+            "description": "Closest task kind, with an explicit `unknown` outcome."
+          },
+          "complexity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "0-3 rubric for scope, dependencies, ambiguity, and stakes."
+          },
+          "capability_required": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "0-3 rubric for capability needed, ignoring price and budget."
+          },
+          "deep_reasoning": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Noul likelihood that extended reasoning materially helps, normalized to 0-1 only when the provider semantics are verified. Never guessed.\n"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Optional, uncalibrated confidence. Missing is neutral. Below the configured threshold it triggers uncertainty handling.\n"
+          },
+          "task_kind_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Optional per-question confidence for `task_kind`."
+          },
+          "complexity_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Optional per-question confidence for `complexity`."
+          },
+          "capability_required_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Optional per-question confidence for `capability_required`."
+          }
+        }
+      },
+      "AutoRoutingPreviewResponse": {
+        "type": "object",
+        "description": "Recomputed `auto` policy result for the supplied draft and sample context. No provider cache hit is measured here; cost and warmth are estimates.\n",
+        "required": [
+          "analysis",
+          "groups"
+        ],
+        "properties": {
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Explicit simulation assumptions and limitations, not measured cache facts."
+          },
+          "judgment_handle": {
+            "type": "string",
+            "description": "Opaque handle for reusing this judgment on a later preview call. Present only when a valid judgment is available.\n"
+          },
+          "analysis": {
+            "type": "object",
+            "required": [
+              "source",
+              "latencyMs"
+            ],
+            "properties": {
+              "judgment": {
+                "$ref": "#/components/schemas/AutoJudgment"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "fresh",
+                  "cache",
+                  "continuation",
+                  "unavailable"
+                ],
+                "description": "Where the judgment came from. `cache` means exact judgment reuse. `unavailable` means baseline ordering is shown.\n"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Human-readable explanation when no usable judgment is available."
+              },
+              "latencyMs": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Classifier latency in milliseconds, or 0 when no call was made."
+              },
+              "cost": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "Classifier cost in USD. Null when unknown, never treated as zero.\n"
+              }
+            }
+          },
+          "groups": {
+            "type": "array",
+            "description": "One entry per target group, in configured priority order.",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "decision",
+                "targets"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "decision": {
+                  "type": "string",
+                  "description": "Reason code for the group's ordering, for example `cold_start`, `quality_upgrade`, `economic_switch`, `cache_hold`, `specialist_switch`, `preference_switch`, `continuation_locked`, or `no_suitable_target_first_option`.\n"
+                },
+                "targets": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Logical target identifier."
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "alias": {
+                        "type": "string",
+                        "description": "Set when this logical target is an alias reference."
+                      },
+                      "profile": {
+                        "description": "The target's `auto_profile` as interpreted for this run, or null when none was configured.\n",
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/AutoTargetProfile"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "rank": {
+                        "type": "integer",
+                        "description": "Position in the recomputed eligible/suitable ordering."
+                      },
+                      "eligible": {
+                        "type": "boolean",
+                        "description": "Passed access, quota, health, and API filtering."
+                      },
+                      "suitable": {
+                        "type": "boolean",
+                        "description": "Profile capability meets the required tier."
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Explanation for an exclusion, for example `capability_below_required`, `below_uncertainty_floor`, or `continuation_target_not_eligible`.\n"
+                      },
+                      "decision": {
+                        "type": "string",
+                        "description": "Per-target outcome, for example `chosen`, `hold`, or `fallback`."
+                      },
+                      "requiredTier": {
+                        "type": "string",
+                        "enum": [
+                          "economy",
+                          "standard",
+                          "high",
+                          "premium"
+                        ]
+                      },
+                      "demand": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 3,
+                        "description": "Composed demand before task floors."
+                      },
+                      "preference": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "description": "0-1 preference score, null outside the confident path."
+                      },
+                      "estimatedCostUsd": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "description": "Estimated request cost in USD, null when unknown."
+                      },
+                      "cacheState": {
+                        "type": "string",
+                        "enum": [
+                          "cold",
+                          "warm",
+                          "unknown"
+                        ],
+                        "description": "Assumed or observed cache state used for the estimate."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "LocalMcpRuntimeStatus": {
         "type": "object",

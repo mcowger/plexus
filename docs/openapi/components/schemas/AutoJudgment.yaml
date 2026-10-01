@@ -1,0 +1,65 @@
+type: object
+description: >
+  Validated classifier output for one request. Malformed judgments are
+  rejected, never silently replaced. Scores are finite and in range before
+  they influence routing.
+required:
+  - task_kind
+  - complexity
+  - capability_required
+  - deep_reasoning
+properties:
+  task_kind:
+    type: string
+    enum:
+      - plan
+      - implement
+      - debug
+      - refactor
+      - review
+      - research
+      - explain
+      - operate
+      - write
+      - chat
+      - unknown
+    description: Closest task kind, with an explicit `unknown` outcome.
+  complexity:
+    type: number
+    minimum: 0
+    maximum: 3
+    description: 0-3 rubric for scope, dependencies, ambiguity, and stakes.
+  capability_required:
+    type: number
+    minimum: 0
+    maximum: 3
+    description: 0-3 rubric for capability needed, ignoring price and budget.
+  deep_reasoning:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: >
+      Noul likelihood that extended reasoning materially helps, normalized to
+      0-1 only when the provider semantics are verified. Never guessed.
+  confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: >
+      Optional, uncalibrated confidence. Missing is neutral. Below the
+      configured threshold it triggers uncertainty handling.
+  task_kind_confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: Optional per-question confidence for `task_kind`.
+  complexity_confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: Optional per-question confidence for `complexity`.
+  capability_required_confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: Optional per-question confidence for `capability_required`.

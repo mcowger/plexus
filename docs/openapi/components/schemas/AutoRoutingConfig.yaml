@@ -1,0 +1,210 @@
+type: object
+description: >
+  Alias-scoped policy for the `auto` routing selector. Thresholds here are
+  shared by every `auto` group on the alias. Settings belong to the alias,
+  not to a group or a global router.
+
+  Only `off` and `active` modes exist. In `active` mode the alias needs a
+  complete policy, qualified enabled targets, and an administrator-authorized
+  Decisions classifier alias. In `off` mode structurally valid incomplete
+  drafts can be saved; malformed or out-of-range values cannot be saved in
+  any mode.
+
+  Applies to all supported text routes, including Responses requests that
+  carry `previous_response_id`. There is no Responses-specific routing
+  exception or forced baseline. Adaptive state is scoped to the
+  authenticated API-key identity, alias, API contract, and conversation
+  branch; a client-supplied session ID is a hint only.
+
+  Defaults below are the provisional starting values from the implementation
+  plan, not claims about classifier accuracy.
+properties:
+  mode:
+    type: string
+    enum:
+      - 'off'
+      - active
+    default: 'off'
+    description: >
+      `active` enables classification and policy evaluation before dispatch.
+      `off` uses the declared baseline ordering without classification.
+  classifier_alias:
+    type: string
+    default: ''
+    description: >
+      Administrator-authorized Decisions-capable model alias used to classify
+      the request. The caller's own access is never used, and the classifier
+      alias must not reach an `auto` group. Empty is allowed only while `off`.
+      Calls are charged and linked to the parent request trace.
+  classifier_deadline_ms:
+    type: integer
+    minimum: 1
+    default: 500
+    description: >
+      Total deadline in milliseconds across classification and the single
+      hot-path attempt. Provisional default is 500 ms; revise from observed
+      latency.
+  rubric_version:
+    type: integer
+    enum:
+      - 1
+    default: 1
+    description: >
+      Server-shipped classification rubric. Unknown versions are rejected.
+      Changing the rubric, not the scoring weights, invalidates cached
+      judgments.
+  baseline_policy:
+    type: string
+    enum:
+      - in_order
+      - cost
+    default: in_order
+    description: >
+      Deterministic ordering used in `off` mode and when classification fails
+      or times out. `in_order` uses the declared target order. `cost` uses
+      qualified targets with a documented unknown-price fallback; unknown
+      pricing is never treated as free.
+  uncertainty_minimum_tier:
+    type: string
+    enum:
+      - economy
+      - standard
+      - high
+      - premium
+    default: high
+    description: >
+      Minimum capability tier an incumbent must meet to be retained when the
+      judgment is unknown or below the confidence threshold. If no auto
+      target qualifies, the first eligible configured option is selected and
+      the unmet qualification is disclosed.
+  scoring:
+    type: object
+    description: >
+      Demand composition and tier mapping. `complexity_weight` and
+      `capability_weight` must be nonnegative and sum to 1.
+    properties:
+      complexity_weight:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.55
+      capability_weight:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.45
+      reasoning_threshold:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.65
+        description: Deep-reasoning likelihood at or above which `reasoning_boost` applies.
+      reasoning_boost:
+        type: number
+        minimum: 0
+        maximum: 3
+        default: 0.5
+        description: Demand added when the reasoning likelihood clears the threshold.
+      confidence_threshold:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.6
+        description: >
+          Below this, any present confidence triggers uncertainty handling.
+          Confidence is not calibrated; this is a caution trigger only.
+      tier_boundaries:
+        type: object
+        description: >
+          Boundaries that map composed demand (0-3) to a scored tier. Must be
+          strictly increasing inside 0-3; equality advances to the higher tier.
+          Change these to retune without reclassifying.
+        properties:
+          standard:
+            type: number
+            minimum: 0
+            maximum: 3
+            default: 0.75
+          high:
+            type: number
+            minimum: 0
+            maximum: 3
+            default: 1.75
+          premium:
+            type: number
+            minimum: 0
+            maximum: 3
+            default: 2.5
+      task_minimum_tiers:
+        type: object
+        default:
+          plan: high
+          review: high
+        description: >
+          Per-task capability floor. The required tier is the maximum of the
+          scored tier and this floor. Applies only to the listed task kinds.
+        propertyNames:
+          enum:
+            - plan
+            - implement
+            - debug
+            - refactor
+            - review
+            - research
+            - explain
+            - operate
+            - write
+            - chat
+        additionalProperties:
+          type: string
+          enum:
+            - economy
+            - standard
+            - high
+            - premium
+  preferences:
+    type: object
+    description: >
+      Preference bonuses on the 0-1 preference scale. Bonuses cannot make an
+      unsuitable target eligible.
+    properties:
+      specialty_bonus:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.1
+      reasoning_bonus:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.1
+  switching:
+    type: object
+    description: >
+      Cache-economic and hysteresis margins. Required capability upgrades are
+      not blocked by these margins.
+    properties:
+      score_deadband:
+        type: number
+        minimum: 0
+        default: 0.2
+        description: >
+          Hysteresis on the 0-3 demand scale. Delays marginal downgrades and
+          never lowers the current request's required tier.
+      minimum_savings_usd:
+        type: number
+        minimum: 0
+        default: 0.01
+      minimum_savings_fraction:
+        type: number
+        minimum: 0
+        maximum: 1
+        default: 0.1
+        description: Minimum savings as a fraction of the incumbent's estimated cost.
+      preference_margin:
+        type: number
+        minimum: 0
+        default: 0.05
+        description: >
+          Width of the comparable preference band. A preference improvement
+          greater than this may switch without savings.

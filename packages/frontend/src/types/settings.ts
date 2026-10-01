@@ -3,12 +3,20 @@ import type { PiAiQuirks, ProviderCacheKeyInjection, ResponsesExtension } from '
 export * from './quota';
 
 /**
+ * UI-only feature flags the backend exposes on the auth/verify response.
+ * These gate presentation only; they never change API or inference behaviour.
+ */
+export interface UiFeatures {
+  autoRouting: boolean;
+}
+
+/**
  * Shape of the principal returned by GET /v0/management/auth/verify.
  * Admins get just { role: 'admin' }; api-key users get the key metadata so
  * the frontend can render a scoped view without a follow-up call.
  */
 export type Principal =
-  | { role: 'admin' }
+  | { role: 'admin'; uiFeatures?: UiFeatures }
   | {
       role: 'limited';
       keyName: string;
@@ -18,6 +26,7 @@ export type Principal =
       excludedModels: string[];
       quotaName?: string | null;
       comment?: string | null;
+      uiFeatures?: UiFeatures;
     };
 
 export interface CompactionSettings {

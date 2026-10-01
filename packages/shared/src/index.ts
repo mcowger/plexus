@@ -46,6 +46,34 @@ export type {
 } from './provider-presets';
 
 export {
+  AUTO_TASK_KINDS,
+  AUTO_CAPABILITY_TIERS,
+  AUTO_REASONING_SUITABILITY,
+  AutoTaskKindSchema,
+  AutoCapabilityTierSchema,
+  AutoReasoningSuitabilitySchema,
+  AutoRoutingScoringSchema,
+  AutoRoutingPreferencesSchema,
+  AutoRoutingSwitchingSchema,
+  AutoRoutingConfigSchema,
+  AutoTargetProfileSchema,
+  DEFAULT_AUTO_ROUTING_SCORING,
+  DEFAULT_AUTO_ROUTING_PREFERENCES,
+  DEFAULT_AUTO_ROUTING_SWITCHING,
+  DEFAULT_AUTO_ROUTING_CONFIG,
+} from './auto-routing';
+export type {
+  AutoTaskKind,
+  AutoCapabilityTier,
+  AutoReasoningSuitability,
+  AutoRoutingScoring,
+  AutoRoutingPreferences,
+  AutoRoutingSwitching,
+  AutoRoutingConfig,
+  AutoTargetProfile,
+} from './auto-routing';
+
+export {
   LocalHttpMcpServerConfigSchema,
   McpKeyCreateSchema,
   McpKeySchema,

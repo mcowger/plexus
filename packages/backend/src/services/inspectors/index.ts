@@ -11,6 +11,10 @@
 
 export { DebugLoggingInspector } from './debug-logging';
 export { UsageInspector, extractUsageFromReconstructed } from './usage-logging';
-export type { ExtractedObservedUsage } from './usage-logging';
+export type {
+  ExtractedObservedUsage,
+  ObservedAutoRoutingUsage,
+  AutoRoutingUsageRecorder,
+} from './usage-logging';
 export { StallInspector } from './stall-inspector';
 export type { StallConfig } from './stall-inspector';

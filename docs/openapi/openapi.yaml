@@ -463,6 +463,8 @@ paths:
     $ref: paths/v0_management_models_metadata_refresh.yaml
   /v0/management/models/metadata/resolve:
     $ref: paths/v0_management_models_metadata_resolve.yaml
+  /v0/management/models/auto-routing/preview:
+    $ref: paths/v0_management_models_auto-routing_preview.yaml
   /v0/management/keys:
     $ref: paths/v0_management_keys.yaml
   /v0/management/keys/{name}:

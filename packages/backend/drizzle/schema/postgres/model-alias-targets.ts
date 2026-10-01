@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, unique } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, boolean, jsonb, unique } from 'drizzle-orm/pg-core';
 import { modelAliases } from './model-aliases';
 
 export const modelAliasTargets = pgTable(
@@ -14,6 +14,7 @@ export const modelAliasTargets = pgTable(
     enabled: boolean('enabled').notNull().default(true),
     groupName: text('group_name'), // target group label
     sortOrder: integer('sort_order').notNull().default(0),
+    autoProfile: jsonb('auto_profile'), // AutoTargetProfile qualification
   },
   (table) => ({
     aliasProviderModelUnique: unique('uq_alias_targets').on(
