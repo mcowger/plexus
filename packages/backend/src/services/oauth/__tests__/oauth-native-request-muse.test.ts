@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  hasCodexLiteOnlyExtensions,
   hasMetaNamespaceExtensions,
   isNativeOAuthProvider,
   nativeOAuthApiType,
@@ -112,5 +113,25 @@ describe('hasMetaNamespaceExtensions', () => {
     expect(hasMetaNamespaceExtensions(null)).toBe(false);
     expect(hasMetaNamespaceExtensions('nope')).toBe(false);
     expect(hasMetaNamespaceExtensions({ tools: [null, 'x'] })).toBe(false);
+  });
+});
+
+describe('hasCodexLiteOnlyExtensions', () => {
+  it('detects custom/tool_search tools and Codex-lite input items', () => {
+    expect(hasCodexLiteOnlyExtensions({ tools: [{ type: 'custom', name: 'apply_patch' }] })).toBe(
+      true
+    );
+    expect(hasCodexLiteOnlyExtensions({ tools: [{ type: 'tool_search' }] })).toBe(true);
+    expect(hasCodexLiteOnlyExtensions({ input: [{ type: 'additional_tools', tools: [] }] })).toBe(
+      true
+    );
+    expect(hasCodexLiteOnlyExtensions({ input: [{ type: 'custom_tool_call' }] })).toBe(true);
+    expect(hasCodexLiteOnlyExtensions({ input: [{ type: 'custom_tool_call_output' }] })).toBe(true);
+  });
+
+  it('ignores namespace and plain function bodies', () => {
+    expect(hasCodexLiteOnlyExtensions({ tools: [{ type: 'namespace', tools: [] }] })).toBe(false);
+    expect(hasCodexLiteOnlyExtensions({ tools: [{ type: 'function', name: 'x' }] })).toBe(false);
+    expect(hasCodexLiteOnlyExtensions(null)).toBe(false);
   });
 });

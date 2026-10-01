@@ -504,6 +504,36 @@ export function hasMetaNamespaceExtensions(body: any): boolean {
   );
 }
 
+/**
+ * Detect Codex-lite-only extensions Meta does NOT support: `custom` /
+ * `tool_search` tools and `additional_tools` / `custom_tool_call(_output)` /
+ * `tool_search_*` input items. A body carrying any of these must take the
+ * transform pipeline even when it also declares namespace tools.
+ */
+export function hasCodexLiteOnlyExtensions(body: any): boolean {
+  if (!body || typeof body !== 'object') return false;
+
+  if (
+    Array.isArray(body.tools) &&
+    body.tools.some((t: any) => t?.type === 'custom' || t?.type === 'tool_search')
+  ) {
+    return true;
+  }
+
+  return (
+    Array.isArray(body.input) &&
+    body.input.some(
+      (it: any) =>
+        it &&
+        typeof it === 'object' &&
+        (it.type === 'additional_tools' ||
+          it.type === 'custom_tool_call' ||
+          it.type === 'custom_tool_call_output' ||
+          (typeof it.type === 'string' && it.type.startsWith('tool_search')))
+    )
+  );
+}
+
 /** Extract the ChatGPT account id from the Codex OAuth token's JWT claim. */
 export function extractChatgptAccountId(token: string): string | undefined {
   try {

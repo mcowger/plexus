@@ -11,6 +11,7 @@ import {
   copilotEndpoint,
   extractChatgptAccountId,
   hasMetaNamespaceExtensions,
+  hasCodexLiteOnlyExtensions,
   isCodexCliShapedBody,
   isGenuineClaudeCodeRequest,
   isNativeOAuthProvider,
@@ -143,8 +144,16 @@ export async function buildRequestPayload(
   // `${namespace}__${name}`: this route returns raw upstream SSE (`nativeBypass`),
   // so a flattened request's calls would never be split back and the client
   // would reject them as unknown tools.
+  // Only when the body is exactly the target format, wasn't rewritten by the
+  // vision preprocessor, and carries no Codex-lite-only extensions Meta
+  // doesn't support (those must still be flattened by the transformer).
   const museNativePassthrough =
-    museNative && incomingIsResponses && hasMetaNamespaceExtensions(request.originalBody);
+    museNative &&
+    incomingIsResponses &&
+    !(request as any)._hasVisionFallthrough &&
+    request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase() &&
+    hasMetaNamespaceExtensions(request.originalBody) &&
+    !hasCodexLiteOnlyExtensions(request.originalBody);
 
   let bypassTransformation: boolean;
   if (codexNative) {
