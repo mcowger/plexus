@@ -263,11 +263,10 @@ describe('Auth Middleware', () => {
       },
     });
 
-    const unauthorized = await fastify.inject({
-      method: 'GET',
-      url: '/v1/muse-code/models',
-    });
-    expect(unauthorized.statusCode).toBe(401);
+    for (const url of ['/v1/muse-code/models', '/muse-code/models']) {
+      const unauthorized = await fastify.inject({ method: 'GET', url });
+      expect(unauthorized.statusCode).toBe(401);
+    }
 
     const response = await fastify.inject({
       method: 'GET',
@@ -304,6 +303,14 @@ describe('Auth Middleware', () => {
         }),
       ],
     });
+
+    const aliasResponse = await fastify.inject({
+      method: 'GET',
+      url: '/muse-code/models',
+      headers: { authorization: 'Bearer sk-valid-key' },
+    });
+    expect(aliasResponse.statusCode).toBe(200);
+    expect(aliasResponse.json()).toEqual(response.json());
   });
 });
 

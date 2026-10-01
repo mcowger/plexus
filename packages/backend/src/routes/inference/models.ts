@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'crypto';
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai';
 import type { Api, Model as PiAiModel } from '@earendil-works/pi-ai';
@@ -415,12 +416,14 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
 }
 
 /**
- * GET /v1/muse-code/models
+ * GET /v1/muse-code/models and /muse-code/models
  * Returns configured aliases in the catalog format expected by the Muse CLI.
- * This route is registered in the authenticated inference scope.
+ * The Muse CLI ignores the path in base_url and always requests
+ * {origin}/muse-code/models, so both paths are registered.
+ * These routes are registered in the authenticated inference scope.
  */
 export async function registerMuseCodeModelsRoute(fastify: FastifyInstance) {
-  fastify.get('/v1/muse-code/models', async (_request, reply) => {
+  const handler = async (_request: FastifyRequest, reply: FastifyReply) => {
     const config = getConfig();
     const metadataManager = ModelMetadataManager.getInstance();
 
@@ -487,5 +490,8 @@ export async function registerMuseCodeModelsRoute(fastify: FastifyInstance) {
     });
 
     return reply.type('application/json').send({ object: 'list', data });
-  });
+  };
+
+  fastify.get('/v1/muse-code/models', handler);
+  fastify.get('/muse-code/models', handler);
 }
