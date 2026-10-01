@@ -36,6 +36,7 @@ const IMAGE_QUALITIES = new Set(['auto', 'low', 'medium', 'high']);
 const IMAGE_OUTPUT_FORMATS = new Set(['png', 'jpeg', 'webp', 'svg']);
 const IMAGE_BACKGROUNDS = new Set(['auto', 'transparent', 'opaque']);
 const MAX_IMAGE_REFERENCES = 16;
+export { MAX_IMAGE_REFERENCES };
 const MAX_REMOTE_IMAGE_BYTES = 20 * 1024 * 1024;
 const REMOTE_IMAGE_TIMEOUT_MS = 15_000;
 const PIXEL_SIZE_PATTERN = /^\d+x\d+$/;
@@ -459,14 +460,22 @@ async function buildOpenAIReferenceRequest(
   signal?: AbortSignal
 ): Promise<FormData> {
   const references = request.input_references ?? [];
-  if (references.length !== 1) {
+  if (references.length === 0) {
     throw new ImageRequestValidationError(
-      'OpenAI-compatible image editing targets support exactly one input reference'
+      'OpenAI-compatible image editing targets require one or more input references'
     );
   }
 
-  const reference = references[0]!;
-  const parsed = await resolveImageReference(reference, signal);
+  // The chat bridge and /v1/images JSON surface reach this function directly.
+  if (references.length > MAX_IMAGE_REFERENCES) {
+    throw new ImageRequestValidationError(
+      `OpenAI-compatible image editing targets support at most ${MAX_IMAGE_REFERENCES} input references`
+    );
+  }
+
+  const resolvedRefs = await Promise.all(
+    references.map((reference) => resolveImageReference(reference, signal))
+  );
 
   const formData = new FormData();
   appendFormValue(formData, 'model', request.model);
@@ -480,11 +489,25 @@ async function buildOpenAIReferenceRequest(
   appendFormValue(formData, 'background', request.background);
   appendFormValue(formData, 'output_compression', request.output_compression);
   appendFormValue(formData, 'seed', request.seed);
-  formData.append(
-    'image',
-    new Blob([new Uint8Array(parsed.data)], { type: parsed.mimeType }),
-    'reference.png'
-  );
+  // N=1 keeps the exact wire shape every existing provider sees (field named
+  // `image`, single part). N≥2 uses OpenAI's documented multi-image edit
+  // shape: `image[]` repeated per file.
+  if (resolvedRefs.length === 1) {
+    const parsed = resolvedRefs[0]!;
+    formData.append(
+      'image',
+      new Blob([new Uint8Array(parsed.data)], { type: parsed.mimeType }),
+      'reference.png'
+    );
+  } else {
+    for (const parsed of resolvedRefs) {
+      formData.append(
+        'image[]',
+        new Blob([new Uint8Array(parsed.data)], { type: parsed.mimeType }),
+        'reference.png'
+      );
+    }
+  }
 
   if (request.mask) {
     const mask = await resolveImageReference(request.mask, signal);
