@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { ProviderCacheKeyInjectionSchema, type ProviderCacheKeyInjection } from './provider';
+import {
+  ProviderCacheKeyInjectionSchema,
+  ResponsesExtensionSchema,
+  type ProviderCacheKeyInjection,
+  type ResponsesExtension,
+} from './provider';
 
 /**
  * Pre-configured provider presets for the Add Provider flow.
@@ -170,6 +175,8 @@ export const ProviderPresetSchema = z
     autoCompat: z.boolean().default(false),
     /** Cache/session key injection destination applied to the provider draft. */
     cacheKeyInjection: ProviderCacheKeyInjectionSchema.optional(),
+    /** Responses API extensions the provider accepts verbatim. */
+    responsesExtensions: z.array(ResponsesExtensionSchema).optional(),
     /** Operator-facing caveats shown in the picker (auth quirks, docs gaps). */
     notes: z.string().optional(),
   })
@@ -270,6 +277,7 @@ export interface ProviderPresetDraft {
   pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
   cacheKeyInjection?: ProviderCacheKeyInjection;
+  responsesExtensions?: ResponsesExtension[];
 }
 
 /**
@@ -297,5 +305,6 @@ export function applyProviderPreset<T extends ProviderPresetDraft>(
     pi_ai_quirks: preset.piAiQuirks ? structuredClone(preset.piAiQuirks) : undefined,
     auto_compat: preset.autoCompat,
     cacheKeyInjection: preset.cacheKeyInjection,
+    responsesExtensions: preset.responsesExtensions ? [...preset.responsesExtensions] : undefined,
   };
 }

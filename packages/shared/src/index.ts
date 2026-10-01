@@ -17,10 +17,17 @@ export {
   PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
   PROVIDER_CACHE_KEY_INJECTION_VALUES,
   ProviderCacheKeyInjectionSchema,
+  getDefaultResponsesExtensions,
+  RESPONSES_EXTENSIONS,
+  RESPONSES_LITE_EXTENSIONS,
+  RESPONSES_EXTENSION_OPTIONS,
+  ResponsesExtensionSchema,
 } from './provider';
 export type {
   ProviderCacheKeyInjection,
   ProviderCacheKeyInjectionOption,
+  ResponsesExtension,
+  ResponsesExtensionOption,
 } from './provider';
 
 export {

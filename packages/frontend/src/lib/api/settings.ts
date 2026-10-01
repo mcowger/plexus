@@ -352,6 +352,7 @@ interface RawBackendProvider {
   allow_100_percent_utilization?: boolean;
   auto_compat?: boolean;
   cache_key_injection?: string;
+  responses_extensions?: string[] | null;
   discount?: number;
   headers?: Record<string, string>;
   extraBody?: Record<string, unknown>;
@@ -417,6 +418,7 @@ export const getProviders = async (): Promise<Provider[]> => {
         allow100PercentUtilization: val.allow_100_percent_utilization === true,
         auto_compat: val.auto_compat === true,
         cacheKeyInjection: val.cache_key_injection as Provider['cacheKeyInjection'],
+        responsesExtensions: val.responses_extensions as Provider['responsesExtensions'],
         discount: typeof val.discount === 'number' ? val.discount : undefined,
         headers: val.headers,
         extraBody:
@@ -524,6 +526,8 @@ export const saveProvider = async (provider: Provider, oldId?: string): Promise<
     // omitted fields would leave its old pi-ai provider/inline quirks in place.
     pi_ai_provider: provider.pi_ai_provider ?? (isExistingProvider ? null : undefined),
     pi_ai_quirks: provider.pi_ai_quirks ?? (isExistingProvider ? null : undefined),
+    // undefined = use the default; null clears a saved list on PATCH.
+    responses_extensions: provider.responsesExtensions ?? (isExistingProvider ? null : undefined),
   };
 
   const res = await fetchWithAuth(

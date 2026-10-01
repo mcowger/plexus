@@ -1,6 +1,6 @@
 import { encode } from 'eventsource-encoder';
 import { UnifiedClientToolCall } from '../../types/unified';
-import { ResponsesToolState, customToolInput } from './tool-mapper';
+import { ResponsesToolState, customToolInput, resolveOutputToolCall } from './tool-mapper';
 import { buildResponsesUsagePayload, generateItemId, generateResponseId } from './utils';
 
 /**
@@ -12,10 +12,6 @@ export function formatResponsesStream(
 ): ReadableStream {
   const encoder = new TextEncoder();
   const reader = stream.getReader();
-
-  const customToolNames = state?.customToolNames ?? new Set<string>();
-  const namespaceMap =
-    state?.namespaceMap ?? new Map<string, { namespace: string; name: string }>();
 
   let hasSentCreated = false;
   let hasSentInProgress = false;
@@ -192,7 +188,8 @@ export function formatResponsesStream(
     // Codex CLI namespace/custom tool split-back for the streamed "added"
     // event; the resolved shape is recomputed at finalization once full
     // arguments are known.
-    if (customToolNames.has(flatName)) {
+    const resolved = resolveOutputToolCall(flatName, state);
+    if (resolved.type === 'custom_tool_call') {
       sendEvent(controller, {
         type: 'response.output_item.added',
         output_index: outputIndex,
@@ -201,14 +198,13 @@ export function formatResponsesStream(
           type: 'custom_tool_call',
           status: 'in_progress',
           call_id: callId,
-          name: flatName,
+          name: resolved.name,
           input: '',
         },
       });
       return;
     }
 
-    const namespaced = namespaceMap.get(flatName);
     sendEvent(controller, {
       type: 'response.output_item.added',
       output_index: outputIndex,
@@ -217,8 +213,8 @@ export function formatResponsesStream(
         type: 'function_call',
         status: 'in_progress',
         call_id: callId,
-        name: namespaced ? namespaced.name : flatName,
-        ...(namespaced ? { namespace: namespaced.namespace } : {}),
+        name: resolved.name,
+        ...(resolved.namespace ? { namespace: resolved.namespace } : {}),
         arguments: '',
       },
     });
@@ -401,24 +397,24 @@ export function formatResponsesStream(
       const flatName = toolNameMap.get(toolIndex) || '';
 
       let toolItem: any;
-      if (customToolNames.has(flatName)) {
+      const resolved = resolveOutputToolCall(flatName, state);
+      if (resolved.type === 'custom_tool_call') {
         toolItem = {
           id: itemId,
           type: 'custom_tool_call',
           status: itemStatus,
           call_id: callId,
-          name: flatName,
+          name: resolved.name,
           input: customToolInput(args),
         };
       } else {
-        const namespaced = namespaceMap.get(flatName);
         toolItem = {
           id: itemId,
           type: 'function_call',
           status: itemStatus,
           call_id: callId,
-          name: namespaced ? namespaced.name : flatName,
-          ...(namespaced ? { namespace: namespaced.namespace } : {}),
+          name: resolved.name,
+          ...(resolved.namespace ? { namespace: resolved.namespace } : {}),
           arguments: args,
         };
       }
@@ -633,7 +629,7 @@ export function formatResponsesStream(
                 // calls; custom tool input is emitted once, complete, in
                 // finalizeOutputItems's output_item.done.
                 const flatName = toolNameMap.get(toolIndex) || '';
-                if (!customToolNames.has(flatName)) {
+                if (resolveOutputToolCall(flatName, state).type !== 'custom_tool_call') {
                   sendEvent(controller, {
                     type: 'response.function_call_arguments.delta',
                     output_index: outputIndex,

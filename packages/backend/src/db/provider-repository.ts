@@ -1,4 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
+import type { ResponsesExtension } from '@plexus/shared';
 import { getDatabase, getSchema } from './client';
 import { decryptField, encryptField } from '../utils/encryption';
 import type { ModelProviderConfig, ProviderConfig } from '../config';
@@ -31,6 +32,7 @@ type ProviderRow = {
   useClaudeMasking: unknown;
   geminiThinkingEnabled: unknown;
   cacheKeyInjection: string | null;
+  responsesExtensions: unknown;
   headers: unknown;
   extraBody: unknown;
   compaction: unknown;
@@ -214,6 +216,9 @@ export class ProviderRepository {
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
       geminiThinkingEnabled: fromBool(config.geminiThinkingEnabled === true),
       cacheKeyInjection: config.cache_key_injection ?? null,
+      responsesExtensions: Array.isArray(config.responses_extensions)
+        ? toJson(config.responses_extensions)
+        : null,
       headers: config.headers ? encryptJsonField(config.headers) : null,
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
       compaction: config.compaction ? toJson(config.compaction) : null,
@@ -565,6 +570,10 @@ export class ProviderRepository {
       useClaudeMasking: toBool(row.useClaudeMasking),
       gemini_thinking_enabled: toBool(row.geminiThinkingEnabled),
       ...(row.cacheKeyInjection ? { cache_key_injection: row.cacheKeyInjection } : {}),
+      ...(() => {
+        const extensions = parseJson<ResponsesExtension[]>(row.responsesExtensions);
+        return Array.isArray(extensions) ? { responses_extensions: extensions } : {};
+      })(),
       auto_compat: toBool(row.autoCompat),
       ...(models ? { models } : {}),
       ...(row.headers ? { headers: decryptJsonField(row.headers) } : {}),

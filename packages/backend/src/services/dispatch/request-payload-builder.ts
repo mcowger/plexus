@@ -1,6 +1,6 @@
 import type { UnifiedChatRequest } from '../../types/unified';
 import { getConfig } from '../../config';
-import { getApiBaseType, getApiSubtype } from '../../utils/api-format';
+import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
 import { applyModelBehaviors } from '../models/model-behaviors';
 import type { RouteResult } from '../routing/router';
@@ -10,8 +10,6 @@ import { isClaudeMaskingApiKeyRoute, isOAuthRoute, isPiAiRoute } from '../oauth/
 import {
   copilotEndpoint,
   extractChatgptAccountId,
-  hasMetaNamespaceExtensions,
-  hasCodexLiteOnlyExtensions,
   isCodexCliShapedBody,
   isGenuineClaudeCodeRequest,
   isNativeOAuthProvider,
@@ -21,11 +19,11 @@ import {
   type PreparedOAuthRequest,
 } from '../oauth/oauth-native-request';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import { applyRegistryAutoCompat, stripLiteUnsupportedTools } from './dispatcher-auto-compat';
 import {
-  applyRegistryAutoCompat,
-  hasCodexResponsesExtensions,
-  stripLiteUnsupportedTools,
-} from './dispatcher-auto-compat';
+  detectResponsesExtensions,
+  hasUnsupportedResponsesExtensions,
+} from './responses-extensions';
 import { appendUserAfterTextOnlyModelTail } from '../../transformers/gemini/utils/model-tail';
 import { isAnthropicTargetProvider } from './adapter-resolver';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
@@ -69,26 +67,9 @@ function shouldUsePassThrough(
     return false;
   }
 
-  // Only force the transform pipeline when the target fell back to the bare
-  // `responses` type (no explicit Lite support advertised) — NOT any
-  // `responses:<subtype>` match. A target that matches the `responses:lite`
-  // subtype EXACTLY has been deliberately configured as Codex-native —
-  // verified live against both providers currently marked `responses:lite`
-  // (see dispatcher-api-subtype.test.ts): both correctly parse raw
-  // `additional_tools`/`custom`/`namespace` wire extensions and invoke tools
-  // without flattening. That's the whole point of the subtype: avoid the
-  // transform pipeline where the target has opted in. Providers that only
-  // match on the base type haven't made that claim, so they still get the
-  // defensive flatten. Checked via getApiBaseType/getApiSubtype (not a naive
-  // `=== 'responses'` string compare) so this expresses the actual intent —
-  // "base type only, no subtype" — rather than "not literally 'responses'",
-  // which would silently stop flattening for any FUTURE `responses:<other>`
-  // subtype too, not just `lite`.
-  if (
-    getApiBaseType(targetApiType) === 'responses' &&
-    getApiSubtype(targetApiType) !== 'lite' &&
-    hasCodexResponsesExtensions(request.originalBody)
-  ) {
+  // Responses extensions the target doesn't accept verbatim must be flattened
+  // by the transformer (see responses-extensions.ts).
+  if (hasUnsupportedResponsesExtensions(request.originalBody, route, targetApiType)) {
     return false;
   }
 
@@ -118,59 +99,34 @@ export async function buildRequestPayload(
     !isClaudeMaskingApiKeyRoute(route, targetApiType) &&
     isPiAiRoute(route, targetApiType);
 
-  // Codex two-path decision. A genuine Codex CLI body
-  // is sent to the ChatGPT backend VERBATIM (pass-through), including its native
-  // custom/namespace tool extensions — so we override the
-  // `hasCodexResponsesExtensions` flattening that `shouldUsePassThrough` applies
-  // (that flattening is for routing to NON-Codex providers). Any other Responses
-  // request is forced through the transformer + adorned for the backend, even
-  // though incoming == target == responses.
+  // Codex two-path decision. A genuine Codex CLI body is sent to the ChatGPT
+  // backend VERBATIM (pass-through) when the backend accepts every extension
+  // it carries. Any other request is forced through the transformer + adorned
+  // for the backend, even though incoming == target == responses — so Codex
+  // doesn't use the same-format `shouldUsePassThrough` rule.
   const oauthProviderForNative = isClaudeMaskingApiKeyRoute(route, targetApiType)
     ? 'anthropic'
     : route.config.oauth_provider || route.provider;
   const codexNative = nativeOAuth && oauthProviderForNative === 'openai-codex';
   const copilotNative = nativeOAuth && oauthProviderForNative === 'github-copilot';
   const museNative = nativeOAuth && oauthProviderForNative === 'meta';
-  const codexCliPassthrough = codexNative && isCodexCliShapedBody(request.originalBody);
+  const codexCliPassthrough =
+    codexNative &&
+    isCodexCliShapedBody(request.originalBody) &&
+    !hasUnsupportedResponsesExtensions(request.originalBody, route, targetApiType);
   const anthropicNative = nativeOAuth && oauthProviderForNative === 'anthropic';
   const incomingBaseType = getApiBaseType(request.incomingApiType?.toLowerCase() ?? '');
   const incomingIsResponses = incomingBaseType === 'responses';
 
-  // Muse Code (Meta's own client) sends Meta's native Responses body —
-  // including its `type: "namespace"` tool grouping and namespace-qualified
-  // `function_call` history — to api.meta.ai, the exact endpoint Muse talks to
-  // directly. Forward it verbatim (the `meta` analogue of
-  // `codexCliPassthrough`) rather than flattening namespace tools to
-  // `${namespace}__${name}`: this route returns raw upstream SSE (`nativeBypass`),
-  // so a flattened request's calls would never be split back and the client
-  // would reject them as unknown tools.
-  // Only when the body is exactly the target format, wasn't rewritten by the
-  // vision preprocessor, and carries no Codex-lite-only extensions Meta
-  // doesn't support (those must still be flattened by the transformer).
-  const museNativePassthrough =
-    museNative &&
-    incomingIsResponses &&
-    !(request as any)._hasVisionFallthrough &&
-    request.incomingApiType?.toLowerCase() === targetApiType.toLowerCase() &&
-    hasMetaNamespaceExtensions(request.originalBody) &&
-    !hasCodexLiteOnlyExtensions(request.originalBody);
-
-  let bypassTransformation: boolean;
-  if (codexNative) {
-    bypassTransformation = codexCliPassthrough;
-  } else if (museNative) {
-    // Same-format Responses bodies already pass through; also pass through
-    // when Meta's native namespace extensions are present so the tool grouping
-    // survives (see museNativePassthrough).
-    bypassTransformation =
-      shouldUsePassThrough(request, targetApiType, route) || museNativePassthrough;
-  } else {
-    // Anthropic and Copilot: standard same-format pass-through detection. For
-    // Copilot this is authoritative (multi-API: a client may send a format the
-    // target model's wire API doesn't match, requiring response translation);
-    // Anthropic clients are always same-format in practice.
-    bypassTransformation = shouldUsePassThrough(request, targetApiType, route);
-  }
+  // Everything except Codex: standard same-format pass-through detection,
+  // which flattens any Responses extension the target doesn't accept (Meta
+  // accepts its own namespace tools — see getDefaultResponsesExtensions).
+  // For Copilot this is authoritative (multi-API: a client may send a format
+  // the target model's wire API doesn't match, requiring response
+  // translation); Anthropic clients are always same-format in practice.
+  const bypassTransformation = codexNative
+    ? codexCliPassthrough
+    : shouldUsePassThrough(request, targetApiType, route);
   let payload: any;
 
   if (bypassTransformation) {
@@ -383,8 +339,11 @@ export async function buildRequestPayload(
     // if the request went through the transformer (e.g. a `responses:lite`
     // body Meta doesn't natively parse), the response must too, so the client
     // transformer's namespaceMap can split flattened tool calls back.
+    // A transformed Codex request that carried extensions was flattened, so
+    // its response must be translated for the names to split back.
     const nativeBypass = codexNative
-      ? codexCliPassthrough || incomingIsResponses
+      ? codexCliPassthrough ||
+        (incomingIsResponses && detectResponsesExtensions(request.originalBody).size === 0)
       : copilotNative || museNative
         ? bypassTransformation
         : incomingIsMessages;

@@ -12,9 +12,10 @@ import type { UnifiedChatRequest } from '../../types/unified';
 // route must forward it VERBATIM. The route returns raw upstream SSE, so
 // flattening the request would leave `muse__read_file` calls unsplit and the
 // client would reject them as unknown tools (see
-// `hasMetaNamespaceExtensions` / `museNativePassthrough`).
+// `getDefaultResponsesExtensions` / `hasUnsupportedResponsesExtensions`).
 
 const { Dispatcher } = await import('../dispatch/dispatcher');
+const { ResponsesTransformer } = await import('../../transformers/responses');
 
 const META_TOKEN = 'mk_live_test';
 
@@ -128,6 +129,13 @@ function codexLiteRequest(): UnifiedChatRequest {
   } as any;
 }
 
+// A Responses body parsed the way the inbound route does, so the transform
+// path sees the client's (flattened) tools.
+async function parsedRequest(body: any): Promise<UnifiedChatRequest> {
+  const request = await new ResponsesTransformer().parseRequest(body);
+  return { ...request, incomingApiType: 'responses', originalBody: body } as UnifiedChatRequest;
+}
+
 async function drain(stream: ReadableStream): Promise<string> {
   const reader = stream.getReader();
   const dec = new TextDecoder();
@@ -206,5 +214,47 @@ describe('Native Meta OAuth dispatch', () => {
     const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
     expect(sent.input).toBeDefined();
     expect(sent.messages).toBeUndefined();
+  });
+
+  test("forwards Muse's dotted `muse.bash` call history verbatim", async () => {
+    setConfigForTesting(metaOAuthConfig());
+    const request = museNamespaceRequest();
+    (request.originalBody as any).input.push(
+      { type: 'function_call', call_id: 'call_1', name: 'muse.bash', arguments: '{}' },
+      { type: 'function_call_output', call_id: 'call_1', output: 'ok' }
+    );
+    const response = await new Dispatcher().dispatch(request);
+
+    expect(response.bypassTransformation).toBe(true);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.input.find((i: any) => i.type === 'function_call').name).toBe('muse.bash');
+  });
+
+  test('flattens custom tools Meta does not accept, so they stay callable', async () => {
+    setConfigForTesting(metaOAuthConfig());
+    const body = {
+      ...museNamespaceRequest().originalBody,
+      tools: [{ type: 'custom', name: 'apply_patch' }],
+    };
+    const response = await new Dispatcher().dispatch(await parsedRequest(body));
+
+    expect(response.bypassTransformation).toBe(false);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.tools).toEqual([
+      expect.objectContaining({ type: 'function', name: 'apply_patch' }),
+    ]);
+  });
+
+  test('an explicit empty responses_extensions flattens Muse namespace tools', async () => {
+    const config = metaOAuthConfig();
+    config.providers.Meta.responses_extensions = [];
+    setConfigForTesting(config);
+    const response = await new Dispatcher().dispatch(
+      await parsedRequest(museNamespaceRequest().originalBody)
+    );
+
+    expect(response.bypassTransformation).toBe(false);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.tools.map((t: any) => t.name)).toEqual(['muse__read_file', 'muse__bash']);
   });
 });

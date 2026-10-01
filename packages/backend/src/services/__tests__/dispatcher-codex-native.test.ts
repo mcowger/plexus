@@ -14,6 +14,7 @@ import type { UnifiedChatRequest } from '../../types/unified';
 // Responses clients stream RAW backend SSE; cross-format clients get translated.
 
 const { Dispatcher } = await import('../dispatch/dispatcher');
+const { ResponsesTransformer } = await import('../../transformers/responses');
 
 // A minimal but real-shaped Codex Responses SSE stream from the backend. The
 // exact whitespace is preserved to prove raw-byte pass-through.
@@ -317,6 +318,38 @@ describe('Native Codex OAuth pass-through', () => {
     // The Codex backend accepts NO max-tokens field (rejects both names).
     expect(sent).not.toHaveProperty('max_output_tokens');
     expect(sent).not.toHaveProperty('max_completion_tokens');
+  });
+
+  test('flattens Muse dotted history the backend rejects, and translates the response back', async () => {
+    setConfigForTesting(codexOAuthConfig());
+    const body = {
+      model: 'codex-alias',
+      stream: true,
+      tools: [
+        {
+          type: 'namespace',
+          name: 'muse',
+          tools: [{ type: 'function', name: 'bash', parameters: { type: 'object' } }],
+        },
+      ],
+      input: [
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+        { type: 'function_call', call_id: 'c1', name: 'muse.bash', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'c1', output: 'ok' },
+      ],
+    };
+    const parsed = await new ResponsesTransformer().parseRequest(body);
+    const response = await new Dispatcher().dispatch({
+      ...parsed,
+      incomingApiType: 'responses',
+      originalBody: body,
+    } as UnifiedChatRequest);
+
+    // Flattened, so the response must be translated for names to split back.
+    expect(response.bypassTransformation).toBe(false);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    expect(sent.tools.map((t: any) => t.name)).toEqual(['muse__bash']);
+    expect(sent.input.find((i: any) => i.type === 'function_call').name).toBe('muse__bash');
   });
 
   test('streams RAW backend Responses SSE to the client, byte-preserved', async () => {

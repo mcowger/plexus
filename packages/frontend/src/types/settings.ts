@@ -1,4 +1,4 @@
-import type { PiAiQuirks, ProviderCacheKeyInjection } from '@plexus/shared';
+import type { PiAiQuirks, ProviderCacheKeyInjection, ResponsesExtension } from '@plexus/shared';
 
 export * from './quota';
 
@@ -65,6 +65,8 @@ export interface Provider {
   maxConcurrency?: number | null;
   auto_compat?: boolean;
   cacheKeyInjection?: ProviderCacheKeyInjection;
+  /** Responses extensions accepted verbatim; undefined uses the default. */
+  responsesExtensions?: ResponsesExtension[];
   // Per-provider stall detection overrides
   stallTtfbMs?: number | null;
   stallTtfbBytes?: number | null;

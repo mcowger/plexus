@@ -371,4 +371,68 @@ describe('Dispatcher API subtypes', () => {
       expect.arrayContaining([expect.objectContaining({ type: 'web_search' })])
     );
   });
+
+  test('flattens a top-level namespace tool on a responses:lite target instead of stripping it', async () => {
+    // The lite wire contract only accepts function/custom/tool_search
+    // declarations, so a namespace tool must be flattened (and split back on
+    // the response) rather than passed through and dropped by the lite strip.
+    const dispatcher = new Dispatcher() as any;
+    const route = makeRoute([{ type: 'responses', subtype: 'lite' }]);
+    const originalBody = {
+      model: 'alias',
+      input: [
+        { type: 'additional_tools', role: 'developer', tools: [] },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+      ],
+      tools: [
+        {
+          type: 'namespace',
+          name: 'crm',
+          tools: [{ type: 'function', name: 'list_open_orders', parameters: {} }],
+        },
+      ],
+    };
+
+    const clientTransformer = new ResponsesTransformer();
+    const unifiedRequest = await clientTransformer.parseRequest(originalBody);
+    unifiedRequest.incomingApiType = 'responses:lite';
+    unifiedRequest.originalBody = originalBody;
+
+    const result = await dispatcher.transformRequestPayload(
+      unifiedRequest,
+      route,
+      TransformerFactory.getTransformer('responses:lite'),
+      'responses:lite'
+    );
+
+    expect(result.bypassTransformation).toBe(false);
+    expect(result.payload.tools).toEqual([
+      expect.objectContaining({ type: 'function', name: 'crm__list_open_orders' }),
+    ]);
+  });
+
+  test('passes namespace tools through when the provider opts in via responses_extensions', async () => {
+    const dispatcher = new Dispatcher() as any;
+    const route = makeRoute(['responses']);
+    route.config.responses_extensions = ['namespace_tools', 'dotted_calls'];
+    const originalBody = {
+      model: 'alias',
+      input: [
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+        { type: 'function_call', call_id: 'c1', name: 'muse.bash', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'c1', output: 'ok' },
+      ],
+      tools: [{ type: 'namespace', name: 'muse', tools: [{ type: 'function', name: 'bash' }] }],
+    };
+
+    const result = await dispatcher.transformRequestPayload(
+      { model: 'alias', messages: [], incomingApiType: 'responses', originalBody },
+      route,
+      TransformerFactory.getTransformer('responses'),
+      'responses'
+    );
+
+    expect(result.bypassTransformation).toBe(true);
+    expect(result.payload.tools).toEqual(originalBody.tools);
+  });
 });

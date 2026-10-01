@@ -97,4 +97,31 @@ describe('provider quirk source PATCH', () => {
     expect(plain.pi_ai_quirks).toBeUndefined();
     expect(plain.auto_compat).toBe(true); // Existing no-source settings remain valid and inert.
   });
+
+  it('preserves omitted responses_extensions, keeps [], and clears them with null', async () => {
+    const url = '/v0/management/providers/extensions';
+    await fastify.inject({
+      method: 'PUT',
+      url,
+      payload: { ...baseProvider, responses_extensions: ['namespace_tools'] },
+    });
+
+    await fastify.inject({ method: 'PATCH', url, payload: { display_name: 'Ext' } });
+    expect((await fastify.inject({ method: 'GET', url })).json().responses_extensions).toEqual([
+      'namespace_tools',
+    ]);
+
+    await fastify.inject({ method: 'PATCH', url, payload: { responses_extensions: [] } });
+    expect((await fastify.inject({ method: 'GET', url })).json().responses_extensions).toEqual([]);
+
+    const clear = await fastify.inject({
+      method: 'PATCH',
+      url,
+      payload: { responses_extensions: null },
+    });
+    expect(clear.statusCode).toBe(200);
+    expect(
+      (await fastify.inject({ method: 'GET', url })).json().responses_extensions
+    ).toBeUndefined();
+  });
 });

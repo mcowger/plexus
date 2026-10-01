@@ -8,6 +8,7 @@ import {
   type PiAiQuirks,
   type ProviderCacheKeyInjection,
   type ProviderPreset,
+  type ResponsesExtension,
 } from '@plexus/shared';
 import { api, type Provider } from '../../lib/api';
 
@@ -40,6 +41,7 @@ interface PresetTouchedFields {
   pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
   cacheKeyInjection?: ProviderCacheKeyInjection;
+  responsesExtensions?: ResponsesExtension[];
 }
 
 /** Minimal draft for replaying a preset apply during comparison. */
@@ -55,6 +57,7 @@ function blankPresetDraftBase() {
     pi_ai_quirks: undefined as PiAiQuirks | undefined,
     auto_compat: undefined as boolean | undefined,
     cacheKeyInjection: undefined as ProviderCacheKeyInjection | undefined,
+    responsesExtensions: undefined as ResponsesExtension[] | undefined,
   };
 }
 
@@ -89,6 +92,7 @@ const RESTORABLE_KEYS = [
   'pi_ai_quirks',
   'auto_compat',
   'cacheKeyInjection',
+  'responsesExtensions',
 ] as const;
 
 export function ProviderPresetPicker({
@@ -179,6 +183,9 @@ export function ProviderPresetPicker({
         pi_ai_quirks: editingProvider.pi_ai_quirks,
         auto_compat: editingProvider.auto_compat,
         cacheKeyInjection: editingProvider.cacheKeyInjection,
+        responsesExtensions: editingProvider.responsesExtensions
+          ? [...editingProvider.responsesExtensions]
+          : undefined,
       });
     }
     setAppliedPreset(preset);

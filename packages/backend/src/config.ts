@@ -4,6 +4,7 @@ import {
   McpServerConfigSchema,
   PiAiQuirksSchema,
   ProviderCacheKeyInjectionSchema,
+  ResponsesExtensionSchema,
 } from '@plexus/shared';
 import { logger } from './utils/logger';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
@@ -319,6 +320,13 @@ export const ProviderConfigSchema = z
      * except Meta OAuth routes which default to `prompt_cache_key`.
      */
     cache_key_injection: ProviderCacheKeyInjectionSchema.optional(),
+    /**
+     * Responses API extensions this provider accepts verbatim. Requests
+     * carrying any other extension are flattened instead of passed through.
+     * `undefined` uses the default (see resolveSupportedResponsesExtensions);
+     * `[]` flattens every extension.
+     */
+    responses_extensions: z.array(ResponsesExtensionSchema).optional(),
     quota_checker: ProviderQuotaCheckerSchema.optional(),
     model_autosync: ModelAutosyncSchema.optional(),
     geminiThinkingEnabled: z.boolean().optional(),

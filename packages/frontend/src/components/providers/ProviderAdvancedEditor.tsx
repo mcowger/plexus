@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   isOAuthPlaceholderUrl,
   getDefaultCacheKeyInjection,
+  getDefaultResponsesExtensions,
   PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
+  RESPONSES_EXTENSION_OPTIONS,
   type ProviderCacheKeyInjection,
+  type ResponsesExtension,
 } from '@plexus/shared';
 import { ChevronDown, ChevronRight, Info, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -1315,6 +1318,65 @@ export function ProviderAdvancedEditor({
                     Inject Plexus's derived per-run cache/session key into this field so upstream
                     prompt-cache routing doesn't depend on the client. Meta OAuth defaults to
                     prompt_cache_key.
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 py-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-body text-[12px] text-text">
+                      Native Responses Extensions
+                    </span>
+                    {editingProvider.responsesExtensions !== undefined && (
+                      <button
+                        type="button"
+                        className="font-body text-[11px] text-primary hover:underline"
+                        onClick={() =>
+                          setEditingProvider({ ...editingProvider, responsesExtensions: undefined })
+                        }
+                      >
+                        Use default
+                      </button>
+                    )}
+                  </div>
+                  {(() => {
+                    const effective: ResponsesExtension[] =
+                      editingProvider.responsesExtensions ??
+                      getDefaultResponsesExtensions({
+                        oauthProvider: editingProvider.oauthProvider,
+                        apiBaseUrl: editingProvider.apiBaseUrl,
+                      });
+                    return RESPONSES_EXTENSION_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-2 cursor-pointer"
+                        title={option.description}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={effective.includes(option.value)}
+                          onChange={(e) => {
+                            const next = new Set(effective);
+                            if (e.target.checked) next.add(option.value);
+                            else next.delete(option.value);
+                            setEditingProvider({
+                              ...editingProvider,
+                              responsesExtensions: RESPONSES_EXTENSION_OPTIONS.map(
+                                (o) => o.value
+                              ).filter((value) => next.has(value)),
+                            });
+                          }}
+                        />
+                        <span className="font-body text-[11px] text-text">{option.label}</span>
+                      </label>
+                    ));
+                  })()}
+                  <div
+                    className="font-body text-[11px] text-text-muted"
+                    style={{ lineHeight: 1.35 }}
+                  >
+                    Responses API extensions this provider accepts verbatim. Requests using any
+                    other extension are flattened to plain function tools and split back on the
+                    response. The default follows the OAuth provider or Responses endpoint (Codex,
+                    api.openai.com, api.meta.ai); other endpoints accept custom tools only.
                   </div>
                 </div>
               </div>

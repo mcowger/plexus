@@ -4,13 +4,99 @@ import { generateItemId } from './utils';
 export interface ResponsesToolState {
   namespaceMap: Map<string, { namespace: string; name: string }>;
   customToolNames: Set<string>;
+  /** Every flat function name the model is given, for resolving history/output names. */
+  toolNames: Set<string>;
 }
 
 export function createResponsesToolState(): ResponsesToolState {
   return {
     namespaceMap: new Map(),
     customToolNames: new Set(),
+    toolNames: new Set(),
   };
+}
+
+export function clearResponsesToolState(state: ResponsesToolState): void {
+  state.namespaceMap.clear();
+  state.customToolNames.clear();
+  state.toolNames.clear();
+}
+
+/**
+ * The flat name of the only namespaced sub-tool called `name`, if exactly one
+ * exists. OpenAI returns (and Codex replays) a call to a tool in Codex's
+ * default `functions` namespace without its namespace — e.g. a custom
+ * `exec` call — so a bare name can still address a namespaced tool.
+ */
+function uniqueNamespacedToolName(name: string, state: ResponsesToolState): string | undefined {
+  let match: string | undefined;
+  for (const [flatName, entry] of state.namespaceMap) {
+    if (entry.name !== name) continue;
+    if (match) return undefined;
+    match = flatName;
+  }
+  return match;
+}
+
+/**
+ * Resolves a function_call / custom_tool_call history item to the flat tool
+ * name the model was given. Accepts every namespace spelling clients send:
+ * `{namespace, name}` (Codex), `name: "<namespace>.<name>"` (Muse Code), or a
+ * bare sub-tool name (OpenAI's default-namespace calls).
+ */
+export function resolveHistoryToolName(
+  name: string,
+  namespace: string | undefined,
+  state?: ResponsesToolState
+): string {
+  if (namespace) return `${namespace}__${name}`;
+  if (!state || typeof name !== 'string' || state.toolNames.has(name)) return name;
+
+  const dot = name.indexOf('.');
+  if (dot > 0) {
+    const dotted = `${name.slice(0, dot)}__${name.slice(dot + 1)}`;
+    if (state.namespaceMap.has(dotted)) return dotted;
+  }
+
+  return uniqueNamespacedToolName(name, state) ?? name;
+}
+
+export interface ResolvedToolCall {
+  type: 'function_call' | 'custom_tool_call';
+  /** Flat name the model used, after resolving provider-side spellings. */
+  flatName: string;
+  name: string;
+  namespace?: string;
+}
+
+/**
+ * Splits a model-generated flat tool name back into the Responses output
+ * shape the client declared: namespace-qualified function calls, and custom
+ * tools (top-level or nested in a namespace) as custom_tool_call. Custom
+ * calls carry only the sub-tool name, matching OpenAI's own output.
+ */
+export function resolveOutputToolCall(
+  rawFlatName: string,
+  state?: ResponsesToolState
+): ResolvedToolCall {
+  const flatName =
+    state && !state.toolNames.has(rawFlatName)
+      ? (uniqueNamespacedToolName(rawFlatName, state) ?? rawFlatName)
+      : rawFlatName;
+  const namespaced = state?.namespaceMap.get(flatName);
+
+  if (state?.customToolNames.has(flatName)) {
+    return { type: 'custom_tool_call', flatName, name: namespaced?.name ?? flatName };
+  }
+  if (namespaced) {
+    return {
+      type: 'function_call',
+      flatName,
+      name: namespaced.name,
+      namespace: namespaced.namespace,
+    };
+  }
+  return { type: 'function_call', flatName, name: flatName };
 }
 
 /**
@@ -94,11 +180,36 @@ export function customToolInput(rawArguments: string): string {
  */
 export function convertToolsForUnified(tools: any[], state?: ResponsesToolState): any[] {
   const result: any[] = [];
+
+  const pushCustom = (name: string, description: string | undefined) => {
+    state?.customToolNames.add(name);
+    state?.toolNames.add(name);
+    result.push({
+      type: 'function',
+      function: {
+        name,
+        description: description || '',
+        parameters: {
+          type: 'object',
+          properties: { input: { type: 'string' } },
+          required: ['input'],
+        },
+      },
+    });
+  };
+
   for (const tool of tools) {
     if (tool.type === 'namespace') {
       for (const subTool of tool.tools || []) {
         const flatName = `${tool.name}__${subTool.name}`;
         state?.namespaceMap.set(flatName, { namespace: tool.name, name: subTool.name });
+        // Codex lite nests custom tools (e.g. `exec`) inside its `functions`
+        // namespace; they keep raw-string input like top-level custom tools.
+        if (subTool.type === 'custom') {
+          pushCustom(flatName, subTool.description);
+          continue;
+        }
+        state?.toolNames.add(flatName);
         result.push({
           type: 'function',
           function: {
@@ -117,19 +228,7 @@ export function convertToolsForUnified(tools: any[], state?: ResponsesToolState)
     }
 
     if (tool.type === 'custom') {
-      state?.customToolNames.add(tool.name);
-      result.push({
-        type: 'function',
-        function: {
-          name: tool.name,
-          description: tool.description || '',
-          parameters: {
-            type: 'object',
-            properties: { input: { type: 'string' } },
-            required: ['input'],
-          },
-        },
-      });
+      pushCustom(tool.name, tool.description);
       continue;
     }
 
@@ -138,6 +237,7 @@ export function convertToolsForUnified(tools: any[], state?: ResponsesToolState)
       continue;
     }
 
+    state?.toolNames.add(tool.name);
     result.push({
       type: 'function',
       function: {
@@ -198,29 +298,16 @@ export function buildToolOutputItem(
   },
   state?: ResponsesToolState
 ): ResponsesOutputItem {
-  const flatName = toolCall.function.name;
+  const resolved = resolveOutputToolCall(toolCall.function.name, state);
 
-  if (state?.customToolNames.has(flatName)) {
+  if (resolved.type === 'custom_tool_call') {
     return {
       type: 'custom_tool_call',
       id: generateItemId('fc'),
       status: 'completed',
       call_id: toolCall.id,
-      name: flatName,
+      name: resolved.name,
       input: customToolInput(toolCall.function.arguments),
-    };
-  }
-
-  const namespaced = state?.namespaceMap.get(flatName);
-  if (namespaced) {
-    return {
-      type: 'function_call',
-      id: generateItemId('fc'),
-      status: 'completed',
-      call_id: toolCall.id,
-      name: namespaced.name,
-      namespace: namespaced.namespace,
-      arguments: toolCall.function.arguments,
     };
   }
 
@@ -229,7 +316,8 @@ export function buildToolOutputItem(
     id: generateItemId('fc'),
     status: 'completed',
     call_id: toolCall.id,
-    name: flatName,
+    name: resolved.name,
+    ...(resolved.namespace ? { namespace: resolved.namespace } : {}),
     arguments: toolCall.function.arguments,
   };
 }

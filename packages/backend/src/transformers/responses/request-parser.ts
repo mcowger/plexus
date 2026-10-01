@@ -1,9 +1,11 @@
 import { UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
 import {
   ResponsesToolState,
+  clearResponsesToolState,
   convertToolsForUnified,
   convertToolChoiceForChatCompletions,
   customToolArgumentsForModel,
+  resolveHistoryToolName,
 } from './tool-mapper';
 
 export * from './normalization';
@@ -117,9 +119,9 @@ export function convertInputItemsToMessages(
         break;
 
       case 'function_call': {
-        // Codex CLI namespace extension: join namespace-qualified calls
-        // back to the flat name providers were given in convertToolsForUnified.
-        const flatName = item.namespace ? `${item.namespace}__${item.name}` : item.name;
+        // Namespace-qualified calls (any client spelling) join back to the
+        // flat name providers were given in convertToolsForUnified.
+        const flatName = resolveHistoryToolName(item.name, item.namespace, state);
         messages.push({
           role: 'assistant',
           content: null,
@@ -141,7 +143,8 @@ export function convertInputItemsToMessages(
         // Codex CLI custom (freeform) tool, e.g. apply_patch. Wrap the raw
         // string input as JSON function-call arguments so the model sees a
         // normal function tool, matching customToolArgumentsForModel.
-        state?.customToolNames.add(item.name);
+        const flatName = resolveHistoryToolName(item.name, item.namespace, state);
+        state?.customToolNames.add(flatName);
         messages.push({
           role: 'assistant',
           content: null,
@@ -150,7 +153,7 @@ export function convertInputItemsToMessages(
               id: item.call_id,
               type: 'function',
               function: {
-                name: item.name,
+                name: flatName,
                 arguments: customToolArgumentsForModel(item.input),
               },
             },
@@ -222,8 +225,7 @@ export async function parseResponsesRequest(
     throw new Error('Missing required field: input');
   }
 
-  state?.namespaceMap.clear();
-  state?.customToolNames.clear();
+  if (state) clearResponsesToolState(state);
 
   // Normalize input to array format
   const normalizedInput = normalizeInput(input.input);

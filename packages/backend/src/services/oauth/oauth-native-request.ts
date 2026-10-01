@@ -43,6 +43,7 @@ import type { UnifiedChatRequest } from '../../types/unified';
 import { CodexVersionService } from './codex-version-service';
 import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
+import { detectResponsesExtensions } from '../dispatch/responses-extensions';
 
 /**
  * Auth for a native Anthropic request. Two modes, mirroring the old executor:
@@ -426,12 +427,11 @@ function buildFrameReverser(
 //     backend fields (reproducing pi-ai's buildRequestBody forcings).
 
 /**
- * Detect a genuine Codex CLI Responses request by body shape. The strongest
- * signal is the CLI turn metadata (`client_metadata`); Codex-native tool
- * extensions (`custom`/`namespace` tools, `additional_tools`/`custom_tool_call`
- * input items) are also CLI-only. Used to choose pass-through vs. adorn AND to
- * override the `hasCodexResponsesExtensions` flattening (which is for routing to
- * NON-Codex providers — the Codex backend understands these natively).
+ * Detect a genuine Codex CLI Responses request by body shape: the CLI turn
+ * metadata (`client_metadata`), or any Responses extension (namespace/custom
+ * tools, Codex lite items, namespaced/custom call history) — only an
+ * extension-native client produces those. Chooses pass-through vs. adorn for
+ * the Codex backend, which accepts every extension verbatim.
  */
 export function isCodexCliShapedBody(body: any): boolean {
   if (!body || typeof body !== 'object') return false;
@@ -449,89 +449,7 @@ export function isCodexCliShapedBody(body: any): boolean {
     }
   }
 
-  if (
-    Array.isArray(body.tools) &&
-    body.tools.some((t: any) => t?.type === 'custom' || t?.type === 'namespace')
-  ) {
-    return true;
-  }
-
-  if (
-    Array.isArray(body.input) &&
-    body.input.some(
-      (it: any) =>
-        it &&
-        typeof it === 'object' &&
-        (it.type === 'additional_tools' ||
-          it.type === 'custom_tool_call' ||
-          it.type === 'custom_tool_call_output')
-    )
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Detect the Meta/Muse namespace-tool extensions. Muse Code — Meta's own
- * Responses client — declares its entire tool set as one `type: "namespace"`
- * tool and replays namespace-qualified `function_call` history. api.meta.ai is
- * the exact endpoint Muse talks to directly and accepts both shapes, so a
- * native Meta route must forward them VERBATIM rather than flattening them to
- * `${namespace}__${name}` (which the raw-SSE response path never splits back).
- *
- * Deliberately narrower than `isCodexCliShapedBody`: `additional_tools`,
- * `tool_search`, and `custom_tool_call` are Codex-lite extensions Meta does
- * NOT advertise, so those still take the transform pipeline.
- */
-export function hasMetaNamespaceExtensions(body: any): boolean {
-  if (!body || typeof body !== 'object') return false;
-
-  if (Array.isArray(body.tools) && body.tools.some((tool: any) => tool?.type === 'namespace')) {
-    return true;
-  }
-
-  return (
-    Array.isArray(body.input) &&
-    body.input.some(
-      (item: any) =>
-        item &&
-        typeof item === 'object' &&
-        item.type === 'function_call' &&
-        typeof item.namespace === 'string'
-    )
-  );
-}
-
-/**
- * Detect Codex-lite-only extensions Meta does NOT support: `custom` /
- * `tool_search` tools and `additional_tools` / `custom_tool_call(_output)` /
- * `tool_search_*` input items. A body carrying any of these must take the
- * transform pipeline even when it also declares namespace tools.
- */
-export function hasCodexLiteOnlyExtensions(body: any): boolean {
-  if (!body || typeof body !== 'object') return false;
-
-  if (
-    Array.isArray(body.tools) &&
-    body.tools.some((t: any) => t?.type === 'custom' || t?.type === 'tool_search')
-  ) {
-    return true;
-  }
-
-  return (
-    Array.isArray(body.input) &&
-    body.input.some(
-      (it: any) =>
-        it &&
-        typeof it === 'object' &&
-        (it.type === 'additional_tools' ||
-          it.type === 'custom_tool_call' ||
-          it.type === 'custom_tool_call_output' ||
-          (typeof it.type === 'string' && it.type.startsWith('tool_search')))
-    )
-  );
+  return detectResponsesExtensions(body).size > 0;
 }
 
 /** Extract the ChatGPT account id from the Codex OAuth token's JWT claim. */

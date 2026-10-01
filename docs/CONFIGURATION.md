@@ -136,6 +136,7 @@ A **provider** represents an upstream AI service that Plexus routes requests to.
 | **pi-ai Quirks** | Inline compatibility traits by API and model, an alternative to pi-ai Provider. | No |
 | **Auto Compat** | Opt-in reasoning and generation mapping from either a pi-ai model link or inline quirks. With neither, no registry-driven quirk handling occurs. | No (default: false) |
 | **Adapters** | Request/response rewrite hooks applied to every model under this provider (see [Provider Adapters](#provider-adapters)) | No |
+| **Native Responses Extensions** | Responses API extensions this provider accepts verbatim (see [Responses API Extensions](#responses-api-extensions)) | No |
 
 ### Multi-Protocol Providers
 
@@ -329,6 +330,44 @@ change configured behavior. Model discovery and model-listing URLs are separate 
 
 `reasoning_rewrite` remains a manual escape hatch but overlaps with auto-compat.
 Avoid enabling both for the same model and field.
+
+### Responses API Extensions
+
+Agent clients such as Codex CLI and Muse Code send OpenAI Responses API extensions that many Responses-compatible upstreams reject:
+
+| Extension | Wire shape |
+|-----------|------------|
+| `namespace_tools` | `tools[]` entries of type `namespace` grouping sub-tools |
+| `namespaced_calls` | `function_call` history with a `namespace` field (`{namespace, name}`) |
+| `dotted_calls` | `function_call` history named `<namespace>.<tool>` (Muse Code's `muse.bash`) |
+| `custom_tools` | `tools[]` entries of type `custom` taking raw string input (e.g. `apply_patch`) |
+| `custom_calls` | `custom_tool_call` / `custom_tool_call_output` history items |
+| `additional_tools` | `additional_tools` input items (Codex lite mode) |
+| `tool_search` | client-executed `tool_search` tools and history items |
+
+Plexus forwards a Responses request verbatim only when the target accepts every extension the request carries. Otherwise it flattens them: namespace tools become `namespace__name` function tools, custom tools become functions with a single string `input`, and tool calls are split back into the client's original shape on the response. Any client can use any Responses or Chat target this way.
+
+The accepted set comes from the first of:
+
+1. The provider's **Native Responses Extensions** setting (`responses_extensions`). An empty list flattens everything.
+2. The `responses:lite` API subtype: every extension except top-level `namespace` tools and dotted names.
+3. The provider default, from its OAuth provider or the host of its Responses endpoint:
+
+| Provider | Default |
+|----------|---------|
+| Codex OAuth | everything except `dotted_calls` |
+| Meta OAuth, or a Responses URL on `api.meta.ai` | `namespace_tools`, `namespaced_calls`, `dotted_calls` |
+| Responses URL on `api.openai.com` | `namespace_tools`, `namespaced_calls`, `custom_tools`, `custom_calls` |
+| Anything else | `custom_tools` |
+
+The defaults track the endpoint, so a provider pointed at api.openai.com or api.meta.ai needs no configuration. Set the field only to override a default or to opt a compatible third-party endpoint in, for example:
+
+```json
+{
+  "api_base_url": { "responses": "https://gateway.example.com/v1" },
+  "responses_extensions": ["namespace_tools", "namespaced_calls"]
+}
+```
 
 ### Raw Provider Passthrough
 

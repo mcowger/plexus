@@ -208,9 +208,10 @@ export async function registerConfigRoutes(
         return reply.code(404).send({ error: `Provider '${slug}' not found` });
       }
       const merged = { ...existing, ...body };
-      // Explicit null clears a saved quirk source on PATCH; omission preserves it.
+      // Explicit null clears a saved setting on PATCH; omission preserves it.
       if (body.pi_ai_provider === null) delete merged.pi_ai_provider;
       if (body.pi_ai_quirks === null) delete merged.pi_ai_quirks;
+      if (body.responses_extensions === null) delete merged.responses_extensions;
       const result = ProviderConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });

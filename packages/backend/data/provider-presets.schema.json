@@ -1062,6 +1062,21 @@
               "x-multi-turn-session-id"
             ]
           },
+          "responsesExtensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "namespace_tools",
+                "namespaced_calls",
+                "dotted_calls",
+                "custom_tools",
+                "custom_calls",
+                "additional_tools",
+                "tool_search"
+              ]
+            }
+          },
           "notes": {
             "type": "string"
           }
