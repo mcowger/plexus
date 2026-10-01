@@ -12,6 +12,7 @@ export type OAuthSessionStatus =
   | 'awaiting_auth'
   | 'awaiting_prompt'
   | 'awaiting_manual_code'
+  | 'awaiting_select'
   | 'success'
   | 'error'
   | 'cancelled';
@@ -27,6 +28,24 @@ export type OAuthPrompt = {
   allowEmpty?: boolean;
 };
 
+/** Options offered by a `select` prompt (e.g. Codex browser vs device code). */
+export type OAuthSelectOption = {
+  id: string;
+  label: string;
+  description?: string;
+};
+
+export type OAuthSelect = {
+  message: string;
+  options: OAuthSelectOption[];
+};
+
+/** Copy/label for the dedicated manual-code input, supplied by the provider. */
+export type OAuthManualCode = {
+  message: string;
+  placeholder?: string;
+};
+
 export type OAuthSession = {
   id: string;
   providerId: OAuthProviderId;
@@ -34,6 +53,8 @@ export type OAuthSession = {
   status: OAuthSessionStatus;
   authInfo?: OAuthAuthInfo;
   prompt?: OAuthPrompt;
+  select?: OAuthSelect;
+  manualCode?: OAuthManualCode;
   progress: string[];
   error?: string;
   createdAt: number;
@@ -45,6 +66,8 @@ type SessionInternal = OAuthSession & {
   rejectPrompt?: (error: Error) => void;
   resolveManualCode?: (value: string) => void;
   rejectManualCode?: (error: Error) => void;
+  resolveSelect?: (value: string) => void;
+  rejectSelect?: (error: Error) => void;
   abortController: AbortController;
   completion: Promise<void>;
   expiresAt: number;
@@ -60,6 +83,7 @@ const ACTIVE_STATUSES: ReadonlySet<OAuthSessionStatus> = new Set([
   'awaiting_auth',
   'awaiting_prompt',
   'awaiting_manual_code',
+  'awaiting_select',
 ]);
 
 const createSessionId = (): string => {
@@ -197,7 +221,27 @@ export class OAuthLoginSessionManager {
     session.resolveManualCode(value);
     session.resolveManualCode = undefined;
     session.rejectManualCode = undefined;
+    session.manualCode = undefined;
     if (session.status === 'awaiting_manual_code') {
+      session.status = 'in_progress';
+    }
+    this.touch(session);
+    return this.stripInternal(session);
+  }
+
+  async submitSelect(sessionId: string, value: string): Promise<OAuthSession> {
+    const session = this.getInternal(sessionId);
+    if (!session.resolveSelect) {
+      throw new Error('No selection is awaiting input');
+    }
+    if (!session.select?.options.some((option) => option.id === value)) {
+      throw new Error(`Unknown option: ${value}`);
+    }
+    session.resolveSelect(value);
+    session.resolveSelect = undefined;
+    session.rejectSelect = undefined;
+    session.select = undefined;
+    if (session.status === 'awaiting_select') {
       session.status = 'in_progress';
     }
     this.touch(session);
@@ -233,10 +277,13 @@ export class OAuthLoginSessionManager {
     session.abortController.abort();
     session.rejectPrompt?.(new Error(reason));
     session.rejectManualCode?.(new Error(reason));
+    session.rejectSelect?.(new Error(reason));
     session.resolvePrompt = undefined;
     session.rejectPrompt = undefined;
     session.resolveManualCode = undefined;
     session.rejectManualCode = undefined;
+    session.resolveSelect = undefined;
+    session.rejectSelect = undefined;
   }
 
   private findActiveSession(providerId: OAuthProviderId): SessionInternal | undefined {
@@ -265,6 +312,8 @@ export class OAuthLoginSessionManager {
       status: session.status,
       authInfo: session.authInfo,
       prompt: session.prompt,
+      select: session.select,
+      manualCode: session.manualCode,
       progress: [...session.progress],
       error: session.error,
       createdAt: session.createdAt,
@@ -292,6 +341,10 @@ export class OAuthLoginSessionManager {
       // (e.g. Copilot treats a blank GHE domain as github.com), so the UI
       // must not block empty submission.
       session.prompt = manual ? undefined : { message, placeholder, allowEmpty: true };
+      // Manual-code entry renders as its own input, so carry the provider's
+      // message/placeholder for the UI to show (Anthropic wants `code#state`,
+      // Codex wants the full redirect URL).
+      session.manualCode = manual ? { message, placeholder } : undefined;
       session.status = manual ? 'awaiting_manual_code' : 'awaiting_prompt';
       this.touch(session);
       const deferred = createDeferred();
@@ -331,14 +384,28 @@ export class OAuthLoginSessionManager {
         this.touch(session);
       },
       prompt: (prompt) => {
-        // Select prompts (e.g. Codex login-method chooser) keep the previous
-        // behaviour: auto-pick the first option.
+        // Select prompts (e.g. Codex browser vs device code) surface as a
+        // chooser so the user can pick the headless method when the browser
+        // cannot reach Plexus. Other prompt types use the text/manual-code
+        // inputs.
         if (prompt.type === 'select') {
-          const selected = prompt.options[0]?.id;
-          if (selected === undefined) {
+          if (prompt.options.length === 0) {
             return Promise.reject(new Error('Login cancelled: no options to select'));
           }
-          return Promise.resolve(selected);
+          session.select = {
+            message: prompt.message,
+            options: prompt.options.map((option) => ({
+              id: option.id,
+              label: option.label,
+              ...(option.description ? { description: option.description } : {}),
+            })),
+          };
+          session.status = 'awaiting_select';
+          this.touch(session);
+          const deferred = createDeferred();
+          session.resolveSelect = deferred.resolve;
+          session.rejectSelect = deferred.reject;
+          return deferred.promise;
         }
         return awaitUserInput(prompt.type === 'manual_code', prompt.message, prompt.placeholder);
       },
@@ -356,15 +423,21 @@ export class OAuthLoginSessionManager {
       session.status = 'success';
       session.error = undefined;
       session.prompt = undefined;
+      session.select = undefined;
+      session.manualCode = undefined;
       session.resolvePrompt = undefined;
       session.rejectPrompt = undefined;
       session.resolveManualCode = undefined;
       session.rejectManualCode = undefined;
+      session.resolveSelect = undefined;
+      session.rejectSelect = undefined;
       this.touch(session);
     } catch (error) {
       if (session.status !== 'cancelled') {
         session.status = 'error';
         session.error = error instanceof Error ? error.message : String(error);
+        session.select = undefined;
+        session.manualCode = undefined;
         this.touch(session);
       }
     }

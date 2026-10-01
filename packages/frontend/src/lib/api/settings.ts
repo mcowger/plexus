@@ -1038,6 +1038,23 @@ export const submitOAuthManualCode = async (
   return json.data;
 };
 
+export const submitOAuthSelect = async (
+  sessionId: string,
+  value: string
+): Promise<OAuthSession> => {
+  const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions/${sessionId}/select`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  });
+  if (!res.ok) {
+    const err = (await res.json()) as { error?: string };
+    throw new Error(err.error || 'Failed to submit OAuth selection');
+  }
+  const json = (await res.json()) as { data: OAuthSession };
+  return json.data;
+};
+
 export const cancelOAuthSession = async (sessionId: string): Promise<OAuthSession> => {
   const res = await fetchWithAuth(`${API_BASE}/v0/management/oauth/sessions/${sessionId}/cancel`, {
     method: 'POST',

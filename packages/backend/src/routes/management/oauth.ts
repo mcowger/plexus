@@ -176,6 +176,23 @@ export async function registerOAuthRoutes(
     }
   });
 
+  fastify.post('/v0/management/oauth/sessions/:id/select', async (request, reply) => {
+    const sessionId = (request.params as { id: string }).id;
+    const parsed = inputSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request body', details: parsed.error.issues });
+    }
+
+    try {
+      const session = await sessionManager.submitSelect(sessionId, parsed.data.value);
+      return reply.send({ data: session });
+    } catch (error) {
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   fastify.post('/v0/management/oauth/sessions/:id/cancel', async (request, reply) => {
     const sessionId = (request.params as { id: string }).id;
     try {

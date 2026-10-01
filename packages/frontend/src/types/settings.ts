@@ -160,6 +160,22 @@ export interface OAuthPrompt {
   allowEmpty?: boolean;
 }
 
+export interface OAuthSelectOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface OAuthSelect {
+  message: string;
+  options: OAuthSelectOption[];
+}
+
+export interface OAuthManualCode {
+  message: string;
+  placeholder?: string;
+}
+
 export interface OAuthSession {
   id: string;
   providerId: string;
@@ -167,6 +183,8 @@ export interface OAuthSession {
   status: string;
   authInfo?: OAuthAuthInfo;
   prompt?: OAuthPrompt;
+  select?: OAuthSelect;
+  manualCode?: OAuthManualCode;
   progress: string[];
   error?: string;
   createdAt: number;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
 import type { Provider, OAuthSession } from '../../lib/api';
 import type { OAuthCredentialStatus } from '../../types/settings';
 import { formatResetsIn, formatTimeAgo } from '../../lib/format';
@@ -50,6 +51,8 @@ interface Props {
   setOauthPromptValue: (v: string) => void;
   oauthManualCode: string;
   setOauthManualCode: (v: string) => void;
+  oauthSelectValue: string;
+  setOauthSelectValue: (v: string) => void;
   oauthError: string | null;
   oauthBusy: boolean;
   oauthCredentialReady: boolean;
@@ -62,6 +65,7 @@ interface Props {
   onStart: () => Promise<void>;
   onSubmitPrompt: () => Promise<void>;
   onSubmitManualCode: () => Promise<void>;
+  onSubmitSelect: () => Promise<void>;
   onCancel: () => Promise<void>;
   onDeleteCredential: () => Promise<void>;
 }
@@ -74,6 +78,8 @@ export function ProviderOAuthEditor({
   setOauthPromptValue,
   oauthManualCode,
   setOauthManualCode,
+  oauthSelectValue,
+  setOauthSelectValue,
   oauthError,
   oauthBusy,
   oauthCredentialReady,
@@ -85,6 +91,7 @@ export function ProviderOAuthEditor({
   onStart,
   onSubmitPrompt,
   onSubmitManualCode,
+  onSubmitSelect,
   onCancel,
   onDeleteCredential,
 }: Props) {
@@ -164,6 +171,25 @@ export function ProviderOAuthEditor({
         </div>
       )}
 
+      {oauthStatus === 'awaiting_select' && oauthSession?.select && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <Select
+              label={oauthSession.select.message}
+              value={oauthSelectValue || oauthSession.select.options[0]?.id || ''}
+              onChange={setOauthSelectValue}
+              options={oauthSession.select.options.map((option) => ({
+                value: option.id,
+                label: option.label,
+              }))}
+            />
+          </div>
+          <Button size="sm" onClick={onSubmitSelect} disabled={oauthBusy}>
+            Continue
+          </Button>
+        </div>
+      )}
+
       {oauthSession?.authInfo && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
           <Input label="Authorization URL" value={oauthSession.authInfo.url} readOnly />
@@ -200,10 +226,10 @@ export function ProviderOAuthEditor({
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', marginBottom: '8px' }}>
           <div style={{ flex: 1 }}>
             <Input
-              label="Paste redirect URL or code"
+              label={oauthSession?.manualCode?.message ?? 'Paste redirect URL or code'}
               value={oauthManualCode}
               onChange={(e) => setOauthManualCode(e.target.value)}
-              placeholder="https://..."
+              placeholder={oauthSession?.manualCode?.placeholder ?? 'https://...'}
             />
           </div>
           <Button size="sm" onClick={onSubmitManualCode} disabled={oauthBusy || !oauthManualCode}>

@@ -197,3 +197,79 @@ describe('OAuthLoginSessionManager — completed login', () => {
     }
   });
 });
+
+describe('OAuthLoginSessionManager — select prompts', () => {
+  const selectProvider = {
+    id: 'openai-codex',
+    name: 'Codex',
+    usesCallbackServer: false,
+    oauth: {
+      name: 'Codex',
+      login: async (interaction: any) => {
+        const method = await interaction.prompt({
+          type: 'select',
+          message: 'Select OpenAI Codex login method:',
+          options: [
+            { id: 'browser', label: 'Browser login (default)' },
+            { id: 'device_code', label: 'Device code login (headless)' },
+          ],
+        });
+        return { type: 'oauth', access: method, refresh: 'r', expires: Date.now() + 60_000 };
+      },
+      refresh: async (credential: any) => credential,
+      toAuth: async (credential: any) => ({ apiKey: credential.access }),
+    },
+  } as unknown as OAuthProviderDescriptor;
+
+  it('surfaces a select prompt and continues with the chosen option', async () => {
+    OAuthAuthManager.resetForTesting();
+    const authManager = OAuthAuthManager.getInstance();
+    const save = registerSpy(authManager, 'setCredentials').mockResolvedValue();
+    const manager = new OAuthLoginSessionManager(() => selectProvider);
+
+    try {
+      const session = await manager.createSession('openai-codex', 'acct');
+      await vi.waitFor(() =>
+        expect(manager.getSession(session.id)?.status).toBe('awaiting_select')
+      );
+
+      expect(manager.getSession(session.id)?.select).toEqual({
+        message: 'Select OpenAI Codex login method:',
+        options: [
+          { id: 'browser', label: 'Browser login (default)' },
+          { id: 'device_code', label: 'Device code login (headless)' },
+        ],
+      });
+
+      await manager.submitSelect(session.id, 'device_code');
+      await vi.waitFor(() => expect(manager.getSession(session.id)?.status).toBe('success'));
+      expect(save).toHaveBeenCalledWith(
+        'openai-codex',
+        'acct',
+        expect.objectContaining({ access: 'device_code' })
+      );
+      expect(manager.getSession(session.id)?.select).toBeUndefined();
+    } finally {
+      manager.dispose();
+      OAuthAuthManager.resetForTesting();
+    }
+  });
+
+  it('rejects an option that was not offered', async () => {
+    OAuthAuthManager.resetForTesting();
+    const manager = new OAuthLoginSessionManager(() => selectProvider);
+
+    try {
+      const session = await manager.createSession('openai-codex', 'acct');
+      await vi.waitFor(() =>
+        expect(manager.getSession(session.id)?.status).toBe('awaiting_select')
+      );
+      await expect(manager.submitSelect(session.id, 'nope')).rejects.toThrow(
+        'Unknown option: nope'
+      );
+    } finally {
+      manager.dispose();
+      OAuthAuthManager.resetForTesting();
+    }
+  });
+});

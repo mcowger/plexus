@@ -191,8 +191,13 @@ describe('OAuth management routes', () => {
 
     const awaiting = await waitForStatus(fastify, session.data.id, 'awaiting_manual_code');
     // Manual-code entry uses the dedicated redirect-URL input only — the
-    // generic prompt object must stay unset so the UI renders one input.
+    // generic prompt object must stay unset so the UI renders one input. The
+    // provider's own message/placeholder ride along so the input is not
+    // hardcoded to one provider.
     expect((awaiting.data as { prompt?: unknown })?.prompt).toBeUndefined();
+    expect(
+      (awaiting.data as { manualCode?: { message?: string; placeholder?: string } }).manualCode
+    ).toEqual({ message: 'Enter the code from the browser' });
 
     await fastify.inject({
       method: 'POST',
@@ -209,6 +214,81 @@ describe('OAuth management routes', () => {
     );
     const authManager = OAuthAuthManager.getInstance();
     expect(authManager.hasProvider('manual-provider' as any, accountId)).toBe(true);
+  });
+
+  it('surfaces a select prompt and submits the chosen method', async () => {
+    const saveCredentials = registerSpy(
+      ConfigService.getInstance(),
+      'setOAuthCredentials'
+    ).mockResolvedValue();
+    const accountId = 'personal';
+    const selectProvider: OAuthProviderDescriptor = {
+      id: 'select-provider',
+      name: 'Select Provider',
+      usesCallbackServer: false,
+      oauth: {
+        name: 'Select Provider',
+        async login(interaction) {
+          const method = await interaction.prompt({
+            type: 'select',
+            message: 'Select login method:',
+            options: [
+              { id: 'browser', label: 'Browser login (default)' },
+              { id: 'device_code', label: 'Device code login (headless)' },
+            ],
+          });
+          return {
+            type: 'oauth',
+            access: method,
+            refresh: 'select-refresh',
+            expires: Date.now() + 60_000,
+          };
+        },
+        async refresh(credential) {
+          return credential;
+        },
+        async toAuth(credential) {
+          return { apiKey: credential.access };
+        },
+      },
+    };
+
+    manager.dispose();
+    manager = new OAuthLoginSessionManager((id) =>
+      id === selectProvider.id ? selectProvider : undefined
+    );
+    fastify = Fastify();
+    await registerOAuthRoutes(fastify, manager);
+
+    const response = await fastify.inject({
+      method: 'POST',
+      url: '/v0/management/oauth/sessions',
+      payload: { providerId: 'select-provider', accountId },
+    });
+    const session = response.json() as { data: { id: string } };
+
+    const awaiting = await waitForStatus(fastify, session.data.id, 'awaiting_select');
+    expect((awaiting.data as { select?: unknown }).select).toEqual({
+      message: 'Select login method:',
+      options: [
+        { id: 'browser', label: 'Browser login (default)' },
+        { id: 'device_code', label: 'Device code login (headless)' },
+      ],
+    });
+
+    await fastify.inject({
+      method: 'POST',
+      url: `/v0/management/oauth/sessions/${session.data.id}/select`,
+      payload: { value: 'device_code' },
+    });
+
+    await waitForStatus(fastify, session.data.id, 'success');
+
+    expect(saveCredentials).toHaveBeenCalledWith(
+      'select-provider',
+      accountId,
+      expect.objectContaining({ accessToken: 'device_code' })
+    );
   });
 
   it('fetches OAuth provider models', async () => {

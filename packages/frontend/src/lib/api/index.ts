@@ -106,6 +106,7 @@ export const api = {
   getOAuthSession: settingsApi.getOAuthSession,
   submitOAuthPrompt: settingsApi.submitOAuthPrompt,
   submitOAuthManualCode: settingsApi.submitOAuthManualCode,
+  submitOAuthSelect: settingsApi.submitOAuthSelect,
   cancelOAuthSession: settingsApi.cancelOAuthSession,
 
   // Metadata Catalogs & Pi Models

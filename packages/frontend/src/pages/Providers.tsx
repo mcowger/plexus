@@ -170,6 +170,8 @@ export const Providers = () => {
                 setOauthPromptValue={f.setOauthPromptValue}
                 oauthManualCode={f.oauthManualCode}
                 setOauthManualCode={f.setOauthManualCode}
+                oauthSelectValue={f.oauthSelectValue}
+                setOauthSelectValue={f.setOauthSelectValue}
                 oauthError={f.oauthError}
                 oauthBusy={f.oauthBusy}
                 oauthCredentialReady={f.oauthCredentialReady}
@@ -181,6 +183,7 @@ export const Providers = () => {
                 onStart={f.handleStartOAuth}
                 onSubmitPrompt={f.handleSubmitPrompt}
                 onSubmitManualCode={f.handleSubmitManualCode}
+                onSubmitSelect={f.handleSubmitSelect}
                 onCancel={f.handleCancelOAuth}
                 onDeleteCredential={f.handleDeleteOAuthCredential}
               />

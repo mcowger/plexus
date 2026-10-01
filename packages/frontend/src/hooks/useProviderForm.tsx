@@ -136,6 +136,7 @@ export function useProviderForm() {
   const [oauthSession, setOauthSession] = useState<OAuthSession | null>(null);
   const [oauthPromptValue, setOauthPromptValue] = useState('');
   const [oauthManualCode, setOauthManualCode] = useState('');
+  const [oauthSelectValue, setOauthSelectValue] = useState('');
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [oauthBusy, setOauthBusy] = useState(false);
   const [oauthCredentialReady, setOauthCredentialReady] = useState(false);
@@ -257,7 +258,8 @@ export function useProviderForm() {
         in_progress: 'Starting',
         awaiting_auth: 'Awaiting browser',
         awaiting_prompt: 'Awaiting input',
-        awaiting_manual_code: 'Awaiting redirect',
+        awaiting_manual_code: 'Awaiting code',
+        awaiting_select: 'Awaiting method',
         success: 'Authenticated',
         error: 'Error',
         cancelled: 'Cancelled',
@@ -427,7 +429,11 @@ export function useProviderForm() {
         const session = await api.getOAuthSession(oauthSessionId);
         if (cancelled) return;
         setOauthSession(session);
-        if (['awaiting_prompt', 'awaiting_manual_code', 'awaiting_auth'].includes(session.status)) {
+        if (
+          ['awaiting_prompt', 'awaiting_manual_code', 'awaiting_select', 'awaiting_auth'].includes(
+            session.status
+          )
+        ) {
           setOauthBusy(false);
         }
         if (['success', 'error', 'cancelled'].includes(session.status)) {
@@ -651,6 +657,7 @@ export function useProviderForm() {
     setOauthSession(null);
     setOauthPromptValue('');
     setOauthManualCode('');
+    setOauthSelectValue('');
     setOauthError(null);
     setOauthBusy(false);
   };
@@ -670,7 +677,11 @@ export function useProviderForm() {
       const session = await api.startOAuthSession(providerId, accountId);
       setOauthSessionId(session.id);
       setOauthSession(session);
-      if (['awaiting_prompt', 'awaiting_manual_code', 'awaiting_auth'].includes(session.status))
+      if (
+        ['awaiting_prompt', 'awaiting_manual_code', 'awaiting_select', 'awaiting_auth'].includes(
+          session.status
+        )
+      )
         setOauthBusy(false);
     } catch (error) {
       setOauthError(error instanceof Error ? error.message : 'Failed to start OAuth');
@@ -703,6 +714,23 @@ export function useProviderForm() {
       setOauthManualCode('');
     } catch (error) {
       setOauthError(error instanceof Error ? error.message : 'Failed to submit code');
+    } finally {
+      setOauthBusy(false);
+    }
+  };
+
+  const handleSubmitSelect = async () => {
+    if (!oauthSessionId || !oauthSession?.select) return;
+    const value = oauthSelectValue || oauthSession.select.options[0]?.id;
+    if (!value) return;
+    setOauthBusy(true);
+    setOauthError(null);
+    try {
+      const session = await api.submitOAuthSelect(oauthSessionId, value);
+      setOauthSession(session);
+      setOauthSelectValue('');
+    } catch (error) {
+      setOauthError(error instanceof Error ? error.message : 'Failed to submit selection');
     } finally {
       setOauthBusy(false);
     }
@@ -1161,6 +1189,8 @@ export function useProviderForm() {
     setOauthPromptValue,
     oauthManualCode,
     setOauthManualCode,
+    oauthSelectValue,
+    setOauthSelectValue,
     oauthError,
     oauthBusy,
     oauthCredentialReady,
@@ -1220,6 +1250,7 @@ export function useProviderForm() {
     handleStartOAuth,
     handleSubmitPrompt,
     handleSubmitManualCode,
+    handleSubmitSelect,
     handleCancelOAuth,
     handleDeleteOAuthCredential,
     // API URLs
