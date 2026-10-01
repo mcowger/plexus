@@ -484,6 +484,13 @@
       "when": 1790695603222,
       "tag": "0068_add_provider_cache_key_injection",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1790873662174,
+      "tag": "0069_add_provider_responses_extensions",
+      "breakpoints": true
     }
   ]
 }
