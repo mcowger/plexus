@@ -14,6 +14,7 @@ import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
 import { StickySessionManager } from './sticky-session-manager';
+import { splitServiceTierSuffix, type ServiceTierSplit } from './service-tier-suffix';
 import {
   getApiBaseType,
   isApiSubtype,
@@ -532,6 +533,22 @@ async function buildGroupCandidates(
 }
 
 export class Router {
+  /**
+   * Splits an `<alias>@<tier>` model name into the bare alias and the service tier.
+   *
+   * The name is returned unchanged when it is itself an alias (or `additional_aliases` entry),
+   * so an alias that legitimately contains `@` keeps working, and when the bare name is not an
+   * alias, so unknown models still fail as "not found" under the name the client sent.
+   */
+  static splitServiceTier(modelName: string): ServiceTierSplit {
+    const config = getConfig();
+    if (findAlias(config, modelName).alias) return { model: modelName };
+
+    const split = splitServiceTierSuffix(modelName);
+    if (!split.serviceTier || !findAlias(config, split.model).alias) return { model: modelName };
+    return split;
+  }
+
   static async resolveCandidates(
     modelName: string,
     incomingApiType?: string,

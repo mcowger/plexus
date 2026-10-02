@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { isGlobalScope, listAllows, scopeMatches, type ScopeLists } from '../routing/scope-match';
+import {
+  isGlobalScope,
+  listAllows,
+  listAllowsAny,
+  scopeMatches,
+  type ScopeLists,
+} from '../routing/scope-match';
 
 describe('listAllows', () => {
   test('empty/absent allowed list allows everything', () => {
@@ -46,6 +52,31 @@ describe('listAllows', () => {
     expect(listAllows(['GPT-4'], undefined, 'gpt-4')).toBe(false);
     expect(listAllows(['gpt-4'], undefined, 'GPT-4')).toBe(false);
     expect(listAllows(undefined, ['GPT-4'], 'gpt-4')).toBe(true);
+  });
+});
+
+describe('listAllowsAny', () => {
+  test('a single value behaves exactly like listAllows', () => {
+    expect(listAllowsAny(['gpt-4'], undefined, ['gpt-4'])).toBe(true);
+    expect(listAllowsAny(['gpt-4'], undefined, ['gpt-5'])).toBe(false);
+    expect(listAllowsAny(undefined, ['gpt-4'], ['gpt-4'])).toBe(false);
+    expect(listAllowsAny(undefined, undefined, ['gpt-4'])).toBe(true);
+  });
+
+  test('excluded wins when ANY of the values is excluded', () => {
+    expect(listAllowsAny(undefined, ['gpt-4'], ['gpt-4@flex', 'gpt-4'])).toBe(false);
+    expect(listAllowsAny(['gpt-4'], ['gpt-4@flex'], ['gpt-4@flex', 'gpt-4'])).toBe(false);
+  });
+
+  test('a non-empty allowed list needs at least one of the values on it', () => {
+    expect(listAllowsAny(['gpt-4'], undefined, ['gpt-4@flex', 'gpt-4'])).toBe(true);
+    expect(listAllowsAny(['gpt-4@flex'], undefined, ['gpt-4@flex', 'gpt-4'])).toBe(true);
+    expect(listAllowsAny(['gpt-5'], undefined, ['gpt-4@flex', 'gpt-4'])).toBe(false);
+  });
+
+  test('empty/absent lists allow everything', () => {
+    expect(listAllowsAny(undefined, undefined, ['gpt-4@flex', 'gpt-4'])).toBe(true);
+    expect(listAllowsAny([], [], ['gpt-4@flex', 'gpt-4'])).toBe(true);
   });
 });
 

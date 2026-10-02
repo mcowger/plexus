@@ -19,15 +19,30 @@ export interface ScopeLists {
   excludedProviders?: string[];
 }
 
+/**
+ * Membership rule over several names for one request (e.g. a tier-suffixed model name and its
+ * bare alias): excluded wins if ANY name is excluded, and a non-empty allowed list needs at least
+ * one name on it.
+ */
+export function listAllowsAny(
+  allowed: string[] | undefined,
+  excluded: string[] | undefined,
+  values: string[]
+): boolean {
+  if (excluded && values.some((value) => excluded.includes(value))) return false;
+  if (allowed && allowed.length > 0 && !values.some((value) => allowed.includes(value))) {
+    return false;
+  }
+  return true;
+}
+
 /** Exact-match membership rule: excluded wins; empty/absent allowed list = allow all. */
 export function listAllows(
   allowed: string[] | undefined,
   excluded: string[] | undefined,
   value: string
 ): boolean {
-  if (excluded && excluded.includes(value)) return false;
-  if (allowed && allowed.length > 0 && !allowed.includes(value)) return false;
-  return true;
+  return listAllowsAny(allowed, excluded, [value]);
 }
 
 /**

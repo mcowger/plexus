@@ -19,15 +19,16 @@ export async function resolveRouteCandidates(
   sessionKey: string | null,
   appendSkippedAttempt: AppendSkippedAttempt
 ): Promise<RouteResult[]> {
-  let candidates = await Router.resolveCandidates(
-    request.model,
-    request.incomingApiType,
-    sessionKey
-  );
+  // `<alias>@<tier>` picks a service tier by model name. Route and authorize against the bare
+  // alias; `request.model` keeps what the client sent (it is logged as the incoming alias).
+  const { model: routedModel, serviceTier } = Router.splitServiceTier(request.model);
+  if (serviceTier) request.serviceTier = serviceTier;
+
+  let candidates = await Router.resolveCandidates(routedModel, request.incomingApiType, sessionKey);
 
   // Fallback for direct/provider/model syntax and legacy single-route behavior.
   if (candidates.length === 0) {
-    candidates = [await Router.resolve(request.model, request.incomingApiType)];
+    candidates = [await Router.resolve(routedModel, request.incomingApiType)];
   }
 
   if (candidates.length === 0) {
@@ -35,7 +36,11 @@ export async function resolveRouteCandidates(
   }
 
   const apiType = request.incomingApiType || 'chat';
-  candidates = applyKeyAccessPolicy(request, candidates, apiType);
+  candidates = applyKeyAccessPolicy(
+    { ...request, baseModel: serviceTier ? routedModel : undefined },
+    candidates,
+    apiType
+  );
 
   const quotaContext = request.metadata?.plexus_metadata?.plexus_quota_context ?? null;
   if (!quotaContext) return candidates;

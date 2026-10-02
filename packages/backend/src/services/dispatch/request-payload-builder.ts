@@ -29,6 +29,7 @@ import { isAnthropicTargetProvider } from './adapter-resolver';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 import { applyEagerToolInputStreaming } from './eager-tool-streaming';
 import { applyBodyCacheKeyInjection } from './cache-key-injection';
+import { applyServiceTierSelection } from './service-tier-selection';
 
 /** Symbol stash for the native OAuth prep, read by the standard dispatch seams. */
 export const NATIVE_OAUTH_STASH = Symbol('nativeOAuthPrep');
@@ -197,6 +198,9 @@ export async function buildRequestPayload(
   if (getApiBaseType(targetApiType) === 'gemini' && Array.isArray((payload as any)?.contents)) {
     (payload as any).contents = appendUserAfterTextOnlyModelTail((payload as any).contents);
   }
+
+  // Before auto-compat so registry-aware mapping sees the tier the client asked for.
+  payload = applyServiceTierSelection(payload, request, targetApiType);
 
   payload = applyGeminiThinkingConfig(route, targetApiType, payload);
   payload = applyRegistryAutoCompat(payload, request, route, targetApiType);

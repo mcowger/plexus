@@ -8,12 +8,17 @@
  */
 
 import type { RouteResult } from './router';
-import { isGlobalScope, listAllows, type ScopeLists } from './scope-match';
+import { isGlobalScope, listAllows, listAllowsAny, type ScopeLists } from './scope-match';
+import { serviceTierNames } from './service-tier-suffix';
 
 export type KeyAccessPolicy = ScopeLists;
 
 export interface PolicyRequest {
   model: string;
+  /** Bare alias when `model` carries an `@<tier>` suffix (see service-tier-suffix.ts). */
+  baseModel?: string;
+  /** The normalised tier that suffix selected. */
+  serviceTier?: string;
   metadata?: {
     plexus_metadata?: {
       plexus_key_policy?: KeyAccessPolicy;
@@ -49,8 +54,19 @@ export function applyKeyAccessPolicy(
   const policy = getKeyAccessPolicy(request);
   if (!policy) return candidates;
 
-  // Model-level: excluded wins, then the model must be on the allowlist (if any).
-  if (!listAllows(policy.allowedModels, policy.excludedModels, request.model)) {
+  // Model-level: excluded wins, then the model must be on the allowlist (if any). A tier-suffixed
+  // name is checked as sent, as its bare alias, and as the canonical `<alias>@<tier>` names of the
+  // tier it selected (lower case; `priority` and `fast` are one tier). So listing `gpt-6-luna`
+  // covers all of its tiers, while `gpt-6-luna@priority` can still be listed on its own and is not
+  // sidestepped by letter case or by the `fast` spelling.
+  const requestedNames = [request.model];
+  if (request.baseModel) {
+    requestedNames.push(request.baseModel);
+    if (request.serviceTier) {
+      requestedNames.push(...serviceTierNames(request.baseModel, request.serviceTier));
+    }
+  }
+  if (!listAllowsAny(policy.allowedModels, policy.excludedModels, requestedNames)) {
     throw buildAccessDeniedError(
       `Key is not allowed to access model '${request.model}' for ${apiType}`
     );

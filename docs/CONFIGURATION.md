@@ -795,6 +795,23 @@ curl ... -d '{"model": "direct/openai_direct/gpt-4o-mini", ...}'
 - Provider and model must exist in configuration
 - Bypasses selector logic and alias settings
 
+### Service Tier Suffix
+
+Clients that cannot set `service_tier` can pick an OpenAI service tier through the model name by appending `@<tier>` to an alias:
+
+```bash
+curl ... -d '{"model": "gpt-6-luna@flex", ...}'   # routes as gpt-6-luna with service_tier: flex
+```
+
+Valid tiers are `auto`, `default`, `flex`, `priority`, and `fast` (OpenAI treats `fast` as `priority`).
+
+- The suffix is only recognised when the text before it is an alias or an `additional_aliases` name. An alias that is itself named `x@flex` is matched as written.
+- It replaces any `service_tier` in the request body. Provider, model, and alias `extraBody` are applied afterwards and still win.
+- It is applied to `chat` and `responses` targets only; Messages and Gemini targets ignore it. It does not apply to `direct/` routing.
+- Key model lists check both names: listing `gpt-6-luna` allows or excludes all of its tiers, and `gpt-6-luna@priority` can be listed on its own, for example to keep a key off that tier. Tier entries are matched against the normalised (lower-case) tier, so write them in lower case. `priority` and `fast` are one tier, so an entry for either covers both.
+- Usage logs record the name the client sent (`gpt-6-luna@flex`) as the incoming alias.
+- `/v1/models` does not list tier names. A client that checks model names against that list needs the full name configured directly.
+
 ---
 
 ## API Keys
