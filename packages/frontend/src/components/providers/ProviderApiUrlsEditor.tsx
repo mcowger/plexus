@@ -1,7 +1,9 @@
+import { useRef } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { Provider } from '../../lib/api';
+import { switchConnectionMode, type ConnectionDraftMap } from '../../lib/providerConnectionDraft';
 
 const KNOWN_APIS = [
   'chat',
@@ -30,6 +32,10 @@ interface Props {
   OAUTH_PROVIDERS: Array<{ value: string; label: string }>;
   isApiBaseUrlsOpen: boolean;
   setIsApiBaseUrlsOpen: (v: boolean) => void;
+  /** Compact Apply Preset action shown beside the URL/OAuth toggle (URL mode only). */
+  presetAction?: React.ReactNode;
+  /** Revealed preset picker panel rendered inside the connection section. */
+  presetPanel?: React.ReactNode;
 }
 
 export function ProviderApiUrlsEditor({
@@ -43,71 +49,55 @@ export function ProviderApiUrlsEditor({
   OAUTH_PROVIDERS,
   isApiBaseUrlsOpen,
   setIsApiBaseUrlsOpen,
+  presetAction,
+  presetPanel,
 }: Props) {
+  // Per-mode connection drafts live in this component instance, which the
+  // provider Modal unmounts when it closes. Closing and reopening the modal
+  // therefore starts a fresh set of drafts — no stale cross-provider state.
+  const connectionDrafts = useRef<ConnectionDraftMap>({});
+
   return (
     <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
       <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
         <label className="font-body text-[13px] font-medium text-text-secondary">
           Connection Type
         </label>
-        <select
-          className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-          value={isOAuthMode ? 'oauth' : 'url'}
-          onChange={(e) => {
-            if (e.target.value === 'oauth') {
-              setEditingProvider({
-                ...editingProvider,
-                apiBaseUrl: 'oauth://',
-                apiKey: 'oauth',
-                oauthProvider: editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value,
-                type: ['oauth'],
-              });
-            } else {
-              setEditingProvider({
-                ...editingProvider,
-                apiBaseUrl: {},
-                apiKey: '',
-                oauthProvider: '',
-                type: [],
-              });
-            }
-          }}
-        >
-          <option value="url">Custom API URL</option>
-          <option value="oauth">OAuth (pi-ai)</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <div
+            role="group"
+            aria-label="Connection Type"
+            className="inline-flex self-start overflow-hidden rounded-md border border-border-glass"
+          >
+            {(['url', 'oauth'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={isOAuthMode === (mode === 'oauth')}
+                className={`px-3 py-1 font-body text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 ${mode === 'oauth' ? 'border-l border-border-glass' : ''} ${isOAuthMode === (mode === 'oauth') ? 'bg-bg-hover text-text font-medium' : 'bg-transparent text-text-muted hover:bg-bg-hover hover:text-text'}`}
+                onClick={() => {
+                  if (isOAuthMode === (mode === 'oauth')) return;
+                  const result = switchConnectionMode(
+                    editingProvider,
+                    mode,
+                    connectionDrafts.current,
+                    OAUTH_PROVIDERS[0]?.value ?? ''
+                  );
+                  connectionDrafts.current = result.drafts;
+                  setEditingProvider(result.provider);
+                }}
+              >
+                {mode === 'url' ? 'URL' : 'OAuth'}
+              </button>
+            ))}
+          </div>
+          {!isOAuthMode && presetAction}
+        </div>
       </div>
+      {presetPanel}
       <label className="font-body text-[13px] font-medium text-text-secondary">
         Supported APIs & Base URLs
       </label>
-      <div
-        style={{
-          fontSize: '11px',
-          color: 'var(--color-text-secondary)',
-          marginBottom: '4px',
-          lineHeight: '1.5',
-        }}
-      >
-        <span style={{ fontStyle: 'italic' }}>API types determine the protocol:</span>
-        <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
-          <li>
-            <span style={{ fontWeight: 600 }}>chat</span> — OpenAI-compatible endpoints, including
-            Ollama&apos;s <code className="text-primary">/v1</code> API
-          </li>
-          <li>
-            <span style={{ fontWeight: 600 }}>completions</span> — OpenAI text/code completion
-            endpoints (e.g. <code className="text-primary">/v1/completions</code> or FIM models)
-          </li>
-          <li>
-            <span style={{ fontWeight: 600 }}>openrouter-images</span> — OpenRouter dedicated image
-            API; use the <code className="text-primary">/api/v1</code> base URL
-          </li>
-          <li>
-            <span style={{ fontWeight: 600 }}>ollama</span> — Native Ollama API, use the root URL
-            (e.g. <code className="text-primary">http://localhost:11434</code>)
-          </li>
-        </ul>
-      </div>
       {isOAuthMode ? (
         <div
           style={{

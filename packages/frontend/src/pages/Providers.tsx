@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
@@ -12,7 +13,10 @@ import { ProviderOAuthEditor } from '../components/providers/ProviderOAuthEditor
 import { ProviderQuotaEditor } from '../components/providers/ProviderQuotaEditor';
 import { ProviderAdvancedEditor } from '../components/providers/ProviderAdvancedEditor';
 import { ProviderModelsEditor } from '../components/providers/ProviderModelsEditor';
-import { ProviderPresetPicker } from '../components/providers/ProviderPresetPicker';
+import {
+  ApplyPresetButton,
+  ProviderPresetPicker,
+} from '../components/providers/ProviderPresetPicker';
 import { FetchModelsModal } from '../components/providers/FetchModelsModal';
 import { DeleteProviderModal } from '../components/providers/DeleteProviderModal';
 import { Code2, Plus } from 'lucide-react';
@@ -21,6 +25,14 @@ import { useNavigate } from 'react-router-dom';
 export const Providers = () => {
   const f = useProviderForm();
   const navigate = useNavigate();
+  // Reveal state for the edit-mode preset picker lives here so the collapsed
+  // action can sit beside the URL/OAuth toggle while the panel renders in the
+  // connection section. Reset whenever the modal closes.
+  const [isPresetRevealed, setIsPresetRevealed] = useState(false);
+
+  useEffect(() => {
+    if (!f.isModalOpen) setIsPresetRevealed(false);
+  }, [f.isModalOpen]);
 
   return (
     <div className="flex flex-col min-h-full">
@@ -77,7 +89,9 @@ export const Providers = () => {
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '-8px' }}>
-            {/* Preset picker (new providers only) */}
+            {/* Preset picker — always open on create. On edit the compact
+                Apply Preset action lives beside the connection toggle and the
+                panel is rendered inside ProviderApiUrlsEditor. */}
             {!f.originalId && (
               <ProviderPresetPicker
                 editingProvider={f.editingProvider}
@@ -145,6 +159,23 @@ export const Providers = () => {
                 OAUTH_PROVIDERS={f.OAUTH_PROVIDERS}
                 isApiBaseUrlsOpen={f.isApiBaseUrlsOpen}
                 setIsApiBaseUrlsOpen={f.setIsApiBaseUrlsOpen}
+                presetAction={
+                  f.originalId && !isPresetRevealed ? (
+                    <ApplyPresetButton onClick={() => setIsPresetRevealed(true)} />
+                  ) : undefined
+                }
+                presetPanel={
+                  f.originalId ? (
+                    <ProviderPresetPicker
+                      editingProvider={f.editingProvider}
+                      setEditingProvider={f.setEditingProvider}
+                      onSelectionChange={f.setPresetSelected}
+                      isEditing
+                      isOAuthMode={f.isOAuthMode}
+                      isRevealed={isPresetRevealed}
+                    />
+                  ) : undefined
+                }
               />
 
               {/* Right: Quota Checker */}

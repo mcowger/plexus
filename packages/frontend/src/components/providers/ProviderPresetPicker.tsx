@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Wand2 } from 'lucide-react';
 import {
   applyProviderPreset,
   findProviderPreset,
@@ -21,13 +21,39 @@ interface Props {
   editingProvider: Provider;
   setEditingProvider: React.Dispatch<React.SetStateAction<Provider>>;
   onSelectionChange: (selected: boolean) => void;
+  /** Existing provider: keep the picker collapsed behind an external Apply Preset action. */
+  isEditing?: boolean;
+  /** OAuth providers authenticate differently; ordinary API presets must not change that. */
+  isOAuthMode?: boolean;
+  /** Whether the collapsed picker has been revealed. Ignored for new providers. */
+  isRevealed?: boolean;
 }
 
 /**
- * Preset picker shown at the top of the Add Provider modal. Selecting a
- * preset fills endpoint and compatibility settings; the operator adds an API
- * key. Rendered for new providers only; never offered on edit, where applying
- * would clobber a working config.
+ * Compact action placed beside the connection-mode toggle. The picker panel
+ * itself is rendered separately by the parent so it can live inside the
+ * Connection Type section instead of the top of the form.
+ */
+export function ApplyPresetButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Apply endpoints and quirks. Keeps the provider ID, name, API key, and models."
+      className="inline-flex items-center gap-1 px-3 py-1 font-body text-[12px] text-text-muted bg-transparent border border-border-glass rounded-md transition-colors hover:bg-bg-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+    >
+      <Wand2 size={12} />
+      Apply Preset
+    </button>
+  );
+}
+
+/**
+ * Preset picker for the Add/Edit Provider modal. Selecting a preset fills the
+ * endpoint and compatibility settings into the draft for review before the
+ * operator saves. On an existing provider the panel stays hidden until the
+ * external ApplyPresetButton is clicked; it keeps the provider's identity,
+ * API key, and models, and is never offered for OAuth providers.
  */
 /** Draft fields a preset apply touches — snapshotted so Custom can undo it. */
 interface PresetTouchedFields {
@@ -99,6 +125,9 @@ export function ProviderPresetPicker({
   editingProvider,
   setEditingProvider,
   onSelectionChange,
+  isEditing = false,
+  isOAuthMode = false,
+  isRevealed = true,
 }: Props) {
   const [presets, setPresets] = useState<ProviderPreset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +163,7 @@ export function ProviderPresetPicker({
     : undefined;
 
   const handleSelect = (presetId: string) => {
+    if (isEditing && isOAuthMode) return;
     setSelectedPresetId(presetId);
     onSelectionChange(!!presetId);
     setVarValues({});
@@ -149,7 +179,9 @@ export function ProviderPresetPicker({
         const appliedValues = applyProviderPreset(
           { ...blankPresetDraftBase(), ...snapshot },
           applied,
-          varValues
+          varValues,
+          undefined,
+          { preserveIdentity: isEditing }
         );
         setEditingProvider((prev) => {
           const restored: Partial<Provider> = {};
@@ -190,7 +222,9 @@ export function ProviderPresetPicker({
     }
     setAppliedPreset(preset);
     setEditingProvider((prev) => {
-      const applied = applyProviderPreset(prev, preset, {}, previous ?? undefined);
+      const applied = applyProviderPreset(prev, preset, {}, previous ?? undefined, {
+        preserveIdentity: isEditing,
+      });
       if (!previous) return applied;
       const sourceEdited =
         prev.pi_ai_provider !== previous.piAiProvider ||
@@ -234,11 +268,27 @@ export function ProviderPresetPicker({
       : {};
   const unresolvedVars = findUnresolvedPresetVars(draftMap);
 
+  // Editing keeps the picker collapsed until asked, so an operator does not
+  // accidentally overwrite a working provider while browsing the form. OAuth
+  // providers are blocked entirely: presets are API-key configurations and
+  // applying one would replace the OAuth auth mode. Returning null keeps this
+  // component mounted (selection state survives mode toggles) while the
+  // external Apply Preset action controls visibility.
+  if (isEditing && (!isRevealed || isOAuthMode)) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-2 border border-border-glass rounded-md p-3 bg-bg-subtle">
+      {isEditing && (
+        <span className="text-[11px] text-text-muted">
+          Replaces endpoints and preset settings. Keeps the provider ID, name, API key, and models.
+          Review before saving.
+        </span>
+      )}
       <div className="flex flex-col gap-1">
         <label className="font-body text-[13px] font-medium text-text-secondary">
-          Start from a preset
+          {isEditing ? 'Apply a preset' : 'Start from a preset'}
         </label>
         <select
           className={SELECT_CLASS}
@@ -246,7 +296,13 @@ export function ProviderPresetPicker({
           onChange={(e) => handleSelect(e.target.value)}
           disabled={isLoading}
         >
-          <option value="">{isLoading ? 'Loading presets…' : 'Custom (blank)'}</option>
+          <option value="">
+            {isLoading
+              ? 'Loading presets…'
+              : isEditing
+                ? 'Custom (keep current)'
+                : 'Custom (blank)'}
+          </option>
           {presets.map((preset) => (
             <option key={preset.id} value={preset.id}>
               {preset.name}

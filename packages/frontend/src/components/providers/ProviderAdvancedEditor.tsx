@@ -2,11 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   isOAuthPlaceholderUrl,
   getDefaultCacheKeyInjection,
-  getDefaultResponsesExtensions,
   PROVIDER_CACHE_KEY_INJECTION_OPTIONS,
-  RESPONSES_EXTENSION_OPTIONS,
   type ProviderCacheKeyInjection,
-  type ResponsesExtension,
 } from '@plexus/shared';
 import { ChevronDown, ChevronRight, Info, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -22,6 +19,7 @@ import {
   PI_AI_AUTO_VALUE,
 } from '../../lib/piAiProvider';
 import { ReasoningRewriteRulesEditor } from './ReasoningRewriteRulesEditor';
+import { ProviderQuirksModal } from './ProviderQuirksModal';
 import {
   getAdapterName,
   KNOWN_ADAPTERS,
@@ -63,7 +61,7 @@ export function ProviderAdvancedEditor({
 
   // pi-ai provider dropdown
   const [piProviders, setPiProviders] = useState<string[]>([]);
-  const [piProviderCustom, setPiProviderCustom] = useState(false);
+  const [quirksModalOpen, setQuirksModalOpen] = useState(false);
   const [piProviderResolving, setPiProviderResolving] = useState(false);
 
   useEffect(() => {
@@ -71,17 +69,9 @@ export function ProviderAdvancedEditor({
       .getPiProviders()
       .then(setPiProviders)
       .catch(() => {
-        /* non-fatal — falls back to custom text input */
+        /* non-fatal — custom quirks remain available */
       });
   }, []);
-
-  // Determine if the current value is already a known provider or needs custom mode
-  useEffect(() => {
-    const val = editingProvider.pi_ai_provider;
-    if (val && piProviders.length > 0 && !piProviders.includes(val)) {
-      setPiProviderCustom(true);
-    }
-  }, [editingProvider.pi_ai_provider, piProviders]);
 
   // Resolve `- auto -` to the concrete pi-ai provider matching the current
   // endpoint URLs / OAuth provider (same lookup as new-provider auto-detect).
@@ -1320,69 +1310,7 @@ export function ProviderAdvancedEditor({
                     prompt_cache_key.
                   </div>
                 </div>
-                <div className="flex flex-col gap-1 py-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-body text-[12px] text-text">
-                      Native Responses Extensions
-                    </span>
-                    {editingProvider.responsesExtensions !== undefined && (
-                      <button
-                        type="button"
-                        className="font-body text-[11px] text-primary hover:underline"
-                        onClick={() =>
-                          setEditingProvider({ ...editingProvider, responsesExtensions: undefined })
-                        }
-                      >
-                        Use default
-                      </button>
-                    )}
-                  </div>
-                  {(() => {
-                    const effective: ResponsesExtension[] =
-                      editingProvider.responsesExtensions ??
-                      getDefaultResponsesExtensions({
-                        oauthProvider: editingProvider.oauthProvider,
-                        apiBaseUrl: editingProvider.apiBaseUrl,
-                      });
-                    return RESPONSES_EXTENSION_OPTIONS.map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-2 cursor-pointer"
-                        title={option.description}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={effective.includes(option.value)}
-                          onChange={(e) => {
-                            const next = new Set(effective);
-                            if (e.target.checked) next.add(option.value);
-                            else next.delete(option.value);
-                            setEditingProvider({
-                              ...editingProvider,
-                              responsesExtensions: RESPONSES_EXTENSION_OPTIONS.map(
-                                (o) => o.value
-                              ).filter((value) => next.has(value)),
-                            });
-                          }}
-                        />
-                        <span className="font-body text-[11px] text-text">{option.label}</span>
-                      </label>
-                    ));
-                  })()}
-                  <div
-                    className="font-body text-[11px] text-text-muted"
-                    style={{ lineHeight: 1.35 }}
-                  >
-                    Responses API extensions this provider's Responses endpoint accepts verbatim.
-                    Requests using any other extension are flattened to plain function tools and
-                    split back on the response. The default follows the OAuth provider or Responses
-                    endpoint (Codex, api.openai.com, api.meta.ai); other endpoints accept custom
-                    tools only. Models routed via the responses:lite subtype always use the fixed
-                    lite contract instead.
-                  </div>
-                </div>
               </div>
-
               {/* Right: inputs */}
               <div
                 style={{
@@ -1488,20 +1416,20 @@ export function ProviderAdvancedEditor({
                     }}
                   />
                 </div>
-                {/* pi-ai Provider */}
+                {/* Provider Quirks */}
                 <div className="flex flex-col gap-0.5">
                   <label className="font-body text-[11px] font-medium text-text-secondary">
-                    pi-ai Provider
-                    {editingProvider.pi_ai_quirks && (
-                      <span className="font-normal text-[10px] text-text-muted ml-1">
-                        inline quirks active
-                      </span>
-                    )}
+                    Provider Quirks
                   </label>
-                  {!piProviderCustom ? (
+                  <div className="flex items-center gap-1.5">
                     <select
-                      className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                      value={editingProvider.pi_ai_provider ?? ''}
+                      aria-label="Provider Quirks"
+                      className="min-w-0 flex-1 py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      value={
+                        editingProvider.pi_ai_quirks
+                          ? '__custom__'
+                          : (editingProvider.pi_ai_provider ?? '')
+                      }
                       disabled={piProviderResolving}
                       title={
                         piProviderResolving
@@ -1511,7 +1439,7 @@ export function ProviderAdvancedEditor({
                       onChange={(e) => {
                         const raw = e.target.value;
                         if (raw === '__custom__') {
-                          setPiProviderCustom(true);
+                          setQuirksModalOpen(true);
                           return;
                         }
                         if (raw === PI_AI_AUTO_VALUE) {
@@ -1521,16 +1449,19 @@ export function ProviderAdvancedEditor({
                         setEditingProvider({
                           ...editingProvider,
                           pi_ai_provider: raw || undefined,
-                          pi_ai_quirks: raw ? undefined : editingProvider.pi_ai_quirks,
-                          auto_compat:
-                            raw || editingProvider.pi_ai_quirks
-                              ? editingProvider.auto_compat
-                              : false,
+                          pi_ai_quirks: undefined,
+                          auto_compat: raw ? editingProvider.auto_compat : false,
                         });
                       }}
                     >
                       <option value="">— none —</option>
                       <option value={PI_AI_AUTO_VALUE}>- auto -</option>
+                      {editingProvider.pi_ai_provider &&
+                        !piProviders.includes(editingProvider.pi_ai_provider) && (
+                          <option value={editingProvider.pi_ai_provider}>
+                            {editingProvider.pi_ai_provider}
+                          </option>
+                        )}
                       {piProviders.map((p) => (
                         <option key={p} value={p}>
                           {p}
@@ -1538,43 +1469,45 @@ export function ProviderAdvancedEditor({
                       ))}
                       <option value="__custom__">custom...</option>
                     </select>
-                  ) : (
-                    <div className="flex gap-1">
-                      <input
-                        className="flex-1 py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-                        type="text"
-                        placeholder="e.g. anthropic, openai"
-                        value={editingProvider.pi_ai_provider ?? ''}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setEditingProvider({
-                            ...editingProvider,
-                            pi_ai_provider: raw || undefined,
-                            pi_ai_quirks: raw ? undefined : editingProvider.pi_ai_quirks,
-                            auto_compat:
-                              raw || editingProvider.pi_ai_quirks
-                                ? editingProvider.auto_compat
-                                : false,
-                          });
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className="font-body text-[11px] text-text-muted hover:text-text px-1"
-                        title="Back to list"
-                        onClick={() => setPiProviderCustom(false)}
-                      >
-                        ↩
-                      </button>
-                    </div>
-                  )}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setQuirksModalOpen(true)}
+                    >
+                      Edit
+                    </Button>
+                  </div>
+                  <span className="font-body text-[10px] text-text-muted">
+                    Built-in pi-ai traits or custom protocol and model overrides, plus Native
+                    Responses Extensions. Enable Auto Compat to apply quirks to requests.
+                  </span>
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+      <ProviderQuirksModal
+        isOpen={quirksModalOpen}
+        onClose={() => setQuirksModalOpen(false)}
+        quirks={editingProvider.pi_ai_quirks}
+        responsesExtensions={editingProvider.responsesExtensions}
+        oauthProvider={editingProvider.oauthProvider}
+        apiBaseUrl={editingProvider.apiBaseUrl}
+        onApply={({ quirks, responsesExtensions }) => {
+          setEditingProvider((prev) => ({
+            ...prev,
+            // A non-empty custom quirks set replaces the builtin pi-ai source; an
+            // untouched/empty set keeps it (and the extensions default) in place.
+            pi_ai_provider: quirks ? undefined : prev.pi_ai_provider,
+            pi_ai_quirks: quirks,
+            responsesExtensions,
+            auto_compat: quirks || prev.pi_ai_provider ? prev.auto_compat : false,
+          }));
+          setQuirksModalOpen(false);
+        }}
+      />
     </div>
   );
 }

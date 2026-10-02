@@ -39,6 +39,7 @@ export {
   substitutePresetVars,
 } from './provider-presets';
 export type {
+  ApplyProviderPresetOptions,
   PiAiQuirks,
   ProviderPreset,
   ProviderPresetDraft,

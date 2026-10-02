@@ -638,3 +638,67 @@ describe('applyProviderPreset', () => {
     expect(preset).toEqual(presetSnapshot);
   });
 });
+
+describe('applyProviderPreset on an existing provider (preserveIdentity)', () => {
+  test('keeps id and name across preset switches even when they match a suggestion', () => {
+    const openai = presetOrThrow('openai');
+    const moonshot = presetOrThrow('moonshot');
+    // The edit draft's id/name happen to equal openai's suggested identity,
+    // which a plain apply would treat as auto-filled on the next switch.
+    const existing = { ...blankDraft(), id: 'openai', name: 'OpenAI Production' };
+
+    const first = applyProviderPreset(existing, openai, {}, undefined, { preserveIdentity: true });
+    expect(first.id).toBe('openai');
+    expect(first.name).toBe('OpenAI Production');
+
+    const second = applyProviderPreset(first, moonshot, {}, openai, { preserveIdentity: true });
+    expect(second.id).toBe('openai');
+    expect(second.name).toBe('OpenAI Production');
+    expect(second.apiBaseUrl).toEqual(moonshot.apiBaseUrl);
+    expect(second.type).toEqual(Object.keys(moonshot.apiBaseUrl));
+  });
+
+  test('preserves API key, models, and unrelated settings while replacing preset fields', () => {
+    const meta = presetOrThrow('meta');
+    const draft: ProviderPresetDraft & {
+      models: Record<string, unknown>;
+      enabled: boolean;
+      headers: Record<string, string>;
+      timeoutMs: number;
+    } = {
+      ...blankDraft(),
+      id: 'my-meta',
+      name: 'My Meta',
+      apiKey: 'sk-live',
+      models: { 'meta/llama-4': { access_via: ['chat'] } },
+      enabled: false,
+      headers: { 'x-custom': 'yes' },
+      timeoutMs: 1234,
+      apiBaseUrl: { chat: 'https://old.example.test' },
+      type: ['chat'],
+      pi_ai_provider: 'stale',
+      auto_compat: true,
+      cacheKeyInjection: 'session_id',
+      responsesExtensions: ['custom_tools'],
+    };
+
+    const applied = applyProviderPreset(draft, meta, {}, undefined, { preserveIdentity: true });
+
+    // Identity and unrelated config survive.
+    expect(applied.id).toBe('my-meta');
+    expect(applied.name).toBe('My Meta');
+    expect(applied.apiKey).toBe('sk-live');
+    expect(applied.models).toEqual({ 'meta/llama-4': { access_via: ['chat'] } });
+    expect(applied.enabled).toBe(false);
+    expect(applied.headers).toEqual({ 'x-custom': 'yes' });
+    expect(applied.timeoutMs).toBe(1234);
+
+    // Preset-controlled fields are replaced.
+    expect(applied.apiBaseUrl).toEqual(meta.apiBaseUrl);
+    expect(applied.type).toEqual(Object.keys(meta.apiBaseUrl));
+    expect(applied.pi_ai_provider).toBe('meta');
+    expect(applied.auto_compat).toBe(true);
+    expect(applied.cacheKeyInjection).toBe('prompt_cache_key');
+    expect(applied.responsesExtensions).toBeUndefined();
+  });
+});

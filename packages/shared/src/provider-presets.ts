@@ -280,19 +280,37 @@ export interface ProviderPresetDraft {
   responsesExtensions?: ResponsesExtension[];
 }
 
+/** Options controlling how a preset apply treats a draft's identity. */
+export interface ApplyProviderPresetOptions {
+  /**
+   * Keep the draft's `id` and `name` verbatim. Used when applying to an
+   * existing provider, whose identity is authoritative even when it happens
+   * to equal a preset's suggested id (which a normal switch would treat as
+   * auto-filled and overwrite).
+   */
+  preserveIdentity?: boolean;
+}
+
 /**
  * Apply endpoints, quirk source and auto-compat to a provider draft. Switching
  * sources clears the alternative; id/name suggestions only replace blank or
- * previously suggested fields, and OAuth-mode leftovers are cleared.
+ * previously suggested fields, and OAuth-mode leftovers are cleared. Callers
+ * applying to an existing provider pass `preserveIdentity` so that provider's
+ * id and name survive a preset switch.
  */
 export function applyProviderPreset<T extends ProviderPresetDraft>(
   draft: T,
   preset: ProviderPreset,
   varValues: Record<string, string> = {},
-  previousPreset?: ProviderPreset
+  previousPreset?: ProviderPreset,
+  options: ApplyProviderPresetOptions = {}
 ): T {
-  const idIsAutoFilled = !draft.id.trim() || draft.id === previousPreset?.suggestedProviderId;
-  const nameIsAutoFilled = !draft.name.trim() || draft.name === previousPreset?.suggestedName;
+  const idIsAutoFilled =
+    !options.preserveIdentity &&
+    (!draft.id.trim() || draft.id === previousPreset?.suggestedProviderId);
+  const nameIsAutoFilled =
+    !options.preserveIdentity &&
+    (!draft.name.trim() || draft.name === previousPreset?.suggestedName);
   return {
     ...draft,
     id: idIsAutoFilled ? preset.suggestedProviderId : draft.id,
