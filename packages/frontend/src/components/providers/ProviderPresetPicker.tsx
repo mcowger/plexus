@@ -278,6 +278,9 @@ export function ProviderPresetPicker({
     return null;
   }
 
+  let blankOptionLabel = isEditing ? 'Custom (keep current)' : 'Custom (blank)';
+  if (isLoading) blankOptionLabel = 'Loading presets…';
+
   return (
     <div className="flex flex-col gap-2 border border-border-glass rounded-md p-3 bg-bg-subtle">
       {isEditing && (
@@ -296,13 +299,7 @@ export function ProviderPresetPicker({
           onChange={(e) => handleSelect(e.target.value)}
           disabled={isLoading}
         >
-          <option value="">
-            {isLoading
-              ? 'Loading presets…'
-              : isEditing
-                ? 'Custom (keep current)'
-                : 'Custom (blank)'}
-          </option>
+          <option value="">{blankOptionLabel}</option>
           {presets.map((preset) => (
             <option key={preset.id} value={preset.id}>
               {preset.name}

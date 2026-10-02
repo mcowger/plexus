@@ -206,7 +206,7 @@ function compatToDraft(compat: QuirksCompat | undefined): CompatDraft {
 function traitsToDraft(traits: QuirksTraits | undefined): TraitsDraft {
   return {
     reasoning: toTri(traits?.reasoning),
-    maxTokens: traits?.maxTokens != null ? String(traits.maxTokens) : '',
+    maxTokens: traits?.maxTokens !== undefined ? String(traits.maxTokens) : '',
     thinkingLevelMap: levelsToDraft(traits?.thinkingLevelMap),
     thinkingLevelMapPresent: traits?.thinkingLevelMap !== undefined,
     compat: compatToDraft(traits?.compat),
@@ -985,7 +985,7 @@ export function ProviderQuirksModal({
                 </label>
               ))}
             </div>
-            <p className="font-body text-[10px] text-text-muted" style={{ lineHeight: 1.35 }}>
+            <p className="font-body text-[10px] leading-[1.35] text-text-muted">
               Responses API extensions this provider's Responses endpoint accepts verbatim. Requests
               using any other extension are flattened to plain function tools and split back on the
               response. The default follows the OAuth provider or Responses endpoint (Codex,
