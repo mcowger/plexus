@@ -129,11 +129,28 @@ export function resolveServiceTier(
 /**
  * `service_tier`/`speed` only exist on wire formats that declare a
  * `serviceTierFormat`. This legacy writer handles `@<tier>` suffixes for
- * providers with no capability map: it writes OpenAI-style bodies verbatim and
- * leaves every other body untouched. Mapped models are overwritten afterwards
- * by the registry auto-compat projection.
+ * providers with no capability map: it writes OpenAI-style bodies (normalizing
+ * the standard/ultrafast wire aliases) and leaves every other body untouched.
+ * Mapped models are overwritten afterwards by the registry auto-compat
+ * projection.
  */
 const SERVICE_TIER_API_TYPES = new Set(['chat', 'responses']);
+
+/**
+ * OpenAI wire aliases for the legacy (unmapped) writer. OpenAI spells the
+ * standard tier `default`, and has no `ultrafast` capacity value — the nearest
+ * same-idea tier is `priority`. Only the emitted value is rewritten; the
+ * request's canonical `serviceTier` is left untouched so a model capability map
+ * still sees `ultrafast`.
+ */
+const LEGACY_SERVICE_TIER_WIRE_ALIASES: Record<string, string> = {
+  standard: 'default',
+  ultrafast: 'priority',
+};
+
+function legacyServiceTierWireValue(tier: string): string {
+  return LEGACY_SERVICE_TIER_WIRE_ALIASES[tier.trim().toLowerCase()] ?? tier;
+}
 
 /**
  * Apply the service tier selected by an `@<tier>` model-name suffix to the
@@ -158,5 +175,5 @@ export function applyServiceTierSelection(
     return payload;
   }
 
-  return { ...payload, service_tier: tier };
+  return { ...payload, service_tier: legacyServiceTierWireValue(tier) };
 }

@@ -373,14 +373,19 @@ function isOpenAiFamily(api: string | undefined): boolean {
 /**
  * Legacy (unmapped) OpenAI-family pass-through spellings. OpenAI's wire value
  * for the standard tier is `default`, so translate the Plexus/Anthropic
- * `standard`/`standard_only` spellings instead of leaking them. Provider-
- * specific spellings we do not recognise (e.g. Google `on_demand`) are left
- * verbatim rather than guessed at.
+ * `standard`/`standard_only` spellings instead of leaking them. OpenAI has no
+ * `ultrafast` capacity value, so decay it to the nearest same-idea tier
+ * `priority`. Provider-specific spellings we do not recognise (e.g. Google
+ * `on_demand`) are left verbatim rather than guessed at.
  */
-const LEGACY_OPENAI_STANDARD_TIERS: ReadonlySet<string> = new Set(['standard', 'standard_only']);
+const LEGACY_OPENAI_SERVICE_TIERS: Record<string, string> = {
+  standard: 'default',
+  standard_only: 'default',
+  ultrafast: 'priority',
+};
 
 function legacyOpenAiServiceTier(tier: string): string {
-  return LEGACY_OPENAI_STANDARD_TIERS.has(tier.trim().toLowerCase()) ? 'default' : tier;
+  return LEGACY_OPENAI_SERVICE_TIERS[tier.trim().toLowerCase()] ?? tier;
 }
 
 /**

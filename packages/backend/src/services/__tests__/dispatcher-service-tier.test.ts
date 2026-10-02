@@ -257,13 +257,14 @@ describe('Dispatcher service-tier suffix', () => {
           allowedModels: ['test-alias@default'],
         })
       );
-      // What goes upstream is still the spelling the client chose.
-      expect(sentBody().service_tier).toBe('standard');
+      // The wire value is normalised to OpenAI's `default` spelling.
+      expect(sentBody().service_tier).toBe('default');
     });
 
     test('an ultrafast entry has no alias and does not cover standard', async () => {
       await new Dispatcher().dispatch(chatRequest('test-alias@ultrafast'));
-      expect(sentBody().service_tier).toBe('ultrafast');
+      // OpenAI has no ultrafast capacity tier; it decays to the nearest priority.
+      expect(sentBody().service_tier).toBe('priority');
       fetchMock.mockClear();
 
       await expect(

@@ -51,6 +51,14 @@ export function splitServiceTierSuffix(modelName: string): ServiceTierSplit {
   return { model: modelName.slice(0, index), serviceTier: tier };
 }
 
+/** Every suffix spelling that names the same tier, keyed by any one of them. */
+const SERVICE_TIER_SUFFIX_ALIASES: Record<string, readonly string[]> = {
+  priority: ['priority', 'fast'],
+  fast: ['priority', 'fast'],
+  default: ['default', 'standard'],
+  standard: ['default', 'standard'],
+};
+
 /**
  * Every `<model>@<tier>` spelling that names the same upstream tier as `tier` (the normalised,
  * lower-case tier from `splitServiceTierSuffix`). `fast` is an alias of `priority` and
@@ -58,11 +66,6 @@ export function splitServiceTierSuffix(modelName: string): ServiceTierSplit {
  * against these, so one entry covers the tier however the client spelled it.
  */
 export function serviceTierNames(model: string, tier: string): string[] {
-  const tiers =
-    tier === 'priority' || tier === 'fast'
-      ? ['priority', 'fast']
-      : tier === 'default' || tier === 'standard'
-        ? ['default', 'standard']
-        : [tier];
-  return tiers.map((name) => `${model}${SERVICE_TIER_SUFFIX_DELIMITER}${name}`);
+  const names = SERVICE_TIER_SUFFIX_ALIASES[tier] ?? [tier];
+  return names.map((name) => `${model}${SERVICE_TIER_SUFFIX_DELIMITER}${name}`);
 }

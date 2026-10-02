@@ -750,27 +750,29 @@ function TraitsEditor({
           }
         />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <span className={LABEL_CLASS}>Service tier map</span>
-        <span className="font-body text-[10px] leading-[1.35] text-text-muted">
-          Canonical tier to upstream value for this API (auto, standard, flex, priority, ultrafast).
-          Default means unset; Unsupported means this API has no exact tier. Neither is an error:
-          Plexus sends the nearest supported equivalent instead (ultrafast to priority to standard;
-          priority to standard; flex to standard). The `@fast` suffix is the client-side alias for
-          priority. For Anthropic fast mode, map priority to fast and select anthropic-speed in
-          Compat below. A format alone does not enable mapping.
-        </span>
-        <ServiceTierMapEditor
-          tiers={traits.serviceTierMap}
-          onChange={(serviceTierMap) =>
-            onChange({
-              ...traits,
-              serviceTierMap,
-              serviceTierMapPresent: false,
-            })
-          }
-        />
-      </div>
+      {api !== 'google-generative-ai' && (
+        <div className="flex flex-col gap-1.5">
+          <span className={LABEL_CLASS}>Service tier map</span>
+          <span className="font-body text-[10px] leading-[1.35] text-text-muted">
+            Canonical tier to upstream value for this API (auto, standard, flex, priority,
+            ultrafast). Default means unset; Unsupported means this API has no exact tier. Neither
+            is an error: Plexus sends the nearest supported equivalent instead (ultrafast to
+            priority to standard; priority to standard; flex to standard). The `@fast` suffix is the
+            client-side alias for priority. For Anthropic fast mode, map priority to fast and select
+            anthropic-speed in Compat below. A format alone does not enable mapping.
+          </span>
+          <ServiceTierMapEditor
+            tiers={traits.serviceTierMap}
+            onChange={(serviceTierMap) =>
+              onChange({
+                ...traits,
+                serviceTierMap,
+                serviceTierMapPresent: false,
+              })
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

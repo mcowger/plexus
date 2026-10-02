@@ -4,6 +4,7 @@ import { Dispatcher } from '../dispatch/dispatcher';
 import { ProviderConfigSchema } from '../../config';
 import { applyQuirkOverlay, applyRegistryAutoCompat } from '../dispatch/dispatcher-auto-compat';
 import * as piAiRegistry from '../pi-ai/registry';
+import { logger } from '../../utils/logger';
 import type { RouteResult } from '../routing/router';
 import type { UnifiedChatRequest } from '../../types/unified';
 
@@ -968,6 +969,38 @@ describe('Registry overlay quirks + service tiers', () => {
     expect(outbound.service_tier).toBe('default');
   });
 
+  test('normalizes a legacy @ultrafast tier to OpenAI priority without a serviceTierMap', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        serviceTier: 'ultrafast',
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'ultrafast' },
+      }),
+      route(),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('priority');
+  });
+
+  test('a mapped ultrafast tier is preserved rather than collapsed to priority', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        serviceTier: 'ultrafast',
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'ultrafast' },
+      }),
+      route({
+        config: overlayConfig({
+          chat: { api: 'openai-completions', serviceTierMap: { ultrafast: 'ultra' } },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('ultra');
+  });
+
   test('strips a tier with no supported fallback', () => {
     const outbound = applyRegistryAutoCompat(
       { model: 'provider-model', messages: [], service_tier: 'flex' },
@@ -1053,6 +1086,7 @@ describe('Registry overlay quirks + service tiers', () => {
   });
 
   test('an overlay thinking map with omitted reasoning inherits builtin reasoning', () => {
+    const warnSpy = registerSpy(logger, 'warn');
     const outbound = applyRegistryAutoCompat(
       { model: 'provider-model', messages: [], reasoning_effort: 'high' },
       request({
@@ -1067,6 +1101,36 @@ describe('Registry overlay quirks + service tiers', () => {
     );
 
     expect(outbound.reasoning_effort).toBe('hard');
+    // A resolved builtin supplies the reasoning capability, so the overlay's
+    // omitted `reasoning` is inheritance, not a no-op worth warning about.
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  test('warns when inline quirks declare a thinking map without reasoning: true', () => {
+    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(null);
+    const warnSpy = registerSpy(logger, 'warn');
+
+    const outbound = applyRegistryAutoCompat(
+      { model: 'upstream/unlinked', messages: [], reasoning_effort: 'high' },
+      request({
+        originalBody: { model: 'upstream/unlinked', messages: [], reasoning_effort: 'high' },
+      }),
+      route({
+        model: 'upstream/unlinked',
+        config: overlayConfig({
+          chat: { api: 'openai-completions', thinkingLevelMap: { high: 'hard' } },
+        }),
+        modelConfig: undefined,
+      }),
+      'chat'
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('thinkingLevelMap without reasoning: true')
+    );
+    // The inline map is a no-op without `reasoning: true`; the intent passes
+    // through untranslated rather than being silently mapped.
+    expect(outbound.reasoning_effort).toBe('high');
   });
 
   test('a target dialect override projects Anthropic speed and clears a cross-dialect capacity service_tier', () => {

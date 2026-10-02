@@ -100,12 +100,12 @@ function resolveAliasInlineTarget(
   const target = [...unique.values()][0]!;
   const quirks = providers[target.provider!]?.pi_ai_quirks;
   if (!quirks) return undefined;
-  const apiType =
-    preferredApi?.length === 1
-      ? preferredApi[0] === 'chat_completions'
-        ? 'chat'
-        : preferredApi[0]!
-      : quirksTargetForBuiltinApi(builtinApi);
+  let apiType: string | undefined;
+  if (preferredApi?.length === 1) {
+    apiType = preferredApi[0] === 'chat_completions' ? 'chat' : preferredApi[0];
+  } else {
+    apiType = quirksTargetForBuiltinApi(builtinApi);
+  }
   if (!apiType) return undefined;
   return { provider: target.provider!, model: target.model!, apiType, quirks };
 }
@@ -193,14 +193,14 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       // otherwise whichever is present. Inline-only quirks keep their existing
       // advertised shape; a resolvable builtin is never skipped just because
       // quirks are present.
-      const advertised: any =
+      const advertised: PiAiModel<Api> | ReturnType<typeof resolveInlineQuirks> | null =
         piModel && inlineTarget
-          ? applyQuirkOverlay(
+          ? (applyQuirkOverlay(
               piModel,
               inlineTarget.quirks,
               inlineTarget.apiType,
               inlineTarget.model
-            )
+            ) as PiAiModel<Api>)
           : (piModel ?? inlineTraits);
 
       // Look up pi compat options if an advertised capability record exists.
@@ -228,12 +228,14 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
           : [];
       // A builtin (overlaid) model reports its full supported level window via
       // pi-ai; an inline-only model advertises exactly the declared levels.
-      const reasoningOptions =
-        piModel && advertised?.reasoning === true
-          ? [{ type: 'effort' as const, values: [...getSupportedThinkingLevels(advertised)] }]
-          : inlineLevels.length > 0
-            ? [{ type: 'effort' as const, values: inlineLevels }]
-            : undefined;
+      let reasoningOptions: { type: 'effort'; values: string[] }[] | undefined;
+      if (piModel && advertised?.reasoning === true) {
+        reasoningOptions = [
+          { type: 'effort', values: [...getSupportedThinkingLevels(advertised as PiAiModel<Api>)] },
+        ];
+      } else if (inlineLevels.length > 0) {
+        reasoningOptions = [{ type: 'effort', values: inlineLevels }];
+      }
 
       const base = {
         id: aliasId,

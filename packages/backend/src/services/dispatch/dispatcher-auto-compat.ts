@@ -616,6 +616,15 @@ export function applyRegistryAutoCompat(
 
   let piAiModel: any;
   if (inline) {
+    // A thinking map alone does not opt a model into reasoning for inline
+    // quirks: `reasoning: true` is required (overlays inherit the builtin
+    // instead). Warn rather than let the map silently no-op.
+    if (inline.thinkingLevelMap !== undefined && inline.reasoning !== true) {
+      logger.warn(
+        `Inline quirks for ${route.provider}/${route.model} declare a thinkingLevelMap ` +
+          `without reasoning: true; the map is ignored. Set reasoning: true to enable it.`
+      );
+    }
     piAiModel = {
       id: route.model,
       api: inline.api,

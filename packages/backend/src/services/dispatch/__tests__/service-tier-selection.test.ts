@@ -38,6 +38,25 @@ describe('applyServiceTierSelection', () => {
     ).toEqual({ model: 'm', service_tier: 'priority' });
   });
 
+  test.each([
+    ['standard', 'default'],
+    ['ultrafast', 'priority'],
+    ['default', 'default'],
+    ['priority', 'priority'],
+    ['fast', 'fast'],
+    ['flex', 'flex'],
+  ])('normalizes the legacy %s suffix to the OpenAI %s wire value', (tier, expected) => {
+    expect(
+      applyServiceTierSelection({ model: 'm' }, request({ serviceTier: tier }), 'chat')
+    ).toEqual({ model: 'm', service_tier: expected });
+  });
+
+  test('leaves the request serviceTier canonical so a map can still see ultrafast', () => {
+    const parsed = request({ serviceTier: 'ultrafast' });
+    applyServiceTierSelection({ model: 'm' }, parsed, 'chat');
+    expect(parsed.serviceTier).toBe('ultrafast');
+  });
+
   test.each(['messages', 'gemini'])('leaves %s bodies alone', (apiType) => {
     const payload = { model: 'm' };
     expect(applyServiceTierSelection(payload, request({ serviceTier: 'flex' }), apiType)).toBe(
