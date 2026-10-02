@@ -82,4 +82,67 @@ describe('key repository defaultServiceTier persistence', () => {
     const keys = await repo.getAllKeys();
     expect(keys['no-tier-key']?.defaultServiceTier).toBeUndefined();
   });
+
+  // Raw backup imports can persist values that never passed KeyConfigSchema.
+  // saveKey writes whatever it is given, so reading must validate rather than
+  // blindly cast any non-empty string.
+  it('omits a stored non-tier string from getAllKeys and getKeyBySecret', async () => {
+    await repo.saveKey('invalid-tier-key', {
+      secret: 'sk-invalid-tier',
+      defaultServiceTier: 'not-a-tier' as KeyConfig['defaultServiceTier'],
+    });
+
+    const keys = await repo.getAllKeys();
+    expect(keys['invalid-tier-key']?.defaultServiceTier).toBeUndefined();
+
+    const found = await repo.getKeyBySecret('sk-invalid-tier');
+    expect(found?.config.defaultServiceTier).toBeUndefined();
+  });
+
+  it('trims and lowercases an otherwise-valid stored tier', async () => {
+    await repo.saveKey('cased-tier-key', {
+      secret: 'sk-cased-tier',
+      defaultServiceTier: '  ULTRAFAST  ' as KeyConfig['defaultServiceTier'],
+    });
+
+    const keys = await repo.getAllKeys();
+    expect(keys['cased-tier-key']?.defaultServiceTier).toBe('ultrafast');
+
+    const found = await repo.getKeyBySecret('sk-cased-tier');
+    expect(found?.config.defaultServiceTier).toBe('ultrafast');
+  });
+
+  it('trims and lowercases a valid stored tier in both lookups', async () => {
+    await repo.saveKey('normalized-tier-key', {
+      secret: 'sk-normalized-tier',
+      defaultServiceTier: 'Priority ' as KeyConfig['defaultServiceTier'],
+    });
+
+    const keys = await repo.getAllKeys();
+    expect(keys['normalized-tier-key']?.defaultServiceTier).toBe('priority');
+
+    const found = await repo.getKeyBySecret('sk-normalized-tier');
+    expect(found?.config.defaultServiceTier).toBe('priority');
+  });
+
+  it('a save with defaultServiceTier null clears the stored tier', async () => {
+    await repo.saveKey('null-cleared-tier-key', {
+      secret: 'sk-null-cleared',
+      defaultServiceTier: 'flex',
+    });
+
+    await repo.saveKey('null-cleared-tier-key', {
+      secret: 'sk-null-cleared',
+      defaultServiceTier: null,
+    });
+
+    const rows = await db.select().from(schema.apiKeys);
+    const row = rows.find((r: any) => r.name === 'null-cleared-tier-key')!;
+    expect(row.generation).toBeNull();
+
+    const keys = await repo.getAllKeys();
+    expect(keys['null-cleared-tier-key']?.defaultServiceTier).toBeUndefined();
+    const found = await repo.getKeyBySecret('sk-null-cleared');
+    expect(found?.config.defaultServiceTier).toBeUndefined();
+  });
 });

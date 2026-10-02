@@ -755,7 +755,7 @@ export const KeyConfigSchema = z.object({
   // request a tier of its own. Shares the `<alias>@<tier>` suffix vocabulary
   // (see services/routing/service-tier-suffix.ts). Persisted in the
   // api_keys.generation JSON column, not a dedicated column.
-  defaultServiceTier: z.enum(SERVICE_TIER_SUFFIXES).optional(),
+  defaultServiceTier: z.enum(SERVICE_TIER_SUFFIXES).nullable().optional(),
   allowedIps: z
     .array(
       z.string().min(1).refine(isValidIpRule, {

@@ -15,17 +15,22 @@ import {
   toBool,
   toJson,
 } from './repository-utils';
+import { SERVICE_TIER_SUFFIXES } from '../services/routing/service-tier-suffix';
 
 /**
  * Read the per-key default service tier out of the api_keys.generation JSON
  * column (`{ serviceTier }`). Tolerates SQLite JSON text and Postgres jsonb.
- * Returns undefined for missing/empty values so callers omit the field.
+ * Raw backup imports can bypass KeyConfigSchema, so values are trimmed,
+ * lower-cased, and validated against the known suffix vocabulary. Missing,
+ * empty, or unrecognised values return undefined so callers omit the field.
  */
 function defaultServiceTierFromGeneration(generation: unknown): KeyConfig['defaultServiceTier'] {
   const parsed = parseJson<{ serviceTier?: unknown }>(generation);
   const tier = parsed?.serviceTier;
-  if (typeof tier !== 'string' || tier.length === 0) return undefined;
-  return tier as KeyConfig['defaultServiceTier'];
+  if (typeof tier !== 'string') return undefined;
+  const normalized = tier.trim().toLowerCase();
+  if (!(SERVICE_TIER_SUFFIXES as readonly string[]).includes(normalized)) return undefined;
+  return normalized as KeyConfig['defaultServiceTier'];
 }
 
 export class KeyRepository {

@@ -105,4 +105,27 @@ describe('key routes — defaultServiceTier', () => {
     expect(res.statusCode).toBe(200);
     expect(serviceState.keys['existing-tier-key-2']?.defaultServiceTier).toBe('ultrafast');
   });
+
+  it('PATCH accepts null to clear the tier without replacing other key settings', async () => {
+    serviceState.keys['clear-tier-key'] = {
+      secret: 'sk-clear',
+      comment: 'keep this comment',
+      allowedModels: ['model-a'],
+      defaultServiceTier: 'priority',
+    };
+
+    const res = await fastify.inject({
+      method: 'PATCH',
+      url: '/v0/management/keys/clear-tier-key',
+      payload: { defaultServiceTier: null },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(serviceState.keys['clear-tier-key']).toEqual({
+      secret: 'sk-clear',
+      comment: 'keep this comment',
+      allowedModels: ['model-a'],
+      defaultServiceTier: null,
+    });
+  });
 });

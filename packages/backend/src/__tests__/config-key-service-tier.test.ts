@@ -26,6 +26,12 @@ describe('KeyConfigSchema defaultServiceTier', () => {
     expect(result.success && result.data.defaultServiceTier).toBeUndefined();
   });
 
+  it('accepts null to clear the default service tier', () => {
+    const result = KeyConfigSchema.safeParse({ secret: 's', defaultServiceTier: null });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.defaultServiceTier).toBeNull();
+  });
+
   it('rejects a tier outside the suffix vocabulary', () => {
     const result = KeyConfigSchema.safeParse({ secret: 's', defaultServiceTier: 'turbo' });
     expect(result.success).toBe(false);
