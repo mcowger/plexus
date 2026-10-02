@@ -10,8 +10,9 @@ import type { MeterContext } from '../checker-registry';
 interface CodexUsageWindow {
   used_percent?: number;
   reset_at?: number;
-  limit_window_seconds?: number;
 }
+
+type CodexUsageWindowKey = 'primary' | 'secondary';
 
 interface CodexRateLimitInfo {
   allowed?: boolean;
@@ -62,19 +63,18 @@ function extractChatGPTAccountId(accessToken: string): string | null {
   }
 }
 
-function windowPeriod(limitWindowSeconds?: number): {
+function windowPeriod(key: CodexUsageWindowKey): {
   periodValue: number;
-  periodUnit: 'hour' | 'day';
+  periodUnit: 'hour' | 'week';
   periodCycle: 'rolling';
 } {
-  if (limitWindowSeconds === 5 * 60 * 60)
-    return { periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling' };
-  return { periodValue: 7, periodUnit: 'day', periodCycle: 'rolling' };
+  if (key === 'primary') return { periodValue: 5, periodUnit: 'hour', periodCycle: 'rolling' };
+  return { periodValue: 1, periodUnit: 'week', periodCycle: 'rolling' };
 }
 
 function buildMeterFromWindow(
   window: CodexUsageWindow,
-  key: string,
+  key: CodexUsageWindowKey,
   label: string,
   ctx: Pick<MeterContext, 'allowance'>
 ): Meter | null {
@@ -84,7 +84,7 @@ function buildMeterFromWindow(
       ? Math.min(Math.max(usedPercent, 0), 100)
       : 0;
   const remaining = Math.max(0, 100 - used);
-  const period = windowPeriod(window.limit_window_seconds);
+  const period = windowPeriod(key);
   const resetsAt =
     typeof window.reset_at === 'number' && window.reset_at > 0
       ? new Date(window.reset_at * 1000).toISOString()
@@ -261,9 +261,7 @@ export default defineChecker({
           unit: 'percentage',
           used: 100,
           remaining: 0,
-          periodValue: 5,
-          periodUnit: 'hour',
-          periodCycle: 'rolling',
+          ...windowPeriod('primary'),
         })
       );
       return meters;

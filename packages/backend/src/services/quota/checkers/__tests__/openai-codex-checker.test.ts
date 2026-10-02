@@ -60,6 +60,41 @@ describe('openai-codex checker', () => {
     expect(m.resetsAt).toBe('2025-01-01T00:00:00.000Z');
   });
 
+  it('records primary as a 5-hour period and secondary as a weekly period', async () => {
+    const token = makeToken({});
+
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            rate_limit: {
+              allowed: true,
+              limit_reached: false,
+              primary_window: { used_percent: 17 },
+              secondary_window: { used_percent: 3 },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx(token));
+
+    expect(meters).toHaveLength(2);
+    expect(meters[0]).toMatchObject({
+      key: 'primary',
+      periodValue: 5,
+      periodUnit: 'hour',
+      periodCycle: 'rolling',
+    });
+    expect(meters[1]).toMatchObject({
+      key: 'secondary',
+      periodValue: 1,
+      periodUnit: 'week',
+      periodCycle: 'rolling',
+    });
+  });
+
   it('accepts apiKey as OAuth JSON blob with access_token', async () => {
     const token = makeToken({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct_123' } });
 
