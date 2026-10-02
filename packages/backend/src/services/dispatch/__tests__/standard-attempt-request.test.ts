@@ -193,6 +193,81 @@ describe('executeStandardAttempt — per-fetch TTFB budget reset', () => {
   });
 });
 
+describe('executeStandardAttempt — auto fast-mode beta', () => {
+  function makeFastModeContext(
+    host: RequestManagerHost,
+    providerPayload: any
+  ): StandardAttemptContext {
+    const request: UnifiedChatRequest = {
+      requestId: 'req-1',
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'hi' } as any],
+      stream: false,
+      incomingApiType: 'messages',
+    };
+    return {
+      host,
+      providerPayload,
+      request,
+      requestWithTargetModel: request,
+      route: makeRoute(),
+      targetApiType: 'messages',
+      transformer: { name: 'test-transformer' },
+      bypassTransformation: false,
+      adapters: [],
+      stallConfig: null,
+      attemptTimeout: {
+        signal: new AbortController().signal,
+        isTimedOut: () => false,
+        cleanup: vi.fn(),
+      },
+      failoverEnabled: true,
+      hasNextTarget: true,
+      retryableStatusCodes: [500, 502, 503],
+      retryableErrors: [],
+      retryHistory: [],
+      attemptedProviders: [],
+      sessionKey: null,
+      release: vi.fn(),
+    };
+  }
+
+  it('drops the auto fast-mode beta when a strip-and-retry removes speed, keeping client betas', async () => {
+    const speed400 = new Response(
+      JSON.stringify({ error: { message: "Unsupported parameter: 'speed'" } }),
+      { status: 400 }
+    );
+    const ok = new Response('{"id":"msg_1"}', { status: 200 });
+    const executeProviderRequest = vi
+      .fn()
+      .mockResolvedValueOnce(speed400)
+      .mockResolvedValueOnce(ok);
+    const handleNonStreamingResponse = vi.fn(async () => ({ content: 'ok' }) as any);
+    const setupHeaders = vi.fn(() => ({ 'anthropic-beta': 'client-beta' }));
+    const host = makeHost({
+      executeProviderRequest,
+      handleNonStreamingResponse,
+      setupHeaders,
+    });
+
+    const result = await executeStandardAttempt(
+      makeFastModeContext(host, { model: 'model-1', speed: 'fast' })
+    );
+    expect(result.outcome).toBe('success');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+
+    // Initial attempt: speed fast implies the auto beta alongside the client's.
+    const firstHeaders = executeProviderRequest.mock.calls[0]![1] as Record<string, string>;
+    expect(firstHeaders['anthropic-beta']).toContain('client-beta');
+    expect(firstHeaders['anthropic-beta']).toContain('fast-mode-2026-02-01');
+
+    // After `speed` was stripped, the auto beta must not linger; client beta stays.
+    const secondHeaders = executeProviderRequest.mock.calls[1]![1] as Record<string, string>;
+    expect(secondHeaders['anthropic-beta']).toContain('client-beta');
+    expect(secondHeaders['anthropic-beta']).not.toContain('fast-mode-2026-02-01');
+  });
+});
+
 describe('executeStandardAttempt — thinking-signature strip-and-retry', () => {
   const signature400Body = JSON.stringify({
     type: 'error',

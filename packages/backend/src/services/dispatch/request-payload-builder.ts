@@ -52,6 +52,33 @@ export interface RequestPayload {
   bypassTransformation: boolean;
 }
 
+/**
+ * Anthropic fast mode (`speed: 'fast'`) requires the `fast-mode-2026-02-01`
+ * beta flag. It is derived from the FINAL outbound body at fetch time — after
+ * provider/alias `extraBody` and adapter overrides, and again after any
+ * strip-and-retry — so a later override to `speed: 'standard'` never leaves a
+ * stale fast-mode beta on the request. Existing caller betas are preserved; the
+ * flag is only appended when absent.
+ */
+export function applyAutoAnthropicBetas(
+  headers: Record<string, string>,
+  payload: any,
+  targetApiType: string
+): void {
+  if (getApiBaseType(targetApiType) !== 'messages') return;
+  if ((payload as { speed?: unknown } | null)?.speed !== 'fast') return;
+  // Config/route headers may spell the header with any casing (e.g.
+  // `Anthropic-Beta`). Merge into the existing key so a fast-mode append does
+  // not leave a duplicate, case-differing header behind.
+  const existingKey = Object.keys(headers).find((key) => key.toLowerCase() === 'anthropic-beta');
+  const betas = (existingKey ? (headers[existingKey] ?? '') : '')
+    .split(',')
+    .map((beta) => beta.trim())
+    .filter(Boolean);
+  if (!betas.includes('fast-mode-2026-02-01')) betas.push('fast-mode-2026-02-01');
+  headers[existingKey ?? 'anthropic-beta'] = betas.join(',');
+}
+
 function shouldUsePassThrough(
   request: UnifiedChatRequest,
   targetApiType: string,

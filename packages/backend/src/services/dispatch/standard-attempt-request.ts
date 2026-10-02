@@ -6,7 +6,7 @@ import type { RetryAttemptRecord } from './dispatcher-types';
 import type { StallConfig } from '../inspectors/stall-inspector';
 import { CooldownManager } from '../runtime/cooldown-manager';
 import type { RequestManagerHost } from './request-manager';
-import { refreshOAuthRoute } from './request-payload-builder';
+import { applyAutoAnthropicBetas, refreshOAuthRoute } from './request-payload-builder';
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
 import {
   createAdvisorResultStripState,
@@ -132,7 +132,11 @@ export async function executeStandardAttempt(
 
   const incomingApi = currentRequest.incomingApiType || 'unknown';
   let url = host.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
-  let headers = host.setupHeaders(route, targetApiType, requestWithTargetModel);
+  // Headers are rebuilt from this base at the start of every retry iteration so
+  // the auto fast-mode beta tracks the CURRENT payload (a strip-and-retry that
+  // removes `speed` must drop the beta too).
+  let baseHeaders = host.setupHeaders(route, targetApiType, requestWithTargetModel);
+  let headers = baseHeaders;
 
   logger.info(
     `Dispatching ${currentRequest.model} to ${route.provider}:${route.model} ${incomingApi} <-> ${transformer.name}`
@@ -164,6 +168,11 @@ export async function executeStandardAttempt(
     // Reset to the pristine, full TTFB budget at the start of every
     // iteration — see the comment on `pristineStallConfig` above.
     effectiveStallConfig = pristineStallConfig;
+
+    // Rebuild from the client/base headers and layer on the beta implied by the
+    // current payload, so a strip that removed `speed` also loses the auto beta.
+    headers = { ...baseHeaders };
+    applyAutoAnthropicBetas(headers, providerPayload, targetApiType);
 
     logger.silly('Upstream Request Payload', providerPayload);
 
@@ -292,7 +301,7 @@ export async function executeStandardAttempt(
           const refreshed = await refreshOAuthRoute(route, targetApiType, attemptTimeout.signal);
           if (refreshed) {
             url = host.buildRequestUrl(route, transformer, requestWithTargetModel, targetApiType);
-            headers = host.setupHeaders(route, targetApiType, requestWithTargetModel);
+            baseHeaders = host.setupHeaders(route, targetApiType, requestWithTargetModel);
             logger.info(
               `OAuth: Successfully refreshed credentials for ${route.provider}/${route.model} after 401 — retrying attempt`
             );

@@ -10,8 +10,19 @@
 
 export const SERVICE_TIER_SUFFIX_DELIMITER = '@';
 
-/** OpenAI `service_tier` request values. OpenAI treats `fast` as an alias of `priority`. */
-export const SERVICE_TIER_SUFFIXES = ['auto', 'default', 'flex', 'priority', 'fast'] as const;
+/**
+ * Service-tier suffix vocabulary. `default` and `standard` name the same tier; so do `priority`
+ * and `fast`. `ultrafast` is the fastest tier above `priority`.
+ */
+export const SERVICE_TIER_SUFFIXES = [
+  'auto',
+  'default',
+  'standard',
+  'flex',
+  'priority',
+  'fast',
+  'ultrafast',
+] as const;
 
 export type ServiceTierSuffix = (typeof SERVICE_TIER_SUFFIXES)[number];
 
@@ -42,11 +53,16 @@ export function splitServiceTierSuffix(modelName: string): ServiceTierSplit {
 
 /**
  * Every `<model>@<tier>` spelling that names the same upstream tier as `tier` (the normalised,
- * lower-case tier from `splitServiceTierSuffix`). `fast` is an alias of `priority`, so either one
- * names both. Key model lists match against these, so one entry covers the tier however the client
- * spelled it.
+ * lower-case tier from `splitServiceTierSuffix`). `fast` is an alias of `priority` and
+ * `standard` is an alias of `default`, so either spelling names both. Key model lists match
+ * against these, so one entry covers the tier however the client spelled it.
  */
 export function serviceTierNames(model: string, tier: string): string[] {
-  const tiers = tier === 'priority' || tier === 'fast' ? ['priority', 'fast'] : [tier];
+  const tiers =
+    tier === 'priority' || tier === 'fast'
+      ? ['priority', 'fast']
+      : tier === 'default' || tier === 'standard'
+        ? ['default', 'standard']
+        : [tier];
   return tiers.map((name) => `${model}${SERVICE_TIER_SUFFIX_DELIMITER}${name}`);
 }

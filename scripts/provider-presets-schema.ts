@@ -51,8 +51,7 @@ export function generateSchema(): JsonSchema {
         if: { type: 'object', required: ['thinkingLevelMap'] },
         then: {
           type: 'object',
-          properties: { reasoning: { const: true } },
-          required: ['reasoning'],
+          properties: { reasoning: { not: { const: false } } },
         },
       },
     ];
@@ -61,7 +60,7 @@ export function generateSchema(): JsonSchema {
     targetSchema.properties.models.additionalProperties.allOf = [
       {
         if: { type: 'object', required: ['thinkingLevelMap'] },
-        then: { type: 'object', properties: { reasoning: { const: true } } },
+        then: { type: 'object', properties: { reasoning: { not: { const: false } } } },
       },
     ];
     preset.allOf ??= [];
@@ -74,22 +73,19 @@ export function generateSchema(): JsonSchema {
       then: { type: 'object', properties: { apiBaseUrl: { type: 'object', required: [target] } } },
     });
   }
-  preset.allOf.push(
-    { not: { type: 'object', required: ['piAiProvider', 'piAiQuirks'] } },
-    {
-      if: {
-        type: 'object',
-        properties: { autoCompat: { const: true } },
-        required: ['autoCompat'],
-      },
-      then: {
-        anyOf: [
-          { type: 'object', required: ['piAiProvider'] },
-          { type: 'object', required: ['piAiQuirks'] },
-        ],
-      },
-    }
-  );
+  preset.allOf.push({
+    if: {
+      type: 'object',
+      properties: { autoCompat: { const: true } },
+      required: ['autoCompat'],
+    },
+    then: {
+      anyOf: [
+        { type: 'object', required: ['piAiProvider'] },
+        { type: 'object', required: ['piAiQuirks'] },
+      ],
+    },
+  });
   return schema;
 }
 

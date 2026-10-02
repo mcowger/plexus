@@ -16,11 +16,14 @@ import { clampThinkingLevel, getSupportedThinkingLevels } from '@earendil-works/
 import type { Model as PiAiModel, ModelThinkingLevel } from '@earendil-works/pi-ai';
 
 import { getCatalogModel } from './catalog';
+import { logger } from '../../utils/logger';
 
 import type { RouteResult } from '../routing/router';
 import type { ReasoningEffort, ReasoningIntent } from './reasoning';
 import { clampEffortToWindow, effortToBudget, intentToEffort } from './reasoning';
 import type { GenerationIntent } from './generation';
+import type { ServiceTierFormat, ServiceTierMap } from '../dispatch/service-tier-selection';
+import { inferServiceTierFormat, resolveServiceTier } from '../dispatch/service-tier-selection';
 
 // ─── resolveBaseUrl ───────────────────────────────────────────────────────────
 //
@@ -278,12 +281,16 @@ function buildEnabledOptions(
 //                   Mirrors pi-ai's own anthropic guard so we never send a
 //                   value the provider will reject.
 //   - verbosity   → OpenAI-family only (textVerbosity).
-//   - serviceTier → OpenAI-family / responses only.
+//   - serviceTier → capability-mapped for models declaring a serviceTierMap /
+//                   serviceTierFormat, legacy OpenAI-family pass-through
+//                   otherwise.
 
 export function buildGenerationOptions(
   model: Pick<PiAiModel<any>, 'api' | 'reasoning' | 'thinkingLevelMap' | 'compat'> & {
     maxTokens?: number;
     id?: string;
+    /** Canonical service-tier capability map (see service-tier-selection.ts). */
+    serviceTierMap?: ServiceTierMap;
   },
   intent: GenerationIntent | undefined
 ): Record<string, any> {
@@ -314,9 +321,41 @@ export function buildGenerationOptions(
     opts.textVerbosity = intent.verbosity;
   }
 
-  // ── serviceTier: OpenAI family only ────────────────────────────────
-  if (intent.serviceTier != null && isOpenAiFamily(api)) {
-    opts.serviceTier = intent.serviceTier;
+  // ── serviceTier: capability-mapped when declared, legacy pass-through otherwise ──
+  if (intent.serviceTier != null) {
+    const map = (model as { serviceTierMap?: ServiceTierMap }).serviceTierMap;
+    // Only a declared capability map engages the mapper. A lone format (or no
+    // config at all) preserves the legacy provider-native pass-through so we
+    // never break provider-specific controls we don't understand.
+    if (map) {
+      const explicitFormat = (model.compat as { serviceTierFormat?: ServiceTierFormat } | undefined)
+        ?.serviceTierFormat;
+      const format = explicitFormat ?? inferServiceTierFormat(api);
+      // No inferable wire shape (e.g. Gemini): the tier cannot be projected.
+      // Emit nothing rather than leak an unmappable value.
+      if (format === 'anthropic-speed' && api !== 'anthropic-messages') {
+        // `anthropic-speed` only has a wire spelling on the Anthropic Messages
+        // API. Any other declared combination is a configuration error: leave
+        // the body untouched rather than writing `speed` to an OpenAI body.
+        logger.warn(
+          `Ignoring serviceTierFormat 'anthropic-speed' for ${api ?? 'unknown'} model ` +
+            `${model.id ?? '<unidentified>'}: it is only supported on anthropic-messages`
+        );
+      } else if (format) {
+        const resolved = resolveServiceTier(intent.serviceTier, map, format);
+        if (resolved) {
+          // `null` is the projection's explicit "omit" signal; an unsupported
+          // tier must not leave the client's rejected value in the body.
+          opts.serviceTier = resolved.value ?? null;
+          opts.serviceTierFormat = format;
+        }
+      }
+    } else if (isOpenAiFamily(api) && intent.serviceTierSource !== 'speed') {
+      // Legacy (unmapped) pass-through. A native Anthropic `speed` value is a
+      // different concept than a capacity `service_tier`, so it must not be
+      // translated into a raw OpenAI `service_tier` without a declared map.
+      opts.serviceTier = legacyOpenAiServiceTier(intent.serviceTier);
+    }
   }
 
   return opts;
@@ -329,6 +368,19 @@ function isOpenAiFamily(api: string | undefined): boolean {
     api === 'openai-completions' ||
     api === 'azure-openai-responses'
   );
+}
+
+/**
+ * Legacy (unmapped) OpenAI-family pass-through spellings. OpenAI's wire value
+ * for the standard tier is `default`, so translate the Plexus/Anthropic
+ * `standard`/`standard_only` spellings instead of leaking them. Provider-
+ * specific spellings we do not recognise (e.g. Google `on_demand`) are left
+ * verbatim rather than guessed at.
+ */
+const LEGACY_OPENAI_STANDARD_TIERS: ReadonlySet<string> = new Set(['standard', 'standard_only']);
+
+function legacyOpenAiServiceTier(tier: string): string {
+  return LEGACY_OPENAI_STANDARD_TIERS.has(tier.trim().toLowerCase()) ? 'default' : tier;
 }
 
 /**

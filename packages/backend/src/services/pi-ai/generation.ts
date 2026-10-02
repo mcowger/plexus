@@ -32,6 +32,12 @@ export interface GenerationIntent {
   verbosity?: TextVerbosity;
   /** Service tier (openai-family / responses), e.g. "auto" | "flex" | "priority". */
   serviceTier?: string;
+  /**
+   * Where the tier intent came from. Native Anthropic `speed` is a distinct
+   * concept from capacity `service_tier`; legacy (unmapped) egress must not
+   * project a native `speed` value as a raw OpenAI `service_tier`.
+   */
+  serviceTierSource?: 'suffix' | 'speed' | 'service_tier';
 }
 
 /** Normalize a client verbosity string to our vocabulary. */

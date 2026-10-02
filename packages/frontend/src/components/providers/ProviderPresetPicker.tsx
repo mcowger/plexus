@@ -367,7 +367,9 @@ export function ProviderPresetPicker({
             {selectedPreset.piAiProvider ? (
               <>
                 Uses the pi-ai <code className="text-primary">{selectedPreset.piAiProvider}</code>{' '}
-                catalog; auto-compat requires a matching model ID.
+                catalog
+                {selectedPreset.piAiQuirks ? ' with inline quirks layered on top' : ''}; auto-compat
+                requires a matching model ID.
               </>
             ) : selectedPreset.piAiQuirks ? (
               <>

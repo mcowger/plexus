@@ -13,8 +13,10 @@ import { Switch } from '../ui/Switch';
 
 /**
  * Structured editor for inline pi-ai quirks (`PiAiQuirks`) plus the provider's
- * Native Responses Extensions list. Each of the five dispatch target keys has a
- * fixed dialect; the operator toggles targets on, edits traits/compat and adds
+ * Native Responses Extensions list. Quirks are an overlay: they layer onto the
+ * provider's built-in pi-ai source (or stand alone when none is selected). Each
+ * of the five dispatch target keys has a fixed dialect; the operator toggles
+ * targets on, edits traits/compat (including the service tier map) and adds
  * exact-model overrides. Provider-wide extensions are edited in the Responses
  * tab. Both drafts stay local until Apply; Cancel/Escape mutate nothing.
  * Zero enabled quirks targets apply `undefined` quirks (never a schema error),
@@ -31,6 +33,9 @@ type PiAiTargetApi = QuirksTarget['api'];
 type TriState = 'unset' | 'true' | 'false';
 type ThinkingFormatValue = NonNullable<QuirksCompat['thinkingFormat']>;
 type MaxTokensFieldValue = NonNullable<QuirksCompat['maxTokensField']>;
+type ServiceTierMap = NonNullable<QuirksTraits['serviceTierMap']>;
+type ServiceTierKey = keyof ServiceTierMap;
+type ServiceTierFormatValue = NonNullable<QuirksCompat['serviceTierFormat']>;
 
 const THINKING_LEVELS: readonly (keyof ThinkingLevelMap)[] = [
   'off',
@@ -54,6 +59,14 @@ const THINKING_FORMATS: readonly ThinkingFormatValue[] = [
 ];
 
 const MAX_TOKENS_FIELDS: readonly MaxTokensFieldValue[] = ['max_tokens', 'max_completion_tokens'];
+
+const SERVICE_TIERS: readonly ServiceTierKey[] = [
+  'auto',
+  'standard',
+  'flex',
+  'priority',
+  'ultrafast',
+];
 
 interface TargetDef {
   key: QuirksKey;
@@ -107,7 +120,14 @@ interface CompatDraft {
   forceAdaptiveThinking: TriState;
   thinkingFormat: '' | ThinkingFormatValue;
   maxTokensField: '' | MaxTokensFieldValue;
+  serviceTierFormat: '' | ServiceTierFormatValue;
 }
+
+interface ServiceTierDraftEntry {
+  mode: 'omit' | 'value' | 'unsupported';
+  value: string;
+}
+type ServiceTiersDraft = Record<ServiceTierKey, ServiceTierDraftEntry>;
 
 interface TraitsDraft {
   reasoning: TriState;
@@ -119,6 +139,12 @@ interface TraitsDraft {
    * a map the operator empties drop back to inheritance/undefined.
    */
   thinkingLevelMapPresent: boolean;
+  serviceTierMap: ServiceTiersDraft;
+  /**
+   * Mirrors `thinkingLevelMapPresent`: an untouched map round-trips verbatim,
+   * and any edit lets an operator-cleared map drop back to undefined.
+   */
+  serviceTierMapPresent: boolean;
   compat: CompatDraft;
 }
 
@@ -158,6 +184,14 @@ function blankLevels(): LevelsDraft {
   return levels;
 }
 
+function blankServiceTiers(): ServiceTiersDraft {
+  const tiers = {} as ServiceTiersDraft;
+  for (const tier of SERVICE_TIERS) {
+    tiers[tier] = { mode: 'omit', value: '' };
+  }
+  return tiers;
+}
+
 function blankCompat(): CompatDraft {
   return {
     supportsTemperature: 'unset',
@@ -165,6 +199,7 @@ function blankCompat(): CompatDraft {
     forceAdaptiveThinking: 'unset',
     thinkingFormat: '',
     maxTokensField: '',
+    serviceTierFormat: '',
   };
 }
 
@@ -174,6 +209,8 @@ function blankTraits(): TraitsDraft {
     maxTokens: '',
     thinkingLevelMap: blankLevels(),
     thinkingLevelMapPresent: false,
+    serviceTierMap: blankServiceTiers(),
+    serviceTierMapPresent: false,
     compat: blankCompat(),
   };
 }
@@ -193,6 +230,17 @@ function levelsToDraft(map: ThinkingLevelMap | undefined): LevelsDraft {
   return levels;
 }
 
+function serviceTiersToDraft(map: ServiceTierMap | undefined): ServiceTiersDraft {
+  const tiers = blankServiceTiers();
+  if (!map) return tiers;
+  for (const tier of SERVICE_TIERS) {
+    const value = map[tier];
+    if (value === undefined) continue;
+    tiers[tier] = value === null ? { mode: 'unsupported', value: '' } : { mode: 'value', value };
+  }
+  return tiers;
+}
+
 function compatToDraft(compat: QuirksCompat | undefined): CompatDraft {
   return {
     supportsTemperature: toTri(compat?.supportsTemperature),
@@ -200,6 +248,7 @@ function compatToDraft(compat: QuirksCompat | undefined): CompatDraft {
     forceAdaptiveThinking: toTri(compat?.forceAdaptiveThinking),
     thinkingFormat: compat?.thinkingFormat ?? '',
     maxTokensField: compat?.maxTokensField ?? '',
+    serviceTierFormat: compat?.serviceTierFormat ?? '',
   };
 }
 
@@ -209,6 +258,8 @@ function traitsToDraft(traits: QuirksTraits | undefined): TraitsDraft {
     maxTokens: traits?.maxTokens !== undefined ? String(traits.maxTokens) : '',
     thinkingLevelMap: levelsToDraft(traits?.thinkingLevelMap),
     thinkingLevelMapPresent: traits?.thinkingLevelMap !== undefined,
+    serviceTierMap: serviceTiersToDraft(traits?.serviceTierMap),
+    serviceTierMapPresent: traits?.serviceTierMap !== undefined,
     compat: compatToDraft(traits?.compat),
   };
 }
@@ -253,6 +304,22 @@ function draftToLevels(levels: LevelsDraft, present: boolean): ThinkingLevelMap 
   return out;
 }
 
+function draftToServiceTiers(
+  tiers: ServiceTiersDraft,
+  present: boolean
+): ServiceTierMap | undefined {
+  const out: ServiceTierMap = {};
+  let any = false;
+  for (const tier of SERVICE_TIERS) {
+    const entry = tiers[tier];
+    if (entry.mode === 'omit') continue;
+    out[tier] = entry.mode === 'unsupported' ? null : entry.value.trim();
+    any = true;
+  }
+  if (!any && !present) return undefined;
+  return out;
+}
+
 // Preserve every declared compat field, including ones not surfaced for the
 // target's protocol, so switching protocols never silently drops stored values.
 function draftToCompat(compat: CompatDraft): QuirksCompat | undefined {
@@ -281,6 +348,11 @@ function draftToCompat(compat: CompatDraft): QuirksCompat | undefined {
     any = true;
   }
 
+  if (compat.serviceTierFormat) {
+    out.serviceTierFormat = compat.serviceTierFormat;
+    any = true;
+  }
+
   const adaptive = triToBool(compat.forceAdaptiveThinking);
   if (adaptive !== undefined) {
     out.forceAdaptiveThinking = adaptive;
@@ -300,6 +372,9 @@ function draftToTraits(traits: TraitsDraft): QuirksTraits {
 
   const levels = draftToLevels(traits.thinkingLevelMap, traits.thinkingLevelMapPresent);
   if (levels) out.thinkingLevelMap = levels;
+
+  const serviceTiers = draftToServiceTiers(traits.serviceTierMap, traits.serviceTierMapPresent);
+  if (serviceTiers) out.serviceTierMap = serviceTiers;
 
   const compat = draftToCompat(traits.compat);
   if (compat) out.compat = compat;
@@ -345,11 +420,21 @@ function collectDraftErrors(draft: QuirksDraft): string[] {
     }
   };
 
+  const checkServiceTiers = (tiers: ServiceTiersDraft, scope: string) => {
+    for (const tier of SERVICE_TIERS) {
+      const entry = tiers[tier];
+      if (entry.mode === 'value' && entry.value.trim() === '') {
+        errors.push(`${scope}: service tier "${tier}" needs a mapped value`);
+      }
+    }
+  };
+
   for (const { key, label } of TARGETS) {
     const target = draft[key];
     if (!target || !target.enabled) continue;
 
     checkLevels(target.thinkingLevelMap, `${label} base traits`);
+    checkServiceTiers(target.serviceTierMap, `${label} base traits`);
 
     const seen = new Set<string>();
     target.models.forEach((model, index) => {
@@ -363,6 +448,7 @@ function collectDraftErrors(draft: QuirksDraft): string[] {
         seen.add(id);
       }
       checkLevels(model.thinkingLevelMap, scope);
+      checkServiceTiers(model.serviceTierMap, scope);
     });
   }
 
@@ -446,6 +532,55 @@ function LevelMapEditor({
   );
 }
 
+function ServiceTierMapEditor({
+  tiers,
+  onChange,
+}: {
+  tiers: ServiceTiersDraft;
+  onChange: (tiers: ServiceTiersDraft) => void;
+}) {
+  const setTier = (tier: ServiceTierKey, entry: ServiceTierDraftEntry) => {
+    onChange({ ...tiers, [tier]: entry });
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {SERVICE_TIERS.map((tier) => {
+        const entry = tiers[tier];
+        return (
+          <div key={tier} className="flex items-center gap-2">
+            <span className="w-20 shrink-0 font-body text-[11px] text-text-secondary">{tier}</span>
+            <select
+              className={`${FIELD_CLASS} w-32 shrink-0`}
+              aria-label={`${tier} service tier mode`}
+              value={entry.mode}
+              onChange={(e) =>
+                setTier(tier, {
+                  ...entry,
+                  mode: e.target.value as ServiceTierDraftEntry['mode'],
+                })
+              }
+            >
+              <option value="omit">Default</option>
+              <option value="value">Value</option>
+              <option value="unsupported">Unsupported</option>
+            </select>
+            {entry.mode === 'value' && (
+              <input
+                className={`${FIELD_CLASS} min-w-0 flex-1`}
+                aria-label={`${tier} service tier mapped value`}
+                value={entry.value}
+                placeholder="provider value"
+                onChange={(e) => setTier(tier, { ...entry, value: e.target.value })}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function CompatEditor({
   api,
   compat,
@@ -457,6 +592,7 @@ function CompatEditor({
 }) {
   const set = (patch: Partial<CompatDraft>) => onChange({ ...compat, ...patch });
   const isCompletions = api === 'openai-completions';
+  const supportsServiceTier = api !== 'google-generative-ai';
 
   return (
     <div className="flex flex-col gap-2">
@@ -529,6 +665,26 @@ function CompatEditor({
             </select>
           </label>
         )}
+        {supportsServiceTier && (
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLASS}>Service tier format</span>
+            <select
+              className={`${FIELD_CLASS} w-full`}
+              value={compat.serviceTierFormat}
+              onChange={(e) =>
+                set({
+                  serviceTierFormat: e.target.value as CompatDraft['serviceTierFormat'],
+                })
+              }
+            >
+              <option value="">Default</option>
+              <option value="service-tier">service-tier (service_tier body)</option>
+              {api === 'anthropic-messages' && (
+                <option value="anthropic-speed">anthropic-speed (speed + beta header)</option>
+              )}
+            </select>
+          </label>
+        )}
       </div>
     </div>
   );
@@ -580,7 +736,7 @@ function TraitsEditor({
           <span className="font-body text-[10px] text-text-muted">
             {inheritedReasoning !== 'unset'
               ? 'Requires Reasoning = true here or on the base traits to apply.'
-              : 'Requires Reasoning = true on this trait to apply.'}
+              : 'Requires Reasoning = true here or inherited from the builtin model.'}
           </span>
         )}
         <LevelMapEditor
@@ -590,6 +746,27 @@ function TraitsEditor({
               ...traits,
               thinkingLevelMap,
               thinkingLevelMapPresent: false,
+            })
+          }
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className={LABEL_CLASS}>Service tier map</span>
+        <span className="font-body text-[10px] leading-[1.35] text-text-muted">
+          Canonical tier to upstream value for this API (auto, standard, flex, priority, ultrafast).
+          Default means unset; Unsupported means this API has no exact tier. Neither is an error:
+          Plexus sends the nearest supported equivalent instead (ultrafast to priority to standard;
+          priority to standard; flex to standard). The `@fast` suffix is the client-side alias for
+          priority. For Anthropic fast mode, map priority to fast and select anthropic-speed in
+          Compat below. A format alone does not enable mapping.
+        </span>
+        <ServiceTierMapEditor
+          tiers={traits.serviceTierMap}
+          onChange={(serviceTierMap) =>
+            onChange({
+              ...traits,
+              serviceTierMap,
+              serviceTierMapPresent: false,
             })
           }
         />
@@ -930,8 +1107,8 @@ export function ProviderQuirksModal({
               </div>
               <p className="font-body text-[10px] text-text-muted">
                 Overrides start from the base traits above: omitted traits inherit, compat fields
-                merge per field, and a thinking level map here replaces the base map entirely.
-                Setting Reasoning = false removes the inherited thinking level map.
+                merge per field, and a thinking level map or service tier map here replaces the base
+                map entirely. Setting Reasoning = false removes the inherited thinking level map.
               </p>
               {target.models.length === 0 ? (
                 <span className="font-body text-[11px] text-text-muted">

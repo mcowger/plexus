@@ -44,6 +44,16 @@ $defs:
       high: { type: [string, 'null'] }
       xhigh: { type: [string, 'null'] }
       max: { type: [string, 'null'] }
+  serviceTierMap:
+    type: object
+    additionalProperties: false
+    description: Canonical tier to native value. Unsupported or omitted tiers use the nearest equivalent.
+    properties:
+      auto: { type: [string, 'null'] }
+      standard: { type: [string, 'null'] }
+      flex: { type: [string, 'null'] }
+      priority: { type: [string, 'null'] }
+      ultrafast: { type: [string, 'null'] }
   compat:
     type: object
     additionalProperties: false
@@ -55,12 +65,14 @@ $defs:
       maxTokensField: { type: string, enum: [max_tokens, max_completion_tokens] }
       forceAdaptiveThinking: { type: boolean }
       supportsReasoningEffort: { type: boolean }
+      serviceTierFormat: { type: string, enum: [service-tier, anthropic-speed] }
   traits:
     type: object
     additionalProperties: false
     properties:
       reasoning: { type: boolean }
       thinkingLevelMap: { $ref: '#/$defs/thinkingLevelMap' }
+      serviceTierMap: { $ref: '#/$defs/serviceTierMap' }
       maxTokens: { type: integer, minimum: 1 }
       compat: { $ref: '#/$defs/compat' }
   target:
@@ -73,6 +85,7 @@ $defs:
         enum: [openai-completions, openai-responses, anthropic-messages, google-generative-ai]
       reasoning: { type: boolean }
       thinkingLevelMap: { $ref: '#/$defs/thinkingLevelMap' }
+      serviceTierMap: { $ref: '#/$defs/serviceTierMap' }
       maxTokens: { type: integer, minimum: 1 }
       compat: { $ref: '#/$defs/compat' }
       models:

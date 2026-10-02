@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { registerSpy } from '../../../test/test-utils';
 import { Dispatcher } from '../dispatch/dispatcher';
 import { ProviderConfigSchema } from '../../config';
-import { applyRegistryAutoCompat } from '../dispatch/dispatcher-auto-compat';
+import { applyQuirkOverlay, applyRegistryAutoCompat } from '../dispatch/dispatcher-auto-compat';
 import * as piAiRegistry from '../pi-ai/registry';
 import type { RouteResult } from '../routing/router';
 import type { UnifiedChatRequest } from '../../types/unified';
@@ -458,7 +458,7 @@ describe('Dispatcher registry auto-compat', () => {
     expect(piAiRegistry.resolvePiAiModel).not.toHaveBeenCalled();
   });
 
-  test('skips auto-compat when the model has no pi_ai_model_id', async () => {
+  test('resolves the exact route model when the provider is selected but unlinked', async () => {
     const dispatcher = new Dispatcher() as any;
 
     const result = await dispatcher.transformRequestPayload(
@@ -469,14 +469,58 @@ describe('Dispatcher registry auto-compat', () => {
           reasoning_effort: 'high',
         },
       }),
-      route({ modelConfig: { pricing: { source: 'simple', input: 0, output: 0 } } as any }),
+      route({
+        model: 'provider-model',
+        modelConfig: { pricing: { source: 'simple', input: 0, output: 0 } } as any,
+      }),
       { transformRequest: vi.fn() },
       'chat',
       []
     );
 
     expect(result.payload.reasoning_effort).toBe('high');
-    expect(piAiRegistry.resolvePiAiModel).not.toHaveBeenCalled();
+    // Provider selected but model unlinked: the catalog lookup uses the exact
+    // upstream model, matching GET /v1/models' automatic identity.
+    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'provider-model');
+  });
+
+  test('does not borrow the route model when an explicit pi_ai_model_id link is invalid', async () => {
+    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(null);
+    const config = ProviderConfigSchema.parse({
+      api_base_url: { chat: 'https://example.test/v1' },
+      api_key: 'test-key',
+      auto_compat: true,
+      pi_ai_provider: 'openai',
+      pi_ai_quirks: {
+        chat: { api: 'openai-completions', compat: { maxTokensField: 'max_completion_tokens' } },
+      },
+    });
+
+    const outbound = applyRegistryAutoCompat(
+      {
+        model: 'upstream/model',
+        messages: [],
+        max_tokens: 256,
+      },
+      request({
+        originalBody: { model: 'upstream/model', messages: [], max_tokens: 256 },
+      }),
+      route({
+        model: 'upstream/model',
+        config,
+        modelConfig: {
+          pricing: { source: 'simple', input: 0, output: 0 },
+          pi_ai_model_id: 'missing-catalog-model',
+        } as any,
+      }),
+      'chat'
+    );
+
+    // The explicit but unresolved link stays invalid; only the explicit quirks
+    // apply, and no `route.model` catalog lookup happens.
+    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledTimes(1);
+    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'missing-catalog-model');
+    expect(outbound.max_completion_tokens).toBe(256);
   });
 
   test('drops temperature when registry compat marks it unsupported', async () => {
@@ -869,5 +913,333 @@ describe('Dispatcher registry auto-compat', () => {
 
     expect(result.payload.reasoning).toEqual({ effort: 'high' });
     expect(result.payload.reasoning_effort).toBeUndefined();
+  });
+});
+
+describe('Registry overlay quirks + service tiers', () => {
+  beforeEach(() => {
+    registerSpy(piAiRegistry, 'resolvePiAiModel').mockReturnValue(piModel());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const overlayConfig = (quirks: any) =>
+    ProviderConfigSchema.parse({
+      api_base_url: { chat: 'https://example.test/v1', messages: 'https://example.test/v1' },
+      api_key: 'test-key',
+      auto_compat: true,
+      pi_ai_provider: 'openai',
+      pi_ai_quirks: quirks,
+    });
+
+  test('maps a tier through the target overlay onto the resolved builtin', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({ originalBody: { model: 'provider-model', messages: [], service_tier: 'flex' } }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { standard: 'default', priority: 'priority' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    // flex unsupported -> standard -> native default; the rejected flex must
+    // never leak upstream.
+    expect(outbound.service_tier).toBe('default');
+  });
+
+  test('normalizes a legacy @standard tier to OpenAI default without a serviceTierMap', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'standard' },
+      request({
+        serviceTier: 'standard',
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'standard' },
+      }),
+      route(),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('default');
+  });
+
+  test('strips a tier with no supported fallback', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({ originalBody: { model: 'provider-model', messages: [], service_tier: 'flex' } }),
+      route({
+        config: overlayConfig({
+          chat: { api: 'openai-completions', serviceTierMap: { standard: null } },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound).not.toHaveProperty('service_tier');
+  });
+
+  test('an exact model serviceTierMap overrides the target map', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'priority' },
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { priority: 'priority' },
+            models: { 'provider-model': { serviceTierMap: { priority: 'fast' } } },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('fast');
+  });
+
+  test('explicit quirks still map tiers when the model has no pi_ai_model_id link', () => {
+    const config = overlayConfig({
+      chat: { api: 'openai-completions', serviceTierMap: { standard: 'default' } },
+    });
+    const outbound = applyRegistryAutoCompat(
+      { model: 'upstream/unlinked', messages: [], service_tier: 'flex' },
+      request({
+        originalBody: { model: 'upstream/unlinked', messages: [], service_tier: 'flex' },
+      }),
+      route({ model: 'upstream/unlinked', config, modelConfig: undefined }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('default');
+    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'upstream/unlinked');
+  });
+
+  test('map-only overlay reasoning inherits the unlinked builtin capability', () => {
+    const config = overlayConfig({
+      chat: { api: 'openai-completions', thinkingLevelMap: { high: 'hard' } },
+    });
+    const outbound = applyRegistryAutoCompat(
+      { model: 'upstream/unlinked', messages: [], reasoning_effort: 'high' },
+      request({
+        originalBody: { model: 'upstream/unlinked', messages: [], reasoning_effort: 'high' },
+      }),
+      route({ model: 'upstream/unlinked', config, modelConfig: undefined }),
+      'chat'
+    );
+
+    // The map declares no `reasoning`, so the resolved builtin's reasoning
+    // capability is inherited rather than assumed off from a map alone.
+    expect(outbound.reasoning_effort).toBe('hard');
+    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'upstream/unlinked');
+  });
+
+  test('target reasoning:false drops the inherited builtin thinking map', () => {
+    const overlayed = applyQuirkOverlay(
+      piModel(),
+      { chat: { api: 'openai-completions', reasoning: false } } as any,
+      'chat',
+      'provider-model'
+    );
+
+    expect(overlayed.reasoning).toBe(false);
+    expect(overlayed.thinkingLevelMap).toBeUndefined();
+  });
+
+  test('an overlay thinking map with omitted reasoning inherits builtin reasoning', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], reasoning_effort: 'high' },
+      request({
+        originalBody: { model: 'provider-model', messages: [], reasoning_effort: 'high' },
+      }),
+      route({
+        config: overlayConfig({
+          chat: { api: 'openai-completions', thinkingLevelMap: { high: 'hard' } },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.reasoning_effort).toBe('hard');
+  });
+
+  test('a target dialect override projects Anthropic speed and clears a cross-dialect capacity service_tier', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'priority' },
+      }),
+      route({
+        config: overlayConfig({
+          messages: { api: 'anthropic-messages', serviceTierMap: { priority: 'fast' } },
+        }),
+      }),
+      'messages'
+    );
+
+    expect(outbound.speed).toBe('fast');
+    // `priority` is an OpenAI spelling, not a native Anthropic capacity value;
+    // it must not survive alongside the projected `speed`.
+    expect(outbound).not.toHaveProperty('service_tier');
+  });
+
+  test('a suffix on native Messages keeps an independently valid capacity service_tier', () => {
+    const outbound = applyRegistryAutoCompat(
+      {
+        model: 'provider-model',
+        messages: [],
+        speed: 'fast',
+        service_tier: 'standard_only',
+      },
+      request({
+        serviceTier: 'priority',
+        incomingApiType: 'messages',
+        originalBody: {
+          model: 'provider-model',
+          messages: [],
+          service_tier: 'standard_only',
+        },
+      }),
+      route({
+        config: overlayConfig({
+          messages: { api: 'anthropic-messages', serviceTierMap: { priority: 'fast' } },
+        }),
+      }),
+      'messages'
+    );
+
+    expect(outbound.speed).toBe('fast');
+    // `standard_only` is a real native Anthropic capacity value, so it survives
+    // the independent speed projection.
+    expect(outbound.service_tier).toBe('standard_only');
+  });
+
+  test('a service-tier format clears native speed that supplied the tier intent', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], speed: 'fast' },
+      request({
+        incomingApiType: 'messages',
+        originalBody: { model: 'provider-model', messages: [], speed: 'fast' },
+      }),
+      route({
+        config: overlayConfig({
+          messages: {
+            api: 'anthropic-messages',
+            serviceTierMap: { priority: 'priority' },
+            compat: { serviceTierFormat: 'service-tier' },
+          },
+        }),
+      }),
+      'messages'
+    );
+
+    // The tier is projected into `service_tier`; the native `speed` that
+    // supplied it must be gone so no fast-mode beta is emitted alongside.
+    expect(outbound.service_tier).toBe('priority');
+    expect(outbound).not.toHaveProperty('speed');
+  });
+
+  test('a suffix overrides native speed without leaving conflicting gateway controls', () => {
+    for (const target of ['chat', 'messages'] as const) {
+      const outbound = applyRegistryAutoCompat(
+        { model: 'provider-model', messages: [], speed: 'fast' },
+        request({ incomingApiType: 'messages', serviceTier: 'standard' }),
+        route({
+          config: overlayConfig({
+            [target]: {
+              api: target === 'chat' ? 'openai-completions' : 'anthropic-messages',
+              serviceTierMap: { standard: 'default', priority: 'priority' },
+              compat: { serviceTierFormat: 'service-tier' },
+            },
+          }),
+        }),
+        target
+      );
+
+      expect(outbound.service_tier).toBe('default');
+      expect(outbound).not.toHaveProperty('speed');
+    }
+  });
+
+  test('native Messages speed wins over a co-sent capacity service_tier', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], speed: 'fast', service_tier: 'auto' },
+      request({
+        incomingApiType: 'messages',
+        originalBody: {
+          model: 'provider-model',
+          messages: [],
+          speed: 'fast',
+          service_tier: 'auto',
+        },
+      }),
+      route({
+        config: overlayConfig({
+          messages: {
+            api: 'anthropic-messages',
+            serviceTierMap: { auto: 'auto', priority: 'fast' },
+          },
+        }),
+      }),
+      'messages'
+    );
+
+    // `speed: fast` is the tier intent (mapped to fast); the capacity
+    // `service_tier: auto` is preserved independently rather than deleted.
+    expect(outbound.speed).toBe('fast');
+    expect(outbound.service_tier).toBe('auto');
+  });
+
+  test('a Messages service-tier format writes service_tier, never speed', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        incomingApiType: 'messages',
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'priority' },
+      }),
+      route({
+        config: overlayConfig({
+          messages: {
+            api: 'anthropic-messages',
+            serviceTierMap: { priority: 'priority' },
+            compat: { serviceTierFormat: 'service-tier' },
+          },
+        }),
+      }),
+      'messages'
+    );
+
+    expect(outbound.service_tier).toBe('priority');
+    expect(outbound).not.toHaveProperty('speed');
+  });
+
+  test('anthropic-speed on a non-Messages API is ignored (bad config guard)', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'priority' },
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { priority: 'fast' },
+            compat: { serviceTierFormat: 'anthropic-speed' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    // The mapping is guarded off, so the client's OpenAI `service_tier`
+    // passes through untouched and no `speed` is fabricated.
+    expect(outbound.service_tier).toBe('priority');
+    expect(outbound).not.toHaveProperty('speed');
   });
 });

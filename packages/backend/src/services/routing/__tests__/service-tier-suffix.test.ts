@@ -2,12 +2,15 @@ import { describe, expect, test } from 'vitest';
 import { serviceTierNames, splitServiceTierSuffix } from '../service-tier-suffix';
 
 describe('splitServiceTierSuffix', () => {
-  test.each(['auto', 'default', 'flex', 'priority', 'fast'])('splits @%s off the model', (tier) => {
-    expect(splitServiceTierSuffix(`gpt-6-luna@${tier}`)).toEqual({
-      model: 'gpt-6-luna',
-      serviceTier: tier,
-    });
-  });
+  test.each(['auto', 'default', 'standard', 'flex', 'priority', 'fast', 'ultrafast'])(
+    'splits @%s off the model',
+    (tier) => {
+      expect(splitServiceTierSuffix(`gpt-6-luna@${tier}`)).toEqual({
+        model: 'gpt-6-luna',
+        serviceTier: tier,
+      });
+    }
+  );
 
   test('matches the tier case-insensitively and normalises it to lower case', () => {
     expect(splitServiceTierSuffix('gpt-6-luna@FLEX')).toEqual({
@@ -37,7 +40,7 @@ describe('splitServiceTierSuffix', () => {
 });
 
 describe('serviceTierNames', () => {
-  test.each(['auto', 'default', 'flex'])('names only @%s for a tier with no alias', (tier) => {
+  test.each(['auto', 'flex', 'ultrafast'])('names only @%s for a tier with no alias', (tier) => {
     expect(serviceTierNames('gpt-6-luna', tier)).toEqual([`gpt-6-luna@${tier}`]);
   });
 
@@ -47,4 +50,14 @@ describe('serviceTierNames', () => {
       'gpt-6-luna@fast',
     ]);
   });
+
+  test.each(['default', 'standard'])(
+    'names both spellings of the standard tier for @%s',
+    (tier) => {
+      expect(serviceTierNames('gpt-6-luna', tier)).toEqual([
+        'gpt-6-luna@default',
+        'gpt-6-luna@standard',
+      ]);
+    }
+  );
 });

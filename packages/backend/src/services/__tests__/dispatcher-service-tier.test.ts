@@ -240,5 +240,40 @@ describe('Dispatcher service-tier suffix', () => {
       ).rejects.toMatchObject(denied('test-alias@flex'));
       expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    test('default and standard are one tier, so an entry for either covers both', async () => {
+      for (const [entry, model] of [
+        ['test-alias@default', 'test-alias@standard'],
+        ['test-alias@standard', 'test-alias@default'],
+      ] as const) {
+        await expect(
+          new Dispatcher().dispatch(withKeyPolicy(chatRequest(model), { excludedModels: [entry] }))
+        ).rejects.toMatchObject(denied(model));
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      await new Dispatcher().dispatch(
+        withKeyPolicy(chatRequest('test-alias@standard'), {
+          allowedModels: ['test-alias@default'],
+        })
+      );
+      // What goes upstream is still the spelling the client chose.
+      expect(sentBody().service_tier).toBe('standard');
+    });
+
+    test('an ultrafast entry has no alias and does not cover standard', async () => {
+      await new Dispatcher().dispatch(chatRequest('test-alias@ultrafast'));
+      expect(sentBody().service_tier).toBe('ultrafast');
+      fetchMock.mockClear();
+
+      await expect(
+        new Dispatcher().dispatch(
+          withKeyPolicy(chatRequest('test-alias@standard'), {
+            allowedModels: ['test-alias@ultrafast'],
+          })
+        )
+      ).rejects.toMatchObject(denied('test-alias@standard'));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });

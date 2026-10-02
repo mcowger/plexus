@@ -89,7 +89,6 @@ export function ProviderAdvancedEditor({
         setEditingProvider((prev) => ({
           ...prev,
           pi_ai_provider: resolved,
-          pi_ai_quirks: undefined,
           auto_compat: true,
         }));
       }
@@ -1273,9 +1272,9 @@ export function ProviderAdvancedEditor({
                       className="font-body text-[11px] text-text-muted"
                       style={{ lineHeight: 1.35 }}
                     >
-                      Translates reasoning and generation options using a mapped pi-ai model or
-                      declared inline quirks. A pi-ai provider also needs per-model pi-ai Model IDs;
-                      inline quirks do not.
+                      Translates reasoning and generation options using pi-ai capabilities and
+                      explicit quirks. Builtin models resolve by Model ID or an exact catalog match;
+                      quirks can overlay them or work independently.
                     </div>
                   </div>
                 </label>
@@ -1420,15 +1419,17 @@ export function ProviderAdvancedEditor({
                 <div className="flex flex-col gap-0.5">
                   <label className="font-body text-[11px] font-medium text-text-secondary">
                     Provider Quirks
+                    {editingProvider.pi_ai_quirks && (
+                      <span className="ml-1 font-normal text-[10px] text-primary">+ custom</span>
+                    )}
                   </label>
                   <div className="flex items-center gap-1.5">
                     <select
                       aria-label="Provider Quirks"
                       className="min-w-0 flex-1 py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
                       value={
-                        editingProvider.pi_ai_quirks
-                          ? '__custom__'
-                          : (editingProvider.pi_ai_provider ?? '')
+                        editingProvider.pi_ai_provider ??
+                        (editingProvider.pi_ai_quirks ? '__custom__' : '')
                       }
                       disabled={piProviderResolving}
                       title={
@@ -1449,8 +1450,10 @@ export function ProviderAdvancedEditor({
                         setEditingProvider({
                           ...editingProvider,
                           pi_ai_provider: raw || undefined,
-                          pi_ai_quirks: undefined,
-                          auto_compat: raw ? editingProvider.auto_compat : false,
+                          auto_compat:
+                            raw || editingProvider.pi_ai_quirks
+                              ? editingProvider.auto_compat
+                              : false,
                         });
                       }}
                     >
@@ -1479,8 +1482,9 @@ export function ProviderAdvancedEditor({
                     </Button>
                   </div>
                   <span className="font-body text-[10px] text-text-muted">
-                    Built-in pi-ai traits or custom protocol and model overrides, plus Native
-                    Responses Extensions. Enable Auto Compat to apply quirks to requests.
+                    Built-in pi-ai traits with optional custom protocol and model overrides layered
+                    on top, plus Native Responses Extensions. Custom quirks never replace the
+                    built-in selection. Enable Auto Compat to apply quirks to requests.
                   </span>
                 </div>
               </div>
@@ -1498,9 +1502,9 @@ export function ProviderAdvancedEditor({
         onApply={({ quirks, responsesExtensions }) => {
           setEditingProvider((prev) => ({
             ...prev,
-            // A non-empty custom quirks set replaces the builtin pi-ai source; an
-            // untouched/empty set keeps it (and the extensions default) in place.
-            pi_ai_provider: quirks ? undefined : prev.pi_ai_provider,
+            // Custom quirks are an overlay: they layer onto the built-in pi-ai
+            // provider (or stand alone when none is selected) and applying them
+            // never clears that selection.
             pi_ai_quirks: quirks,
             responsesExtensions,
             auto_compat: quirks || prev.pi_ai_provider ? prev.auto_compat : false,

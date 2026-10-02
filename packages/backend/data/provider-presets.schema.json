@@ -119,6 +119,27 @@
                     },
                     "additionalProperties": false
                   },
+                  "serviceTierMap": {
+                    "type": "object",
+                    "properties": {
+                      "auto": {
+                        "type": ["string", "null"]
+                      },
+                      "standard": {
+                        "type": ["string", "null"]
+                      },
+                      "flex": {
+                        "type": ["string", "null"]
+                      },
+                      "priority": {
+                        "type": ["string", "null"]
+                      },
+                      "ultrafast": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "maxTokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -152,6 +173,10 @@
                       },
                       "supportsReasoningEffort": {
                         "type": "boolean"
+                      },
+                      "serviceTierFormat": {
+                        "type": "string",
+                        "enum": ["service-tier", "anthropic-speed"]
                       }
                     },
                     "additionalProperties": false
@@ -199,6 +224,27 @@
                           },
                           "additionalProperties": false
                         },
+                        "serviceTierMap": {
+                          "type": "object",
+                          "properties": {
+                            "auto": {
+                              "type": ["string", "null"]
+                            },
+                            "standard": {
+                              "type": ["string", "null"]
+                            },
+                            "flex": {
+                              "type": ["string", "null"]
+                            },
+                            "priority": {
+                              "type": ["string", "null"]
+                            },
+                            "ultrafast": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "maxTokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -232,6 +278,10 @@
                             },
                             "supportsReasoningEffort": {
                               "type": "boolean"
+                            },
+                            "serviceTierFormat": {
+                              "type": "string",
+                              "enum": ["service-tier", "anthropic-speed"]
                             }
                           },
                           "additionalProperties": false
@@ -248,7 +298,9 @@
                             "type": "object",
                             "properties": {
                               "reasoning": {
-                                "const": true
+                                "not": {
+                                  "const": false
+                                }
                               }
                             }
                           }
@@ -269,10 +321,11 @@
                       "type": "object",
                       "properties": {
                         "reasoning": {
-                          "const": true
+                          "not": {
+                            "const": false
+                          }
                         }
-                      },
-                      "required": ["reasoning"]
+                      }
                     }
                   }
                 ]
@@ -310,6 +363,27 @@
                     },
                     "additionalProperties": false
                   },
+                  "serviceTierMap": {
+                    "type": "object",
+                    "properties": {
+                      "auto": {
+                        "type": ["string", "null"]
+                      },
+                      "standard": {
+                        "type": ["string", "null"]
+                      },
+                      "flex": {
+                        "type": ["string", "null"]
+                      },
+                      "priority": {
+                        "type": ["string", "null"]
+                      },
+                      "ultrafast": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "maxTokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -343,6 +417,10 @@
                       },
                       "supportsReasoningEffort": {
                         "type": "boolean"
+                      },
+                      "serviceTierFormat": {
+                        "type": "string",
+                        "enum": ["service-tier", "anthropic-speed"]
                       }
                     },
                     "additionalProperties": false
@@ -390,6 +468,27 @@
                           },
                           "additionalProperties": false
                         },
+                        "serviceTierMap": {
+                          "type": "object",
+                          "properties": {
+                            "auto": {
+                              "type": ["string", "null"]
+                            },
+                            "standard": {
+                              "type": ["string", "null"]
+                            },
+                            "flex": {
+                              "type": ["string", "null"]
+                            },
+                            "priority": {
+                              "type": ["string", "null"]
+                            },
+                            "ultrafast": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "maxTokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -423,6 +522,10 @@
                             },
                             "supportsReasoningEffort": {
                               "type": "boolean"
+                            },
+                            "serviceTierFormat": {
+                              "type": "string",
+                              "enum": ["service-tier", "anthropic-speed"]
                             }
                           },
                           "additionalProperties": false
@@ -439,7 +542,9 @@
                             "type": "object",
                             "properties": {
                               "reasoning": {
-                                "const": true
+                                "not": {
+                                  "const": false
+                                }
                               }
                             }
                           }
@@ -460,10 +565,11 @@
                       "type": "object",
                       "properties": {
                         "reasoning": {
-                          "const": true
+                          "not": {
+                            "const": false
+                          }
                         }
-                      },
-                      "required": ["reasoning"]
+                      }
                     }
                   }
                 ]
@@ -496,6 +602,27 @@
                         "type": ["string", "null"]
                       },
                       "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "serviceTierMap": {
+                    "type": "object",
+                    "properties": {
+                      "auto": {
+                        "type": ["string", "null"]
+                      },
+                      "standard": {
+                        "type": ["string", "null"]
+                      },
+                      "flex": {
+                        "type": ["string", "null"]
+                      },
+                      "priority": {
+                        "type": ["string", "null"]
+                      },
+                      "ultrafast": {
                         "type": ["string", "null"]
                       }
                     },
@@ -534,6 +661,10 @@
                       },
                       "supportsReasoningEffort": {
                         "type": "boolean"
+                      },
+                      "serviceTierFormat": {
+                        "type": "string",
+                        "enum": ["service-tier", "anthropic-speed"]
                       }
                     },
                     "additionalProperties": false
@@ -581,6 +712,27 @@
                           },
                           "additionalProperties": false
                         },
+                        "serviceTierMap": {
+                          "type": "object",
+                          "properties": {
+                            "auto": {
+                              "type": ["string", "null"]
+                            },
+                            "standard": {
+                              "type": ["string", "null"]
+                            },
+                            "flex": {
+                              "type": ["string", "null"]
+                            },
+                            "priority": {
+                              "type": ["string", "null"]
+                            },
+                            "ultrafast": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "maxTokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -614,6 +766,10 @@
                             },
                             "supportsReasoningEffort": {
                               "type": "boolean"
+                            },
+                            "serviceTierFormat": {
+                              "type": "string",
+                              "enum": ["service-tier", "anthropic-speed"]
                             }
                           },
                           "additionalProperties": false
@@ -630,7 +786,9 @@
                             "type": "object",
                             "properties": {
                               "reasoning": {
-                                "const": true
+                                "not": {
+                                  "const": false
+                                }
                               }
                             }
                           }
@@ -651,10 +809,11 @@
                       "type": "object",
                       "properties": {
                         "reasoning": {
-                          "const": true
+                          "not": {
+                            "const": false
+                          }
                         }
-                      },
-                      "required": ["reasoning"]
+                      }
                     }
                   }
                 ]
@@ -687,6 +846,27 @@
                         "type": ["string", "null"]
                       },
                       "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "serviceTierMap": {
+                    "type": "object",
+                    "properties": {
+                      "auto": {
+                        "type": ["string", "null"]
+                      },
+                      "standard": {
+                        "type": ["string", "null"]
+                      },
+                      "flex": {
+                        "type": ["string", "null"]
+                      },
+                      "priority": {
+                        "type": ["string", "null"]
+                      },
+                      "ultrafast": {
                         "type": ["string", "null"]
                       }
                     },
@@ -725,6 +905,10 @@
                       },
                       "supportsReasoningEffort": {
                         "type": "boolean"
+                      },
+                      "serviceTierFormat": {
+                        "type": "string",
+                        "enum": ["service-tier", "anthropic-speed"]
                       }
                     },
                     "additionalProperties": false
@@ -772,6 +956,27 @@
                           },
                           "additionalProperties": false
                         },
+                        "serviceTierMap": {
+                          "type": "object",
+                          "properties": {
+                            "auto": {
+                              "type": ["string", "null"]
+                            },
+                            "standard": {
+                              "type": ["string", "null"]
+                            },
+                            "flex": {
+                              "type": ["string", "null"]
+                            },
+                            "priority": {
+                              "type": ["string", "null"]
+                            },
+                            "ultrafast": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "maxTokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -805,6 +1010,10 @@
                             },
                             "supportsReasoningEffort": {
                               "type": "boolean"
+                            },
+                            "serviceTierFormat": {
+                              "type": "string",
+                              "enum": ["service-tier", "anthropic-speed"]
                             }
                           },
                           "additionalProperties": false
@@ -821,7 +1030,9 @@
                             "type": "object",
                             "properties": {
                               "reasoning": {
-                                "const": true
+                                "not": {
+                                  "const": false
+                                }
                               }
                             }
                           }
@@ -842,10 +1053,11 @@
                       "type": "object",
                       "properties": {
                         "reasoning": {
-                          "const": true
+                          "not": {
+                            "const": false
+                          }
                         }
-                      },
-                      "required": ["reasoning"]
+                      }
                     }
                   }
                 ]
@@ -878,6 +1090,27 @@
                         "type": ["string", "null"]
                       },
                       "max": {
+                        "type": ["string", "null"]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "serviceTierMap": {
+                    "type": "object",
+                    "properties": {
+                      "auto": {
+                        "type": ["string", "null"]
+                      },
+                      "standard": {
+                        "type": ["string", "null"]
+                      },
+                      "flex": {
+                        "type": ["string", "null"]
+                      },
+                      "priority": {
+                        "type": ["string", "null"]
+                      },
+                      "ultrafast": {
                         "type": ["string", "null"]
                       }
                     },
@@ -916,6 +1149,10 @@
                       },
                       "supportsReasoningEffort": {
                         "type": "boolean"
+                      },
+                      "serviceTierFormat": {
+                        "type": "string",
+                        "enum": ["service-tier", "anthropic-speed"]
                       }
                     },
                     "additionalProperties": false
@@ -963,6 +1200,27 @@
                           },
                           "additionalProperties": false
                         },
+                        "serviceTierMap": {
+                          "type": "object",
+                          "properties": {
+                            "auto": {
+                              "type": ["string", "null"]
+                            },
+                            "standard": {
+                              "type": ["string", "null"]
+                            },
+                            "flex": {
+                              "type": ["string", "null"]
+                            },
+                            "priority": {
+                              "type": ["string", "null"]
+                            },
+                            "ultrafast": {
+                              "type": ["string", "null"]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "maxTokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -996,6 +1254,10 @@
                             },
                             "supportsReasoningEffort": {
                               "type": "boolean"
+                            },
+                            "serviceTierFormat": {
+                              "type": "string",
+                              "enum": ["service-tier", "anthropic-speed"]
                             }
                           },
                           "additionalProperties": false
@@ -1012,7 +1274,9 @@
                             "type": "object",
                             "properties": {
                               "reasoning": {
-                                "const": true
+                                "not": {
+                                  "const": false
+                                }
                               }
                             }
                           }
@@ -1033,10 +1297,11 @@
                       "type": "object",
                       "properties": {
                         "reasoning": {
-                          "const": true
+                          "not": {
+                            "const": false
+                          }
                         }
-                      },
-                      "required": ["reasoning"]
+                      }
                     }
                   }
                 ]
@@ -1186,12 +1451,6 @@
                   "required": ["gemini"]
                 }
               }
-            }
-          },
-          {
-            "not": {
-              "type": "object",
-              "required": ["piAiProvider", "piAiQuirks"]
             }
           },
           {

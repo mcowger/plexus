@@ -300,6 +300,145 @@ describe('GET /v1/models – inline compatibility metadata', () => {
     });
     await fastify.close();
   });
+
+  it('overlays quirks onto a resolvable builtin instead of skipping it', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({
+      providers: {
+        'builtin-proxy': {
+          api_base_url: { responses: 'https://example.test/v1' },
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai',
+          pi_ai_quirks: {
+            responses: {
+              api: 'openai-responses',
+              compat: { supportsTemperature: false },
+            },
+          },
+        },
+      },
+      models: {
+        'builtin-overlay': {
+          preferred_api: ['responses'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'builtin-proxy', model: 'gpt-5.6-luna' }],
+            },
+          ],
+        },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+    const model = response.json().data[0];
+    // The builtin is still resolved and advertised...
+    expect(model).toMatchObject({
+      pi_provider: 'openai',
+      pi_model: 'gpt-5.6-luna',
+      reasoning_options: [
+        { type: 'effort', values: ['off', 'low', 'medium', 'high', 'xhigh', 'max'] },
+      ],
+    });
+    // ...with the target's quirks overlaid onto its compat.
+    expect(model.pi_options).toMatchObject({ supportsTemperature: false });
+    await fastify.close();
+  });
+
+  it('overlays quirks when an explicit pi_model link is configured, stripping the Plexus-only tier format', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({
+      providers: {
+        'explicit-proxy': {
+          api_base_url: { responses: 'https://example.test/v1' },
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai',
+          pi_ai_quirks: {
+            responses: {
+              api: 'openai-responses',
+              compat: { supportsTemperature: false, serviceTierFormat: 'service-tier' },
+            },
+          },
+        },
+      },
+      models: {
+        'explicit-overlay': {
+          pi_model: { provider: 'openai', model_id: 'gpt-5.6-luna' },
+          preferred_api: ['responses'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'explicit-proxy', model: 'gpt-5.6-luna' }],
+            },
+          ],
+        },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+    const model = response.json().data[0];
+    expect(model).toMatchObject({ pi_provider: 'openai', pi_model: 'gpt-5.6-luna' });
+    // The explicit link is overlaid with the target's quirks...
+    expect(model.pi_options).toMatchObject({ supportsTemperature: false });
+    // ...but `serviceTierFormat` is a dispatch hint, not a client-facing option.
+    expect(model.pi_options).not.toHaveProperty('serviceTierFormat');
+    await fastify.close();
+  });
+
+  it('selects the quirks block matching the resolved builtin when preferred APIs are ambiguous', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({
+      providers: {
+        'multi-proxy': {
+          api_base_url: {
+            chat: 'https://example.test/v1',
+            responses: 'https://example.test/v1',
+          },
+          api_key: 'sk-test',
+          pi_ai_provider: 'openai',
+          pi_ai_quirks: {
+            chat: {
+              api: 'openai-completions',
+              compat: { maxTokensField: 'max_completion_tokens' },
+            },
+            responses: {
+              api: 'openai-responses',
+              compat: { supportsTemperature: false },
+            },
+          },
+        },
+      },
+      models: {
+        'multi-api': {
+          pi_model: { provider: 'openai', model_id: 'gpt-5.6-luna' },
+          preferred_api: ['chat_completions', 'responses'],
+          target_groups: [
+            {
+              name: 'primary',
+              selector: 'in_order',
+              targets: [{ provider: 'multi-proxy', model: 'gpt-5.6-luna' }],
+            },
+          ],
+        },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+    const model = response.json().data[0];
+    // The builtin is an openai-responses model, so the `responses` quirks block
+    // wins over the arbitrary first preferred API (`chat_completions`).
+    expect(model.pi_options).toMatchObject({ supportsTemperature: false });
+    expect(model.pi_options).not.toHaveProperty('maxTokensField');
+    await fastify.close();
+  });
 });
 
 // ─── Vision fallthrough modality injection ──────────────

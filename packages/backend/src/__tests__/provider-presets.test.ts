@@ -176,6 +176,178 @@ describe('built-in presets catalog (data/provider-presets.json)', () => {
   });
 });
 
+describe('service tier preset seeds', () => {
+  const project = (
+    quirks: ProviderPreset['piAiQuirks'],
+    targetApiType: string,
+    model: string,
+    body: Record<string, unknown>
+  ) =>
+    applyRegistryAutoCompat(
+      body,
+      { model, messages: [], incomingApiType: targetApiType } as any,
+      {
+        provider: 'preset-test',
+        model,
+        config: { auto_compat: true, pi_ai_quirks: quirks } as any,
+      } as any,
+      targetApiType
+    );
+
+  test('openai keeps the builtin provider and adds an overlay service tier map', () => {
+    const openai = presetOrThrow('openai');
+    expect(openai.piAiProvider).toBe('openai');
+    expect(openai.piAiQuirks).toBeDefined();
+
+    // Applying the preset must retain BOTH sources: the pi-ai builtin lookup
+    // and the inline overlay that maps per-model tier support.
+    const applied = applyProviderPreset(blankDraft(), openai);
+    expect(applied.pi_ai_provider).toBe('openai');
+    expect(applied.pi_ai_quirks).toEqual(openai.piAiQuirks);
+    expect(applied.auto_compat).toBe(true);
+
+    const safeMap = {
+      auto: 'auto',
+      standard: 'default',
+      flex: null,
+      priority: null,
+      ultrafast: null,
+    };
+    expect(openai.piAiQuirks?.chat?.serviceTierMap).toEqual(safeMap);
+    expect(openai.piAiQuirks?.responses?.serviceTierMap).toEqual(safeMap);
+    expect(openai.piAiQuirks?.chat?.compat?.serviceTierFormat).toBe('service-tier');
+    expect(openai.piAiQuirks?.responses?.compat?.serviceTierFormat).toBe('service-tier');
+
+    // A model override replaces the whole map, so it repeats auto/standard and
+    // lists only the premium tiers proven for that model + endpoint.
+    const responsesModels = openai.piAiQuirks?.responses?.models;
+    expect(responsesModels?.['gpt-6-astra']?.serviceTierMap).toEqual({
+      auto: 'auto',
+      standard: 'default',
+      flex: 'flex',
+      priority: 'priority',
+      ultrafast: 'ultrafast',
+    });
+    expect(responsesModels?.['gpt-5.5-pro']?.serviceTierMap).toEqual({
+      auto: 'auto',
+      standard: 'default',
+      flex: 'flex',
+    });
+    expect(responsesModels?.['gpt-4.1']?.serviceTierMap).toEqual({
+      auto: 'auto',
+      standard: 'default',
+      priority: 'priority',
+    });
+
+    // Chat Completions: the *-pro models are Responses-only and ultrafast is
+    // Responses-only, so neither is declared on the chat target.
+    const chatModels = openai.piAiQuirks?.chat?.models;
+    expect(chatModels?.['gpt-5.5-pro']).toBeUndefined();
+    expect(chatModels?.['gpt-5.4-pro']).toBeUndefined();
+    expect(chatModels?.['gpt-6-astra']?.serviceTierMap).toEqual({
+      auto: 'auto',
+      standard: 'default',
+      flex: 'flex',
+      priority: 'priority',
+    });
+  });
+
+  test('openai projects documented tiers and never leaks an unsupported one', () => {
+    const quirks = presetOrThrow('openai').piAiQuirks;
+    expect(
+      project(quirks, 'responses', 'gpt-6-astra', { service_tier: 'ultrafast' }).service_tier
+    ).toBe('ultrafast');
+    expect(project(quirks, 'chat', 'gpt-5.5', { service_tier: 'flex' }).service_tier).toBe('flex');
+    // gpt-4.1 has no flex endpoint: fall back to the standard tier.
+    expect(project(quirks, 'responses', 'gpt-4.1', { service_tier: 'flex' }).service_tier).toBe(
+      'default'
+    );
+    // gpt-5.5 supports flex + priority but not ultrafast: downgrade to priority.
+    expect(
+      project(quirks, 'responses', 'gpt-5.5', { service_tier: 'ultrafast' }).service_tier
+    ).toBe('priority');
+    // gpt-5.5-pro is Responses-only: a chat flex request falls back to standard.
+    expect(project(quirks, 'chat', 'gpt-5.5-pro', { service_tier: 'flex' }).service_tier).toBe(
+      'default'
+    );
+    // ultrafast is Responses-only: a chat request falls back to priority.
+    expect(project(quirks, 'chat', 'gpt-6-astra', { service_tier: 'ultrafast' }).service_tier).toBe(
+      'priority'
+    );
+  });
+
+  test('anthropic keeps the builtin provider and gates fast mode per model', () => {
+    const anthropic = presetOrThrow('anthropic');
+    expect(anthropic.piAiProvider).toBe('anthropic');
+    const applied = applyProviderPreset(blankDraft(), anthropic);
+    expect(applied.pi_ai_provider).toBe('anthropic');
+    expect(applied.pi_ai_quirks).toEqual(anthropic.piAiQuirks);
+
+    expect(anthropic.piAiQuirks?.messages?.compat?.serviceTierFormat).toBe('anthropic-speed');
+    // The docs never accept speed:"standard" as a request value, so the base
+    // map is all null and only evidenced fast-mode models get an override.
+    expect(anthropic.piAiQuirks?.messages?.serviceTierMap).toEqual({
+      auto: null,
+      standard: null,
+      flex: null,
+      priority: null,
+      ultrafast: null,
+    });
+    for (const model of ['claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8']) {
+      expect(anthropic.piAiQuirks?.messages?.models?.[model]?.serviceTierMap).toEqual({
+        priority: 'fast',
+      });
+    }
+  });
+
+  test('anthropic writes fast mode only for eligible models and preserves service_tier', () => {
+    const quirks = presetOrThrow('anthropic').piAiQuirks;
+    expect(project(quirks, 'messages', 'claude-opus-5', { speed: 'fast' }).speed).toBe('fast');
+    // Opus 4.7 rejects speed:"fast", so the unsupported intent is stripped.
+    expect(project(quirks, 'messages', 'claude-opus-4-7', { speed: 'fast' }).speed).toBeUndefined();
+    // Capacity service_tier is independent of fast mode and survives.
+    expect(
+      project(quirks, 'messages', 'claude-opus-5', { service_tier: 'auto' }).service_tier
+    ).toBe('auto');
+  });
+
+  test('openrouter applies one gateway tier policy across all three APIs', () => {
+    const openrouter = presetOrThrow('openrouter');
+    expect(openrouter.piAiProvider).toBe('openrouter');
+    const applied = applyProviderPreset(blankDraft(), openrouter);
+    expect(applied.pi_ai_provider).toBe('openrouter');
+    expect(applied.pi_ai_quirks).toEqual(openrouter.piAiQuirks);
+
+    const policy = {
+      auto: null,
+      standard: 'default',
+      flex: 'flex',
+      priority: 'priority',
+      ultrafast: 'ultrafast',
+    };
+    for (const target of ['chat', 'messages', 'responses'] as const) {
+      expect(openrouter.piAiQuirks?.[target]?.serviceTierMap).toEqual(policy);
+      expect(openrouter.piAiQuirks?.[target]?.compat?.serviceTierFormat).toBe('service-tier');
+    }
+
+    // Messages carries the OpenAI-style service_tier OpenRouter documents, not
+    // Anthropic's native speed field.
+    expect(
+      project(openrouter.piAiQuirks, 'messages', 'openai/gpt-5', { service_tier: 'flex' })
+        .service_tier
+    ).toBe('flex');
+    expect(
+      project(openrouter.piAiQuirks, 'chat', 'openai/gpt-5', { service_tier: 'priority' })
+        .service_tier
+    ).toBe('priority');
+    expect(
+      project(openrouter.piAiQuirks, 'responses', 'openai/gpt-6-astra', {
+        service_tier: 'ultrafast',
+      }).service_tier
+    ).toBe('ultrafast');
+  });
+});
+
 describe('loadLocalPresets failures', () => {
   test('missing disk file falls back to the embedded catalog (release binaries)', async () => {
     const presets = await loadLocalPresets(join(tmpdir(), 'no-such-presets.json'));
@@ -374,8 +546,51 @@ describe('three quirk source modes', () => {
     expect(validateEditorCatalog(editorCatalog(entry))).toBe(true);
   });
 
+  test('allows piAiProvider and piAiQuirks together as overlays', () => {
+    const entry = {
+      ...inlineEntry,
+      piAiProvider: 'openai',
+      piAiQuirks: {
+        chat: {
+          api: 'openai-completions',
+          compat: { serviceTierFormat: 'service-tier' },
+          serviceTierMap: { auto: 'auto', standard: 'default', priority: 'priority' },
+          models: { 'team/model-1': { serviceTierMap: { flex: 'flex' } } },
+        },
+      },
+    };
+    const parsed = ProviderPresetSchema.parse(entry);
+    expect(parsed.piAiProvider).toBe('openai');
+    expect(parsed.piAiQuirks?.chat?.serviceTierMap).toEqual({
+      auto: 'auto',
+      standard: 'default',
+      priority: 'priority',
+    });
+    expect(parsed.piAiQuirks?.chat?.compat?.serviceTierFormat).toBe('service-tier');
+    expect(parsed.piAiQuirks?.chat?.models?.['team/model-1']?.serviceTierMap).toEqual({
+      flex: 'flex',
+    });
+    expect(validateEditorCatalog(editorCatalog(entry))).toBe(true);
+  });
+
+  test('rejects an unknown service tier key or format', () => {
+    expect(
+      ProviderPresetSchema.safeParse({
+        ...inlineEntry,
+        piAiQuirks: { chat: { api: 'openai-completions', serviceTierMap: { turbo: 'x' } } },
+      }).success
+    ).toBe(false);
+    expect(
+      ProviderPresetSchema.safeParse({
+        ...inlineEntry,
+        piAiQuirks: {
+          chat: { api: 'openai-completions', compat: { serviceTierFormat: 'vertex-tier' } },
+        },
+      }).success
+    ).toBe(false);
+  });
+
   test.each([
-    ['both sources', { ...inlineEntry, piAiProvider: 'openai' }],
     ['empty quirks', { ...inlineEntry, piAiQuirks: {} }],
     [
       'quirks on an unconfigured target',
@@ -418,13 +633,6 @@ describe('three quirk source modes', () => {
       { ...inlineEntry, piAiQuirks: { chat: { api: 'openai-completions', maxTokens: -1 } } },
     ],
     [
-      'reasoning map without declared reasoning',
-      {
-        ...inlineEntry,
-        piAiQuirks: { chat: { api: 'openai-completions', thinkingLevelMap: { high: 'high' } } },
-      },
-    ],
-    [
       'unsupported model reasoning override',
       {
         ...inlineEntry,
@@ -437,6 +645,15 @@ describe('three quirk source modes', () => {
         },
       },
     ],
+    [
+      'explicit target reasoning false with a thinking map',
+      {
+        ...inlineEntry,
+        piAiQuirks: {
+          chat: { api: 'openai-completions', reasoning: false, thinkingLevelMap: { high: 'high' } },
+        },
+      },
+    ],
   ])('runtime and editor reject %s', (_label, entry) => {
     expect(ProviderPresetSchema.safeParse(entry).success).toBe(false);
     expect(
@@ -445,10 +662,25 @@ describe('three quirk source modes', () => {
     ).toBe(false);
   });
 
-  test('runtime also rejects invalid model reasoning inherited from an unknown common target', () => {
+  test('allows a thinking map with omitted reasoning for builtin-model overlays', () => {
     const quirks = {
       chat: {
         api: 'openai-completions',
+        models: { 'team/a': { thinkingLevelMap: { high: 'high' } } },
+      },
+    };
+    expect(PiAiQuirksSchema.safeParse(quirks).success).toBe(true);
+    expect(ProviderPresetSchema.safeParse({ ...inlineEntry, piAiQuirks: quirks }).success).toBe(
+      true
+    );
+    expect(validateEditorCatalog(editorCatalog({ ...inlineEntry, piAiQuirks: quirks }))).toBe(true);
+  });
+
+  test('runtime rejects a model-level thinking map that inherits reasoning: false', () => {
+    const quirks = {
+      chat: {
+        api: 'openai-completions',
+        reasoning: false,
         models: { 'team/a': { thinkingLevelMap: { high: 'high' } } },
       },
     };

@@ -18,7 +18,423 @@
         "speech": "https://api.openai.com/v1"
       },
       "piAiProvider": "openai",
-      "autoCompat": true
+      "autoCompat": true,
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": "auto",
+            "standard": "default",
+            "flex": null,
+            "priority": null,
+            "ultrafast": null
+          },
+          "models": {
+            "gpt-4.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-2024-05-13": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.2": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-terra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-astra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6.1-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o3": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            }
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": "auto",
+            "standard": "default",
+            "flex": null,
+            "priority": null,
+            "ultrafast": null
+          },
+          "models": {
+            "gpt-4.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-2024-05-13": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.2": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.4-pro": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.5-pro": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-terra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-astra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority",
+                "ultrafast": "ultrafast"
+              }
+            },
+            "gpt-6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6.1-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o3": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            }
+          }
+        }
+      },
+      "notes": "Service tiers follow OpenAI's documented per-model support (pricing page). Chat Completions omits gpt-5.5-pro/gpt-5.4-pro (Responses-API only) and ultrafast (Responses-only); flex models are limited to their listed context windows. Account eligibility and rate limits still apply."
     },
     {
       "id": "anthropic",
@@ -31,7 +447,40 @@
         "messages": "https://api.anthropic.com/v1"
       },
       "piAiProvider": "anthropic",
-      "autoCompat": true
+      "autoCompat": true,
+      "piAiQuirks": {
+        "messages": {
+          "api": "anthropic-messages",
+          "compat": {
+            "serviceTierFormat": "anthropic-speed"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": null,
+            "flex": null,
+            "priority": null,
+            "ultrafast": null
+          },
+          "models": {
+            "claude-opus-5-5": {
+              "serviceTierMap": {
+                "priority": "fast"
+              }
+            },
+            "claude-opus-5": {
+              "serviceTierMap": {
+                "priority": "fast"
+              }
+            },
+            "claude-opus-4-8": {
+              "serviceTierMap": {
+                "priority": "fast"
+              }
+            }
+          }
+        }
+      },
+      "notes": "Fast mode (priority) is a research preview on Claude Opus 5.5, Claude Opus 5, and Claude Opus 4.8 and requires account-manager access; other models reject speed:\"fast\". Standard speed uses the native default."
     },
     {
       "id": "openrouter",
@@ -49,7 +498,48 @@
       },
       "piAiProvider": "openrouter",
       "autoCompat": true,
-      "notes": "Optional attribution headers (HTTP-Referer, X-Title) can be added under headers."
+      "notes": "Service tiers pass through as service_tier on chat, responses, and messages; OpenRouter picks eligible tier endpoints and falls back per provider, so support is a gateway policy, not a per-model assertion. Optional attribution headers (HTTP-Referer, X-Title) can be added under headers.",
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": "default",
+            "flex": "flex",
+            "priority": "priority",
+            "ultrafast": "ultrafast"
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": "default",
+            "flex": "flex",
+            "priority": "priority",
+            "ultrafast": "ultrafast"
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": "default",
+            "flex": "flex",
+            "priority": "priority",
+            "ultrafast": "ultrafast"
+          }
+        }
+      }
     },
     {
       "id": "requesty",

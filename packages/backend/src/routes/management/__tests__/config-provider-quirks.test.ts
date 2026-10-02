@@ -70,13 +70,16 @@ describe('provider quirk source PATCH', () => {
       pi_ai_quirks: quirks,
     });
 
-    const conflict = await fastify.inject({
+    const coexist = await fastify.inject({
       method: 'PATCH',
       url,
       payload: { pi_ai_provider: 'openai' },
     });
-    expect(conflict.statusCode).toBe(400);
-    expect((await fastify.inject({ method: 'GET', url })).json().pi_ai_quirks).toEqual(quirks);
+    expect(coexist.statusCode).toBe(200);
+    expect((await fastify.inject({ method: 'GET', url })).json()).toMatchObject({
+      pi_ai_provider: 'openai',
+      pi_ai_quirks: quirks,
+    });
 
     const switchSource = await fastify.inject({
       method: 'PATCH',

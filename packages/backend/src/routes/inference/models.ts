@@ -13,7 +13,10 @@ import {
   resolvePreferredApi,
 } from '../../services/models/model-metadata-manager';
 import { getCatalogModel } from '../../services/pi-ai/catalog';
-import { resolveInlineQuirks } from '../../services/dispatch/dispatcher-auto-compat';
+import {
+  applyQuirkOverlay,
+  resolveInlineQuirks,
+} from '../../services/dispatch/dispatcher-auto-compat';
 import { renderModelsUiPage } from './models-ui';
 
 let v1ModelsLastHash: string | null = null;
@@ -44,11 +47,51 @@ const MUSE_CODE_STATIC_METADATA = {
   },
 };
 
-function inlineTraitsForAlias(
+interface AliasInlineTarget {
+  provider: string;
+  model: string;
+  apiType: string;
+  quirks: NonNullable<ProviderConfig['pi_ai_quirks']>;
+}
+
+/**
+ * Map a resolved pi-ai builtin `api` to the quirks target key it describes.
+ * Used when an alias names multiple wire APIs and the builtin unambiguously
+ * determines which quirks block applies.
+ */
+function quirksTargetForBuiltinApi(api: string | undefined): string | undefined {
+  switch (api) {
+    case 'openai-completions':
+      return 'chat';
+    case 'openai-responses':
+    case 'openai-codex-responses':
+    case 'azure-openai-responses':
+      return 'responses';
+    case 'anthropic-messages':
+      return 'messages';
+    case 'google-generative-ai':
+    case 'google-generative-ai-vertex':
+      return 'gemini';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The single target + wire API an alias points at, when it points at exactly
+ * one, along with that provider's explicit quirks. Used to overlay quirks onto
+ * a resolved pi-ai builtin (or to advertise quirks inline when there is none).
+ *
+ * The quirks block is selected from the alias's single preferred API when
+ * unambiguous; otherwise the resolved builtin's wire shape decides it, rather
+ * than an arbitrary first entry.
+ */
+function resolveAliasInlineTarget(
   modelConfig: ModelConfig,
   providers: Record<string, ProviderConfig>,
-  preferredApi: string[] | undefined
-) {
+  preferredApi: string[] | undefined,
+  builtinApi: string | undefined
+): AliasInlineTarget | undefined {
   const targets = (modelConfig.target_groups ?? [])
     .flatMap((group) => group.targets)
     .filter((target) => target.enabled !== false && target.provider && target.model);
@@ -57,9 +100,14 @@ function inlineTraitsForAlias(
   const target = [...unique.values()][0]!;
   const quirks = providers[target.provider!]?.pi_ai_quirks;
   if (!quirks) return undefined;
-  if (preferredApi?.length !== 1) return undefined;
-  const apiType = preferredApi[0] === 'chat_completions' ? 'chat' : preferredApi[0]!;
-  return resolveInlineQuirks(quirks, apiType, target.model!);
+  const apiType =
+    preferredApi?.length === 1
+      ? preferredApi[0] === 'chat_completions'
+        ? 'chat'
+        : preferredApi[0]!
+      : quirksTargetForBuiltinApi(builtinApi);
+  if (!apiType) return undefined;
+  return { provider: target.provider!, model: target.model!, apiType, quirks };
 }
 
 export async function registerModelsRoute(fastify: FastifyInstance) {
@@ -95,24 +143,29 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       );
       let piModelConfig = modelConfig?.pi_model;
       const preferredApi = resolvePreferredApi(aliasId, modelConfig, config.providers);
-      const inlineSource =
-        !modelConfig?.pi_model &&
-        (modelConfig.target_groups ?? []).some((group) =>
-          group.targets.some(
-            (target) =>
-              target.enabled !== false &&
-              target.provider &&
-              config.providers[target.provider]?.pi_ai_quirks
-          )
-        );
-      const inlineTraits = inlineSource
-        ? inlineTraitsForAlias(modelConfig, config.providers, preferredApi)
-        : undefined;
+      const hasTargetQuirks = (modelConfig.target_groups ?? []).some((group) =>
+        group.targets.some(
+          (target) =>
+            target.enabled !== false &&
+            target.provider &&
+            config.providers[target.provider]?.pi_ai_quirks
+        )
+      );
+      const hasTargetPiAiProvider = (modelConfig.target_groups ?? []).some((group) =>
+        group.targets.some(
+          (target) =>
+            target.enabled !== false &&
+            !!target.provider &&
+            !!config.providers[target.provider]?.pi_ai_provider
+        )
+      );
 
-      // Look up pi compat options if a pi model reference is configured.
-      let piOptions: Record<string, unknown> | undefined;
-      let piModel: PiAiModel<Api> | null = null;
-      if (!inlineSource && !piModelConfig && automaticIdentity.provider) {
+      // Resolve a pi-ai builtin regardless of inline quirks so advertised
+      // capabilities can be the builtin OVERLAID with the target's quirks. A
+      // quirks-only target with no explicit `pi_ai_provider` link keeps its
+      // previous inline-only advertisement rather than fabricating an identity.
+      const canResolveBuiltin = !hasTargetQuirks || hasTargetPiAiProvider;
+      if (canResolveBuiltin && !piModelConfig && automaticIdentity.provider) {
         const inferred = getCatalogModel(automaticIdentity.provider, automaticIdentity.model);
         if (inferred) {
           piModelConfig = {
@@ -121,11 +174,45 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
           };
         }
       }
+      let piModel: PiAiModel<Api> | null = null;
       if (piModelConfig) {
         piModel = getCatalogModel(piModelConfig.provider, piModelConfig.model_id);
-        if (piModel?.compat && Object.keys(piModel.compat).length > 0) {
-          piOptions = piModel.compat as Record<string, unknown>;
-        }
+      }
+
+      // Overlay quirks onto the builtin even when an explicit `pi_model` link
+      // is configured; a multi-API alias selects the quirks block from the
+      // resolved builtin's wire shape rather than an arbitrary first entry.
+      const inlineTarget = hasTargetQuirks
+        ? resolveAliasInlineTarget(modelConfig, config.providers, preferredApi, piModel?.api)
+        : undefined;
+      const inlineTraits = inlineTarget
+        ? resolveInlineQuirks(inlineTarget.quirks, inlineTarget.apiType, inlineTarget.model)
+        : undefined;
+
+      // Capability source: builtin overlaid with quirks when both exist,
+      // otherwise whichever is present. Inline-only quirks keep their existing
+      // advertised shape; a resolvable builtin is never skipped just because
+      // quirks are present.
+      const advertised: any =
+        piModel && inlineTarget
+          ? applyQuirkOverlay(
+              piModel,
+              inlineTarget.quirks,
+              inlineTarget.apiType,
+              inlineTarget.model
+            )
+          : (piModel ?? inlineTraits);
+
+      // Look up pi compat options if an advertised capability record exists.
+      // `serviceTierFormat` is a Plexus-only dispatch hint, not a pi-ai compat
+      // field, so it is never advertised to clients.
+      let piOptions: Record<string, unknown> | undefined;
+      if (advertised?.compat && Object.keys(advertised.compat).length > 0) {
+        const { serviceTierFormat: _serviceTierFormat, ...compat } = advertised.compat as Record<
+          string,
+          unknown
+        >;
+        if (Object.keys(compat).length > 0) piOptions = compat;
       }
 
       // Canonical reasoning effort levels from the pi-ai model record
@@ -139,11 +226,14 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
               .filter(([, value]) => value !== null)
               .map(([level]) => level)
           : [];
-      const reasoningOptions = piModel?.reasoning
-        ? [{ type: 'effort' as const, values: [...getSupportedThinkingLevels(piModel)] }]
-        : inlineLevels.length > 0
-          ? [{ type: 'effort' as const, values: inlineLevels }]
-          : undefined;
+      // A builtin (overlaid) model reports its full supported level window via
+      // pi-ai; an inline-only model advertises exactly the declared levels.
+      const reasoningOptions =
+        piModel && advertised?.reasoning === true
+          ? [{ type: 'effort' as const, values: [...getSupportedThinkingLevels(advertised)] }]
+          : inlineLevels.length > 0
+            ? [{ type: 'effort' as const, values: inlineLevels }]
+            : undefined;
 
       const base = {
         id: aliasId,
@@ -155,9 +245,6 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         ...(piModelConfig && { pi_provider: piModelConfig.provider }),
         ...(piModelConfig && { pi_model: piModelConfig.model_id }),
         ...(piOptions !== undefined && { pi_options: piOptions }),
-        ...(inlineTraits?.compat &&
-          Object.keys(inlineTraits.compat).length > 0 &&
-          !piOptions && { pi_options: inlineTraits.compat }),
         ...(reasoningOptions !== undefined && { reasoning_options: reasoningOptions }),
       };
 

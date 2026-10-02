@@ -10,7 +10,7 @@ import {
  * Pre-configured provider presets for the Add Provider flow.
  *
  * Each preset pre-fills the endpoint map and optionally selects a pi-ai
- * builtin or explicit inline quirks. Auto-compat is opt-in for either source;
+ * builtin and/or explicit quirks overlays. Auto-compat is opt-in for either source;
  * presets without a source leave request payloads unchanged.
  * Endpoint research lives with the project history; per-preset `notes`
  * capture only what an operator needs at setup time.
@@ -79,6 +79,30 @@ const PiAiCompatSchema = z
     maxTokensField: z.enum(['max_tokens', 'max_completion_tokens']).optional(),
     forceAdaptiveThinking: z.boolean().optional(),
     supportsReasoningEffort: z.boolean().optional(),
+    /**
+     * Wire shape used to project a canonical service tier onto this API:
+     * `service-tier` writes the provider's `service_tier` body field (OpenAI,
+     * OpenRouter); `anthropic-speed` writes `speed` plus the
+     * `fast-mode-2026-02-01` beta header. When omitted, the wire shape is
+     * inferred from the resolved API where supported.
+     */
+    serviceTierFormat: z.enum(['service-tier', 'anthropic-speed']).optional(),
+  })
+  .strict();
+
+/**
+ * Canonical service-tier capability map. Keys are Plexus's canonical tiers;
+ * values are the provider-native string to write, or `null` when this model
+ * does not support that tier (callers fall back to a nearest supported tier).
+ * An absent key means unknown and is treated the same as `null`.
+ */
+const ServiceTierMapSchema = z
+  .object({
+    auto: z.string().nullable().optional(),
+    standard: z.string().nullable().optional(),
+    flex: z.string().nullable().optional(),
+    priority: z.string().nullable().optional(),
+    ultrafast: z.string().nullable().optional(),
   })
   .strict();
 
@@ -86,6 +110,7 @@ const PiAiQuirkTraitsSchema = z
   .object({
     reasoning: z.boolean().optional(),
     thinkingLevelMap: ThinkingLevelMapSchema.optional(),
+    serviceTierMap: ServiceTierMapSchema.optional(),
     maxTokens: z.number().int().positive().optional(),
     compat: PiAiCompatSchema.optional(),
   })
@@ -119,21 +144,26 @@ export const PiAiQuirksSchema = z
     message: 'piAiQuirks must define at least one target API',
   })
   .superRefine((quirks, ctx) => {
+    // A `thinkingLevelMap` may be declared without `reasoning: true`: as an
+    // overlay it inherits the builtin model's reasoning capability, which the
+    // runtime resolves. Only an EXPLICIT `reasoning: false` alongside a map is
+    // contradictory (this holds for inline-only quirks too, which never assume
+    // reasoning from a map alone).
     for (const [target, definition] of Object.entries(quirks)) {
       if (!definition) continue;
-      if (definition.thinkingLevelMap && definition.reasoning !== true) {
+      if (definition.thinkingLevelMap && definition.reasoning === false) {
         ctx.addIssue({
           code: 'custom',
           path: [target, 'thinkingLevelMap'],
-          message: 'thinkingLevelMap requires reasoning: true on this target',
+          message: 'thinkingLevelMap cannot accompany reasoning: false on this target',
         });
       }
       for (const [modelId, model] of Object.entries(definition.models ?? {})) {
-        if (model.thinkingLevelMap && (model.reasoning ?? definition.reasoning) !== true) {
+        if (model.thinkingLevelMap && (model.reasoning ?? definition.reasoning) === false) {
           ctx.addIssue({
             code: 'custom',
             path: [target, 'models', modelId, 'thinkingLevelMap'],
-            message: 'thinkingLevelMap requires reasoning: true for this model',
+            message: 'thinkingLevelMap cannot accompany reasoning: false for this model',
           });
         }
       }
@@ -179,9 +209,6 @@ export const ProviderPresetSchema = z
     responsesExtensions: z.array(ResponsesExtensionSchema).optional(),
     /** Operator-facing caveats shown in the picker (auth quirks, docs gaps). */
     notes: z.string().optional(),
-  })
-  .refine((preset) => !(preset.piAiProvider && preset.piAiQuirks), {
-    message: 'piAiProvider and piAiQuirks are mutually exclusive',
   })
   .refine((preset) => !preset.autoCompat || !!(preset.piAiProvider || preset.piAiQuirks), {
     message: 'autoCompat requires piAiProvider or piAiQuirks',
@@ -292,11 +319,13 @@ export interface ApplyProviderPresetOptions {
 }
 
 /**
- * Apply endpoints, quirk source and auto-compat to a provider draft. Switching
- * sources clears the alternative; id/name suggestions only replace blank or
- * previously suggested fields, and OAuth-mode leftovers are cleared. Callers
- * applying to an existing provider pass `preserveIdentity` so that provider's
- * id and name survive a preset switch.
+ * Apply endpoints, quirk sources and auto-compat to a provider draft. A preset
+ * may declare a pi-ai builtin provider, inline quirks, or both (quirks overlay
+ * the builtin); sources the preset does not declare are cleared. id/name
+ * suggestions only replace blank or previously suggested fields, and
+ * OAuth-mode leftovers are cleared. Callers applying to an existing provider
+ * pass `preserveIdentity` so that provider's id and name survive a preset
+ * switch.
  */
 export function applyProviderPreset<T extends ProviderPresetDraft>(
   draft: T,

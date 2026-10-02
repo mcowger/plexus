@@ -4,8 +4,13 @@ import { AnthropicTransformer } from '../../../transformers/anthropic';
 import { OpenAITransformer } from '../../../transformers/openai';
 import type { UnifiedChatRequest } from '../../../types/unified';
 import type { RouteResult } from '../../routing/router';
-import { buildRequestPayload } from '../request-payload-builder';
-import { applyServiceTierSelection } from '../service-tier-selection';
+import { buildRequestPayload, applyAutoAnthropicBetas } from '../request-payload-builder';
+import { setupProviderHeaders } from '../../providers/provider-request-headers';
+import {
+  applyServiceTierSelection,
+  normalizeServiceTier,
+  resolveServiceTier,
+} from '../service-tier-selection';
 
 const request = (overrides: Partial<UnifiedChatRequest> = {}) =>
   ({ model: 'gpt-6-luna', messages: [], ...overrides }) as UnifiedChatRequest;
@@ -142,5 +147,151 @@ describe('buildRequestPayload with a selected tier', () => {
     );
 
     expect(payload).not.toHaveProperty('service_tier');
+  });
+
+  const anthropicOverlay = (extraBody?: Record<string, unknown>) => ({
+    api_base_url: { messages: 'https://api.anthropic.com/v1' },
+    api_key: 'test-key',
+    auto_compat: true,
+    pi_ai_quirks: {
+      messages: { api: 'anthropic-messages', serviceTierMap: { priority: 'fast' } },
+    },
+    ...(extraBody ? { extraBody } : {}),
+  });
+
+  test('mapped Anthropic priority adds speed fast and the fast-mode beta', async () => {
+    const parsed = request({
+      model: 'claude-x',
+      incomingApiType: 'messages',
+      serviceTier: 'priority',
+      originalBody: {
+        model: 'claude-x',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hi' }],
+      },
+    });
+    parsed.anthropicBeta = undefined;
+
+    const routeConfig = route(anthropicOverlay());
+    const { payload } = await buildRequestPayload(
+      parsed,
+      routeConfig,
+      new AnthropicTransformer(),
+      'messages'
+    );
+
+    expect(payload.speed).toBe('fast');
+    // The auto beta is derived from the final payload at fetch time, not
+    // persisted onto the shared request.
+    expect(parsed.anthropicBeta).toBeUndefined();
+    const headers = setupProviderHeaders(routeConfig, 'messages', parsed);
+    applyAutoAnthropicBetas(headers, payload, 'messages');
+    expect(headers['anthropic-beta']).toContain('fast-mode-2026-02-01');
+  });
+
+  test('an extraBody speed:standard override leaves no fast-mode beta behind', async () => {
+    const parsed = request({
+      model: 'claude-x',
+      incomingApiType: 'messages',
+      serviceTier: 'priority',
+      originalBody: {
+        model: 'claude-x',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hi' }],
+      },
+    });
+    parsed.anthropicBeta = undefined;
+
+    const routeConfig = route(anthropicOverlay({ speed: 'standard' }));
+    const { payload } = await buildRequestPayload(
+      parsed,
+      routeConfig,
+      new AnthropicTransformer(),
+      'messages'
+    );
+
+    expect(payload.speed).toBe('standard');
+    const headers = setupProviderHeaders(routeConfig, 'messages', parsed);
+    applyAutoAnthropicBetas(headers, payload, 'messages');
+    expect(headers['anthropic-beta'] ?? '').not.toContain('fast-mode-2026-02-01');
+  });
+
+  test('fast-mode beta merges into an existing differently-cased header', () => {
+    const headers: Record<string, string> = { 'Anthropic-Beta': 'client-beta' };
+
+    applyAutoAnthropicBetas(headers, { speed: 'fast' }, 'messages');
+
+    expect(headers['Anthropic-Beta']).toBe('client-beta,fast-mode-2026-02-01');
+    expect(
+      Object.keys(headers).filter((key) => key.toLowerCase() === 'anthropic-beta')
+    ).toHaveLength(1);
+  });
+});
+
+describe('normalizeServiceTier', () => {
+  test.each([
+    ['auto', 'auto'],
+    ['default', 'standard'],
+    ['on_demand', 'standard'],
+    ['standard_only', 'standard'],
+    ['standard', 'standard'],
+    ['flex', 'flex'],
+    ['FLEX', 'flex'],
+    ['fast', 'priority'],
+    ['priority', 'priority'],
+    ['ultrafast', 'ultrafast'],
+  ])('normalizes %s to %s', (raw, expected) => {
+    expect(normalizeServiceTier(raw)).toBe(expected);
+  });
+
+  test('returns undefined for a provider-specific value', () => {
+    expect(normalizeServiceTier('scale')).toBeUndefined();
+    expect(normalizeServiceTier(undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveServiceTier', () => {
+  const openAiMap = {
+    auto: 'auto',
+    standard: 'default',
+    flex: 'flex',
+    priority: 'priority',
+    ultrafast: 'ultrafast',
+  };
+
+  test('emits nothing when there is no tier intent', () => {
+    expect(resolveServiceTier(undefined, openAiMap, 'service-tier')).toBeUndefined();
+  });
+
+  test('maps a supported tier to its native value', () => {
+    expect(resolveServiceTier('flex', openAiMap, 'service-tier')).toEqual({ value: 'flex' });
+    expect(resolveServiceTier('fast', openAiMap, 'service-tier')).toEqual({ value: 'priority' });
+    expect(resolveServiceTier('on_demand', openAiMap, 'service-tier')).toEqual({
+      value: 'default',
+    });
+  });
+
+  test('falls back to the nearest same-idea tier', () => {
+    const map = { standard: 'default' };
+    expect(resolveServiceTier('ultrafast', map, 'service-tier')).toEqual({ value: 'default' });
+    expect(resolveServiceTier('priority', map, 'service-tier')).toEqual({ value: 'default' });
+    expect(resolveServiceTier('flex', map, 'service-tier')).toEqual({ value: 'default' });
+  });
+
+  test('an explicit null tier is unsupported and falls through', () => {
+    const map = { standard: null, priority: null as string | null };
+    expect(resolveServiceTier('priority', map, 'service-tier')).toEqual({});
+  });
+
+  test('preserves a provider-specific value for service-tier, omits it for anthropic-speed', () => {
+    expect(resolveServiceTier('scale', {}, 'service-tier')).toEqual({ value: 'scale' });
+    expect(resolveServiceTier('scale', {}, 'anthropic-speed')).toEqual({});
+  });
+
+  test('anthropic-speed writes only fast/standard and omits auto', () => {
+    const map = { auto: 'auto', standard: 'standard', priority: 'fast' };
+    expect(resolveServiceTier('priority', map, 'anthropic-speed')).toEqual({ value: 'fast' });
+    expect(resolveServiceTier('flex', map, 'anthropic-speed')).toEqual({ value: 'standard' });
+    expect(resolveServiceTier('auto', map, 'anthropic-speed')).toEqual({});
   });
 });

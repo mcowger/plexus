@@ -348,9 +348,6 @@ export const ProviderConfigSchema = z
     compaction: CompactionOverrideSchema.optional(),
     raw_passthrough: RawPassthroughConfigSchema.optional(),
   })
-  .refine((data) => !data.pi_ai_provider || !data.pi_ai_quirks, {
-    message: "'pi_ai_provider' and 'pi_ai_quirks' are mutually exclusive",
-  })
   .refine((data) => !!data.api_key || isOAuthProviderConfig(data), {
     message: "'api_key' must be specified for provider",
   })

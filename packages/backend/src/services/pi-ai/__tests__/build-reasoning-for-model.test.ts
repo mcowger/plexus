@@ -356,5 +356,68 @@ describe('buildGenerationOptions', () => {
       expect(opts.textVerbosity).toBeUndefined();
       expect(opts.serviceTier).toBeUndefined();
     });
+
+    it('does not translate a native speed intent through a legacy unmapped OpenAI model', () => {
+      const model = { api: 'openai-completions', reasoning: false } as any;
+      const fromSpeed = buildGenerationOptions(
+        model,
+        gen({ serviceTier: 'fast', serviceTierSource: 'speed' })
+      );
+      expect(fromSpeed.serviceTier).toBeUndefined();
+
+      const fromCapacity = buildGenerationOptions(
+        model,
+        gen({ serviceTier: 'flex', serviceTierSource: 'service_tier' })
+      );
+      expect(fromCapacity.serviceTier).toBe('flex');
+    });
+
+    it.each(['standard', 'standard_only', 'STANDARD'])(
+      'normalizes the legacy %s tier to OpenAI default',
+      (tier) => {
+        const model = { api: 'openai-completions', reasoning: false } as any;
+        const opts = buildGenerationOptions(
+          model,
+          gen({ serviceTier: tier, serviceTierSource: 'suffix' })
+        );
+        expect(opts.serviceTier).toBe('default');
+      }
+    );
+
+    it('leaves a provider-specific legacy tier spelling untouched', () => {
+      const model = { api: 'openai-responses', reasoning: false } as any;
+      const opts = buildGenerationOptions(
+        model,
+        gen({ serviceTier: 'on_demand', serviceTierSource: 'service_tier' })
+      );
+      expect(opts.serviceTier).toBe('on_demand');
+    });
+
+    it('maps a declared serviceTierMap and ignores anthropic-speed on OpenAI APIs', () => {
+      const mapped = {
+        api: 'openai-completions',
+        reasoning: false,
+        serviceTierMap: { priority: 'priority' },
+      } as any;
+      const opts = buildGenerationOptions(
+        mapped,
+        gen({ serviceTier: 'fast', serviceTierSource: 'speed' })
+      );
+      expect(opts.serviceTier).toBe('priority');
+      expect(opts.serviceTierFormat).toBe('service-tier');
+
+      const badConfig = {
+        api: 'openai-completions',
+        reasoning: false,
+        serviceTierMap: { priority: 'fast' },
+        compat: { serviceTierFormat: 'anthropic-speed' },
+      } as any;
+      const guarded = buildGenerationOptions(
+        badConfig,
+        gen({ serviceTier: 'fast', serviceTierSource: 'speed' })
+      );
+      expect(guarded.serviceTier).toBeUndefined();
+      expect(guarded.serviceTierFormat).toBeUndefined();
+    });
   });
 });

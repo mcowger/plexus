@@ -110,15 +110,46 @@ function extractGenerationIntent(payload: any, request: UnifiedChatRequest): Gen
   const temperature =
     source.temperature ?? source.generationConfig?.temperature ?? request.temperature;
   const verbosity = normalizeVerbosity(source.text?.verbosity ?? request.text?.verbosity);
-  const serviceTier = source.service_tier ?? request.originalBody?.service_tier;
+  // Native Anthropic Messages carries BOTH `speed` (fast mode) and
+  // `service_tier` (capacity). `speed` is the more specific tier intent, so it
+  // wins; the projection preserves `service_tier` independently.
+  const serviceTierIntent = pickServiceTierIntent(request, source);
 
   return {
     reasoning: extractReasoningIntent(source, request),
     ...(typeof maxTokens === 'number' ? { maxTokens } : {}),
     ...(typeof temperature === 'number' ? { temperature } : {}),
     ...(verbosity ? { verbosity } : {}),
-    ...(typeof serviceTier === 'string' ? { serviceTier } : {}),
+    ...(serviceTierIntent
+      ? { serviceTier: serviceTierIntent.value, serviceTierSource: serviceTierIntent.source }
+      : {}),
   };
+}
+
+/**
+ * Pick the single most-specific tier intent from a body plus the `@<tier>`
+ * suffix, recording where it came from. The `speed` field is checked before
+ * `service_tier` so native Anthropic fast mode beats a co-sent capacity tier.
+ */
+function pickServiceTierIntent(
+  request: UnifiedChatRequest,
+  source: Record<string, any>
+): { value: string; source: 'suffix' | 'speed' | 'service_tier' } | undefined {
+  if (typeof request.serviceTier === 'string') {
+    return { value: request.serviceTier, source: 'suffix' };
+  }
+  const candidates: Array<[unknown, 'speed' | 'service_tier']> = [
+    [source.speed, 'speed'],
+    [source.service_tier, 'service_tier'],
+    [request.originalBody?.speed, 'speed'],
+    [request.originalBody?.service_tier, 'service_tier'],
+  ];
+  for (const [value, tierSource] of candidates) {
+    if (typeof value === 'string' && value.length > 0) {
+      return { value, source: tierSource };
+    }
+  }
+  return undefined;
 }
 
 function mappedThinkingValue(model: any, effort: string | undefined): string | undefined {
@@ -134,6 +165,72 @@ function mappedOffValue(model: any): string | undefined {
 
 function shouldDropTemperature(intent: GenerationIntent, options: Record<string, any>): boolean {
   return intent.temperature != null && !hasOwn(options, 'temperature');
+}
+
+/**
+ * Write a resolved service tier into an OpenAI-compatible body. `service_tier`
+ * is the only wire spelling these dialects have; an `anthropic-speed` format is
+ * never valid here (guarded in the registry) and is ignored defensively.
+ *
+ * A native Anthropic `speed` that supplied the tier intent has no OpenAI
+ * spelling: strip it so the projected `service_tier` is not accompanied by a
+ * contradictory cross-dialect control.
+ */
+function projectOpenAiServiceTier(
+  next: Record<string, any>,
+  options: Record<string, any>,
+  source: GenerationIntent['serviceTierSource']
+): void {
+  if (options.serviceTier === undefined) return;
+  if (options.serviceTierFormat === 'anthropic-speed') return;
+  if (source === 'speed' || source === 'suffix') delete next.speed;
+  if (options.serviceTier === null) delete next.service_tier;
+  else next.service_tier = options.serviceTier;
+}
+
+/**
+ * The only `service_tier` values native Anthropic Messages recognises as the
+ * independent capacity control. Anything else is a cross-dialect canonical
+ * tier (OpenAI `priority`/`flex`, Google `on_demand`, ...) and must not leak
+ * alongside native `speed`.
+ */
+const ANTHROPIC_NATIVE_SERVICE_TIERS = new Set(['auto', 'standard_only']);
+
+/**
+ * Write a resolved service tier into an Anthropic Messages body. The
+ * `service-tier` format (e.g. OpenRouter's Anthropic-compatible endpoint) uses
+ * `service_tier`; the native `anthropic-speed` format uses `speed`. Native
+ * `speed` and the capacity `service_tier` are independent, so projecting one
+ * never clears the other — but each is only written in its native spelling:
+ *
+ *   - `service-tier`: a native `speed` that supplied the intent is cleared so
+ *     the fast-mode beta is not emitted alongside the projected tier.
+ *   - `anthropic-speed`: `service_tier` survives only when it is a real native
+ *     capacity value (`auto`/`standard_only`); a canonical OpenAI value would
+ *     contradict the projected `speed` and is dropped.
+ */
+function projectAnthropicServiceTier(
+  next: Record<string, any>,
+  options: Record<string, any>,
+  source: GenerationIntent['serviceTierSource']
+): void {
+  if (options.serviceTier === undefined) return;
+  if (options.serviceTierFormat === 'service-tier') {
+    if (source === 'speed' || source === 'suffix') delete next.speed;
+    if (options.serviceTier === null) delete next.service_tier;
+    else next.service_tier = options.serviceTier;
+    return;
+  }
+  // anthropic-speed: only `speed` is written; an independently valid native
+  // capacity `service_tier` stays, cross-dialect noise is cleared.
+  if (
+    typeof next.service_tier === 'string' &&
+    !ANTHROPIC_NATIVE_SERVICE_TIERS.has(next.service_tier.trim().toLowerCase())
+  ) {
+    delete next.service_tier;
+  }
+  if (options.serviceTier === null) delete next.speed;
+  else next.speed = options.serviceTier;
 }
 
 function projectOpenAiCompletionsAutoCompat(
@@ -156,6 +253,11 @@ function projectOpenAiCompletionsAutoCompat(
   }
   if (hasOwn(options, 'temperature')) next.temperature = options.temperature;
   else if (shouldDropTemperature(intent, options)) delete next.temperature;
+
+  // Mapped service tier: write the native value, or strip an unsupported one so
+  // the client's rejected tier cannot leak upstream. Legacy (unmapped) models
+  // have no key here and keep their existing pass-through.
+  projectOpenAiServiceTier(next, options, intent.serviceTierSource);
 
   if (!model.reasoning) return next;
 
@@ -302,7 +404,7 @@ function projectResponsesAutoCompat(
   if (options.maxTokens != null) next.max_output_tokens = options.maxTokens;
   if (hasOwn(options, 'temperature')) next.temperature = options.temperature;
   else if (shouldDropTemperature(intent, options)) delete next.temperature;
-  if (options.serviceTier !== undefined) next.service_tier = options.serviceTier;
+  projectOpenAiServiceTier(next, options, intent.serviceTierSource);
   if (options.textVerbosity !== undefined) {
     next.text = { ...(next.text ?? {}), verbosity: options.textVerbosity };
   }
@@ -333,6 +435,12 @@ function projectAnthropicAutoCompat(
   if (options.maxTokens != null) next.max_tokens = options.maxTokens;
   if (hasOwn(options, 'temperature')) next.temperature = options.temperature;
   else if (shouldDropTemperature(intent, options)) delete next.temperature;
+
+  // Anthropic fast mode: `speed` + the fast-mode beta header are the mapped
+  // shape for the native dialect. The `service-tier` format writes
+  // `service_tier` instead (OpenRouter-style Messages). In both cases the
+  // other, independent Anthropic control is left untouched.
+  projectAnthropicServiceTier(next, options, intent.serviceTierSource);
 
   if (options.thinkingEnabled === true) {
     const display = options.thinkingDisplay ?? 'summarized';
@@ -399,7 +507,51 @@ export function resolveInlineQuirks(
   const model = models?.[modelId];
   if (!model) return traits;
   const merged = { ...traits, ...model, compat: { ...traits.compat, ...model.compat } };
-  if (model.reasoning === false) delete merged.thinkingLevelMap;
+  if ((model.reasoning ?? traits.reasoning) === false) delete merged.thinkingLevelMap;
+  return merged;
+}
+
+/**
+ * Overlay explicit quirks onto a resolved builtin model. The target block is
+ * applied first, then the exact `route.model` entry; each declared field
+ * replaces the layer below it, while omitted fields (notably `reasoning`)
+ * inherit the builtin. An explicit target `api` owns the dialect and may differ
+ * from the builtin model's api.
+ */
+export function applyQuirkOverlay(
+  base: any,
+  quirks: PiAiQuirks | undefined,
+  targetApiType: string,
+  modelId: string
+): any {
+  const target = quirks?.[getApiBaseType(targetApiType) as keyof PiAiQuirks];
+  if (!target) return base;
+  const { models, ...traits } = target;
+  const model = models?.[modelId];
+  const baseCompat = base.compat ?? {};
+  const withTarget = {
+    ...base,
+    ...(traits.api ? { api: traits.api } : {}),
+    ...(traits.reasoning !== undefined ? { reasoning: traits.reasoning } : {}),
+    ...(traits.maxTokens !== undefined ? { maxTokens: traits.maxTokens } : {}),
+    ...(traits.thinkingLevelMap !== undefined ? { thinkingLevelMap: traits.thinkingLevelMap } : {}),
+    ...(traits.serviceTierMap !== undefined ? { serviceTierMap: traits.serviceTierMap } : {}),
+    ...(traits.compat ? { compat: { ...baseCompat, ...traits.compat } } : {}),
+  };
+  // An explicit `reasoning: false` owns the capability: drop any inherited
+  // builtin thinking map even when this target declares no override model.
+  if (withTarget.reasoning === false) delete withTarget.thinkingLevelMap;
+  if (!model) return withTarget;
+  const targetCompat = withTarget.compat ?? baseCompat;
+  const merged = {
+    ...withTarget,
+    ...(model.reasoning !== undefined ? { reasoning: model.reasoning } : {}),
+    ...(model.maxTokens !== undefined ? { maxTokens: model.maxTokens } : {}),
+    ...(model.thinkingLevelMap !== undefined ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
+    ...(model.serviceTierMap !== undefined ? { serviceTierMap: model.serviceTierMap } : {}),
+    ...(model.compat ? { compat: { ...targetCompat, ...model.compat } } : {}),
+  };
+  if (merged.reasoning === false) delete merged.thinkingLevelMap;
   return merged;
 }
 
@@ -425,6 +577,9 @@ function selectInlineGenerationIntent(
     ...(traits.compat?.supportsTemperature !== undefined && intent.temperature !== undefined
       ? { temperature: intent.temperature }
       : {}),
+    ...(traits.serviceTierMap !== undefined && intent.serviceTier !== undefined
+      ? { serviceTier: intent.serviceTier, serviceTierSource: intent.serviceTierSource }
+      : {}),
   };
 }
 
@@ -439,25 +594,47 @@ export function applyRegistryAutoCompat(
 
   const piAiProvider = route.config.pi_ai_provider;
   const piAiModelId = route.modelConfig?.pi_ai_model_id;
-  const inline = !piAiProvider
-    ? resolveInlineQuirks(route.config.pi_ai_quirks, targetApiType, route.model)
-    : undefined;
-  if (!inline && (!piAiProvider || !piAiModelId)) return providerPayload;
+  const quirks = route.config.pi_ai_quirks;
 
-  const piAiModel = inline
-    ? {
-        id: route.model,
-        api: inline.api,
-        reasoning: inline.reasoning === true && inline.thinkingLevelMap !== undefined,
-        thinkingLevelMap: inline.thinkingLevelMap ?? {},
-        maxTokens: inline.maxTokens,
-        compat: inline.compat ?? {},
-      }
-    : resolvePiAiModel(piAiProvider!, piAiModelId!);
-  if (!piAiModel) {
+  // Resolve the builtin base. An explicit per-model link is authoritative: if
+  // it does not resolve, the route stays unresolved (explicit quirks remain the
+  // fallback) rather than silently borrowing a catalog entry for `route.model`.
+  // When the provider is selected but the model is unlinked, resolve the exact
+  // `route.model` in the catalog — the same automatic identity `GET /v1/models`
+  // advertises — before falling back to inline-only quirks.
+  let base: ReturnType<typeof resolvePiAiModel> = null;
+  if (piAiProvider) {
+    base = resolvePiAiModel(piAiProvider, piAiModelId ?? route.model);
+  }
+
+  // Inline quirks are the fallback whenever there is no resolved builtin: no
+  // provider selected, an unresolved explicit link, or an unlinked route whose
+  // model is not in the catalog. Explicit quirks stay authoritative so preset
+  // tier maps work without per-model `pi_ai_model_id` links.
+  const inline =
+    !base && quirks ? resolveInlineQuirks(quirks, targetApiType, route.model) : undefined;
+
+  let piAiModel: any;
+  if (inline) {
+    piAiModel = {
+      id: route.model,
+      api: inline.api,
+      // Inline quirks never assume reasoning from a map alone; explicit
+      // `reasoning: true` is required (overlays inherit the builtin instead).
+      reasoning: inline.reasoning === true && inline.thinkingLevelMap !== undefined,
+      thinkingLevelMap: inline.thinkingLevelMap ?? {},
+      serviceTierMap: inline.serviceTierMap,
+      maxTokens: inline.maxTokens,
+      compat: inline.compat ?? {},
+    };
+  } else if (base) {
+    piAiModel = applyQuirkOverlay(base, quirks, targetApiType, route.model);
+  } else {
     logger.debug(
-      `Registry auto-compat skipped: ${route.provider}/${route.model} references unresolved ` +
-        `pi-ai model ${piAiProvider}/${piAiModelId}`
+      `Registry auto-compat skipped: ${route.provider}/${route.model} has no resolvable ` +
+        `pi-ai base${
+          piAiProvider ? ` (${piAiProvider}/${piAiModelId ?? '<unlinked>'})` : ''
+        } and no matching quirks`
     );
     return providerPayload;
   }
@@ -470,6 +647,12 @@ export function applyRegistryAutoCompat(
   if (inline && Object.keys(options).length === 0 && inline.compat?.supportsTemperature !== false) {
     return providerPayload;
   }
+
+  // Anthropic fast mode's beta flag is resolved at fetch time in
+  // standard-attempt-request.ts against the FINAL `speed`, so an explicit
+  // override to `standard` (or a strip-and-retry that removes `speed`) never
+  // leaves a stale fast-mode beta behind.
+
   const api = (piAiModel.api as string | undefined) ?? targetApiType;
   let nextPayload: any;
   if (

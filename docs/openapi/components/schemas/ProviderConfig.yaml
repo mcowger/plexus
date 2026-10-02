@@ -228,23 +228,23 @@ properties:
     type: boolean
     default: false
     description: >
-      Opts into compatibility mapping from either `pi_ai_provider` plus
-      a resolvable per-model `pi_ai_model_id`, or `pi_ai_quirks` for the target
-      API and exact upstream model ID. Without either source, requests pass
-      through unchanged.
+      Opts into compatibility mapping from `pi_ai_provider` and/or
+      `pi_ai_quirks` for the target API and exact upstream model ID.
+      Explicit quirks overlay builtin capabilities. Without either source,
+      requests pass through unchanged.
   pi_ai_provider:
     type: string
     description: >
-      Builtin pi-ai provider ID used with `models[*].pi_ai_model_id`.
-      Mutually exclusive with `pi_ai_quirks`.
+      Builtin pi-ai provider ID used with `models[*].pi_ai_model_id` or an
+      exact catalog model match. Can be combined with `pi_ai_quirks` overlays.
   pi_ai_quirks:
     $ref: ./PiAiQuirks.yaml
     description: >
       Inline compatibility traits, keyed by target API type. Model overrides
-      use exact upstream model IDs; `thinkingLevelMap` replaces the common
-      map and named `compat` flags merge. No builtin pi-ai provider or
-      per-model pi-ai ID is needed. Mutually exclusive with `pi_ai_provider`.
-      Send null in PATCH to clear a previously saved source.
+      use exact upstream model IDs; `thinkingLevelMap` and `serviceTierMap`
+      replace inherited maps and named `compat` flags merge. These traits
+      overlay a builtin model when available and work independently otherwise.
+      Send null in PATCH to clear previously saved quirks.
   useClaudeMasking:
     type: boolean
     default: false
