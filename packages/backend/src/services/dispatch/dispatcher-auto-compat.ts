@@ -11,6 +11,7 @@ import { projectReasoningForResponses } from '../../transformers/utils';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 import { getApiBaseType } from '../../utils/api-format';
 import { LITE_ALLOWED_TOOL_TYPES } from './responses-extensions';
+import { getDefaultServiceTier, hasExplicitTier } from './service-tier-selection';
 
 function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -130,6 +131,10 @@ function extractGenerationIntent(payload: any, request: UnifiedChatRequest): Gen
  * Pick the single most-specific tier intent from a body plus the `@<tier>`
  * suffix, recording where it came from. The `speed` field is checked before
  * `service_tier` so native Anthropic fast mode beats a co-sent capacity tier.
+ *
+ * The per-key default is used only when the client supplied no tier. Preserve
+ * its canonical spelling when the legacy writer has already emitted a wire
+ * alias into the payload.
  */
 function pickServiceTierIntent(
   request: UnifiedChatRequest,
@@ -138,17 +143,31 @@ function pickServiceTierIntent(
   if (typeof request.serviceTier === 'string') {
     return { value: request.serviceTier, source: 'suffix' };
   }
+
+  const originalBody = request.originalBody;
+  const keyDefault = getDefaultServiceTier(request);
+
+  // Lowest precedence: the per-key default. When the original client body
+  // records no explicit tier it is the only genuine intent; returning the
+  // canonical value before inspecting the payload keeps a legacy-injected wire
+  // alias from hiding `ultrafast`/`standard` from a serviceTierMap.
+  if (keyDefault && originalBody && !hasExplicitTier(originalBody)) {
+    return { value: keyDefault, source: 'service_tier' };
+  }
+
   const candidates: Array<[unknown, 'speed' | 'service_tier']> = [
     [source.speed, 'speed'],
     [source.service_tier, 'service_tier'],
-    [request.originalBody?.speed, 'speed'],
-    [request.originalBody?.service_tier, 'service_tier'],
+    [originalBody?.speed, 'speed'],
+    [originalBody?.service_tier, 'service_tier'],
   ];
   for (const [value, tierSource] of candidates) {
     if (typeof value === 'string' && value.length > 0) {
       return { value, source: tierSource };
     }
   }
+
+  if (keyDefault) return { value: keyDefault, source: 'service_tier' };
   return undefined;
 }
 

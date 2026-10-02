@@ -125,6 +125,19 @@ export interface Cooldown {
   lastError?: string;
 }
 
+/**
+ * Per-key default service tier. Mirrors the backend `<alias>@<tier>` suffix
+ * vocabulary (see packages/backend/src/services/routing/service-tier-suffix.ts).
+ */
+export type KeyDefaultServiceTier =
+  | 'auto'
+  | 'default'
+  | 'standard'
+  | 'flex'
+  | 'priority'
+  | 'fast'
+  | 'ultrafast';
+
 export interface KeyConfig {
   key: string; // The user-facing alias/name for the key (e.g. 'my-app')
   secret: string; // The actual sk-uuid
@@ -140,6 +153,9 @@ export interface KeyConfig {
   excludedProviders?: string[];
   allowRawPassthrough?: boolean;
   allowedIps?: string[];
+  // Default service tier applied when the client does not request one.
+  // Undefined means "Provider default" (no key-level override).
+  defaultServiceTier?: KeyDefaultServiceTier;
   expiresInMinutes?: number;
   expiresAt?: number;
   disabledAt?: number;

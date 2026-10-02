@@ -64,6 +64,20 @@ properties:
     description: >
       Privileged provider-wide raw access. Existing provider allow/deny lists
       still apply; model restrictions do not apply to raw requests.
+  defaultServiceTier:
+    type: string
+    enum:
+      - auto
+      - default
+      - standard
+      - flex
+      - priority
+      - fast
+      - ultrafast
+    description: >
+      Optional default service tier for this key. Applied only when the client
+      does not request a service tier itself; a client-supplied `service_tier`
+      or `<model>@<tier>` suffix overrides it. Omit to use the provider default.
   quota:
     type:
       - string

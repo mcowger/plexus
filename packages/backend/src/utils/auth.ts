@@ -16,6 +16,7 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
         allowedProviders?: string[];
         excludedModels?: string[];
         excludedProviders?: string[];
+        defaultServiceTier?: string;
       }
     | undefined;
 
@@ -30,12 +31,18 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
     ?.map((entry) => entry.trim())
     .filter(Boolean);
 
-  if (
-    (!allowedModels || allowedModels.length === 0) &&
-    (!allowedProviders || allowedProviders.length === 0) &&
-    (!excludedModels || excludedModels.length === 0) &&
-    (!excludedProviders || excludedProviders.length === 0)
-  ) {
+  const defaultServiceTier =
+    typeof keyConfig?.defaultServiceTier === 'string' && keyConfig.defaultServiceTier.trim()
+      ? keyConfig.defaultServiceTier.trim()
+      : undefined;
+
+  const hasAccessLists =
+    (allowedModels && allowedModels.length > 0) ||
+    (allowedProviders && allowedProviders.length > 0) ||
+    (excludedModels && excludedModels.length > 0) ||
+    (excludedProviders && excludedProviders.length > 0);
+
+  if (!hasAccessLists && !defaultServiceTier) {
     return unifiedRequest;
   }
 
@@ -45,12 +52,17 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
       ...(unifiedRequest.metadata || {}),
       plexus_metadata: {
         ...(unifiedRequest.metadata?.plexus_metadata || {}),
-        plexus_key_policy: {
-          ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
-          ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
-          ...(excludedModels && excludedModels.length > 0 ? { excludedModels } : {}),
-          ...(excludedProviders && excludedProviders.length > 0 ? { excludedProviders } : {}),
-        },
+        ...(defaultServiceTier ? { defaultServiceTier } : {}),
+        ...(hasAccessLists
+          ? {
+              plexus_key_policy: {
+                ...(allowedModels && allowedModels.length > 0 ? { allowedModels } : {}),
+                ...(allowedProviders && allowedProviders.length > 0 ? { allowedProviders } : {}),
+                ...(excludedModels && excludedModels.length > 0 ? { excludedModels } : {}),
+                ...(excludedProviders && excludedProviders.length > 0 ? { excludedProviders } : {}),
+              },
+            }
+          : {}),
       },
     },
   };

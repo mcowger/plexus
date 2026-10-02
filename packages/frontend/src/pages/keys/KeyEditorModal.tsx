@@ -9,6 +9,20 @@ import { Switch } from '../../components/ui/Switch';
 import { formatExpiry } from './helpers';
 import type { ExpiryUnit } from './types';
 
+/** Mirrors the backend `<alias>@<tier>` suffix vocabulary. */
+const SERVICE_TIER_OPTIONS: Array<{
+  value: NonNullable<KeyConfig['defaultServiceTier']>;
+  label: string;
+}> = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'default', label: 'Default' },
+  { value: 'standard', label: 'Standard (alias of Default)' },
+  { value: 'flex', label: 'Flex' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'fast', label: 'Fast (alias of Priority)' },
+  { value: 'ultrafast', label: 'Ultrafast' },
+];
+
 interface KeyEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -261,6 +275,39 @@ export const KeyEditorModal = ({
         independently). When left empty, this key falls back to the system's default quotas, if any
         are configured.
       </p>
+
+      <div className="flex flex-col gap-2">
+        <label
+          htmlFor="key-default-service-tier"
+          className="font-body text-[13px] font-medium text-text-secondary"
+        >
+          Default service tier
+        </label>
+        <select
+          id="key-default-service-tier"
+          className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2 text-sm text-text"
+          value={editingKey.defaultServiceTier ?? ''}
+          onChange={(event) =>
+            setEditingKey({
+              ...editingKey,
+              defaultServiceTier: event.target.value
+                ? (event.target.value as NonNullable<KeyConfig['defaultServiceTier']>)
+                : undefined,
+            })
+          }
+        >
+          <option value="">Provider default</option>
+          {SERVICE_TIER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-text-muted -mt-1">
+          Applied only when the client does not request a service tier itself. A client-supplied{' '}
+          <code>service_tier</code> or <code>@tier</code> model suffix overrides this value.
+        </p>
+      </div>
     </div>
   </Modal>
 );

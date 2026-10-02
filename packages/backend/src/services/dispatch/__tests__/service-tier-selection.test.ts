@@ -76,6 +76,87 @@ describe('applyServiceTierSelection', () => {
   });
 });
 
+describe('applyServiceTierSelection — per-key default tier', () => {
+  const withDefault = (tier: string, overrides: Partial<UnifiedChatRequest> = {}) =>
+    request({
+      metadata: { plexus_metadata: { defaultServiceTier: tier } } as UnifiedChatRequest['metadata'],
+      ...overrides,
+    });
+
+  test.each(['chat', 'responses', 'responses:lite'])(
+    'applies the key default on %s when the client requested no tier',
+    (apiType) => {
+      expect(applyServiceTierSelection({ model: 'm' }, withDefault('flex'), apiType)).toEqual({
+        model: 'm',
+        service_tier: 'flex',
+      });
+    }
+  );
+
+  test('normalizes a standard key default to the OpenAI wire value', () => {
+    expect(applyServiceTierSelection({ model: 'm' }, withDefault('standard'), 'chat')).toEqual({
+      model: 'm',
+      service_tier: 'default',
+    });
+  });
+
+  test('an explicit @tier suffix beats the key default', () => {
+    const out = applyServiceTierSelection(
+      { model: 'm' },
+      withDefault('priority', { serviceTier: 'flex' }),
+      'chat'
+    );
+
+    expect(out.service_tier).toBe('flex');
+  });
+
+  test('an explicit body service_tier beats the key default and is left untouched', () => {
+    const payload = { model: 'm', service_tier: 'flex' };
+
+    expect(applyServiceTierSelection(payload, withDefault('priority'), 'chat')).toBe(payload);
+  });
+
+  test('an explicit originalBody service_tier (cross-format) beats the key default', () => {
+    const payload = { model: 'm' };
+
+    expect(
+      applyServiceTierSelection(
+        payload,
+        withDefault('priority', { originalBody: { service_tier: 'flex' } }),
+        'chat'
+      )
+    ).toBe(payload);
+  });
+
+  test('an explicit originalBody speed (cross-format) beats the key default', () => {
+    const payload = { model: 'm' };
+
+    expect(
+      applyServiceTierSelection(
+        payload,
+        withDefault('priority', { originalBody: { speed: 'fast' } }),
+        'chat'
+      )
+    ).toBe(payload);
+  });
+
+  test('does not apply the key default to messages or gemini bodies', () => {
+    for (const apiType of ['messages', 'gemini']) {
+      const payload = { model: 'm' };
+
+      expect(applyServiceTierSelection(payload, withDefault('flex'), apiType)).toBe(payload);
+    }
+  });
+
+  test('never mutates originalBody', () => {
+    const originalBody = { model: 'm', messages: [] };
+
+    applyServiceTierSelection({ model: 'm' }, withDefault('flex', { originalBody }), 'chat');
+
+    expect(originalBody).toEqual({ model: 'm', messages: [] });
+  });
+});
+
 describe('buildRequestPayload with a selected tier', () => {
   const route = (config: Record<string, unknown> = {}, canonicalModel?: string): RouteResult => ({
     provider: 'openai',

@@ -11,6 +11,7 @@ import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
 import { getCatalogModel } from './services/pi-ai/catalog';
 import { isKnownOAuthProviderId } from './services/oauth/oauth-providers';
+import { SERVICE_TIER_SUFFIXES } from './services/routing/service-tier-suffix';
 
 // --- Zod Schemas ---
 
@@ -750,6 +751,11 @@ export const KeyConfigSchema = z.object({
   excludedModels: z.array(z.string().min(1)).optional(),
   excludedProviders: z.array(z.string().min(1)).optional(),
   allowRawPassthrough: z.boolean().optional(),
+  // Optional per-key default service tier. Applied when the client does not
+  // request a tier of its own. Shares the `<alias>@<tier>` suffix vocabulary
+  // (see services/routing/service-tier-suffix.ts). Persisted in the
+  // api_keys.generation JSON column, not a dedicated column.
+  defaultServiceTier: z.enum(SERVICE_TIER_SUFFIXES).optional(),
   allowedIps: z
     .array(
       z.string().min(1).refine(isValidIpRule, {

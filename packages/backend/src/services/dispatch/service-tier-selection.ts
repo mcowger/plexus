@@ -136,6 +136,24 @@ export function resolveServiceTier(
  */
 const SERVICE_TIER_API_TYPES = new Set(['chat', 'responses']);
 
+/** True when a body-shaped value carries a non-empty `speed` or `service_tier`. */
+export function hasExplicitTier(value: any): boolean {
+  if (!value || typeof value !== 'object') return false;
+  return (
+    (typeof value.speed === 'string' && value.speed.length > 0) ||
+    (typeof value.service_tier === 'string' && value.service_tier.length > 0)
+  );
+}
+
+/**
+ * The per-key default service tier attached to the request metadata by
+ * attachKeyAccessPolicy(). Returns undefined when the key declared none.
+ */
+export function getDefaultServiceTier(request: UnifiedChatRequest): string | undefined {
+  const value = request.metadata?.plexus_metadata?.defaultServiceTier;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 /**
  * OpenAI wire aliases for the legacy (unmapped) writer. OpenAI spells the
  * standard tier `default`, and has no `ultrafast` capacity value — the nearest
@@ -154,26 +172,49 @@ function legacyServiceTierWireValue(tier: string): string {
 
 /**
  * Apply the service tier selected by an `@<tier>` model-name suffix to the
- * upstream body.
+ * upstream body, falling back to the per-key `defaultServiceTier` when the
+ * client requested no tier of its own.
  *
  * The suffix is the most specific thing the client said, so it replaces a
  * `service_tier` already in the body. Provider, model, and alias `extraBody`
- * are merged after this and still win.
+ * are merged after this and still win. An explicit body `service_tier`/`speed`
+ * (including a cross-format value preserved on `originalBody`) also beats the
+ * key default, and the body is left untouched in that case so the injected
+ * default cannot mask the explicit tier in the registry projection later.
  */
 export function applyServiceTierSelection(
   payload: any,
   request: UnifiedChatRequest,
   targetApiType: string
 ): any {
-  const tier = request.serviceTier;
-  if (!tier) return payload;
+  const apiBaseType = getApiBaseType(targetApiType);
 
-  if (!SERVICE_TIER_API_TYPES.has(getApiBaseType(targetApiType))) {
+  if (request.serviceTier) {
+    if (!SERVICE_TIER_API_TYPES.has(apiBaseType)) {
+      logger.debug(
+        `Service tier '${request.serviceTier}' not applied: ${targetApiType} bodies have no service_tier`
+      );
+      return payload;
+    }
+    return { ...payload, service_tier: legacyServiceTierWireValue(request.serviceTier) };
+  }
+
+  // No suffix. An explicit `service_tier`/`speed` the client sent in the body
+  // (possibly transformed away from the payload, so `originalBody` is
+  // authoritative for cross-format routing) always beats the key default.
+  if (hasExplicitTier(payload) || hasExplicitTier(request.originalBody)) {
+    return payload;
+  }
+
+  const defaultTier = getDefaultServiceTier(request);
+  if (!defaultTier) return payload;
+
+  if (!SERVICE_TIER_API_TYPES.has(apiBaseType)) {
     logger.debug(
-      `Service tier '${tier}' not applied: ${targetApiType} bodies have no service_tier`
+      `Default service tier '${defaultTier}' not applied: ${targetApiType} bodies have no service_tier`
     );
     return payload;
   }
 
-  return { ...payload, service_tier: legacyServiceTierWireValue(tier) };
+  return { ...payload, service_tier: legacyServiceTierWireValue(defaultTier) };
 }

@@ -222,6 +222,7 @@ export const getKeys = async (): Promise<KeyConfig[]> => {
         excludedProviders?: string[];
         allowRawPassthrough?: boolean;
         allowedIps?: string[];
+        defaultServiceTier?: KeyConfig['defaultServiceTier'];
         expiresAt?: number;
         disabledAt?: number;
       }
@@ -238,6 +239,7 @@ export const getKeys = async (): Promise<KeyConfig[]> => {
       excludedProviders: val.excludedProviders,
       allowRawPassthrough: val.allowRawPassthrough === true,
       allowedIps: val.allowedIps,
+      defaultServiceTier: val.defaultServiceTier,
       expiresAt: val.expiresAt,
       disabledAt: val.disabledAt,
     }));
@@ -273,6 +275,9 @@ export const saveKey = async (keyConfig: KeyConfig, oldKeyName?: string): Promis
         excludedProviders: keyConfig.excludedProviders ?? [],
         allowRawPassthrough: keyConfig.allowRawPassthrough === true,
         allowedIps: keyConfig.allowedIps ?? [],
+        // Undefined is omitted by JSON.stringify, so a PUT with no tier clears
+        // the stored default (see KeyRepository.saveKey).
+        defaultServiceTier: keyConfig.defaultServiceTier,
         ...(keyConfig.expiresInMinutes ? { expiresInMinutes: keyConfig.expiresInMinutes } : {}),
       }),
     }

@@ -95,6 +95,14 @@ export interface PlexusMetadata {
   oauthAccount?: string;
   clientHeaders?: Record<string, unknown>;
   plexus_key_policy?: KeyAccessPolicy;
+  /**
+   * Per-API-key default service tier from the key config. Attached by
+   * attachKeyAccessPolicy() even when the key has no access lists. Lowest
+   * precedence: it only applies when the client supplied no tier of its own
+   * (`@<tier>` suffix or an explicit `service_tier`/`speed`). See
+   * service-tier-selection.ts and dispatcher-auto-compat.ts.
+   */
+  defaultServiceTier?: string;
   /** Attached by attachQuotaContext() (quota-middleware.ts) after the
    * per-request quota check — read by Dispatcher.applyQuotaFilter() to
    * narrow candidates around exhausted scoped quotas. `QuotaContext` type

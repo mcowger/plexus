@@ -1306,4 +1306,187 @@ describe('Registry overlay quirks + service tiers', () => {
     expect(outbound.service_tier).toBe('priority');
     expect(outbound).not.toHaveProperty('speed');
   });
+
+  test('applies the key default through the serviceTierMap when the client requested no tier', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [] },
+      request({
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'ultrafast' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { ultrafast: 'ultra', standard: 'default' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    // The canonical `ultrafast` must reach the map; a legacy wire alias would
+    // have collapsed it to `priority` before the map saw it.
+    expect(outbound.service_tier).toBe('ultra');
+  });
+
+  test('applies the key default as Anthropic speed when the client requested no tier', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [] },
+      request({
+        incomingApiType: 'messages',
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'priority' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      route({
+        config: overlayConfig({
+          messages: { api: 'anthropic-messages', serviceTierMap: { priority: 'fast' } },
+        }),
+      }),
+      'messages'
+    );
+
+    expect(outbound.speed).toBe('fast');
+  });
+
+  test('preserves a canonical key default through the full payload builder', async () => {
+    const originalBody = {
+      model: 'alias-model',
+      messages: [{ role: 'user', content: 'hello' }],
+    };
+    const result = await (new Dispatcher() as any).transformRequestPayload(
+      request({
+        originalBody,
+        metadata: { plexus_metadata: { defaultServiceTier: 'ultrafast' } },
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { ultrafast: 'ultra', priority: 'priority' },
+          },
+        }),
+      }),
+      { transformRequest: vi.fn() },
+      'chat',
+      []
+    );
+
+    expect(result.payload.service_tier).toBe('ultra');
+    expect(originalBody).not.toHaveProperty('service_tier');
+  });
+
+  test('preserves payload tier precedence over originalBody controls without a key default', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({
+        originalBody: { messages: [], service_tier: 'flex', speed: 'fast' },
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { flex: 'flex', priority: 'priority' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('flex');
+  });
+
+  test('an explicit payload tier beats the key default when originalBody is absent', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'priority' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { flex: 'flex', priority: 'priority' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('flex');
+  });
+
+  test('an explicit body tier beats the key default', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({
+        originalBody: { model: 'provider-model', messages: [], service_tier: 'flex' },
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'priority' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { flex: 'flex', priority: 'priority' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('flex');
+  });
+
+  test('an explicit @tier suffix beats the key default', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [] },
+      request({
+        serviceTier: 'flex',
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'priority' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      route({
+        config: overlayConfig({
+          chat: {
+            api: 'openai-completions',
+            serviceTierMap: { flex: 'flex', priority: 'priority' },
+          },
+        }),
+      }),
+      'chat'
+    );
+
+    expect(outbound.service_tier).toBe('flex');
+  });
+
+  test('an explicit originalBody speed beats the key default', () => {
+    const outbound = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [] },
+      request({
+        incomingApiType: 'messages',
+        originalBody: { model: 'provider-model', messages: [], speed: 'fast' },
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'standard' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      route({
+        config: overlayConfig({
+          messages: {
+            api: 'anthropic-messages',
+            serviceTierMap: { priority: 'fast', standard: 'standard' },
+          },
+        }),
+      }),
+      'messages'
+    );
+
+    expect(outbound.speed).toBe('fast');
+  });
 });

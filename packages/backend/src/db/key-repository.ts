@@ -7,12 +7,26 @@ import type { KeyConfig } from '../config';
 import {
   fromBool,
   now,
+  parseJson,
   parseStringArray,
   quotasFromRow,
   stringifyQuotaNames,
   stringifyStringArray,
   toBool,
+  toJson,
 } from './repository-utils';
+
+/**
+ * Read the per-key default service tier out of the api_keys.generation JSON
+ * column (`{ serviceTier }`). Tolerates SQLite JSON text and Postgres jsonb.
+ * Returns undefined for missing/empty values so callers omit the field.
+ */
+function defaultServiceTierFromGeneration(generation: unknown): KeyConfig['defaultServiceTier'] {
+  const parsed = parseJson<{ serviceTier?: unknown }>(generation);
+  const tier = parsed?.serviceTier;
+  if (typeof tier !== 'string' || tier.length === 0) return undefined;
+  return tier as KeyConfig['defaultServiceTier'];
+}
 
 export class KeyRepository {
   private db() {
@@ -36,6 +50,7 @@ export class KeyRepository {
       const excludedProviders = parseStringArray(row.excludedProviders);
       const allowedIps = parseStringArray(row.allowedIps);
       const quotas = quotasFromRow(row);
+      const defaultServiceTier = defaultServiceTierFromGeneration(row.generation);
 
       result[row.name] = {
         secret: decrypt(row.secret),
@@ -49,6 +64,7 @@ export class KeyRepository {
         ...(excludedProviders ? { excludedProviders } : {}),
         allowRawPassthrough: toBool(row.allowRawPassthrough),
         ...(allowedIps ? { allowedIps } : {}),
+        ...(defaultServiceTier ? { defaultServiceTier } : {}),
       };
     }
 
@@ -91,6 +107,7 @@ export class KeyRepository {
     const excludedProviders = parseStringArray(row.excludedProviders);
     const allowedIps = parseStringArray(row.allowedIps);
     const quotas = quotasFromRow(row);
+    const defaultServiceTier = defaultServiceTierFromGeneration(row.generation);
 
     return {
       name: row.name,
@@ -106,6 +123,7 @@ export class KeyRepository {
         ...(excludedProviders ? { excludedProviders } : {}),
         allowRawPassthrough: toBool(row.allowRawPassthrough),
         ...(allowedIps ? { allowedIps } : {}),
+        ...(defaultServiceTier ? { defaultServiceTier } : {}),
       },
     };
   }
@@ -139,7 +157,12 @@ export class KeyRepository {
       excludedProviders: stringifyStringArray(config.excludedProviders),
       allowRawPassthrough: fromBool(config.allowRawPassthrough === true),
       allowedIps: stringifyStringArray(config.allowedIps),
-      generation: null,
+      // Per-key default service tier lives in the generation JSON. A PUT that
+      // omits `defaultServiceTier` clears any stored default (null); callers
+      // that want to preserve it (PATCH) merge the existing config first.
+      generation: config.defaultServiceTier
+        ? toJson({ serviceTier: config.defaultServiceTier })
+        : null,
       expiresAt: existingKey
         ? existingKey.expiresAt
         : config.expiresInMinutes
