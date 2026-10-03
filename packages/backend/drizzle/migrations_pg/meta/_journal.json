@@ -631,6 +631,13 @@
       "when": 1790980276400,
       "tag": "0089_add_usage_service_tiers",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1791058209654,
+      "tag": "0090_add_alias_pricing_tiers",
+      "breakpoints": true
     }
   ]
 }

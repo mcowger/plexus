@@ -1,0 +1,1 @@
+ALTER TABLE `alias_metadata_overrides` ADD `pricing_tiers` text;

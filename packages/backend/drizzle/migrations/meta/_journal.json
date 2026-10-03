@@ -498,6 +498,13 @@
       "when": 1790980275840,
       "tag": "0070_add_usage_service_tiers",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "6",
+      "when": 1791058209135,
+      "tag": "0071_add_alias_pricing_tiers",
+      "breakpoints": true
     }
   ]
 }
