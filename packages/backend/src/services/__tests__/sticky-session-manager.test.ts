@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach } from 'vitest';
 import { StickySessionManager } from '../routing/sticky-session-manager';
 import type { UnifiedChatRequest } from '../../types/unified';
+import { registerSpy } from '../../../test/test-utils';
 
 function mgr() {
   const m = StickySessionManager.getInstance();
@@ -92,6 +93,36 @@ describe('StickySessionManager get/set', () => {
 
   test('returns null for unknown key', () => {
     expect(mgr().get('alias', 'chat', 'k')).toBeNull();
+  });
+
+  test('expires after five minutes even when lookups refresh LRU recency', () => {
+    const clock = registerSpy(Date, 'now').mockReturnValue(1_000);
+    const m = mgr();
+    m.set('alias', 'chat', 'k', 'prov', 'mod');
+    clock.mockReturnValue(300_999);
+    expect(m.get('alias', 'chat', 'k')).not.toBeNull();
+    clock.mockReturnValue(301_000);
+    expect(m.get('alias', 'chat', 'k')).toBeNull();
+    expect(m.size()).toBe(0);
+  });
+
+  test('successful write-back renews expiration and can change targets', () => {
+    const clock = registerSpy(Date, 'now').mockReturnValue(1_000);
+    const m = mgr();
+    m.set('alias', 'chat', 'k', 'p1', 'm1');
+    clock.mockReturnValue(200_000);
+    m.set('alias', 'chat', 'k', 'p2', 'm2', 3_800_000);
+    clock.mockReturnValue(301_000);
+    expect(m.get('alias', 'chat', 'k')).toEqual({ provider: 'p2', model: 'm2' });
+    clock.mockReturnValue(3_800_000);
+    expect(m.get('alias', 'chat', 'k')).toBeNull();
+  });
+
+  test('does not retain a request whose cache window elapsed before completion', () => {
+    registerSpy(Date, 'now').mockReturnValue(400_000);
+    const m = mgr();
+    m.set('alias', 'chat', 'k', 'prov', 'mod', 300_000);
+    expect(m.size()).toBe(0);
   });
 
   test('round-trips provider/model', () => {

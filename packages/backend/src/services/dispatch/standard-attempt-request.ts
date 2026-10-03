@@ -30,6 +30,7 @@ import {
 } from './dispatcher-auto-compat';
 import { EMPTY_COMPLETION_REASON, isEmptyUnifiedResponse } from './empty-completion';
 import { extractRequestedServiceTier, type ServiceTierCapture } from './service-tier-metadata';
+import { resolveStickyCacheTtlMs } from './cache-retention';
 
 function attachRequestedServiceTier(
   response: UnifiedChatResponse,
@@ -222,6 +223,7 @@ async function runStandardAttempt(
   // strip-retry's silly-level log reflects the field that was actually
   // removed, not just the original request.
   let response: Response;
+  let stickyExpiresAt = 0;
   while (true) {
     // Reset to the pristine, full TTFB budget at the start of every
     // iteration — see the comment on `pristineStallConfig` above.
@@ -243,6 +245,7 @@ async function runStandardAttempt(
     let stallAbortController: AbortController | undefined;
     let ttfbTimerId: ReturnType<typeof setTimeout> | undefined;
     const dispatchStartTime = Date.now();
+    stickyExpiresAt = dispatchStartTime + resolveStickyCacheTtlMs(providerPayload, targetApiType);
 
     // When TTFB stall detection is configured for streaming requests, wrap
     // the fetch + probe in a single timeout that covers the entire TTFB
@@ -668,7 +671,7 @@ async function runStandardAttempt(
       visionFallthroughModel: (currentRequest as any)._visionFallthroughModel,
     });
     CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
-    host.recordStickySession(sessionKey, route, currentRequest);
+    host.recordStickySession(sessionKey, route, currentRequest, stickyExpiresAt);
     host.appendSuccessAttempt(retryHistory, route, targetApiType, upstreamModel);
     host.attachAttemptMetadata(
       streamResponse,
@@ -767,7 +770,7 @@ async function runStandardAttempt(
   }
 
   CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
-  host.recordStickySession(sessionKey, route, currentRequest);
+  host.recordStickySession(sessionKey, route, currentRequest, stickyExpiresAt);
   host.appendSuccessAttempt(retryHistory, route, targetApiType, upstreamModel);
   host.attachAttemptMetadata(
     nonStreamingResponse,

@@ -606,6 +606,70 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
   });
 });
 
+describe('executeStandardAttempt sticky expiration', () => {
+  it.each([false, true])(
+    'captures final retry payload and start time (stream=%s)',
+    async (stream) => {
+      const clock = registerSpy(Date, 'now').mockReturnValue(1_000);
+      const executeProviderRequest = vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          clock.mockReturnValue(10_000);
+          return new Response(
+            JSON.stringify({
+              error: { message: "Unsupported parameter: 'prompt_cache_retention'" },
+            }),
+            { status: 400 }
+          );
+        })
+        .mockImplementationOnce(async () => {
+          clock.mockReturnValue(100_000);
+          return new Response(null, { status: 200 });
+        });
+      const host = makeHost({
+        executeProviderRequest,
+        probeStreamingStart: vi.fn(async (response) => ({ ok: true, response })),
+        handleNonStreamingResponse: vi.fn(async () => ({ content: 'ok' }) as any),
+      });
+      const request = { ...makeStreamingRequest(), stream };
+      const route = makeRoute();
+      const result = await executeStandardAttempt({
+        host,
+        providerPayload: { model: 'model-1', prompt_cache_retention: '24h' },
+        request,
+        requestWithTargetModel: request,
+        route,
+        targetApiType: 'chat',
+        transformer: { name: 'test-transformer' },
+        bypassTransformation: false,
+        adapters: [],
+        stallConfig: null,
+        attemptTimeout: {
+          signal: new AbortController().signal,
+          isTimedOut: () => false,
+          cleanup: vi.fn(),
+        },
+        failoverEnabled: false,
+        hasNextTarget: false,
+        retryableStatusCodes: [],
+        retryableErrors: [],
+        retryHistory: [],
+        attemptedProviders: [],
+        sessionKey: 'session',
+        release: vi.fn(),
+      });
+      expect(result.outcome).toBe('success');
+      expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+      expect(host.recordStickySession).toHaveBeenCalledExactlyOnceWith(
+        'session',
+        route,
+        request,
+        310_000
+      );
+    }
+  );
+});
+
 describe('failover-policy 402 status code handling', () => {
   it('treats 402 Payment Required as retryable regardless of configured retryable status codes', () => {
     expect(isRetryableStatus(402, [])).toBe(true);

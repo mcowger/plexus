@@ -324,7 +324,8 @@ export class Dispatcher {
   private recordStickySession(
     sessionKey: string | null,
     route: RouteResult,
-    request: UnifiedChatRequest
+    request: UnifiedChatRequest,
+    expiresAt: number
   ): void {
     if (!sessionKey || !route.canonicalModel) return;
     if ((request as any)._isVisionDescriptorRequest) return;
@@ -335,7 +336,8 @@ export class Dispatcher {
       request.incomingApiType || 'chat',
       sessionKey,
       route.provider,
-      route.model
+      route.model,
+      expiresAt
     );
   }
 

@@ -5,6 +5,8 @@ interface StickyEntry {
   model: string;
 }
 
+export const DEFAULT_STICKY_TTL_MS = 5 * 60 * 1000;
+
 /**
  * In-memory LRU mapping conversation session → (provider, model) for the last
  * successful dispatch on that session. Used by aliases with `sticky_session`
@@ -14,14 +16,14 @@ interface StickyEntry {
  * Keyed by `${alias}:${apiType}:${sessionKey}` so two aliases or API wire
  * contracts sharing a conversation prefix cannot poison each other.
  *
- * No TTL. Bounded by MAX_ENTRIES with insertion-order LRU eviction (Map keeps
+ * Cache-aware expiration. Bounded by MAX_ENTRIES with insertion-order LRU eviction (Map keeps
  * insertion order; `get` re-inserts to refresh recency).
  */
 export class StickySessionManager {
   private static readonly MAX_ENTRIES = 10_000;
   private static instance: StickySessionManager;
 
-  private entries: Map<string, StickyEntry> = new Map();
+  private entries: Map<string, StickyEntry & { expiresAt: number }> = new Map();
 
   public static getInstance(): StickySessionManager {
     if (!StickySessionManager.instance) {
@@ -58,10 +60,14 @@ export class StickySessionManager {
     const key = StickySessionManager.makeKey(alias, apiType, sessionKey);
     const entry = this.entries.get(key);
     if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+      this.entries.delete(key);
+      return null;
+    }
     // Refresh recency: re-insert to move to tail.
     this.entries.delete(key);
     this.entries.set(key, entry);
-    return entry;
+    return { provider: entry.provider, model: entry.model };
   }
 
   public set(
@@ -69,12 +75,14 @@ export class StickySessionManager {
     apiType: string,
     sessionKey: string,
     provider: string,
-    model: string
+    model: string,
+    expiresAt: number = Date.now() + DEFAULT_STICKY_TTL_MS
   ): void {
     const key = StickySessionManager.makeKey(alias, apiType, sessionKey);
     // Delete first so re-setting refreshes recency.
     this.entries.delete(key);
-    this.entries.set(key, { provider, model });
+    if (expiresAt <= Date.now()) return;
+    this.entries.set(key, { provider, model, expiresAt });
     if (this.entries.size > StickySessionManager.MAX_ENTRIES) {
       const oldest = this.entries.keys().next().value;
       if (oldest !== undefined) {
