@@ -14,6 +14,7 @@ function alias(
 function provider(map?: Record<string, string | null>): ProviderConfig {
   return {
     api_base_url: { responses: 'https://example.test/v1' },
+    auto_compat: true,
     pi_ai_quirks: {
       responses: {
         api: 'openai-responses',
@@ -75,6 +76,20 @@ describe('resolveAliasServiceTiers', () => {
         disabled: { ...provider({ priority: 'priority' }), enabled: false },
       })
     ).toBeUndefined();
+  });
+
+  it('requires auto-compat on either the provider or model', () => {
+    const models = { root: alias([{ provider: 'api', model: 'custom' }]) };
+    const api = provider({ flex: 'flex' });
+    api.auto_compat = undefined;
+    expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
+    api.auto_compat = false;
+    expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
+    api.models = { custom: { auto_compat: true } } as unknown as ProviderConfig['models'];
+    expect(resolveAliasServiceTiers('root', models, { api })).toEqual(['flex']);
+    api.auto_compat = true;
+    api.models = { custom: { auto_compat: false } } as unknown as ProviderConfig['models'];
+    expect(resolveAliasServiceTiers('root', models, { api })).toEqual(['flex']);
   });
 
   it('distinguishes unknown capabilities from a known empty map', () => {
@@ -164,10 +179,12 @@ describe('resolveAliasServiceTiers', () => {
     const providers = {
       openai: {
         api_base_url: { responses: 'https://example.test' },
+        auto_compat: openai!.autoCompat,
         pi_ai_quirks: openai!.piAiQuirks,
       },
       anthropic: {
         api_base_url: { messages: 'https://example.test' },
+        auto_compat: anthropic!.autoCompat,
         pi_ai_quirks: anthropic!.piAiQuirks,
       },
     } as unknown as Record<string, ProviderConfig>;

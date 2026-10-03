@@ -44,6 +44,8 @@ const nativeTiers: Record<string, Tier> = {
   ultrafast: 'ultrafast',
 };
 
+const anthropicTiers: Record<string, Tier> = { fast: 'priority', standard: 'standard' };
+
 /** Backfill positive declarations only. Never remove or replace a configured value. */
 export function backfillServiceTiers(rawCatalog: unknown, rawSource: unknown) {
   const source = sourceSchema.parse(rawSource);
@@ -59,6 +61,7 @@ export function backfillServiceTiers(rawCatalog: unknown, rawSource: unknown) {
     const preset = catalog.presets.find((entry) => entry.id === providerId);
     if (!preset) throw new Error(`Missing ${providerId} preset`);
     const originalPreset = original.presets.find((entry) => entry.id === providerId)!;
+    const addedTiers = new Map<string, string>();
     for (const [modelId, model] of Object.entries(source[providerId].models).sort(([a], [b]) =>
       a.localeCompare(b)
     )) {
@@ -66,16 +69,8 @@ export function backfillServiceTiers(rawCatalog: unknown, rawSource: unknown) {
         const body = mode.provider?.body;
         if (!body || (!('service_tier' in body) && !('speed' in body))) continue;
         const native = providerId === 'openai' ? body.service_tier : body.speed;
-        const tier =
-          providerId === 'openai'
-            ? typeof native === 'string'
-              ? nativeTiers[native]
-              : undefined
-            : native === 'fast'
-              ? 'priority'
-              : native === 'standard'
-                ? 'standard'
-                : undefined;
+        const tierTable = providerId === 'openai' ? nativeTiers : anthropicTiers;
+        const tier = typeof native === 'string' ? tierTable[native] : undefined;
         const expectedHeaders =
           providerId === 'anthropic' && native === 'fast'
             ? { 'anthropic-beta': 'fast-mode-2026-02-01' }
@@ -121,6 +116,15 @@ export function backfillServiceTiers(rawCatalog: unknown, rawSource: unknown) {
             warnings.push(`${providerId}/${modelId}/${api}: conflicting tier format; skipped`);
             continue;
           }
+          const addedKey = JSON.stringify([api, modelId, tier]);
+          const added = addedTiers.get(addedKey);
+          if (added !== undefined) {
+            if (added !== native)
+              warnings.push(
+                `${providerId}/${modelId}/${api}/${tier}: conflicting models.dev modes (${added} vs ${String(native)}); kept first`
+              );
+            continue;
+          }
           const existing =
             originalPreset.piAiQuirks?.[api]?.models?.[modelId]?.serviceTierMap?.[tier];
           if (existing !== undefined) {
@@ -133,7 +137,16 @@ export function backfillServiceTiers(rawCatalog: unknown, rawSource: unknown) {
           // A model map replaces the common map. Seed a new override with the
           // common map so auto/standard and any explicit restrictions survive.
           const map = modelTraits?.serviceTierMap ?? { ...target.serviceTierMap };
+          const inherited = map[tier];
+          if (inherited === native) continue;
+          if (typeof inherited === 'string') {
+            warnings.push(
+              `${providerId}/${modelId}/${api}/${tier}: inherited ${JSON.stringify(inherited)} conflicts with ${JSON.stringify(native)}; preserved`
+            );
+            continue;
+          }
           map[tier] = native as string;
+          addedTiers.set(addedKey, native as string);
           target.models ??= {};
           target.models[modelId] = { ...modelTraits, serviceTierMap: map };
           changes.push(`${providerId}/${modelId}/${api}: ${tier} -> ${native}`);

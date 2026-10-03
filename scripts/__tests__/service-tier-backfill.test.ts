@@ -127,6 +127,53 @@ describe('models.dev service tier backfill', () => {
     });
   });
 
+  it('deduplicates additions and preserves the first conflicting source mode', () => {
+    const input = catalog();
+    input.presets[0]!.piAiQuirks.responses.serviceTierMap.standard = null as any;
+    const result = backfillServiceTiers(
+      input,
+      source({
+        newer: model({
+          first: mode({ service_tier: 'default' }),
+          duplicate: mode({ service_tier: 'default' }),
+          conflicting: mode({ service_tier: 'standard' }),
+        }),
+      })
+    );
+    expect(result.changes).toEqual(['openai/newer/responses: standard -> default']);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('conflicting models.dev modes');
+    expect(
+      result.catalog.presets[0]!.piAiQuirks?.responses?.models?.newer?.serviceTierMap?.standard
+    ).toBe('default');
+  });
+
+  it('preserves inherited strings without redundant model overrides', () => {
+    const input = catalog();
+    const result = backfillServiceTiers(
+      input,
+      source({
+        newer: model({
+          identical: mode({ service_tier: 'default' }),
+          conflicting: mode({ service_tier: 'standard' }),
+          positive: mode({ service_tier: 'priority' }),
+        }),
+      })
+    );
+    expect(result.changes).toEqual(['openai/newer/responses: priority -> priority']);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('inherited');
+    expect(
+      result.catalog.presets[0]!.piAiQuirks?.responses?.models?.newer?.serviceTierMap?.standard
+    ).toBe('default');
+    const unchanged = backfillServiceTiers(
+      input,
+      source({ newer: model({ identical: mode({ service_tier: 'default' }) }) })
+    );
+    expect(unchanged.changes).toEqual([]);
+    expect(unchanged.catalog).toEqual(input);
+  });
+
   it('keeps ultrafast off Chat and honors explicit endpoint shapes', () => {
     const result = backfillServiceTiers(
       catalog(),

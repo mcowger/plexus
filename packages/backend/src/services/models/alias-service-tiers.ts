@@ -51,6 +51,7 @@ export function resolveAliasServiceTiers(
         provider.models && !Array.isArray(provider.models)
           ? provider.models[target.model]
           : undefined;
+      if (provider.auto_compat !== true && model?.auto_compat !== true) continue;
       // Match dispatch: explicit model links are authoritative, and unresolved
       // links fall back to inline quirks rather than another catalog identity.
       const base = provider.pi_ai_provider

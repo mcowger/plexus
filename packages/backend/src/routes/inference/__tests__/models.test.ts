@@ -152,6 +152,7 @@ describe('GET /v1/models – service_tiers', () => {
     setConfigForTesting({
       providers: {
         plus: {
+          auto_compat: true,
           api_base_url: { responses: 'https://example.test/v1' },
           pi_ai_quirks: {
             responses: {
@@ -161,6 +162,7 @@ describe('GET /v1/models – service_tiers', () => {
           },
         },
         api: {
+          auto_compat: true,
           api_base_url: { messages: 'https://example.test/v1' },
           pi_ai_quirks: {
             messages: {
@@ -170,6 +172,7 @@ describe('GET /v1/models – service_tiers', () => {
           },
         },
         direct: {
+          auto_compat: true,
           api_base_url: { responses: 'https://example.test/v1' },
           pi_ai_quirks: {
             responses: { api: 'openai-responses', serviceTierMap: { flex: 'flex' } },
