@@ -80,7 +80,7 @@ describe('getServiceTierDisplay', () => {
   ] as const)('maps the requested %s tier to %s', (requested, expected) => {
     const tier = getServiceTierDisplay({ requestedServiceTier: requested });
     expect(tier?.tier).toBe(expected);
-    expect(tier?.isActual).toBe(false);
+    expect(tier?.actualTier).toBeUndefined();
   });
 
   it('uses the actual tier for the icon when the provider reports one', () => {
@@ -90,9 +90,9 @@ describe('getServiceTierDisplay', () => {
       serviceTierRaw: 'fast',
       requestedServiceTierRaw: 'standard',
     });
-    expect(tier?.tier).toBe('priority');
-    expect(tier?.isActual).toBe(true);
-    expect(tier?.label).toBe('Service tier: Priority');
+    expect(tier?.tier).toBe('flex');
+    expect(tier?.actualTier).toBe('priority');
+    expect(tier?.label).toBe('Requested service tier: Flex; actual service tier: Priority');
     expect(tier?.tooltip).toContain('Actual tier: Priority');
     expect(tier?.tooltip).toContain('Native value: fast');
     expect(tier?.tooltip).toContain('Requested tier: Flex');
@@ -105,7 +105,7 @@ describe('getServiceTierDisplay', () => {
       requestedServiceTierRaw: 'fast',
     });
     expect(tier?.tier).toBe('priority');
-    expect(tier?.isActual).toBe(false);
+    expect(tier?.actualTier).toBeUndefined();
     expect(tier?.label).toBe('Requested service tier: Priority');
     expect(tier?.tooltip).toContain('Requested tier: Priority');
     expect(tier?.tooltip).toContain('Requested native value: fast');
