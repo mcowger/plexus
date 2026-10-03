@@ -266,6 +266,19 @@ describe('ModelMetadataManager – models.dev source', () => {
     expect(meta!.pricing?.input_cache_read).toBe(String(0.08 / 1_000_000));
   });
 
+  test('normalizes nested models.dev context tier cutoffs', () => {
+    const meta = mgr.getMetadata('models.dev', 'openrouter.openai/gpt-6-sol');
+    expect(meta!.pricing?.tiers).toEqual([
+      {
+        input_tokens_above: 272000,
+        prompt: String(4 / 1_000_000),
+        completion: String(15 / 1_000_000),
+        input_cache_read: String(0.4 / 1_000_000),
+        input_cache_write: String(5 / 1_000_000),
+      },
+    ]);
+  });
+
   test('getMetadata includes modalities from models.dev', () => {
     const meta = mgr.getMetadata('models.dev', 'anthropic.claude-3-5-haiku-20241022');
     expect(meta!.architecture?.input_modalities).toContain('text');

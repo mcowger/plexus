@@ -165,7 +165,11 @@ interface ModelsDevModel {
     cache_read?: number;
     cache_write?: number;
     tiers?: Array<{
-      size: number;
+      size?: number;
+      tier?: {
+        type?: string;
+        size?: number;
+      };
       input?: number;
       output?: number;
       cache_read?: number;
@@ -325,17 +329,23 @@ function normalizeModelsDevModel(
             input_cache_read: toPerTokenString(raw.cost?.cache_read),
             input_cache_write: toPerTokenString(raw.cost?.cache_write),
             ...(raw.cost?.tiers && {
-              tiers: raw.cost.tiers.map((tier) => ({
-                input_tokens_above: tier.size,
-                ...(tier.input != null && { prompt: toPerTokenString(tier.input) }),
-                ...(tier.output != null && { completion: toPerTokenString(tier.output) }),
-                ...(tier.cache_read != null && {
-                  input_cache_read: toPerTokenString(tier.cache_read),
-                }),
-                ...(tier.cache_write != null && {
-                  input_cache_write: toPerTokenString(tier.cache_write),
-                }),
-              })),
+              tiers: raw.cost.tiers.flatMap((tier) => {
+                const input_tokens_above = tier.tier?.size ?? tier.size;
+                if (input_tokens_above === undefined) return [];
+                return [
+                  {
+                    input_tokens_above,
+                    ...(tier.input != null && { prompt: toPerTokenString(tier.input) }),
+                    ...(tier.output != null && { completion: toPerTokenString(tier.output) }),
+                    ...(tier.cache_read != null && {
+                      input_cache_read: toPerTokenString(tier.cache_read),
+                    }),
+                    ...(tier.cache_write != null && {
+                      input_cache_write: toPerTokenString(tier.cache_write),
+                    }),
+                  },
+                ];
+              }),
             }),
           }
         : undefined,
