@@ -34,6 +34,7 @@ export interface CustomCheckerRecord {
 export interface OAuthCredentialsData {
   accessToken: string;
   refreshToken: string;
+  enterpriseUrl?: string;
   expiresAt: number; // epoch seconds
 }
 
@@ -606,6 +607,7 @@ export class ConfigRepository {
     return {
       accessToken: decrypt(row.accessToken),
       refreshToken: decrypt(row.refreshToken),
+      enterpriseUrl: row.enterpriseUrl ?? undefined,
       expiresAt: row.expiresAt,
     };
   }
@@ -645,6 +647,7 @@ export class ConfigRepository {
         .set({
           accessToken: encryptedAccessToken,
           refreshToken: encryptedRefreshToken,
+          enterpriseUrl: creds.enterpriseUrl ?? null,
           expiresAt: creds.expiresAt,
           updatedAt: timestamp,
         })
@@ -658,6 +661,7 @@ export class ConfigRepository {
           accountId,
           accessToken: encryptedAccessToken,
           refreshToken: encryptedRefreshToken,
+          enterpriseUrl: creds.enterpriseUrl ?? null,
           expiresAt: creds.expiresAt,
           createdAt: timestamp,
           updatedAt: timestamp,

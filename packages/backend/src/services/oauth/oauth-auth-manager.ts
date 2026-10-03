@@ -118,6 +118,7 @@ export class OAuthAuthManager {
             type: 'oauth',
             access: creds.accessToken,
             refresh: creds.refreshToken,
+            enterpriseUrl: creds.enterpriseUrl,
             expires: creds.expiresAt,
           } as OAuthCredentials;
           // Loading a valid persisted credential must not count as "never
@@ -167,6 +168,7 @@ export class OAuthAuthManager {
       await configService.setOAuthCredentials(provider, accountId, {
         accessToken: credentials.access,
         refreshToken: credentials.refresh,
+        enterpriseUrl: credentials.enterpriseUrl as string | undefined,
         expiresAt: credentials.expires,
       });
     } catch (error: any) {
@@ -345,6 +347,21 @@ export class OAuthAuthManager {
     signal?: AbortSignal
   ): Promise<string> {
     return this.getApiKey(provider, accountId, { forceRefresh: true, signal });
+  }
+
+  async getBaseUrl(
+    provider: OAuthProvider,
+    accountId?: string | null
+  ): Promise<string | undefined> {
+    const credentials = this.getCredentials(provider, accountId);
+    if (!credentials) return undefined;
+    const descriptor = getOAuthProviderAuth(provider);
+    if (!descriptor) throw new Error(`OAuth: unknown provider '${provider}'.`);
+    const auth = await descriptor.oauth.toAuth({
+      ...credentials,
+      type: 'oauth',
+    } as OAuthCredential);
+    return auth.baseUrl;
   }
 
   private async refreshCredentials(

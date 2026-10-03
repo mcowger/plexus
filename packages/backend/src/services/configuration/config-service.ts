@@ -407,6 +407,7 @@ export class ConfigService {
           await this.repo.setOAuthCredentials(providerType, accountId, {
             accessToken: credData.access || '',
             refreshToken: credData.refresh || '',
+            enterpriseUrl: credData.enterpriseUrl,
             expiresAt: credData.expires || 0,
           });
         }

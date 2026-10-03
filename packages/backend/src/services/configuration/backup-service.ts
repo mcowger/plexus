@@ -53,6 +53,7 @@ export interface ConfigBackupData {
     account_id: string;
     access_token: string;
     refresh_token: string;
+    enterprise_url?: string;
     expires_at: number;
   }>;
 }
@@ -302,6 +303,7 @@ export class BackupService {
           account_id: accountId,
           access_token: creds.accessToken,
           refresh_token: creds.refreshToken,
+          enterprise_url: creds.enterpriseUrl,
           expires_at: creds.expiresAt,
         });
       }
@@ -461,6 +463,7 @@ export class BackupService {
       await repo.setOAuthCredentials(cred.provider_type, cred.account_id, {
         accessToken: cred.access_token,
         refreshToken: cred.refresh_token,
+        enterpriseUrl: cred.enterprise_url,
         expiresAt: cred.expires_at,
       });
     }

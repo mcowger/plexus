@@ -68,9 +68,26 @@ export default defineChecker({
   }),
   async check(ctx) {
     const apiKey = await resolveApiKey(ctx.getOption.bind(ctx), ctx.checkerId);
+    const provider =
+      ctx.getOption<string>('oauthProvider', 'github-copilot').trim() || 'github-copilot';
+    const accountId = ctx.getOption<string>('oauthAccountId', '').trim();
+    const credentials = OAuthAuthManager.getInstance().getCredentials(
+      provider,
+      accountId || undefined
+    );
+    const enterpriseUrl = credentials?.enterpriseUrl;
+    let domain = 'github.com';
+    if (typeof enterpriseUrl === 'string' && enterpriseUrl.trim()) {
+      try {
+        domain = new URL(enterpriseUrl.includes('://') ? enterpriseUrl : `https://${enterpriseUrl}`)
+          .hostname;
+      } catch {
+        // Match pi OAuth's fallback for malformed imported enterprise domains.
+      }
+    }
     const endpoint = ctx.getOption<string>(
       'endpoint',
-      'https://api.github.com/copilot_internal/user'
+      `https://api.${domain}/copilot_internal/user`
     );
     const userAgent = ctx.getOption<string>('userAgent', 'GitHubCopilotChat/0.26.7');
     const editorVersion = ctx.getOption<string>('editorVersion', 'vscode/1.96.2');

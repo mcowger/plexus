@@ -8,6 +8,7 @@ export const oauthCredentials = pgTable(
     accountId: text('account_id').notNull(),
     accessToken: text('access_token').notNull(),
     refreshToken: text('refresh_token').notNull(),
+    enterpriseUrl: text('enterprise_url'),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(), // Epoch seconds
     createdAt: bigint('created_at', { mode: 'number' }).notNull(), // Epoch milliseconds
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(), // Epoch milliseconds
