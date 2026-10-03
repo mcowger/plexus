@@ -64,11 +64,29 @@ describe('getServiceTierDisplay', () => {
     '__proto__',
     'toString',
     'hasOwnProperty',
-  ])('hides the unlisted %s tier', (tier) => {
+  ])('does not map the unlisted %s tier to an icon', (tier) => {
     expect(getServiceTierDisplay({ requestedServiceTier: tier })).toBeNull();
-    expect(
-      getServiceTierDisplay({ serviceTier: tier, requestedServiceTier: 'priority' })
-    ).toBeNull();
+  });
+
+  it('falls back to a mapped actual icon when the requested tier is unmapped', () => {
+    const tier = getServiceTierDisplay({
+      requestedServiceTier: 'scale',
+      serviceTier: 'priority',
+    });
+    expect(tier?.tier).toBe('priority');
+    expect(tier?.actualTier).toBeUndefined();
+    expect(tier?.label).toBe('Requested service tier: Scale; actual service tier: Priority');
+  });
+
+  it('keeps the requested icon and reports an unmapped actual tier accessibly', () => {
+    const tier = getServiceTierDisplay({
+      requestedServiceTier: 'priority',
+      serviceTier: 'scale',
+    });
+    expect(tier?.tier).toBe('priority');
+    expect(tier?.actualTier).toBeUndefined();
+    expect(tier?.label).toBe('Requested service tier: Priority; actual service tier: Scale');
+    expect(tier?.tooltip).toContain('Actual tier: Scale');
   });
 
   it.each([
@@ -83,7 +101,7 @@ describe('getServiceTierDisplay', () => {
     expect(tier?.actualTier).toBeUndefined();
   });
 
-  it('uses the actual tier for the icon when the provider reports one', () => {
+  it('shows requested and actual icons when the supported tiers differ', () => {
     const tier = getServiceTierDisplay({
       serviceTier: 'priority',
       requestedServiceTier: 'flex',
@@ -97,6 +115,17 @@ describe('getServiceTierDisplay', () => {
     expect(tier?.tooltip).toContain('Native value: fast');
     expect(tier?.tooltip).toContain('Requested tier: Flex');
     expect(tier?.tooltip).toContain('Requested native value: standard');
+  });
+
+  it('labels a matching actual tier as the service tier', () => {
+    const tier = getServiceTierDisplay({
+      requestedServiceTier: 'priority',
+      serviceTier: 'priority',
+    });
+    expect(tier?.tier).toBe('priority');
+    expect(tier?.actualTier).toBeUndefined();
+    expect(tier?.label).toBe('Service tier: Priority');
+    expect(tier?.tooltip).toContain('Requested tier: Priority (matched)');
   });
 
   it('says requested-only in the label when the actual tier was not reported', () => {

@@ -27,11 +27,11 @@ const DISPLAY_SERVICE_TIERS: Record<string, DisplayServiceTier> = {
 };
 
 export interface ServiceTierDisplay {
-  /** Requested tier shown first. */
+  /** Requested tier icon, falling back to a mapped actual tier when needed. */
   tier: DisplayServiceTier;
-  /** Actual tier, shown after an arrow when it differs from the request. */
+  /** Mapped actual tier, shown after an arrow when the requested icon is available. */
   actualTier?: DisplayServiceTier;
-  /** Accessible label; marks requested-only when no actual tier was reported. */
+  /** Accessible label; reports the actual tier whenever the provider returned one. */
   label: string;
   /** Tooltip with the actual, requested, and native/provider tier values. */
   tooltip: string;
@@ -45,10 +45,12 @@ const formatServiceTierValue = (value: string): string =>
  *
  * The tier only shows when the request explicitly asked for one
  * (`requestedServiceTier`); a provider-reported default alone is not enough.
- * The requested tier is always shown. When a different, supported actual tier
- * is reported, it is shown after the requested tier with an arrow. Values outside
- * the display mapping (scale, reserved, performance, deferred, unknown, ...) are
- * not mapped to icons.
+ * The requested tier is shown when it has a mapped icon. When a different,
+ * supported actual tier is reported, it is shown after the requested tier with
+ * an arrow. If the request has no mapped icon, a mapped actual tier is shown on
+ * its own. Values outside the display mapping (scale, reserved, performance,
+ * deferred, unknown, ...) are reported in the accessible label and tooltip but
+ * are not mapped to icons.
  */
 export const getServiceTierDisplay = (
   log: Pick<
@@ -61,19 +63,18 @@ export const getServiceTierDisplay = (
 
   const actual = log.serviceTier ?? null;
   const requestedKey = requested.toLowerCase();
-  const tier = Object.prototype.hasOwnProperty.call(DISPLAY_SERVICE_TIERS, requestedKey)
+  const requestedTier = Object.prototype.hasOwnProperty.call(DISPLAY_SERVICE_TIERS, requestedKey)
     ? DISPLAY_SERVICE_TIERS[requestedKey]
     : undefined;
-  if (!tier) return null;
-
   const actualKey = actual?.toLowerCase();
-  const actualTier =
-    actual &&
-    actualKey !== requestedKey &&
-    actualKey &&
-    Object.prototype.hasOwnProperty.call(DISPLAY_SERVICE_TIERS, actualKey)
+  const mappedActual =
+    actualKey && Object.prototype.hasOwnProperty.call(DISPLAY_SERVICE_TIERS, actualKey)
       ? DISPLAY_SERVICE_TIERS[actualKey]
       : undefined;
+  const tiersDiffer = Boolean(actual && actualKey !== requestedKey);
+  const tier = requestedTier ?? mappedActual;
+  if (!tier) return null;
+  const actualTier = tiersDiffer && requestedTier ? mappedActual : undefined;
 
   const tooltipParts: string[] = [];
   if (actual) {
@@ -83,7 +84,7 @@ export const getServiceTierDisplay = (
     tooltipParts.push(`Native value: ${log.serviceTierRaw}`);
   }
   if (requested) {
-    const matchNote = actual && requested === actual ? ' (matched)' : '';
+    const matchNote = actual && !tiersDiffer ? ' (matched)' : '';
     tooltipParts.push(`Requested tier: ${formatServiceTierValue(requested)}${matchNote}`);
   }
   if (log.requestedServiceTierRaw && log.requestedServiceTierRaw !== requested) {
@@ -96,8 +97,10 @@ export const getServiceTierDisplay = (
   return {
     tier,
     actualTier,
-    label: actualTier
-      ? `Requested service tier: ${formatServiceTierValue(requested)}; actual service tier: ${formatServiceTierValue(actual!)}`
+    label: actual
+      ? tiersDiffer
+        ? `Requested service tier: ${formatServiceTierValue(requested)}; actual service tier: ${formatServiceTierValue(actual)}`
+        : `Service tier: ${formatServiceTierValue(actual)}`
       : `Requested service tier: ${formatServiceTierValue(requested)}`,
     tooltip: tooltipParts.join(' • '),
   };
