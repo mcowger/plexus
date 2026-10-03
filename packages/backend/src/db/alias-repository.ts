@@ -79,6 +79,7 @@ interface AliasMetadataOverrideRow {
   pricingCompletion: string | null;
   pricingInputCacheRead: string | null;
   pricingInputCacheWrite: string | null;
+  pricingTiers: unknown;
   architectureInputModalities: unknown;
   architectureOutputModalities: unknown;
   architectureTokenizer: string | null;
@@ -422,6 +423,7 @@ export class AliasRepository {
           pricingCompletion: overrides.pricing?.completion ?? null,
           pricingInputCacheRead: overrides.pricing?.input_cache_read ?? null,
           pricingInputCacheWrite: overrides.pricing?.input_cache_write ?? null,
+          pricingTiers: overrides.pricing?.tiers ? toJson(overrides.pricing.tiers) : null,
           architectureInputModalities: overrides.architecture?.input_modalities
             ? toJson(overrides.architecture.input_modalities)
             : null,

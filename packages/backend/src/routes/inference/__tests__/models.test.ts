@@ -623,6 +623,40 @@ describe('GET /v1/models – with metadata', () => {
     expect(model.top_provider.max_completion_tokens).toBe(8192);
   });
 
+  it('allows alias metadata to override catalog long-context pricing tiers', async () => {
+    const mgr = ModelMetadataManager.getInstance();
+    await mgr.loadAll({
+      openrouter: openrouterMetadataFixture,
+      modelsDev: '/nonexistent',
+      catwalk: '/nonexistent',
+    });
+
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({
+      models: {
+        'claude-alias': {
+          targets: [],
+          metadata: {
+            source: 'openrouter',
+            source_path: 'anthropic/claude-3.5-sonnet',
+            overrides: {
+              pricing: {
+                tiers: [{ input_tokens_above: 272000, prompt: '0.000020' }],
+              },
+            },
+          },
+        },
+      },
+    } as unknown as PlexusConfig);
+
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data[0].pricing.tiers).toEqual([
+      { input_tokens_above: 272000, prompt: '0.000020' },
+    ]);
+  });
+
   it('should return base fields when metadata source_path is not found in catalog', async () => {
     const mgr = ModelMetadataManager.getInstance();
     await mgr.loadAll({

@@ -113,6 +113,7 @@ interface MetadataOverrideRow {
   pricingCompletion: string | null;
   pricingInputCacheRead: string | null;
   pricingInputCacheWrite: string | null;
+  pricingTiers: unknown;
   architectureInputModalities: unknown;
   architectureOutputModalities: unknown;
   architectureTokenizer: string | null;
@@ -132,6 +133,10 @@ export function overrideRowToOverrides(row: MetadataOverrideRow): MetadataOverri
   if (row.pricingCompletion != null) pricing.completion = row.pricingCompletion;
   if (row.pricingInputCacheRead != null) pricing.input_cache_read = row.pricingInputCacheRead;
   if (row.pricingInputCacheWrite != null) pricing.input_cache_write = row.pricingInputCacheWrite;
+  const pricingTiers = parseJson<NonNullable<MetadataOverrides['pricing']>['tiers']>(
+    row.pricingTiers
+  );
+  if (pricingTiers && Array.isArray(pricingTiers)) pricing.tiers = pricingTiers;
   if (Object.keys(pricing).length > 0) overrides.pricing = pricing;
 
   const architecture: MetadataOverrides['architecture'] = {};

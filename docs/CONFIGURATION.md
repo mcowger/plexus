@@ -756,7 +756,19 @@ metadata:
   source: auto
   overrides:
     context_length: 180000
+    pricing:
+      tiers:
+        - input_tokens_above: 272000
+          prompt: "0.000005"
+          completion: "0.000015"
 ```
+
+Pricing tiers are optional. OpenRouter and models.dev tiers are included when the
+catalog publishes them; configure `metadata.overrides.pricing.tiers` when you
+need to supply or replace them for an alias. Each tier applies when the request's
+input token count exceeds `input_tokens_above`. Prices use per-token decimal
+strings, matching the base `pricing` fields. Omitted prices inherit the base
+pricing value. `/v1/models` returns these bands in the alias's `pricing.tiers`.
 
 To pin an alias to a specific catalog entry instead:
 

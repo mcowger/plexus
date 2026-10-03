@@ -114,10 +114,18 @@ interface OpenRouterRawModel {
       input_cache_read?: string;
       input_cache_write?: string;
     }>;
+    overrides?: Array<{
+      min_prompt_tokens?: number;
+      prompt?: string;
+      completion?: string;
+      input_cache_read?: string;
+      input_cache_write?: string;
+    }>;
     [key: string]:
       | string
       | Array<{
-          input_tokens_above: number;
+          input_tokens_above?: number;
+          min_prompt_tokens?: number;
           prompt?: string;
           completion?: string;
           input_cache_read?: string;
@@ -156,6 +164,13 @@ interface ModelsDevModel {
     output?: number;
     cache_read?: number;
     cache_write?: number;
+    tiers?: Array<{
+      size: number;
+      input?: number;
+      output?: number;
+      cache_read?: number;
+      cache_write?: number;
+    }>;
   };
   limit?: {
     context?: number;
@@ -244,7 +259,21 @@ function normalizeOpenRouterModel(
           completion: raw.pricing.completion,
           input_cache_read: raw.pricing.input_cache_read,
           input_cache_write: raw.pricing.input_cache_write,
-          tiers: raw.pricing.tiers,
+          tiers:
+            raw.pricing.tiers ??
+            raw.pricing.overrides
+              ?.filter((tier) => tier.min_prompt_tokens !== undefined)
+              .map((tier) => ({
+                input_tokens_above: tier.min_prompt_tokens!,
+                ...(tier.prompt !== undefined && { prompt: tier.prompt }),
+                ...(tier.completion !== undefined && { completion: tier.completion }),
+                ...(tier.input_cache_read !== undefined && {
+                  input_cache_read: tier.input_cache_read,
+                }),
+                ...(tier.input_cache_write !== undefined && {
+                  input_cache_write: tier.input_cache_write,
+                }),
+              })),
         }
       : undefined,
     supported_parameters: raw.supported_parameters,
@@ -295,6 +324,19 @@ function normalizeModelsDevModel(
             completion: toPerTokenString(raw.cost?.output),
             input_cache_read: toPerTokenString(raw.cost?.cache_read),
             input_cache_write: toPerTokenString(raw.cost?.cache_write),
+            ...(raw.cost?.tiers && {
+              tiers: raw.cost.tiers.map((tier) => ({
+                input_tokens_above: tier.size,
+                ...(tier.input != null && { prompt: toPerTokenString(tier.input) }),
+                ...(tier.output != null && { completion: toPerTokenString(tier.output) }),
+                ...(tier.cache_read != null && {
+                  input_cache_read: toPerTokenString(tier.cache_read),
+                }),
+                ...(tier.cache_write != null && {
+                  input_cache_write: toPerTokenString(tier.cache_write),
+                }),
+              })),
+            }),
           }
         : undefined,
     supported_parameters: params.length > 0 ? params : undefined,

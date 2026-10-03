@@ -24,7 +24,9 @@ properties:
   pricing:
     type: object
     additionalProperties: true
-    description: Price per million tokens (prompt, completion, cache hits).
+    description: >-
+      Per-token pricing (prompt, completion, cache hits), including optional
+      context-length tiers in `tiers` when the source catalog provides them.
   supported_parameters:
     type: array
     items:

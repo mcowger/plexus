@@ -1018,7 +1018,7 @@
           "Inference — Models"
         ],
         "summary": "List configured aliases (public)",
-        "description": "Returns all configured model aliases. If an alias has a `metadata`\nblock, the response includes enriched OpenRouter-style fields.\n\nThis endpoint computes a SHA-256 hash of the fully serialized JSON\nresponse to provide `ETag` and `Last-Modified` headers. Computing the\nhash on the fly is explicitly accepted as benchmarks show it is\nextremely fast (<0.01ms). It supports `If-None-Match` and\n`If-Modified-Since` headers to return a 304 Not Modified status.\n",
+        "description": "Returns all configured model aliases. If an alias has a `metadata`\nblock, the response includes enriched OpenRouter-style fields. When\navailable, `pricing.tiers` lists context-length pricing bands; aliases can\nalso define these under `metadata.overrides.pricing.tiers`.\n\nThis endpoint computes a SHA-256 hash of the fully serialized JSON\nresponse to provide `ETag` and `Last-Modified` headers. Computing the\nhash on the fly is explicitly accepted as benchmarks show it is\nextremely fast (<0.01ms). It supports `If-None-Match` and\n`If-Modified-Since` headers to return a 304 Not Modified status.\n",
         "security": [],
         "responses": {
           "200": {
@@ -1066,7 +1066,14 @@
                       "pricing": {
                         "prompt": "0.0000001",
                         "completion": "0.0000004",
-                        "input_cache_read": "0.000000025"
+                        "input_cache_read": "0.000000025",
+                        "tiers": [
+                          {
+                            "input_tokens_above": 272000,
+                            "prompt": "0.0000002",
+                            "completion": "0.0000008"
+                          }
+                        ]
                       },
                       "supported_parameters": [
                         "temperature",
@@ -12169,19 +12176,56 @@
           "pricing": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Pricing in dollars per million tokens.\n",
+            "description": "Pricing in dollars per token, represented as decimal strings.\n",
             "properties": {
               "prompt": {
                 "type": "string",
-                "description": "Input price per million tokens."
+                "description": "Input price per token."
               },
               "completion": {
                 "type": "string",
-                "description": "Output price per million tokens."
+                "description": "Output price per token."
               },
               "input_cache_read": {
                 "type": "string",
-                "description": "Cache hit price per million tokens."
+                "description": "Cache hit price per token, as a decimal string."
+              },
+              "input_cache_write": {
+                "type": "string",
+                "description": "Cache write price per token, as a decimal string."
+              },
+              "tiers": {
+                "type": "array",
+                "description": "Context-length pricing bands, when the source catalog or alias defines them.",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "input_tokens_above"
+                  ],
+                  "properties": {
+                    "input_tokens_above": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Apply this band when input tokens exceed this threshold."
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "description": "Input price per token for this band."
+                    },
+                    "completion": {
+                      "type": "string",
+                      "description": "Output price per token for this band."
+                    },
+                    "input_cache_read": {
+                      "type": "string",
+                      "description": "Cached input read price per token for this band."
+                    },
+                    "input_cache_write": {
+                      "type": "string",
+                      "description": "Cached input write price per token for this band."
+                    }
+                  }
+                }
               }
             }
           },
@@ -12256,7 +12300,7 @@
           "pricing": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Price per million tokens (prompt, completion, cache hits)."
+            "description": "Per-token pricing (prompt, completion, cache hits), including optional context-length tiers in `tiers` when the source catalog provides them."
           },
           "supported_parameters": {
             "type": "array",
@@ -13174,6 +13218,39 @@
               "input_cache_write": {
                 "type": "string",
                 "description": "Cost per cached input token write."
+              },
+              "tiers": {
+                "type": "array",
+                "description": "Optional context-length pricing bands. A tier applies when the request input token count is greater than `input_tokens_above`. Fields omitted from a tier inherit the base pricing values.\n",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "input_tokens_above"
+                  ],
+                  "properties": {
+                    "input_tokens_above": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Input token threshold for this pricing band."
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "description": "Cost per input token in this band."
+                    },
+                    "completion": {
+                      "type": "string",
+                      "description": "Cost per output token in this band."
+                    },
+                    "input_cache_read": {
+                      "type": "string",
+                      "description": "Cost per cached input token read in this band."
+                    },
+                    "input_cache_write": {
+                      "type": "string",
+                      "description": "Cost per cached input token write in this band."
+                    }
+                  }
+                }
               }
             }
           },

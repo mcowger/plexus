@@ -33,6 +33,32 @@ properties:
       input_cache_write:
         type: string
         description: Cost per cached input token write.
+      tiers:
+        type: array
+        description: >
+          Optional context-length pricing bands. A tier applies when the
+          request input token count is greater than `input_tokens_above`.
+          Fields omitted from a tier inherit the base pricing values.
+        items:
+          type: object
+          required: [input_tokens_above]
+          properties:
+            input_tokens_above:
+              type: integer
+              minimum: 0
+              description: Input token threshold for this pricing band.
+            prompt:
+              type: string
+              description: Cost per input token in this band.
+            completion:
+              type: string
+              description: Cost per output token in this band.
+            input_cache_read:
+              type: string
+              description: Cost per cached input token read in this band.
+            input_cache_write:
+              type: string
+              description: Cost per cached input token write in this band.
   architecture:
     type: object
     description: Input/output modality and tokenizer information.

@@ -50,17 +50,43 @@ properties:
     type: object
     additionalProperties: true
     description: >
-      Pricing in dollars per million tokens.
+      Pricing in dollars per token, represented as decimal strings.
     properties:
       prompt:
         type: string
-        description: Input price per million tokens.
+        description: Input price per token.
       completion:
         type: string
-        description: Output price per million tokens.
+        description: Output price per token.
       input_cache_read:
         type: string
-        description: Cache hit price per million tokens.
+        description: Cache hit price per token, as a decimal string.
+      input_cache_write:
+        type: string
+        description: Cache write price per token, as a decimal string.
+      tiers:
+        type: array
+        description: Context-length pricing bands, when the source catalog or alias defines them.
+        items:
+          type: object
+          required: [input_tokens_above]
+          properties:
+            input_tokens_above:
+              type: integer
+              minimum: 0
+              description: Apply this band when input tokens exceed this threshold.
+            prompt:
+              type: string
+              description: Input price per token for this band.
+            completion:
+              type: string
+              description: Output price per token for this band.
+            input_cache_read:
+              type: string
+              description: Cached input read price per token for this band.
+            input_cache_write:
+              type: string
+              description: Cached input write price per token for this band.
   supported_parameters:
     type: array
     items:

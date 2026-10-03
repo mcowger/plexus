@@ -15,6 +15,7 @@ export const aliasMetadataOverrides = sqliteTable(
     pricingCompletion: text('pricing_completion'),
     pricingInputCacheRead: text('pricing_input_cache_read'),
     pricingInputCacheWrite: text('pricing_input_cache_write'),
+    pricingTiers: text('pricing_tiers'), // JSON: conditional pricing tiers
     architectureInputModalities: text('architecture_input_modalities'), // JSON: string[]
     architectureOutputModalities: text('architecture_output_modalities'), // JSON: string[]
     architectureTokenizer: text('architecture_tokenizer'),

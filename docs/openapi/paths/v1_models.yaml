@@ -4,7 +4,9 @@ get:
   summary: List configured aliases (public)
   description: |
     Returns all configured model aliases. If an alias has a `metadata`
-    block, the response includes enriched OpenRouter-style fields.
+    block, the response includes enriched OpenRouter-style fields. When
+    available, `pricing.tiers` lists context-length pricing bands; aliases can
+    also define these under `metadata.overrides.pricing.tiers`.
 
     This endpoint computes a SHA-256 hash of the fully serialized JSON
     response to provide `ETag` and `Last-Modified` headers. Computing the
@@ -49,6 +51,10 @@ get:
                   prompt: '0.0000001'
                   completion: '0.0000004'
                   input_cache_read: '0.000000025'
+                  tiers:
+                    - input_tokens_above: 272000
+                      prompt: '0.0000002'
+                      completion: '0.0000008'
                 supported_parameters:
                   - temperature
                   - tools
