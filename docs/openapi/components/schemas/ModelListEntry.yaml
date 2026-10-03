@@ -87,6 +87,20 @@ properties:
             input_cache_write:
               type: string
               description: Cached input write price per token for this band.
+  service_tiers:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum: [auto, standard, flex, priority, ultrafast]
+    description: >
+      Union of native service tiers declared by enabled alias targets and
+      providers, including nested aliases. Uses canonical Plexus names in
+      the order auto, standard, flex, priority, ultrafast. Support on one
+      target is sufficient; another target may rewrite or downgrade the tier.
+      Unknown capabilities contribute nothing. Omitted when no target has
+      known, projectable capabilities; an empty array means the known maps
+      declare no native tiers. Does not include tier pricing.
   supported_parameters:
     type: array
     items:

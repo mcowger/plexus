@@ -145,6 +145,85 @@ describe('GET /v1/models', () => {
   });
 });
 
+describe('GET /v1/models – service_tiers', () => {
+  it('publishes canonical target unions even when metadata enrichment is disabled', async () => {
+    const fastify = Fastify();
+    await registerModelsRoute(fastify);
+    setConfigForTesting({
+      providers: {
+        plus: {
+          api_base_url: { responses: 'https://example.test/v1' },
+          pi_ai_quirks: {
+            responses: {
+              api: 'openai-codex-responses',
+              serviceTierMap: { standard: 'default', priority: 'priority', flex: null },
+            },
+          },
+        },
+        api: {
+          api_base_url: { messages: 'https://example.test/v1' },
+          pi_ai_quirks: {
+            messages: {
+              api: 'anthropic-messages',
+              serviceTierMap: { priority: 'fast' },
+            },
+          },
+        },
+        direct: {
+          api_base_url: { responses: 'https://example.test/v1' },
+          pi_ai_quirks: {
+            responses: { api: 'openai-responses', serviceTierMap: { flex: 'flex' } },
+          },
+        },
+      },
+      models: {
+        mixed: {
+          metadata: { source: 'disabled' },
+          target_groups: [
+            {
+              name: 'main',
+              selector: 'in_order',
+              targets: [
+                { provider: 'plus', model: 'custom' },
+                { provider: 'api', model: 'custom' },
+                { alias: 'child' },
+              ],
+            },
+          ],
+        },
+        child: {
+          target_groups: [
+            {
+              name: 'main',
+              selector: 'in_order',
+              targets: [{ provider: 'direct', model: 'custom' }],
+            },
+          ],
+        },
+        unknown: { targets: [] },
+      },
+    } as unknown as PlexusConfig);
+    const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+    expect(response.statusCode).toBe(200);
+    const models = response.json().data;
+    expect(models.find((model: any) => model.id === 'mixed').service_tiers).toEqual([
+      'standard',
+      'flex',
+      'priority',
+    ]);
+    expect(models.find((model: any) => model.id === 'child').service_tiers).toEqual(['flex']);
+    expect(models.find((model: any) => model.id === 'unknown')).not.toHaveProperty('service_tiers');
+    expect(models.find((model: any) => model.id === 'mixed')).not.toHaveProperty('name');
+    const cached = await fastify.inject({
+      method: 'GET',
+      url: '/v1/models',
+      headers: { 'if-none-match': response.headers.etag! },
+    });
+    expect(cached.statusCode).toBe(304);
+    await fastify.close();
+  });
+});
+
 // ─── Reasoning options from the pi-ai catalog ──────────────
 
 describe('GET /v1/models – reasoning_options', () => {

@@ -145,6 +145,13 @@
                 "priority": "priority"
               }
             },
+            "gpt-5.6": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
             "gpt-5.6-luna": {
               "serviceTierMap": {
                 "auto": "auto",
@@ -336,6 +343,13 @@
                 "flex": "flex"
               }
             },
+            "gpt-5.3-codex": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
             "gpt-5.4-pro": {
               "serviceTierMap": {
                 "auto": "auto",
@@ -356,6 +370,13 @@
                 "auto": "auto",
                 "standard": "default",
                 "flex": "flex"
+              }
+            },
+            "gpt-5.6": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
               }
             },
             "gpt-5.6-luna": {

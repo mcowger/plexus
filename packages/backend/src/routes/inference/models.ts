@@ -13,6 +13,7 @@ import {
   resolvePreferredApi,
 } from '../../services/models/model-metadata-manager';
 import { getCatalogModel } from '../../services/pi-ai/catalog';
+import { resolveAliasServiceTiers } from '../../services/models/alias-service-tiers';
 import {
   applyQuirkOverlay,
   resolveInlineQuirks,
@@ -237,6 +238,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         reasoningOptions = [{ type: 'effort', values: inlineLevels }];
       }
 
+      const serviceTiers = resolveAliasServiceTiers(aliasId, config.models, config.providers ?? {});
       const base = {
         id: aliasId,
         object: 'model' as const,
@@ -248,6 +250,7 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         ...(piModelConfig && { pi_model: piModelConfig.model_id }),
         ...(piOptions !== undefined && { pi_options: piOptions }),
         ...(reasoningOptions !== undefined && { reasoning_options: reasoningOptions }),
+        ...(serviceTiers !== undefined && { service_tiers: serviceTiers }),
       };
 
       const enriched = resolveModelMetadata(

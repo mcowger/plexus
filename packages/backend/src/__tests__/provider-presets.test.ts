@@ -252,6 +252,37 @@ describe('service tier preset seeds', () => {
     });
   });
 
+  test('backfills models.dev priority declarations without inferring flex or reasoning modes', () => {
+    // models.dev providers/openai/models/{gpt-5.3-codex,gpt-5.6}.toml
+    // declare fast as service_tier: priority. GPT-5.6 pro is reasoning.mode,
+    // not a service tier. Missing catalog declarations do not revoke existing maps.
+    const openai = presetOrThrow('openai');
+    const expected = { auto: 'auto', standard: 'default', priority: 'priority' };
+    const applied = applyProviderPreset(blankDraft(), openai);
+    expect(applied.pi_ai_provider).toBe('openai');
+    expect(applied.auto_compat).toBe(true);
+    for (const [api, model] of [
+      ['chat', 'gpt-5.6'],
+      ['responses', 'gpt-5.6'],
+      ['responses', 'gpt-5.3-codex'],
+    ] as const) {
+      expect(applied.pi_ai_quirks?.[api]?.models?.[model]?.serviceTierMap).toEqual(expected);
+      expect(
+        project(openai.piAiQuirks, api, model, { service_tier: 'priority' }).service_tier
+      ).toBe('priority');
+      expect(project(openai.piAiQuirks, api, model, { service_tier: 'flex' }).service_tier).toBe(
+        'default'
+      );
+      expect(
+        project(openai.piAiQuirks, api, model, { service_tier: 'ultrafast' }).service_tier
+      ).toBe('priority');
+    }
+    expect(openai.piAiQuirks?.chat?.models?.['gpt-5.3-codex']).toBeUndefined();
+    expect(
+      project(openai.piAiQuirks, 'chat', 'gpt-5.3-codex', { service_tier: 'priority' }).service_tier
+    ).toBe('default');
+  });
+
   test('openai projects documented tiers and never leaks an unsupported one', () => {
     const quirks = presetOrThrow('openai').piAiQuirks;
     expect(

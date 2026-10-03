@@ -822,7 +822,7 @@ Valid tiers are `auto`, `default`, `flex`, `priority`, and `fast` (OpenAI treats
 - It is applied to `chat` and `responses` targets only; Messages and Gemini targets ignore it. It does not apply to `direct/` routing.
 - Key model lists check both names: listing `gpt-6-luna` allows or excludes all of its tiers, and `gpt-6-luna@priority` can be listed on its own, for example to keep a key off that tier. Tier entries are matched against the normalised (lower-case) tier, so write them in lower case. `priority` and `fast` are one tier, so an entry for either covers both.
 - Usage logs record the name the client sent (`gpt-6-luna@flex`) as the incoming alias.
-- `/v1/models` does not list tier names. A client that checks model names against that list needs the full name configured directly.
+- `/v1/models` publishes `service_tiers` using canonical Plexus names (`auto`, `standard`, `flex`, `priority`, `ultrafast`) in that order. The list is the union of native capabilities declared by enabled targets and providers, including nested aliases. A tier only needs support on one target; routing may select another target and rewrite or downgrade it as usual. Unknown capabilities contribute nothing. The field is omitted when no target has known, projectable capabilities; an empty list means the known maps declare no native tiers. Tier pricing is not included, and tier-suffixed model IDs are not added to the model list.
 
 ---
 

@@ -71,6 +71,7 @@
     "lint:migrations": "bun run scripts/lint-migrations.ts",
     "generate:provider-presets-schema": "bun run scripts/provider-presets-schema.ts --write",
     "check:provider-presets-schema": "bun run scripts/provider-presets-schema.ts",
+    "backfill:service-tiers": "bun run scripts/backfill-service-tiers.ts",
     "lint:openapi": "bunx @redocly/cli lint docs/openapi/openapi.yaml",
     "bundle:openapi": "bunx @redocly/cli bundle docs/openapi/openapi.yaml -o docs/openapi.yaml",
     "generate:openapi:asset": "bunx @redocly/cli bundle docs/openapi/openapi.yaml -o packages/backend/src/assets/openapi.json",
