@@ -6,9 +6,16 @@ import * as registry from '../../pi-ai/registry';
 import { resolveAliasServiceTiers } from '../alias-service-tiers';
 
 function alias(
-  targets: Array<{ provider?: string; model?: string; alias?: string; enabled?: boolean }>
+  targets: Array<{
+    provider?: string;
+    model?: string;
+    alias?: string;
+    enabled?: boolean;
+  }>
 ) {
-  return { target_groups: [{ name: 'primary', selector: 'in_order', targets }] } as ModelConfig;
+  return {
+    target_groups: [{ name: 'primary', selector: 'in_order', targets }],
+  } as ModelConfig;
 }
 
 function provider(map?: Record<string, string | null>): ProviderConfig {
@@ -18,7 +25,12 @@ function provider(map?: Record<string, string | null>): ProviderConfig {
     pi_ai_quirks: {
       responses: {
         api: 'openai-responses',
-        ...(map && { serviceTierMap: map }),
+        ...(map && {
+          models: {
+            custom: { serviceTierMap: map },
+            'gpt-6-luna': { serviceTierMap: map },
+          },
+        }),
       },
     },
   } as unknown as ProviderConfig;
@@ -44,7 +56,7 @@ describe('resolveAliasServiceTiers', () => {
       'flex',
       'priority',
     ]);
-    expect(providers.plus.pi_ai_quirks?.responses?.serviceTierMap?.flex).toBeNull();
+    expect(providers.plus.pi_ai_quirks?.responses?.models?.custom?.serviceTierMap?.flex).toBeNull();
   });
 
   it('expands nested and additional aliases, tolerates cycles and missing references', () => {
@@ -55,9 +67,11 @@ describe('resolveAliasServiceTiers', () => {
         additional_aliases: ['alternate'],
       },
     };
-    expect(resolveAliasServiceTiers('root', models, { api: provider({ flex: 'flex' }) })).toEqual([
-      'flex',
-    ]);
+    expect(
+      resolveAliasServiceTiers('root', models, {
+        api: provider({ flex: 'flex' }),
+      })
+    ).toEqual(['flex']);
   });
 
   it('ignores disabled targets, nested references and providers', () => {
@@ -85,30 +99,43 @@ describe('resolveAliasServiceTiers', () => {
     expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
     api.auto_compat = false;
     expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
-    api.models = { custom: { auto_compat: true } } as unknown as ProviderConfig['models'];
+    api.models = {
+      custom: { auto_compat: true },
+    } as unknown as ProviderConfig['models'];
     expect(resolveAliasServiceTiers('root', models, { api })).toEqual(['flex']);
     api.auto_compat = true;
-    api.models = { custom: { auto_compat: false } } as unknown as ProviderConfig['models'];
+    api.models = {
+      custom: { auto_compat: false },
+    } as unknown as ProviderConfig['models'];
     expect(resolveAliasServiceTiers('root', models, { api })).toEqual(['flex']);
   });
 
   it('distinguishes unknown capabilities from a known empty map', () => {
     const models = { root: alias([{ provider: 'api', model: 'custom' }]) };
     expect(resolveAliasServiceTiers('root', models, { api: provider() })).toBeUndefined();
-    expect(resolveAliasServiceTiers('root', models, { api: provider({ flex: null }) })).toEqual([]);
+    expect(
+      resolveAliasServiceTiers('root', models, {
+        api: provider({ flex: null }),
+      })
+    ).toEqual([]);
     expect(resolveAliasServiceTiers('root', models, { api: provider({}) })).toEqual([]);
   });
 
   it('uses model overrides as replacements and respects model API access', () => {
     const api = provider({ flex: 'flex', priority: 'priority' });
-    api.api_base_url = { responses: 'https://example.test', chat: 'https://example.test' };
+    api.api_base_url = {
+      responses: 'https://example.test',
+      chat: 'https://example.test',
+    };
     api.models = {
       custom: { access_via: [{ type: 'responses', subtype: 'special' }] },
     } as unknown as ProviderConfig['models'];
-    api.pi_ai_quirks!.responses!.models = { custom: { serviceTierMap: { standard: 'default' } } };
+    api.pi_ai_quirks!.responses!.models = {
+      custom: { serviceTierMap: { standard: 'default' } },
+    };
     api.pi_ai_quirks!.chat = {
       api: 'openai-completions',
-      serviceTierMap: { ultrafast: 'ultrafast' },
+      models: { custom: { serviceTierMap: { ultrafast: 'ultrafast' } } },
     };
     expect(
       resolveAliasServiceTiers(
@@ -146,7 +173,9 @@ describe('resolveAliasServiceTiers', () => {
     const spy = registerSpy(registry, 'resolvePiAiModel').mockReturnValue(null);
     const api = provider({ flex: 'flex' });
     api.pi_ai_provider = 'openai';
-    api.models = { custom: { pi_ai_model_id: 'missing' } } as unknown as ProviderConfig['models'];
+    api.models = {
+      custom: { pi_ai_model_id: 'missing' },
+    } as unknown as ProviderConfig['models'];
     expect(
       resolveAliasServiceTiers(
         'root',
@@ -157,17 +186,64 @@ describe('resolveAliasServiceTiers', () => {
     expect(spy).toHaveBeenCalledWith('openai', 'missing');
   });
 
-  it('rejects unmappable formats and empty or unsupported speed spellings', () => {
-    const api = provider({ priority: 'fast', standard: 'standard', auto: 'auto', flex: '' });
-    api.pi_ai_quirks!.responses!.compat = { serviceTierFormat: 'anthropic-speed' };
+  it('ignores provider-wide maps that no model declares', () => {
+    const api = provider();
+    api.pi_ai_quirks!.responses!.serviceTierMap = {
+      flex: 'flex',
+      priority: 'priority',
+    };
     const models = { root: alias([{ provider: 'api', model: 'custom' }]) };
     expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
-    const map = api.pi_ai_quirks!.responses!.serviceTierMap;
+  });
+
+  it('does not advertise OpenRouter tiers for arbitrary models', () => {
+    const openrouter = presets.presets.find((preset) => preset.id === 'openrouter');
+    const providers = {
+      openrouter: {
+        api_base_url: { chat: 'https://example.test' },
+        auto_compat: openrouter!.autoCompat,
+        pi_ai_quirks: openrouter!.piAiQuirks,
+      },
+    } as unknown as Record<string, ProviderConfig>;
+    for (const model of ['anthropic/claude-sonnet-4', 'deepseek/deepseek-chat']) {
+      expect(
+        resolveAliasServiceTiers(
+          'root',
+          { root: alias([{ provider: 'openrouter', model }]) },
+          providers
+        )
+      ).toBeUndefined();
+    }
+  });
+
+  it('rejects unmappable formats and empty or unsupported speed spellings', () => {
+    const api = provider({
+      priority: 'fast',
+      standard: 'standard',
+      auto: 'auto',
+      flex: '',
+    });
+    api.pi_ai_quirks!.responses!.compat = {
+      serviceTierFormat: 'anthropic-speed',
+    };
+    const models = { root: alias([{ provider: 'api', model: 'custom' }]) };
+    expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
+    const map = api.pi_ai_quirks!.responses!.models!.custom!.serviceTierMap;
     api.api_base_url = { messages: 'https://example.test' };
-    api.pi_ai_quirks = { messages: { api: 'anthropic-messages', serviceTierMap: map } };
+    api.pi_ai_quirks = {
+      messages: {
+        api: 'anthropic-messages',
+        models: { custom: { serviceTierMap: map } },
+      },
+    };
     expect(resolveAliasServiceTiers('root', models, { api })).toEqual(['standard', 'priority']);
     api.api_base_url = { gemini: 'https://example.test' };
-    api.pi_ai_quirks = { gemini: { api: 'google-generative-ai', serviceTierMap: map } };
+    api.pi_ai_quirks = {
+      gemini: {
+        api: 'google-generative-ai',
+        models: { custom: { serviceTierMap: map } },
+      },
+    };
     expect(resolveAliasServiceTiers('root', models, { api })).toBeUndefined();
   });
 
@@ -206,16 +282,20 @@ describe('resolveAliasServiceTiers', () => {
     expect(
       resolveAliasServiceTiers(
         'custom',
-        { custom: alias([{ provider: 'anthropic', model: 'claude-opus-5-5' }]) },
+        {
+          custom: alias([{ provider: 'anthropic', model: 'claude-opus-5-5' }]),
+        },
         providers
       )
     ).toEqual(['priority']);
     expect(
       resolveAliasServiceTiers(
         'custom',
-        { custom: alias([{ provider: 'anthropic', model: 'claude-sonnet-5-5' }]) },
+        {
+          custom: alias([{ provider: 'anthropic', model: 'claude-sonnet-5-5' }]),
+        },
         providers
       )
-    ).toEqual([]);
+    ).toBeUndefined();
   });
 });

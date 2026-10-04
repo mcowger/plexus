@@ -1,6 +1,7 @@
+import type { PiAiQuirks } from '@plexus/shared';
 import { getProviderTypes } from '../../config';
 import type { ModelConfig, ProviderConfig } from '../../config';
-import { normalizeApiAccessList } from '../../utils/api-format';
+import { getApiBaseType, normalizeApiAccessList } from '../../utils/api-format';
 import { applyQuirkOverlay, resolveInlineQuirks } from '../dispatch/dispatcher-auto-compat';
 import {
   inferServiceTierFormat,
@@ -20,6 +21,8 @@ const CANONICAL_TIERS: readonly CanonicalServiceTier[] = [
 
 /**
  * Union of native capabilities across enabled targets, not a routing guarantee.
+ * Only per-model maps (`pi_ai_quirks.<api>.models[model].serviceTierMap` or the
+ * linked catalog model) are advertised; provider-wide maps are ignored.
  * Unknown targets contribute nothing; fallback-only tiers are never advertised.
  */
 export function resolveAliasServiceTiers(
@@ -64,8 +67,14 @@ export function resolveAliasServiceTiers(
         const capability = base
           ? applyQuirkOverlay(base, provider.pi_ai_quirks, apiType, target.model)
           : resolveInlineQuirks(provider.pi_ai_quirks, apiType, target.model);
-        const map: ServiceTierMap | undefined = capability?.serviceTierMap;
-        if (!map) continue;
+        // Only a per-model declaration counts. A provider/API-wide map is a
+        // dispatch default (e.g. gateways like OpenRouter), not an assertion
+        // that every model behind the provider supports those tiers.
+        const common = provider.pi_ai_quirks?.[getApiBaseType(apiType) as keyof PiAiQuirks];
+        const map: ServiceTierMap | undefined =
+          common?.models?.[target.model]?.serviceTierMap ??
+          (base as { serviceTierMap?: ServiceTierMap } | null)?.serviceTierMap;
+        if (!map || !capability) continue;
         const format: ServiceTierFormat | undefined =
           capability.compat?.serviceTierFormat ?? inferServiceTierFormat(capability.api);
         if (!format || (format === 'anthropic-speed' && capability.api !== 'anthropic-messages')) {

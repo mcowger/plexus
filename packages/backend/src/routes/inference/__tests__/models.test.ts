@@ -157,7 +157,11 @@ describe('GET /v1/models – service_tiers', () => {
           pi_ai_quirks: {
             responses: {
               api: 'openai-codex-responses',
-              serviceTierMap: { standard: 'default', priority: 'priority', flex: null },
+              models: {
+                custom: {
+                  serviceTierMap: { standard: 'default', priority: 'priority', flex: null },
+                },
+              },
             },
           },
         },
@@ -167,7 +171,7 @@ describe('GET /v1/models – service_tiers', () => {
           pi_ai_quirks: {
             messages: {
               api: 'anthropic-messages',
-              serviceTierMap: { priority: 'fast' },
+              models: { custom: { serviceTierMap: { priority: 'fast' } } },
             },
           },
         },
@@ -175,7 +179,10 @@ describe('GET /v1/models – service_tiers', () => {
           auto_compat: true,
           api_base_url: { responses: 'https://example.test/v1' },
           pi_ai_quirks: {
-            responses: { api: 'openai-responses', serviceTierMap: { flex: 'flex' } },
+            responses: {
+              api: 'openai-responses',
+              models: { custom: { serviceTierMap: { flex: 'flex' } } },
+            },
           },
         },
       },

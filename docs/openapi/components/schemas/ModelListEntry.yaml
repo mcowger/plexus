@@ -94,8 +94,9 @@ properties:
       type: string
       enum: [auto, standard, flex, priority, ultrafast]
     description: >
-      Union of native service tiers declared by enabled alias targets and
-      providers, including nested aliases. Uses canonical Plexus names in
+      Union of native service tiers declared per model by enabled alias
+      targets, including nested aliases. Provider-wide tier maps are not
+      advertised. Uses canonical Plexus names in
       the order auto, standard, flex, priority, ultrafast. Support on one
       target is sufficient; another target may rewrite or downgrade the tier.
       Unknown capabilities contribute nothing. Omitted when no target has
