@@ -505,6 +505,13 @@
       "when": 1791058209135,
       "tag": "0071_add_alias_pricing_tiers",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "6",
+      "when": 1791083615939,
+      "tag": "0072_add_oauth_enterprise_url",
+      "breakpoints": true
     }
   ]
 }

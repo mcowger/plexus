@@ -470,7 +470,11 @@ export async function refreshOAuthRoute(
       delete stashed.headers['chatgpt-account-id'];
     }
   } else if (provider === 'github-copilot') {
-    const baseUrl = resolveCopilotBaseUrl(token).replace(/\/$/, '');
+    const resolvedBaseUrl = await OAuthAuthManager.getInstance().getBaseUrl(
+      provider,
+      oauthAccountId
+    );
+    const baseUrl = (resolvedBaseUrl || resolveCopilotBaseUrl(token)).replace(/\/$/, '');
     stashed.url = `${baseUrl}${copilotEndpoint(targetApiType)}`;
   }
 

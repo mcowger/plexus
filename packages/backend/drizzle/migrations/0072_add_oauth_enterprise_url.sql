@@ -1,0 +1,1 @@
+ALTER TABLE `oauth_credentials` ADD `enterprise_url` text;

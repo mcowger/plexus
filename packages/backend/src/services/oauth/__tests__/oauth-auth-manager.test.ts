@@ -96,6 +96,36 @@ describe('OAuthAuthManager', () => {
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
+  it('reloads the enterprise domain and uses pi OAuth to resolve the account base URL', async () => {
+    mocks.configService.getAllOAuthProviders.mockResolvedValue([
+      { providerType: 'github-copilot', accountId: 'work' },
+    ]);
+    mocks.configService.getOAuthCredentials.mockResolvedValue({
+      ...initialCredentials,
+      enterpriseUrl: 'work.ghe.com',
+    });
+    mocks.toAuth.mockImplementation(async (credentials) => ({
+      apiKey: credentials.access,
+      baseUrl: `https://copilot-api.${credentials.enterpriseUrl}`,
+    }));
+    mocks.refresh.mockResolvedValue({ ...refreshedCredentials, enterpriseUrl: 'work.ghe.com' });
+    const manager = await createManager();
+
+    await expect(manager.getBaseUrl('github-copilot', 'work')).resolves.toBe(
+      'https://copilot-api.work.ghe.com'
+    );
+    await manager.forceRefresh('github-copilot', 'work');
+    expect(mocks.refresh).toHaveBeenCalledWith(
+      expect.objectContaining({ enterpriseUrl: 'work.ghe.com' }),
+      expect.any(AbortSignal)
+    );
+    expect(mocks.configService.setOAuthCredentials).toHaveBeenCalledWith(
+      'github-copilot',
+      'work',
+      expect.objectContaining({ enterpriseUrl: 'work.ghe.com' })
+    );
+  });
+
   it('serializes and spaces refreshes across accounts for the same provider', async () => {
     vi.useFakeTimers();
     mocks.configService.getAllOAuthProviders.mockResolvedValue([

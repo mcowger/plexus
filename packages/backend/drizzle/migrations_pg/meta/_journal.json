@@ -638,6 +638,13 @@
       "when": 1791058209654,
       "tag": "0090_add_alias_pricing_tiers",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1791083616430,
+      "tag": "0091_add_oauth_enterprise_url",
+      "breakpoints": true
     }
   ]
 }

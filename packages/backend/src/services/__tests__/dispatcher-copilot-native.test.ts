@@ -4,6 +4,7 @@ import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { copilotWireApiType, isNativeOAuthProvider } from '../oauth/oauth-native-request';
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedChatRequest } from '../../types/unified';
+import { NATIVE_OAUTH_STASH, refreshOAuthRoute } from '../dispatch/request-payload-builder';
 
 // Native GitHub Copilot OAuth.
 //
@@ -208,7 +209,7 @@ describe('Native GitHub Copilot OAuth', () => {
     expect(init.headers['Authorization']).toBe(`Bearer ${COPILOT_TOKEN}`);
   });
 
-  test('Business account token forces the standard api.githubcopilot.com endpoint', async () => {
+  test('Business account token preserves the account-specific endpoint', async () => {
     OAuthAuthManager.resetForTesting();
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
       COPILOT_BUSINESS_TOKEN
@@ -217,8 +218,33 @@ describe('Native GitHub Copilot OAuth', () => {
     await new Dispatcher().dispatch(chatRequest('cop-chat'));
 
     const [url] = fetchSpy.mock.calls[0] as any[];
-    // proxy.business.* → api.githubcopilot.com (NOT api.business.*, which only
-    // serves NES/autocomplete).
-    expect(url).toBe('https://api.githubcopilot.com/chat/completions');
+    expect(url).toBe('https://api.business.githubcopilot.com/chat/completions');
+  });
+
+  test('uses the enterprise base URL resolved by pi OAuth', async () => {
+    registerSpy(OAuthAuthManager.getInstance(), 'getBaseUrl').mockResolvedValue(
+      'https://copilot-api.work.ghe.com'
+    );
+    setConfigForTesting(copilotConfig());
+    await new Dispatcher().dispatch(chatRequest('cop-chat'));
+    expect(fetchSpy.mock.calls[0]![0]).toBe('https://copilot-api.work.ghe.com/chat/completions');
+  });
+
+  test('resolves the enterprise base URL again after refreshing a rejected token', async () => {
+    const manager = OAuthAuthManager.getInstance();
+    registerSpy(manager, 'getApiKey').mockResolvedValue('refreshed-token');
+    const baseUrl = registerSpy(manager, 'getBaseUrl').mockResolvedValue(
+      'https://copilot-api.work.ghe.com'
+    );
+    const route = {
+      provider: 'Copilot',
+      model: 'gpt-4.1',
+      config: copilotConfig().providers.Copilot,
+      [NATIVE_OAUTH_STASH]: { url: 'https://old.example/chat/completions', headers: {}, body: {} },
+    } as any;
+    const refreshed = await refreshOAuthRoute(route, 'chat');
+    expect(refreshed?.url).toBe('https://copilot-api.work.ghe.com/chat/completions');
+    expect(refreshed?.headers.Authorization).toBe('Bearer refreshed-token');
+    expect(baseUrl).toHaveBeenCalledWith('github-copilot', 'test-account');
   });
 });

@@ -48,6 +48,23 @@ describe('ConfigRepository OAuth credential upsert', () => {
     expect(result).toEqual({ created: true, linkedProviderSlugs: [] });
   });
 
+  it('round-trips the enterprise domain on insert and token rotation', async () => {
+    await repo.setOAuthCredentials('github-copilot', 'work', {
+      ...creds,
+      enterpriseUrl: 'work.ghe.com',
+    });
+    expect((await repo.getOAuthCredentials('github-copilot', 'work'))?.enterpriseUrl).toBe(
+      'work.ghe.com'
+    );
+    await repo.setOAuthCredentials('github-copilot', 'work', {
+      ...rotated,
+      enterpriseUrl: 'other.ghe.com',
+    });
+    expect((await repo.getOAuthCredentials('github-copilot', 'work'))?.enterpriseUrl).toBe(
+      'other.ghe.com'
+    );
+  });
+
   it('reports a token rotation as neither created nor linking', async () => {
     await repo.saveProvider('metasub', oauthProvider());
     await repo.setOAuthCredentials('meta', 'metasub', creds);

@@ -8,6 +8,7 @@ export const oauthCredentials = sqliteTable(
     accountId: text('account_id').notNull(),
     accessToken: text('access_token').notNull(),
     refreshToken: text('refresh_token').notNull(),
+    enterpriseUrl: text('enterprise_url'),
     expiresAt: integer('expires_at').notNull(), // Epoch seconds
     createdAt: integer('created_at').notNull(), // Epoch milliseconds
     updatedAt: integer('updated_at').notNull(), // Epoch milliseconds

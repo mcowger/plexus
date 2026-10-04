@@ -644,18 +644,12 @@ export function copilotEndpoint(apiType: string): string {
 
 /**
  * Resolve the Copilot API base URL from the OAuth token's `proxy-ep` claim
- * (mirrors pi-ai's getGitHubCopilotBaseUrl). Business accounts route through
- * `proxy.business.githubcopilot.com`, which only serves NES/autocomplete — chat
- * must use the standard `api.githubcopilot.com` endpoint (the same fix the old
- * pi-ai executor path applied). Falls back to the individual endpoint.
+ * (mirrors pi-ai's getGitHubCopilotBaseUrl). Falls back to the individual endpoint.
  */
 export function resolveCopilotBaseUrl(token: string): string {
   const match = token.match(/proxy-ep=([^;]+)/);
   if (match) {
     const proxyHost = match[1]!;
-    if (proxyHost === 'proxy.business.githubcopilot.com') {
-      return 'https://api.githubcopilot.com';
-    }
     return `https://${proxyHost.replace(/^proxy\./, 'api.')}`;
   }
   return 'https://api.individual.githubcopilot.com';
@@ -731,10 +725,11 @@ function prepareCopilotOAuthRequest(
   token: string,
   nativeBody: any,
   streaming: boolean,
-  apiType: string
+  apiType: string,
+  resolvedBaseUrl?: string
 ): PreparedOAuthRequest {
   const body = adornCopilotBody(nativeBody, apiType, streaming);
-  const baseUrl = resolveCopilotBaseUrl(token).replace(/\/$/, '');
+  const baseUrl = (resolvedBaseUrl || resolveCopilotBaseUrl(token)).replace(/\/$/, '');
   const url = `${baseUrl}${copilotEndpoint(apiType)}`;
 
   const headers: Record<string, string> = {
@@ -803,7 +798,11 @@ export function prepareOAuthNativeRequest(
   auth: NativeAnthropicAuth,
   nativeBody: any,
   streaming: boolean,
-  options?: { codexPassthrough?: boolean; apiType?: string } & AnthropicNativeOptions
+  options?: {
+    codexPassthrough?: boolean;
+    apiType?: string;
+    baseUrl?: string;
+  } & AnthropicNativeOptions
 ): PreparedOAuthRequest {
   if (provider === 'anthropic') {
     return prepareAnthropicOAuthRequest(modelId, auth, nativeBody, streaming, options);
@@ -828,7 +827,8 @@ export function prepareOAuthNativeRequest(
       auth.token,
       nativeBody,
       streaming,
-      options?.apiType ?? 'chat'
+      options?.apiType ?? 'chat',
+      options?.baseUrl
     );
   }
   if (provider === 'meta') {
@@ -1088,5 +1088,12 @@ export async function prepareNativeOAuthDispatch(
   // `params` carries exactly the native-request options plus dispatch-only
   // fields (provider/modelId/..., which the callee ignores) — passed straight
   // through. The codex boolean coercion happens at its use site.
-  return prepareOAuthNativeRequest(provider, modelId, auth, nativeBody, streaming, params);
+  const baseUrl =
+    provider === 'github-copilot'
+      ? await OAuthAuthManager.getInstance().getBaseUrl(provider, oauthAccountId)
+      : undefined;
+  return prepareOAuthNativeRequest(provider, modelId, auth, nativeBody, streaming, {
+    ...params,
+    baseUrl,
+  });
 }
