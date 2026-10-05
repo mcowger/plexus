@@ -122,12 +122,12 @@ describe('POST /v1/decisions', () => {
     ConcurrencyTracker.resetForTesting();
   });
 
-  async function post(body: Record<string, any>) {
+  async function post(body: Record<string, any>, url = '/v1/decisions') {
     const fastify = Fastify();
     await registerDecisionsRoute(fastify, new Dispatcher(), storage);
     const response = await fastify.inject({
       method: 'POST',
-      url: '/v1/decisions',
+      url,
       payload: body,
     });
     await fastify.close();
@@ -177,6 +177,29 @@ describe('POST /v1/decisions', () => {
       providerReportedCost: 0.000019992,
       responseStatus: 'success',
       isPassthrough: false,
+    });
+  });
+
+  test('serves the same request on the /v1/systemone alias', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(upstreamBody()), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const response = await post(
+      { model: 'decisions_alias', state: { ticket: 'Blank checkout screen.' }, questions },
+      '/v1/systemone'
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(upstreamBody());
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://openrouter.ai/api/v1/systemone');
+    expect(savedRequests).toHaveLength(1);
+    expect(savedRequests[0]).toMatchObject({
+      incomingApiType: 'decisions',
+      responseStatus: 'success',
     });
   });
 
@@ -543,6 +566,14 @@ describe('POST /v1/decisions policy hardening', () => {
       payload: validBody(),
     });
     expect(denied.statusCode).toBe(401);
+
+    const deniedAlias = await fastify.inject({
+      method: 'POST',
+      url: '/v1/systemone',
+      headers: { authorization: 'Bearer wrong' },
+      payload: validBody(),
+    });
+    expect(deniedAlias.statusCode).toBe(401);
     // Only the authenticated request reached the upstream.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await fastify.close();

@@ -29,11 +29,11 @@ export async function registerDecisionsRoute(
   quotaEnforcer?: QuotaEnforcer
 ) {
   /**
-   * POST /v1/decisions
+   * POST /v1/decisions (alias: POST /v1/systemone)
    * Buffered Jev-style Decisions endpoint (questions and answers).
    * Accepts `{model, state, questions}` on the System One protocol.
    */
-  fastify.post('/v1/decisions', async (request: any, reply: any) => {
+  const handler = async (request: any, reply: any) => {
     const requestId = crypto.randomUUID();
     const clientRequestId = getClientRequestId(request.headers);
     reply.header('x-request-id', requestId);
@@ -234,5 +234,8 @@ export async function registerDecisionsRoute(
     } finally {
       disconnect.cleanup();
     }
-  });
+  };
+
+  fastify.post('/v1/decisions', handler);
+  fastify.post('/v1/systemone', handler);
 }
