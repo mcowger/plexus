@@ -384,6 +384,35 @@ describe('buildGenerationOptions', () => {
       }
     );
 
+    it('omits a key-default tier for legacy unmapped models but keeps explicit ones', () => {
+      const model = { api: 'openai-completions', reasoning: false } as any;
+      const omitted = buildGenerationOptions(
+        model,
+        gen({ serviceTier: 'fast', serviceTierSource: 'key_default' })
+      );
+      expect(omitted.serviceTier).toBeUndefined();
+      expect(omitted.serviceTierFormat).toBeUndefined();
+
+      const explicit = buildGenerationOptions(
+        model,
+        gen({ serviceTier: 'fast', serviceTierSource: 'suffix' })
+      );
+      expect(explicit.serviceTier).toBe('priority');
+    });
+
+    it('resolves a key-default tier through a declared serviceTierMap', () => {
+      const mapped = {
+        api: 'openai-completions',
+        reasoning: false,
+        serviceTierMap: { ultrafast: 'ultra', standard: 'default' },
+      } as any;
+      const opts = buildGenerationOptions(
+        mapped,
+        gen({ serviceTier: 'ultrafast', serviceTierSource: 'key_default' })
+      );
+      expect(opts.serviceTier).toBe('ultra');
+    });
+
     it('leaves a provider-specific legacy tier spelling untouched', () => {
       const model = { api: 'openai-responses', reasoning: false } as any;
       const opts = buildGenerationOptions(

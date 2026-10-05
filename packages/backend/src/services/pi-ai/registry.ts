@@ -350,10 +350,18 @@ export function buildGenerationOptions(
           opts.serviceTierFormat = format;
         }
       }
-    } else if (isOpenAiFamily(api) && intent.serviceTierSource !== 'speed') {
-      // Legacy (unmapped) pass-through. A native Anthropic `speed` value is a
-      // different concept than a capacity `service_tier`, so it must not be
-      // translated into a raw OpenAI `service_tier` without a declared map.
+    } else if (
+      isOpenAiFamily(api) &&
+      intent.serviceTierSource !== 'speed' &&
+      intent.serviceTierSource !== 'key_default'
+    ) {
+      // Legacy (unmapped) pass-through for EXPLICIT tiers only. A native
+      // Anthropic `speed` value is a different concept than a capacity
+      // `service_tier`, so it must not be translated into a raw OpenAI
+      // `service_tier` without a declared map. A per-key default is
+      // best-effort: with no declared support the provider may reject any
+      // value we send, so omit it (the caller strips the injected value and
+      // the provider native default applies) rather than guessing.
       opts.serviceTier = legacyOpenAiServiceTier(intent.serviceTier);
     }
   }
@@ -373,7 +381,10 @@ function isOpenAiFamily(api: string | undefined): boolean {
 /**
  * Legacy (unmapped) OpenAI-family pass-through spellings. OpenAI's wire value
  * for the standard tier is `default`, so translate the Plexus/Anthropic
- * `standard`/`standard_only` spellings instead of leaking them. OpenAI has no
+ * `standard`/`standard_only` spellings instead of leaking them. `fast` is
+ * Plexus's alias for `priority` and has no OpenAI wire spelling, so translate
+ * it as well — leaking `fast` makes OpenAI-compatible upstreams (e.g. Meta)
+ * reject the request with `unknown variant 'fast'`. OpenAI has no
  * `ultrafast` capacity value, so decay it to the nearest same-idea tier
  * `priority`. Provider-specific spellings we do not recognise (e.g. Google
  * `on_demand`) are left verbatim rather than guessed at.
@@ -381,6 +392,7 @@ function isOpenAiFamily(api: string | undefined): boolean {
 const LEGACY_OPENAI_SERVICE_TIERS: Record<string, string> = {
   standard: 'default',
   standard_only: 'default',
+  fast: 'priority',
   ultrafast: 'priority',
 };
 

@@ -134,7 +134,8 @@ export function resolveServiceTier(
  * Mapped models are overwritten afterwards by the registry auto-compat
  * projection.
  */
-const SERVICE_TIER_API_TYPES = new Set(['chat', 'responses']);
+/** Target base types whose bodies carry an OpenAI-style `service_tier` field. */
+export const SERVICE_TIER_API_TYPES = new Set(['chat', 'responses']);
 
 /** True when a body-shaped value carries a non-empty `speed` or `service_tier`. */
 export function hasExplicitTier(value: any): boolean {
@@ -156,13 +157,15 @@ export function getDefaultServiceTier(request: UnifiedChatRequest): string | und
 
 /**
  * OpenAI wire aliases for the legacy (unmapped) writer. OpenAI spells the
- * standard tier `default`, and has no `ultrafast` capacity value — the nearest
+ * standard tier `default`, has no `fast` value (`fast` is Plexus's alias for
+ * `priority`), and has no `ultrafast` capacity value — the nearest
  * same-idea tier is `priority`. Only the emitted value is rewritten; the
  * request's canonical `serviceTier` is left untouched so a model capability map
  * still sees `ultrafast`.
  */
 const LEGACY_SERVICE_TIER_WIRE_ALIASES: Record<string, string> = {
   standard: 'default',
+  fast: 'priority',
   ultrafast: 'priority',
 };
 
@@ -217,4 +220,42 @@ export function applyServiceTierSelection(
   }
 
   return { ...payload, service_tier: legacyServiceTierWireValue(defaultTier) };
+}
+
+/**
+ * Remove a per-key-default tier previously injected by
+ * {@link applyServiceTierSelection} when the target turns out to declare no
+ * tier support. Key defaults are best-effort: sending one to a provider that
+ * does not understand `service_tier` (or the value) fails the whole request,
+ * so unknown support means omit and let the provider native default apply.
+ * Explicit tiers are never touched here — a suffix, body `service_tier`, or
+ * `speed` is a deliberate client demand that keeps its legacy pass-through.
+ *
+ * Provenance: with the client `originalBody` present (always true on the
+ * live request path), any payload tier coexisting with "no explicit tier
+ * anywhere" can only be our injection. Without an `originalBody` (unit-level
+ * direct calls) provenance is ambiguous, so only an exact wire-form match
+ * against the key default is removed and a genuinely different explicit tier
+ * is preserved.
+ *
+ * Returns the payload unchanged when there is nothing to strip; otherwise a
+ * shallow copy without `service_tier` (never mutates its input).
+ */
+export function stripKeyDefaultTier(payload: any, request: UnifiedChatRequest): any {
+  if (!payload || typeof payload !== 'object') return payload;
+  if (typeof request.serviceTier === 'string' && request.serviceTier.length > 0) return payload;
+  if (hasExplicitTier(request.originalBody)) return payload;
+  const keyDefault = getDefaultServiceTier(request);
+  if (!keyDefault) return payload;
+  const current = (payload as Record<string, unknown>).service_tier;
+  if (typeof current !== 'string' || current.length === 0) return payload;
+  if (current.trim().toLowerCase() !== legacyServiceTierWireValue(keyDefault).toLowerCase()) {
+    return payload;
+  }
+  const next = { ...payload };
+  delete next.service_tier;
+  logger.debug(
+    `Stripped key-default service tier '${current}' for ${request.model ?? '<unknown model>'}: target declares no tier support`
+  );
+  return next;
 }

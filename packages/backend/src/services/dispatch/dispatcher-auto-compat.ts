@@ -11,7 +11,12 @@ import { projectReasoningForResponses } from '../../transformers/utils';
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 import { getApiBaseType } from '../../utils/api-format';
 import { LITE_ALLOWED_TOOL_TYPES } from './responses-extensions';
-import { getDefaultServiceTier, hasExplicitTier } from './service-tier-selection';
+import {
+  SERVICE_TIER_API_TYPES,
+  getDefaultServiceTier,
+  hasExplicitTier,
+  stripKeyDefaultTier,
+} from './service-tier-selection';
 
 function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -134,12 +139,15 @@ function extractGenerationIntent(payload: any, request: UnifiedChatRequest): Gen
  *
  * The per-key default is used only when the client supplied no tier. Preserve
  * its canonical spelling when the legacy writer has already emitted a wire
- * alias into the payload.
+ * alias into the payload. Key defaults are tagged `key_default` (not
+ * `service_tier`) so egress can treat them as best-effort: mapped targets
+ * resolve them through the capability map, unmapped targets strip them
+ * instead of leaking a tier the provider may reject.
  */
 function pickServiceTierIntent(
   request: UnifiedChatRequest,
   source: Record<string, any>
-): { value: string; source: 'suffix' | 'speed' | 'service_tier' } | undefined {
+): { value: string; source: 'suffix' | 'speed' | 'service_tier' | 'key_default' } | undefined {
   if (typeof request.serviceTier === 'string') {
     return { value: request.serviceTier, source: 'suffix' };
   }
@@ -152,7 +160,7 @@ function pickServiceTierIntent(
   // canonical value before inspecting the payload keeps a legacy-injected wire
   // alias from hiding `ultrafast`/`standard` from a serviceTierMap.
   if (keyDefault && originalBody && !hasExplicitTier(originalBody)) {
-    return { value: keyDefault, source: 'service_tier' };
+    return { value: keyDefault, source: 'key_default' };
   }
 
   const candidates: Array<[unknown, 'speed' | 'service_tier']> = [
@@ -167,7 +175,7 @@ function pickServiceTierIntent(
     }
   }
 
-  if (keyDefault) return { value: keyDefault, source: 'service_tier' };
+  if (keyDefault) return { value: keyDefault, source: 'key_default' };
   return undefined;
 }
 
@@ -275,7 +283,8 @@ function projectOpenAiCompletionsAutoCompat(
 
   // Mapped service tier: write the native value, or strip an unsupported one so
   // the client's rejected tier cannot leak upstream. Legacy (unmapped) models
-  // have no key here and keep their existing pass-through.
+  // keep pass-through for explicit tiers; key defaults were stripped up front
+  // and the registry omits them, so an unsupported default can never leak.
   projectOpenAiServiceTier(next, options, intent.serviceTierSource);
 
   if (!model.reasoning) return next;
@@ -611,6 +620,19 @@ export function applyRegistryAutoCompat(
   const autoCompat = route.config.auto_compat === true || route.modelConfig?.auto_compat === true;
   if (!autoCompat) return providerPayload;
 
+  // Key defaults are best-effort: strip an injected default up front on
+  // OpenAI-family targets so nothing downstream mistakes it for an explicit
+  // client tier. Mapped targets re-resolve the canonical default from request
+  // metadata and write the native value; unmapped targets (including the
+  // no-base and inline early returns below) stay stripped and the provider
+  // native default applies. Explicit tiers are never touched here.
+  const tierPayload =
+    SERVICE_TIER_API_TYPES.has(getApiBaseType(targetApiType)) &&
+    typeof providerPayload === 'object' &&
+    providerPayload !== null
+      ? stripKeyDefaultTier(providerPayload, request)
+      : providerPayload;
+
   const piAiProvider = route.config.pi_ai_provider;
   const piAiModelId = route.modelConfig?.pi_ai_model_id;
   const quirks = route.config.pi_ai_quirks;
@@ -664,16 +686,16 @@ export function applyRegistryAutoCompat(
           piAiProvider ? ` (${piAiProvider}/${piAiModelId ?? '<unlinked>'})` : ''
         } and no matching quirks`
     );
-    return providerPayload;
+    return tierPayload;
   }
 
-  const intent = extractGenerationIntent(providerPayload, request);
+  const intent = extractGenerationIntent(tierPayload, request);
   const selectedIntent = inline ? selectInlineGenerationIntent(inline, intent) : intent;
   const options = buildGenerationOptions(piAiModel, selectedIntent);
   // An inline API declaration alone carries no model capabilities. Leave the
   // payload untouched unless a declared trait actually requests a projection.
   if (inline && Object.keys(options).length === 0 && inline.compat?.supportsTemperature !== false) {
-    return providerPayload;
+    return tierPayload;
   }
 
   // Anthropic fast mode's beta flag is resolved at fetch time in
@@ -688,20 +710,20 @@ export function applyRegistryAutoCompat(
     api === 'openai-codex-responses' ||
     api === 'azure-openai-responses'
   ) {
-    nextPayload = projectResponsesAutoCompat(providerPayload, piAiModel, selectedIntent, options);
+    nextPayload = projectResponsesAutoCompat(tierPayload, piAiModel, selectedIntent, options);
   } else if (api === 'anthropic-messages') {
     nextPayload = projectAnthropicAutoCompat(
-      providerPayload,
+      tierPayload,
       piAiModel,
       selectedIntent,
       options,
       !!inline
     );
   } else if (api === 'google-generative-ai' || api === 'google-generative-ai-vertex') {
-    nextPayload = projectGeminiAutoCompat(providerPayload, selectedIntent, options);
+    nextPayload = projectGeminiAutoCompat(tierPayload, selectedIntent, options);
   } else {
     nextPayload = projectOpenAiCompletionsAutoCompat(
-      providerPayload,
+      tierPayload,
       request,
       piAiModel,
       selectedIntent,

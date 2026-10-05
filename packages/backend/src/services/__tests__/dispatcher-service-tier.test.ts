@@ -355,13 +355,15 @@ describe('Dispatcher service-tier suffix', () => {
       }
       expect(fetchMock).not.toHaveBeenCalled();
 
-      // What goes upstream is still the spelling the client chose.
+      // The wire value is normalised: OpenAI has no `fast` spelling, so the
+      // `fast` alias for `priority` is sent as `priority` (a literal `fast`
+      // makes OpenAI-compatible upstreams reject the request).
       await new Dispatcher().dispatch(
         withKeyPolicy(chatRequest('test-alias@fast'), {
           allowedModels: ['test-alias@priority'],
         })
       );
-      expect(sentBody().service_tier).toBe('fast');
+      expect(sentBody().service_tier).toBe('priority');
       fetchMock.mockClear();
 
       await expect(

@@ -36,8 +36,12 @@ export interface GenerationIntent {
    * Where the tier intent came from. Native Anthropic `speed` is a distinct
    * concept from capacity `service_tier`; legacy (unmapped) egress must not
    * project a native `speed` value as a raw OpenAI `service_tier`.
+   * `key_default` marks a per-key default tier: best-effort only, so egress
+   * strips it when the target declares no tier support instead of risking an
+   * upstream rejection. Explicit tiers (`suffix` / `speed` / `service_tier`)
+   * keep their legacy pass-through on unmapped targets.
    */
-  serviceTierSource?: 'suffix' | 'speed' | 'service_tier';
+  serviceTierSource?: 'suffix' | 'speed' | 'service_tier' | 'key_default';
 }
 
 /** Normalize a client verbosity string to our vocabulary. */

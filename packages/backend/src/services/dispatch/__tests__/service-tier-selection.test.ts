@@ -10,6 +10,7 @@ import {
   applyServiceTierSelection,
   normalizeServiceTier,
   resolveServiceTier,
+  stripKeyDefaultTier,
 } from '../service-tier-selection';
 
 const request = (overrides: Partial<UnifiedChatRequest> = {}) =>
@@ -43,7 +44,7 @@ describe('applyServiceTierSelection', () => {
     ['ultrafast', 'priority'],
     ['default', 'default'],
     ['priority', 'priority'],
-    ['fast', 'fast'],
+    ['fast', 'priority'],
     ['flex', 'flex'],
   ])('normalizes the legacy %s suffix to the OpenAI %s wire value', (tier, expected) => {
     expect(
@@ -97,6 +98,13 @@ describe('applyServiceTierSelection — per-key default tier', () => {
     expect(applyServiceTierSelection({ model: 'm' }, withDefault('standard'), 'chat')).toEqual({
       model: 'm',
       service_tier: 'default',
+    });
+  });
+
+  test('normalizes a fast key default to priority (fast has no OpenAI wire spelling)', () => {
+    expect(applyServiceTierSelection({ model: 'm' }, withDefault('fast'), 'chat')).toEqual({
+      model: 'm',
+      service_tier: 'priority',
     });
   });
 
@@ -154,6 +162,55 @@ describe('applyServiceTierSelection — per-key default tier', () => {
     applyServiceTierSelection({ model: 'm' }, withDefault('flex', { originalBody }), 'chat');
 
     expect(originalBody).toEqual({ model: 'm', messages: [] });
+  });
+});
+
+describe('stripKeyDefaultTier', () => {
+  const withDefault = (tier: string, overrides: Partial<UnifiedChatRequest> = {}) =>
+    request({
+      metadata: { plexus_metadata: { defaultServiceTier: tier } } as UnifiedChatRequest['metadata'],
+      ...overrides,
+    });
+
+  test('strips an injected key default (wire alias) when the client sent no tier', () => {
+    const payload = { model: 'm', service_tier: 'priority' };
+    const out = stripKeyDefaultTier(payload, withDefault('fast', { originalBody: { model: 'm' } }));
+
+    expect(out).toEqual({ model: 'm' });
+    expect(payload).toEqual({ model: 'm', service_tier: 'priority' });
+  });
+
+  test('leaves a suffix-selected tier alone', () => {
+    const payload = { model: 'm', service_tier: 'flex' };
+
+    expect(stripKeyDefaultTier(payload, withDefault('priority', { serviceTier: 'flex' }))).toBe(
+      payload
+    );
+  });
+
+  test('leaves a tier the client sent in the body alone', () => {
+    const payload = { model: 'm', service_tier: 'flex' };
+
+    expect(
+      stripKeyDefaultTier(
+        payload,
+        withDefault('priority', { originalBody: { service_tier: 'flex' } })
+      )
+    ).toBe(payload);
+  });
+
+  test('leaves a genuinely different explicit tier alone without an originalBody', () => {
+    const payload = { model: 'm', service_tier: 'flex' };
+
+    expect(stripKeyDefaultTier(payload, withDefault('priority'))).toBe(payload);
+  });
+
+  test('does nothing without a key default or without an injected tier', () => {
+    const payload = { model: 'm', service_tier: 'flex' };
+    expect(stripKeyDefaultTier(payload, request())).toBe(payload);
+
+    const clean = { model: 'm' };
+    expect(stripKeyDefaultTier(clean, withDefault('flex'))).toBe(clean);
   });
 });
 
