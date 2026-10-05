@@ -1032,6 +1032,82 @@ describe('Registry overlay quirks + service tiers', () => {
     expect(outbound.service_tier).toBe('flex');
   });
 
+  test('a non-auto-compat route without declared support strips an injected key default', () => {
+    const plain = route({
+      config: {
+        api_base_url: 'https://example.test/v1',
+        api_key: 'test-key',
+      } as any,
+      modelConfig: undefined,
+    });
+
+    const stripped = applyRegistryAutoCompat(
+      // Post-injection state: the legacy writer emitted the `flex` default.
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({
+        originalBody: { model: 'provider-model', messages: [] },
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'flex' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      plain,
+      'chat'
+    );
+    expect(stripped).not.toHaveProperty('service_tier');
+  });
+
+  test('a non-auto-compat route with a declared map keeps the key default value', () => {
+    const declared = route({
+      config: {
+        api_base_url: 'https://example.test/v1',
+        api_key: 'test-key',
+        pi_ai_quirks: {
+          chat: { serviceTierMap: { priority: 'priority', standard: 'default' } },
+        },
+      } as any,
+      modelConfig: undefined,
+    });
+
+    const kept = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'priority' },
+      request({
+        originalBody: { model: 'provider-model', messages: [] },
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'fast' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      declared,
+      'chat'
+    );
+    expect(kept.service_tier).toBe('priority');
+  });
+
+  test('a null-only map counts as no declared support', () => {
+    const none = route({
+      config: {
+        api_base_url: 'https://example.test/v1',
+        api_key: 'test-key',
+        pi_ai_quirks: {
+          chat: { serviceTierMap: { flex: null, priority: null } },
+        },
+      } as any,
+      modelConfig: undefined,
+    });
+
+    const stripped = applyRegistryAutoCompat(
+      { model: 'provider-model', messages: [], service_tier: 'flex' },
+      request({
+        originalBody: { model: 'provider-model', messages: [] },
+        metadata: {
+          plexus_metadata: { defaultServiceTier: 'flex' },
+        } as UnifiedChatRequest['metadata'],
+      }),
+      none,
+      'chat'
+    );
+    expect(stripped).not.toHaveProperty('service_tier');
+  });
+
   test('an unresolvable route strips an injected key default but keeps an explicit tier', () => {
     vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(null);
     const noBase = route({

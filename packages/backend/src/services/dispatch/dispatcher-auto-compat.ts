@@ -611,6 +611,23 @@ function selectInlineGenerationIntent(
   };
 }
 
+/**
+ * Whether the route positively declares service-tier support for a target: a
+ * per-model `serviceTierMap` (which replaces the provider-wide one) or a
+ * provider-wide map with at least one usable native value. The pi-ai catalog
+ * itself never carries tier maps, so preset/config quirks are the
+ * declaration surface. Unknown support means key defaults are withheld;
+ * explicit client tiers still pass through.
+ */
+function routeDeclaresTierSupport(route: RouteResult, targetApiType: string): boolean {
+  const block = route.config.pi_ai_quirks?.[getApiBaseType(targetApiType) as keyof PiAiQuirks];
+  if (!block) return false;
+  const modelMap = block.models?.[route.model]?.serviceTierMap;
+  const effective = modelMap ?? block.serviceTierMap;
+  if (!effective) return false;
+  return Object.values(effective).some((v) => typeof v === 'string' && v.length > 0);
+}
+
 export function applyRegistryAutoCompat(
   providerPayload: any,
   request: UnifiedChatRequest,
@@ -618,20 +635,23 @@ export function applyRegistryAutoCompat(
   targetApiType: string
 ): any {
   const autoCompat = route.config.auto_compat === true || route.modelConfig?.auto_compat === true;
-  if (!autoCompat) return providerPayload;
 
-  // Key defaults are best-effort: strip an injected default up front on
-  // OpenAI-family targets so nothing downstream mistakes it for an explicit
-  // client tier. Mapped targets re-resolve the canonical default from request
-  // metadata and write the native value; unmapped targets (including the
-  // no-base and inline early returns below) stay stripped and the provider
-  // native default applies. Explicit tiers are never touched here.
+  // Key defaults are best-effort: when the route declares no tier support,
+  // strip an injected default up front — regardless of auto_compat — so an
+  // unknown provider can never reject the request over a tier nobody asked
+  // for. `auto_compat` defaults off, so gating the strip on it would leave
+  // most unmapped routes sending injected defaults verbatim. Routes with a
+  // declared map keep the injected value for the mapping below; explicit
+  // tiers are never touched here.
   const tierPayload =
+    !routeDeclaresTierSupport(route, targetApiType) &&
     SERVICE_TIER_API_TYPES.has(getApiBaseType(targetApiType)) &&
     typeof providerPayload === 'object' &&
     providerPayload !== null
       ? stripKeyDefaultTier(providerPayload, request)
       : providerPayload;
+
+  if (!autoCompat) return tierPayload;
 
   const piAiProvider = route.config.pi_ai_provider;
   const piAiModelId = route.modelConfig?.pi_ai_model_id;
