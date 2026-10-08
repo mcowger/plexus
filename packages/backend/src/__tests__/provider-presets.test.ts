@@ -174,6 +174,41 @@ describe('built-in presets catalog (data/provider-presets.json)', () => {
     const messages = project('messages', { max_tokens: 4000, reasoning_effort: 'low' });
     expect(messages.thinking).toMatchObject({ type: 'enabled', budget_tokens: 2048 });
   });
+
+  test('opper declares inline quirks with a messages base under /v3/compat/v1', () => {
+    const opper = presetOrThrow('opper');
+    expect(opper.piAiProvider).toBeUndefined();
+    expect(opper.autoCompat).toBe(true);
+    expect(Object.keys(opper.piAiQuirks ?? {}).sort()).toEqual(['chat', 'messages', 'responses']);
+    // Plexus appends /messages, and Opper serves Anthropic messages at /v3/compat/v1/messages.
+    expect(opper.apiBaseUrl).toEqual({
+      chat: 'https://api.opper.ai/v3/compat',
+      messages: 'https://api.opper.ai/v3/compat/v1',
+      responses: 'https://api.opper.ai/v3/compat',
+    });
+
+    const project = (targetApiType: string, body: Record<string, unknown>) =>
+      applyRegistryAutoCompat(
+        body,
+        { model: 'alias', messages: [], incomingApiType: targetApiType } as any,
+        {
+          provider: 'opper',
+          model: 'claude-sonnet-4-6',
+          config: { auto_compat: true, pi_ai_quirks: opper.piAiQuirks } as any,
+        } as any,
+        targetApiType
+      );
+
+    // Opper chat reads top-level reasoning_effort with low, medium or high,
+    // so minimal is sent as low.
+    const chat = project('chat', { reasoning: { effort: 'high' } });
+    expect(chat.reasoning).toBeUndefined();
+    expect(chat.reasoning_effort).toBe('high');
+    expect(opper.piAiQuirks?.chat?.thinkingLevelMap?.minimal).toBe('low');
+
+    const messages = project('messages', { max_tokens: 4000, reasoning_effort: 'low' });
+    expect(messages.thinking).toMatchObject({ type: 'enabled', budget_tokens: 2048 });
+  });
 });
 
 describe('service tier preset seeds', () => {
