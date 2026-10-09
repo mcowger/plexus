@@ -305,6 +305,20 @@ fastify.setErrorHandler((error, request, reply) => {
   }
 
   const err = error as any;
+
+  // Oversized bodies (Fastify bodyLimit) are reported the way clients expect
+  // for context overflow, so they compact and retry instead of failing.
+  if (err.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+    return reply.code(413).send({
+      error: {
+        message:
+          'Your input exceeds the context window of this model. Please adjust your input and try again.',
+        type: 'invalid_request_error',
+        code: 'context_length_exceeded',
+      },
+    });
+  }
+
   reply.code(err.statusCode || 500).send({
     error: {
       message: err.message || 'Internal Server Error',
