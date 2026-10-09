@@ -305,6 +305,17 @@ fastify.setErrorHandler((error, request, reply) => {
   }
 
   const err = error as any;
+
+  // Oversized bodies (Fastify bodyLimit) are reported the way clients expect
+  // for context overflow, so they compact and retry instead of failing.
+  if (err.statusCode === 413) {
+    return reply.code(413).send({
+      message:
+        'Your input exceeds the context window of this model. Please adjust your input and try again.',
+      type: 'invalid_request_error',
+    });
+  }
+
   reply.code(err.statusCode || 500).send({
     error: {
       message: err.message || 'Internal Server Error',
