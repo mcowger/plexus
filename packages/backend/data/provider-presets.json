@@ -622,6 +622,65 @@
       "notes": "Get a key at https://app.requesty.ai/api-keys. Model ids look like openai/gpt-4o-mini. Fetch Models reads GET /v1/models on the same base. Reasoning effort above high is model dependent upstream, so it clamps to high. For EU routing use https://router.eu.requesty.ai/v1."
     },
     {
+      "id": "opper",
+      "name": "Opper",
+      "description": "Opper AI gateway, OpenAI chat and responses plus Anthropic messages under one compat base.",
+      "docsUrl": "https://docs.opper.ai",
+      "suggestedProviderId": "opper",
+      "suggestedName": "Opper",
+      "apiBaseUrl": {
+        "chat": "https://api.opper.ai/v3/compat",
+        "messages": "https://api.opper.ai/v3/compat/v1",
+        "responses": "https://api.opper.ai/v3/compat"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "disabled",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Get a key at https://platform.opper.ai. Model ids are pool names such as claude-sonnet-4-6 or gpt-5.4-mini, which Opper routes across the providers serving that model; a provider/model id such as anthropic/claude-sonnet-4-6 pins one route. Fetch Models reads GET /v3/compat/models on the chat base. Anthropic messages live under /v3/compat/v1, so that base carries the /v1 segment. Reasoning effort is sent as low, medium or high, so minimal is sent as low."
+    },
+    {
       "id": "meta",
       "name": "Meta",
       "description": "Meta Model API — chat, responses, and Anthropic-compatible messages.",
