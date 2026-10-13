@@ -2,6 +2,43 @@ import { UnifiedChatRequest } from '../../types/unified';
 import { convertUnifiedToolsToAnthropic } from './tool-mapper';
 import { clampAnthropicEffortAndThinking } from './thinking-clamp';
 
+const BASE64_DATA_URL_PATTERN = /^data:([^;,]*)(?:;[^;,]*)*;base64,([\s\S]+)$/i;
+
+type AnthropicImageSource =
+  | { type: 'base64'; media_type: string; data: string }
+  | { type: 'url'; url: string };
+
+/**
+ * Converts a unified `image_url` into an Anthropic image source.
+ *
+ * `data:` URIs become `base64` sources and `http(s)` URLs become `url` sources.
+ * Anything else cannot be expressed to Anthropic, so it is rejected locally with
+ * a 400 instead of being forwarded as an empty image (which Anthropic rejects
+ * with an opaque `image cannot be empty` error).
+ */
+function toAnthropicImageSource(url: unknown, fallbackMediaType?: string): AnthropicImageSource {
+  if (typeof url === 'string') {
+    const dataMatch = url.match(BASE64_DATA_URL_PATTERN);
+    if (dataMatch?.[2]) {
+      return {
+        type: 'base64',
+        media_type: dataMatch[1] || fallbackMediaType || 'image/jpeg',
+        data: dataMatch[2],
+      };
+    }
+    if (/^https?:\/\//i.test(url)) {
+      return { type: 'url', url };
+    }
+  }
+
+  throw Object.assign(
+    new Error(
+      'Unsupported image_url: expected a base64 data URI or an http(s) URL for Anthropic targets'
+    ),
+    { routingContext: { statusCode: 400, code: 'invalid_request_error' } }
+  );
+}
+
 /**
  * Transforms a Unified request into Anthropic API format.
  *
@@ -64,11 +101,7 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
             } else if (part.type === 'image_url') {
               content.push({
                 type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: part.media_type || 'image/jpeg',
-                  data: '',
-                },
+                source: toAnthropicImageSource(part.image_url?.url, part.media_type),
                 ...(part.cache_control !== undefined ? { cache_control: part.cache_control } : {}),
               });
             }
