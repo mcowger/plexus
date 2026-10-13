@@ -284,6 +284,42 @@ describe('Gemini Request Parser', () => {
       expect(result.reasoning?.max_tokens).toBe(4096);
     });
 
+    it('should parse thinkingBudget -1 as adaptive thinking', async () => {
+      const input = {
+        contents: [{ role: 'user', parts: [{ text: 'Think' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          thinkingConfig: {
+            thinkingBudget: -1,
+          },
+        },
+      };
+
+      const result = await parseGeminiRequest(input);
+
+      expect(result.reasoning).toBeDefined();
+      expect(result.reasoning?.max_tokens).toBe(-1);
+      expect(result.reasoning?.adaptive).toBe(true);
+    });
+
+    it('should parse thinkingBudget 0 as disabled thinking', async () => {
+      const input = {
+        contents: [{ role: 'user', parts: [{ text: 'Think' }] }],
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      };
+
+      const result = await parseGeminiRequest(input);
+
+      expect(result.reasoning).toBeDefined();
+      expect(result.reasoning?.max_tokens).toBe(0);
+      expect(result.reasoning?.enabled).toBe(false);
+    });
+
     it('should produce no reasoning when thinkingConfig is absent', async () => {
       const input = {
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],

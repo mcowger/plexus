@@ -88,15 +88,16 @@ function extractReasoningIntent(payload: any, request: UnifiedChatRequest): Reas
 
   const thinkingConfig = source.generationConfig?.thinkingConfig;
   if (thinkingConfig && typeof thinkingConfig === 'object') {
-    const effort = normalizeEffort(thinkingConfig.thinkingLevel);
+    const thinkingBudget = thinkingConfig.thinkingBudget ?? thinkingConfig.thinking_budget;
+    const thinkingLevel = thinkingConfig.thinkingLevel ?? thinkingConfig.thinking_level;
+    const effort = normalizeEffort(thinkingLevel);
     const visibility: ReasoningVisibility | undefined =
       thinkingConfig.includeThoughts === true ? 'summary' : undefined;
     return {
       ...(effort && effort !== 'off' ? { effort } : {}),
-      ...(typeof thinkingConfig.thinkingBudget === 'number'
-        ? { budgetTokens: thinkingConfig.thinkingBudget }
-        : {}),
-      ...(thinkingConfig.thinkingBudget === 0 ? { enabled: false } : { enabled: true }),
+      ...(typeof thinkingBudget === 'number' ? { budgetTokens: thinkingBudget } : {}),
+      ...(thinkingBudget === 0 ? { enabled: false } : { enabled: true }),
+      ...(thinkingBudget === -1 ? { adaptive: true } : {}),
       ...(visibility ? { visibility } : {}),
       source: 'client',
     };

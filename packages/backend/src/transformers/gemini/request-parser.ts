@@ -73,11 +73,13 @@ export async function parseGeminiRequest(input: any): Promise<UnifiedChatRequest
   if (generationConfig.thinkingConfig) {
     const tc = generationConfig.thinkingConfig;
     const thinkingLevel = (tc.thinkingLevel ?? tc.thinking_level) as string | undefined;
+    const thinkingBudget = tc.thinkingBudget ?? tc.thinking_budget;
     unifiedChatRequest.reasoning = {
-      enabled: tc.includeThoughts ?? tc.include_thoughts,
-      max_tokens: tc.thinkingBudget ?? tc.thinking_budget,
+      enabled: thinkingBudget === 0 ? false : (tc.includeThoughts ?? tc.include_thoughts),
+      max_tokens: thinkingBudget,
       // Map Gemini's thinkingLevel (NONE/LOW/MEDIUM/HIGH) to unified ThinkLevel
       effort: thinkingLevel ? (thinkingLevel.toLowerCase() as any) : undefined,
+      ...(thinkingBudget === -1 ? { adaptive: true } : {}),
     };
   }
 

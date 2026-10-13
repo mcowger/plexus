@@ -5,6 +5,7 @@ import {
   effortToBudget,
   getReasoningLogValue,
   splitReasoningSuffix,
+  intentToEffort,
 } from '../reasoning';
 
 describe('normalizeEffort', () => {
@@ -93,6 +94,13 @@ describe('getReasoningLogValue', () => {
       undefined,
       'on',
     ],
+    // Gemini thinkingBudget maps -1 to 'auto' and 0 to 'off'
+    [{ generationConfig: { thinkingConfig: { thinkingBudget: -1 } } }, undefined, 'auto'],
+    [{ generationConfig: { thinkingConfig: { thinking_budget: -1 } } }, undefined, 'auto'],
+    [{ generationConfig: { thinkingConfig: { thinkingBudget: 0 } } }, undefined, 'off'],
+    [{ generationConfig: { thinkingConfig: { thinking_budget: 0 } } }, undefined, 'off'],
+    [{ reasoning_effort: 'auto' }, undefined, 'auto'],
+    [{}, { reasoning: { max_tokens: -1 } }, 'auto'],
   ] as const)('extracts %s as %s', (payload, request, expected) => {
     expect(getReasoningLogValue(request, payload)).toBe(expected);
   });
@@ -115,5 +123,15 @@ describe('getReasoningLogValue', () => {
 
   it('does not report an unspecified reasoning setting', () => {
     expect(getReasoningLogValue({}, {})).toBeUndefined();
+  });
+});
+
+describe('intentToEffort', () => {
+  it('maps budgetTokens: -1 to adaptive default effort', () => {
+    expect(intentToEffort({ budgetTokens: -1, source: 'client' })).toBe('high');
+  });
+
+  it('maps budgetTokens: 0 to off', () => {
+    expect(intentToEffort({ budgetTokens: 0, source: 'client' })).toBe('off');
   });
 });

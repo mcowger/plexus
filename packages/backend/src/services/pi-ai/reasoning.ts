@@ -151,7 +151,7 @@ export function normalizeEffort(raw: unknown): ReasoningEffort | 'off' | undefin
   }
 }
 
-export type ReasoningLogValue = ReasoningEffort | 'off' | 'on';
+export type ReasoningLogValue = ReasoningEffort | 'off' | 'on' | 'auto';
 
 function reasoningIntentToLogValue(intent: {
   effort?: unknown;
@@ -161,10 +161,15 @@ function reasoningIntentToLogValue(intent: {
 }): ReasoningLogValue | undefined {
   if (intent.enabled === false) return 'off';
 
+  const rawEffort =
+    typeof intent.effort === 'string' ? intent.effort.trim().toLowerCase() : undefined;
+  if (rawEffort === 'auto') return 'auto';
+
   const effort = normalizeEffort(intent.effort);
   if (effort) return effort === 'off' ? 'off' : effort;
 
   if (typeof intent.budgetTokens === 'number') {
+    if (intent.budgetTokens === -1) return 'auto';
     const budgetEffort = budgetToEffort(intent.budgetTokens);
     return budgetEffort === 'off' ? 'off' : budgetEffort;
   }
@@ -232,7 +237,12 @@ export function getReasoningLogValue(
     if (value) return value;
   }
 
-  const chatEffort = normalizeEffort(source.reasoning_effort ?? source.reasoning_level);
+  const chatEffortRaw =
+    typeof (source.reasoning_effort ?? source.reasoning_level) === 'string'
+      ? (source.reasoning_effort ?? source.reasoning_level).trim().toLowerCase()
+      : undefined;
+  if (chatEffortRaw === 'auto') return 'auto';
+  const chatEffort = normalizeEffort(chatEffortRaw);
   if (chatEffort) return chatEffort === 'off' ? 'off' : chatEffort;
 
   const thinkingConfig = source.generationConfig?.thinkingConfig;
@@ -345,10 +355,10 @@ export const ADAPTIVE_DEFAULT_EFFORT: ReasoningEffort = 'high';
 export function intentToEffort(intent: ReasoningIntent): ReasoningEffort | 'off' | undefined {
   if (intent.enabled === false) return 'off';
   if (intent.effort) return intent.effort;
+  if (intent.budgetTokens === -1 || intent.adaptive) return ADAPTIVE_DEFAULT_EFFORT;
   if (intent.budgetTokens != null) return budgetToEffort(intent.budgetTokens);
   // Adaptive: model-decides-magnitude, flattened to the documented default for
   // egress paths that require a concrete effort.
-  if (intent.adaptive) return ADAPTIVE_DEFAULT_EFFORT;
   if (intent.enabled === true) return 'medium'; // enabled but unspecified magnitude
   return undefined;
 }

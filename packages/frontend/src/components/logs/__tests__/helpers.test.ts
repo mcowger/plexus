@@ -1,10 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatReasoningEffort,
   getAttemptIndicatorLabel,
   getServiceTierDisplay,
   hasUpstreamRewrite,
   isDecisionsApiType,
 } from '../helpers';
+
+describe('formatReasoningEffort', () => {
+  it('capitalizes known effort values', () => {
+    expect(formatReasoningEffort('auto')).toBe('Auto');
+    expect(formatReasoningEffort('off')).toBe('Off');
+    expect(formatReasoningEffort('minimal')).toBe('Minimal');
+    expect(formatReasoningEffort('low')).toBe('Low');
+    expect(formatReasoningEffort('medium')).toBe('Medium');
+    expect(formatReasoningEffort('high')).toBe('High');
+    expect(formatReasoningEffort('xhigh')).toBe('Xhigh');
+    expect(formatReasoningEffort('max')).toBe('Max');
+  });
+
+  it('returns null for missing, null, or empty effort', () => {
+    expect(formatReasoningEffort(null)).toBeNull();
+    expect(formatReasoningEffort(undefined)).toBeNull();
+    expect(formatReasoningEffort('')).toBeNull();
+  });
+});
 
 describe('isDecisionsApiType', () => {
   it('recognizes the decisions ingress type', () => {
