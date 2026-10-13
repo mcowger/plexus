@@ -211,7 +211,7 @@ export default defineChecker({
       meters.push(
         ctx.allowance({
           key: 'weekly',
-          label: 'Weekly quota',
+          label: 'Weekly',
           unit: 'percentage',
           used: weekly.usagePercent,
           remaining: Math.max(0, 100 - weekly.usagePercent),

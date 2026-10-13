@@ -61,14 +61,14 @@ describe('claude-code checker', () => {
     expect(meters).toHaveLength(2);
     expect(meters[0]).toMatchObject({
       key: 'five_hour',
-      label: '5-hour quota',
+      label: '5-hour',
       used: 15,
       remaining: 85,
       resetsAt: '2026-06-01T21:00:00.000Z',
     });
     expect(meters[1]).toMatchObject({
       key: 'weekly',
-      label: 'Weekly quota',
+      label: 'Weekly',
       used: 40,
       remaining: 60,
       resetsAt: '2026-06-04T00:00:00.000Z',

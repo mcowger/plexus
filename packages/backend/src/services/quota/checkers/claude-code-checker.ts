@@ -236,7 +236,7 @@ export default defineChecker({
       meters.push(
         ctx.allowance({
           key: 'five_hour',
-          label: '5-hour quota',
+          label: '5-hour',
           unit: 'percentage',
           used: usage.five_hour.utilization,
           remaining: Math.max(0, 100 - usage.five_hour.utilization),
@@ -252,7 +252,7 @@ export default defineChecker({
       meters.push(
         ctx.allowance({
           key: 'weekly',
-          label: 'Weekly quota',
+          label: 'Weekly',
           unit: 'percentage',
           used: usage.seven_day.utilization,
           remaining: Math.max(0, 100 - usage.seven_day.utilization),

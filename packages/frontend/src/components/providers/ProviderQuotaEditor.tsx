@@ -20,7 +20,6 @@ import { OllamaQuotaConfig } from '../quota/OllamaQuotaConfig';
 import { DevPassQuotaConfig } from '../quota/DevPassQuotaConfig';
 import { NeuralwattQuotaConfig } from '../quota/NeuralwattQuotaConfig';
 import { ZenmuxQuotaConfig } from '../quota/ZenmuxQuotaConfig';
-import { WaferQuotaConfig } from '../quota/WaferQuotaConfig';
 import { OpenCodeGoQuotaConfig } from '../quota/OpenCodeGoQuotaConfig';
 import { CrofQuotaConfig } from '../quota/CrofQuotaConfig';
 import { ExeDevQuotaConfig } from '../quota/ExeDevQuotaConfig';
@@ -69,7 +68,6 @@ const QUOTA_CONFIG_MAP: Record<
   devpass: DevPassQuotaConfig,
   neuralwatt: NeuralwattQuotaConfig,
   zenmux: ZenmuxQuotaConfig,
-  wafer: WaferQuotaConfig,
   'opencode-go': OpenCodeGoQuotaConfig,
   crof: CrofQuotaConfig,
   exedev: ExeDevQuotaConfig,

@@ -257,7 +257,7 @@ export default defineChecker({
       meters.push(
         ctx.allowance({
           key: 'primary',
-          label: 'Primary rate limit',
+          label: '5-hour',
           unit: 'percentage',
           used: 100,
           remaining: 0,
@@ -268,22 +268,12 @@ export default defineChecker({
     }
 
     if (rateLimit.primary_window) {
-      const m = buildMeterFromWindow(
-        rateLimit.primary_window,
-        'primary',
-        'Primary rate limit',
-        ctx
-      );
+      const m = buildMeterFromWindow(rateLimit.primary_window, 'primary', '5-hour', ctx);
       if (m) meters.push(m);
     }
 
     if (rateLimit.secondary_window) {
-      const m = buildMeterFromWindow(
-        rateLimit.secondary_window,
-        'secondary',
-        'Secondary rate limit',
-        ctx
-      );
+      const m = buildMeterFromWindow(rateLimit.secondary_window, 'secondary', 'Weekly', ctx);
       if (m) meters.push(m);
     }
 

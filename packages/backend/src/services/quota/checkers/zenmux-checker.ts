@@ -72,7 +72,7 @@ export default defineChecker({
     meters.push(
       ctx.allowance({
         key: 'quota_5h',
-        label: '5-hour quota',
+        label: '5-hour',
         unit: 'flows',
         limit: quota_5_hour.max_flows,
         used: quota_5_hour.used_flows,
@@ -87,7 +87,7 @@ export default defineChecker({
     meters.push(
       ctx.allowance({
         key: 'quota_7d',
-        label: '7-day quota',
+        label: 'Weekly',
         unit: 'flows',
         limit: quota_7_day.max_flows,
         used: quota_7_day.used_flows,

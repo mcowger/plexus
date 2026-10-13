@@ -84,7 +84,7 @@ describe('muse-code quota checker', () => {
     const meters = await checker.check(ctx);
     expect(meters).toHaveLength(2);
     const rolling = meters.find((m) => m.key === 'rolling')!;
-    expect(rolling.label).toBe('Rolling (5 hours)');
+    expect(rolling.label).toBe('5-hour');
     expect(rolling.used).toBe(12);
     expect(rolling.limit).toBe(100);
     expect(rolling.remaining).toBe(88);

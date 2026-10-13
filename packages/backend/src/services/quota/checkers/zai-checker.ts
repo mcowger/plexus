@@ -51,7 +51,7 @@ export default defineChecker({
         meters.push(
           ctx.allowance({
             key: 'five_hour',
-            label: 'Token usage (5 hour)',
+            label: '5-hour',
             unit: 'percentage',
             used: limit.percentage,
             remaining: 100 - limit.percentage,

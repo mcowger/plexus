@@ -141,12 +141,6 @@ function rollingPeriod(minutes?: number): { periodValue: number; periodUnit: 'mi
   return { periodValue: 5, periodUnit: 'hour' };
 }
 
-function rollingLabel(minutes?: number): string {
-  const { periodValue, periodUnit } = rollingPeriod(minutes);
-  const unit = periodUnit === 'hour' ? (periodValue === 1 ? 'hour' : 'hours') : 'minutes';
-  return `Rolling (${periodValue} ${unit})`;
-}
-
 function buildWindowMeter(
   window: MuseUsageWindow,
   key: string,
@@ -419,7 +413,7 @@ export default defineChecker({
       const meter = buildWindowMeter(
         subscription.window,
         'rolling',
-        rollingLabel(subscription.window.window_duration_mins),
+        '5-hour',
         rollingPeriod(subscription.window.window_duration_mins),
         ctx
       );

@@ -66,7 +66,7 @@ export default defineChecker({
       meters.push(
         ctx.allowance({
           key: 'rolling_5h',
-          label: 'Rolling 5-hour limit',
+          label: '5-hour',
           unit: 'requests',
           limit: max,
           used,
