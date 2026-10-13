@@ -253,20 +253,6 @@ export default defineChecker({
     const rateLimit = data.rate_limit;
     const meters: Meter[] = [];
 
-    if (rateLimit.limit_reached) {
-      meters.push(
-        ctx.allowance({
-          key: 'primary',
-          label: '5-hour',
-          unit: 'percentage',
-          used: 100,
-          remaining: 0,
-          ...windowPeriod('primary'),
-        })
-      );
-      return meters;
-    }
-
     if (rateLimit.primary_window) {
       const m = buildMeterFromWindow(rateLimit.primary_window, 'primary', '5-hour', ctx);
       if (m) meters.push(m);
@@ -275,6 +261,23 @@ export default defineChecker({
     if (rateLimit.secondary_window) {
       const m = buildMeterFromWindow(rateLimit.secondary_window, 'secondary', 'Weekly', ctx);
       if (m) meters.push(m);
+    }
+
+    // `limit_reached` is account-level: either window may have run out.
+    // Window meters built above already clamp an exhausted window to 100%.
+    // Only if neither window shows exhaustion do we fall back to a neutral
+    // meter that doesn't blame a specific window.
+    if (rateLimit.limit_reached && !meters.some((m) => (m.used ?? 0) >= 100)) {
+      meters.push(
+        ctx.allowance({
+          key: 'rate_limit',
+          label: 'Rate limit',
+          unit: 'percentage',
+          used: 100,
+          remaining: 0,
+          ...windowPeriod('primary'),
+        })
+      );
     }
 
     return meters;

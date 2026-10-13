@@ -137,9 +137,14 @@ describe('openai-codex checker', () => {
 
     const meters = await checkerDef.check(makeCtx(token));
 
-    expect(meters[0]?.used).toBe(100);
-    expect(meters[0]?.remaining).toBe(0);
-    expect(meters[0]?.status).toBe('exhausted');
+    // limit_reached is account-level and the primary window only shows 12%,
+    // so the real window meter is kept and a neutral fallback reports exhaustion.
+    expect(meters).toHaveLength(2);
+    expect(meters[0]).toMatchObject({ key: 'primary', used: 12 });
+    expect(meters[1]).toMatchObject({ key: 'rate_limit', label: 'Rate limit' });
+    expect(meters[1]?.used).toBe(100);
+    expect(meters[1]?.remaining).toBe(0);
+    expect(meters[1]?.status).toBe('exhausted');
   });
 
   it('throws for invalid OAuth JSON blob', async () => {
