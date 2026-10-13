@@ -149,8 +149,9 @@ export async function fetchModelsFromUrl(
 // ─── Muse OAuth: live model discovery ─────────────────────────────────────
 
 /**
- * Static fallback when the Muse model list is unreachable. The muse-spark
- * family from pi-ai's native `meta` provider catalog.
+ * Static fallback when the Muse model list is unreachable. Mirrors the Muse
+ * family from pi-ai's native `meta` provider catalog (keep in sync when the
+ * bundled pi-ai version adds or drops models).
  */
 export const MUSE_STATIC_MODELS: readonly DiscoveredModel[] = [
   'muse-spark-1.1',
@@ -158,6 +159,7 @@ export const MUSE_STATIC_MODELS: readonly DiscoveredModel[] = [
   'muse-spark-1.2-contributor',
   'muse-spark-1.3',
   'muse-spark-1.3-contributor',
+  'muse-wonder-1.0',
 ].map((id) => ({ id, name: id }));
 
 const MUSE_MODELS_URL = 'https://api.meta.ai/v1/models';
