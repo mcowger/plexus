@@ -691,6 +691,12 @@ export class Router {
         if (alias?.target_groups) {
           const group = alias.target_groups.find((g) => g.name === groupName);
           if (group) {
+            if (!group.targets || group.targets.length === 0) {
+              throw new Error(
+                `No targets configured in group '${groupName}' for alias '${aliasName}'`
+              );
+            }
+
             const candidates = await buildGroupCandidates(
               group,
               config,
@@ -733,9 +739,17 @@ export class Router {
 
     const { alias, canonicalModel } = findAlias(config, modelName);
 
-    if (alias && alias.target_groups && alias.target_groups.length > 0) {
+    if (alias) {
+      const hasConfiguredTargets =
+        alias.target_groups &&
+        alias.target_groups.some((group) => group.targets && group.targets.length > 0);
+
+      if (!hasConfiguredTargets) {
+        throw new Error(`No targets configured for alias '${modelName}'`);
+      }
+
       const visited = withVisited(new Set(), canonicalModel);
-      for (const group of alias.target_groups) {
+      for (const group of alias.target_groups!) {
         const candidates = await buildGroupCandidates(
           group,
           config,

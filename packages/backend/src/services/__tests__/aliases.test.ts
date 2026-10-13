@@ -188,6 +188,11 @@ describe('Router Direct Alias/Target Group Routing', () => {
             selector: 'in_order' as const,
             targets: [{ provider: 'p3', model: 'm3' }],
           },
+          {
+            name: 'empty',
+            selector: 'in_order' as const,
+            targets: [],
+          },
         ],
       },
     },
@@ -232,6 +237,12 @@ describe('Router Direct Alias/Target Group Routing', () => {
   test('throws 404 when target group does not exist', async () => {
     await expect(Router.resolve('direct/smart-model/nonexistent')).rejects.toThrow(
       "Direct routing failed: Target group 'nonexistent' not found for alias 'smart-model'"
+    );
+  });
+
+  test('throws when direct target group has no targets configured', async () => {
+    await expect(Router.resolve('direct/smart-model/empty')).rejects.toThrow(
+      "No targets configured in group 'empty' for alias 'smart-model'"
     );
   });
 

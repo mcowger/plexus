@@ -118,6 +118,14 @@ describe('Router target groups', () => {
     );
   });
 
+  test('resolve throws distinct error when alias has no configured targets', async () => {
+    setConfigForTesting(makeGroupedConfig([{ name: 'default', selector: 'random', targets: [] }]));
+
+    await expect(Router.resolve('test-alias')).rejects.toThrow(
+      "No targets configured for alias 'test-alias'"
+    );
+  });
+
   test('empty group is skipped', async () => {
     setConfigForTesting(
       makeGroupedConfig([
@@ -317,6 +325,20 @@ describe('Router target groups', () => {
 
     const result = await Router.resolveCandidates('no-groups');
     expect(result).toEqual([]);
+  });
+
+  test('resolve throws when alias has no target_groups', async () => {
+    setConfigForTesting({
+      providers: {},
+      models: {
+        'no-groups': {},
+      },
+      keys: {},
+    } as any);
+
+    await expect(Router.resolve('no-groups')).rejects.toThrow(
+      "No targets configured for alias 'no-groups'"
+    );
   });
 
   test('resolve preserves canonical model and incoming alias through groups', async () => {
