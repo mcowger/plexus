@@ -388,7 +388,7 @@ export async function proxyMcpRequest(
 
   const upstreamUrl = getEffectiveUpstreamUrl(serverConfig);
   const staticHeaders = serverConfig.headers || {};
-  logger.info('[mcp-proxy:' + serverName + '] proxying ' + method + ' request to ' + upstreamUrl);
+  logger.debug('[mcp-proxy:' + serverName + '] proxying ' + method + ' request to ' + upstreamUrl);
 
   logger.silly(`Server config: ${JSON.stringify({ upstreamUrl, staticHeaders })}`);
 
@@ -469,7 +469,7 @@ export async function proxyMcpRequest(
     }
 
     if (!response) throw new Error('MCP upstream request was not attempted');
-    logger.info(
+    logger.debug(
       '[mcp-proxy:' + serverName + '] upstream fetch completed with status ' + response.status
     );
 
@@ -486,7 +486,7 @@ export async function proxyMcpRequest(
     logger.silly(`Content-Type: ${contentType}`);
 
     if (contentType?.toLowerCase().includes('text/event-stream')) {
-      logger.info('[mcp-proxy:' + serverName + '] upstream streaming response detected');
+      logger.debug('[mcp-proxy:' + serverName + '] upstream streaming response detected');
       if (response.body) {
         return {
           status: response.status,
@@ -522,7 +522,7 @@ export async function proxyMcpRequest(
       logger.silly(`Response body (text): ${responseText.substring(0, 500)}`);
     }
 
-    logger.info(
+    logger.debug(
       '[mcp-proxy:' +
         serverName +
         '] returning buffered upstream response with status ' +

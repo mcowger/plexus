@@ -165,10 +165,9 @@ export class RequestManager {
       host.emitRoutingUpdate(currentRequest.requestId, route);
 
       try {
-        // Determine Target API Type
-        logger.info(
-          `Dispatcher: Selected API type '${targetApiType}' for model '${route.model}'. Reason: ${selectionReason}`
-        );
+        // Determine Target API Type (synthetic 'oauth' below is a config
+        // placeholder, not the wire protocol — the info log happens after
+        // effectiveApiType resolution so it reports the real type).
 
         // 2. Get Transformer
         // ALL OAuth routes now run through the STANDARD path via the native
@@ -213,6 +212,36 @@ export class RequestManager {
           effectiveApiType = resolved;
         } else {
           effectiveApiType = targetApiType;
+        }
+        // Log the resolved wire type, not the synthetic 'oauth' placeholder:
+        // for OAuth routes selectTargetApiType can only report e.g.
+        // "incoming type 'responses' not supported, defaulted to 'oauth'"
+        // even when the resolved wire type matches incoming exactly (the
+        // follow-up "Dispatching ... responses <-> responses" line then
+        // contradicts it). Derive an accurate reason here instead.
+        let effectiveReason = selectionReason;
+        if (effectiveApiType !== targetApiType) {
+          const incoming = currentRequest.incomingApiType?.toLowerCase();
+          if (incoming && incoming === effectiveApiType.toLowerCase()) {
+            effectiveReason = `matched incoming request type '${incoming}' via OAuth wire type`;
+          } else if (incoming) {
+            effectiveReason = `OAuth wire type '${effectiveApiType}' (incoming '${incoming}' will be translated)`;
+          } else {
+            effectiveReason = `OAuth wire type '${effectiveApiType}'`;
+          }
+        }
+        // A plain incoming match is routine (the follow-up "Dispatching ..."
+        // line already reports the outcome), so it goes to debug. Anything
+        // the operator might need to notice — an OAuth placeholder resolved
+        // to a wire type, a default, or a cross-format translation — stays
+        // at info.
+        const isRoutineMatch =
+          effectiveApiType === targetApiType && selectionReason.startsWith('matched incoming');
+        const selectionMessage = `Dispatcher: Selected API type '${effectiveApiType}' for model '${route.model}'. Reason: ${effectiveReason}`;
+        if (isRoutineMatch) {
+          logger.debug(selectionMessage);
+        } else {
+          logger.info(selectionMessage);
         }
         const transformer = TransformerFactory.getTransformer(effectiveApiType);
 

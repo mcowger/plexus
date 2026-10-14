@@ -191,7 +191,7 @@ async function filterGroupTargets(
 
     if (embeddingsTargets.length > 0) {
       if (logModelName) {
-        logger.info(
+        logger.debug(
           `Router: Filtered to ${embeddingsTargets.length} embeddings-compatible targets (from ${healthyTargets.length} total).`
         );
       }

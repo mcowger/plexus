@@ -384,7 +384,10 @@ class McpProcessManager {
             if (label === 'stderr') {
               logger.warn(`[mcp-local:${label}] ${text}`);
             } else {
-              logger.info(`[mcp-local:${label}] ${text}`);
+              // Child stdout is per-request noise (e.g. uvicorn access
+              // logs) — lifecycle events are logged separately at info.
+              // Full output stays available via the management logs API.
+              logger.debug(`[mcp-local:${label}] ${text}`);
             }
           }
         }
