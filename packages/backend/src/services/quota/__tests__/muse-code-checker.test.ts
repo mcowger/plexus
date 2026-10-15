@@ -96,6 +96,7 @@ describe('muse-code quota checker', () => {
     expect(weekly.label).toBe('Weekly');
     expect(weekly.used).toBe(31);
     expect(weekly.periodUnit).toBe('week');
+    expect(weekly.periodCycle).toBe('fixed');
   });
 
   it('sends the minted key as Bearer with the minimal probe body', async () => {

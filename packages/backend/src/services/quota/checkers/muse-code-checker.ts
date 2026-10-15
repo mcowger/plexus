@@ -146,7 +146,8 @@ function buildWindowMeter(
   key: string,
   label: string,
   period: { periodValue: number; periodUnit: 'minute' | 'hour' | 'day' | 'week' },
-  ctx: Pick<MeterContext, 'allowance'>
+  ctx: Pick<MeterContext, 'allowance'>,
+  periodCycle: 'fixed' | 'rolling' = 'rolling'
 ): Meter | null {
   const usedPercent = window.used_percent;
   if (typeof usedPercent !== 'number' || !Number.isFinite(usedPercent) || usedPercent < 0) {
@@ -162,7 +163,7 @@ function buildWindowMeter(
     remaining: Math.max(0, 100 - used),
     periodValue: period.periodValue,
     periodUnit: period.periodUnit,
-    periodCycle: 'rolling',
+    periodCycle,
     resetsAt: parseResetsAt(window.resets_at),
   });
 }
@@ -420,12 +421,16 @@ export default defineChecker({
       if (meter) meters.push(meter);
     }
     if (subscription.weekly) {
+      // Meta's weekly window is anchored to a fixed calendar boundary
+      // (Monday 00:00 UTC — resets_at stays pinned there across snapshots
+      // instead of sliding), so it reports as fixed rather than rolling.
       const meter = buildWindowMeter(
         subscription.weekly,
         'weekly',
         'Weekly',
         { periodValue: 1, periodUnit: 'week' },
-        ctx
+        ctx,
+        'fixed'
       );
       if (meter) meters.push(meter);
     }
