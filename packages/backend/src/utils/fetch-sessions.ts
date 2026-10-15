@@ -3,13 +3,19 @@
  *
  * A session gives one origin its own connection pool plus TLS/proxy/keep-alive
  * settings; sessions never share connections with each other or with plain
- * `fetch()`. Sessions are cached per origin in a bounded LRU so unbounded host
- * cardinality (e.g. user-supplied image URLs) cannot leak pooled sessions.
+ * `fetch()`. Sessions are cached per origin in an LRU capped at MAX_SESSIONS
+ * map entries.
  *
- * Eviction never force-closes: the entry is dropped from the map and its idle
- * sockets die via `idleTimeout`. Force-closing could abort a live stream on
- * that origin — recency only updates when a request starts, so a busy
- * streaming origin can legitimately be the oldest entry.
+ * Only low-cardinality, admin-configured origins are routed here (provider
+ * base URLs, quota-checker endpoints, pi.dev). Untrusted high-cardinality
+ * URLs such as user-supplied image downloads intentionally stay on plain
+ * global fetch.
+ *
+ * Eviction drops the entry without force-closing: the entry is removed from
+ * the map and its idle sockets die via `idleTimeout`, so a live stream on an
+ * evicted origin is never aborted. Live pools can therefore transiently
+ * exceed MAX_SESSIONS under origin churn, but stay bounded by distinct
+ * origins per idle window — a non-issue for the configured origins above.
  *
  * Proxy behaviour is inherited from the environment (`NO_PROXY` wildcards/CIDR,
  * `ALL_PROXY` fallback); per-request options still override the session. A
