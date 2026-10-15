@@ -1,4 +1,5 @@
 import { getConfig } from '../../config';
+import { fetchWithSession } from '../../utils/fetch-sessions';
 import type { StallConfig } from '../inspectors/stall-inspector';
 import { probeStreamingStart as probeStreamStart } from '../probes/stream-probe';
 
@@ -39,7 +40,7 @@ export async function executeUpstreamRequest(
   payload: any,
   signal?: AbortSignal
 ): Promise<Response> {
-  return fetch(url, {
+  return fetchWithSession(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),

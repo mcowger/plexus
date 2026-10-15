@@ -1,4 +1,5 @@
 import type { Meter } from '../../types/meter';
+import { fetchWithSession } from '../../utils/fetch-sessions';
 import type { AllowanceParams, BalanceParams, MeterContext } from './checker-registry';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -36,7 +37,7 @@ export function createCustomCheckerFetch(options: Record<string, unknown>) {
   return (input: string | URL, init: RequestInit = {}) => {
     const headers = new Headers(buildCustomCheckerHeaders(options));
     new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-    return globalThis.fetch(input, { ...init, headers });
+    return fetchWithSession(input, { ...init, headers });
   };
 }
 

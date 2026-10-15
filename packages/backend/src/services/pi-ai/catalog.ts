@@ -42,6 +42,7 @@ import type {
   ProviderStreams,
 } from '@earendil-works/pi-ai';
 import { logger } from '../../utils/logger';
+import { fetchWithSession } from '../../utils/fetch-sessions';
 
 const DEFAULT_CATALOG_BASE_URL = 'https://pi.dev';
 const CATALOG_USER_AGENT = 'plexus-gateway';
@@ -92,7 +93,7 @@ async function fetchPiDevCatalog(
   }
 ): Promise<readonly AnyModel[]> {
   const catalogBaseUrl = options.catalogBaseUrl ?? DEFAULT_CATALOG_BASE_URL;
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const fetchImpl = options.fetchImpl ?? fetchWithSession;
   const url = new URL(`/api/models/providers/${encodeURIComponent(providerId)}`, catalogBaseUrl);
   const response = await fetchImpl(url, {
     headers: { accept: 'application/json', 'User-Agent': CATALOG_USER_AGENT },

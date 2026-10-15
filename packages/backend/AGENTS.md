@@ -48,7 +48,7 @@ required; verify each against the **live** server, not just unit tests.
 
 ### Verification
 
-- `bun x tsc --noEmit` from `packages/backend`, biome on touched files,
+- `bun run typecheck` from `packages/backend` (backed by `bun check`; never `tsc`), biome on touched files,
   and the affected vitest suites.
 - **Curl the live dev server** (default `ADMIN_KEY=password` locally):
   `curl -H "x-admin-key: password"

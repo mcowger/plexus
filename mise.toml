@@ -2,7 +2,7 @@
 act = "latest"
 actionlint = "latest"
 "aqua:vercel-labs/agent-browser" = "latest"
-bun = "latest"
+bun = "1.4.3"
 "github:codecoradev/cora-code" = "latest"
 "github:fatedier/frp" = "latest"
 "github:universal-ctags/ctags-nightly-build" = "latest"

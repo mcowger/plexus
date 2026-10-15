@@ -78,6 +78,8 @@ docs/openapi.yaml
 # Compiled binaries
 plexus-
 plexus
+# Sourcemap sidecars from `bun build --compile --sourcemap` (see compile:* scripts)
+/*.js.map
 !packages/backend/src/routes/mcp/plexus/
 !packages/backend/src/routes/mcp/plexus/**
 

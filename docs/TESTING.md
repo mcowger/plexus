@@ -29,6 +29,20 @@ The default test command uses `--changed HEAD` and runs only tests affected by u
 bun run test:force
 ```
 
+### Typecheck
+
+```bash
+bun run typecheck
+```
+
+Runs `bun check` (Bun's built-in TypeScript checker) in every workspace via `bun run --workspaces typecheck`. Never run `tsc`/`tsgo` directly, and never add a `typescript` dependency — `bun check` reads `tsconfig.json` with no install needed. Required before handing work back (see [AGENTS.md](../AGENTS.md#before-handing-work-back)); CI runs it as a blocking gate.
+
+### Coverage
+
+```bash
+bun run test:coverage
+```
+
 ### Watch Mode
 
 ```bash
@@ -91,7 +105,7 @@ This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future ca
 
 ## Test Architecture
 
-Backend tests run on **Vitest** with three parallel projects defined in `packages/backend/vitest.config.ts`:
+Backend tests run on **Vitest** with three parallel projects (`vitest.unit.config.ts`, `vitest.sqlite.config.ts`, `vitest.postgres.config.ts`) wired through the `projects` key in `packages/backend/vitest.config.ts`:
 
 | Project | Purpose | DB Setup |
 |---------|---------|----------|
@@ -142,7 +156,7 @@ packages/backend/
 - **Integration tests** (tests that exercise multiple services/components together) go in `packages/backend/test/integration/`.
 - **Infrastructure** (setup files, shared utilities) stays in `packages/backend/test/` directly.
 - **Never** put unit tests directly in `packages/backend/test/`, and never put integration tests inside `packages/backend/src/`.
-- The backend-relative Vitest `include` globs (`src/**/*.test.ts` and `test/**/*.test.ts`) cover both locations automatically.
+- The Vitest `include` globs (`src/**/*.{test,spec}.ts`, `test/**/*.{test,spec}.ts`, plus `scripts/**`) cover all locations automatically.
 
 ## Mocking Rules
 
@@ -152,6 +166,7 @@ Registered in `packages/backend/test/vitest.setup.ts` — **do NOT re-mock in te
 
 - `packages/backend/src/utils/logger` — logger, logEmitter, level helpers
 - `@earendil-works/pi-ai` — getModels, getModel, complete (`vi.fn`), stream (`vi.fn`)
+- `@earendil-works/pi-ai/providers/all` and `@earendil-works/pi-ai/compat` — builtin-model and compat entry points. pi-ai's real `createProvider` is intentionally **not** mocked so catalog-overlay tests exercise genuine merge/restore/persist semantics
 
 ### `@earendil-works/pi-ai` Specifics
 
@@ -162,6 +177,10 @@ Registered in `packages/backend/test/vitest.setup.ts` — **do NOT re-mock in te
 ### Adding New Module Mocks
 
 If a test needs to mock a module **not** already in `vitest.setup.ts`, it may add its own `vi.mock` factory. That mock will be active only for that file's execution. Do not duplicate a mock already registered globally.
+
+### Mocking `fetch`
+
+Outbound provider traffic goes through `fetchWithSession` (`packages/backend/src/utils/fetch-sessions.ts`), which routes each HTTP(S) origin through a pooled `Bun.FetchSession`. Under Vitest it delegates to `globalThis.fetch`, so keep mocking `globalThis.fetch` (via `registerSpy`) exactly as before — do not mock the session module itself, or tests will diverge from production request shape. Non-HTTP(S) URLs always use plain fetch.
 
 ### Using `registerSpy`
 

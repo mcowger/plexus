@@ -44,12 +44,12 @@ docker run -d \
 echo "Container started: ${CONTAINER_NAME}"
 
 # ------------------------------------------------------------------
-# Wait for the "Server starting on port" log line
+# Wait for the "Server listening on" log line
 # ------------------------------------------------------------------
 echo "Waiting for server to start (timeout: ${TIMEOUT}s)..."
 STARTED=0
 for i in $(seq 1 "${TIMEOUT}"); do
-  if docker logs "${CONTAINER_NAME}" 2>&1 | grep -q "Server starting on port"; then
+  if docker logs "${CONTAINER_NAME}" 2>&1 | grep -q "Server listening on"; then
     echo "Server ready (detected after ~${i}s)"
     STARTED=1
     break

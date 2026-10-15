@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "bun x tsc --noEmit"
+    "typecheck": "bun check"
   },
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -13,8 +13,5 @@
   },
   "dependencies": {
     "zod": "^4.6.6"
-  },
-  "devDependencies": {
-    "typescript": "^7.0.2"
   }
 }

@@ -20,13 +20,10 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "prepack": "bun run --cwd ../.. sync:cli-skill",
-    "typecheck": "bun x tsc --noEmit",
+    "typecheck": "bun check",
     "test": "bunx --bun vitest run"
   },
-  "devDependencies": {
-    "typescript": "^7.0.2"
-  },
   "engines": {
-    "bun": ">=1.4.0"
+    "bun": ">=1.4.3"
   }
 }

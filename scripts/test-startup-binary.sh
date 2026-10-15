@@ -3,14 +3,14 @@
 # Smoke-test the compiled Linux binary: verify it starts, serves /health, and loads /ui/.
 #
 # Usage: bash scripts/test-startup-binary.sh
-# Expected working directory: repository root (where plexus-linux lives after compile:linux)
+# Expected working directory: repository root (where plexus-linux-amd64 lives after compile:linux-amd64)
 set -euo pipefail
 
 ADMIN_KEY="test-startup-key-ci"
 PORT=14000
 TIMEOUT=60
 BINARY_WORKDIR="packages/backend"
-BINARY_NAME="plexus-linux"
+BINARY_NAME="plexus-linux-amd64"
 LOG_FILE="/tmp/plexus-binary-startup.log"
 
 echo "=== Binary Startup Test ==="
@@ -33,7 +33,7 @@ trap cleanup EXIT
 # file path ../frontend/dist resolves to packages/frontend/dist.
 # ------------------------------------------------------------------
 if [[ ! -f "./${BINARY_NAME}" ]]; then
-  echo "ERROR: ./${BINARY_NAME} not found. Run 'bun run compile:linux' first."
+  echo "ERROR: ./${BINARY_NAME} not found. Run 'bun run compile:linux-amd64' first."
   exit 1
 fi
 
@@ -55,12 +55,12 @@ popd >/dev/null
 echo "Binary PID: ${PID}"
 
 # ------------------------------------------------------------------
-# Wait for the "Server starting on port" log line
+# Wait for the "Server listening on" log line
 # ------------------------------------------------------------------
 echo "Waiting for server to start (timeout: ${TIMEOUT}s)..."
 STARTED=0
 for i in $(seq 1 "${TIMEOUT}"); do
-  if grep -q "Server starting on port" "${LOG_FILE}" 2>/dev/null; then
+  if grep -q "Server listening on" "${LOG_FILE}" 2>/dev/null; then
     echo "Server ready (detected after ~${i}s)"
     STARTED=1
     break

@@ -24,6 +24,7 @@ import {
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
 import { prepareCodexImagesDispatch } from '../oauth/oauth-native-request';
 import { getApiBaseType } from '../../utils/api-format';
+import { fetchWithSession } from '../../utils/fetch-sessions';
 import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import type { RetryAttemptRecord } from './dispatcher-types';
 import {
@@ -749,7 +750,7 @@ export class MediaDispatcher {
           });
         }
 
-        const response = await fetch(url, {
+        const response = await fetchWithSession(url, {
           method: 'POST',
           headers,
           body: formData,
@@ -1006,7 +1007,7 @@ export class MediaDispatcher {
         const acceptHeader = isStreamed ? 'text/event-stream' : 'audio/*';
         headers['Accept'] = acceptHeader;
 
-        const response = await fetch(url, {
+        const response = await fetchWithSession(url, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload),
@@ -1273,7 +1274,7 @@ export class MediaDispatcher {
           DebugManager.getInstance().addTransformedRequest(request.requestId, debugPayload);
         }
 
-        const response = await fetch(url, {
+        const response = await fetchWithSession(url, {
           method: 'POST',
           signal: attemptTimeout.signal,
           headers,
@@ -1486,7 +1487,7 @@ export class MediaDispatcher {
           DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
         }
 
-        const response = await fetch(url, {
+        const response = await fetchWithSession(url, {
           method: 'POST',
           signal: attemptTimeout.signal,
           headers,

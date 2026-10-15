@@ -105,7 +105,6 @@ jobs:
 
       - name: Typecheck all workspaces
         run: bun run typecheck
-        continue-on-error: true
 
       - name: Run backend tests
         run: cd packages/backend && bun run test

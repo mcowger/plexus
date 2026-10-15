@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "bun run build.ts",
-    "typecheck": "bun run build && bun x tsc --noEmit",
+    "typecheck": "bun check",
     "dev": "bun run build.ts --watch"
   },
   "devDependencies": {
@@ -14,8 +14,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "postcss": "^8.5.29",
-    "tailwindcss": "^4.3.0",
-    "typescript": "^7.0.2"
+    "tailwindcss": "^4.3.0"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.28",
@@ -36,8 +35,5 @@
     "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
     "yaml": "^2.9.1"
-  },
-  "peerDependencies": {
-    "typescript": "^7.0.2"
   }
 }

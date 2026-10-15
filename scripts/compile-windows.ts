@@ -46,6 +46,8 @@ const args = [
   ...files('packages/frontend/dist', '.svg'),
   ...files('packages/frontend/dist', '.webmanifest'),
   '--compile',
+  '--minify',
+  '--sourcemap',
   '--asset-naming=[name].[ext]',
   `--target=${target}`,
   `--outfile=${outfile}`,

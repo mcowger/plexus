@@ -4,7 +4,7 @@ Plexus can be run via Docker, as a standalone binary, or from source using Bun.
 
 ## Prerequisites
 
-- **Bun**: Plexus is built with [Bun](https://bun.sh/). If you are running from source or building binaries, you will need Bun installed.
+- **Bun 1.4.3+**: Plexus is built with [Bun](https://bun.sh/). If you are running from source or building binaries, you will need Bun 1.4.3 or newer installed (`mise install` installs the pinned 1.4.3; Docker and CI pin `oven/bun:1.4.3`).
 
 ## Docker (Preferred)
 

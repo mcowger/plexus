@@ -1,3 +1,5 @@
+import { fetchWithSession } from '../../utils/fetch-sessions';
+
 const METER_MARKER = '__plexus_quota_meter__';
 
 function requestHeaders(options: Record<string, unknown>): Record<string, string> {
@@ -49,7 +51,7 @@ function createContext(request: {
     fetch(input: string | URL, init: RequestInit = {}) {
       const headers = new Headers(requestHeaders(request.options));
       new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-      return globalThis.fetch(input, { ...init, headers });
+      return fetchWithSession(input, { ...init, headers });
     },
     balance(params: unknown) {
       return { [METER_MARKER]: 'balance', params };
