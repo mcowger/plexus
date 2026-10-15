@@ -489,8 +489,10 @@ const start = async () => {
       mcpUsageStorage.stopCleanupJob();
       responsesStorage.stopCleanupJob();
       await mcpProcessManager.stopAll();
-      closeFetchSessions();
       await fastify.close();
+      // After the server has drained: in-flight streams may still be reading
+      // from session sockets, so sessions close last.
+      closeFetchSessions();
       const { closeDatabase } = await import('./db/client');
       await closeDatabase();
       logger.info('Shutdown complete');
