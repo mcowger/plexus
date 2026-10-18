@@ -182,5 +182,28 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
     }
   }
 
+  // Cross-format structured outputs (chat `response_format`, responses
+  // `text.format` — both normalized onto `request.response_format` by their
+  // parsers) are expressed to Anthropic as `output_config.format`. Merge
+  // without clobbering: a client-supplied `format` (same-format verbatim
+  // pass-through above) always wins, and a pre-existing `output_config`
+  // (e.g. `effort` from the client or registry auto-compat) is
+  // spread-preserved. Only `json_schema` with a present schema is
+  // expressible — Anthropic's format union has no `json_object`/bare-text
+  // equivalent, so anything else is left untouched rather than fabricated.
+  if (
+    request.response_format?.type === 'json_schema' &&
+    request.response_format.json_schema !== undefined &&
+    (payload.output_config as { format?: unknown } | undefined)?.format === undefined
+  ) {
+    payload.output_config = {
+      ...(payload.output_config ?? {}),
+      format: {
+        type: 'json_schema',
+        schema: request.response_format.json_schema,
+      },
+    };
+  }
+
   return clampAnthropicEffortAndThinking(payload, request.model);
 }

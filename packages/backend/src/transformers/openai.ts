@@ -7,6 +7,36 @@ import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../utils/gemini-malformed-f
 import { composeContentWithImageMarkdown } from './image-rendering';
 
 /**
+ * Normalizes a Chat Completions `response_format` into the unified shape
+ * (`json_schema` holds the raw schema; `name`/`description`/`strict` are
+ * siblings — see types/unified.ts and the Responses request-parser).
+ *
+ * The standard `json_schema` spelling nests the schema under
+ * `json_schema.schema`; a bare schema object (some gateways forward it
+ * unwrapped) is accepted as-is. Descriptor fields the client omitted stay
+ * absent so emitters can apply their own fallbacks. Returns `undefined` when
+ * the client sent nothing usable, so the caller can keep the key off the
+ * unified request entirely.
+ */
+function normalizeChatResponseFormat(
+  input: any
+): UnifiedChatRequest['response_format'] | undefined {
+  if (!input || typeof input !== 'object' || typeof input.type !== 'string') return undefined;
+  if (input.type !== 'json_schema') {
+    return { type: input.type as 'text' | 'json_object' | 'json_schema' };
+  }
+  const js = input.json_schema;
+  if (!js || typeof js !== 'object') return { type: 'json_schema', json_schema: js };
+  return {
+    type: 'json_schema',
+    json_schema: js.schema ?? js,
+    ...(js.name !== undefined ? { name: js.name } : {}),
+    ...(js.description !== undefined ? { description: js.description } : {}),
+    ...(js.strict !== undefined ? { strict: js.strict } : {}),
+  };
+}
+
+/**
  * OpenAITransformer
  */
 export class OpenAITransformer implements Transformer {
@@ -68,6 +98,18 @@ export class OpenAITransformer implements Transformer {
           ? legacy
           : undefined;
 
+    // Normalize `response_format` onto the unified request using the same shape
+    // the Responses parser produces (`json_schema` holds the raw schema;
+    // `name`/`description`/`strict` are siblings) so every downstream builder
+    // (chat, responses, Anthropic, Gemini) can translate it. Without this the
+    // field is silently dropped on all cross-format routes (chat -> responses,
+    // chat -> messages, chat -> gemini) and chat -> chat only survives by
+    // accident of the same-format `originalBody` spread in transformRequest.
+    // Conditional spread keeps the key absent (not `response_format:
+    // undefined`) when the client sent nothing — downstream `in`-checks must
+    // not see a phantom key.
+    const responseFormat = normalizeChatResponseFormat(input.response_format);
+
     return {
       messages,
       model: input.model,
@@ -77,6 +119,7 @@ export class OpenAITransformer implements Transformer {
       tools: input.tools,
       tool_choice: input.tool_choice,
       reasoning: input.reasoning,
+      ...(responseFormat !== undefined ? { response_format: responseFormat } : {}),
     };
   }
 

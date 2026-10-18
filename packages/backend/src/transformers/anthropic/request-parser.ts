@@ -110,6 +110,22 @@ export async function parseAnthropicRequest(input: any): Promise<UnifiedChatRequ
     tool_choice: input.tool_choice,
   };
 
+  // Cross-format structured outputs: carry `output_config.format` onto the
+  // unified `response_format` so messages -> chat/responses/gemini routes can
+  // translate it instead of silently dropping it. Only `json_schema` is
+  // carried — it is the only format type the unified shape models. `effort`
+  // is deliberately NOT carried here; it feeds `reasoning` via the thinking
+  // mapping below.
+  if (
+    input.output_config?.format?.type === 'json_schema' &&
+    input.output_config.format.schema !== undefined
+  ) {
+    result.response_format = {
+      type: 'json_schema',
+      json_schema: input.output_config.format.schema,
+    };
+  }
+
   // Map Thinking/Reasoning Configuration
   if (input.thinking) {
     const thinkingType = input.thinking.type;
