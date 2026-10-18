@@ -191,9 +191,22 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
   // spread-preserved. Only `json_schema` with a present schema is
   // expressible — Anthropic's format union has no `json_object`/bare-text
   // equivalent, so anything else is left untouched rather than fabricated.
+  // An explicit `strict: false` opts out entirely: the pre-change behavior
+  // was to drop the schema and complete unstructured, and Anthropic
+  // enforces `format` (400 on unsupported models/keywords), so forwarding
+  // a best-effort request as enforced would turn working routes into hard
+  // errors. Note the deliberate asymmetry with the chat/Responses emitters:
+  // those omit an UNSET `strict` (upstream default `false` applies), while
+  // here an unset `strict` still forwards the schema — Anthropic's format
+  // has no non-enforcing mode to default into, and skipping it would
+  // reintroduce the silent unstructured drop from #985 for the most common
+  // client shape. The skip below is therefore an intentional silent drop of
+  // a best-effort request only; the builders are pure functions with no
+  // logger, so the opt-out is documented here rather than logged.
   if (
     request.response_format?.type === 'json_schema' &&
     request.response_format.json_schema !== undefined &&
+    request.response_format.strict !== false &&
     (payload.output_config as { format?: unknown } | undefined)?.format === undefined
   ) {
     payload.output_config = {

@@ -139,10 +139,12 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
       // Rebuild the full structured-output descriptor: the unified shape
       // carries `name`/`description`/`strict` as siblings (see
       // request-parser.ts), and the Responses wire shape needs them back
-      // inside `text.format`. The fabricated fallbacks mirror the chat
-      // emitter (transformers/openai.ts) so a descriptor that omitted them
-      // still enforces the schema instead of 400ing upstream on a missing
-      // `name` — an explicit `strict: false` still survives via `??`.
+      // inside `text.format`. `name` gets a fabricated fallback (upstream
+      // 400s without it); `strict` is emitted ONLY when the client set it
+      // explicitly — omitting it preserves the upstream default (`false`),
+      // since strict mode rejects schemas with optional properties. An
+      // Anthropic-originated schema (parser never sets `strict`) therefore
+      // stays non-strict instead of 400ing.
       payload.text = {
         format: {
           type: 'json_schema',
@@ -150,7 +152,9 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
           ...(request.response_format.description !== undefined
             ? { description: request.response_format.description }
             : {}),
-          strict: request.response_format.strict ?? true,
+          ...(request.response_format.strict !== undefined
+            ? { strict: request.response_format.strict }
+            : {}),
           schema: request.response_format.json_schema,
         },
       };

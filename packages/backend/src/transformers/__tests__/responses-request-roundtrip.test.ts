@@ -528,8 +528,8 @@ describe('parseRequest conditional-spread hygiene (omitted fields leave no own p
     // The Responses `text.format` structured-output descriptor is more than
     // the schema: clients also send `name`, `description`, and `strict`.
     // Discarding them forces the responses -> chat emission to fabricate
-    // `name: "response_schema"` / `strict: true`, silently overriding what
-    // the client asked for (e.g. strict: false).
+    // `name: "response_schema"` over the client-supplied value (an omitted
+    // `strict` stays omitted so the upstream default applies).
     const DESCRIPTOR_REQUEST = {
       ...MINIMAL_REQUEST,
       text: {
@@ -570,7 +570,7 @@ describe('parseRequest conditional-spread hygiene (omitted fields leave no own p
       });
     });
 
-    it('fallbacks apply ONLY when the client omitted the descriptor fields', async () => {
+    it('a missing name gets the response_schema fallback; an omitted strict stays omitted', async () => {
       const unified = await new ResponsesTransformer().parseRequest({
         ...MINIMAL_REQUEST,
         text: {
@@ -582,12 +582,14 @@ describe('parseRequest conditional-spread hygiene (omitted fields leave no own p
       });
       const chatPayload = await new OpenAITransformer().transformRequest(unified);
 
+      // `name` gets a fabricated fallback (upstream 400s without it);
+      // `strict` stays omitted so the upstream default (`false`) applies —
+      // fabricating `strict: true` would 400 on schemas with optional fields.
       expect(chatPayload.response_format).toEqual({
         type: 'json_schema',
         json_schema: {
           name: 'response_schema',
           schema: { type: 'object', properties: { ok: { type: 'boolean' } } },
-          strict: true,
         },
       });
     });

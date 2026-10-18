@@ -290,8 +290,9 @@ export async function parseResponsesRequest(
             json_schema: input.text.format.schema,
             // Carry the full structured-output descriptor: dropping
             // name/description/strict would force the responses -> chat
-            // emission to fabricate `name: "response_schema"` /
-            // `strict: true` over the client-supplied values.
+            // emission to fabricate `name: "response_schema"` over the
+            // client-supplied value (an omitted `strict` stays omitted so
+            // the upstream default applies).
             ...(input.text.format.name !== undefined ? { name: input.text.format.name } : {}),
             ...(input.text.format.description !== undefined
               ? { description: input.text.format.description }

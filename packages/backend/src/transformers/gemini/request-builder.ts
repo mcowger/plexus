@@ -217,14 +217,22 @@ export async function buildGeminiRequest(
     temperature: request.temperature,
   };
 
-  // Pass through response format settings
-  if (request.response_format) {
+  // Pass through response format settings. An explicit `strict: false` on a
+  // `json_schema` descriptor opts out entirely (mirrors the Anthropic
+  // builder): Gemini's `responseJsonSchema` is always enforcing, so
+  // forwarding a best-effort request as enforced would turn working routes
+  // into hard errors. An omitted `strict` still forwards — skipping it would
+  // reintroduce the silent unstructured drop from #985.
+  if (
+    request.response_format &&
+    !(request.response_format.type === 'json_schema' && request.response_format.strict === false)
+  ) {
     if (
       request.response_format.type === 'json_object' ||
       request.response_format.type === 'json_schema'
     ) {
       generationConfig.responseMimeType = 'application/json';
-      if (request.response_format.json_schema) {
+      if (request.response_format.json_schema !== undefined) {
         generationConfig.responseJsonSchema = request.response_format.json_schema;
       }
     }

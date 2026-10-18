@@ -154,10 +154,13 @@ export interface UnifiedChatRequest {
     type: 'text' | 'json_object' | 'json_schema';
     json_schema?: any;
     /**
-     * Structured-output descriptor fields carried from the client (Responses
-     * `text.format.name` / `description` / `strict`) so cross-format
-     * emission preserves the client-supplied values — fabricated fallbacks
-     * (`response_schema`, `strict: true`) apply only when these are absent.
+     * Structured-output descriptor fields carried from the client (chat
+     * `response_format.json_schema`, Responses `text.format`, or Anthropic
+     * `output_config.format` — see the chat/Responses/Anthropic parsers) so
+     * cross-format emission preserves the client-supplied values — a missing
+     * `name` gets a fabricated `response_schema` fallback (upstreams 400
+     * without it), while an omitted `strict` stays omitted (upstream default
+     * applies).
      */
     name?: string;
     description?: string;

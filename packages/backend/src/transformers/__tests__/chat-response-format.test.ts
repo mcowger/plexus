@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OpenAITransformer } from '../openai';
+import { ResponsesTransformer } from '../responses';
 import { buildAnthropicRequest } from '../anthropic/request-builder';
 import { parseAnthropicRequest } from '../anthropic/request-parser';
 import { buildResponsesRequest } from '../responses/request-builder';
@@ -148,12 +149,130 @@ describe('cross-format structured-output emission', () => {
     });
   });
 
+  it('chat -> chat passes the client descriptor through verbatim (no rebuild)', async () => {
+    // Bare-schema fixture: no `name`, no `strict`. A rebuild would visibly
+    // change this (fabricated `name: "response_schema"` wrapper), so
+    // `toEqual` against the ORIGINAL proves the fast path ran — reference
+    // equality alone would be brittle against future cloning of the spread.
+    const body = {
+      model: 'openai/gpt-6.1-sol',
+      stream: false,
+      messages: [{ role: 'user', content: 'Summarize faithfully.' }],
+      response_format: { type: 'json_schema', json_schema: SCHEMA },
+    };
+    const unified = await parseChat(body);
+    const out = await new OpenAITransformer().transformRequest(unified);
+
+    expect(out.response_format).toEqual(body.response_format);
+  });
+
+  it('chat -> chat passes an explicit strict:false through verbatim', async () => {
+    const body = structuredClone(CHAT_BODY);
+    body.response_format.json_schema.strict = false;
+    const unified = await parseChat(body);
+    const out = await new OpenAITransformer().transformRequest(unified);
+
+    expect(out.response_format).toEqual(body.response_format);
+  });
+
+  it('same-format with middleware-injected response_format still rebuilds', async () => {
+    // The client sent no descriptor, but middleware attached a unified one:
+    // with nothing verbatim to preserve, the cross-format rebuild applies.
+    const { response_format: _dropped, ...body } = CHAT_BODY as any;
+    const unified = await parseChat(body);
+    unified.response_format = {
+      type: 'json_schema',
+      json_schema: SCHEMA,
+      name: 'injected',
+      strict: false,
+    };
+    const out = await new OpenAITransformer().transformRequest(unified);
+
+    expect(out.response_format).toEqual({
+      type: 'json_schema',
+      json_schema: { name: 'injected', schema: SCHEMA, strict: false },
+    });
+  });
+
+  it('chat -> responses omits strict when the client omitted it', async () => {
+    const body = structuredClone(CHAT_BODY);
+    delete (body.response_format.json_schema as any).strict;
+    const unified = await parseChat(body);
+    const out = await buildResponsesRequest(unified);
+
+    expect(out.text.format).toEqual({
+      type: 'json_schema',
+      name: 'meeting_summary',
+      schema: SCHEMA,
+    });
+    expect('strict' in out.text.format).toBe(false);
+  });
+
+  it('chat -> messages with omitted strict still emits output_config.format', async () => {
+    // The main #985 path: raw REST callers often omit `strict`. Skipping it
+    // would reintroduce the silent unstructured drop, so only an explicit
+    // `strict: false` opts out.
+    const body = structuredClone(CHAT_BODY);
+    delete (body.response_format.json_schema as any).strict;
+    const unified = await parseChat(body);
+    const out = await buildAnthropicRequest(unified);
+
+    expect(out.output_config).toEqual({
+      format: { type: 'json_schema', schema: SCHEMA },
+    });
+  });
+
+  it('chat -> responses carries description alongside name/schema', async () => {
+    const body = structuredClone(CHAT_BODY);
+    (body.response_format.json_schema as any).description = 'A meeting summary';
+    const unified = await parseChat(body);
+    const out = await buildResponsesRequest(unified);
+
+    expect(out.text.format).toEqual({
+      type: 'json_schema',
+      name: 'meeting_summary',
+      description: 'A meeting summary',
+      strict: true,
+      schema: SCHEMA,
+    });
+  });
+
+  it('responses -> messages with explicit strict:false stays unstructured', async () => {
+    const unified = await new ResponsesTransformer().parseRequest({
+      model: 'openai/gpt-6.1-sol',
+      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
+      text: { format: { type: 'json_schema', name: 's', strict: false, schema: SCHEMA } },
+    });
+    const out = await buildAnthropicRequest(unified);
+
+    expect(out.output_config).toBeUndefined();
+  });
+
+  it('chat -> messages with explicit strict:false stays unstructured (best-effort opt-out)', async () => {
+    const body = structuredClone(CHAT_BODY);
+    body.response_format.json_schema.strict = false;
+    const unified = await parseChat(body);
+    const out = await buildAnthropicRequest(unified);
+
+    expect(out.output_config).toBeUndefined();
+  });
+
   it('chat -> gemini emits responseMimeType + responseJsonSchema', async () => {
     const unified = await parseChat(CHAT_BODY);
     const out = await buildGeminiRequest(unified);
 
     expect(out.generationConfig?.responseMimeType).toBe('application/json');
     expect(out.generationConfig?.responseJsonSchema).toEqual(SCHEMA);
+  });
+
+  it('chat -> gemini with explicit strict:false stays unstructured (best-effort opt-out)', async () => {
+    const body = structuredClone(CHAT_BODY);
+    body.response_format.json_schema.strict = false;
+    const unified = await parseChat(body);
+    const out = await buildGeminiRequest(unified);
+
+    expect(out.generationConfig?.responseMimeType).toBeUndefined();
+    expect(out.generationConfig?.responseJsonSchema).toBeUndefined();
   });
 });
 
@@ -185,7 +304,7 @@ describe('messages-format structured outputs', () => {
     expect(unified.response_format).toEqual({ type: 'json_schema', json_schema: SCHEMA });
   });
 
-  it('messages -> chat re-emits the parsed schema (fabricated name/strict fallbacks)', async () => {
+  it('messages -> chat re-emits the parsed schema (fabricated name only, strict stays omitted)', async () => {
     const unified = await parseAnthropicRequest(MESSAGES_BODY);
     unified.incomingApiType = 'messages';
     unified.originalBody = MESSAGES_BODY;
@@ -193,7 +312,21 @@ describe('messages-format structured outputs', () => {
 
     expect(out.response_format).toEqual({
       type: 'json_schema',
-      json_schema: { name: 'response_schema', schema: SCHEMA, strict: true },
+      json_schema: { name: 'response_schema', schema: SCHEMA },
     });
+  });
+
+  it('messages -> responses re-emits without a fabricated strict:true', async () => {
+    const unified = await parseAnthropicRequest(MESSAGES_BODY);
+    unified.incomingApiType = 'messages';
+    unified.originalBody = MESSAGES_BODY;
+    const out = await buildResponsesRequest(unified);
+
+    expect(out.text.format).toEqual({
+      type: 'json_schema',
+      name: 'response_schema',
+      schema: SCHEMA,
+    });
+    expect('strict' in out.text.format).toBe(false);
   });
 });
