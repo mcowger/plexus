@@ -1,4 +1,8 @@
-import { getCatalogModels } from '../pi-ai/catalog';
+import {
+  getSuggestedChatModels,
+  miniMaxDiscoveryProvider,
+  selectMiniMaxChatChoices,
+} from './minimax-model-choices';
 import { getProviderTypes, type ProviderConfig } from '../../config';
 import { logger } from '../../utils/logger';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
@@ -140,7 +144,8 @@ export async function fetchModelsFromUrl(
       throw error;
     }
 
-    return normalizeModelsResponse(await response.json());
+    const normalized = normalizeModelsResponse(await response.json());
+    return { data: selectMiniMaxChatChoices(normalized.data, miniMaxDiscoveryProvider(url)) };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -225,7 +230,7 @@ export async function listMuseOAuthModels(oauthAccountId?: string | null): Promi
 }
 
 export function getOAuthProviderModels(providerId: string): DiscoveredModel[] {
-  return getCatalogModels(providerId).map((model) => ({
+  return getSuggestedChatModels(providerId).map((model) => ({
     id: model.id,
     name: model.name,
     context_length: model.contextWindow,

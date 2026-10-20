@@ -471,6 +471,18 @@ function projectAnthropicAutoCompat(
   // other, independent Anthropic control is left untouched.
   projectAnthropicServiceTier(next, options, intent.serviceTierSource);
 
+  // Native MiniMax M3 models use adaptive thinking, not Anthropic's token-budget
+  // dialect. Preserve native effort fields and explicit disabled requests (Flash
+  // rejects disabled itself) rather than synthesizing enabled/budget_tokens.
+  if (
+    (model.provider === 'minimax' || model.provider === 'minimax-cn') &&
+    (model.id === 'MiniMax-M3' || model.id === 'MiniMax-M3.1-Flash')
+  ) {
+    if (intent.reasoning.enabled === true) next.thinking = { type: 'adaptive' };
+    else if (intent.reasoning.enabled === false) next.thinking = { type: 'disabled' };
+    return next;
+  }
+
   if (options.thinkingEnabled === true) {
     const display = options.thinkingDisplay ?? 'summarized';
     if (model.compat?.forceAdaptiveThinking === true) {

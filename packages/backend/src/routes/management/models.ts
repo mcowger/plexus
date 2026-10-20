@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { logger } from '../../utils/logger';
+import { getSuggestedChatModels } from '../../services/providers/minimax-model-choices';
 import {
   ModelMetadataManager,
   resolveAutomaticModelIdentity,
@@ -12,7 +13,6 @@ import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
 import {
   getCatalogAllModels,
   getCatalogModel,
-  getCatalogModels,
   getModelCatalog,
   REMOTE_CATALOG_REFRESH_INTERVAL_MS,
 } from '../../services/pi-ai/catalog';
@@ -91,7 +91,7 @@ export async function registerModelRoutes(fastify: FastifyInstance) {
     }
 
     // Catalog models for this provider (built-in baseline + pi.dev overlay).
-    const merged = getCatalogModels(query.provider).map((m) => ({
+    const merged = getSuggestedChatModels(query.provider).map((m) => ({
       id: m.id,
       name: m.name,
       api: m.api as string,
