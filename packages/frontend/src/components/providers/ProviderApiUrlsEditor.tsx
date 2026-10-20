@@ -115,7 +115,8 @@ export function ProviderApiUrlsEditor({
             </label>
             <select
               className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
-              value={editingProvider.oauthProvider || OAUTH_PROVIDERS[0].value}
+              value={(editingProvider.oauthProvider || OAUTH_PROVIDERS[0]?.value) ?? ''}
+              disabled={OAUTH_PROVIDERS.length === 0}
               onChange={(e) =>
                 setEditingProvider({ ...editingProvider, oauthProvider: e.target.value })
               }
@@ -126,6 +127,12 @@ export function ProviderApiUrlsEditor({
                 </option>
               ))}
             </select>
+            {OAUTH_PROVIDERS.length === 0 && (
+              <div className="text-[11px] text-warning">
+                No OAuth providers available — the provider list failed to load. Close and reopen
+                the dialog to retry.
+              </div>
+            )}
           </div>
           <div className="text-[11px] text-text-secondary" style={{ lineHeight: '1.5' }}>
             Uses the provider ID as its OAuth account — one login per provider.
