@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle } from 'lucide-r
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import type { Provider } from '../../lib/api';
+import type { OAuthProvidersStatus } from '../../hooks/useProviderForm';
 import { switchConnectionMode, type ConnectionDraftMap } from '../../lib/providerConnectionDraft';
 
 const KNOWN_APIS = [
@@ -30,6 +31,10 @@ interface Props {
   editingProvider: Provider;
   setEditingProvider: React.Dispatch<React.SetStateAction<Provider>>;
   OAUTH_PROVIDERS: Array<{ value: string; label: string }>;
+  /** Load state of the OAuth provider list, so loading/error/empty render differently. */
+  oauthProvidersStatus: OAuthProvidersStatus;
+  /** Refetch the OAuth provider list after a load failure. */
+  onReloadOAuthProviders: () => void;
   isApiBaseUrlsOpen: boolean;
   setIsApiBaseUrlsOpen: (v: boolean) => void;
   /** Compact Apply Preset action shown beside the URL/OAuth toggle (URL mode only). */
@@ -47,6 +52,8 @@ export function ProviderApiUrlsEditor({
   editingProvider,
   setEditingProvider,
   OAUTH_PROVIDERS,
+  oauthProvidersStatus,
+  onReloadOAuthProviders,
   isApiBaseUrlsOpen,
   setIsApiBaseUrlsOpen,
   presetAction,
@@ -127,10 +134,17 @@ export function ProviderApiUrlsEditor({
                 </option>
               ))}
             </select>
-            {OAUTH_PROVIDERS.length === 0 && (
+            {oauthProvidersStatus === 'loading' && (
+              <div className="text-[11px] text-text-secondary" style={{ fontStyle: 'italic' }}>
+                Loading OAuth providers…
+              </div>
+            )}
+            {oauthProvidersStatus === 'error' && (
               <div className="text-[11px] text-warning">
-                No OAuth providers available — the provider list failed to load. Close and reopen
-                the dialog to retry.
+                Failed to load OAuth providers.{' '}
+                <button type="button" className="underline" onClick={onReloadOAuthProviders}>
+                  Retry
+                </button>
               </div>
             )}
           </div>

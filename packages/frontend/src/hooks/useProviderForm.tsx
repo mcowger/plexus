@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { findUnresolvedPresetVars, isOAuthPlaceholderUrl } from '@plexus/shared';
 import { useNavigate } from 'react-router-dom';
 import { api, Provider, OAuthSession, OAuthProviderInfo, fetchQuotaCheckers } from '../lib/api';
@@ -109,6 +109,9 @@ export interface FetchedModel {
   visibility?: 'list' | 'hide';
 }
 
+/** Load state of the OAuth provider list: loading, failed, or loaded. */
+export type OAuthProvidersStatus = 'loading' | 'error' | 'ready';
+
 /** Fallback protocol for Codex image models when the backend sends none. */
 const CODEX_IMAGE_ACCESS = 'codex-images';
 const CODEX_OAUTH_PROVIDER = 'openai-codex';
@@ -129,6 +132,7 @@ export function useProviderForm() {
   // pi-ai ships — new provider flows (e.g. xAI, Kimi Code, OpenRouter) show
   // up here automatically with no frontend change.
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
+  const [oauthProvidersStatus, setOauthProvidersStatus] = useState<OAuthProvidersStatus>('loading');
   const OAUTH_PROVIDERS = oauthProviders.map((p) => ({ value: p.id, label: p.name }));
   const [customCheckerIds, setCustomCheckerIds] = useState<string[]>([]);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
@@ -280,12 +284,20 @@ export function useProviderForm() {
     });
   }, []);
 
-  useEffect(() => {
-    api
-      .getOAuthProviders()
-      .then(setOauthProviders)
-      .catch(() => setOauthProviders([]));
+  const reloadOAuthProviders = useCallback(async () => {
+    setOauthProvidersStatus('loading');
+    try {
+      setOauthProviders(await api.getOAuthProviders());
+      setOauthProvidersStatus('ready');
+    } catch {
+      setOauthProviders([]);
+      setOauthProvidersStatus('error');
+    }
   }, []);
+
+  useEffect(() => {
+    void reloadOAuthProviders();
+  }, [reloadOAuthProviders]);
 
   useEffect(() => {
     api
@@ -1207,6 +1219,8 @@ export function useProviderForm() {
     customCheckerIds,
     quotas,
     quotasLoading,
+    oauthProvidersStatus,
+    reloadOAuthProviders,
     oauthSessionId,
     oauthSession,
     oauthPromptValue,

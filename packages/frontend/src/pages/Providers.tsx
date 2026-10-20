@@ -157,6 +157,8 @@ export const Providers = () => {
                 editingProvider={f.editingProvider}
                 setEditingProvider={f.setEditingProvider}
                 OAUTH_PROVIDERS={f.OAUTH_PROVIDERS}
+                oauthProvidersStatus={f.oauthProvidersStatus}
+                onReloadOAuthProviders={f.reloadOAuthProviders}
                 isApiBaseUrlsOpen={f.isApiBaseUrlsOpen}
                 setIsApiBaseUrlsOpen={f.setIsApiBaseUrlsOpen}
                 presetAction={
