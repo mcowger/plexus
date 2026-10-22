@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { backfillServiceTiers } from './lib/service-tier-backfill';
 
 const DEFAULT_SOURCE = 'https://models.dev/api.json';
@@ -57,14 +58,10 @@ This edits preset defaults only, not providers already saved in the database.`);
     `${result.changes.length} tier additions${options.write ? '' : ' (dry-run; use --write to apply)'}`
   );
   if (!options.write || result.changes.length === 0) return;
-  const formatted = execFileSync(
-    'bunx',
-    ['biome', 'format', '--stdin-file-path', options.presets],
-    {
-      input: `${JSON.stringify(result.catalog, null, 2)}\n`,
-      encoding: 'utf8',
-    }
-  );
+  const formatted = execFileSync('bun', ['fmt', '--stdin-filepath', options.presets], {
+    input: `${JSON.stringify(result.catalog, null, 2)}\n`,
+    encoding: 'utf8',
+  });
   if ((await readFile(options.presets, 'utf8')) !== before)
     throw new Error('Preset file changed during backfill; refusing to overwrite');
   const temporary = `${options.presets}.${process.pid}.tmp`;

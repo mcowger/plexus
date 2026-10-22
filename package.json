@@ -1,21 +1,11 @@
 {
   "name": "plexus2",
-  "module": "index.ts",
-  "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1",
-    "@redocly/cli": "^2.64.1",
-    "@vitest/coverage-istanbul": "5.0.5",
-    "agent-browser": "^0.39.1",
-    "bun-types": "1.4.4",
-    "lefthook": "^2.2.1",
-    "octokit": "^5.0.5",
-    "vitest": "^5.0.5",
-    "yaml": "^2.9.1",
-    "zod": "^4.6.6"
-  },
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "module": "index.ts",
   "scripts": {
     "dev": "bun run generate:openapi:asset && bun run scripts/dev.ts",
     "profile": "bun run dev --profile",
@@ -64,10 +54,9 @@
     "build:default-populate": "bun run scripts/build-populate.ts",
     "postinstall": "bun run scripts/wrap-drizzle-kit.ts",
     "prepare": "if [ -z \"$CI\" ]; then lefthook install; fi",
-    "format": "bunx --bun biome format --write .",
-    "format:check": "bunx --bun biome format .",
-    "lint": "bunx --bun biome lint --write .",
-    "lint:check": "bunx --bun biome lint .",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
+    "format:changed": "bun fmt --changed",
     "lint:migrations": "bun run scripts/lint-migrations.ts",
     "generate:provider-presets-schema": "bun run scripts/provider-presets-schema.ts --write",
     "check:provider-presets-schema": "bun run scripts/provider-presets-schema.ts",
@@ -87,14 +76,23 @@
     "code:review:commit": "opencodereview review --commit HEAD",
     "deploy:staging": "bun run scripts/deploy-staging.ts"
   },
-  "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
-  "overrides": {
-    "zod": "^4.6.5"
-  },
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.64.1",
+    "@vitest/coverage-istanbul": "5.0.5",
+    "agent-browser": "^0.39.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "bun-types": "1.4.4",
+    "lefthook": "^2.2.1",
+    "octokit": "^5.0.5",
+    "vitest": "^5.0.5",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.6"
+  },
+  "overrides": {
+    "zod": "^4.6.5"
   }
 }

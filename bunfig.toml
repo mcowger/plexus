@@ -3,3 +3,24 @@
 
 [test]
 root = "./test/bun-test-guard"
+
+# Formatter configuration for `bun fmt` (Bun 1.4.4+).
+# Replaces the former Biome setup; see .prettierignore for excluded paths.
+[fmt]
+printWidth = 100
+tabWidth = 2
+useTabs = false
+semi = true
+singleQuote = true
+quoteProps = "as-needed"
+trailingComma = "es5"
+arrowParens = "always"
+bracketSpacing = true
+bracketSameLine = false
+endOfLine = "lf"
+proseWrap = "preserve"
+sortImports = true
+sortTailwindcss = true
+sortPackageJson = true
+# jsdoc stays off: it reflows and mangles ASCII diagrams inside doc comments.
+jsdoc = false

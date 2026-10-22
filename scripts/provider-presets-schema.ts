@@ -3,11 +3,13 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import Ajv2020 from 'ajv/dist/2020.js';
+
 import addFormats from 'ajv-formats';
+import Ajv2020 from 'ajv/dist/2020.js';
 import { z } from 'zod';
-import { ProviderPresetSchema } from '../packages/shared/src/provider-presets';
+
 import { parseAndValidatePresets } from '../packages/backend/src/services/provider-presets';
+import { ProviderPresetSchema } from '../packages/shared/src/provider-presets';
 
 const schemaUrl =
   'https://raw.githubusercontent.com/mcowger/plexus/main/packages/backend/data/provider-presets.schema.json';
@@ -91,7 +93,7 @@ export function generateSchema(): JsonSchema {
 
 async function main(): Promise<void> {
   const raw = `${JSON.stringify(generateSchema(), null, 2)}\n`;
-  const generated = execFileSync('bunx', ['biome', 'format', '--stdin-file-path', schemaPath], {
+  const generated = execFileSync('bun', ['fmt', '--stdin-filepath', schemaPath], {
     input: raw,
     encoding: 'utf8',
   });

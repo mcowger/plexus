@@ -1,0 +1,29 @@
+# Ignore list for `bun fmt` (bun fmt reads .prettierignore and .gitignore).
+# Keep in sync with docs/CONTRIBUTING guidance when adding generated output.
+
+# Vendored skills, refreshed weekly by .github/workflows/vendored-skills.yml
+.agents/
+.claude/
+.cora/
+
+# Build output
+**/dist/
+**/build/
+**/coverage/
+
+# Generated assets and checked-in generated code
+packages/frontend/src/assets/
+packages/frontend/dist/
+packages/backend/src/assets/openapi.json
+packages/cli/src/skill.ts
+
+# Generated migrations (never edit or reformat by hand)
+packages/backend/drizzle/migrations/
+packages/backend/drizzle/migrations_pg/
+
+# Golden fixtures are compared byte-for-byte
+packages/backend/src/transformers/oauth/__tests__/golden-fixtures/
+
+# Minified vendor files
+**/*.min.js
+**/*.min.css

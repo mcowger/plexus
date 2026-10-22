@@ -48,11 +48,11 @@ required; verify each against the **live** server, not just unit tests.
 
 ### Verification
 
-- `bun run typecheck` from `packages/backend` (backed by `bun check`; never `tsc`), biome on touched files,
+- `bun run typecheck` from `packages/backend` (backed by `bun check`; never `tsc`), `bun fmt` on touched files,
   and the affected vitest suites.
 - **Curl the live dev server** (default `ADMIN_KEY=password` locally):
   `curl -H "x-admin-key: password"
-  localhost:<port>/v0/management/oauth/providers` must list the new id.
+localhost:<port>/v0/management/oauth/providers` must list the new id.
   Unit tests run against the working tree; the live endpoint verifies the
   running server. When the UI disagrees with the tests, check this endpoint
   first. A missing id can mean missing registration or a stale server;

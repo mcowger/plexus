@@ -3,6 +3,7 @@
 This file is a **guardrail**, not general documentation.
 
 **Use order:**
+
 1. Read **Critical rules**.
 2. Match the task in **Task triggers**.
 3. Use the listed command/workflow exactly.
@@ -47,16 +48,16 @@ Run these commands from the repository root:
 - Stop the agent dev stack: `bun run dev:stop`
 - Tests: `bun run test` (never `bun test`)
 - Type check: `bun run typecheck` (uses `bun check`; never `tsc`)
-- Lint check: `bun run lint:check`
-- Format: `bun run format`
+- Format: `bun run format` (or `bun fmt` directly)
 - Format check: `bun run format:check`
+- Format only changed files: `bun run format:changed`
 
 For lifecycle targets, ports, and FRP tunnels, read [Development](CONTRIBUTING.md#development).
 For optional review commands, read [Manual OpenCodeReview review](CONTRIBUTING.md#manual-opencodereview-review); never invoke OpenCodeReview automatically during commits or install it just for a review.
 
 ## Before handing work back
 
-- After code changes, run relevant tests, typecheck, lint check, and format check using the commands above.
+- After code changes, run relevant tests, typecheck, and format check using the commands above.
 - For browser-visible changes, also complete the frontend verification workflow.
 - For documentation-only changes, check links, command references, and formatting; don't boot the application or run unrelated tests.
 - Report the checks run and their results. State any failures, skipped checks, or blockers explicitly; blocked verification is not a passing check.

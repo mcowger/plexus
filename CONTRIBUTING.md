@@ -73,11 +73,15 @@ Load the `opencodereview-cli` skill before invoking OpenCodeReview. If it is una
 
 ## Code Style
 
-All code must be formatted with Biome before committing:
+All code must be formatted with `bun fmt` (Bun 1.4.4+) before committing. Configuration lives in the `[fmt]` section of `bunfig.toml`; ignored paths live in `.prettierignore`.
 
 ```bash
-bun run format
+bun run format          # format everything
+bun run format:check    # verify without writing
+bun run format:changed  # format only files changed vs. the default branch
 ```
+
+The pre-commit hook runs `bun fmt --staged`, which formats just the staged files and re-stages them, so you normally don't need to run the formatter by hand.
 
 ## Running Tests
 
@@ -223,12 +227,12 @@ existing resources are replaced rather than duplicated.
 
 #### What gets seeded
 
-| Category | Count | Notes |
-|---|---|---|
-| Providers | 11 | Frontier cloud providers (Kilocode, Wisgate, Neuralwatt, OpenRouter, Google, OpenAI, Anthropic, CC, CC-Sigma, OpenLimits, Ozore) |
-| Quotas | 2 | Daily, weekly budgets and limits |
-| Model aliases | 19 | Frontier model architectures (gpt-5.x, claude-4.5/5, gemini-3.5, deepseek-v4) for chat, embeddings, speech, transcriptions |
-| API keys | 4 | Default, OWUI, GithubKey, GHAKey |
+| Category      | Count | Notes                                                                                                                            |
+| ------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Providers     | 11    | Frontier cloud providers (Kilocode, Wisgate, Neuralwatt, OpenRouter, Google, OpenAI, Anthropic, CC, CC-Sigma, OpenLimits, Ozore) |
+| Quotas        | 2     | Daily, weekly budgets and limits                                                                                                 |
+| Model aliases | 19    | Frontier model architectures (gpt-5.x, claude-4.5/5, gemini-3.5, deepseek-v4) for chat, embeddings, speech, transcriptions       |
+| API keys      | 4     | Default, OWUI, GithubKey, GHAKey                                                                                                 |
 
 All provider URLs are mapped to their real production API gateways, but with safe, redacted mock keys by default. No real secrets are checked into the codebase.
 
@@ -241,11 +245,11 @@ without touching committed files and without risk of accidentally leaking secret
 
 #### Environment variables
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `PLEXUS_URL` | `http://localhost` | Base URL of the target instance |
-| `PLEXUS_PORT` | derived from cwd | Port (matches `bun run dev` automatically) |
-| `PLEXUS_ADMIN_KEY` | `password` | Admin key |
+| Variable           | Default            | Purpose                                    |
+| ------------------ | ------------------ | ------------------------------------------ |
+| `PLEXUS_URL`       | `http://localhost` | Base URL of the target instance            |
+| `PLEXUS_PORT`      | derived from cwd   | Port (matches `bun run dev` automatically) |
+| `PLEXUS_ADMIN_KEY` | `password`         | Admin key                                  |
 
 ### Resetting to a clean state
 

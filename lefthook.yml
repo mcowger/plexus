@@ -9,13 +9,13 @@ pre-commit:
   # in dedicated workflow steps, making the hook redundant and harmful
   # (failed hook = create_pull_request retries with a new branch each time).
   skip:
-    - CI: "true"
+    - CI: 'true'
 
   commands:
     # --- Block manually committed migration files ----------------------------
     no-migrations:
       skip:
-        - CI: "true"
+        - CI: 'true'
       run: |
         if [ "${ALLOW_MIGRATIONS:-}" = "1" ]; then exit 0; fi
         migration_files=$(git diff --cached --name-only -- \
@@ -37,21 +37,14 @@ pre-commit:
 
     # --- Validate changed GitHub Actions workflow YAML -----------------------
     workflow-yaml:
-      glob: ".github/workflows/*.{yml,yaml}"
+      glob: '.github/workflows/*.{yml,yaml}'
       run: mise exec -- actionlint {staged_files}
 
-    # --- Biome: format staged source files in-place and re-stage -------------
-    biome-format:
-      glob: "*.{ts,tsx,js,jsx,json}"
-      exclude:
-        - "packages/backend/drizzle/migrations/**"
-        - "packages/backend/drizzle/migrations_pg/**"
-        - "packages/backend/src/assets/openapi.json"
-      run: bunx --bun biome format --write {staged_files} && git add {staged_files}
-
-    # --- Biome: lint all sources ---------------------------------------------
-    biome-lint:
-      run: bunx --bun biome lint .
+    # --- Format staged files in-place and re-stage --------------------------
+    # `bun fmt --staged` formats only staged files and re-stages them, which
+    # replaces both the old biome-format and biome-lint hook commands.
+    fmt:
+      run: bun fmt --staged
 
     # --- TypeScript type-check across all packages ---------------------------
     typecheck:
@@ -59,15 +52,15 @@ pre-commit:
 
     # --- Frontend build (catches broken imports/exports) ---------------------
     frontend-build:
-      glob: "packages/frontend/src/**"
+      glob: 'packages/frontend/src/**'
       run: bun run build:frontend
 
     # --- OpenAPI spec lint (only when OpenAPI docs change) -----------------
     openapi-lint:
-      glob: "docs/openapi/**"
+      glob: 'docs/openapi/**'
       run: bun run lint:openapi
 
     # --- Backend tests (only when backend source changes) --------------------
     backend-tests:
-      glob: "packages/backend/src/**"
+      glob: 'packages/backend/src/**'
       run: bun run test
