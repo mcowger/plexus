@@ -80,7 +80,7 @@
     "@earendil-works/pi-ai": "1.4.0"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.64.1",
+    "@redocly/cli": "^2.65.0",
     "@vitest/coverage-istanbul": "5.0.5",
     "agent-browser": "^0.39.1",
     "ajv": "^8.20.0",
