@@ -1,25 +1,26 @@
+import { beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-
+// Shared handles registered globally by the preload. mockLogger is asserted on for
+// the warn the normalize_anthropic_tool_ids adapter emits when it rewrites ids;
+// mockComplete backs the pi-ai executor.
+import { mockComplete, mockLogger } from '../../../test/mocks';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
-// Globally mocked in test/vitest.setup.ts — imported here only to assert on the
-// warn the normalize_anthropic_tool_ids adapter emits when it rewrites ids.
-import { logger } from '../../utils/logger';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
-// per-file vi.mock() call here. Dispatcher is imported dynamically so it
+// @earendil-works/pi-ai is mocked globally in bun-test.setup.ts — do not add a
+// per-file mock.module() call here. Dispatcher is imported dynamically so it
 // resolves after that registration, mirroring dispatcher-claude-masking.test.ts.
 const { Dispatcher } = await import('../dispatch/dispatcher');
-import * as piAi from '@earendil-works/pi-ai/compat';
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
 
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 // ---------------------------------------------------------------------------
 // Wire-level proof for the `normalize_anthropic_tool_ids` adapter.
@@ -400,9 +401,8 @@ function makeChatToAnthropicRequest(alias: string): UnifiedChatRequest {
 
 /** The adapter's own operator-visible trace, used to prove it was injected. */
 function normalizeWarns(): string[] {
-  return vi
-    .mocked(logger.warn)
-    .mock.calls.map((call) => String(call[0]))
+  return mockLogger.warn.mock.calls
+    .map((call) => String(call[0]))
     .filter((message) => message.includes('normalize_anthropic_tool_ids'));
 }
 
@@ -410,10 +410,10 @@ describe('Dispatcher Anthropic tool-id normalization', () => {
   beforeEach(() => {
     fetchMock.mockClear();
     CooldownManager.resetForTesting();
-    // Re-apply since mockReset: true clears vi.fn() state between tests. No
+    // Re-apply since mockReset: true clears mock() state between tests. No
     // assertion depends on the value; it only keeps the pi-ai executor from
     // throwing if a route were ever misrouted onto it.
-    vi.mocked(piAi.complete).mockResolvedValue({
+    mockComplete.mockResolvedValue({
       content: [{ type: 'text', text: 'ok' }],
       stopReason: 'stop',
       usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
@@ -514,7 +514,7 @@ describe('Dispatcher Anthropic tool-id normalization', () => {
 
     expect(response).toBeDefined();
     // The masked API-key route goes NATIVE (real fetch, x-api-key), not pi-ai.
-    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -542,7 +542,7 @@ describe('Dispatcher Anthropic tool-id normalization', () => {
     const emittedCch = CCH_PATTERN.exec(body.system[0].text)?.[1];
     expect(emittedCch).toBeDefined();
     expect(emittedCch).not.toBe('00000');
-    expect(recomputeCch(body)).toBe(emittedCch);
+    expect(recomputeCch(body)).toBe<unknown>(emittedCch);
 
     // The recompute is genuinely id-sensitive: putting the poisoned ids back
     // changes the hash, so the match above cannot be an accident.
@@ -566,7 +566,7 @@ describe('Dispatcher Anthropic tool-id normalization', () => {
     const response = await dispatcher.dispatch(makeMaskedRequest());
 
     expect(response).toBeDefined();
-    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

@@ -1,17 +1,19 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import { UnifiedSpeechRequest } from '../../types/unified';
 import { Dispatcher } from '../dispatch/dispatcher';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-const fetchMock = vi.fn(async (url: string, options: any) => {
+const fetchMock = mock(async (url: string, options: any) => {
   return new Response(Buffer.from([0x01, 0x02, 0x03, 0x04]), {
     status: 200,
     headers: { 'Content-Type': 'audio/mpeg' },
   });
 });
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 describe('Dispatcher Speech extra_body', () => {
   beforeEach(async () => {

@@ -1,4 +1,3 @@
-import Fastify from 'fastify';
 /**
  * Tests for backup and restore routes.
  *
@@ -7,40 +6,35 @@ import Fastify from 'fastify';
  * services/__tests__/backup-service.test.ts. Here we verify route wiring,
  * content-type handling, and input validation.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
-// Mock the database and config to avoid needing a real DB
-vi.mock('../../../db/client', () => ({
-  getDatabase: vi.fn(),
-  getSchema: vi.fn(() => ({})),
-  getCurrentDialect: vi.fn(() => 'sqlite'),
-}));
+import Fastify from 'fastify';
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
-      exportConfig: vi.fn(async () => ({
-        providers: {},
-        models: {},
-        keys: {},
-        user_quotas: {},
-        mcp_servers: {},
-        settings: {},
-        oauth_providers: [],
-      })),
-      getRepository: vi.fn(() => ({
-        getAllOAuthProviders: vi.fn(async () => []),
-        getOAuthCredentials: vi.fn(),
-      })),
-      initialize: vi.fn(),
+import * as client from '../../../db/client';
+import { ConfigService } from '../../../services/configuration/config-service';
+
+// Stub the database and config to avoid needing a real DB (restored after every test).
+beforeEach(() => {
+  spyOn(client, 'getDatabase').mockImplementation(mock() as any);
+  spyOn(client, 'getSchema').mockImplementation((() => ({})) as any);
+  spyOn(client, 'getCurrentDialect').mockImplementation((() => 'sqlite') as any);
+  spyOn(ConfigService, 'getInstance').mockImplementation((() => ({
+    exportConfig: mock(async () => ({
+      providers: {},
+      models: {},
+      keys: {},
+      user_quotas: {},
+      mcp_servers: {},
+      settings: {},
+      oauth_providers: [],
     })),
-  },
-}));
-
-vi.mock('../../../utils/logger', () => ({
-  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(), silly: vi.fn() },
-  getCurrentLogLevel: vi.fn(() => 'info'),
-}));
+    getRepository: mock(() => ({
+      getAllOAuthProviders: mock(async () => []),
+      getOAuthCredentials: mock(),
+    })),
+    initialize: mock(),
+  })) as any);
+});
 
 import { registerBackupRoutes } from '../backup';
 
@@ -52,12 +46,12 @@ describe('Backup management routes', () => {
   beforeEach(async () => {
     fastify = Fastify({ bodyLimit: 30 * 1024 * 1024 });
     mockUsageStorage = {
-      deleteAllUsageLogs: vi.fn(async () => true),
-      deleteAllErrors: vi.fn(async () => true),
-      deleteAllDebugLogs: vi.fn(async () => true),
+      deleteAllUsageLogs: mock(async () => true),
+      deleteAllErrors: mock(async () => true),
+      deleteAllDebugLogs: mock(async () => true),
     };
     mockMcpUsageStorage = {
-      deleteAllLogs: vi.fn(async () => true),
+      deleteAllLogs: mock(async () => true),
     };
     await registerBackupRoutes(fastify, mockUsageStorage, mockMcpUsageStorage);
   });

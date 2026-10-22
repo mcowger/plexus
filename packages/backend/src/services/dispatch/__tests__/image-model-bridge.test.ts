@@ -18,14 +18,14 @@
  *     chunk carrying `usage`.
  */
 
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 
+import { mockLogger } from '../../../../test/mocks';
 import { registerSpy } from '../../../../test/test-utils';
 import type { PlexusConfig } from '../../../config';
 import { ImageRequestValidationError } from '../../../transformers/image';
 import { MAX_INLINE_IMAGE_BASE64_CHARS } from '../../../transformers/image-rendering';
 import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../../types/unified';
-import { logger } from '../../../utils/logger';
 import type { RouteResult } from '../../routing/router';
 import type { ImageBridgeHost } from '../image-model-bridge';
 import {
@@ -119,7 +119,7 @@ describe('isImageModelRoute', () => {
     const config = configWithModels({ image_alias: {} });
 
     expect(isImageModelRoute(chatRequest(), candidates, config)).toBe(false);
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(expect.stringContaining('image_alias'));
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('image_alias'));
   });
 
   test('warns once per alias, not once per request', () => {
@@ -132,14 +132,14 @@ describe('isImageModelRoute', () => {
     for (let i = 0; i < 5; i++) {
       expect(isImageModelRoute(chatRequest(), mixed('image_alias'), config)).toBe(false);
     }
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledTimes(1);
+    expect(mockLogger.warn).toHaveBeenCalledTimes(1);
 
     // A different alias is still worth warning about once.
     expect(
       isImageModelRoute(chatRequest({ model: 'other_alias' }), mixed('other_alias'), config)
     ).toBe(false);
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(logger.warn)).toHaveBeenLastCalledWith(expect.stringContaining('other_alias'));
+    expect(mockLogger.warn).toHaveBeenCalledTimes(2);
+    expect(mockLogger.warn).toHaveBeenLastCalledWith(expect.stringContaining('other_alias'));
   });
 
   test('does NOT bridge an ordinary chat alias', () => {
@@ -147,7 +147,7 @@ describe('isImageModelRoute', () => {
     const config = configWithModels({ chat_alias: {} });
 
     expect(isImageModelRoute(chatRequest({ model: 'chat_alias' }), candidates, config)).toBe(false);
-    expect(vi.mocked(logger.warn)).not.toHaveBeenCalled();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
   test('ignores request.tools entirely: an image_generation tool on a chat alias does not bridge', () => {
@@ -431,11 +431,11 @@ describe('synthesizeChatStream', () => {
 });
 
 describe('bridgeChatToImageGeneration', () => {
-  let dispatchImageGenerations: ReturnType<typeof vi.fn>;
+  let dispatchImageGenerations: ReturnType<typeof mock>;
   let host: ImageBridgeHost;
 
   beforeEach(() => {
-    dispatchImageGenerations = vi.fn(async () => imageResponse());
+    dispatchImageGenerations = mock(async () => imageResponse());
     host = { dispatchImageGenerations } as unknown as ImageBridgeHost;
   });
 

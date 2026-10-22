@@ -14,7 +14,7 @@
  *     transformed-snapshot usage fallback).
  */
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import {
   synthesizeChatResponse,

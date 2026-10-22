@@ -1,8 +1,7 @@
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-
-import { beforeEach, describe, expect, test } from 'vitest';
 
 import { calculateCosts } from '../../utils/calculate-costs';
 import { ModelMetadataManager } from '../models/model-metadata-manager';

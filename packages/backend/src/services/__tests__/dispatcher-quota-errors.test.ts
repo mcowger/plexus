@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
@@ -6,15 +6,17 @@ import { DEADLINE_EXPIRED_PATTERNS, QUOTA_ERROR_PATTERNS } from '../../utils/con
 import { Dispatcher } from '../dispatch/dispatcher';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
-// per-file vi.mock() call here.  With isolate: false all files share one
+// @earendil-works/pi-ai is mocked globally in bun-test.setup.ts — do not add a
+// per-file mock.module() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
 
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function makeConfig(options?: { targetCount?: number }) {
   const targetCount = options?.targetCount ?? 2;

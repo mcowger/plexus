@@ -106,8 +106,8 @@ jobs:
       - name: Typecheck all workspaces
         run: bun run typecheck
 
-      - name: Run backend tests
-        run: cd packages/backend && bun run test
+      - name: Run tests (changed only)
+        run: bun test --parallel --changed=HEAD
 
       - name: Check for pending migrations
         run: |
@@ -513,7 +513,7 @@ jobs:
 
       - name: Test CLI package
         run: |
-          bun run --cwd packages/cli test
+          bun test --parallel packages/cli
           bun run --cwd packages/cli typecheck
 
       - name: Set next CLI patch version

@@ -1,10 +1,11 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+
 import Fastify from 'fastify';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';
 import { registerModelRoutes } from '../models';
 
-// NOTE: @earendil-works/pi-ai is globally mocked (see test/vitest.setup.ts):
+// NOTE: @earendil-works/pi-ai is globally mocked (see test/bun-test.setup.ts):
 // getBuiltinProviders() returns ['anthropic', 'openai-codex', 'openai',
 // 'google', 'meta'] and getProviders() returns id-only stubs without baseUrl,
 // so endpoint matching resolves to null here — URL semantics are covered by

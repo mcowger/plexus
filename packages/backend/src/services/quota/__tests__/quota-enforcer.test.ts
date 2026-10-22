@@ -1,5 +1,15 @@
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  setSystemTime,
+  test,
+} from 'bun:test';
+
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { PlexusConfig, setConfigForTesting } from '../../../config';
 import { getCurrentDialect, getDatabase, getSchema } from '../../../db/client';
@@ -102,7 +112,7 @@ describe('QuotaEnforcer', () => {
   });
 
   afterEach(async () => {
-    vi.useRealTimers();
+    setSystemTime();
     await db.delete(schema.quotaState);
     await db.delete(schema.requestUsage);
   });
@@ -227,9 +237,8 @@ describe('QuotaEnforcer', () => {
     });
 
     test('leak math: elapsed time decays a leaky rolling bucket', async () => {
-      vi.useFakeTimers({ toFake: ['Date'] });
       const now = new Date('2026-03-15T12:00:00.000Z');
-      vi.setSystemTime(now);
+      setSystemTime(now);
 
       setConfigForTesting(
         createTestConfig(
@@ -255,10 +264,9 @@ describe('QuotaEnforcer', () => {
     });
 
     test('ISO-Monday weekly window: window start anchors to Monday, not Sunday', async () => {
-      vi.useFakeTimers({ toFake: ['Date'] });
       // 2024-01-01 is a Monday. Wednesday of the same week:
       const now = new Date('2024-01-03T15:00:00.000Z');
-      vi.setSystemTime(now);
+      setSystemTime(now);
 
       setConfigForTesting(
         createTestConfig(
@@ -472,8 +480,7 @@ describe('QuotaEnforcer', () => {
       // clock this test is flaky — any wall-clock jitter between the write
       // and the read below shaves fractions of a token off currentUsage,
       // which can round down to 4999 under CI load.
-      vi.useFakeTimers({ toFake: ['Date'] });
-      vi.setSystemTime(new Date('2026-03-15T12:00:00.000Z'));
+      setSystemTime(new Date('2026-03-15T12:00:00.000Z'));
 
       setConfigForTesting(
         createTestConfig(
@@ -503,9 +510,8 @@ describe('QuotaEnforcer', () => {
     });
 
     test('SQL-side leak: recordUsage decays the persisted bucket before adding new usage', async () => {
-      vi.useFakeTimers({ toFake: ['Date'] });
       const start = new Date('2026-03-15T12:00:00.000Z');
-      vi.setSystemTime(start);
+      setSystemTime(start);
 
       setConfigForTesting(
         createTestConfig(
@@ -522,7 +528,7 @@ describe('QuotaEnforcer', () => {
       // math over a seeded row), this exercises upsertQuotaState's SQL CASE
       // expression: the DB row itself must decay from lastUpdated before the
       // new usage is added.
-      vi.setSystemTime(new Date(start.getTime() + 30 * 60 * 1000));
+      setSystemTime(new Date(start.getTime() + 30 * 60 * 1000));
       await quotaEnforcer.recordUsage('k', 'openai', 'gpt-4', { tokensInput: 100 });
 
       const rows = await db.select().from(schema.quotaState);

@@ -17,7 +17,7 @@
  *   - extracting the shared builder does not change the Responses request.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { CodexVersionService } from '../codex-version-service';
@@ -50,7 +50,7 @@ describe('buildCodexOAuthHeaders', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     CodexVersionService.resetForTesting();
   });
 
@@ -86,7 +86,7 @@ describe('prepareCodexImagesDispatch', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
     CodexVersionService.resetForTesting();
   });
@@ -146,7 +146,7 @@ describe('prepareOAuthNativeRequest — Codex Responses headers (unchanged)', ()
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     CodexVersionService.resetForTesting();
   });
 

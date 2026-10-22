@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import type { ProviderConfig } from '../../config';
@@ -19,11 +19,11 @@ describe('ModelAutosyncScheduler', () => {
   afterEach(() => {
     ModelAutosyncScheduler.getInstance().stop();
     ModelAutosyncScheduler.resetInstance();
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('keeps provider configs cached when scheduling autosync', () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     const scheduler = ModelAutosyncScheduler.getInstance();
     const runSyncNow = registerSpy(scheduler, 'runSyncNow').mockResolvedValue(0);
@@ -36,7 +36,7 @@ describe('ModelAutosyncScheduler', () => {
   });
 
   it('keeps provider configs cached when rescheduling interval changes', () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     const scheduler = ModelAutosyncScheduler.getInstance();
     const runSyncNow = registerSpy(scheduler, 'runSyncNow').mockResolvedValue(0);

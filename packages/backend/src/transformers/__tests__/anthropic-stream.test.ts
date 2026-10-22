@@ -1,5 +1,6 @@
+import { describe, expect, it, test } from 'bun:test';
+
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
-import { describe, expect, test } from 'vitest';
 
 import { UnifiedChatStreamChunk } from '../../types/unified';
 import { AnthropicTransformer } from '../anthropic';

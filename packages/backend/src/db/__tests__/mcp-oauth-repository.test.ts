@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
-  update: vi.fn(),
+import * as client from '../client';
+
+const mocks = {
+  update: mock(),
   schema: {
     mcpOauthAuthorizationCodes: {
       codeHash: {},
@@ -12,12 +14,12 @@ const mocks = vi.hoisted(() => ({
       revokedAt: {},
     },
   },
-}));
+};
 
-vi.mock('../client', () => ({
-  getDatabase: () => ({ update: mocks.update }),
-  getSchema: () => mocks.schema,
-}));
+beforeEach(() => {
+  spyOn(client, 'getDatabase').mockImplementation((() => ({ update: mocks.update })) as any);
+  spyOn(client, 'getSchema').mockImplementation((() => mocks.schema) as any);
+});
 
 import { McpOauthRepository } from '../mcp-oauth-repository';
 

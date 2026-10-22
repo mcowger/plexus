@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   budgetToEffort,
@@ -24,7 +24,7 @@ describe('normalizeEffort', () => {
     ['maximum', 'max'],
     ['MAX', 'max'],
   ])('normalizes %s → %s', (raw, expected) => {
-    expect(normalizeEffort(raw)).toBe(expected);
+    expect(normalizeEffort(raw)).toBe<unknown>(expected);
   });
 
   it('returns undefined for unknown values and non-strings', () => {

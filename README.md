@@ -111,7 +111,7 @@ ENCRYPTION_KEY="<current-key>" NEW_ENCRYPTION_KEY="<new-key>" ./plexus rekey
 ```bash
 bun install
 bun run dev
-bun run test
+bun test
 ```
 
 The dev port is derived from the worktree directory name. Use
@@ -122,7 +122,7 @@ is optional: when `frpc`, `FRPC_SERVER_ADDR`, and `FRPC_AUTH_TOKEN` are
 available, the dev server creates a worktree-specific tunnel and tears it down
 with the server.
 
-`bun test` is intentionally blocked; use `bun run test`. See [Testing](docs/TESTING.md).
+Tests run on Bun's built-in runner: `bun test` (no flags needed). See [Testing](docs/TESTING.md) for the mocking and isolation rules every test file must follow.
 
 ---
 

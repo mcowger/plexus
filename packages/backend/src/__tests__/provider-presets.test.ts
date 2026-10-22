@@ -1,3 +1,4 @@
+import { afterEach, beforeAll, describe, expect, it, test } from 'bun:test';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,7 +15,6 @@ import {
 } from '@plexus/shared';
 import addFormats from 'ajv-formats';
 import Ajv2020 from 'ajv/dist/2020.js';
-import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
 import editorSchema from '../../data/provider-presets.schema.json' with { type: 'json' };
 import { applyRegistryAutoCompat } from '../services/dispatch/dispatcher-auto-compat';
@@ -815,7 +815,7 @@ describe('applyProviderPreset', () => {
 
     expect(applied.id).toBe('moonshot');
     expect(applied.name).toBe('Moonshot');
-    expect(applied.apiBaseUrl).toEqual(preset.apiBaseUrl);
+    expect(applied.apiBaseUrl).toEqual<unknown>(preset.apiBaseUrl);
     expect(applied.type).toEqual(['chat', 'responses', 'messages']);
     expect(applied.pi_ai_provider).toBe('moonshotai');
     expect(applied.auto_compat).toBe(true);
@@ -872,7 +872,7 @@ describe('applyProviderPreset', () => {
 
     expect(applied.id).toBe('my-openai');
     expect(applied.name).toBe('Mine');
-    expect(applied.apiBaseUrl).toEqual(preset.apiBaseUrl);
+    expect(applied.apiBaseUrl).toEqual<unknown>(preset.apiBaseUrl);
   });
 
   test('clears OAuth-mode leftovers since presets are API-key providers', () => {
@@ -882,7 +882,7 @@ describe('applyProviderPreset', () => {
       preset
     );
 
-    expect(applied.apiBaseUrl).toEqual(preset.apiBaseUrl);
+    expect(applied.apiBaseUrl).toEqual<unknown>(preset.apiBaseUrl);
     expect(applied.apiKey).toBe('');
     expect(applied.oauthProvider).toBe('');
   });

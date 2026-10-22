@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import type { ModelConfig } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';

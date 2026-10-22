@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, jest, test } from 'bun:test';
 
 import { createPlexusMcpTestFixture } from './plexus-mcp-test-fixtures';
 
@@ -14,7 +14,7 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {

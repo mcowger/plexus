@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
 
-import { registerSpy } from '../../../../test/test-utils';
+import { advanceTimersByTimeAsync, registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import type { UnifiedImageGenerationRequest } from '../../../types/unified';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
@@ -57,7 +57,7 @@ describe('image attempt lifecycle', () => {
     await CooldownManager.getInstance().clearCooldown();
   });
   afterEach(async () => {
-    vi.useRealTimers();
+    jest.useRealTimers();
     await CooldownManager.getInstance().clearCooldown();
   });
 
@@ -110,12 +110,13 @@ describe('image attempt lifecycle', () => {
       const failure = registerSpy(CooldownManager.getInstance(), 'markProviderFailure');
       const release = registerSpy(ConcurrencyTracker.getInstance(), 'release');
       const dispatched = new Dispatcher().dispatchImageGenerations(request, controller.signal);
-      const assertion = expect(dispatched).rejects.toMatchObject({
-        routingContext: { statusCode: 499 },
-      });
+      const outcome = dispatched.then(
+        () => 'resolved',
+        (e: any) => `rejected:${e?.routingContext?.statusCode}`
+      );
       await ready;
       controller.abort();
-      await assertion;
+      expect(await outcome).toBe('rejected:499');
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(release).toHaveBeenCalledTimes(1);
       expect(failure).not.toHaveBeenCalled();
@@ -123,7 +124,7 @@ describe('image attempt lifecycle', () => {
   );
 
   test('deadline covers body consumption, fails over, and clears every attempt timer', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     let started!: () => void;
     const ready = new Promise<void>((resolve) => {
       started = resolve;
@@ -140,18 +141,18 @@ describe('image attempt lifecycle', () => {
       .mockResolvedValueOnce(success());
     const result = new Dispatcher().dispatchImageGenerations(request, undefined, () => 20);
     await ready;
-    await vi.advanceTimersByTimeAsync(20);
+    await advanceTimersByTimeAsync(20);
     expect((await result).plexus?.provider).toBe('second');
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(ConcurrencyTracker.getInstance().getSnapshot()).toEqual({ providers: {}, targets: {} });
     // Cooldown has its own scheduling; attempt signals must not abort after successful cleanup.
     const secondSignal = fetch.mock.calls[1]![1]!.signal!;
-    await vi.advanceTimersByTimeAsync(100);
+    await advanceTimersByTimeAsync(100);
     expect(secondSignal.aborted).toBe(false);
   });
 
   test('deadline stops waiting for shared OAuth setup without cancelling that setup', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     const cfg = config();
     cfg.providers.first = {
       api_base_url: 'oauth://',
@@ -175,7 +176,7 @@ describe('image attempt lifecycle', () => {
     const fetch = registerSpy(globalThis, 'fetch').mockResolvedValue(success());
     const result = new Dispatcher().dispatchImageGenerations(request, undefined, () => 20);
     await ready;
-    await vi.advanceTimersByTimeAsync(20);
+    await advanceTimersByTimeAsync(20);
     expect((await result).plexus?.provider).toBe('second');
     expect(fetch).toHaveBeenCalledTimes(1);
     finishRefresh('refreshed-token');
@@ -204,10 +205,13 @@ describe('image attempt lifecycle', () => {
       },
       controller.signal
     );
-    const assertion = expect(result).rejects.toMatchObject({ routingContext: { statusCode: 499 } });
+    const outcome = result.then(
+      () => 'resolved',
+      (e: any) => `rejected:${e?.routingContext?.statusCode}`
+    );
     await ready;
     controller.abort();
-    await assertion;
+    expect(await outcome).toBe('rejected:499');
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(ConcurrencyTracker.getInstance().getSnapshot()).toEqual({ providers: {}, targets: {} });
   });

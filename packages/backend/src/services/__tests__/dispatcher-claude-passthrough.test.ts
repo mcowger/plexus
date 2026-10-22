@@ -8,21 +8,23 @@
  * that fails `isGenuineClaudeCodeRequest` keeps the masking behavior.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
 
+import { mockComplete } from '../../../test/mocks';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
-// per-file vi.mock() call here.  With isolate: false all files share one
+// @earendil-works/pi-ai is mocked globally in bun-test.setup.ts — do not add a
+// per-file mock.module() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 const { Dispatcher } = await import('../dispatch/dispatcher');
-import * as piAi from '@earendil-works/pi-ai/compat';
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch should not be called without a mock implementation');
 });
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 const CLIENT_UA = 'claude-cli/2.1.278 (external, cli)';
 const SESSION_ID = 'f30933dc-c43f-4e8f-82d2-8d87c3ef60e6';
@@ -102,7 +104,7 @@ function upstreamOk() {
 describe('Dispatcher genuine Claude Code passthrough', () => {
   beforeEach(() => {
     fetchMock.mockClear();
-    vi.mocked(piAi.complete).mockResolvedValue({
+    mockComplete.mockResolvedValue({
       content: [{ type: 'text', text: 'ok' }],
       stopReason: 'stop',
       usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
@@ -112,7 +114,7 @@ describe('Dispatcher genuine Claude Code passthrough', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   test('genuine client body reaches Anthropic verbatim (key swap only)', async () => {
@@ -123,7 +125,7 @@ describe('Dispatcher genuine Claude Code passthrough', () => {
     const response = await dispatcher.dispatch(genuineRequest());
 
     expect(response).toBeDefined();
-    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.anthropic.com/v1/messages');

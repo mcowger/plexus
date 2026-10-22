@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { CodexVersionService } from '../codex-version-service';
 import { prepareOAuthNativeRequest } from '../oauth-native-request';

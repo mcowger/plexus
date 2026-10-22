@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedImageGenerationRequest } from '../../types/unified';
@@ -311,7 +311,7 @@ describe('CodexImageTransformer', () => {
         },
       });
 
-      expect(result).toEqual({
+      expect(result).toEqual<unknown>({
         created: 1748372400,
         data: [
           { b64_json: 'AA==', media_type: 'image/png' },

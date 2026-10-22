@@ -72,8 +72,16 @@ jobs:
       - name: Typecheck all workspaces
         run: bun run typecheck
 
-      - name: Run backend tests
-        run: cd packages/backend && bun run test:force-all
+      - name: Run tests
+        run: bun test --parallel
+
+      # --parallel gives every file a fresh global, which hides mock/global leaks between
+      # files. Plain `bun test` shares one process, so this step keeps that invariant honest.
+      - name: Run tests in one shared process (leak check)
+        run: bun test
+
+      - name: Run DB tests against Postgres (pglite)
+        run: PLEXUS_TEST_DIALECT=postgres bun test --parallel packages/backend/src/db packages/backend/test/integration/config-service-oauth-credential-cache.test.ts packages/backend/src/routes/management/__tests__/usage-summary.test.ts packages/backend/src/services/__tests__/usage-storage-performance.test.ts packages/backend/src/services/__tests__/usage-retention.test.ts packages/backend/src/services/oauth/__tests__/dropped-oauth-providers.test.ts packages/backend/src/services/quota/__tests__/quota-enforcer.test.ts packages/backend/src/services/quota/__tests__/quota-scheduler.test.ts
 
   record-dispatch-check:
     name: Record workflow_dispatch check

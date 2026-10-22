@@ -11,7 +11,7 @@
  *     the static muse-spark catalog with a warning.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import type { ProviderConfig } from '../../../config';
@@ -59,7 +59,7 @@ describe('listMuseOAuthModels', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 
@@ -110,7 +110,7 @@ describe('discoverProviderModels — meta', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

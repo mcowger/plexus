@@ -14,7 +14,7 @@
  *      back to `reasoning` before transformResponse() consumes it.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import * as configModule from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';

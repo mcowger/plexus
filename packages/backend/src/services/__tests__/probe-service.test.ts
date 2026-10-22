@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import { DecisionsIngressSchema } from '../../types/decisions';
@@ -7,15 +7,16 @@ import { UsageStorageService } from '../observability/usage-storage';
 import { ProbeService } from '../probes/probe-service';
 
 function makeMocks() {
+  const dispatchDecisions = mock();
   const usageStorage = {
-    saveRequest: vi.fn(async () => {}),
-    saveError: vi.fn(),
-    emitStartedAsync: vi.fn(),
-    emitUpdatedAsync: vi.fn(),
+    saveRequest: mock(async () => {}),
+    saveError: mock(),
+    emitStartedAsync: mock(),
+    emitUpdatedAsync: mock(),
   } as unknown as UsageStorageService;
 
   const dispatcher = {
-    dispatch: vi.fn(async () => ({
+    dispatch: mock(async () => ({
       id: 'r',
       model: 'test-model',
       created: Date.now(),
@@ -29,13 +30,13 @@ function makeMocks() {
         attemptCount: 1,
       },
     })),
-    dispatchDecisions: vi.fn(),
-    dispatchEmbeddings: vi.fn(),
-    dispatchImageGenerations: vi.fn(),
-    dispatchSpeech: vi.fn(),
+    dispatchDecisions,
+    dispatchEmbeddings: mock(),
+    dispatchImageGenerations: mock(),
+    dispatchSpeech: mock(),
   } as unknown as Dispatcher;
 
-  return { usageStorage, dispatcher };
+  return { usageStorage, dispatcher, dispatchDecisions };
 }
 
 describe('ProbeService', () => {
@@ -157,13 +158,13 @@ describe('ProbeService', () => {
   });
 
   test('decisions probe sends structured questions and returns structured answers', async () => {
-    const { usageStorage, dispatcher } = makeMocks();
+    const { usageStorage, dispatcher, dispatchDecisions } = makeMocks();
     const answers = {
       is_bug: { type: 'noul' as const, noul: 0.96 },
       team: { type: 'choice' as const, choice: 'payments' },
       urgency: { type: 'score' as const, score: 2 },
     };
-    vi.mocked(dispatcher.dispatchDecisions).mockResolvedValueOnce({
+    dispatchDecisions.mockResolvedValueOnce({
       model: 'jev',
       answers,
       usage: { input_tokens: 12, output_tokens: 34 },
@@ -179,16 +180,14 @@ describe('ProbeService', () => {
     expect(result.success).toBe(true);
     expect(JSON.parse(result.response!)).toEqual(answers);
     expect(dispatcher.dispatch).not.toHaveBeenCalled();
-    expect(dispatcher.dispatchDecisions).toHaveBeenCalledTimes(1);
-    const dispatched = vi.mocked(dispatcher.dispatchDecisions).mock.calls[0]![0];
+    expect(dispatchDecisions).toHaveBeenCalledTimes(1);
+    const dispatched = dispatchDecisions.mock.calls[0]![0];
     expect(dispatched.model).toBe('direct/p1/jev');
     expect(dispatched.incomingApiType).toBe('decisions');
     expect(DecisionsIngressSchema.safeParse(dispatched.originalBody).success).toBe(true);
-    expect(Object.values(dispatched.questions).map((question) => question.type)).toEqual([
-      'noul',
-      'choice',
-      'score',
-    ]);
+    expect(
+      Object.values<{ type: string }>(dispatched.questions).map((question) => question.type)
+    ).toEqual(['noul', 'choice', 'score']);
     expect(dispatched.originalBody).not.toHaveProperty('messages');
     expect(usageStorage.saveRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -201,10 +200,8 @@ describe('ProbeService', () => {
   });
 
   test('decisions probe reports upstream failure without falling back to chat', async () => {
-    const { usageStorage, dispatcher } = makeMocks();
-    vi.mocked(dispatcher.dispatchDecisions).mockRejectedValueOnce(
-      new Error('Invalid decisions response')
-    );
+    const { usageStorage, dispatcher, dispatchDecisions } = makeMocks();
+    dispatchDecisions.mockRejectedValueOnce(new Error('Invalid decisions response'));
     const result = await new ProbeService(dispatcher, usageStorage).runProbe({
       provider: 'p1',
       model: 'jev',
@@ -231,7 +228,7 @@ describe('ProbeService', () => {
   });
 
   test('runProbe cancels streaming response to release concurrency slot', async () => {
-    const cancelSpy = vi.fn(async () => {});
+    const cancelSpy = mock(async () => {});
     const { usageStorage, dispatcher } = makeMocks();
     (dispatcher.dispatch as any).mockResolvedValueOnce({
       id: 'r',
@@ -291,7 +288,7 @@ describe('ProbeService', () => {
   });
 
   test('runProbe swallows stream cancellation errors', async () => {
-    const cancelSpy = vi.fn(async () => {
+    const cancelSpy = mock(async () => {
       throw new Error('stream already closed');
     });
     const { usageStorage, dispatcher } = makeMocks();

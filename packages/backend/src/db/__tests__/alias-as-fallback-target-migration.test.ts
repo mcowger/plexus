@@ -1,9 +1,8 @@
 import { Database } from 'bun:sqlite';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { toDbBoolean } from '../../utils/normalize';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';

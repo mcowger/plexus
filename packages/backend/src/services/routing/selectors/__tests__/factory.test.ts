@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { UsageStorageService } from '../../../observability/usage-storage';
 import { QuotaScheduler } from '../../../quota/quota-scheduler';
@@ -15,7 +15,7 @@ import { UsageSelector } from '../usage';
 describe('SelectorFactory', () => {
   const mockStorage = {} as unknown as UsageStorageService;
   const mockQuotaScheduler = {
-    getLatestQuotaForProvider: vi.fn(),
+    getLatestQuotaForProvider: mock(),
   } as unknown as QuotaScheduler;
 
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { type ProviderConfig, ProviderConfigSchema } from '../../config';
 import { closeDatabase, initializeDatabase } from '../client';

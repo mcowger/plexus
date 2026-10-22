@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 
 import type { UsageRecord } from '../../types/usage';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../provider-cost';

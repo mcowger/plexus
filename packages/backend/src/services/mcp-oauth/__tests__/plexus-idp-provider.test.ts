@@ -1,9 +1,9 @@
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 import crypto from 'node:crypto';
 
 import formbody from '@fastify/formbody';
 import Fastify, { FastifyInstance } from 'fastify';
 import type { FastifyRequest } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { setConfigForTesting } from '../../../config';
 import type {

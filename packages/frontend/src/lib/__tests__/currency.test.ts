@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
 
 import { registerSpy } from '../../../../backend/test/test-utils';
+import { useHappyDom } from '../../../test/happydom';
 import {
   CURRENCY_RATE_CACHE_MAX_AGE_MS,
   CURRENCY_RATES_STORAGE_KEY,
@@ -16,40 +17,15 @@ import {
   SUPPORTED_CURRENCIES,
 } from '../currency';
 
-function createStorage(): Storage {
-  const values = new Map<string, string>();
-
-  return {
-    get length() {
-      return values.size;
-    },
-    clear() {
-      values.clear();
-    },
-    getItem(key) {
-      return values.get(key) ?? null;
-    },
-    key(index) {
-      return [...values.keys()][index] ?? null;
-    },
-    removeItem(key) {
-      values.delete(key);
-    },
-    setItem(key, value) {
-      values.set(key, String(value));
-    },
-  };
-}
-
-const storage = createStorage();
+useHappyDom();
 
 beforeEach(() => {
-  storage.clear();
-  vi.stubGlobal('localStorage', storage);
+  localStorage.clear();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  localStorage.clear();
+  jest.restoreAllMocks();
 });
 
 describe('currency helpers', () => {
@@ -78,7 +54,7 @@ describe('currency helpers', () => {
   it('returns fresh cached rates without fetching again', async () => {
     const now = 1_700_000_000_000;
     registerSpy(Date, 'now').mockReturnValue(now);
-    storage.setItem(
+    localStorage.setItem(
       CURRENCY_RATES_STORAGE_KEY,
       JSON.stringify({
         date: '2026-07-31',
@@ -109,7 +85,7 @@ describe('currency helpers', () => {
   });
 
   it('normalizes cached rates and ignores non-numeric entries', () => {
-    storage.setItem(
+    localStorage.setItem(
       CURRENCY_RATES_STORAGE_KEY,
       JSON.stringify({
         date: '2026-07-31',
@@ -128,7 +104,7 @@ describe('currency helpers', () => {
   it('falls back to stale cached rates when fetching fails', async () => {
     const now = 1_700_000_000_000;
     registerSpy(Date, 'now').mockReturnValue(now);
-    storage.setItem(
+    localStorage.setItem(
       CURRENCY_RATES_STORAGE_KEY,
       JSON.stringify({
         date: '2026-07-30',
@@ -156,12 +132,12 @@ describe('currency helpers', () => {
 
     setSelectedCurrency('EUR');
 
-    expect(storage.getItem(DISPLAY_CURRENCY_STORAGE_KEY)).toBe('EUR');
+    expect(localStorage.getItem(DISPLAY_CURRENCY_STORAGE_KEY)).toBe('EUR');
     expect(getSelectedCurrency()).toBe('EUR');
   });
 
   it('falls back to USD for an unsupported selected currency', () => {
-    storage.setItem(DISPLAY_CURRENCY_STORAGE_KEY, 'not-supported');
+    localStorage.setItem(DISPLAY_CURRENCY_STORAGE_KEY, 'not-supported');
 
     expect(getSelectedCurrency()).toBe(DEFAULT_CURRENCY);
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
 
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../cline-checker';
@@ -55,18 +55,20 @@ describe('cline checker', () => {
   const setFetchMock = (responses: Response[]): void => {
     capturedUrls.length = 0;
     let i = 0;
-    global.fetch = vi.fn(async (input: unknown, init: unknown) => {
-      capturedUrls.push(String(input as string));
-      capturedAuth =
-        new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
-      const res = responses[i] ?? responses[responses.length - 1]!;
-      i++;
-      return res;
-    }) as unknown as typeof fetch;
+    spyOn(globalThis, 'fetch').mockImplementation(
+      mock(async (input: unknown, init: unknown) => {
+        capturedUrls.push(String(input as string));
+        capturedAuth =
+          new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
+        const res = responses[i] ?? responses[responses.length - 1]!;
+        i++;
+        return res;
+      }) as unknown as typeof fetch
+    );
   };
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     capturedAuth = undefined;
   });
 
@@ -121,8 +123,8 @@ describe('cline checker', () => {
 
   it('returns a subscription allowance meter when an active plan exists', async () => {
     const now = new Date('2026-06-16T00:00:00Z');
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
 
     setFetchMock([
       jsonResponse(meResponse()),
@@ -137,7 +139,7 @@ describe('cline checker', () => {
     ]);
 
     const meters = await checkerDef.check(makeCtx());
-    vi.useRealTimers();
+    jest.useRealTimers();
 
     const planMeter = meters.find((m) => m.key === 'subscription_plan');
     expect(planMeter).toBeDefined();
@@ -174,9 +176,11 @@ describe('cline checker', () => {
   });
 
   it('throws when fetch throws a network error', async () => {
-    global.fetch = vi.fn(async () => {
-      throw new Error('network failure');
-    }) as unknown as typeof fetch;
+    spyOn(globalThis, 'fetch').mockImplementation(
+      mock(async () => {
+        throw new Error('network failure');
+      }) as unknown as typeof fetch
+    );
 
     await expect(checkerDef.check(makeCtx())).rejects.toThrow('network failure');
   });

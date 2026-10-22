@@ -162,7 +162,7 @@ Return the following in `stats`, each series bucket, and each grouped entry wher
 
 ### Workstream G: Regression tests
 
-**Backend fixtures can be prepared in parallel; assertions depend on Workstream A.** Load the `vitest` skill before editing tests.
+**Backend fixtures can be prepared in parallel; assertions depend on Workstream A.** Read docs/TESTING.md before editing tests.
 
 Extend `packages/backend/src/routes/management/__tests__/usage-summary.test.ts` to cover:
 
@@ -205,7 +205,7 @@ If cold global summaries miss the budget, add `request_usage(start_time)` to bot
 Run:
 
 ```bash
-bun run test
+bun test
 bun run typecheck
 bun run lint:openapi
 bun run format:check

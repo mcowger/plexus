@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { anthropicModelSupportsDisable, clampAnthropicEffortAndThinking } from '../thinking-clamp';
 
@@ -146,9 +146,9 @@ describe('clampAnthropicEffortAndThinking', () => {
       expect(
         clampAnthropicEffortAndThinking(undefined as unknown as Record<string, unknown>)
       ).toBeUndefined();
-      expect(clampAnthropicEffortAndThinking('string' as unknown as Record<string, unknown>)).toBe(
-        'string'
-      );
+      expect<unknown>(
+        clampAnthropicEffortAndThinking('string' as unknown as Record<string, unknown>)
+      ).toBe('string');
     });
 
     it('clamps unrecognized effort strings to low', () => {

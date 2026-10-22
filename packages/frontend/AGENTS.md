@@ -13,6 +13,14 @@
 - Put assets in `packages/frontend/src/assets/`.
 - Import assets with static ES6 imports only; do not use dynamic asset paths.
 
+## Tests
+
+Frontend tests run with the rest of the suite via `bun test` from the repository root (`bun:test`; there is no per-package test script). Read [docs/TESTING.md](../../docs/TESTING.md) first.
+
+- Tests that need `window`, `document`, `localStorage` or `navigator` call `useHappyDom()` once at the top level (`packages/frontend/test/happydom.ts`). It registers happy-dom for that file and unregisters it afterwards. Happy-dom replaces `fetch` and the stream classes, so a registration that outlives its file breaks backend tests running later in the same process. Do not register it as an import side effect, and do not stub `localStorage`/`document` by hand.
+- Mock `fetch` with `spyOn(globalThis, 'fetch')`, never by assigning `globalThis.fetch`.
+- Pure-logic tests that need no DOM (`format`, `normalize`, `modelList`, …) need no setup at all.
+
 ## Icons
 
 **Do not use emoji characters in the codebase.** Instead, use Lucide icons from the `lucide-react` library.

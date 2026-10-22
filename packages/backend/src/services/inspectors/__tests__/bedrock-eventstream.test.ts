@@ -1,5 +1,6 @@
+import { describe, expect, it, test } from 'bun:test';
+
 import { EventStreamCodec } from '@smithy/core/event-streams';
-import { describe, expect, test } from 'vitest';
 
 import { BedrockEventStreamMetadataObserver } from '../bedrock-eventstream';
 

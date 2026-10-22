@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
@@ -6,11 +6,13 @@ import { Dispatcher } from '../dispatch/dispatcher';
 import type { QuotaCheckSnapshot, QuotaContext } from '../quota/quota-enforcer';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
 
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function makeConfig() {
   return {

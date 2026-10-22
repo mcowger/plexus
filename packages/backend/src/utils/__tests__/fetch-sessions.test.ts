@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import {
@@ -8,14 +8,14 @@ import {
 } from '../fetch-sessions';
 
 type StubSession = {
-  fetch: ReturnType<typeof vi.fn>;
-  close: ReturnType<typeof vi.fn>;
+  fetch: ReturnType<typeof mock>;
+  close: ReturnType<typeof mock>;
 };
 
 function makeStubSession(): StubSession {
   return {
-    fetch: vi.fn(async () => new Response('ok')),
-    close: vi.fn(),
+    fetch: mock(async () => new Response('ok')),
+    close: mock(),
   };
 }
 
@@ -40,7 +40,6 @@ describe('fetchWithSession', () => {
   afterEach(() => {
     closeFetchSessions();
     overrideSessionFactoryForTesting(undefined);
-    vi.unstubAllGlobals();
   });
 
   it('reuses one session per origin', async () => {
@@ -87,7 +86,7 @@ describe('fetchWithSession', () => {
     expect(stubs).toHaveLength(0);
   });
 
-  it('delegates to global fetch under Vitest without a factory override', async () => {
+  it('delegates to global fetch under test without a factory override', async () => {
     overrideSessionFactoryForTesting(undefined);
     const spy = registerSpy(globalThis, 'fetch').mockResolvedValue(new Response('ok'));
     await fetchWithSession('https://api.example.com/v1/chat');

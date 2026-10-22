@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { assertNoAliasRefCycles, setConfigForTesting } from '../../config';
 import { Router } from '../routing/router';

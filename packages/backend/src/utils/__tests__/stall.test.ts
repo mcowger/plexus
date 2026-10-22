@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 
 import type { StallConfig } from '../../services/inspectors/stall-inspector';
 import { resolveStallConfig, wireStallDetection } from '../stall';

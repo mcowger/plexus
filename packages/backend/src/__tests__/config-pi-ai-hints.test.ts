@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, test } from 'bun:test';
 
 import { registerSpy } from '../../test/test-utils';
 import { validateConfig } from '../config';
 import { resetModelCatalogForTesting } from '../services/pi-ai/catalog';
 import { logger } from '../utils/logger';
 
-// pi-ai and logger are globally mocked in test/vitest.setup.ts
+// pi-ai and logger are globally mocked in test/bun-test.setup.ts
 
 const BASE_PROVIDER = {
   api_base_url: 'https://api.example.com/v1',

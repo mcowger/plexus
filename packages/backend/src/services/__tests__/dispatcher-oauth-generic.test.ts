@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { genericOAuthApiType, prepareGenericOAuthDispatch } from '../oauth/oauth-native-request';
+import * as catalog from '../pi-ai/catalog';
 
 // Generic OAuth dispatch — every pi-ai OAuth provider that ISN'T one of the
 // hand-ported native providers (Anthropic/Codex/Copilot). These are plain
@@ -20,12 +21,14 @@ import { genericOAuthApiType, prepareGenericOAuthDispatch } from '../oauth/oauth
 // configured-and-logged-in xai/kimi-coding/openrouter route would fail on
 // every actual inference request.
 
-vi.mock('../pi-ai/catalog', () => ({
-  getCatalogModel: vi.fn(),
-  getCatalogModels: vi.fn(),
-}));
+const getCatalogModel = mock();
+const getCatalogModels = mock();
 
-const { getCatalogModel, getCatalogModels } = await import('../pi-ai/catalog');
+beforeEach(() => {
+  spyOn(catalog, 'getCatalogModel').mockImplementation(getCatalogModel);
+  spyOn(catalog, 'getCatalogModels').mockImplementation(getCatalogModels);
+});
+
 const { Dispatcher } = await import('../dispatch/dispatcher');
 
 const GENERIC_TOKEN = 'oauth-access-token-for-test';
@@ -85,33 +88,33 @@ function chatRequest(): UnifiedChatRequest {
 
 describe('genericOAuthApiType', () => {
   afterEach(() => {
-    vi.mocked(getCatalogModel).mockReset();
-    vi.mocked(getCatalogModels).mockReset();
+    getCatalogModel.mockReset();
+    getCatalogModels.mockReset();
   });
 
   test('maps a pi-ai openai-completions model to the chat wire type', () => {
-    vi.mocked(getCatalogModel).mockReturnValue({ api: 'openai-completions' } as any);
+    getCatalogModel.mockReturnValue({ api: 'openai-completions' } as any);
     expect(genericOAuthApiType('xai', 'grok-test')).toBe('chat');
   });
 
   test('maps openai-responses / anthropic-messages models correctly', () => {
-    vi.mocked(getCatalogModel).mockReturnValue({ api: 'openai-responses' } as any);
+    getCatalogModel.mockReturnValue({ api: 'openai-responses' } as any);
     expect(genericOAuthApiType('xai', 'grok-4.5')).toBe('responses');
-    vi.mocked(getCatalogModel).mockReturnValue({ api: 'anthropic-messages' } as any);
+    getCatalogModel.mockReturnValue({ api: 'anthropic-messages' } as any);
     expect(genericOAuthApiType('some-provider', 'some-model')).toBe('messages');
   });
 
   test('returns undefined for an unknown model or unsupported wire api', () => {
-    vi.mocked(getCatalogModel).mockReturnValue(null);
-    vi.mocked(getCatalogModels).mockReturnValue([]);
+    getCatalogModel.mockReturnValue(null);
+    getCatalogModels.mockReturnValue([]);
     expect(genericOAuthApiType('xai', 'unknown-model')).toBeUndefined();
-    vi.mocked(getCatalogModel).mockReturnValue({ api: 'gemini' } as any);
+    getCatalogModel.mockReturnValue({ api: 'gemini' } as any);
     expect(genericOAuthApiType('some-provider', 'gemini-model')).toBeUndefined();
   });
 
   test('infers a missing model API from the provider catalog', () => {
-    vi.mocked(getCatalogModel).mockReturnValue(null);
-    vi.mocked(getCatalogModels).mockReturnValue([
+    getCatalogModel.mockReturnValue(null);
+    getCatalogModels.mockReturnValue([
       { api: 'openai-responses', baseUrl: 'https://api.x.ai/v1' },
       { api: 'openai-responses', baseUrl: 'https://api.x.ai/v1' },
     ] as any);
@@ -120,8 +123,8 @@ describe('genericOAuthApiType', () => {
   });
 
   test('does not infer an API when the provider catalog is ambiguous', () => {
-    vi.mocked(getCatalogModel).mockReturnValue(null);
-    vi.mocked(getCatalogModels).mockReturnValue([
+    getCatalogModel.mockReturnValue(null);
+    getCatalogModels.mockReturnValue([
       { api: 'openai-responses', baseUrl: 'https://api.x.ai/v1' },
       { api: 'openai-completions', baseUrl: 'https://api.x.ai/v1' },
     ] as any);
@@ -131,17 +134,17 @@ describe('genericOAuthApiType', () => {
 });
 
 describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
-    vi.mocked(getCatalogModel).mockReturnValue({
+    getCatalogModel.mockReturnValue({
       id: 'grok-test',
       api: 'openai-completions',
       baseUrl: 'https://api.x.ai/v1',
     } as any);
     OAuthAuthManager.resetForTesting();
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(GENERIC_TOKEN);
-    fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    fetchSpy = spyOn(global, 'fetch').mockResolvedValue(
       new Response(CHAT_COMPLETION_JSON, {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -150,10 +153,10 @@ describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
-    vi.mocked(getCatalogModel).mockReset();
-    vi.mocked(getCatalogModels).mockReset();
+    getCatalogModel.mockReset();
+    getCatalogModels.mockReset();
   });
 
   test('does NOT throw "OAuth provider is not supported" — dispatches successfully', async () => {
@@ -185,8 +188,8 @@ describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
   });
 
   test('uses a cataloged provider model API and base URL when the requested model is missing', async () => {
-    vi.mocked(getCatalogModel).mockReturnValue(null);
-    vi.mocked(getCatalogModels).mockReturnValue([
+    getCatalogModel.mockReturnValue(null);
+    getCatalogModels.mockReturnValue([
       {
         id: 'grok-4.5',
         api: 'openai-responses',
@@ -216,7 +219,7 @@ describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
   });
 
   test('raises a clear error when the model has no known wire API, instead of mis-routing', async () => {
-    vi.mocked(getCatalogModel).mockReturnValue({ id: 'grok-test', api: 'gemini' } as any);
+    getCatalogModel.mockReturnValue({ id: 'grok-test', api: 'gemini' } as any);
     setConfigForTesting(genericOAuthConfig());
     await expect(new Dispatcher().dispatch(chatRequest())).rejects.toThrow(/wire API/i);
   });

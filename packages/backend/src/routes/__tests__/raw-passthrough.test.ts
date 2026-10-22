@@ -1,8 +1,8 @@
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import http from 'node:http';
 
 import { EventStreamCodec } from '@smithy/core/event-streams';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { setConfigForTesting } from '../../config';
 import { StallInspector } from '../../services/inspectors/stall-inspector';
@@ -93,17 +93,17 @@ describe('raw passthrough routes', () => {
     });
 
     usageStorage = {
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
-      saveRequest: vi.fn().mockResolvedValue(undefined),
-      saveError: vi.fn().mockResolvedValue(undefined),
-      saveDebugLog: vi.fn().mockResolvedValue(undefined),
-      registerInFlight: vi.fn(),
-      deregisterInFlight: vi.fn(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
+      saveRequest: mock().mockResolvedValue(undefined),
+      saveError: mock().mockResolvedValue(undefined),
+      saveDebugLog: mock().mockResolvedValue(undefined),
+      registerInFlight: mock(),
+      deregisterInFlight: mock(),
     } as unknown as UsageStorageService;
     quotaEnforcer = {
-      loadQuotaContext: vi.fn().mockResolvedValue(null),
-      recordUsage: vi.fn().mockResolvedValue(undefined),
+      loadQuotaContext: mock().mockResolvedValue(null),
+      recordUsage: mock().mockResolvedValue(undefined),
     } as unknown as QuotaEnforcer;
     ConcurrencyTracker.resetForTesting();
     DebugManager.getInstance().resetForTesting();

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
 
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../claude-code-checker';
@@ -32,15 +32,17 @@ describe('claude-code checker', () => {
   let capturedAuth: string | undefined;
 
   const setFetchMock = (response: Response): void => {
-    global.fetch = vi.fn(async (_input: unknown, init: unknown) => {
-      capturedAuth =
-        new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
-      return response;
-    }) as unknown as typeof fetch;
+    spyOn(globalThis, 'fetch').mockImplementation(
+      mock(async (_input: unknown, init: unknown) => {
+        capturedAuth =
+          new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
+        return response;
+      }) as unknown as typeof fetch
+    );
   };
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     capturedAuth = undefined;
   });
 

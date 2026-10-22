@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -8,10 +8,12 @@ import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { StickySessionManager } from '../routing/sticky-session-manager';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function successChatResponse(model: string) {
   return new Response(

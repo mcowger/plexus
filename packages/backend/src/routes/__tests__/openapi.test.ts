@@ -1,5 +1,6 @@
+import { describe, expect, test } from 'bun:test';
+
 import Fastify from 'fastify';
-import { describe, expect, test } from 'vitest';
 
 import { registerOpenApiRoute } from '../openapi';
 

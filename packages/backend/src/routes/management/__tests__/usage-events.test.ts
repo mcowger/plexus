@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { UsageEventsBroadcaster } from '../usage';

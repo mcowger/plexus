@@ -1,30 +1,33 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-const serviceState = vi.hoisted(() => {
+import Fastify, { FastifyInstance } from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
+
+const serviceState = (() => {
   const state = {
     quotas: {} as Record<string, any>,
     keys: {} as Record<string, any>,
     settings: {} as Record<string, unknown>,
-    deleteUserQuota: vi.fn(async (name: string) => {
+    deleteUserQuota: mock(async (name: string) => {
       delete state.quotas[name];
     }),
   };
   return state;
-});
+})();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(
+    mock(() => ({
       deleteUserQuota: serviceState.deleteUserQuota,
-      getAllSettings: vi.fn(async () => serviceState.settings),
-      getRepository: vi.fn(() => ({
-        getAllUserQuotas: vi.fn(async () => serviceState.quotas),
-        getAllKeys: vi.fn(async () => serviceState.keys),
+      getAllSettings: mock(async () => serviceState.settings),
+      getRepository: mock(() => ({
+        getAllUserQuotas: mock(async () => serviceState.quotas),
+        getAllKeys: mock(async () => serviceState.keys),
       })),
-    })),
-  },
-}));
+    })) as any
+  );
+});
 
 import { registerUserQuotaRoutes } from '../user-quotas';
 

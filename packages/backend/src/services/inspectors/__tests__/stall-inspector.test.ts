@@ -1,6 +1,5 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
 import { PassThrough } from 'stream';
-
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type StallConfig, StallInspector } from '../stall-inspector';
 
@@ -29,12 +28,12 @@ describe('StallInspector', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   describe('TTFB is handled at dispatcher level', () => {
     it("does NOT start a TTFB timer — that is the dispatcher probe's job", () => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
 
       const config = createConfig({ ttfbMs: 5000, ttfbBytes: 100, minBytesPerSecond: null });
       const inspector = new StallInspector('req-1', config, abortController);
@@ -44,22 +43,20 @@ describe('StallInspector', () => {
 
       // Advance past TTFB timeout — the StallInspector should NOT abort
       // because TTFB detection is handled by the dispatcher's probe
-      vi.advanceTimersByTime(5001);
-
+      jest.advanceTimersByTime(5001);
       expect(abortController.signal.aborted).toBe(false);
 
       inspector.destroy();
     });
 
     it('does not abort even when ttfbMs expires with no bytes', () => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
 
       const config = createConfig({ ttfbMs: 5000, ttfbBytes: 100, minBytesPerSecond: null });
       const inspector = new StallInspector('req-2', config, abortController);
 
       // Advance past TTFB timeout without any bytes
-      vi.advanceTimersByTime(6000);
-
+      jest.advanceTimersByTime(6000);
       expect(abortController.signal.aborted).toBe(false);
 
       inspector.destroy();
@@ -68,7 +65,7 @@ describe('StallInspector', () => {
 
   describe('Throughput stall detection', () => {
     it('detects throughput stall after grace period when stream is too slow', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({
         ttfbMs: null,
@@ -86,14 +83,12 @@ describe('StallInspector', () => {
       inspector.write(createChunk(100));
 
       // Advance through grace period
-      vi.advanceTimersByTime(1100);
-
+      jest.advanceTimersByTime(1100);
       // Write a very small amount (10 bytes)
       inspector.write(createChunk(10));
 
       // Advance past the window so throughput is clearly below 500 B/s
-      vi.advanceTimersByTime(3100);
-
+      jest.advanceTimersByTime(3100);
       expect(abortController.signal.aborted).toBe(true);
       expect(abortReason?.name).toBe('TimeoutError');
       expect(abortReason?.message).toContain('throughput');
@@ -102,7 +97,7 @@ describe('StallInspector', () => {
     });
 
     it('does not abort when throughput is above threshold', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({
         ttfbMs: null,
@@ -116,8 +111,7 @@ describe('StallInspector', () => {
       inspector.write(createChunk(100));
 
       // Advance through grace period
-      vi.advanceTimersByTime(600);
-
+      jest.advanceTimersByTime(600);
       // Write enough bytes to stay above 100 B/s
       // 100 bytes over 2 seconds = 50 B/s, so we need more
       inspector.write(createChunk(500));
@@ -126,7 +120,7 @@ describe('StallInspector', () => {
       expect(abortController.signal.aborted).toBe(false);
 
       // Continue writing enough data
-      vi.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(1000);
       inspector.write(createChunk(500));
 
       expect(abortController.signal.aborted).toBe(false);
@@ -135,7 +129,7 @@ describe('StallInspector', () => {
     });
 
     it('catches fully stalled stream via periodic check (no chunks arriving)', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({
         ttfbMs: 5000,
@@ -155,15 +149,15 @@ describe('StallInspector', () => {
 
       // Advance through grace period + some monitoring time
       // The periodic check fires every windowMs/2 = 1500ms
-      vi.advanceTimersByTime(2000); // Past grace period (1000ms) + into monitoring
+      jest.advanceTimersByTime(2000);
+      // Past grace period (1000ms) + into monitoring
 
       // Write a tiny chunk to create a second data point
       inspector.write(createChunk(5));
 
       // Now advance far enough that throughput over the window is below threshold.
       // With 205 total bytes over 5+ seconds, throughput is ~40 B/s, well below 500.
-      vi.advanceTimersByTime(4000);
-
+      jest.advanceTimersByTime(4000);
       expect(abortController.signal.aborted).toBe(true);
       expect(abortReason?.message).toContain('throughput');
 
@@ -173,7 +167,7 @@ describe('StallInspector', () => {
 
   describe('State machine', () => {
     it('transitions from DISPATCHED to GRACE_PERIOD on first chunk when throughput monitoring is active', () => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
 
       const config = createConfig({
         ttfbMs: 10000,
@@ -187,14 +181,14 @@ describe('StallInspector', () => {
       inspector.write(createChunk(60));
 
       // TTFB timer no longer exists — should not abort
-      vi.advanceTimersByTime(11000);
+      jest.advanceTimersByTime(11000);
       expect(abortController.signal.aborted).toBe(false);
 
       inspector.destroy();
     });
 
     it('transitions from GRACE_PERIOD to MONITORING after grace period', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({
         ttfbMs: 5000,
@@ -209,11 +203,11 @@ describe('StallInspector', () => {
       inspector.write(createChunk(60));
 
       // During grace period — no abort even if throughput is low
-      vi.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(1000);
       expect(abortController.signal.aborted).toBe(false);
 
       // Advance past grace period but keep sending data
-      vi.advanceTimersByTime(1500);
+      jest.advanceTimersByTime(1500);
       inspector.write(createChunk(1000)); // Plenty of throughput
       expect(abortController.signal.aborted).toBe(false);
 
@@ -221,7 +215,7 @@ describe('StallInspector', () => {
     });
 
     it('stays in DISPATCHED if no throughput monitoring is configured', () => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
 
       const config = createConfig({ ttfbMs: 5000, minBytesPerSecond: null });
       const inspector = new StallInspector('req-dispatched', config, abortController);
@@ -230,7 +224,7 @@ describe('StallInspector', () => {
       inspector.write(createChunk(100));
 
       // Advance time — should not abort (no TTFB timer, no throughput check)
-      vi.advanceTimersByTime(10000);
+      jest.advanceTimersByTime(10000);
       expect(abortController.signal.aborted).toBe(false);
 
       inspector.destroy();
@@ -239,7 +233,7 @@ describe('StallInspector', () => {
 
   describe('updateConfig', () => {
     it('updates config but does not start TTFB timer (dispatcher handles TTFB)', () => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
 
       const config = createConfig({ ttfbMs: 10000, ttfbBytes: 100, minBytesPerSecond: null });
       const inspector = new StallInspector('req-10', config, abortController);
@@ -252,15 +246,14 @@ describe('StallInspector', () => {
       });
 
       // Advance well past the 5000ms TTFB — should NOT abort
-      vi.advanceTimersByTime(6000);
-
+      jest.advanceTimersByTime(6000);
       expect(abortController.signal.aborted).toBe(false);
 
       inspector.destroy();
     });
 
     it('enables throughput monitoring when updateConfig adds minBytesPerSecond', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({ ttfbMs: 5000, minBytesPerSecond: null });
       const inspector = new StallInspector('req-10b', config, abortController);
@@ -284,8 +277,7 @@ describe('StallInspector', () => {
       inspector.write(createChunk(5));
 
       // Advance through grace period + monitoring window + periodic check
-      vi.advanceTimersByTime(5000);
-
+      jest.advanceTimersByTime(5000);
       expect(abortController.signal.aborted).toBe(true);
       expect(abortReason?.message).toContain('throughput');
 
@@ -295,7 +287,7 @@ describe('StallInspector', () => {
 
   describe('Cleanup', () => {
     it('cleans up timers on destroy', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({ minBytesPerSecond: 500, gracePeriodMs: 1000 });
       const inspector = new StallInspector('req-11', config, abortController);
@@ -306,12 +298,12 @@ describe('StallInspector', () => {
       inspector.destroy();
 
       // Timer should be cleared — no abort after the timeout
-      vi.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(6000);
       expect(abortController.signal.aborted).toBe(false);
     });
 
     it('cleans up timers on flush (normal stream end)', () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
+      jest.useFakeTimers();
 
       const config = createConfig({ minBytesPerSecond: 500, gracePeriodMs: 1000 });
       const inspector = new StallInspector('req-12', config, abortController);
@@ -322,7 +314,7 @@ describe('StallInspector', () => {
       // Simulate a normal stream end
       inspector.end();
 
-      vi.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(6000);
       expect(abortController.signal.aborted).toBe(false);
     });
   });

@@ -15,7 +15,7 @@
  *     `api.meta.ai` targets, and a tombstone opts out.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { resolveAdapters } from '../../../services/dispatch/adapter-resolver';
 import type { RouteResult } from '../../../services/routing/router';

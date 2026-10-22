@@ -1,5 +1,5 @@
-# Backend tests run via Vitest using `bun run test`.
-# `bun test` is intentionally blocked by test/bun-test-guard/no-bun-test.test.ts.
+# Tests run with Bun's native test runner: `bun test` (repo root or here).
+# The preload registers shared mocks and creates the per-process test DB.
 
 [test]
-root = "./test/bun-test-guard"
+preload = ["./test/bun-test.setup.ts"]

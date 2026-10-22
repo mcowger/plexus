@@ -11,7 +11,7 @@
  * (it belongs to ImageGenerationTransformerFactory).
  */
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { ImageBridgeTransformer } from '../../../transformers/image-bridge';
 import { TransformerFactory } from '../transformer-factory';

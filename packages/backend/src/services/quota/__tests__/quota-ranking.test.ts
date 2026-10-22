@@ -1,10 +1,11 @@
+import { describe, expect, test } from 'bun:test';
+
 import {
   constrainedRatio,
   mostConstrained,
   QuotaRatioFields,
   sortMostConstrainedFirst,
 } from '@plexus/shared';
-import { describe, expect, test } from 'vitest';
 
 const entry = (name: string, limit: number, remaining: number) => ({ name, limit, remaining });
 

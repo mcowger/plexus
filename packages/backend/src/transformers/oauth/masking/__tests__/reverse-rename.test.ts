@@ -10,7 +10,7 @@
  * a real `tool_use.name` match without scoping to the `"name":"..."` key.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { reverseToolRenames } from '../reverse-rename';
 

@@ -1,3 +1,11 @@
+/**
+ * headroom-compactor.test.ts
+ *
+ * TDD tests for HeadroomCompactor — all tests inject a fake compressFn,
+ * so no real headroom-ai server is ever contacted.
+ */
+import { describe, expect, mock, test } from 'bun:test';
+
 import type {
   AssistantMessage,
   Context,
@@ -5,13 +13,6 @@ import type {
   UserMessage,
 } from '@earendil-works/pi-ai';
 import type { CompressResult } from 'headroom-ai';
-/**
- * headroom-compactor.test.ts
- *
- * TDD tests for HeadroomCompactor — all tests inject a fake compressFn,
- * so no real headroom-ai server is ever contacted.
- */
-import { describe, expect, test, vi } from 'vitest';
 
 import { fromOpenAI, HeadroomCompactor, toOpenAI } from '../headroom-compactor';
 import { COMPACTION_DEFAULTS } from '../types';
@@ -100,7 +101,7 @@ describe('HeadroomCompactor', () => {
   describe('1. forward mapping — pi-ai → OpenAI shapes sent to compressFn', () => {
     test('user text, assistant with toolCall, toolResult map to correct OpenAI shapes', async () => {
       const capturedArgs: { messages: any[]; options: any } = { messages: [], options: {} };
-      const fakeFn = vi.fn(async (messages: any[], options: any) => {
+      const fakeFn = mock(async (messages: any[], options: any) => {
         capturedArgs.messages = messages;
         capturedArgs.options = options;
         return echoResult(messages);
@@ -149,7 +150,7 @@ describe('HeadroomCompactor', () => {
 
     test('options carry model, baseUrl, numeric tokenBudget (10000-4096=5904), and timeout', async () => {
       const capturedOptions: any = {};
-      const fakeFn = vi.fn(async (messages: any[], options: any) => {
+      const fakeFn = mock(async (messages: any[], options: any) => {
         Object.assign(capturedOptions, options);
         return echoResult(messages);
       });
@@ -171,7 +172,7 @@ describe('HeadroomCompactor', () => {
     test('options include the caller abort signal when provided', async () => {
       const controller = new AbortController();
       const capturedOptions: any = {};
-      const fakeFn = vi.fn(async (messages: any[], options: any) => {
+      const fakeFn = mock(async (messages: any[], options: any) => {
         Object.assign(capturedOptions, options);
         return echoResult(messages);
       });
@@ -198,7 +199,7 @@ describe('HeadroomCompactor', () => {
           ],
         },
       ];
-      const fakeFn = vi.fn(async () => echoResult(compressedOpenAI));
+      const fakeFn = mock(async () => echoResult(compressedOpenAI));
 
       // Original context has toolCall id=call_1 (name='search') and id=call_2 (name='f')
       const context: Context = {
@@ -247,7 +248,7 @@ describe('HeadroomCompactor', () => {
 
     test('assistantTemplate taken from first AssistantMessage in original context', async () => {
       const compressedOpenAI = [{ role: 'assistant', content: 'hello', tool_calls: undefined }];
-      const fakeFn = vi.fn(async () => echoResult(compressedOpenAI));
+      const fakeFn = mock(async () => echoResult(compressedOpenAI));
 
       const context: Context = {
         messages: [
@@ -297,7 +298,7 @@ describe('HeadroomCompactor', () => {
   describe('3. error propagation', () => {
     test('compressFn throw causes compact() to reject', async () => {
       const boom = new Error('network fail');
-      const fakeFn = vi.fn(async () => {
+      const fakeFn = mock(async () => {
         throw boom;
       });
       const context: Context = { messages: [makeUserMsg('hi')] };
@@ -321,7 +322,7 @@ describe('HeadroomCompactor', () => {
           ],
         },
       ];
-      const fakeFn = vi.fn(async () => echoResult(compressedOpenAI));
+      const fakeFn = mock(async () => echoResult(compressedOpenAI));
       const context: Context = {
         messages: [
           makeAssistantMsg({
@@ -341,7 +342,7 @@ describe('HeadroomCompactor', () => {
   describe('4. targetRatio overrides tokenBudget when set', () => {
     test('targetRatio=0.5, contextLength=10000 → tokenBudget=5000', async () => {
       const capturedOptions: any = {};
-      const fakeFn = vi.fn(async (messages: any[], options: any) => {
+      const fakeFn = mock(async (messages: any[], options: any) => {
         Object.assign(capturedOptions, options);
         return echoResult(messages);
       });
@@ -360,7 +361,7 @@ describe('HeadroomCompactor', () => {
 
     test('no contextLength → tokenBudget is undefined', async () => {
       const capturedOptions: any = {};
-      const fakeFn = vi.fn(async (messages: any[], options: any) => {
+      const fakeFn = mock(async (messages: any[], options: any) => {
         Object.assign(capturedOptions, options);
         return echoResult(messages);
       });

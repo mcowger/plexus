@@ -1,15 +1,23 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test';
 
+import { setLocation, useHappyDom } from '../../../test/happydom';
 import { api, type Provider } from '../api';
 
+useHappyDom();
+
 describe('provider auto-compat persistence', () => {
+  beforeEach(() => {
+    localStorage.setItem('plexus_admin_key', 'test-admin-key');
+    setLocation('http://localhost/ui/providers');
+  });
+
   afterEach(() => {
-    vi.unstubAllGlobals();
+    localStorage.clear();
+    jest.restoreAllMocks();
   });
 
   it('sends and reloads provider-level auto_compat', async () => {
-    const fetchMock = vi
-      .fn()
+    const fetchMock = spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(
         new Response(
@@ -24,9 +32,6 @@ describe('provider auto-compat persistence', () => {
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
       );
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('localStorage', { getItem: vi.fn(() => 'test-admin-key') });
-    vi.stubGlobal('window', { location: { pathname: '/ui/providers' } });
 
     const provider: Provider = {
       id: 'test',
@@ -48,10 +53,9 @@ describe('provider auto-compat persistence', () => {
   });
 
   it('sends false when disabling provider boolean settings', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('localStorage', { getItem: vi.fn(() => 'test-admin-key') });
-    vi.stubGlobal('window', { location: { pathname: '/ui/providers' } });
+    const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 200 })
+    );
 
     await api.saveProvider({
       id: 'test',
@@ -76,10 +80,9 @@ describe('provider auto-compat persistence', () => {
   });
 
   it('patches only enabled when updating provider status', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('localStorage', { getItem: vi.fn(() => 'test-admin-key') });
-    vi.stubGlobal('window', { location: { pathname: '/ui/providers' } });
+    const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 200 })
+    );
 
     await api.updateProviderEnabled('provider/with-slash', false);
 

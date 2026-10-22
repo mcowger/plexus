@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, test } from 'bun:test';
 
 import type { ModelTarget } from '../../../../config';
 import type { MeterCheckResult } from '../../../../types/meter';
@@ -46,7 +46,7 @@ function target(provider: string): ModelTarget {
 describe('QuotaSelector', () => {
   it('returns null for empty targets and the target for a single candidate', async () => {
     const provider: QuotaSnapshotProvider = {
-      getLatestQuotaForProvider: vi.fn(),
+      getLatestQuotaForProvider: mock(),
     };
     const selector = new QuotaSelector(provider);
     const onlyTarget = target('one');
@@ -62,7 +62,7 @@ describe('QuotaSelector', () => {
       ['later', result('later', [allowance(50, 72)])],
     ]);
     const provider: QuotaSnapshotProvider = {
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     };
@@ -87,7 +87,7 @@ describe('QuotaSelector', () => {
       ['full', result('full', [allowance(90, 24)])],
     ]);
     const provider: QuotaSnapshotProvider = {
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     };
@@ -104,7 +104,7 @@ describe('QuotaSelector', () => {
       ['available', result('available', [allowance(50, 72)])],
     ]);
     const provider: QuotaSnapshotProvider = {
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     };
@@ -129,7 +129,7 @@ describe('QuotaSelector', () => {
       ['balance', result('balance', [{ ...allowance(50, 24), resetsAt: undefined }])],
     ]);
     const selector = new QuotaSelector({
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     });
@@ -141,7 +141,7 @@ describe('QuotaSelector', () => {
 
   it('tracks balance-only meters without reset times as non-expiring quota', async () => {
     const selector = new QuotaSelector({
-      getLatestQuotaForProvider: vi.fn((provider: string) =>
+      getLatestQuotaForProvider: mock((provider: string) =>
         Promise.resolve(
           provider === 'balance'
             ? result('balance', [{ ...allowance(50, 24), resetsAt: undefined }])
@@ -161,7 +161,7 @@ describe('QuotaSelector', () => {
       ['less-headroom', result('less-headroom', [{ ...allowance(80, 24), resetsAt: undefined }])],
     ]);
     const selector = new QuotaSelector({
-      getLatestQuotaForProvider: vi.fn((provider: string) =>
+      getLatestQuotaForProvider: mock((provider: string) =>
         Promise.resolve(snapshots.get(provider) ?? null)
       ),
     });
@@ -177,7 +177,7 @@ describe('QuotaSelector', () => {
       ['single-window', result('single-window', [allowance(25, 72)])],
     ]);
     const provider: QuotaSnapshotProvider = {
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     };
@@ -194,7 +194,7 @@ describe('QuotaSelector', () => {
       ['tracked', result('tracked', [allowance(10, 24)])],
     ]);
     const provider: QuotaSnapshotProvider = {
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     };
@@ -205,7 +205,7 @@ describe('QuotaSelector', () => {
     ).toEqual(target('tracked'));
 
     const fallbackSelector = new QuotaSelector({
-      getLatestQuotaForProvider: vi.fn(() => Promise.resolve(null)),
+      getLatestQuotaForProvider: mock(() => Promise.resolve(null)),
     });
     expect(await fallbackSelector.select([target('first'), target('second')])).toEqual(
       target('first')
@@ -228,7 +228,7 @@ describe('QuotaSelector', () => {
       ['available', result('available', [allowance(50, 72)])],
     ]);
     const selector = new QuotaSelector({
-      getLatestQuotaForProvider: vi.fn((name: string) =>
+      getLatestQuotaForProvider: mock((name: string) =>
         Promise.resolve(snapshots.get(name) ?? null)
       ),
     });
@@ -239,7 +239,7 @@ describe('QuotaSelector', () => {
   });
 
   it('shares quota reads while ordering the full candidate list', async () => {
-    const getLatestQuotaForProvider = vi.fn(() =>
+    const getLatestQuotaForProvider = mock(() =>
       Promise.resolve(result('tracked', [allowance(10, 24)]))
     );
     const selector = new QuotaSelector({ getLatestQuotaForProvider });

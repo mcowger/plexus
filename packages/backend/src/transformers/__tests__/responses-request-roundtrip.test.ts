@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { parseAnthropicRequest } from '../anthropic/request-parser';
 import { OpenAITransformer } from '../openai';

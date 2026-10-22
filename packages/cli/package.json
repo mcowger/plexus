@@ -20,8 +20,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "prepack": "bun run --cwd ../.. sync:cli-skill",
-    "typecheck": "bun check",
-    "test": "bunx --bun vitest run"
+    "typecheck": "bun check"
   },
   "engines": {
     "bun": ">=1.4.4"

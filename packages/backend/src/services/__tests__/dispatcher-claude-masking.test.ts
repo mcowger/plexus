@@ -1,18 +1,20 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from 'bun:test';
 
+import { mockComplete } from '../../../test/mocks';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 
-// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
-// per-file vi.mock() call here.  With isolate: false all files share one
+// @earendil-works/pi-ai is mocked globally in bun-test.setup.ts — do not add a
+// per-file mock.module() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 const { Dispatcher } = await import('../dispatch/dispatcher');
-import * as piAi from '@earendil-works/pi-ai/compat';
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch should not be called in pi-ai masking path');
 });
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function maskedAnthropicConfig() {
   return {
@@ -73,12 +75,9 @@ function makeRequest(): UnifiedChatRequest {
 describe('Dispatcher Claude Masking routing', () => {
   beforeEach(() => {
     fetchMock.mockClear();
-    // Re-apply mock implementation since mockReset: true clears vi.fn() state.
-    // Note: we do NOT assert on piAi.complete call counts here because with
-    // isolate: false + setupFiles re-running per file, the dispatcher holds a
-    // different spy instance than the one in this file's piAi namespace.
+    // Re-apply mock implementation since mockReset: true clears mock() state.
     // We verify the pi-ai path was taken via response.plexus.apiType + fetch absence.
-    vi.mocked(piAi.complete).mockResolvedValue({
+    mockComplete.mockResolvedValue({
       content: [{ type: 'text', text: 'ok' }],
       stopReason: 'stop',
       usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
@@ -88,7 +87,7 @@ describe('Dispatcher Claude Masking routing', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   test('useClaudeMasking:true routes through the NATIVE path (real fetch, x-api-key, masked body, no pi-ai)', async () => {
@@ -118,7 +117,7 @@ describe('Dispatcher Claude Masking routing', () => {
 
     expect(response).toBeDefined();
     // pi-ai executor must NOT have been used.
-    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
     // Went native to the real Anthropic endpoint.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -159,6 +158,6 @@ describe('Dispatcher Claude Masking routing', () => {
     // native fetch must have been called
     expect(fetchMock).toHaveBeenCalled();
     // pi-ai complete() must NOT have been called
-    expect(vi.mocked(piAi.complete)).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
   });
 });

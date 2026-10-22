@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { closeDatabase } from '../../src/db/client';
 import { ConfigRepository } from '../../src/db/config-repository';
 import { ConfigService } from '../../src/services/configuration/config-service';
 import { ModelAutosyncScheduler } from '../../src/services/models/model-autosync-scheduler';
 import { creds, oauthProvider, resetOAuthDatabase, rotated } from '../oauth-credential-test-utils';
-import { registerSpy } from '../test-utils';
+import { registerSpy, waitFor } from '../test-utils';
 
 describe('ConfigService OAuth credential cache', () => {
   let repo: ConfigRepository;
@@ -36,7 +36,7 @@ describe('ConfigService OAuth credential cache', () => {
 
     // The login alone triggers the rebuild (no flush, no provider save).
     expect(rebuild).toHaveBeenCalled();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(service.getConfig().providers['metasub']?.oauth_account).toBe('metasub');
     });
   });
@@ -64,7 +64,7 @@ describe('ConfigService OAuth credential cache', () => {
     await service.deleteOAuthCredentials('meta', 'metasub');
 
     expect(rebuild).toHaveBeenCalled();
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(service.getConfig().providers['metasub']?.oauth_account).toBeUndefined();
     });
   });

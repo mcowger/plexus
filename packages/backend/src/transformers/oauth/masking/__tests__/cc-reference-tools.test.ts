@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { CC_TOOL_REFERENCE, matchesReferenceShape } from '../cc-reference-tools';
 

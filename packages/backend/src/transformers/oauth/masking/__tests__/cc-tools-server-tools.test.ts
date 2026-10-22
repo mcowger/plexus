@@ -20,7 +20,7 @@
  * this locks the masking pass to the same rule.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { stripDescriptionsAndInjectSyntheticTools } from '../cc-tools';
 

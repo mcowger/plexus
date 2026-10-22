@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { ResponsesTransformer } from '../../transformers/responses';
 import { Dispatcher } from '../dispatch/dispatcher';

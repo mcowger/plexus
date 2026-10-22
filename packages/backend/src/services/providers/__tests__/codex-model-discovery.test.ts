@@ -19,7 +19,7 @@
  *     body) degrades to the static catalog + image models with a warning.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import type { ProviderConfig } from '../../../config';
@@ -111,7 +111,7 @@ describe('listCodexOAuthModels', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
     CodexVersionService.resetForTesting();
   });
@@ -271,7 +271,7 @@ describe('discoverProviderModels for OAuth providers', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
     CodexVersionService.resetForTesting();
   });

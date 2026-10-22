@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';

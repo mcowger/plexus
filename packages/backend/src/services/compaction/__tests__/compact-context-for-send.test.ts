@@ -15,9 +15,12 @@
  *     + context with a long toolResult text → compacted:true (real native strategy)
  */
 
-import type { Context, ToolResultMessage, UserMessage } from '@earendil-works/pi-ai';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
+import type { Context, ToolResultMessage, UserMessage } from '@earendil-works/pi-ai';
+
+import * as configModule from '../../../config';
+import * as enforceLimits from '../../models/enforce-limits';
 import type { RouteResult } from '../../routing/router';
 
 // ---------------------------------------------------------------------------
@@ -25,20 +28,12 @@ import type { RouteResult } from '../../routing/router';
 // compaction-service and resolve-settings pick up the stub on first import.
 // ---------------------------------------------------------------------------
 
-const mockGetConfig = vi.fn();
-const mockResolveContextLength = vi.fn();
+const mockGetConfig = mock();
+const mockResolveContextLength = mock();
 
-vi.mock('../../../config', () => ({
-  getConfig: () => mockGetConfig(),
-}));
-
-// Also mock enforce-limits (resolveContextLength uses ModelMetadataManager which
+// enforce-limits is stubbed in beforeEach (resolveContextLength uses ModelMetadataManager which
 // requires a database / file on disk; we short-circuit by returning undefined, which
 // causes compactContextForSend to fall back to route.modelArchitecture?.context_length).
-vi.mock('../../models/enforce-limits', () => ({
-  resolveContextLength: (aliasConfig: unknown) => mockResolveContextLength(aliasConfig),
-  enforceContextLimitForRoute: () => {},
-}));
 
 // Import AFTER mocks are registered
 import { compactContextForSend, CompactionService } from '../compaction-service';
@@ -48,6 +43,11 @@ import { compactContextForSend, CompactionService } from '../compaction-service'
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  spyOn(configModule, 'getConfig').mockImplementation(() => mockGetConfig());
+  spyOn(enforceLimits, 'resolveContextLength').mockImplementation((aliasConfig: unknown) =>
+    mockResolveContextLength(aliasConfig)
+  );
+  spyOn(enforceLimits, 'enforceContextLimitForRoute').mockImplementation(() => {});
   CompactionService.resetForTesting();
   mockGetConfig.mockReset();
   mockResolveContextLength.mockReset();

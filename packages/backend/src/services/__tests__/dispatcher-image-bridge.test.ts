@@ -19,7 +19,7 @@
  *   - image-pipeline errors propagate with their routing context intact.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -131,7 +131,7 @@ describe('Dispatcher image-model auto-bridge', () => {
   });
 
   afterEach(async () => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     await CooldownManager.getInstance().clearCooldown();
     StickySessionManager.getInstance().clear();
   });

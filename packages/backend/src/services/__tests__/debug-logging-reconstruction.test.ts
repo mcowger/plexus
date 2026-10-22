@@ -1,6 +1,5 @@
+import { beforeEach, describe, expect, it, mock, test } from 'bun:test';
 import { once } from 'node:events';
-
-import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { registerSpy } from '../../../test/test-utils';
 import { logger } from '../../utils/logger';
@@ -182,7 +181,7 @@ describe('DebugLoggingInspector Reconstruction', () => {
 
     test('finalizes a completed Responses stream before the transport ends', () => {
       const completedRequestId = 'test-responses-completed-before-end';
-      const onTerminal = vi.fn();
+      const onTerminal = mock();
       const inspector = new DebugLoggingInspector(completedRequestId, 'raw', onTerminal);
       const stream = inspector.createInspector('responses');
       const completedEvent = `data: ${JSON.stringify({
@@ -580,7 +579,7 @@ describe('DebugLoggingInspector Reconstruction', () => {
   describe('reconstructChatCompletions streaming terminal finalization', () => {
     test('finalizes a completed chat stream before the transport ends', () => {
       const completedRequestId = 'test-chat-completed-before-end';
-      const onTerminal = vi.fn();
+      const onTerminal = mock();
       const inspector = new DebugLoggingInspector(completedRequestId, 'raw', onTerminal);
       const stream = inspector.createInspector('chat');
       const usageFrame = `data: ${JSON.stringify({
@@ -613,7 +612,7 @@ describe('DebugLoggingInspector Reconstruction', () => {
 
     test('does not finalize a chat stream on a non-terminal data frame', () => {
       const requestIdOpen = 'test-chat-no-terminal';
-      const onTerminal = vi.fn();
+      const onTerminal = mock();
       const inspector = new DebugLoggingInspector(requestIdOpen, 'raw', onTerminal);
       const stream = inspector.createInspector('chat');
 
@@ -634,7 +633,7 @@ describe('DebugLoggingInspector Reconstruction', () => {
 
     test('detects the terminal frame after the debug body is truncated', async () => {
       const truncatedRequestId = 'test-chat-terminal-after-truncation';
-      const onTerminal = vi.fn();
+      const onTerminal = mock();
       const inspector = new DebugLoggingInspector(truncatedRequestId, 'raw', onTerminal);
       const stream = inspector.createInspector('chat');
       const write = (value: string) =>

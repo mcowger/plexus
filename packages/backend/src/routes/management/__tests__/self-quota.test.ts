@@ -1,23 +1,25 @@
-import Fastify from 'fastify';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+import Fastify from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
 import type { Principal } from '../_principal';
 
-const mockConfigService = vi.hoisted(() => ({
-  getInstance: vi.fn(),
-}));
+const mockConfigService = {
+  getInstance: mock(),
+};
 
-const mockGetConfig = vi.hoisted(() => vi.fn());
-const mockSaveKey = vi.hoisted(() => vi.fn());
+const mockGetConfig = mock();
+const mockSaveKey = mock();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(
+    mock(() => ({
       getConfig: mockGetConfig,
       saveKey: mockSaveKey,
-    })),
-  },
-}));
+    })) as any
+  );
+});
 
 import { registerSelfRoutes } from '../self';
 
@@ -111,7 +113,7 @@ describe('self-service routes — quota', () => {
 
       const resetsAtMs = new Date('2026-03-01T00:00:00.000Z').getTime();
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(async () => ({
+        loadQuotaContext: mock(async () => ({
           keyName: 'bare-key',
           checks: [
             {
@@ -161,7 +163,7 @@ describe('self-service routes — quota', () => {
       });
 
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(async () => ({
+        loadQuotaContext: mock(async () => ({
           keyName: 'bare-key',
           checks: [
             {
@@ -198,7 +200,7 @@ describe('self-service routes — quota', () => {
 
       const resetsAtMs = Date.now() + 60_000;
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(async () => ({
+        loadQuotaContext: mock(async () => ({
           keyName: 'multi-key',
           checks: [
             {

@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
@@ -23,15 +24,15 @@ const TEST_CONFIG = {
 
 function makeMockDeps() {
   const mockUsageStorage = {
-    saveRequest: vi.fn(),
-    saveError: vi.fn(),
-    updatePerformanceMetrics: vi.fn(),
-    emitStartedAsync: vi.fn(),
-    emitUpdatedAsync: vi.fn(),
+    saveRequest: mock(),
+    saveError: mock(),
+    updatePerformanceMetrics: mock(),
+    emitStartedAsync: mock(),
+    emitUpdatedAsync: mock(),
   } as unknown as UsageStorageService;
 
   const mockDispatcher = {
-    dispatch: vi.fn(async () => ({
+    dispatch: mock(async () => ({
       id: 'test-id',
       model: 'test-model',
       created: Date.now(),
@@ -52,13 +53,13 @@ function makeMockDeps() {
         attemptCount: 1,
       },
     })),
-    dispatchDecisions: vi.fn(async () => ({
+    dispatchDecisions: mock(async () => ({
       model: 'jev',
       answers: { is_bug: { type: 'noul', noul: 0.96 } },
       usage: { input_tokens: 12, output_tokens: 3 },
       plexus: { provider: 'typesafe', model: 'jev', apiType: 'decisions' },
     })),
-    dispatchEmbeddings: vi.fn(async () => ({
+    dispatchEmbeddings: mock(async () => ({
       object: 'list',
       data: [{ object: 'embedding', embedding: [0.1, 0.2], index: 0 }],
       model: 'text-embedding-3-small',
@@ -71,7 +72,7 @@ function makeMockDeps() {
         attemptCount: 1,
       },
     })),
-    dispatchImageGenerations: vi.fn(async () => ({
+    dispatchImageGenerations: mock(async () => ({
       created: Date.now(),
       data: [{ url: 'https://example.com/image.png' }],
       plexus: {
@@ -82,7 +83,7 @@ function makeMockDeps() {
         attemptCount: 1,
       },
     })),
-    dispatchSpeech: vi.fn(async () => ({
+    dispatchSpeech: mock(async () => ({
       content: Buffer.from('audio-data'),
       plexus: {
         provider: 'openai',
@@ -103,6 +104,8 @@ describe('POST /v0/management/test', () => {
   let mockDispatcher: Dispatcher;
   let probeService: ProbeService;
 
+  const originalAdminKey = process.env.ADMIN_KEY;
+
   beforeEach(async () => {
     process.env.ADMIN_KEY = 'test-admin-key';
     setConfigForTesting(TEST_CONFIG);
@@ -117,6 +120,8 @@ describe('POST /v0/management/test', () => {
 
   afterEach(async () => {
     await fastify.close();
+    if (originalAdminKey === undefined) delete process.env.ADMIN_KEY;
+    else process.env.ADMIN_KEY = originalAdminKey;
   });
 
   it('requires admin key authentication', async () => {

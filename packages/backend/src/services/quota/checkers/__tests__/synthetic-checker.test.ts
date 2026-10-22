@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
 
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../synthetic-checker';
@@ -8,11 +8,11 @@ const makeCtx = (options: Record<string, unknown> = {}) =>
 
 describe('synthetic checker', () => {
   const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
-    global.fetch = vi.fn(impl) as unknown as typeof fetch;
+    spyOn(globalThis, 'fetch').mockImplementation(mock(impl) as unknown as typeof fetch);
   };
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('is registered under synthetic', () => {

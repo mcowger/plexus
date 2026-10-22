@@ -9,7 +9,7 @@
  *     (connected once, refreshed on every save) or null when absent;
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import {
   creds,

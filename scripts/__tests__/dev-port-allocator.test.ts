@@ -1,7 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 import { execFileSync } from 'child_process';
 import { join } from 'path';
-
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getPaseoPort } from '../dev-config';
 import { deriveDevPort } from '../dev-port-allocator';

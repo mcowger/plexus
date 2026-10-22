@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, spyOn } from 'bun:test';
 
+import { advanceTimersByTimeAsync } from '../../../../test/test-utils';
 import { CC_VERSION } from '../../../transformers/oauth/masking/cc-constants';
 import { ClaudeCodeVersionService } from '../claude-code-version-service';
 
@@ -22,12 +23,8 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('fetches and stores the latest dist-tag from the npm registry', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.300', stable: '2.1.280', next: '2.1.300' }),
-      })
+    spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ latest: '2.1.300', stable: '2.1.280', next: '2.1.300' })
     );
 
     const service = ClaudeCodeVersionService.getInstance();
@@ -37,12 +34,8 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('prefers the latest tag over stable', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.280', stable: '2.1.267' }),
-      })
+    spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ latest: '2.1.280', stable: '2.1.267' })
     );
 
     const service = ClaudeCodeVersionService.getInstance();
@@ -52,7 +45,7 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('falls back to the previous version on network error', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+    spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'));
 
     const service = ClaudeCodeVersionService.getInstance();
     const error = await service.fetchVersion();
@@ -62,13 +55,7 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('falls back to the previous version on non-ok response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 403 }));
 
     const service = ClaudeCodeVersionService.getInstance();
     const error = await service.fetchVersion();
@@ -78,13 +65,7 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('falls back to the previous version when latest is missing', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({}));
 
     const service = ClaudeCodeVersionService.getInstance();
     await service.fetchVersion();
@@ -93,13 +74,7 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('ignores non-semver latest tags', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.300-beta.1' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ latest: '2.1.300-beta.1' }));
 
     const service = ClaudeCodeVersionService.getInstance();
     await service.fetchVersion();
@@ -109,27 +84,19 @@ describe('ClaudeCodeVersionService', () => {
 
   it('keeps the last-known version when a refresh fails', async () => {
     const service = ClaudeCodeVersionService.getInstance();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.300' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ latest: '2.1.300' }));
     await service.fetchVersion();
     expect(service.getVersion()).toBe('2.1.300');
 
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+    spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'));
     await service.fetchVersion();
     expect(service.getVersion()).toBe('2.1.300');
   });
 
   it('uses the npm dist-tags URL', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ latest: '2.1.300' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
+    const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ latest: '2.1.300' })
+    );
 
     const service = ClaudeCodeVersionService.getInstance();
     await service.fetchVersion();
@@ -146,67 +113,61 @@ describe('ClaudeCodeVersionService', () => {
   });
 
   it('startAutoRefresh refetches the version on schedule', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       ClaudeCodeVersionService.resetForTesting();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.300' }),
-      });
-      vi.stubGlobal('fetch', mockFetch);
+      const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({ latest: '2.1.300' })
+      );
 
       const service = ClaudeCodeVersionService.getInstance();
       service.startAutoRefresh(60);
       expect(mockFetch).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+      await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(service.getVersion()).toBe('2.1.300');
 
       service.stopAutoRefresh();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
   it('stopAutoRefresh cancels scheduled refetches', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       ClaudeCodeVersionService.resetForTesting();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.300' }),
-      });
-      vi.stubGlobal('fetch', mockFetch);
+      const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({ latest: '2.1.300' })
+      );
 
       const service = ClaudeCodeVersionService.getInstance();
       service.startAutoRefresh(60);
       service.stopAutoRefresh();
 
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+      await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
       expect(mockFetch).not.toHaveBeenCalled();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
   it('resetForTesting stops the auto-refresh timer', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       ClaudeCodeVersionService.resetForTesting();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '2.1.300' }),
-      });
-      vi.stubGlobal('fetch', mockFetch);
+      const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({ latest: '2.1.300' })
+      );
 
       ClaudeCodeVersionService.getInstance().startAutoRefresh(60);
       ClaudeCodeVersionService.resetForTesting();
 
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+      await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
       expect(mockFetch).not.toHaveBeenCalled();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 });

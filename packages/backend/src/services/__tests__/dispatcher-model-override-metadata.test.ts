@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, test } from 'bun:test';
 
 import type { RequestManagerHost } from '../dispatch/request-manager';
 import { executeStandardAttempt } from '../dispatch/standard-attempt-request';
@@ -21,9 +21,9 @@ function makeRoute(): RouteResult {
 
 function makeHost(overrides: Partial<RequestManagerHost> = {}): RequestManagerHost {
   return {
-    appendFailureAttempt: vi.fn(),
-    appendSkippedAttempt: vi.fn(),
-    appendSuccessAttempt: vi.fn(
+    appendFailureAttempt: mock(),
+    appendSkippedAttempt: mock(),
+    appendSuccessAttempt: mock(
       (history: any[], route: any, apiType?: string, upstream?: string) => {
         history.push({
           index: history.length + 1,
@@ -37,7 +37,7 @@ function makeHost(overrides: Partial<RequestManagerHost> = {}): RequestManagerHo
         });
       }
     ),
-    attachAttemptMetadata: vi.fn(
+    attachAttemptMetadata: mock(
       (response: any, _a: any, _h: any, route: any, _t: any, upstream?: string) => {
         response.plexus = {
           ...(response.plexus || {}),
@@ -46,29 +46,29 @@ function makeHost(overrides: Partial<RequestManagerHost> = {}): RequestManagerHo
         };
       }
     ),
-    buildAllTargetsFailedError: vi.fn(() => new Error('all failed')),
-    buildCancelledError: vi.fn(() => new Error('cancelled')),
-    buildRequestUrl: vi.fn(() => 'https://example.test/v1/chat/completions'),
-    buildTimeoutError: vi.fn(() => new Error('timeout')),
-    createAttemptTimeout: vi.fn(),
-    dispatchImageGenerations: vi.fn(async () => ({}) as any),
-    emitRoutingUpdate: vi.fn(),
-    executeProviderRequest: vi.fn(async () => new Response('{"id":"x"}', { status: 200 })),
-    formatFailureReason: vi.fn((e: any) => e?.message ?? 'error'),
-    getUsageStorage: vi.fn(() => undefined),
-    handleNonStreamingResponse: vi.fn(async () => ({ content: 'ok' }) as any),
-    handleProviderError: vi.fn(),
-    handleStreamingResponse: vi.fn(() => ({}) as any),
-    isPiAiRoute: vi.fn(() => false),
-    isRetryableNetworkError: vi.fn(() => false),
-    isRetryableStatus: vi.fn(() => false),
-    probeStreamingStart: vi.fn(),
-    recordAttemptMetric: vi.fn(async () => {}),
-    recordStickySession: vi.fn(),
-    saveIntermediateError: vi.fn(),
-    selectTargetApiType: vi.fn(() => ({ selectionReason: 'test' })),
-    setupHeaders: vi.fn(() => ({})),
-    transformRequestPayload: vi.fn(async () => ({ payload: {}, bypassTransformation: false })),
+    buildAllTargetsFailedError: mock(() => new Error('all failed')),
+    buildCancelledError: mock(() => new Error('cancelled')),
+    buildRequestUrl: mock(() => 'https://example.test/v1/chat/completions'),
+    buildTimeoutError: mock(() => new Error('timeout')),
+    createAttemptTimeout: mock(),
+    dispatchImageGenerations: mock(async () => ({}) as any),
+    emitRoutingUpdate: mock(),
+    executeProviderRequest: mock(async () => new Response('{"id":"x"}', { status: 200 })),
+    formatFailureReason: mock((e: any) => e?.message ?? 'error'),
+    getUsageStorage: mock(() => undefined),
+    handleNonStreamingResponse: mock(async () => ({ content: 'ok' }) as any),
+    handleProviderError: mock(),
+    handleStreamingResponse: mock(() => ({}) as any),
+    isPiAiRoute: mock(() => false),
+    isRetryableNetworkError: mock(() => false),
+    isRetryableStatus: mock(() => false),
+    probeStreamingStart: mock(),
+    recordAttemptMetric: mock(async () => {}),
+    recordStickySession: mock(),
+    saveIntermediateError: mock(),
+    selectTargetApiType: mock(() => ({ selectionReason: 'test' })),
+    setupHeaders: mock(() => ({})),
+    transformRequestPayload: mock(async () => ({ payload: {}, bypassTransformation: false })),
     ...overrides,
   };
 }
@@ -86,7 +86,7 @@ describe('dispatcher model_override metadata (issue #916)', () => {
     // Post-adapter payload: model_override rewrote contributor -> full model
     const providerPayload = { model: 'muse-spark-1.3' };
     let capturedFetchModel: string | undefined;
-    const executeProviderRequest = vi.fn(async (_url: any, _h: any, payload: any) => {
+    const executeProviderRequest = mock(async (_url: any, _h: any, payload: any) => {
       capturedFetchModel = payload?.model;
       return new Response('{"id":"x"}', { status: 200 });
     });
@@ -107,7 +107,7 @@ describe('dispatcher model_override metadata (issue #916)', () => {
       attemptTimeout: {
         signal: new AbortController().signal,
         isTimedOut: () => false,
-        cleanup: vi.fn(),
+        cleanup: mock(),
       },
       failoverEnabled: false,
       hasNextTarget: false,
@@ -116,7 +116,7 @@ describe('dispatcher model_override metadata (issue #916)', () => {
       retryHistory,
       attemptedProviders,
       sessionKey: null,
-      release: vi.fn(),
+      release: mock(),
     });
 
     expect(result.outcome).toBe('success');

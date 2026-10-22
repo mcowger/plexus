@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import presets from '../../../../data/provider-presets.json';
 import { registerSpy } from '../../../../test/test-utils';
@@ -272,7 +272,7 @@ describe('resolveAliasServiceTiers', () => {
           { custom: alias([{ provider: 'openai', model }]) },
           providers
         )
-      ).toEqual([
+      ).toEqual<unknown>([
         'auto',
         'standard',
         'flex',

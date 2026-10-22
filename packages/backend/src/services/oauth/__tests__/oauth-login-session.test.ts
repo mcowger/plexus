@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, test } from 'bun:test';
 
-import { registerSpy } from '../../../../test/test-utils';
+import { registerSpy, waitFor } from '../../../../test/test-utils';
 import { OAuthAuthManager } from '../oauth-auth-manager';
 import { OAuthLoginSessionManager } from '../oauth-login-session';
 import type { OAuthProviderDescriptor } from '../oauth-providers';
@@ -10,7 +10,7 @@ import type { OAuthProviderDescriptor } from '../oauth-providers';
 // prompt settles. Rejecting the prompt is therefore what frees the port.
 function makeProviderResolver() {
   let promptRejected: ((reason: unknown) => void) | null = null;
-  const portReleased = vi.fn();
+  const portReleased = mock();
 
   const descriptor = {
     id: 'anthropic',
@@ -173,7 +173,7 @@ describe('OAuthLoginSessionManager — completed login', () => {
       expect(manager.getSession(session.id)?.status).toBe('in_progress');
 
       releaseSave();
-      await vi.waitFor(() => expect(manager.getSession(session.id)?.status).toBe('success'));
+      await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('success'));
       await expect(cancellation).resolves.toMatchObject({ status: 'success' });
     } finally {
       releaseSave();
@@ -190,7 +190,7 @@ describe('OAuthLoginSessionManager — completed login', () => {
 
     try {
       const session = await manager.createSession('anthropic', 'acct');
-      await vi.waitFor(() => expect(manager.getSession(session.id)?.status).toBe('error'));
+      await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('error'));
       expect(manager.getSession(session.id)?.error).toBe('database unavailable');
     } finally {
       manager.dispose();
@@ -230,9 +230,7 @@ describe('OAuthLoginSessionManager — select prompts', () => {
 
     try {
       const session = await manager.createSession('openai-codex', 'acct');
-      await vi.waitFor(() =>
-        expect(manager.getSession(session.id)?.status).toBe('awaiting_select')
-      );
+      await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('awaiting_select'));
 
       expect(manager.getSession(session.id)?.select).toEqual({
         message: 'Select OpenAI Codex login method:',
@@ -243,7 +241,7 @@ describe('OAuthLoginSessionManager — select prompts', () => {
       });
 
       await manager.submitSelect(session.id, 'device_code');
-      await vi.waitFor(() => expect(manager.getSession(session.id)?.status).toBe('success'));
+      await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('success'));
       expect(save).toHaveBeenCalledWith(
         'openai-codex',
         'acct',
@@ -262,9 +260,7 @@ describe('OAuthLoginSessionManager — select prompts', () => {
 
     try {
       const session = await manager.createSession('openai-codex', 'acct');
-      await vi.waitFor(() =>
-        expect(manager.getSession(session.id)?.status).toBe('awaiting_select')
-      );
+      await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('awaiting_select'));
       await expect(manager.submitSelect(session.id, 'nope')).rejects.toThrow(
         'Unknown option: nope'
       );

@@ -1,8 +1,7 @@
-# Root tests are intentionally blocked.
-# Use `cd packages/backend && bun run test` for backend tests.
-
+# Tests run with Bun's native test runner: `bun test` from the repo root.
+# The preload registers shared mocks and creates the per-process test DB.
 [test]
-root = "./test/bun-test-guard"
+preload = ["./packages/backend/test/bun-test.setup.ts"]
 
 # Formatter configuration for `bun fmt` (Bun 1.4.4+, replacing Biome).
 # `bun fmt` already skips .gitignore matches, node_modules, minified files and

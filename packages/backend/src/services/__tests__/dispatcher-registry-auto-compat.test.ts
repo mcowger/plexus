@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, type Mock, mock, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { ProviderConfigSchema } from '../../config';
@@ -49,13 +49,16 @@ function piModel(overrides: Record<string, any> = {}) {
   } as any;
 }
 
+let resolvePiAiModel: Mock<typeof piAiRegistry.resolvePiAiModel>;
+
 describe('Dispatcher registry auto-compat', () => {
   beforeEach(() => {
-    registerSpy(piAiRegistry, 'resolvePiAiModel').mockReturnValue(piModel());
+    resolvePiAiModel = registerSpy(piAiRegistry, 'resolvePiAiModel');
+    resolvePiAiModel.mockReturnValue(piModel());
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   test('applies registry reasoning fields on the passthrough path', async () => {
@@ -70,7 +73,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -81,7 +84,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('applies registry reasoning fields on the transformed Anthropic path', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         api: 'anthropic-messages',
         provider: 'anthropic',
@@ -104,7 +107,7 @@ describe('Dispatcher registry auto-compat', () => {
         } as any,
       }),
       {
-        transformRequest: vi.fn(async () => ({
+        transformRequest: mock(async () => ({
           model: 'provider-model',
           messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
           max_tokens: 4096,
@@ -125,7 +128,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('clamps minimal effort to low for Anthropic adaptive thinking models', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         api: 'anthropic-messages',
         provider: 'anthropic',
@@ -147,7 +150,7 @@ describe('Dispatcher registry auto-compat', () => {
         } as any,
       }),
       {
-        transformRequest: vi.fn(async () => ({
+        transformRequest: mock(async () => ({
           model: 'provider-model',
           messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
           max_tokens: 4096,
@@ -165,7 +168,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('clamps disabled thinking to adaptive with low effort for Opus 5 cannot-disable model', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         id: 'claude-opus-5',
         api: 'anthropic-messages',
@@ -190,7 +193,7 @@ describe('Dispatcher registry auto-compat', () => {
         } as any,
       }),
       {
-        transformRequest: vi.fn(async () => ({
+        transformRequest: mock(async () => ({
           model: 'claude-opus-5',
           messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
           max_tokens: 4096,
@@ -208,7 +211,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('maps transformed payload output_config.effort off to disabled thinking on supported model', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         id: 'claude-sonnet-4-6',
         api: 'anthropic-messages',
@@ -230,7 +233,7 @@ describe('Dispatcher registry auto-compat', () => {
         } as any,
       }),
       {
-        transformRequest: vi.fn(async () => ({
+        transformRequest: mock(async () => ({
           model: 'claude-sonnet-4-6',
           messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
           max_tokens: 4096,
@@ -246,7 +249,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('clamps transformed payload output_config.effort off to adaptive low effort on Opus 5', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         id: 'claude-opus-5',
         api: 'anthropic-messages',
@@ -269,7 +272,7 @@ describe('Dispatcher registry auto-compat', () => {
         } as any,
       }),
       {
-        transformRequest: vi.fn(async () => ({
+        transformRequest: mock(async () => ({
           model: 'claude-opus-5',
           messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
           max_tokens: 4096,
@@ -326,7 +329,7 @@ describe('Dispatcher registry auto-compat', () => {
           config,
           modelConfig: { pricing: { source: 'simple', input: 0, output: 0 } } as any,
         }),
-        { transformRequest: vi.fn(async () => ({ ...originalBody, model })) },
+        { transformRequest: mock(async () => ({ ...originalBody, model })) },
         targetApiType,
         []
       );
@@ -348,7 +351,7 @@ describe('Dispatcher registry auto-compat', () => {
     const responses = (await dispatch('upstream/special', 'responses')).payload;
     expect(responses.max_output_tokens).toBe(128);
     expect(responses.max_completion_tokens).toBeUndefined();
-    expect(piAiRegistry.resolvePiAiModel).not.toHaveBeenCalled();
+    expect(resolvePiAiModel).not.toHaveBeenCalled();
   });
 
   test('model reasoning:false removes inherited map without suppressing unrelated quirks', async () => {
@@ -441,7 +444,7 @@ describe('Dispatcher registry auto-compat', () => {
         chat: { api: 'openai-completions', compat: { maxTokensField: 'max_completion_tokens' } },
       },
     } as any;
-    const transformer = { transformRequest: vi.fn(async () => payload) };
+    const transformer = { transformRequest: mock(async () => payload) };
     const dispatch = (
       auto_compat: boolean,
       targetApiType: string,
@@ -457,7 +460,7 @@ describe('Dispatcher registry auto-compat', () => {
     expect((await dispatch(false, 'chat', config.pi_ai_quirks)).payload.max_tokens).toBe(256);
     expect((await dispatch(true, 'messages', config.pi_ai_quirks)).payload.max_tokens).toBe(256);
     expect((await dispatch(true, 'chat', undefined)).payload.max_tokens).toBe(256);
-    expect(piAiRegistry.resolvePiAiModel).not.toHaveBeenCalled();
+    expect(resolvePiAiModel).not.toHaveBeenCalled();
   });
 
   test('resolves the exact route model when the provider is selected but unlinked', async () => {
@@ -475,7 +478,7 @@ describe('Dispatcher registry auto-compat', () => {
         model: 'provider-model',
         modelConfig: { pricing: { source: 'simple', input: 0, output: 0 } } as any,
       }),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -483,11 +486,11 @@ describe('Dispatcher registry auto-compat', () => {
     expect(result.payload.reasoning_effort).toBe('high');
     // Provider selected but model unlinked: the catalog lookup uses the exact
     // upstream model, matching GET /v1/models' automatic identity.
-    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'provider-model');
+    expect(resolvePiAiModel).toHaveBeenCalledWith('openai', 'provider-model');
   });
 
   test('does not borrow the route model when an explicit pi_ai_model_id link is invalid', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(null);
+    resolvePiAiModel.mockReturnValue(null);
     const config = ProviderConfigSchema.parse({
       api_base_url: { chat: 'https://example.test/v1' },
       api_key: 'test-key',
@@ -520,13 +523,13 @@ describe('Dispatcher registry auto-compat', () => {
 
     // The explicit but unresolved link stays invalid; only the explicit quirks
     // apply, and no `route.model` catalog lookup happens.
-    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledTimes(1);
-    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'missing-catalog-model');
+    expect(resolvePiAiModel).toHaveBeenCalledTimes(1);
+    expect(resolvePiAiModel).toHaveBeenCalledWith('openai', 'missing-catalog-model');
     expect(outbound.max_completion_tokens).toBe(256);
   });
 
   test('drops temperature when registry compat marks it unsupported', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         reasoning: false,
         compat: { supportsTemperature: false },
@@ -543,7 +546,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -575,7 +578,7 @@ describe('Dispatcher registry auto-compat', () => {
           pi_ai_model_id: 'registry-model',
         } as any,
       }),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -598,7 +601,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -608,7 +611,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('openrouter format emits the reasoning object and strips stale reasoning_effort', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({ compat: { supportsReasoningEffort: true, thinkingFormat: 'openrouter' } })
     );
     const dispatcher = new Dispatcher() as any;
@@ -622,7 +625,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route({ provider: 'openrouter' }),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -632,7 +635,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('qwen format translates to enable_thinking and strips both OpenAI-style notations', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({ compat: { supportsReasoningEffort: true, thinkingFormat: 'qwen' } })
     );
     const dispatcher = new Dispatcher() as any;
@@ -647,7 +650,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -661,7 +664,7 @@ describe('Dispatcher registry auto-compat', () => {
     // zai with supportsReasoningEffort=false: the intent lands on `thinking`
     // alone, and the client's untranslated `reasoning_effort` must be REMOVED
     // — leaving it would resend an unsupported field to the strict upstream.
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({ compat: { supportsReasoningEffort: false, thinkingFormat: 'zai' } })
     );
     const dispatcher = new Dispatcher() as any;
@@ -675,7 +678,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -686,7 +689,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('ant-ling drops the unified reasoning notation when the intent is a disable it cannot express', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({ compat: { supportsReasoningEffort: true, thinkingFormat: 'ant-ling' } })
     );
     const dispatcher = new Dispatcher() as any;
@@ -700,7 +703,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -710,7 +713,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('ant-ling emits its own reasoning object and strips reasoning_effort when enabled', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({ compat: { supportsReasoningEffort: true, thinkingFormat: 'ant-ling' } })
     );
     const dispatcher = new Dispatcher() as any;
@@ -724,7 +727,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -737,7 +740,7 @@ describe('Dispatcher registry auto-compat', () => {
     // compat.supportsReasoningEffort is undefined (unknown, not false): the
     // default dialect natively speaks reasoning_effort, so an untranslatable
     // client value passes through instead of being silently dropped.
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         thinkingLevelMap: {},
         compat: {},
@@ -754,7 +757,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -764,7 +767,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('default format strips reasoning_effort when the dialect provably lacks support', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(
+    resolvePiAiModel.mockReturnValue(
       piModel({
         thinkingLevelMap: {},
         compat: { supportsReasoningEffort: false },
@@ -781,7 +784,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -794,7 +797,7 @@ describe('Dispatcher registry auto-compat', () => {
     // Client sent BOTH fields with conflicting values: reasoning.enabled=false
     // is authoritative (checked before reasoning_effort), so after deleting the
     // reasoning object the surviving 'high' effort would reverse the intent.
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(piModel({ compat: {} }));
+    resolvePiAiModel.mockReturnValue(piModel({ compat: {} }));
     const dispatcher = new Dispatcher() as any;
 
     const result = await dispatcher.transformRequestPayload(
@@ -807,7 +810,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -817,7 +820,7 @@ describe('Dispatcher registry auto-compat', () => {
   });
 
   test('default format drops stale reasoning_effort when null reasoning falls back to request intent', async () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(piModel({ compat: {} }));
+    resolvePiAiModel.mockReturnValue(piModel({ compat: {} }));
     const dispatcher = new Dispatcher() as any;
 
     const result = await dispatcher.transformRequestPayload(
@@ -831,7 +834,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -846,7 +849,7 @@ describe('Dispatcher registry auto-compat', () => {
     // passes through when provider support is unknown. (The malformed field
     // itself still goes upstream on this path; the reactive strip-and-retry
     // is the guard against a strict upstream rejecting it.)
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(piModel({ compat: {} }));
+    resolvePiAiModel.mockReturnValue(piModel({ compat: {} }));
     const dispatcher = new Dispatcher() as any;
 
     const result = await dispatcher.transformRequestPayload(
@@ -859,7 +862,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -871,7 +874,7 @@ describe('Dispatcher registry auto-compat', () => {
     // `typeof [] === 'object'` would otherwise mark this as an authoritative
     // reasoning object; array values must pass through the same way as other
     // malformed values without making a valid reasoning_effort look stale.
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(piModel({ compat: {} }));
+    resolvePiAiModel.mockReturnValue(piModel({ compat: {} }));
     const dispatcher = new Dispatcher() as any;
 
     const result = await dispatcher.transformRequestPayload(
@@ -884,7 +887,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -896,7 +899,7 @@ describe('Dispatcher registry auto-compat', () => {
     // With model.reasoning disabled there is nothing to translate — the
     // projection is a no-op passthrough and must NOT strip the field (it may
     // be handled by the reactive unsupported-param strip-and-retry instead).
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(piModel({ reasoning: false }));
+    resolvePiAiModel.mockReturnValue(piModel({ reasoning: false }));
     const dispatcher = new Dispatcher() as any;
 
     const result = await dispatcher.transformRequestPayload(
@@ -908,7 +911,7 @@ describe('Dispatcher registry auto-compat', () => {
         },
       }),
       route(),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );
@@ -920,11 +923,12 @@ describe('Dispatcher registry auto-compat', () => {
 
 describe('Registry overlay quirks + service tiers', () => {
   beforeEach(() => {
-    registerSpy(piAiRegistry, 'resolvePiAiModel').mockReturnValue(piModel());
+    resolvePiAiModel = registerSpy(piAiRegistry, 'resolvePiAiModel');
+    resolvePiAiModel.mockReturnValue(piModel());
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   const overlayConfig = (quirks: any) =>
@@ -1110,7 +1114,7 @@ describe('Registry overlay quirks + service tiers', () => {
   });
 
   test('an unresolvable route strips an injected key default but keeps an explicit tier', () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(null);
+    resolvePiAiModel.mockReturnValue(null);
     const noBase = route({
       config: {
         api_base_url: 'https://example.test/v1',
@@ -1215,7 +1219,7 @@ describe('Registry overlay quirks + service tiers', () => {
     );
 
     expect(outbound.service_tier).toBe('default');
-    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'upstream/unlinked');
+    expect(resolvePiAiModel).toHaveBeenCalledWith('openai', 'upstream/unlinked');
   });
 
   test('map-only overlay reasoning inherits the unlinked builtin capability', () => {
@@ -1234,7 +1238,7 @@ describe('Registry overlay quirks + service tiers', () => {
     // The map declares no `reasoning`, so the resolved builtin's reasoning
     // capability is inherited rather than assumed off from a map alone.
     expect(outbound.reasoning_effort).toBe('hard');
-    expect(piAiRegistry.resolvePiAiModel).toHaveBeenCalledWith('openai', 'upstream/unlinked');
+    expect(resolvePiAiModel).toHaveBeenCalledWith('openai', 'upstream/unlinked');
   });
 
   test('target reasoning:false drops the inherited builtin thinking map', () => {
@@ -1271,7 +1275,7 @@ describe('Registry overlay quirks + service tiers', () => {
   });
 
   test('warns when inline quirks declare a thinking map without reasoning: true', () => {
-    vi.mocked(piAiRegistry.resolvePiAiModel).mockReturnValue(null);
+    resolvePiAiModel.mockReturnValue(null);
     const warnSpy = registerSpy(logger, 'warn');
 
     const outbound = applyRegistryAutoCompat(
@@ -1533,7 +1537,7 @@ describe('Registry overlay quirks + service tiers', () => {
           },
         }),
       }),
-      { transformRequest: vi.fn() },
+      { transformRequest: mock() },
       'chat',
       []
     );

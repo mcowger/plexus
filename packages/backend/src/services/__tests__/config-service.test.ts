@@ -1,47 +1,47 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 
+import { advanceTimersByTimeAsync } from '../../../test/test-utils';
 import type { ProviderConfig } from '../../config';
+import { QuotaScheduler } from '../quota/quota-scheduler';
 
-const mockScheduler = vi.hoisted(() => ({
-  getCheckerIds: vi.fn(() => []),
-  isInitialized: vi.fn(() => true),
-  reload: vi.fn(() => Promise.resolve()),
-}));
+const mockScheduler = {
+  getCheckerIds: mock(() => []),
+  isInitialized: mock(() => true),
+  reload: mock(() => Promise.resolve()),
+};
 
-vi.mock('../quota/quota-scheduler', () => ({
-  QuotaScheduler: {
-    getInstance: vi.fn(() => mockScheduler),
-  },
-}));
+beforeEach(() => {
+  spyOn(QuotaScheduler, 'getInstance').mockReturnValue(mockScheduler as any);
+});
 
 import { ConfigService } from '../configuration/config-service';
 
 function createMockRepo() {
   return {
-    saveProvider: vi.fn(),
-    deleteProvider: vi.fn(),
-    saveAlias: vi.fn(),
-    deleteAlias: vi.fn(),
-    deleteAllAliases: vi.fn(() => Promise.resolve(0)),
-    saveKey: vi.fn(),
-    deleteKey: vi.fn(),
-    saveUserQuota: vi.fn(),
-    deleteUserQuota: vi.fn(),
-    saveMcpServer: vi.fn(),
-    deleteMcpServer: vi.fn(),
-    setSetting: vi.fn(),
-    setSettingsBulk: vi.fn(),
-    getAllProviders: vi.fn(() => Promise.resolve({})),
-    getAllAliases: vi.fn(() => Promise.resolve({})),
-    getAllKeys: vi.fn(() => Promise.resolve({})),
-    getAllUserQuotas: vi.fn(() => Promise.resolve({})),
-    getAllMcpServers: vi.fn(() => Promise.resolve({})),
-    getFailoverPolicy: vi.fn(() => Promise.resolve({ enabled: false })),
-    getCooldownPolicy: vi.fn(() => Promise.resolve({ enabled: false })),
-    getBackgroundExplorationConfig: vi.fn(() => Promise.resolve({ enabled: false })),
-    getMcpOAuthConfig: vi.fn(() => Promise.resolve(undefined)),
-    getTimeoutConfig: vi.fn(() => Promise.resolve({ defaultSeconds: 300 })),
-    getStallConfig: vi.fn(() =>
+    saveProvider: mock(),
+    deleteProvider: mock(),
+    saveAlias: mock(),
+    deleteAlias: mock(),
+    deleteAllAliases: mock(() => Promise.resolve(0)),
+    saveKey: mock(),
+    deleteKey: mock(),
+    saveUserQuota: mock(),
+    deleteUserQuota: mock(),
+    saveMcpServer: mock(),
+    deleteMcpServer: mock(),
+    setSetting: mock(),
+    setSettingsBulk: mock(),
+    getAllProviders: mock(() => Promise.resolve({})),
+    getAllAliases: mock(() => Promise.resolve({})),
+    getAllKeys: mock(() => Promise.resolve({})),
+    getAllUserQuotas: mock(() => Promise.resolve({})),
+    getAllMcpServers: mock(() => Promise.resolve({})),
+    getFailoverPolicy: mock(() => Promise.resolve({ enabled: false })),
+    getCooldownPolicy: mock(() => Promise.resolve({ enabled: false })),
+    getBackgroundExplorationConfig: mock(() => Promise.resolve({ enabled: false })),
+    getMcpOAuthConfig: mock(() => Promise.resolve(undefined)),
+    getTimeoutConfig: mock(() => Promise.resolve({ defaultSeconds: 300 })),
+    getStallConfig: mock(() =>
       Promise.resolve({
         ttfbSeconds: null,
         ttfbBytes: 100,
@@ -50,7 +50,7 @@ function createMockRepo() {
         gracePeriodSeconds: 30,
       })
     ),
-    getAllSettings: vi.fn(() => Promise.resolve({})),
+    getAllSettings: mock(() => Promise.resolve({})),
   };
 }
 
@@ -80,11 +80,11 @@ describe('ConfigService write coalescing', () => {
 
   afterEach(() => {
     ConfigService.resetInstance();
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('coalesces multiple rapid mutations into a single rebuild', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     await service.saveProvider('p1', {} as any);
     await service.saveProvider('p2', {} as any);
@@ -92,15 +92,14 @@ describe('ConfigService write coalescing', () => {
 
     expect(rebuildCount).toBe(0);
 
-    await vi.advanceTimersByTimeAsync(150);
-
+    await advanceTimersByTimeAsync(150);
     expect(rebuildCount).toBe(1);
 
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('flush forces immediate rebuild', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     await service.saveProvider('p1', {} as any);
     expect(rebuildCount).toBe(0);
@@ -108,30 +107,30 @@ describe('ConfigService write coalescing', () => {
     await service.flush();
     expect(rebuildCount).toBe(1);
 
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('timer eventually fires and rebuilds after mutations', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     await service.saveProvider('p1', {} as any);
     expect(rebuildCount).toBe(0);
 
-    await vi.advanceTimersByTimeAsync(150);
+    await advanceTimersByTimeAsync(150);
     expect(rebuildCount).toBe(1);
 
     // A subsequent mutation triggers a new rebuild cycle
     await service.saveAlias('a1', {} as any);
     expect(rebuildCount).toBe(1);
 
-    await vi.advanceTimersByTimeAsync(150);
+    await advanceTimersByTimeAsync(150);
     expect(rebuildCount).toBe(2);
 
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('reloads quota scheduler after first quota checker is saved when scheduler is initialized', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     const providerConfig: ProviderConfig = {
       api_base_url: 'https://api.synthetic.new',
@@ -155,6 +154,6 @@ describe('ConfigService write coalescing', () => {
     expect(mockScheduler.isInitialized).toHaveBeenCalled();
     expect(mockScheduler.reload).toHaveBeenCalled();
 
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 });

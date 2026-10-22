@@ -19,7 +19,7 @@
  * first.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { applyClaudeCodeMasking } from '../apply-masking';
 import { buildFixtureTools, buildPiAiOutputFixture } from './fixtures';
@@ -107,7 +107,7 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
       ['TodoWrite', 'mcp__client__TodoWrite'],
     ]) {
       expect(names).not.toContain(original);
-      expect(names).toContain(renamed);
+      expect<unknown[]>(names).toContain(renamed);
     }
   });
 

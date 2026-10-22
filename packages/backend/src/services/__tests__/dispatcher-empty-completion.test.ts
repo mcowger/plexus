@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
@@ -14,11 +14,14 @@ import { CooldownManager } from '../runtime/cooldown-manager';
 // dispatcher-failover.test.ts because that file has unrelated in-flight
 // changes from other tasks in the working tree.
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const unconfiguredFetch = async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
-});
+};
+const fetchMock: any = mock(unconfiguredFetch);
 
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function makeConfig(options?: { failoverEnabled?: boolean; targetCount?: number }) {
   const failoverEnabled = options?.failoverEnabled ?? true;
@@ -340,7 +343,9 @@ function geminiContentResponse(text = 'ok') {
 
 describe('Dispatcher empty-completion failover (T5)', () => {
   beforeEach(() => {
-    fetchMock.mockClear();
+    // mockReset drops queued mockImplementationOnce entries a previous test left unconsumed.
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(unconfiguredFetch);
     setConfigForTesting(makeConfig());
     CooldownManager.resetForTesting();
   });
@@ -447,13 +452,13 @@ describe('Dispatcher empty-completion failover (T5)', () => {
       .mockImplementationOnce(async () => emptyChatResponse('model-1'))
       .mockImplementationOnce(async () => contentChatResponse('model-2'));
 
-    const saveErrorSpy = vi.fn();
+    const saveErrorSpy = mock();
     const dispatcher = new Dispatcher();
     dispatcher.setUsageStorage({
       saveError: saveErrorSpy,
-      recordFailedAttempt: vi.fn(),
-      recordSuccessfulAttempt: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      recordFailedAttempt: mock(),
+      recordSuccessfulAttempt: mock(),
+      emitUpdatedAsync: mock(),
     } as any);
 
     await dispatcher.dispatch({ ...makeChatRequest(), requestId: 'req-empty-intermediate' });

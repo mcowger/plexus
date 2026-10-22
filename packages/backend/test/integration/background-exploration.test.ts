@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
 import { PlexusConfig, setConfigForTesting } from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';
@@ -60,7 +60,7 @@ describe('Background exploration integration', () => {
 
     // Make the performance selector deterministic: pick p1 (higher TPS).
     const mockUsageStorage = {
-      getProviderPerformance: vi.fn(async (provider?: string) => {
+      getProviderPerformance: mock(async (provider?: string) => {
         if (provider === 'p1')
           return [
             { target_model: 'm1', avg_tokens_per_sec: 100, sample_count: 10, last_updated: 1000 },
@@ -83,7 +83,7 @@ describe('Background exploration integration', () => {
 
   test('live request triggers background probes for stale targets in the resolved group', async () => {
     const probeService = {
-      runProbe: vi.fn(async () => ({
+      runProbe: mock(async () => ({
         success: true,
         durationMs: 5,
         apiType: 'chat' as const,
@@ -135,7 +135,7 @@ describe('Background exploration integration', () => {
     } as PlexusConfig);
 
     const probeService = {
-      runProbe: vi.fn(async () => ({
+      runProbe: mock(async () => ({
         success: true,
         durationMs: 5,
         apiType: 'chat' as const,
@@ -151,7 +151,7 @@ describe('Background exploration integration', () => {
 
   test('targets on cooldown are skipped by background probes', async () => {
     const probeService = {
-      runProbe: vi.fn(async () => ({
+      runProbe: mock(async () => ({
         success: true,
         durationMs: 5,
         apiType: 'chat' as const,

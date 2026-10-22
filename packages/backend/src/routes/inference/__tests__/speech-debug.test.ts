@@ -1,5 +1,6 @@
+import { afterAll, beforeAll, describe, expect, it, mock, test } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
@@ -23,7 +24,7 @@ describe('Speech Route Debug Logging', () => {
     fastify = Fastify();
 
     mockDispatcher = {
-      dispatchSpeech: vi.fn(async () => ({
+      dispatchSpeech: mock(async () => ({
         audio: Buffer.from([0x01, 0x02, 0x03, 0x04]),
         plexus: {
           provider: 'openai-s',
@@ -37,12 +38,12 @@ describe('Speech Route Debug Logging', () => {
 
     savedDebugLogs = [];
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
-      saveDebugLog: vi.fn((log: any) => {
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
+      saveDebugLog: mock((log: any) => {
         savedDebugLogs.push(log);
       }),
     } as unknown as UsageStorageService;

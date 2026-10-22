@@ -1,5 +1,6 @@
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
@@ -56,15 +57,15 @@ afterAll(() => {
 
 function makeMockDeps() {
   const mockUsageStorage = {
-    saveRequest: vi.fn(),
-    saveError: vi.fn(),
-    updatePerformanceMetrics: vi.fn(),
-    emitStartedAsync: vi.fn(),
-    emitUpdatedAsync: vi.fn(),
+    saveRequest: mock(),
+    saveError: mock(),
+    updatePerformanceMetrics: mock(),
+    emitStartedAsync: mock(),
+    emitUpdatedAsync: mock(),
   } as unknown as UsageStorageService;
 
   const mockDispatcher = {
-    dispatch: vi.fn(async () => ({
+    dispatch: mock(async () => ({
       id: 'test-id',
       model: 'test-model',
       created: Date.now(),
@@ -74,7 +75,7 @@ function makeMockDeps() {
   } as unknown as Dispatcher;
 
   const mockProbeService = {
-    runProbe: vi.fn(async () => ({
+    runProbe: mock(async () => ({
       success: true,
       durationMs: 0,
       apiType: 'chat' as const,

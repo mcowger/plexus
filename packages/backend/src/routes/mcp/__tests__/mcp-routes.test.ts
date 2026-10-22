@@ -1,5 +1,16 @@
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  test,
+} from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
@@ -53,12 +64,12 @@ describe('MCP Routes', () => {
 
     // Mock MCP usage storage
     mockMcpUsageStorage = {
-      saveRequest: vi.fn(),
-      saveDebugLog: vi.fn(),
+      saveRequest: mock(),
+      saveDebugLog: mock(),
     } as unknown as McpUsageStorageService;
 
     // Mock the proxyMcpRequest function to avoid network calls
-    mockProxyMcpRequest = vi.fn(async () => ({
+    mockProxyMcpRequest = mock(async () => ({
       status: 200,
       headers: { 'content-type': 'application/json' },
       body: { jsonrpc: '2.0', id: 1, result: {} },
@@ -550,7 +561,7 @@ describe('MCP Routes', () => {
 
     beforeEach(async () => {
       oauthFastify = Fastify();
-      validateToken = vi.fn(async (token: string) => {
+      validateToken = mock(async (token: string) => {
         if (token === 'pox_valid_oauth_token') {
           return { keyName: 'test-key-1', scopes: ['mcp:read'] };
         }
@@ -571,7 +582,7 @@ describe('MCP Routes', () => {
 
       registerSpy(mcpAuthProviderFactory, 'isMcpOAuthEnabled').mockReturnValue(true);
       registerSpy(mcpAuthProviderFactory, 'getMcpAuthProvider').mockReturnValue({
-        getDiscoveryMetadata: vi.fn((request) => ({
+        getDiscoveryMetadata: mock((request) => ({
           issuer: 'http://localhost',
           authorization_endpoint: 'http://localhost/oauth/authorize',
           token_endpoint: 'http://localhost/oauth/token',
@@ -583,15 +594,15 @@ describe('MCP Routes', () => {
           scopes_supported: ['mcp:read', 'mcp:write'],
           resource_supported: true,
         })),
-        getProtectedResourceMetadata: vi.fn((request) => ({
+        getProtectedResourceMetadata: mock((request) => ({
           resource: `http://localhost/mcp/${(request.params as { name: string }).name}`,
           authorization_servers: ['http://localhost'],
           scopes_supported: ['mcp:read', 'mcp:write'],
           bearer_methods_supported: ['header'],
         })),
-        handleAuthorize: vi.fn(async (_request, reply) => reply.send({ ok: true })),
-        handleToken: vi.fn(async (_request, reply) => reply.send({ access_token: 'pox-token' })),
-        handleRegister: vi.fn(async (_request, reply) =>
+        handleAuthorize: mock(async (_request, reply) => reply.send({ ok: true })),
+        handleToken: mock(async (_request, reply) => reply.send({ access_token: 'pox-token' })),
+        handleRegister: mock(async (_request, reply) =>
           reply.code(201).send({ client_id: 'mcp-test' })
         ),
         validateToken,

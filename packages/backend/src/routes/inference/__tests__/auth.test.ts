@@ -1,5 +1,6 @@
+import { beforeAll, describe, expect, it, mock, test } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { getConfig, setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
@@ -17,7 +18,7 @@ describe('Auth Middleware', () => {
 
     // Mock dependencies
     const mockDispatcher = {
-      dispatch: vi.fn(async () => ({
+      dispatch: mock(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -27,11 +28,11 @@ describe('Auth Middleware', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
     // Initialize singletons to avoid errors
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -324,7 +325,7 @@ describe('Key Attribution', () => {
 
     // Mock dependencies
     const mockDispatcher = {
-      dispatch: vi.fn(async () => ({
+      dispatch: mock(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -334,11 +335,11 @@ describe('Key Attribution', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
     // Initialize singletons
@@ -556,7 +557,7 @@ describe('Key Access Policy Propagation', () => {
     capturedRequest = null;
 
     const mockDispatcher = {
-      dispatch: vi.fn(async (request: any) => {
+      dispatch: mock(async (request: any) => {
         capturedRequest = request;
         return {
           id: '123',
@@ -569,11 +570,11 @@ describe('Key Access Policy Propagation', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -666,7 +667,7 @@ describe('Key Access Policy Exclusion Propagation', () => {
     capturedRequest = null;
 
     const mockDispatcher = {
-      dispatch: vi.fn(async (request: any) => {
+      dispatch: mock(async (request: any) => {
         capturedRequest = request;
         return {
           id: '123',
@@ -679,11 +680,11 @@ describe('Key Access Policy Exclusion Propagation', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -747,7 +748,7 @@ describe('Key IP Allowlist', () => {
     fastify = Fastify();
 
     const mockDispatcher = {
-      dispatch: vi.fn(async () => ({
+      dispatch: mock(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -757,11 +758,11 @@ describe('Key IP Allowlist', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);
@@ -865,7 +866,7 @@ describe('Trusted Proxy Header Handling', () => {
     fastify = Fastify();
 
     const mockDispatcher = {
-      dispatch: vi.fn(async () => ({
+      dispatch: mock(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -875,11 +876,11 @@ describe('Trusted Proxy Header Handling', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);

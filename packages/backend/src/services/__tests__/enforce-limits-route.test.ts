@@ -6,8 +6,9 @@
  * helper was added to enforce-limits.ts (GREEN).
  */
 
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+
 import type { Context } from '@earendil-works/pi-ai';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import type { ModelConfig } from '../../config';
 import {

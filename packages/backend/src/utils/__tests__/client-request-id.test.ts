@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../client-request-id';
 

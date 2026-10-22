@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, mock, test } from 'bun:test';
 
-import { registerSpy } from '../../../../test/test-utils';
+import { advanceTimersByTimeAsync, registerSpy } from '../../../../test/test-utils';
 import type { LocalHttpMcpServerConfig } from '../../../types/mcp';
 import { mcpProcessManager } from '../mcp-process-manager';
 
@@ -31,7 +31,7 @@ function makeChild(pid: number, exitOn: string | null = 'SIGTERM') {
         controller.close();
       },
     }),
-    kill: vi.fn((signal: string) => {
+    kill: mock((signal: string) => {
       if (signal === exitOn) finish(0);
     }),
     finish,
@@ -44,7 +44,7 @@ let children: Array<{ finish: (code: number) => void }> = [];
 beforeEach(async () => {
   await mcpProcessManager.resetForTesting();
   children = [];
-  vi.useFakeTimers();
+  jest.useFakeTimers();
 });
 
 afterEach(async () => {
@@ -52,14 +52,14 @@ afterEach(async () => {
   try {
     await mcpProcessManager.resetForTesting();
   } finally {
-    vi.useRealTimers();
+    jest.useRealTimers();
   }
 });
 
 describe('local MCP process supervision', () => {
   test('accepts HTTP 405 readiness and releases an indefinite response body', async () => {
     registerSpy(Bun, 'spawn').mockReturnValue(makeChild(101));
-    const cancel = vi.fn();
+    const cancel = mock();
     const body = new ReadableStream({ cancel });
     registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(body, { status: 405 }));
 
@@ -68,7 +68,7 @@ describe('local MCP process supervision', () => {
     expect(status.status).toBe('running');
     expect(status.pid).toBe(101);
     expect(cancel).toHaveBeenCalledOnce();
-    expect(vi.getTimerCount()).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   test('aborts hanging readiness requests at the startup deadline and cleans up', async () => {
@@ -83,14 +83,19 @@ describe('local MCP process supervision', () => {
       });
     });
     const result = mcpProcessManager.start('test', config);
-    const assertion = expect(result).rejects.toThrow('did not become ready');
-    await vi.advanceTimersByTimeAsync(1200);
-    await assertion;
+    await advanceTimersByTimeAsync(1200);
+    expect(jest.getTimerCount()).toBe(0);
+    const startError = await result.then(
+      () => {
+        throw new Error('expected start() to reject');
+      },
+      (e) => e
+    );
+    expect(startError.message).toMatch('did not become ready');
 
     expect(signals.every((signal) => signal.aborted)).toBe(true);
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
     expect(mcpProcessManager.getStatus('test')).toMatchObject({ status: 'failed', pid: null });
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   test('allows a readiness request to use a proportional share of a larger startup budget', async () => {
@@ -112,9 +117,9 @@ describe('local MCP process supervision', () => {
     });
 
     const starting = mcpProcessManager.start('test', { ...config, startup_timeout_ms: 8000 });
-    await vi.advanceTimersByTimeAsync(1499);
+    await advanceTimersByTimeAsync(1499);
     expect(readinessSignal?.aborted).toBe(false);
-    await vi.advanceTimersByTimeAsync(1);
+    await advanceTimersByTimeAsync(1);
     await expect(starting).resolves.toMatchObject({ status: 'running', pid: 110 });
   });
 
@@ -125,13 +130,13 @@ describe('local MCP process supervision', () => {
     await mcpProcessManager.start('test', config);
 
     const stopping = mcpProcessManager.stop('test');
-    await vi.advanceTimersByTimeAsync(2999);
+    await advanceTimersByTimeAsync(2999);
     expect(child.kill.mock.calls).toEqual([['SIGTERM']]);
     expect(mcpProcessManager.getStatus('test').pid).toBe(103);
-    await vi.advanceTimersByTimeAsync(1);
+    await advanceTimersByTimeAsync(1);
     expect(await stopping).toMatchObject({ status: 'stopped', pid: null });
     expect(child.kill.mock.calls).toEqual([['SIGTERM'], ['SIGKILL']]);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   test('retains the live process and refuses a replacement if termination fails', async () => {
@@ -140,16 +145,27 @@ describe('local MCP process supervision', () => {
     registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
     await mcpProcessManager.start('test', config);
 
-    const stopped = expect(mcpProcessManager.stop('test')).rejects.toThrow('after SIGKILL');
-    await vi.advanceTimersByTimeAsync(4000);
-    await stopped;
+    const stopPromise = mcpProcessManager.stop('test');
+    await advanceTimersByTimeAsync(4000);
+    const stopError = await stopPromise.then(
+      () => {
+        throw new Error('expected stop() to reject');
+      },
+      (e) => e
+    );
+    expect(stopError.message).toMatch('after SIGKILL');
     expect(mcpProcessManager.getStatus('test')).toMatchObject({ status: 'failed', pid: 104 });
 
-    const restarted = expect(mcpProcessManager.restart('test', config)).rejects.toThrow(
-      'after SIGKILL'
+    const restartPromise = mcpProcessManager.restart('test', config);
+    jest.useFakeTimers();
+    await advanceTimersByTimeAsync(4000);
+    const restartError = await restartPromise.then(
+      () => {
+        throw new Error('expected restart() to reject');
+      },
+      (e) => e
     );
-    await vi.advanceTimersByTimeAsync(4000);
-    await restarted;
+    expect(restartError.message).toMatch('after SIGKILL');
     expect(spawn).toHaveBeenCalledOnce();
   });
 
@@ -159,11 +175,15 @@ describe('local MCP process supervision', () => {
     registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
     await mcpProcessManager.start('test', config);
 
-    const resetting = expect(mcpProcessManager.resetForTesting()).rejects.toBeInstanceOf(
-      AggregateError
+    const resettingPromise = mcpProcessManager.resetForTesting();
+    await advanceTimersByTimeAsync(4000);
+    const resettingError = await resettingPromise.then(
+      () => {
+        throw new Error('expected resetForTesting() to reject');
+      },
+      (e) => e
     );
-    await vi.advanceTimersByTimeAsync(4000);
-    await resetting;
+    expect(resettingError).toBeInstanceOf(AggregateError);
 
     expect(mcpProcessManager.getStatus('test')).toMatchObject({ status: 'stopped', pid: null });
   });
@@ -177,11 +197,15 @@ describe('local MCP process supervision', () => {
       });
     });
 
-    const starting = expect(mcpProcessManager.start('test', config)).rejects.toThrow(
-      'did not become ready'
+    const startingPromise = mcpProcessManager.start('test', config);
+    await advanceTimersByTimeAsync(5200);
+    const startingError = await startingPromise.then(
+      () => {
+        throw new Error('expected start() to reject');
+      },
+      (e) => e
     );
-    await vi.advanceTimersByTimeAsync(5200);
-    await starting;
+    expect(startingError.message).toMatch('did not become ready');
 
     expect(mcpProcessManager.getStatus('test')).toMatchObject({
       status: 'failed',
@@ -204,10 +228,16 @@ describe('local MCP process supervision', () => {
         });
       })
       .mockResolvedValue(new Response(null, { status: 405 }));
-    const initial = expect(mcpProcessManager.start('test', config)).rejects.toThrow('cancelled');
-    await vi.advanceTimersByTimeAsync(0);
+    const initialPromise = mcpProcessManager.start('test', config);
+    await advanceTimersByTimeAsync(0);
     const restart = mcpProcessManager.restart('test', config);
-    await initial;
+    const initialError = await initialPromise.then(
+      () => {
+        throw new Error('expected start() to reject');
+      },
+      (e) => e
+    );
+    expect(initialError.message).toMatch('cancelled');
     expect(await restart).toMatchObject({ status: 'running', pid: 106 });
     expect(firstSignal?.aborted).toBe(true);
     expect(spawn).toHaveBeenCalledTimes(2);
@@ -216,9 +246,15 @@ describe('local MCP process supervision', () => {
 
   test('stop cancels a queued start before it spawns', async () => {
     const spawn = registerSpy(Bun, 'spawn');
-    const initial = expect(mcpProcessManager.start('test', config)).rejects.toThrow('cancelled');
+    const initialPromise = mcpProcessManager.start('test', config);
     const stopped = mcpProcessManager.stop('test');
-    await initial;
+    const initialError = await initialPromise.then(
+      () => {
+        throw new Error('expected start() to reject');
+      },
+      (e) => e
+    );
+    expect(initialError.message).toMatch('cancelled');
     expect(await stopped).toMatchObject({ status: 'stopped', pid: null });
     expect(spawn).not.toHaveBeenCalled();
   });
@@ -233,15 +269,21 @@ describe('local MCP process supervision', () => {
         signal!.addEventListener('abort', () => reject(signal!.reason), { once: true });
       });
     });
-    const initial = expect(mcpProcessManager.start('test', config)).rejects.toThrow(
-      'exited before readiness'
-    );
-    await vi.advanceTimersByTimeAsync(0);
+    const initialPromise = mcpProcessManager.start('test', config);
+    await advanceTimersByTimeAsync(0);
     child.finish(1);
-    await initial;
+    // Let the exit propagate (exit event -> abort -> rejection -> timer cleanup).
+    await advanceTimersByTimeAsync(0);
+    expect(jest.getTimerCount()).toBe(0);
+    const initialError = await initialPromise.then(
+      () => {
+        throw new Error('expected start() to reject');
+      },
+      (e) => e
+    );
+    expect(initialError.message).toMatch('exited before readiness');
     expect(signal?.aborted).toBe(true);
     expect(mcpProcessManager.getStatus('test')).toMatchObject({ status: 'failed', pid: null });
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   test('serializes simultaneous starts and config changes without duplicate children', async () => {

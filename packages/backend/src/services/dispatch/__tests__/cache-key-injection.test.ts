@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { ProviderConfig } from '../../../config';
 import type { UnifiedChatRequest } from '../../../types/unified';
@@ -78,7 +78,7 @@ describe('deriveCacheInjectionKey', () => {
         { role: 'user', content: 'hi' },
       ] as any,
     });
-    expect(deriveCacheInjectionKey(req)).toBe(
+    expect(deriveCacheInjectionKey(req)).toBe<unknown>(
       StickySessionManager.computeSessionKey({ ...req, previousResponseId: undefined })
     );
     expect(deriveCacheInjectionKey(req)).not.toBe('r:resp-1');
@@ -91,7 +91,7 @@ describe('deriveCacheInjectionKey', () => {
         { role: 'user', content: 'hi' },
       ] as any,
     });
-    expect(deriveCacheInjectionKey(req)).toBe(StickySessionManager.computeSessionKey(req));
+    expect(deriveCacheInjectionKey(req)).toBe<unknown>(StickySessionManager.computeSessionKey(req));
   });
 
   it('returns undefined when no client or Plexus key exists', () => {

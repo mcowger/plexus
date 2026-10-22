@@ -1,9 +1,8 @@
+import { describe, expect, it, test } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-import { describe, expect, it } from 'vitest';
 
 import { parseArgs } from '../backfill-service-tiers';
 import { backfillServiceTiers } from '../lib/service-tier-backfill';

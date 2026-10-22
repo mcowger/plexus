@@ -1,13 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
+
+import * as piAi from '@earendil-works/pi-ai';
 
 import type { ReasoningIntent } from '../reasoning';
 
 // buildReasoningOptionsForModel calls into pi-ai's clampThinkingLevel /
-// getSupportedThinkingLevels. The global mock in test/vitest.setup.ts provides
+// getSupportedThinkingLevels. The global mock in test/mocks.ts provides
 // a shared implementation, but this suite pins its own faithful copies that
 // honour thinkingLevelMap (mirroring pi-ai's real models.ts) so the tests stay
 // independent of the global mock's shape.
-vi.mock('@earendil-works/pi-ai', () => {
+beforeEach(() => {
   const LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
   const getSupportedThinkingLevels = (model: any) => {
     if (!model.reasoning) return ['off'];
@@ -33,11 +35,8 @@ vi.mock('@earendil-works/pi-ai', () => {
     }
     return avail[0] ?? 'off';
   };
-  return {
-    getModel: (provider: string, modelId: string) => ({ id: modelId, provider }),
-    getSupportedThinkingLevels,
-    clampThinkingLevel,
-  };
+  spyOn(piAi, 'getSupportedThinkingLevels').mockImplementation(getSupportedThinkingLevels as any);
+  spyOn(piAi, 'clampThinkingLevel').mockImplementation(clampThinkingLevel as any);
 });
 
 import type { GenerationIntent } from '../generation';

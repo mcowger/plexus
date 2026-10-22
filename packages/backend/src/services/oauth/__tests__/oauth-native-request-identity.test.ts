@@ -12,7 +12,7 @@
  * startup/offline fallback.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, spyOn, test } from 'bun:test';
 
 import { CC_VERSION } from '../../../transformers/oauth/masking/cc-constants';
 import { ClaudeCodeVersionService } from '../claude-code-version-service';
@@ -78,13 +78,7 @@ describe('prepareOAuthNativeRequest — Claude Code identity', () => {
   });
 
   it('picks up a refreshed version without a restart', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ latest: '9.9.9' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ latest: '9.9.9' }));
     await ClaudeCodeVersionService.getInstance().fetchVersion();
 
     const { userAgent, ccVersion } = preparedIdentity();

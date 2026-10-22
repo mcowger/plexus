@@ -1,8 +1,7 @@
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 
 const openApiDocument = {
   openapi: '3.1.0',
@@ -33,7 +32,7 @@ describe('plexuscli end-to-end', () => {
 
   beforeAll(async () => {
     const result = await Bun.build({
-      entrypoints: [join(process.cwd(), 'src', 'index.ts')],
+      entrypoints: [join(import.meta.dir, '..', '..', 'src', 'index.ts')],
       outdir: buildDir,
       compile: true,
       target: 'bun',

@@ -1,8 +1,7 @@
+import { describe, expect, it, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-
-import { describe, expect, it } from 'vitest';
 
 import {
   getPaseoScriptStatus,

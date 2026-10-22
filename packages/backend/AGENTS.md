@@ -49,7 +49,7 @@ required; verify each against the **live** server, not just unit tests.
 ### Verification
 
 - `bun run typecheck` from `packages/backend` (backed by `bun check`; never `tsc`), `bun fmt` on touched files,
-  and the affected vitest suites.
+  and the affected test suites (`bun test <path>`).
 - **Curl the live dev server** (default `ADMIN_KEY=password` locally):
   `curl -H "x-admin-key: password"
 localhost:<port>/v0/management/oauth/providers` must list the new id.

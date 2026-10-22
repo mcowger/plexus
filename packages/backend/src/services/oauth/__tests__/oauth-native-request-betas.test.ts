@@ -17,7 +17,7 @@
  * `oauth-2025-04-20` are never sent by the caller.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { REQUIRED_BETAS } from '../../../transformers/oauth/masking';
 import { prepareOAuthNativeRequest } from '../oauth-native-request';

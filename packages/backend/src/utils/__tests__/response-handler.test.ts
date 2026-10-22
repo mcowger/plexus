@@ -1,11 +1,13 @@
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
+
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { registerSpy } from '../../../test/test-utils';
 import { TransformerFactory } from '../../services/dispatch/transformer-factory';
 import { DebugManager } from '../../services/observability/debug-manager';
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { handleResponse } from '../../services/responses/response-handler';
+import * as safeguards from '../../transformers/anthropic/synthetic-safeguards';
 import { SYNTHETIC_SAFEGUARD_EXPLANATION } from '../../transformers/anthropic/synthetic-safeguards';
 import { Transformer } from '../../types/transformer';
 import { UnifiedChatResponse } from '../../types/unified';
@@ -15,44 +17,42 @@ import { logger } from '../../utils/logger';
 // Force the alias toggle on for the synthetic-safeguard regression test
 // without depending on global config state; every other test in this file
 // uses apiType 'chat' or omits `safeguards`, so the gate stays closed for them.
-vi.mock('../../transformers/anthropic/synthetic-safeguards', async (importOriginal) => {
-  const mod =
-    await importOriginal<typeof import('../../transformers/anthropic/synthetic-safeguards')>();
-  return {
-    ...mod,
-    resolveSyntheticSafeguardToggle: (canonical?: string | null) =>
+beforeEach(() => {
+  const realToggle = safeguards.resolveSyntheticSafeguardToggle;
+  spyOn(safeguards, 'resolveSyntheticSafeguardToggle').mockImplementation(
+    (canonical?: string | null) =>
       (globalThis as { __forceSyntheticToggle?: boolean }).__forceSyntheticToggle ??
-      mod.resolveSyntheticSafeguardToggle(canonical),
-  };
+      realToggle(canonical)
+  );
 });
 
 describe('handleResponse', () => {
   const originalAdminKey = process.env.ADMIN_KEY;
 
   const mockStorage = {
-    saveRequest: vi.fn(),
-    saveError: vi.fn(),
-    updatePerformanceMetrics: vi.fn(),
+    saveRequest: mock(),
+    saveError: mock(),
+    updatePerformanceMetrics: mock(),
   } as unknown as UsageStorageService;
 
   const mockTransformer: Transformer = {
     name: 'test-transformer',
     defaultEndpoint: '/test',
-    parseRequest: vi.fn(),
-    transformRequest: vi.fn(),
-    transformResponse: vi.fn(),
-    extractUsage: vi.fn(),
-    formatResponse: vi.fn((r) => Promise.resolve({ formatted: true, ...r })),
+    parseRequest: mock(),
+    transformRequest: mock(),
+    transformResponse: mock(),
+    extractUsage: mock(),
+    formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
   };
 
   const mockReply = {
-    send: vi.fn(function (this: any, data) {
+    send: mock(function (this: any, data) {
       return this;
     }),
-    header: vi.fn(function (this: any) {
+    header: mock(function (this: any) {
       return this;
     }),
-    code: vi.fn(function (this: any) {
+    code: mock(function (this: any) {
       return this;
     }),
   } as unknown as FastifyReply;
@@ -62,7 +62,7 @@ describe('handleResponse', () => {
   } as unknown as FastifyRequest;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     process.env.ADMIN_KEY = originalAdminKey;
   });
 
@@ -301,7 +301,7 @@ describe('handleResponse', () => {
     };
     const usageRecord: Partial<UsageRecord> = { requestId: 'req-malformed' };
     const quotaEnforcer = {
-      recordUsage: vi.fn().mockResolvedValue(undefined),
+      recordUsage: mock().mockResolvedValue(undefined),
     };
 
     await handleResponse(
@@ -443,11 +443,11 @@ describe('handleResponse', () => {
       return {
         name: 'fake-stream-transformer',
         defaultEndpoint: '/test',
-        parseRequest: vi.fn(),
-        transformRequest: vi.fn(),
-        transformResponse: vi.fn(),
-        extractUsage: vi.fn(),
-        formatResponse: vi.fn(),
+        parseRequest: mock(),
+        transformRequest: mock(),
+        transformResponse: mock(),
+        extractUsage: mock(),
+        formatResponse: mock(),
         transformStream(stream: ReadableStream): ReadableStream {
           const decoder = new TextDecoder();
           return new ReadableStream({
@@ -969,7 +969,7 @@ describe('handleResponse', () => {
     try {
       const messagesTransformer: Transformer = {
         ...mockTransformer,
-        formatResponse: vi.fn((r: UnifiedChatResponse) =>
+        formatResponse: mock((r: UnifiedChatResponse) =>
           Promise.resolve({
             id: 'msg_1',
             type: 'message',

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { ProviderConfigSchema, setConfigForTesting } from '../../../config';
 import { AnthropicTransformer } from '../../../transformers/anthropic';
@@ -399,7 +399,7 @@ describe('normalizeServiceTier', () => {
     ['priority', 'priority'],
     ['ultrafast', 'ultrafast'],
   ])('normalizes %s to %s', (raw, expected) => {
-    expect(normalizeServiceTier(raw)).toBe(expected);
+    expect(normalizeServiceTier(raw)).toBe<unknown>(expected);
   });
 
   test('returns undefined for a provider-specific value', () => {

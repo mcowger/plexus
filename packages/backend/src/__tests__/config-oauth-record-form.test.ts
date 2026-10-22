@@ -1,5 +1,6 @@
+import { describe, expect, test } from 'bun:test';
+
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
-import { describe, expect, test } from 'vitest';
 
 import { getProviderTypes, ProviderConfigSchema, validateConfig } from '../config';
 

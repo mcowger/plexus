@@ -1,4 +1,3 @@
-import { parse as parseCsvSync } from 'csv-parse/sync';
 /**
  * Unit tests for BackupService — CSV helpers, tar builder/parser,
  * and config backup envelope validation.
@@ -7,7 +6,9 @@ import { parse as parseCsvSync } from 'csv-parse/sync';
  * parts of the service. DB-backed integration tests would need a
  * test database and are out of scope for this file.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
+
+import { parse as parseCsvSync } from 'csv-parse/sync';
 
 // We test the internal helpers via the module's exported functions
 // and the archive round-trip. Since BackupService depends on the DB

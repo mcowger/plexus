@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -112,12 +112,12 @@ describe('copilotWireApiType', () => {
 });
 
 describe('Native GitHub Copilot OAuth', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(COPILOT_TOKEN);
-    fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    fetchSpy = spyOn(global, 'fetch').mockResolvedValue(
       new Response(CHAT_SSE, {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
@@ -126,7 +126,7 @@ describe('Native GitHub Copilot OAuth', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

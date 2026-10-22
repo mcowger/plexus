@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import { Router } from '../routing/router';

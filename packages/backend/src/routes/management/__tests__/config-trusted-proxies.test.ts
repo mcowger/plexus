@@ -1,31 +1,34 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-const serviceState = vi.hoisted(() => {
+import Fastify, { FastifyInstance } from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
+
+const serviceState = (() => {
   const state = {
     trustedProxies: ['0.0.0.0/0', '::/0'] as string[],
-    setSetting: vi.fn(async (key: string, value: unknown) => {
+    setSetting: mock(async (key: string, value: unknown) => {
       if (key === 'trustedProxies') {
         state.trustedProxies = value as string[];
       }
     }),
-    getTrustedProxies: vi.fn(async () => state.trustedProxies),
-    getConfig: vi.fn(() => ({ providers: {} })),
+    getTrustedProxies: mock(async () => state.trustedProxies),
+    getConfig: mock(() => ({ providers: {} })),
   };
   return state;
-});
+})();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(
+    mock(() => ({
       setSetting: serviceState.setSetting,
       getConfig: serviceState.getConfig,
-      getRepository: vi.fn(() => ({
+      getRepository: mock(() => ({
         getTrustedProxies: serviceState.getTrustedProxies,
       })),
-    })),
-  },
-}));
+    })) as any
+  );
+});
 
 import { registerConfigRoutes } from '../config';
 

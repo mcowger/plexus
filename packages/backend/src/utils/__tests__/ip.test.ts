@@ -1,5 +1,6 @@
+import { describe, expect, test } from 'bun:test';
+
 import { FastifyRequest } from 'fastify';
-import { describe, expect, test, vi } from 'vitest';
 
 import { getClientIp, getTrustedClientIp } from '../ip';
 

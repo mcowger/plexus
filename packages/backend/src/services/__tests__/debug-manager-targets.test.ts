@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 
 import { DebugManager } from '../observability/debug-manager';
 import { runInRequestContext } from '../observability/request-context';
@@ -6,13 +6,13 @@ import type { UsageStorageService } from '../observability/usage-storage';
 
 describe('DebugManager target capture', () => {
   let debugManager: DebugManager;
-  let saveDebugLog: ReturnType<typeof vi.fn>;
+  let saveDebugLog: ReturnType<typeof mock>;
 
   beforeEach(() => {
     debugManager = DebugManager.getInstance();
     debugManager.resetForTesting();
     debugManager.setEnabled(false);
-    saveDebugLog = vi.fn();
+    saveDebugLog = mock();
     debugManager.setStorage({ saveDebugLog } as unknown as UsageStorageService);
   });
 

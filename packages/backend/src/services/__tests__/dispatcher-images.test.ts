@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -9,8 +9,10 @@ import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { DebugManager } from '../observability/debug-manager';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-const fetchMock = vi.fn();
-global.fetch = fetchMock as any;
+const fetchMock = mock();
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function baseConfig(providerId: string, provider: any, model: string) {
   return {

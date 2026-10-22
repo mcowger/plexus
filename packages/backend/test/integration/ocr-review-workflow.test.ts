@@ -1,7 +1,7 @@
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 
 const workflow = parse(
@@ -14,12 +14,12 @@ const marker = '<!-- ocr-review-detail -->';
 describe('OCR review workflow', () => {
   let comments: { id?: number; user: { login: string }; body: string }[];
   let github: {
-    paginate: ReturnType<typeof vi.fn>;
+    paginate: ReturnType<typeof mock>;
     rest: {
       issues: {
-        listComments: ReturnType<typeof vi.fn>;
-        createComment: ReturnType<typeof vi.fn>;
-        updateComment: ReturnType<typeof vi.fn>;
+        listComments: ReturnType<typeof mock>;
+        createComment: ReturnType<typeof mock>;
+        updateComment: ReturnType<typeof mock>;
       };
     };
   };
@@ -27,25 +27,25 @@ describe('OCR review workflow', () => {
   beforeEach(() => {
     comments = [];
     github = {
-      paginate: vi.fn(async () => comments),
+      paginate: mock(async () => comments),
       rest: {
         issues: {
-          listComments: vi.fn(),
-          createComment: vi.fn(async ({ body }: { body: string }) => {
+          listComments: mock(),
+          createComment: mock(async ({ body }: { body: string }) => {
             comments.push({
               id: comments.length + 1,
               user: { login: 'github-actions[bot]' },
               body,
             });
           }),
-          updateComment: vi.fn(),
+          updateComment: mock(),
         },
       },
     };
   });
 
   async function runGate(eventName = 'pull_request_target', action = 'opened') {
-    const core = { info: vi.fn(), setOutput: vi.fn() };
+    const core = { info: mock(), setOutput: mock() };
     await runInNewContext(`(async () => { ${gate.with.script} })()`, {
       github,
       core,
@@ -141,13 +141,11 @@ describe('OCR review workflow', () => {
     const summary = steps.find(
       (step: { name: string }) => step.name === 'Post detailed OCR summary'
     );
-    const readReview = vi.fn(() =>
-      JSON.stringify({ comments: [], summary: { files_reviewed: 1 } })
-    );
+    const readReview = mock(() => JSON.stringify({ comments: [], summary: { files_reviewed: 1 } }));
 
     await runInNewContext(`(async () => { ${summary.with.script} })()`, {
       github,
-      core: { warning: vi.fn() },
+      core: { warning: mock() },
       context: {
         repo: { owner: 'owner', repo: 'plexus' },
         payload: { pull_request: { number: 123 } },

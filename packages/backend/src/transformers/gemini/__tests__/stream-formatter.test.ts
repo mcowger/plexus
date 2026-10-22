@@ -1,5 +1,6 @@
+import { describe, expect, test } from 'bun:test';
+
 import { createParser, EventSourceMessage } from 'eventsource-parser';
-import { describe, expect, test } from 'vitest';
 
 import { formatGeminiStream } from '../stream-formatter';
 

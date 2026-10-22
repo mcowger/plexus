@@ -88,19 +88,14 @@ The pre-commit hook runs `bun fmt --staged`, which formats just the staged files
 From the repo root:
 
 ```bash
-bun run test
+bun test                    # whole suite, one process
+bun test --changed=HEAD     # only tests affected by uncommitted changes
+bun test --parallel         # spread files across cores (what CI and the pre-commit hook use)
 ```
 
-Or from the backend package:
+Run plain `bun test` before pushing: it shares one process across all files, so it catches mock and global leaks that `--parallel` hides. Before writing or changing a test, read [docs/TESTING.md](docs/TESTING.md) — it covers how to mock, fake timers and `fetch`, and which patterns leak between files.
 
-```bash
-cd packages/backend
-bun run test
-```
-
-> Note: `bun test` is intentionally blocked both at repo root and in `packages/backend`. Use `bun run test` instead.
-
-The pre-commit hook runs backend tests automatically.
+The pre-commit hook runs the affected tests automatically (`bun test --parallel --changed=HEAD`).
 
 ## Development
 

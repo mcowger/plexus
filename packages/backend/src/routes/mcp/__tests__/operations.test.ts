@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { BackupService } from '../../../services/configuration/backup-service';
@@ -17,7 +17,7 @@ describe('Plexus management MCP routes - operations', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {

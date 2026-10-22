@@ -1,14 +1,17 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from 'bun:test';
 
+import Fastify, { FastifyInstance } from 'fastify';
+
+import { actualLogger, loggerMockModule } from '../../../../test/mocks';
 import { registerSystemLogRoutes } from '../system-logs';
 
-vi.mock('../../../utils/logger', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../utils/logger')>();
-  return actual;
-});
+// This file exercises real log capture; the preload installs a mocked logger.
+mock.module('../../../utils/logger', () => actualLogger);
+const { clearRecentLogsForTesting, logger } = actualLogger;
 
-import { clearRecentLogsForTesting, logger } from '../../../utils/logger';
+afterAll(() => {
+  mock.module('../../../utils/logger', () => loggerMockModule);
+});
 
 describe('system log routes', () => {
   let fastify: FastifyInstance;

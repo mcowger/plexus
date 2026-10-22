@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { UnifiedChatRequest } from '../../../types/unified';
 import { buildGeminiRequest } from '../request-builder';

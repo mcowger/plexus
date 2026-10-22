@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, test } from 'bun:test';
 
 import type { ProviderConfig } from '../../config';
 import {
@@ -10,10 +10,6 @@ import {
 } from '../providers/provider-model-discovery';
 
 describe('provider model discovery', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('derives OpenAI-compatible /models URLs from chat completion URLs', () => {
     const provider: ProviderConfig = {
       api_base_url: 'https://api.example.com/v1/chat/completions',
@@ -77,13 +73,12 @@ describe('provider model discovery', () => {
   });
 
   it('does not forward provider API keys to the public Ollama catalog', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ models: ['llama3.2'] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     );
-    vi.stubGlobal('fetch', fetchMock);
 
     const provider: ProviderConfig = {
       api_base_url: { ollama: 'https://ollama.example.com/api' },
@@ -106,13 +101,12 @@ describe('provider model discovery', () => {
   });
 
   it('uses Anthropic API-key authentication for Anthropic model endpoints', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ data: [{ id: 'claude-sonnet-4-20250514' }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     );
-    vi.stubGlobal('fetch', fetchMock);
 
     await fetchModelsFromUrl('https://api.anthropic.com/v1/models', 'sk-ant-test');
 
@@ -125,13 +119,12 @@ describe('provider model discovery', () => {
   });
 
   it('uses Bearer authentication for non-Anthropic model endpoints', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ data: [{ id: 'gpt-5' }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     );
-    vi.stubGlobal('fetch', fetchMock);
 
     await fetchModelsFromUrl('https://api.example.com/v1/models', 'sk-test');
 

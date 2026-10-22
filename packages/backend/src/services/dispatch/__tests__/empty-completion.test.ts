@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { ResponsesTransformer } from '../../../transformers/responses';
 import type { UnifiedChatResponse } from '../../../types/unified';

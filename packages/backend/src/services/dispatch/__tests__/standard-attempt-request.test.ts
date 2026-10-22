@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import type { UnifiedChatRequest } from '../../../types/unified';
@@ -75,33 +75,33 @@ function makeStreamingRequest(): UnifiedChatRequest {
 
 function makeHost(overrides: Partial<RequestManagerHost> = {}): RequestManagerHost {
   return {
-    appendFailureAttempt: vi.fn(),
-    appendSkippedAttempt: vi.fn(),
-    appendSuccessAttempt: vi.fn(),
-    attachAttemptMetadata: vi.fn(),
-    buildAllTargetsFailedError: vi.fn(() => new Error('all targets failed')),
-    buildCancelledError: vi.fn(() => new Error('cancelled')),
-    buildRequestUrl: vi.fn(() => 'https://example.test/v1/chat/completions'),
-    buildTimeoutError: vi.fn(() => new Error('timeout')),
-    createAttemptTimeout: vi.fn(),
-    dispatchImageGenerations: vi.fn(async () => ({}) as any),
-    emitRoutingUpdate: vi.fn(),
-    executeProviderRequest: vi.fn(),
-    formatFailureReason: vi.fn((error: any) => error?.message ?? 'error'),
-    getUsageStorage: vi.fn(() => undefined),
-    handleNonStreamingResponse: vi.fn(async () => ({}) as any),
-    handleProviderError: vi.fn(),
-    handleStreamingResponse: vi.fn(() => ({}) as any),
-    isPiAiRoute: vi.fn(() => false),
-    isRetryableNetworkError: vi.fn(() => false),
-    isRetryableStatus: vi.fn(() => false),
-    probeStreamingStart: vi.fn(),
-    recordAttemptMetric: vi.fn(async () => {}),
-    recordStickySession: vi.fn(),
-    saveIntermediateError: vi.fn(),
-    selectTargetApiType: vi.fn(() => ({ selectionReason: 'test' })),
-    setupHeaders: vi.fn(() => ({})),
-    transformRequestPayload: vi.fn(async () => ({ payload: {}, bypassTransformation: false })),
+    appendFailureAttempt: mock(),
+    appendSkippedAttempt: mock(),
+    appendSuccessAttempt: mock(),
+    attachAttemptMetadata: mock(),
+    buildAllTargetsFailedError: mock(() => new Error('all targets failed')),
+    buildCancelledError: mock(() => new Error('cancelled')),
+    buildRequestUrl: mock(() => 'https://example.test/v1/chat/completions'),
+    buildTimeoutError: mock(() => new Error('timeout')),
+    createAttemptTimeout: mock(),
+    dispatchImageGenerations: mock(async () => ({}) as any),
+    emitRoutingUpdate: mock(),
+    executeProviderRequest: mock(),
+    formatFailureReason: mock((error: any) => error?.message ?? 'error'),
+    getUsageStorage: mock(() => undefined),
+    handleNonStreamingResponse: mock(async () => ({}) as any),
+    handleProviderError: mock(),
+    handleStreamingResponse: mock(() => ({}) as any),
+    isPiAiRoute: mock(() => false),
+    isRetryableNetworkError: mock(() => false),
+    isRetryableStatus: mock(() => false),
+    probeStreamingStart: mock(),
+    recordAttemptMetric: mock(async () => {}),
+    recordStickySession: mock(),
+    saveIntermediateError: mock(),
+    selectTargetApiType: mock(() => ({ selectionReason: 'test' })),
+    setupHeaders: mock(() => ({})),
+    transformRequestPayload: mock(async () => ({ payload: {}, bypassTransformation: false })),
     ...overrides,
   };
 }
@@ -127,13 +127,12 @@ describe('executeStandardAttempt — per-fetch TTFB budget reset', () => {
     );
     const okResponse = new Response(null, { status: 200 });
 
-    const executeProviderRequest = vi
-      .fn()
+    const executeProviderRequest = mock()
       .mockResolvedValueOnce(badRequestResponse)
       .mockResolvedValueOnce(okResponse);
 
     const probeStopError = new Error('test-stop-after-probe');
-    const probeStreamingStart = vi.fn().mockResolvedValue({
+    const probeStreamingStart = mock().mockResolvedValue({
       ok: false,
       streamStarted: true,
       error: probeStopError,
@@ -164,7 +163,7 @@ describe('executeStandardAttempt — per-fetch TTFB budget reset', () => {
       attemptTimeout: {
         signal: new AbortController().signal,
         isTimedOut: () => false,
-        cleanup: vi.fn(),
+        cleanup: mock(),
       },
       failoverEnabled: true,
       hasNextTarget: true,
@@ -173,7 +172,7 @@ describe('executeStandardAttempt — per-fetch TTFB budget reset', () => {
       retryHistory: [],
       attemptedProviders: [],
       sessionKey: null,
-      release: vi.fn(),
+      release: mock(),
     };
 
     await expect(executeStandardAttempt(context)).rejects.toThrow('test-stop-after-probe');
@@ -220,7 +219,7 @@ describe('executeStandardAttempt — auto fast-mode beta', () => {
       attemptTimeout: {
         signal: new AbortController().signal,
         isTimedOut: () => false,
-        cleanup: vi.fn(),
+        cleanup: mock(),
       },
       failoverEnabled: true,
       hasNextTarget: true,
@@ -229,7 +228,7 @@ describe('executeStandardAttempt — auto fast-mode beta', () => {
       retryHistory: [],
       attemptedProviders: [],
       sessionKey: null,
-      release: vi.fn(),
+      release: mock(),
     };
   }
 
@@ -239,12 +238,9 @@ describe('executeStandardAttempt — auto fast-mode beta', () => {
       { status: 400 }
     );
     const ok = new Response('{"id":"msg_1"}', { status: 200 });
-    const executeProviderRequest = vi
-      .fn()
-      .mockResolvedValueOnce(speed400)
-      .mockResolvedValueOnce(ok);
-    const handleNonStreamingResponse = vi.fn(async () => ({ content: 'ok' }) as any);
-    const setupHeaders = vi.fn(() => ({ 'anthropic-beta': 'client-beta' }));
+    const executeProviderRequest = mock().mockResolvedValueOnce(speed400).mockResolvedValueOnce(ok);
+    const handleNonStreamingResponse = mock(async () => ({ content: 'ok' }) as any);
+    const setupHeaders = mock(() => ({ 'anthropic-beta': 'client-beta' }));
     const host = makeHost({
       executeProviderRequest,
       handleNonStreamingResponse,
@@ -308,7 +304,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
       attemptTimeout: {
         signal: new AbortController().signal,
         isTimedOut: () => false,
-        cleanup: vi.fn(),
+        cleanup: mock(),
       },
       failoverEnabled: true,
       hasNextTarget: true,
@@ -317,7 +313,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
       retryHistory: [],
       attemptedProviders: [],
       sessionKey: null,
-      release: vi.fn(),
+      release: mock(),
       ...overrides,
     };
   }
@@ -326,13 +322,13 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     // Fresh Response per call: a Response body is single-read, so a shared
     // instance would throw on a second (buggy) fetch's .text() and mask the
     // real assertion failure.
-    const executeProviderRequest = vi.fn(
+    const executeProviderRequest = mock(
       async () => new Response(signature400Body, { status: 400 })
     );
-    const handleProviderError = vi.fn(async () => {
+    const handleProviderError = mock(async () => {
       throw new Error('HTTP 400: invalid signature');
     });
-    const isRetryableStatus = vi.fn(() => true);
+    const isRetryableStatus = mock(() => true);
     const host = makeHost({ executeProviderRequest, handleProviderError, isRetryableStatus });
 
     // The known false-positive shape: an OpenAI-chat-format payload also has
@@ -358,11 +354,10 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
   });
 
   it('strips thinking blocks copy-on-write on a genuine signature 400: original payload object never mutated, retried payload stripped', async () => {
-    const executeProviderRequest = vi
-      .fn()
+    const executeProviderRequest = mock()
       .mockImplementationOnce(async () => new Response(signature400Body, { status: 400 }))
       .mockImplementationOnce(async () => new Response('{"id":"msg_1"}', { status: 200 }));
-    const handleNonStreamingResponse = vi.fn(async () => ({ content: 'ok' }) as any);
+    const handleNonStreamingResponse = mock(async () => ({ content: 'ok' }) as any);
     const host = makeHost({ executeProviderRequest, handleNonStreamingResponse });
 
     const providerPayload = {
@@ -403,10 +398,10 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     const stripBody = JSON.stringify({
       error: { message: 'Unsupported parameter: service_tier' },
     });
-    const executeProviderRequest = vi
-      .fn()
-      .mockImplementation(async () => new Response(stripBody, { status: 400 }));
-    const handleProviderError = vi.fn(async () => {
+    const executeProviderRequest = mock().mockImplementation(
+      async () => new Response(stripBody, { status: 400 })
+    );
+    const handleProviderError = mock(async () => {
       throw new Error('HTTP 400: unsupported parameter');
     });
     const host = makeHost({ executeProviderRequest, handleProviderError });
@@ -430,7 +425,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
   });
 
   it('retries on early stream error from probeStreamingStart', async () => {
-    const executeProviderRequest = vi.fn(
+    const executeProviderRequest = mock(
       async () =>
         new Response('data: {"error":{"code":429,"message":"Rate limit"}}\n\n', { status: 200 })
     );
@@ -439,7 +434,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     (streamError as any).statusCode = 429;
     (streamError as any).cooldownDuration = 30000;
 
-    const probeStreamingStart = vi.fn().mockResolvedValue({
+    const probeStreamingStart = mock().mockResolvedValue({
       ok: false,
       error: streamError,
       streamStarted: false,
@@ -486,20 +481,19 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     const authManager = OAuthAuthManager.getInstance();
     const getApiKeySpy = registerSpy(authManager, 'getApiKey').mockResolvedValue('new-token');
 
-    const executeProviderRequest = vi
-      .fn()
+    const executeProviderRequest = mock()
       .mockImplementationOnce(
         async () => new Response('{"error":{"code":"token_expired"}}', { status: 401 })
       )
       .mockImplementationOnce(async () => new Response('{"id":"resp_ok"}', { status: 200 }));
-    const handleNonStreamingResponse = vi.fn(async () => ({ content: 'success' }) as any);
-    const handleProviderError = vi.fn();
+    const handleNonStreamingResponse = mock(async () => ({ content: 'success' }) as any);
+    const handleProviderError = mock();
     const host = makeHost({
       executeProviderRequest,
       handleNonStreamingResponse,
       handleProviderError,
-      buildRequestUrl: vi.fn(() => (route as any)[NATIVE_OAUTH_STASH].url),
-      setupHeaders: vi.fn(() => ({ ...(route as any)[NATIVE_OAUTH_STASH].headers })),
+      buildRequestUrl: mock(() => (route as any)[NATIVE_OAUTH_STASH].url),
+      setupHeaders: mock(() => ({ ...(route as any)[NATIVE_OAUTH_STASH].headers })),
     });
 
     const result = await executeStandardAttempt(
@@ -544,19 +538,17 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     const authManager = OAuthAuthManager.getInstance();
     registerSpy(authManager, 'getApiKey').mockResolvedValue('new-token');
 
-    const executeProviderRequest = vi
-      .fn()
-      .mockImplementation(
-        async () => new Response('{"error":{"code":"token_expired"}}', { status: 401 })
-      );
-    const handleProviderError = vi.fn(async () => {
+    const executeProviderRequest = mock().mockImplementation(
+      async () => new Response('{"error":{"code":"token_expired"}}', { status: 401 })
+    );
+    const handleProviderError = mock(async () => {
       throw new Error('HTTP 401: Unauthorized');
     });
     const host = makeHost({
       executeProviderRequest,
       handleProviderError,
-      buildRequestUrl: vi.fn(() => (route as any)[NATIVE_OAUTH_STASH].url),
-      setupHeaders: vi.fn(() => ({ ...(route as any)[NATIVE_OAUTH_STASH].headers })),
+      buildRequestUrl: mock(() => (route as any)[NATIVE_OAUTH_STASH].url),
+      setupHeaders: mock(() => ({ ...(route as any)[NATIVE_OAUTH_STASH].headers })),
     });
 
     await expect(
@@ -582,12 +574,10 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     const authManager = OAuthAuthManager.getInstance();
     const getApiKeySpy = registerSpy(authManager, 'getApiKey');
 
-    const executeProviderRequest = vi
-      .fn()
-      .mockImplementationOnce(
-        async () => new Response('{"error":"invalid_api_key"}', { status: 401 })
-      );
-    const handleProviderError = vi.fn(async () => {
+    const executeProviderRequest = mock().mockImplementationOnce(
+      async () => new Response('{"error":"invalid_api_key"}', { status: 401 })
+    );
+    const handleProviderError = mock(async () => {
       throw new Error('HTTP 401: Invalid API key');
     });
     const host = makeHost({
@@ -612,8 +602,7 @@ describe('executeStandardAttempt sticky expiration', () => {
     'captures final retry payload and start time (stream=%s)',
     async (stream) => {
       const clock = registerSpy(Date, 'now').mockReturnValue(1_000);
-      const executeProviderRequest = vi
-        .fn()
+      const executeProviderRequest = mock()
         .mockImplementationOnce(async () => {
           clock.mockReturnValue(10_000);
           return new Response(
@@ -629,8 +618,8 @@ describe('executeStandardAttempt sticky expiration', () => {
         });
       const host = makeHost({
         executeProviderRequest,
-        probeStreamingStart: vi.fn(async (response) => ({ ok: true, response })),
-        handleNonStreamingResponse: vi.fn(async () => ({ content: 'ok' }) as any),
+        probeStreamingStart: mock(async (response) => ({ ok: true, response })),
+        handleNonStreamingResponse: mock(async () => ({ content: 'ok' }) as any),
       });
       const request = { ...makeStreamingRequest(), stream };
       const route = makeRoute();
@@ -648,7 +637,7 @@ describe('executeStandardAttempt sticky expiration', () => {
         attemptTimeout: {
           signal: new AbortController().signal,
           isTimedOut: () => false,
-          cleanup: vi.fn(),
+          cleanup: mock(),
         },
         failoverEnabled: false,
         hasNextTarget: false,
@@ -657,16 +646,12 @@ describe('executeStandardAttempt sticky expiration', () => {
         retryHistory: [],
         attemptedProviders: [],
         sessionKey: 'session',
-        release: vi.fn(),
+        release: mock(),
       });
       expect(result.outcome).toBe('success');
       expect(executeProviderRequest).toHaveBeenCalledTimes(2);
-      expect(host.recordStickySession).toHaveBeenCalledExactlyOnceWith(
-        'session',
-        route,
-        request,
-        310_000
-      );
+      expect(host.recordStickySession).toHaveBeenCalledTimes(1);
+      expect(host.recordStickySession).toHaveBeenCalledWith('session', route, request, 310_000);
     }
   );
 });

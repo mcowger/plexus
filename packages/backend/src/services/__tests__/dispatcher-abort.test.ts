@@ -1,9 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from 'bun:test';
 
+import { advanceTimersByTimeAsync } from '../../../test/test-utils';
 import { Dispatcher } from '../dispatch/dispatcher';
 
 // Prevent real network calls
-global.fetch = vi.fn(async () => new Response('', { status: 200 })) as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(
+    mock(async () => new Response('', { status: 200 })) as any
+  );
+});
 
 describe('Dispatcher — AbortSignal / cancellation', () => {
   let dispatcher: Dispatcher;
@@ -13,7 +18,7 @@ describe('Dispatcher — AbortSignal / cancellation', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   test('buildCancelledError returns 499 and client_disconnected for a plain abort', () => {
@@ -41,7 +46,7 @@ describe('Dispatcher — AbortSignal / cancellation', () => {
   });
 
   test('per-attempt timeout does not abort the route signal', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     const routeController = new AbortController();
 
     const attemptTimeout = (dispatcher as any).createAttemptTimeout(
@@ -50,8 +55,7 @@ describe('Dispatcher — AbortSignal / cancellation', () => {
       () => 4_000
     );
 
-    await vi.advanceTimersByTimeAsync(4_000);
-
+    await advanceTimersByTimeAsync(4_000);
     expect(attemptTimeout.isTimedOut()).toBe(true);
     expect(attemptTimeout.signal.aborted).toBe(true);
     expect(routeController.signal.aborted).toBe(false);
@@ -67,8 +71,8 @@ describe('Dispatcher — AbortSignal / cancellation', () => {
 
   test('executeProviderRequest forwards AbortSignal to fetch', async () => {
     const controller = new AbortController();
-    const mockFetch = vi.fn(async () => new Response('{}', { status: 200 }));
-    global.fetch = mockFetch as any;
+    const mockFetch = mock(async () => new Response('{}', { status: 200 }));
+    spyOn(globalThis, 'fetch').mockImplementation(mockFetch as any);
 
     await (dispatcher as any).executeProviderRequest(
       'https://example.com/v1/test',

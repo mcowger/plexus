@@ -1,13 +1,16 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
-const serviceState = vi.hoisted(() => {
+import Fastify, { FastifyInstance } from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
+
+const serviceState = (() => {
   const state = {
     keys: {} as Record<string, any>,
-    saveKey: vi.fn(async (name: string, config: any) => {
+    saveKey: mock(async (name: string, config: any) => {
       state.keys[name] = config;
     }),
-    disableTimeBoundKey: vi.fn(async (name: string) => {
+    disableTimeBoundKey: mock(async (name: string) => {
       const key = state.keys[name];
       if (!key?.expiresAt) return false;
       state.keys[name] = { ...key, disabledAt: Date.now() };
@@ -15,19 +18,19 @@ const serviceState = vi.hoisted(() => {
     }),
   };
   return state;
-});
+})();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(
+    mock(() => ({
       saveKey: serviceState.saveKey,
       disableTimeBoundKey: serviceState.disableTimeBoundKey,
-      getRepository: vi.fn(() => ({
-        getAllKeys: vi.fn(async () => serviceState.keys),
+      getRepository: mock(() => ({
+        getAllKeys: mock(async () => serviceState.keys),
       })),
-    })),
-  },
-}));
+    })) as any
+  );
+});
 
 import { registerConfigRoutes } from '../config';
 

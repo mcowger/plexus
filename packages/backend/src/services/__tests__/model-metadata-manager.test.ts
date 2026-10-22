@@ -1,7 +1,7 @@
+import { afterAll, afterEach, beforeAll, describe, expect, jest, spyOn, test } from 'bun:test';
 import path from 'path';
 
-import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-
+import { advanceTimersByTimeAsync, asFetch } from '../../../test/test-utils';
 import type { MetadataOverrides, ModelConfig, ProviderConfig } from '../../config';
 import {
   mergeOverrides,
@@ -22,8 +22,7 @@ afterAll(() => {
 });
 
 afterEach(() => {
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
+  jest.useRealTimers();
 });
 
 // ─── OpenRouter ──────────────────────────────────────────────────
@@ -156,55 +155,56 @@ describe('ModelMetadataManager – OpenRouter source', () => {
 
   test('loadAll merges OpenRouter embeddings and videos catalog endpoints', async () => {
     ModelMetadataManager.resetForTesting();
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith('/api/v1/models')) {
-        return new Response(JSON.stringify({ data: [{ id: 'openai/gpt-4o', name: 'GPT-4o' }] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (url.endsWith('/api/v1/embeddings/models')) {
-        return new Response(
-          JSON.stringify({
-            data: [
-              {
-                id: 'google/gemini-embedding-2',
-                name: 'Google: Gemini Embedding 2',
-                description: 'Multimodal embedding model',
-                context_length: 8192,
-                architecture: {
-                  modality: 'text+image+file+audio+video->embeddings',
-                  input_modalities: ['text', 'image', 'file', 'audio', 'video'],
-                  output_modalities: ['embeddings'],
-                  tokenizer: 'Gemini',
-                  instruct_type: null,
+    const fetchMock = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith('/api/v1/models')) {
+          return new Response(JSON.stringify({ data: [{ id: 'openai/gpt-4o', name: 'GPT-4o' }] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (url.endsWith('/api/v1/embeddings/models')) {
+          return new Response(
+            JSON.stringify({
+              data: [
+                {
+                  id: 'google/gemini-embedding-2',
+                  name: 'Google: Gemini Embedding 2',
+                  description: 'Multimodal embedding model',
+                  context_length: 8192,
+                  architecture: {
+                    modality: 'text+image+file+audio+video->embeddings',
+                    input_modalities: ['text', 'image', 'file', 'audio', 'video'],
+                    output_modalities: ['embeddings'],
+                    tokenizer: 'Gemini',
+                    instruct_type: null,
+                  },
                 },
-              },
-            ],
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-      if (url.endsWith('/api/v1/videos/models')) {
-        return new Response(
-          JSON.stringify({
-            data: [
-              {
-                id: 'google/veo-3.1-fast',
-                name: 'Google: Veo 3.1 Fast',
-                description: 'Video generation model',
-                supported_frame_images: ['first_frame'],
-                generate_audio: true,
-              },
-            ],
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-      return new Response('{}', { status: 404, statusText: 'Not Found' });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (url.endsWith('/api/v1/videos/models')) {
+          return new Response(
+            JSON.stringify({
+              data: [
+                {
+                  id: 'google/veo-3.1-fast',
+                  name: 'Google: Veo 3.1 Fast',
+                  description: 'Video generation model',
+                  supported_frame_images: ['first_frame'],
+                  generate_audio: true,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response('{}', { status: 404, statusText: 'Not Found' });
+      })
+    );
 
     const manager = ModelMetadataManager.getInstance();
     await manager.loadAll({
@@ -405,9 +405,8 @@ describe('ModelMetadataManager – Catwalk source', () => {
 describe('ModelMetadataManager – limit normalization', () => {
   test('omits non-positive catalog limits instead of producing invalid overrides', async () => {
     ModelMetadataManager.resetForTesting();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(
         async () =>
           new Response(
             JSON.stringify({
@@ -522,9 +521,8 @@ describe('ModelMetadataManager – error handling', () => {
     const before = mgr.getMetadata('models.dev', 'anthropic.claude-3-5-haiku-20241022');
     expect(before?.name).toBe('Claude Haiku 3.5');
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(
         async () =>
           new Response(JSON.stringify({ anthropic: { models: {} } }), {
             status: 200,
@@ -556,9 +554,8 @@ describe('ModelMetadataManager – error handling', () => {
     const before = mgr.getMetadata('catwalk', 'anthropic.claude-3-5-haiku-20241022');
     expect(before?.name).toBe('Claude 3.5 Haiku');
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(
         async () =>
           new Response(JSON.stringify([]), {
             status: 200,
@@ -578,22 +575,23 @@ describe('ModelMetadataManager – error handling', () => {
   });
 
   test('startAutoRefresh schedules refresh every 60 minutes', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     ModelMetadataManager.resetForTesting();
     const mgr = ModelMetadataManager.getInstance();
 
-    const fetchMock = vi.fn(async (_input: string | URL | Request) => {
-      return new Response(
-        JSON.stringify({
-          data: [{ id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }],
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async (_input: string | URL | Request) => {
+        return new Response(
+          JSON.stringify({
+            data: [{ id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }],
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      })
+    );
 
     await mgr.refreshAll({
       openrouter: 'https://example.com/openrouter.json',
@@ -604,8 +602,7 @@ describe('ModelMetadataManager – error handling', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
 
     mgr.startAutoRefresh(60);
-    await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
-
+    await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
     expect(fetchMock).toHaveBeenCalledTimes(6);
     mgr.stopAutoRefresh();
   });
@@ -770,9 +767,8 @@ describe('resolveModelMetadata', () => {
 
   test('overrides catalog text output for embeddings aliases', async () => {
     ModelMetadataManager.resetForTesting();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(
         async () =>
           new Response(
             JSON.stringify({

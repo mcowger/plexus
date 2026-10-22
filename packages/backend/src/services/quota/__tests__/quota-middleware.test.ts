@@ -1,5 +1,6 @@
+import { describe, expect, it, mock, test } from 'bun:test';
+
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { describe, expect, test, vi } from 'vitest';
 
 import type { QuotaCheckSnapshot, QuotaContext, QuotaEnforcer } from '../quota-enforcer';
 import {
@@ -39,11 +40,11 @@ function makeContext(overrides: Partial<QuotaContext> = {}): QuotaContext {
 
 function makeReply(): FastifyReply {
   return {
-    send: vi.fn(function (this: any, data) {
+    send: mock(function (this: any, data) {
       this.body = data;
       return this;
     }),
-    code: vi.fn(function (this: any, code: number) {
+    code: mock(function (this: any, code: number) {
       this.statusCode = code;
       return this;
     }),
@@ -256,7 +257,7 @@ describe('checkQuotaMiddleware', () => {
   test('no keyName on request — allows through with a null context', async () => {
     const request = {} as FastifyRequest;
     const reply = makeReply();
-    const quotaEnforcer = { loadQuotaContext: vi.fn() } as unknown as QuotaEnforcer;
+    const quotaEnforcer = { loadQuotaContext: mock() } as unknown as QuotaEnforcer;
 
     const result = await checkQuotaMiddleware(request, reply, quotaEnforcer);
     expect(result).toEqual({ ok: true, context: null });
@@ -269,7 +270,7 @@ describe('checkQuotaMiddleware', () => {
     const request = { keyName: 'k1' } as unknown as FastifyRequest;
     const reply = makeReply();
     const quotaEnforcer = {
-      loadQuotaContext: vi.fn().mockResolvedValue(ctx),
+      loadQuotaContext: mock().mockResolvedValue(ctx),
     } as unknown as QuotaEnforcer;
 
     const result = await checkQuotaMiddleware(request, reply, quotaEnforcer);
@@ -293,7 +294,7 @@ describe('checkQuotaMiddleware', () => {
     const request = { keyName: 'k1' } as unknown as FastifyRequest;
     const reply = makeReply();
     const quotaEnforcer = {
-      loadQuotaContext: vi.fn().mockResolvedValue(ctx),
+      loadQuotaContext: mock().mockResolvedValue(ctx),
     } as unknown as QuotaEnforcer;
 
     const result = await checkQuotaMiddleware(request, reply, quotaEnforcer);
@@ -308,7 +309,7 @@ describe('checkQuotaMiddleware', () => {
     const request = { keyName: 'k1' } as unknown as FastifyRequest;
     const reply = makeReply();
     const quotaEnforcer = {
-      loadQuotaContext: vi.fn().mockResolvedValue(null),
+      loadQuotaContext: mock().mockResolvedValue(null),
     } as unknown as QuotaEnforcer;
 
     const result = await checkQuotaMiddleware(request, reply, quotaEnforcer);
@@ -318,18 +319,22 @@ describe('checkQuotaMiddleware', () => {
 });
 
 describe('recordQuotaUsage', () => {
-  function makeEnforcer(recordUsage = vi.fn(async () => undefined)): QuotaEnforcer {
+  function makeEnforcer(
+    recordUsage = mock<QuotaEnforcer['recordUsage']>(async () => undefined)
+  ): QuotaEnforcer {
     return { recordUsage } as unknown as QuotaEnforcer;
   }
 
   test('no keyName — returns without touching the enforcer', async () => {
-    const quotaEnforcer = makeEnforcer();
+    const recordUsage = mock<QuotaEnforcer['recordUsage']>(async () => undefined);
+    const quotaEnforcer = makeEnforcer(recordUsage);
     await recordQuotaUsage(undefined, 'openai', 'gpt-5', { costTotal: 1 }, quotaEnforcer);
-    expect(quotaEnforcer.recordUsage).not.toHaveBeenCalled();
+    expect(recordUsage).not.toHaveBeenCalled();
   });
 
   test('normalizes nullable usage fields to undefined and forwards provider/model positionally', async () => {
-    const quotaEnforcer = makeEnforcer();
+    const recordUsage = mock<QuotaEnforcer['recordUsage']>(async () => undefined);
+    const quotaEnforcer = makeEnforcer(recordUsage);
     await recordQuotaUsage(
       'k1',
       'openai',
@@ -344,9 +349,8 @@ describe('recordQuotaUsage', () => {
       quotaEnforcer
     );
 
-    expect(quotaEnforcer.recordUsage).toHaveBeenCalledTimes(1);
-    const [keyArg, providerArg, modelArg, usageArg] = vi.mocked(quotaEnforcer.recordUsage).mock
-      .calls[0]!;
+    expect(recordUsage).toHaveBeenCalledTimes(1);
+    const [keyArg, providerArg, modelArg, usageArg] = recordUsage.mock.calls[0]!;
     expect(keyArg).toBe('k1');
     expect(providerArg).toBe('openai');
     expect(modelArg).toBe('gpt-5');
@@ -356,16 +360,17 @@ describe('recordQuotaUsage', () => {
   });
 
   test('null/undefined finalProvider and finalModel fall back to empty strings', async () => {
-    const quotaEnforcer = makeEnforcer();
+    const recordUsage = mock<QuotaEnforcer['recordUsage']>(async () => undefined);
+    const quotaEnforcer = makeEnforcer(recordUsage);
     await recordQuotaUsage('k1', null, undefined, {}, quotaEnforcer);
 
-    const [, providerArg, modelArg] = vi.mocked(quotaEnforcer.recordUsage).mock.calls[0]!;
+    const [, providerArg, modelArg] = recordUsage.mock.calls[0]!;
     expect(providerArg).toBe('');
     expect(modelArg).toBe('');
   });
 
   test('a failing enforcer is swallowed — quota accounting must not fail the request', async () => {
-    const quotaEnforcer = makeEnforcer(vi.fn().mockRejectedValue(new Error('db down')));
+    const quotaEnforcer = makeEnforcer(mock().mockRejectedValue(new Error('db down')));
     await expect(
       recordQuotaUsage('k1', 'openai', 'gpt-5', { costTotal: 1 }, quotaEnforcer)
     ).resolves.toBeUndefined();

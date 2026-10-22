@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, test } from 'bun:test';
 
-import { registerSpy } from '../../../../test/test-utils';
+import { eq } from 'drizzle-orm';
+
+import { advanceTimersByTimeAsync, registerSpy } from '../../../../test/test-utils';
 import type { QuotaConfig } from '../../../config';
 import {
   closeDatabase,
@@ -254,7 +255,7 @@ describe('QuotaScheduler persistence', () => {
 
   it('times out while loading the last successful snapshot', async () => {
     const scheduler = QuotaScheduler.getInstance() as any;
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     try {
       let resolveFallbackStarted!: () => void;
@@ -291,12 +292,19 @@ describe('QuotaScheduler persistence', () => {
       scheduler.schema = getSchema();
 
       const latestPromise = scheduler.getLatestQuota(CHECKER_ID);
-      const timeoutAssertion = expect(latestPromise).rejects.toThrow('Database query timeout');
+      // Capture (rather than `expect(latestPromise).rejects` up front): that matcher blocks until
+      // the promise settles, and this one only settles once the clock advances below.
+      const timeoutError = latestPromise.then(
+        () => {
+          throw new Error('expected getLatestQuota to reject');
+        },
+        (e: Error) => e
+      );
       await fallbackStarted;
-      await vi.advanceTimersByTimeAsync(15_000);
-      await timeoutAssertion;
+      await advanceTimersByTimeAsync(15_000);
+      expect((await timeoutError).message).toMatch('Database query timeout');
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
@@ -333,7 +341,7 @@ describe('QuotaScheduler persistence', () => {
   });
 
   it('updates existing checker options and reschedules interval changes on reload', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     try {
       const scheduler = QuotaScheduler.getInstance();
@@ -369,16 +377,15 @@ describe('QuotaScheduler persistence', () => {
       expect(updatedConfig?.intervalMinutes).toBe(1);
       expect(updatedConfig?.options.endpoint).toBe('https://new.example.com/v2/quotas');
 
-      await vi.advanceTimersByTimeAsync(60_000);
-
+      await advanceTimersByTimeAsync(60_000);
       expect(runCheckNow).toHaveBeenCalledWith('synthetic-reload-checker');
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
   it('serializes and spaces Claude checks that share the Anthropic usage endpoint', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     try {
       const scheduler = QuotaScheduler.getInstance() as any;
@@ -394,20 +401,19 @@ describe('QuotaScheduler persistence', () => {
 
       const first = scheduler.runCheckNow('claude-checker-1');
       const second = scheduler.runCheckNow('claude-checker-2');
-      await vi.advanceTimersByTimeAsync(0);
-
+      await advanceTimersByTimeAsync(0);
       expect(check).toHaveBeenCalledTimes(1);
       const firstResult = await first;
 
-      await vi.advanceTimersByTimeAsync(14_999);
+      await advanceTimersByTimeAsync(14_999);
       expect(check).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(1);
+      await advanceTimersByTimeAsync(1);
       const secondResult = await second;
       expect(check).toHaveBeenCalledTimes(2);
       expect(Date.parse(secondResult!.checkedAt) - Date.parse(firstResult!.checkedAt)).toBe(15_000);
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 });

@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+
 import Fastify from 'fastify';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { setConfigForTesting } from '../../src/config';
 import { registerDecisionsRoute } from '../../src/routes/inference/decisions';
@@ -9,8 +10,10 @@ import { buildQuotaExceededError } from '../../src/services/quota/quota-middlewa
 import { ConcurrencyTracker } from '../../src/services/runtime/concurrency-tracker';
 import { CooldownManager } from '../../src/services/runtime/cooldown-manager';
 
-const fetchMock = vi.fn();
-global.fetch = fetchMock as any;
+const fetchMock = mock();
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function decisionsConfig() {
   return {
@@ -111,10 +114,10 @@ describe('POST /v1/decisions', () => {
     savedRequests = [];
     savedErrors = [];
     storage = {
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
-      saveRequest: vi.fn((record: any) => savedRequests.push(record)),
-      saveError: vi.fn((...args: any[]) => savedErrors.push(args)),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
+      saveRequest: mock((record: any) => savedRequests.push(record)),
+      saveError: mock((...args: any[]) => savedErrors.push(args)),
     };
   });
 
@@ -294,10 +297,10 @@ describe('POST /v1/decisions policy hardening', () => {
     savedRequests = [];
     savedErrors = [];
     storage = {
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
-      saveRequest: vi.fn((record: any) => savedRequests.push(record)),
-      saveError: vi.fn((...args: any[]) => savedErrors.push(args)),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
+      saveRequest: mock((record: any) => savedRequests.push(record)),
+      saveError: mock((...args: any[]) => savedErrors.push(args)),
     };
   });
 
@@ -433,7 +436,7 @@ describe('POST /v1/decisions policy hardening', () => {
           resetsAtMs: Date.now() + 60000,
         },
       }),
-      recordUsage: vi.fn(),
+      recordUsage: mock(),
     };
 
     const fastify = Fastify();
@@ -480,7 +483,7 @@ describe('POST /v1/decisions policy hardening', () => {
         ],
         blockedGlobal: null,
       }),
-      recordUsage: vi.fn(),
+      recordUsage: mock(),
     };
 
     const fastify = Fastify();

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';
@@ -205,7 +205,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest is called for the descriptor child request on success', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: vi.fn(async (record: any) => {
+      saveRequest: mock(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;
@@ -233,7 +233,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest records correct provider and model from the response', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: vi.fn(async (record: any) => {
+      saveRequest: mock(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;
@@ -255,7 +255,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest records token counts from the response', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: vi.fn(async (record: any) => {
+      saveRequest: mock(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;
@@ -277,7 +277,7 @@ describe('VisionDescriptorService: child request usage logging', () => {
   test('saveRequest is called with error status when dispatch throws', async () => {
     const savedRecords: any[] = [];
     const mockStorage = {
-      saveRequest: vi.fn(async (record: any) => {
+      saveRequest: mock(async (record: any) => {
         savedRecords.push(record);
       }),
     } as unknown as UsageStorageService;

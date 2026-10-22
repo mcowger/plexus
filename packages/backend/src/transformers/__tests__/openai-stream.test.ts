@@ -1,5 +1,6 @@
+import { describe, expect, it, test } from 'bun:test';
+
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
-import { describe, expect, test } from 'vitest';
 
 import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../../utils/gemini-malformed-function-call';
 import { OpenAITransformer } from '../openai';

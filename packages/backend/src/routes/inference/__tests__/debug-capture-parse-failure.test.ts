@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
@@ -71,12 +72,12 @@ describe('Debug capture when request parsing fails', () => {
 
     savedDebugLogs = [];
     const usageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
-      saveDebugLog: vi.fn((log: any) => savedDebugLogs.push(log)),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
+      saveDebugLog: mock((log: any) => savedDebugLogs.push(log)),
     } as unknown as UsageStorageService;
 
     const debugManager = DebugManager.getInstance();

@@ -1,27 +1,37 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+  mock,
+  setSystemTime,
+  spyOn,
+} from 'bun:test';
 
+import { advanceTimersByTimeAsync, waitFor } from '../../../../test/test-utils';
+import { ConfigService } from '../../configuration/config-service';
 import { OAuthAuthManager } from '../oauth-auth-manager';
+import * as oauthProviders from '../oauth-providers';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   configService: {
-    getAllOAuthProviders: vi.fn(),
-    getOAuthCredentials: vi.fn(),
-    setOAuthCredentials: vi.fn(),
-    deleteOAuthCredentials: vi.fn(),
+    getAllOAuthProviders: mock(),
+    getOAuthCredentials: mock(),
+    setOAuthCredentials: mock(),
+    deleteOAuthCredentials: mock(),
   },
-  getConfigInstance: vi.fn(),
-  getOAuthProviderAuth: vi.fn(),
-  refresh: vi.fn(),
-  toAuth: vi.fn(),
-}));
+  getConfigInstance: mock(),
+  getOAuthProviderAuth: mock(),
+  refresh: mock(),
+  toAuth: mock(),
+};
 
-vi.mock('../../configuration/config-service', () => ({
-  ConfigService: { getInstance: mocks.getConfigInstance },
-}));
-
-vi.mock('../oauth-providers', () => ({
-  getOAuthProviderAuth: mocks.getOAuthProviderAuth,
-}));
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(mocks.getConfigInstance);
+  spyOn(oauthProviders, 'getOAuthProviderAuth').mockImplementation(mocks.getOAuthProviderAuth);
+});
 
 const initialCredentials = {
   accessToken: 'old-access',
@@ -58,7 +68,8 @@ describe('OAuthAuthManager', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
+    setSystemTime();
   });
 
   async function createManager(): Promise<OAuthAuthManager> {
@@ -68,10 +79,9 @@ describe('OAuthAuthManager', () => {
   }
 
   it('refreshes proactively at the requested cadence and persists rotated credentials', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    setSystemTime(new Date());
     const manager = await createManager();
-    vi.advanceTimersByTime(60 * 60 * 1000);
-
+    setSystemTime(new Date(Date.now() + 60 * 60 * 1000));
     await expect(
       manager.getApiKey('anthropic', 'personal', { refreshIfOlderThanMs: 60 * 60 * 1000 })
     ).resolves.toBe('new-access');
@@ -128,7 +138,7 @@ describe('OAuthAuthManager', () => {
   });
 
   it('serializes and spaces refreshes across accounts for the same provider', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     mocks.configService.getAllOAuthProviders.mockResolvedValue([
       { providerType: 'anthropic', accountId: 'personal' },
       { providerType: 'anthropic', accountId: 'work' },
@@ -138,21 +148,20 @@ describe('OAuthAuthManager', () => {
 
     const first = manager.getApiKey('anthropic', 'personal', { refreshIfOlderThanMs: 0 });
     const second = manager.getApiKey('anthropic', 'work', { refreshIfOlderThanMs: 0 });
-    await vi.advanceTimersByTimeAsync(0);
-
+    await advanceTimersByTimeAsync(0);
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
     await expect(first).resolves.toBe('new-access');
 
-    await vi.advanceTimersByTimeAsync(29_999);
+    await advanceTimersByTimeAsync(29_999);
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(1);
+    await advanceTimersByTimeAsync(1);
     await expect(second).resolves.toBe('new-access');
     expect(mocks.refresh).toHaveBeenCalledTimes(2);
   });
 
   it('propagates cancellation while waiting behind another account refresh', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     mocks.configService.getAllOAuthProviders.mockResolvedValue([
       { providerType: 'anthropic', accountId: 'personal' },
       { providerType: 'anthropic', accountId: 'work' },
@@ -171,7 +180,9 @@ describe('OAuthAuthManager', () => {
 
     const manager = await createManager();
     const first = manager.getApiKey('anthropic', 'personal', { refreshIfOlderThanMs: 0 });
-    await vi.waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
+    // Fake timers are active, so flush microtasks instead of polling on a real timer.
+    await advanceTimersByTimeAsync(0);
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
 
     const controller = new AbortController();
     const second = manager.getApiKey('anthropic', 'work', {
@@ -185,7 +196,7 @@ describe('OAuthAuthManager', () => {
     await expect(first).resolves.toBe('new-access');
 
     const third = manager.getApiKey('anthropic', 'work', { refreshIfOlderThanMs: 0 });
-    await vi.advanceTimersByTimeAsync(30_000);
+    await advanceTimersByTimeAsync(30_000);
     await expect(third).resolves.toBe('new-access');
     expect(mocks.refresh).toHaveBeenCalledTimes(2);
   });
@@ -218,7 +229,7 @@ describe('OAuthAuthManager', () => {
       refreshIfOlderThanMs: 0,
       signal: controller.signal,
     });
-    await vi.waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
     controller.abort(new DOMException('Request aborted', 'AbortError'));
 
     await expect(apiKey).rejects.toMatchObject({ name: 'AbortError' });
@@ -255,7 +266,7 @@ describe('OAuthAuthManager', () => {
     const first = manager.getApiKey('anthropic', 'personal', { refreshIfOlderThanMs: 0 });
     const second = manager.getApiKey('anthropic', 'personal', { refreshIfOlderThanMs: 0 });
 
-    await vi.waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
     resolveRefresh?.(refreshedCredentials);
 
     await expect(Promise.all([first, second])).resolves.toEqual(['new-access', 'new-access']);
@@ -272,7 +283,7 @@ describe('OAuthAuthManager', () => {
     const manager = await createManager();
 
     const first = manager.getApiKey('anthropic', 'personal', { refreshIfOlderThanMs: 0 });
-    await vi.waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
 
     const controller = new AbortController();
     const second = manager.getApiKey('anthropic', 'personal', {
@@ -318,7 +329,7 @@ describe('OAuthAuthManager', () => {
   });
 
   it('refreshes when token is within refreshIfExpiringWithinMs buffer', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    setSystemTime(new Date());
     mocks.configService.getOAuthCredentials.mockResolvedValue({
       accessToken: 'expiring-access',
       refreshToken: 'valid-refresh',
@@ -335,7 +346,7 @@ describe('OAuthAuthManager', () => {
   });
 
   it('refreshes by default when token is within the default 60s expiry buffer', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    setSystemTime(new Date());
     mocks.configService.getOAuthCredentials.mockResolvedValue({
       accessToken: 'almost-expired-access',
       refreshToken: 'valid-refresh',
@@ -349,7 +360,7 @@ describe('OAuthAuthManager', () => {
   });
 
   it('honors refresh backoff on repeated forceRefresh calls after token-endpoint failure', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    setSystemTime(new Date());
     mocks.refresh.mockRejectedValue(new Error('HTTP 500: Internal Server Error'));
     const manager = await createManager();
 
@@ -364,7 +375,7 @@ describe('OAuthAuthManager', () => {
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
 
     // After backoff window expires (60s), next forceRefresh can retry
-    vi.advanceTimersByTime(61 * 1000);
+    setSystemTime(new Date(Date.now() + 61 * 1000));
     await expect(manager.forceRefresh('anthropic', 'personal')).rejects.toThrow('HTTP 500');
     expect(mocks.refresh).toHaveBeenCalledTimes(2);
   });

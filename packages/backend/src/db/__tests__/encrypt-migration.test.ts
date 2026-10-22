@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
+
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { decrypt, hashSecret, isEncrypted, resetEncryptionKeyCache } from '../../utils/encryption';
 import { toDbBoolean } from '../../utils/normalize';

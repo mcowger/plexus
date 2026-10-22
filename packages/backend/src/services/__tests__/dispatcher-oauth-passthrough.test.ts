@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
+
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -20,7 +21,7 @@ import { handleResponse } from '../responses/response-handler';
 // response). This test guards that the native path handles a multi-turn OAuth
 // request end-to-end without error.
 
-// @earendil-works/pi-ai is mocked globally in vitest.setup.ts.
+// @earendil-works/pi-ai is mocked globally in bun-test.setup.ts.
 const { Dispatcher } = await import('../dispatch/dispatcher');
 
 function oauthConfigWithChatAccessVia() {
@@ -81,7 +82,7 @@ function multiTurnChatRequest(): UnifiedChatRequest {
 }
 
 describe('Dispatcher OAuth pass-through regression (issue #162)', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
@@ -91,7 +92,7 @@ describe('Dispatcher OAuth pass-through regression (issue #162)', () => {
     // Native OAuth runs through the standard fetch path — mock the
     // upstream so no real network call is made. A minimal Anthropic Messages
     // non-streaming response body is enough to exercise the native path.
-    fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    fetchSpy = spyOn(global, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           id: 'msg_test',
@@ -108,7 +109,7 @@ describe('Dispatcher OAuth pass-through regression (issue #162)', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 
@@ -280,7 +281,7 @@ function parseSseDataPayloads(text: string): any[] {
 }
 
 describe('Dispatcher OAuth pass-through — cross-format Anthropic response translation (regression)', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
@@ -296,7 +297,7 @@ describe('Dispatcher OAuth pass-through — cross-format Anthropic response tran
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 
@@ -430,19 +431,19 @@ describe('Dispatcher OAuth pass-through — cross-format Anthropic response tran
     const clientTransformer = TransformerFactory.getTransformer('chat');
     const usageRecord: Partial<UsageRecord> = { requestId: 'req-e2e-cross-format' };
     const usageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(),
     } as unknown as UsageStorageService;
     const sentBodies: any[] = [];
     const reply = {
-      header: vi.fn(function (this: any) {
+      header: mock(function (this: any) {
         return this;
       }),
-      code: vi.fn(function (this: any) {
+      code: mock(function (this: any) {
         return this;
       }),
-      send: vi.fn(function (this: any, body: any) {
+      send: mock(function (this: any, body: any) {
         sentBodies.push(body);
         return this;
       }),

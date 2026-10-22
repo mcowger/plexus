@@ -11,7 +11,7 @@
  * that session fails the same way.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { applyToolRenames } from '../rename-apply';
 import type { RenamePair } from '../types';

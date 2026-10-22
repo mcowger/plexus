@@ -1,6 +1,6 @@
 // Helper function to replicate the getLogLevel logic for testing
 // This is needed because the logger module initializes winston at import time
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 function getLogLevel(): string {
   if (process.env.LOG_LEVEL) {
     return process.env.LOG_LEVEL;
@@ -18,7 +18,7 @@ describe('getLogLevel', () => {
   beforeEach(() => {
     // Save only the specific env vars we mutate, so we restore in-place
     // rather than replacing the process.env reference (which leaks to shared
-    // closures in vitest.setup.ts under isolate: false).
+    // closures in bun-test.setup.ts).
     originalLogLevel = process.env.LOG_LEVEL;
     originalDebug = process.env.DEBUG;
   });

@@ -1,7 +1,6 @@
+import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-
-import { describe, expect, it } from 'vitest';
 
 import { buildPopulate } from '../build-populate';
 

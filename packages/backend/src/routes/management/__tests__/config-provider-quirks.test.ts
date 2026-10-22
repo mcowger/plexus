@@ -1,25 +1,26 @@
-import Fastify, { type FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
-const state = vi.hoisted(() => {
+import Fastify, { type FastifyInstance } from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
+
+const state = (() => {
   const providers = new Map<string, Record<string, unknown>>();
   return {
     providers,
-    getProvider: vi.fn(async (slug: string) => providers.get(slug) ?? null),
-    saveProvider: vi.fn(async (slug: string, provider: Record<string, unknown>) => {
+    getProvider: mock(async (slug: string) => providers.get(slug) ?? null),
+    saveProvider: mock(async (slug: string, provider: Record<string, unknown>) => {
       providers.set(slug, provider);
     }),
   };
-});
+})();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: () => ({
-      getRepository: () => ({ getProvider: state.getProvider }),
-      saveProvider: state.saveProvider,
-    }),
-  },
-}));
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation((() => ({
+    getRepository: () => ({ getProvider: state.getProvider }),
+    saveProvider: state.saveProvider,
+  })) as any);
+});
 
 import { registerConfigRoutes } from '../config';
 

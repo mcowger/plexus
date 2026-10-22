@@ -31,7 +31,16 @@ Before writing code, read [packages/backend/AGENTS.md](packages/backend/AGENTS.m
 
 ### If the task writes or updates tests
 
-Before editing tests, read [docs/TESTING.md](docs/TESTING.md) for Plexus test placement, mocks, spies, and singleton resets. Load the **`vitest`** skill for framework reference; project rules take precedence over generic examples.
+Before editing tests, read [docs/TESTING.md](docs/TESTING.md) for Plexus test placement, mocks, spies, and singleton resets. Tests use Bun's native test runner (`bun:test`); project rules take precedence over generic examples.
+
+All test files share one process under plain `bun test`, so a leak in one file fails others. Hard rules (details and examples in TESTING.md):
+
+- **Never `mock.module()` first-party code.** Use `spyOn` in a top-level `beforeEach` (auto-restored). Shared logger/pi-ai mocks live in `packages/backend/test/mocks.ts`.
+- **Never assign `global.fetch`** (use `spyOn(globalThis, 'fetch').mockImplementation(asFetch(…))` with real `Response` objects). Undo any other global, `process.env` value, fake timer, or system date you change.
+- **Don't create `expect(p).rejects` / `.resolves` before the statement that settles `p`** — it deadlocks the run at 100% CPU. Trigger first, assert after (or capture with `.then`).
+- **Fake timers:** use `advanceTimersByTimeAsync` from `test/test-utils.ts` for async code; `setSystemTime()` (not `toFake`) to freeze the date; never `Bun.sleep`/`waitFor` under fake timers.
+- **Frontend DOM tests** call `useHappyDom()` (`packages/frontend/test/happydom.ts`); never register happy-dom as an import side effect.
+- **Run plain `bun test` before handing work back** (CI uses `--parallel`, which hides leaks).
 
 ### If the task changes frontend code
 
@@ -46,7 +55,7 @@ Run these commands from the repository root:
 - Dev server: `bun run dev`
 - Dev stack for agents (background, worktree-safe): `bun run dev:agent --detach`
 - Stop the agent dev stack: `bun run dev:stop`
-- Tests: `bun run test` (never `bun test`)
+- Tests: `bun test` (Bun's native runner; add `--changed=HEAD` for affected-only)
 - Type check: `bun run typecheck` (uses `bun check`; never `tsc`)
 - Format: `bun run format` (or `bun fmt` directly)
 - Format check: `bun run format:check`

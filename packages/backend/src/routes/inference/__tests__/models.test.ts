@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 import path from 'path';
 
 import Fastify from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { PlexusConfig, setConfigForTesting } from '../../../config';
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';

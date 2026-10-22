@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
-import { logger } from '../../../utils/logger';
+import { mockLogger } from '../../../../test/mocks';
 import {
   normalizeAnthropicToolIds,
   normalizeAnthropicToolIdsAdapter,
@@ -167,7 +167,7 @@ describe('sanitizeAnthropicToolId', () => {
 
 describe('normalizeAnthropicToolIdsAdapter.preDispatch', () => {
   beforeEach(() => {
-    vi.mocked(logger.warn).mockClear();
+    mockLogger.warn.mockClear();
   });
 
   it('rewrites a tool_use/tool_result pair to the same sanitized id and warns once', () => {
@@ -206,10 +206,8 @@ describe('normalizeAnthropicToolIdsAdapter.preDispatch', () => {
       text: 'searching',
     });
 
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-      expect.stringContaining('rewrote 2 tool id(s)')
-    );
+    expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('rewrote 2 tool id(s)'));
   });
 
   it('rewrites an orphan tool_result whose id has no matching tool_use', () => {
@@ -253,9 +251,7 @@ describe('normalizeAnthropicToolIdsAdapter.preDispatch', () => {
     expect(rewrittenId).toMatch(VALID_ANTHROPIC_TOOL_ID);
     expect(payload.messages[1].content[0].tool_use_id).toMatch(/^functions_X_1_[0-9a-f]{8}$/);
 
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-      expect.stringContaining('rewrote 2 tool id(s)')
-    );
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('rewrote 2 tool id(s)'));
   });
 
   it('leaves system, tools, tool_choice, text blocks and valid ids untouched', () => {
@@ -297,7 +293,7 @@ describe('normalizeAnthropicToolIdsAdapter.preDispatch', () => {
 
     expect(normalizeAnthropicToolIds(payload)).toBe(0);
     expect(normalizeAnthropicToolIdsAdapter.preDispatch(payload)).toEqual(before);
-    expect(vi.mocked(logger.warn)).not.toHaveBeenCalled();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
   // Chat-format tool ids live at message level and the OpenAI wire has no
@@ -349,7 +345,7 @@ describe('normalizeAnthropicToolIdsAdapter.preDispatch', () => {
       expect(normalizeAnthropicToolIdsAdapter.preDispatch(body)).toEqual(before);
     }
 
-    expect(vi.mocked(logger.warn)).not.toHaveBeenCalled();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
   it('handles server/mcp block variants and malformed blocks', () => {

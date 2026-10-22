@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import type { KeyConfig, QuotaDefinition } from '../../config';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';

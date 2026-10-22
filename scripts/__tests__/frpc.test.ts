@@ -1,6 +1,5 @@
+import { afterEach, describe, expect, it, test } from 'bun:test';
 import { readFileSync } from 'fs';
-
-import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   buildFrpcArgs,

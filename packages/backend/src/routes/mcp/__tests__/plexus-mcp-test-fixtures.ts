@@ -1,5 +1,6 @@
+import { expect, mock, test } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { expect, vi } from 'vitest';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { getConfig, type PlexusConfig, setConfigForTesting } from '../../../config';
@@ -99,38 +100,38 @@ export function createPlexusMcpTestFixture(): PlexusMcpTestFixture {
   let started = false;
 
   const mockMcpUsageStorage = {
-    saveRequest: vi.fn(),
-    saveDebugLog: vi.fn(),
-    getLogs: vi.fn(),
-    deleteLog: vi.fn(),
-    deleteAllLogs: vi.fn(),
+    saveRequest: mock(),
+    saveDebugLog: mock(),
+    getLogs: mock(),
+    deleteLog: mock(),
+    deleteAllLogs: mock(),
   } as unknown as McpUsageStorageService;
 
   const mockUsageStorage = {
-    getUsage: vi.fn(async () => ({
+    getUsage: mock(async () => ({
       data: [{ requestId: 'req-1', provider: 'openrouter', apiKey: 'test-key' }],
       total: 1,
     })),
-    getDb: vi.fn(() => ({
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            groupBy: vi.fn(() => ({ orderBy: vi.fn(async () => []) })),
+    getDb: mock(() => ({
+      select: mock(() => ({
+        from: mock(() => ({
+          where: mock(() => ({
+            groupBy: mock(() => ({ orderBy: mock(async () => []) })),
           })),
         })),
       })),
     })),
-    deleteUsageLog: vi.fn(async () => true),
-    deleteAllUsageLogs: vi.fn(async () => true),
-    getDebugLogs: vi.fn(async () => [
+    deleteUsageLog: mock(async () => true),
+    deleteAllUsageLogs: mock(async () => true),
+    getDebugLogs: mock(async () => [
       { requestId: 'req-debug', createdAt: 123, responseStatus: 200 },
     ]),
-    getDebugLog: vi.fn(async (requestId: string) =>
+    getDebugLog: mock(async (requestId: string) =>
       requestId === 'req-debug' ? { requestId, createdAt: 123, responseStatus: 200 } : null
     ),
-    deleteDebugLog: vi.fn(async () => true),
-    deleteAllDebugLogs: vi.fn(async () => true),
-    deleteAllErrors: vi.fn(async () => true),
+    deleteDebugLog: mock(async () => true),
+    deleteAllDebugLogs: mock(async () => true),
+    deleteAllErrors: mock(async () => true),
   } as unknown as UsageStorageService;
 
   function setConfigSnapshot() {

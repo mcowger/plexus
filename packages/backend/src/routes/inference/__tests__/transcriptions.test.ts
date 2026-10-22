@@ -1,7 +1,8 @@
+import { afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
+
 import multipart from '@fastify/multipart';
 import Fastify, { FastifyInstance } from 'fastify';
 import FormData from 'form-data';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
@@ -97,7 +98,7 @@ describe('Transcriptions Endpoint', () => {
     });
 
     mockDispatcher = {
-      dispatch: vi.fn(async () => ({
+      dispatch: mock(async () => ({
         id: '123',
         model: 'gpt-4',
         created: 123,
@@ -111,13 +112,13 @@ describe('Transcriptions Endpoint', () => {
           cache_creation_tokens: 0,
         },
       })),
-      dispatchEmbeddings: vi.fn(async () => ({
+      dispatchEmbeddings: mock(async () => ({
         object: 'list',
         data: [],
         model: 'text-embedding-3-small',
         usage: { prompt_tokens: 8, total_tokens: 8 },
       })),
-      dispatchTranscription: vi.fn(async () => ({
+      dispatchTranscription: mock(async () => ({
         text: 'This is a test transcription.',
         usage: {
           input_tokens: 150,
@@ -135,12 +136,12 @@ describe('Transcriptions Endpoint', () => {
     } as unknown as Dispatcher;
 
     mockUsageStorage = {
-      saveRequest: vi.fn(),
-      saveError: vi.fn(),
-      saveDebugLog: vi.fn(),
-      updatePerformanceMetrics: vi.fn(),
-      emitStartedAsync: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      saveRequest: mock(),
+      saveError: mock(),
+      saveDebugLog: mock(),
+      updatePerformanceMetrics: mock(),
+      emitStartedAsync: mock(),
+      emitUpdatedAsync: mock(),
     } as unknown as UsageStorageService;
 
     DebugManager.getInstance().setStorage(mockUsageStorage);

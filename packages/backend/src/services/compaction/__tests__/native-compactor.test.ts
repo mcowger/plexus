@@ -1,10 +1,11 @@
+import { describe, expect, it, test } from 'bun:test';
+
 import type {
   AssistantMessage,
   Context,
   ToolResultMessage,
   UserMessage,
 } from '@earendil-works/pi-ai';
-import { describe, expect, test } from 'vitest';
 
 import { NativeCompactor } from '../native-compactor';
 import { COMPACTION_DEFAULTS } from '../types';

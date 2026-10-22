@@ -1,6 +1,8 @@
-import { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, mock, test } from 'bun:test';
 
+import { FastifyInstance } from 'fastify';
+
+import { advanceTimersByTimeAsync } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
 import { UsageStorageService } from '../../../services/observability/usage-storage';
@@ -51,12 +53,12 @@ type EditsHandler = (request: FakeRequest, reply: FakeReply) => Promise<unknown>
 
 describe('Images route telemetry', () => {
   beforeEach(() => setConfigForTesting({ providers: {}, models: {}, keys: {} } as any));
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => jest.useRealTimers());
 
   it.each(['/v1/images/generations', '/v1/images/edits'])(
     'cancels pending dispatch and cleans disconnect polling for %s',
     async (path) => {
-      vi.useFakeTimers();
+      jest.useFakeTimers();
       let handler!: (request: any, reply: any) => Promise<unknown>;
       const fastify = {
         post: (registeredPath: string, callback: typeof handler) => {
@@ -67,7 +69,7 @@ describe('Images route telemetry', () => {
       const ready = new Promise<void>((resolve) => {
         started = resolve;
       });
-      const dispatchImageGenerations = vi.fn(
+      const dispatchImageGenerations = mock(
         (_request: UnifiedImageGenerationRequest, signal: AbortSignal) => {
           started();
           return new Promise((_, reject) =>
@@ -85,10 +87,10 @@ describe('Images route telemetry', () => {
         }
       );
       const storage = {
-        emitStartedAsync: vi.fn(),
-        emitUpdatedAsync: vi.fn(),
-        saveRequest: vi.fn(),
-        saveError: vi.fn(),
+        emitStartedAsync: mock(),
+        emitUpdatedAsync: mock(),
+        saveRequest: mock(),
+        saveError: mock(),
       } as unknown as UsageStorageService;
       await registerImagesRoute(
         fastify,
@@ -110,9 +112,9 @@ describe('Images route telemetry', () => {
           }
         : { model: 'images', prompt: 'a fox' };
       const reply: FakeReply = {
-        header: vi.fn(() => reply),
-        code: vi.fn(() => reply),
-        send: vi.fn(),
+        header: mock(() => reply),
+        code: mock(() => reply),
+        send: mock(),
       };
       const result = handler(
         {
@@ -126,11 +128,11 @@ describe('Images route telemetry', () => {
       );
       await ready;
       handle.closed = true;
-      await vi.advanceTimersByTimeAsync(250);
+      await advanceTimersByTimeAsync(250);
       await result;
       expect(dispatchImageGenerations.mock.calls[0]![1].aborted).toBe(true);
       expect(reply.code).toHaveBeenCalledWith(499);
-      expect(vi.getTimerCount()).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
     }
   );
   it('returns promptly even when saveRequest is unresolved for /v1/images/edits', async () => {
@@ -144,7 +146,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async () => ({
+    const dispatchImageGenerations = mock(async () => ({
       created: 123,
       data: [{ b64_json: 'ZWRpdGVk' }],
       usage: { input_tokens: 50, output_tokens: 100, total_tokens: 150 },
@@ -161,14 +163,14 @@ describe('Images route telemetry', () => {
       dispatchImageGenerations,
     } as unknown as Dispatcher;
 
-    const saveRequest = vi.fn(() => new Promise<void>(() => {}));
-    const saveError = vi.fn(async () => {});
+    const saveRequest = mock(() => new Promise<void>(() => {}));
+    const saveError = mock(async () => {});
 
     const mockUsageStorage = {
       saveRequest,
       saveError,
-      emitStartedAsync: vi.fn(() => {}),
-      emitUpdatedAsync: vi.fn(() => {}),
+      emitStartedAsync: mock(() => {}),
+      emitUpdatedAsync: mock(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -197,15 +199,15 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: vi.fn((statusCode: number) => {
+      code: mock((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: vi.fn((payload: unknown) => {
+      send: mock((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
-      header: vi.fn(() => reply),
+      header: mock(() => reply),
     };
 
     const outcome = await Promise.race([
@@ -233,7 +235,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async () => ({
+    const dispatchImageGenerations = mock(async () => ({
       created: 123,
       data: [{ b64_json: 'ZWRpdGVk' }],
       usage: { input_tokens: 50, output_tokens: 100, total_tokens: 150 },
@@ -250,8 +252,8 @@ describe('Images route telemetry', () => {
       dispatchImageGenerations,
     } as unknown as Dispatcher;
 
-    const saveRequest = vi.fn(async () => {});
-    const saveError = vi.fn(async () => {});
+    const saveRequest = mock(async () => {});
+    const saveError = mock(async () => {});
 
     const startedEvents: Array<{ incomingApiType?: string }> = [];
     const updatedEvents: Array<{
@@ -263,10 +265,10 @@ describe('Images route telemetry', () => {
       canonicalModelName?: string;
     }> = [];
 
-    const emitStartedAsync = vi.fn((record: { incomingApiType?: string }) => {
+    const emitStartedAsync = mock((record: { incomingApiType?: string }) => {
       startedEvents.push(record);
     });
-    const emitUpdatedAsync = vi.fn(
+    const emitUpdatedAsync = mock(
       (record: {
         incomingModelAlias?: string;
         apiKey?: string;
@@ -313,15 +315,15 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: vi.fn((statusCode: number) => {
+      code: mock((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: vi.fn((payload: unknown) => {
+      send: mock((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
-      header: vi.fn(() => reply),
+      header: mock(() => reply),
     };
 
     await editsHandler!(request, reply);
@@ -367,7 +369,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async (_request: UnifiedImageGenerationRequest) => ({
+    const dispatchImageGenerations = mock(async (_request: UnifiedImageGenerationRequest) => ({
       created: 321,
       data: [{ b64_json: 'ZWRpdGVk' }],
       plexus: { provider: 'openai', model: 'gpt-image-1', apiType: 'images' },
@@ -378,10 +380,10 @@ describe('Images route telemetry', () => {
     } as unknown as Dispatcher;
 
     const mockUsageStorage = {
-      saveRequest: vi.fn(async () => {}),
-      saveError: vi.fn(async () => {}),
-      emitStartedAsync: vi.fn(() => {}),
-      emitUpdatedAsync: vi.fn(() => {}),
+      saveRequest: mock(async () => {}),
+      saveError: mock(async () => {}),
+      emitStartedAsync: mock(() => {}),
+      emitUpdatedAsync: mock(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -424,9 +426,9 @@ describe('Images route telemetry', () => {
     };
 
     const reply: FakeReply = {
-      code: vi.fn(() => reply),
-      send: vi.fn((payload: unknown) => payload),
-      header: vi.fn(() => reply),
+      code: mock(() => reply),
+      send: mock((payload: unknown) => payload),
+      header: mock(() => reply),
     };
 
     await editsHandler!(request, reply);
@@ -468,7 +470,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async (_request: UnifiedImageGenerationRequest) => ({
+    const dispatchImageGenerations = mock(async (_request: UnifiedImageGenerationRequest) => ({
       created: 321,
       data: [{ b64_json: 'ZWRpdGVk' }],
       plexus: { provider: 'openai', model: 'gpt-image-1', apiType: 'images' },
@@ -479,10 +481,10 @@ describe('Images route telemetry', () => {
     } as unknown as Dispatcher;
 
     const mockUsageStorage = {
-      saveRequest: vi.fn(async () => {}),
-      saveError: vi.fn(async () => {}),
-      emitStartedAsync: vi.fn(() => {}),
-      emitUpdatedAsync: vi.fn(() => {}),
+      saveRequest: mock(async () => {}),
+      saveError: mock(async () => {}),
+      emitStartedAsync: mock(() => {}),
+      emitUpdatedAsync: mock(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -527,15 +529,15 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: vi.fn((statusCode: number) => {
+      code: mock((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: vi.fn((payload: unknown) => {
+      send: mock((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
-      header: vi.fn(() => reply),
+      header: mock(() => reply),
     };
 
     await editsHandler!(request, reply);
@@ -562,7 +564,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async (_request: UnifiedImageGenerationRequest) => ({
+    const dispatchImageGenerations = mock(async (_request: UnifiedImageGenerationRequest) => ({
       created: 321,
       data: [{ b64_json: 'ZWRpdGVk' }],
       plexus: { provider: 'openai', model: 'gpt-image-1', apiType: 'images' },
@@ -573,10 +575,10 @@ describe('Images route telemetry', () => {
     } as unknown as Dispatcher;
 
     const mockUsageStorage = {
-      saveRequest: vi.fn(async () => {}),
-      saveError: vi.fn(async () => {}),
-      emitStartedAsync: vi.fn(() => {}),
-      emitUpdatedAsync: vi.fn(() => {}),
+      saveRequest: mock(async () => {}),
+      saveError: mock(async () => {}),
+      emitStartedAsync: mock(() => {}),
+      emitUpdatedAsync: mock(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -612,15 +614,15 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: vi.fn((statusCode: number) => {
+      code: mock((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: vi.fn((payload: unknown) => {
+      send: mock((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
-      header: vi.fn(() => reply),
+      header: mock(() => reply),
     };
 
     await editsHandler!(request, reply);
@@ -659,7 +661,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async (_request: UnifiedImageGenerationRequest) => ({
+    const dispatchImageGenerations = mock(async (_request: UnifiedImageGenerationRequest) => ({
       created: 321,
       data: [{ b64_json: 'ZWRpdGVk' }],
       plexus: { provider: 'openai', model: 'gpt-image-1', apiType: 'images' },
@@ -670,10 +672,10 @@ describe('Images route telemetry', () => {
     } as unknown as Dispatcher;
 
     const mockUsageStorage = {
-      saveRequest: vi.fn(async () => {}),
-      saveError: vi.fn(async () => {}),
-      emitStartedAsync: vi.fn(() => {}),
-      emitUpdatedAsync: vi.fn(() => {}),
+      saveRequest: mock(async () => {}),
+      saveError: mock(async () => {}),
+      emitStartedAsync: mock(() => {}),
+      emitUpdatedAsync: mock(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -681,7 +683,7 @@ describe('Images route telemetry', () => {
 
     const imageBytes = Buffer.from('fake-image-data');
     const maskBytes = Buffer.from('fake-mask-data');
-    const partsCalls = vi.fn();
+    const partsCalls = mock();
 
     const request: FakeRequest = {
       ip: '127.0.0.1',
@@ -718,15 +720,15 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: vi.fn((statusCode: number) => {
+      code: mock((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: vi.fn((payload: unknown) => {
+      send: mock((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
-      header: vi.fn(() => reply),
+      header: mock(() => reply),
     };
 
     await editsHandler!(request, reply);
@@ -760,7 +762,7 @@ describe('Images route telemetry', () => {
       },
     } as unknown as FastifyInstance;
 
-    const dispatchImageGenerations = vi.fn(async (_request: UnifiedImageGenerationRequest) => ({
+    const dispatchImageGenerations = mock(async (_request: UnifiedImageGenerationRequest) => ({
       created: 321,
       data: [],
       plexus: { provider: 'openai', model: 'gpt-image-1', apiType: 'images' },
@@ -771,10 +773,10 @@ describe('Images route telemetry', () => {
     } as unknown as Dispatcher;
 
     const mockUsageStorage = {
-      saveRequest: vi.fn(async () => {}),
-      saveError: vi.fn(async () => {}),
-      emitStartedAsync: vi.fn(() => {}),
-      emitUpdatedAsync: vi.fn(() => {}),
+      saveRequest: mock(async () => {}),
+      saveError: mock(async () => {}),
+      emitStartedAsync: mock(() => {}),
+      emitUpdatedAsync: mock(() => {}),
     } as unknown as UsageStorageService;
 
     await registerImagesRoute(fastify, mockDispatcher, mockUsageStorage);
@@ -794,15 +796,15 @@ describe('Images route telemetry', () => {
 
     const replyState: { statusCode?: number; payload?: unknown } = {};
     const reply: FakeReply = {
-      code: vi.fn((statusCode: number) => {
+      code: mock((statusCode: number) => {
         replyState.statusCode = statusCode;
         return reply;
       }),
-      send: vi.fn((payload: unknown) => {
+      send: mock((payload: unknown) => {
         replyState.payload = payload;
         return payload;
       }),
-      header: vi.fn(() => reply),
+      header: mock(() => reply),
     };
 
     await editsHandler!(request, reply);

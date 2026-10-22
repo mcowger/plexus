@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, jest, mock, test } from 'bun:test';
+
 import Fastify from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { ConfigService } from '../../../services/configuration/config-service';
@@ -10,8 +11,8 @@ import type { OAuthProviderDescriptor } from '../../../services/oauth/oauth-prov
 import { CODEX_IMAGE_MODELS } from '../../../services/providers/provider-model-discovery';
 import { registerOAuthRoutes } from '../oauth';
 
-// @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
-// per-file vi.mock() call here.  With isolate: false all files share one
+// @earendil-works/pi-ai is mocked globally in bun-test.setup.ts — do not add a
+// per-file mock.module() call here.  With isolate: false all files share one
 // module registry and competing registrations create last-writer-wins races.
 
 const waitForStatus = async (
@@ -371,7 +372,7 @@ describe('OAuth management routes', () => {
     });
 
     afterEach(() => {
-      vi.restoreAllMocks();
+      jest.restoreAllMocks();
       CodexVersionService.resetForTesting();
     });
 
@@ -446,7 +447,7 @@ describe('OAuth management routes', () => {
 
   describe('Muse Code live model discovery', () => {
     afterEach(() => {
-      vi.restoreAllMocks();
+      jest.restoreAllMocks();
     });
 
     it('forwards accountId to the Muse backend and reports the live source', async () => {
@@ -519,7 +520,7 @@ describe('OAuth management routes', () => {
     });
 
     afterEach(() => {
-      vi.restoreAllMocks();
+      jest.restoreAllMocks();
       ConfigService.resetInstance();
     });
 

@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, setSystemTime } from 'bun:test';
+
 import Fastify from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../../db/client';
 import { runMigrations } from '../../../db/migrate';
@@ -27,14 +28,13 @@ describe('Usage summary route', () => {
   });
 
   afterEach(async () => {
-    vi.useRealTimers();
+    setSystemTime();
     await fastify.close();
     await closeDatabase();
   });
 
   it('aggregates tokens and requests in summary series buckets', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
+    setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
 
     const now = new Date();
     now.setSeconds(0, 0);
@@ -125,8 +125,7 @@ describe('Usage summary route', () => {
   });
 
   it('scopes stats to the requested range and returns bounded breakdowns', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
+    setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
 
     const now = new Date().getTime();
     const rows = [
@@ -270,8 +269,7 @@ describe('Usage summary route', () => {
   });
 
   it('rejects custom ranges longer than twelve months', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
+    setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
 
     const response = await fastify.inject({
       method: 'GET',
@@ -283,8 +281,7 @@ describe('Usage summary route', () => {
   });
 
   it('applies each preset window independently', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
+    setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
 
     const now = new Date().getTime();
     const offsets = [
@@ -328,8 +325,7 @@ describe('Usage summary route', () => {
   });
 
   it('rejects malformed, reversed, and future custom ranges', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
+    setSystemTime(new Date('2026-07-07T12:00:00.000Z'));
 
     const cases = [
       'range=custom',

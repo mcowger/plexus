@@ -8,7 +8,7 @@
  * identity headers preserved, masking skipped).
  */
 
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'bun:test';
 
 import type { UnifiedChatRequest } from '../../../types/unified';
 import { ClaudeCodeVersionService } from '../claude-code-version-service';

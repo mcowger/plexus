@@ -22,12 +22,13 @@
  * refused proxy tunnel surfaces as `ERR_PROXY_TUNNEL` rejection, handled by the
  * existing fetch error paths at each call site.
  *
- * Test seam: under Vitest (`VITEST=true`) this delegates to `globalThis.fetch`
- * via dynamic lookup so `vi.spyOn(globalThis, 'fetch')` keeps intercepting.
- * Pooling is a transport detail; request shape is unchanged. Tests that need
- * the session paths use `overrideSessionFactoryForTesting` (which also lifts
- * the Vitest delegation). The gate intentionally ignores `NODE_ENV` so
- * `NODE_ENV=test` deployments (staging, CI smoke runs) still get pooling.
+ * Test seam: under the test runner (`PLEXUS_UNDER_TEST=true`, set by the
+ * bun-test preload) this delegates to `globalThis.fetch` via dynamic lookup
+ * so `spyOn(globalThis, 'fetch')` keeps intercepting. Pooling is a transport
+ * detail; request shape is unchanged. Tests that need the session paths use
+ * `overrideSessionFactoryForTesting` (which also lifts the delegation). The
+ * gate intentionally ignores `NODE_ENV` so `NODE_ENV=test` deployments
+ * (staging, CI smoke runs) still get pooling.
  */
 
 const MAX_SESSIONS = 50;
@@ -71,7 +72,7 @@ function getOrCreateSession(origin: string): Bun.FetchSession | undefined {
 
 /** Drop-in replacement for global `fetch` for outbound provider traffic. */
 export function fetchWithSession(input: string | URL, init?: RequestInit): Promise<Response> {
-  if (!testFactory && process.env.VITEST === 'true') {
+  if (!testFactory && process.env.PLEXUS_UNDER_TEST === 'true') {
     return globalThis.fetch(input as string, init);
   }
   let origin: string | undefined;

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 
 import { CodexImageTransformer } from '../../transformers/images/codex';
 import { ImageGenerationTransformerFactory } from '../dispatch/image-transformer-factory';

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import { hashSecret } from '../../utils/encryption';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';

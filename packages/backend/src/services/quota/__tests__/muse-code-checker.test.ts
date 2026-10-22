@@ -18,7 +18,7 @@
  *     zeroed meters.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
@@ -72,7 +72,7 @@ describe('muse-code quota checker', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

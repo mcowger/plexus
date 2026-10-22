@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { OpenAITransformer } from '../openai';
 import { ResponsesTransformer } from '../responses';

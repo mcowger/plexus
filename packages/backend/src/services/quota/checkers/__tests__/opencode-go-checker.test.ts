@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { registerSpy } from '../../../../../test/test-utils';
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
 
 import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
 import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';

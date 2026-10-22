@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { ModelTarget, PlexusConfig, setConfigForTesting } from '../../../../config';
 import { UsageStorageService } from '../../../observability/usage-storage';
@@ -22,7 +22,7 @@ const makeConfig = (
 });
 
 describe('E2EPerformanceSelector', () => {
-  const mockGetProviderPerformance = vi.fn((provider?: string, model?: string): Promise<any[]> =>
+  const mockGetProviderPerformance = mock((provider?: string, model?: string): Promise<any[]> =>
     Promise.resolve([])
   );
   const mockStorage = {
@@ -203,7 +203,7 @@ describe('E2EPerformanceSelector', () => {
         // 0.01 < 0.05 default → explore (can pick any candidate)
         Math.random = () => 0.01;
         const explored = await selector.select(targets);
-        expect([targets[0]!, targets[1]!]).toContain(explored);
+        expect<unknown[]>([targets[0]!, targets[1]!]).toContain(explored);
 
         // 0.99 >= 0.05 → pick best
         Math.random = () => 0.99;

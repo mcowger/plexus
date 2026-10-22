@@ -1,7 +1,7 @@
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import path from 'path';
 
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ModelMetadataManager } from '../../services/models/model-metadata-manager';
 import { UsageStorageService } from '../../services/observability/usage-storage';
@@ -12,28 +12,28 @@ import { UsageRecord } from '../../types/usage';
 
 describe('handleResponse - OpenRouter Pricing', () => {
   const mockStorage = {
-    saveRequest: vi.fn(),
-    updatePerformanceMetrics: vi.fn(),
+    saveRequest: mock(),
+    updatePerformanceMetrics: mock(),
   } as unknown as UsageStorageService;
 
   const mockTransformer: Transformer = {
     name: 'test-transformer',
     defaultEndpoint: '/test',
-    parseRequest: vi.fn(),
-    transformRequest: vi.fn(),
-    transformResponse: vi.fn(),
-    formatResponse: vi.fn((r) => Promise.resolve({ formatted: true, ...r })),
-    extractUsage: vi.fn(),
+    parseRequest: mock(),
+    transformRequest: mock(),
+    transformResponse: mock(),
+    formatResponse: mock((r) => Promise.resolve({ formatted: true, ...r })),
+    extractUsage: mock(),
   };
 
   const mockReply = {
-    send: vi.fn(function (this: any, data) {
+    send: mock(function (this: any, data) {
       return this;
     }),
-    header: vi.fn(function (this: any) {
+    header: mock(function (this: any) {
       return this;
     }),
-    code: vi.fn(function (this: any) {
+    code: mock(function (this: any) {
       return this;
     }),
   } as unknown as FastifyReply;

@@ -1,10 +1,11 @@
+import { describe, expect, it, mock, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 import type { ModelsStore, ModelsStoreEntry, MutableModels, Provider } from '@earendil-works/pi-ai';
-import { describe, expect, it, vi } from 'vitest';
 
+import { waitFor } from '../../../../test/test-utils';
 import {
   createModelCatalog,
   defaultModelsStorePath,
@@ -12,7 +13,7 @@ import {
   REMOTE_CATALOG_REFRESH_INTERVAL_MS,
 } from '../catalog';
 
-// pi-ai and logger are globally mocked in test/vitest.setup.ts, with the
+// pi-ai and logger are globally mocked in test/bun-test.setup.ts, with the
 // real createProvider re-exported — these tests exercise genuine pi-ai
 // overlay semantics against hand-rolled provider/store/fetch fakes.
 
@@ -84,14 +85,14 @@ function makeCatalog(overrides: {
   return createModelCatalog({
     models: makeModels(...(overrides.providers ?? [makeProvider('anthropic', [BASELINE_MODEL])])),
     store: overrides.store ?? new MapStore(),
-    fetchImpl: (overrides.fetchImpl ?? vi.fn()) as any,
+    fetchImpl: (overrides.fetchImpl ?? mock()) as any,
     now: overrides.now,
   });
 }
 
 describe('createModelCatalog', () => {
   it('serves baseline models before any refresh, without network', async () => {
-    const fetchImpl = vi.fn();
+    const fetchImpl = mock();
     const catalog = makeCatalog({ fetchImpl });
     await catalog.init({ allowNetwork: false });
 
@@ -101,7 +102,7 @@ describe('createModelCatalog', () => {
   });
 
   it('merges the remote overlay over the baseline', async () => {
-    const fetchImpl = vi.fn(async () =>
+    const fetchImpl = mock(async () =>
       jsonResponse({
         'claude-new': { id: 'claude-new', name: 'New', contextWindow: 500000 },
         'claude-base': { id: 'claude-base', name: 'Baseline v2', contextWindow: 400000 },
@@ -119,10 +120,10 @@ describe('createModelCatalog', () => {
 
   it('persists the overlay and restores it without network', async () => {
     const store = new MapStore();
-    const fetchImpl = vi.fn(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
+    const fetchImpl = mock(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
     await makeCatalog({ store, fetchImpl }).refresh();
 
-    const fetchImpl2 = vi.fn();
+    const fetchImpl2 = mock();
     const second = makeCatalog({ store, fetchImpl: fetchImpl2 });
     await second.init({ allowNetwork: false });
 
@@ -134,7 +135,7 @@ describe('createModelCatalog', () => {
     // createProvider stamps checkedAt with the real clock, so the fake clock
     // anchors to real time and only advances relative to it.
     let now = Date.now();
-    const fetchImpl = vi.fn(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
+    const fetchImpl = mock(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
     const catalog = makeCatalog({ fetchImpl, now: () => now });
 
     await catalog.refresh();
@@ -152,7 +153,7 @@ describe('createModelCatalog', () => {
   });
 
   it('treats 404 as "no overlay" without failing and records the check', async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse({}, 404));
+    const fetchImpl = mock(async () => jsonResponse({}, 404));
     const catalog = makeCatalog({ fetchImpl });
 
     const result = await catalog.refresh();
@@ -169,7 +170,7 @@ describe('createModelCatalog', () => {
       models: [{ id: 'claude-stored', provider: 'anthropic' } as any],
       checkedAt: 1,
     });
-    const fetchImpl = vi.fn(async () => {
+    const fetchImpl = mock(async () => {
       throw new Error('network down');
     });
     const catalog = makeCatalog({ store, fetchImpl, now: () => 2_000_000_000 });
@@ -182,7 +183,7 @@ describe('createModelCatalog', () => {
   it('accepts model-ID keyed, array, and {models:[]} catalog shapes', async () => {
     const bodies: unknown[] = [{ m1: { id: 'm1' } }, [{ id: 'm1' }], { models: [{ id: 'm1' }] }];
     for (const body of bodies) {
-      const fetchImpl = vi.fn(async () => jsonResponse(body));
+      const fetchImpl = mock(async () => jsonResponse(body));
       const catalog = makeCatalog({ providers: [makeProvider('p', [])], fetchImpl });
       await catalog.refresh();
       expect(catalog.getModel('p', 'm1')?.provider).toBe('p');
@@ -195,12 +196,12 @@ describe('createModelCatalog', () => {
   });
 
   it('does not drive refresh for self-refreshing providers', async () => {
-    const radiusRefresh = vi.fn(async () => {});
+    const radiusRefresh = mock(async () => {});
     const radius = {
       ...makeProvider('radius', []),
       refreshModels: radiusRefresh,
     } as unknown as Provider;
-    const fetchImpl = vi.fn(async () => jsonResponse({ m1: { id: 'm1' } }));
+    const fetchImpl = mock(async () => jsonResponse({ m1: { id: 'm1' } }));
     const catalog = createModelCatalog({
       models: makeModels(radius, makeProvider('anthropic', [BASELINE_MODEL])),
       store: new MapStore(),
@@ -213,19 +214,17 @@ describe('createModelCatalog', () => {
   });
 
   it('refreshes in the background when init allows network', async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
+    const fetchImpl = mock(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
     const catalog = makeCatalog({ fetchImpl });
 
     await catalog.init({ allowNetwork: true });
-    await vi.waitFor(() =>
-      expect(catalog.getModel('anthropic', 'claude-new')?.id).toBe('claude-new')
-    );
+    await waitFor(() => expect(catalog.getModel('anthropic', 'claude-new')?.id).toBe('claude-new'));
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     catalog.dispose();
   });
 
   it('periodically re-refreshes after init and stops on dispose', async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
+    const fetchImpl = mock(async () => jsonResponse({ 'claude-new': { id: 'claude-new' } }));
     const catalog = createModelCatalog({
       models: makeModels(makeProvider('anthropic', [BASELINE_MODEL])),
       store: new MapStore(),
@@ -236,7 +235,7 @@ describe('createModelCatalog', () => {
     });
 
     await catalog.init({ allowNetwork: true });
-    await vi.waitFor(() => expect(fetchImpl.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(fetchImpl.mock.calls.length).toBeGreaterThanOrEqual(2));
 
     catalog.dispose();
     const callsAtDispose = fetchImpl.mock.calls.length;
@@ -255,7 +254,10 @@ describe('FileModelsStore', () => {
       await store.write('anthropic', { models: [{ id: 'm' } as any], checkedAt: 123 });
 
       const fresh = new FileModelsStore(file);
-      expect(await fresh.read('anthropic')).toEqual({ models: [{ id: 'm' }], checkedAt: 123 });
+      expect(await fresh.read('anthropic')).toEqual<unknown>({
+        models: [{ id: 'm' }],
+        checkedAt: 123,
+      });
       expect(await fresh.read('openai')).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -293,7 +295,10 @@ describe('FileModelsStore', () => {
       await store.write('anthropic', { models: [{ id: 'm' } as any], checkedAt: 2 });
 
       const fresh = new FileModelsStore(file);
-      expect(await fresh.read('anthropic')).toEqual({ models: [{ id: 'm' }], checkedAt: 2 });
+      expect(await fresh.read('anthropic')).toEqual<unknown>({
+        models: [{ id: 'm' }],
+        checkedAt: 2,
+      });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

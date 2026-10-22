@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import { VisionDescriptorService } from '../../src/services/vision/vision-descriptor-service';
 import { TextContent, UnifiedChatRequest, UnifiedMessage } from '../../src/types/unified';

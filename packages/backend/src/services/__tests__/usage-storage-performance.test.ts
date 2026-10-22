@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
+
 import { and, eq, sql } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { registerSpy } from '../../../test/test-utils';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../db/client';

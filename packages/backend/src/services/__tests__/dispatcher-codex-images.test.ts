@@ -14,7 +14,7 @@
  *   - a Codex usage-limit 429 keeps the existing status propagation + cooldown.
  */
 
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -111,7 +111,7 @@ describe('Dispatcher Codex images OAuth dispatch', () => {
   });
 
   afterEach(async () => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     await CooldownManager.getInstance().clearCooldown();
     OAuthAuthManager.resetForTesting();
     CodexVersionService.resetForTesting();

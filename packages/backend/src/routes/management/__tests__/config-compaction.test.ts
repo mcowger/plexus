@@ -1,31 +1,34 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-const serviceState = vi.hoisted(() => {
+import Fastify, { FastifyInstance } from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
+
+const serviceState = (() => {
   const state = {
     compaction: {} as Record<string, unknown>,
-    setSetting: vi.fn(async (key: string, value: unknown) => {
+    setSetting: mock(async (key: string, value: unknown) => {
       if (key === 'compaction') {
         state.compaction = value as Record<string, unknown>;
       }
     }),
-    getCompactionConfig: vi.fn(async () => state.compaction),
-    getConfig: vi.fn(() => ({ providers: {} })),
+    getCompactionConfig: mock(async () => state.compaction),
+    getConfig: mock(() => ({ providers: {} })),
   };
   return state;
-});
+})();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(
+    mock(() => ({
       setSetting: serviceState.setSetting,
       getConfig: serviceState.getConfig,
-      getRepository: vi.fn(() => ({
+      getRepository: mock(() => ({
         getCompactionConfig: serviceState.getCompactionConfig,
       })),
-    })),
-  },
-}));
+    })) as any
+  );
+});
 
 import { registerConfigRoutes } from '../config';
 

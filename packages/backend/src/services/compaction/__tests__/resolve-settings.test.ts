@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 
 import { resolveCompactionSettings } from '../resolve-settings';
 import { COMPACTION_DEFAULTS } from '../types';

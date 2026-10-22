@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import * as configModule from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';

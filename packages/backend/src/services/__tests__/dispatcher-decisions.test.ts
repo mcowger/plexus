@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import type { UnifiedDecisionsRequest } from '../../types/unified';
@@ -6,8 +6,10 @@ import { Dispatcher } from '../dispatch/dispatcher';
 import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-const fetchMock = vi.fn();
-global.fetch = fetchMock as any;
+const fetchMock = mock();
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function decisionsConfig(extra: Record<string, any> = {}) {
   return {

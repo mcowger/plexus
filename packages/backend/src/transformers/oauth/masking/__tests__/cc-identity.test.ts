@@ -10,7 +10,7 @@
  * a reference to the pre-call body and expect it untouched.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { injectClaudeCodeIdentity } from '../cc-identity';
 

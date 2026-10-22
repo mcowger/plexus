@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, spyOn } from 'bun:test';
 
+import { advanceTimersByTimeAsync } from '../../../test/test-utils';
 import { CodexVersionService } from '../oauth/codex-version-service';
 
 describe('CodexVersionService', () => {
@@ -28,13 +29,7 @@ describe('CodexVersionService', () => {
   });
 
   it('fetches and stores version from GitHub releases', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'v0.200.0' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ tag_name: 'v0.200.0' }));
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -46,13 +41,7 @@ describe('CodexVersionService', () => {
   });
 
   it('strips v prefix from tag', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'v1.2.3' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ tag_name: 'v1.2.3' }));
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -61,13 +50,7 @@ describe('CodexVersionService', () => {
   });
 
   it('handles tag without v prefix', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: '0.150.0' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ tag_name: '0.150.0' }));
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -76,7 +59,7 @@ describe('CodexVersionService', () => {
   });
 
   it('falls back to default on network error', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
+    spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'));
 
     const service = CodexVersionService.getInstance();
     const error = await service.fetchVersion();
@@ -86,13 +69,7 @@ describe('CodexVersionService', () => {
   });
 
   it('falls back to default on non-ok response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 403 }));
 
     const service = CodexVersionService.getInstance();
     const error = await service.fetchVersion();
@@ -102,13 +79,7 @@ describe('CodexVersionService', () => {
   });
 
   it('falls back to default when tag_name is missing', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({}));
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -117,13 +88,7 @@ describe('CodexVersionService', () => {
   });
 
   it('handles rust-v prefix tag', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'rust-v0.128.0' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ tag_name: 'rust-v0.128.0' }));
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -132,13 +97,7 @@ describe('CodexVersionService', () => {
   });
 
   it('ignores unexpected tag format', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'codex-beta' }),
-      })
-    );
+    spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ tag_name: 'codex-beta' }));
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -147,11 +106,9 @@ describe('CodexVersionService', () => {
   });
 
   it('uses correct GitHub API URL', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ tag_name: 'v0.200.0' }),
-    });
-    vi.stubGlobal('fetch', mockFetch);
+    const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ tag_name: 'v0.200.0' })
+    );
 
     const service = CodexVersionService.getInstance();
     await service.fetchVersion();
@@ -168,67 +125,61 @@ describe('CodexVersionService', () => {
   });
 
   it('startAutoRefresh refetches the version on schedule', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       CodexVersionService.resetForTesting();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'v0.200.0' }),
-      });
-      vi.stubGlobal('fetch', mockFetch);
+      const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({ tag_name: 'v0.200.0' })
+      );
 
       const service = CodexVersionService.getInstance();
       service.startAutoRefresh(60);
       expect(mockFetch).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+      await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(service.getVersion()).toBe('0.200.0');
 
       service.stopAutoRefresh();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
   it('stopAutoRefresh cancels scheduled refetches', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       CodexVersionService.resetForTesting();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'v0.200.0' }),
-      });
-      vi.stubGlobal('fetch', mockFetch);
+      const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({ tag_name: 'v0.200.0' })
+      );
 
       const service = CodexVersionService.getInstance();
       service.startAutoRefresh(60);
       service.stopAutoRefresh();
 
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+      await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
       expect(mockFetch).not.toHaveBeenCalled();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
   it('resetForTesting stops the auto-refresh timer', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       CodexVersionService.resetForTesting();
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'v0.200.0' }),
-      });
-      vi.stubGlobal('fetch', mockFetch);
+      const mockFetch = spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({ tag_name: 'v0.200.0' })
+      );
 
       CodexVersionService.getInstance().startAutoRefresh(60);
       CodexVersionService.resetForTesting();
 
-      await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
+      await advanceTimersByTimeAsync(60 * 60 * 1000 + 1);
       expect(mockFetch).not.toHaveBeenCalled();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { buildAnthropicRequest } from '../anthropic/request-builder';
 import { parseAnthropicRequest } from '../anthropic/request-parser';

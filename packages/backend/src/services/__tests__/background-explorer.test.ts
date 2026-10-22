@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
 import { ModelTargetGroup, setConfigForTesting } from '../../config';
 import { ProbeService } from '../probes/probe-service';
@@ -18,7 +18,7 @@ function makeGroup(
 
 function makeProbeService() {
   return {
-    runProbe: vi.fn(async () => ({
+    runProbe: mock(async () => ({
       success: true,
       durationMs: 5,
       apiType: 'chat' as const,
@@ -271,7 +271,7 @@ describe('BackgroundExplorer', () => {
 
     let resolveProbe: () => void = () => {};
     const probe = {
-      runProbe: vi.fn(
+      runProbe: mock(
         () =>
           new Promise<any>((resolve) => {
             resolveProbe = () =>
@@ -304,8 +304,7 @@ describe('BackgroundExplorer', () => {
     setBaseConfig({ enabled: true, stalenessThresholdSeconds: 1 });
 
     const probe = {
-      runProbe: vi
-        .fn()
+      runProbe: mock()
         .mockResolvedValueOnce({
           success: false,
           durationMs: 5,
@@ -345,7 +344,7 @@ describe('BackgroundExplorer', () => {
     setBaseConfig({ enabled: true, stalenessThresholdSeconds: 0 });
 
     const probe = {
-      runProbe: vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
+      runProbe: mock().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
         success: true,
         durationMs: 5,
         apiType: 'chat',

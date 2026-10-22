@@ -17,13 +17,14 @@
  * the bytes a chat client actually receives.
  */
 
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, mock, test } from 'bun:test';
 
+import type { FastifyReply, FastifyRequest } from 'fastify';
+
+import { mockLogger } from '../../../test/mocks';
 import { OpenAITransformer } from '../../transformers/openai';
 import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../types/unified';
 import type { UsageRecord } from '../../types/usage';
-import { logger } from '../../utils/logger';
 import { synthesizeChatStream } from '../dispatch/image-model-bridge';
 import type { UsageStorageService } from '../observability/usage-storage';
 import { handleResponse } from '../responses/response-handler';
@@ -31,20 +32,20 @@ import { handleResponse } from '../responses/response-handler';
 const TINY_IMAGE_B64 = 'aGVsbG8=';
 
 const mockStorage = {
-  saveRequest: vi.fn(),
-  saveError: vi.fn(),
-  updatePerformanceMetrics: vi.fn(),
-  registerInFlight: vi.fn(),
+  saveRequest: mock(),
+  saveError: mock(),
+  updatePerformanceMetrics: mock(),
+  registerInFlight: mock(),
 } as unknown as UsageStorageService;
 
 const mockReply = {
-  send: vi.fn(function (this: any) {
+  send: mock(function (this: any) {
     return this;
   }),
-  header: vi.fn(function (this: any) {
+  header: mock(function (this: any) {
     return this;
   }),
-  code: vi.fn(function (this: any) {
+  code: mock(function (this: any) {
     return this;
   }),
 } as unknown as FastifyReply;
@@ -64,7 +65,7 @@ function drainNodeStream(stream: any): Promise<string> {
 
 describe('handleResponse with bridged image output', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   test('streams the bridged unified chunks through the real client formatter', async () => {
@@ -102,7 +103,7 @@ describe('handleResponse with bridged image output', () => {
     expect(body).toContain('data: [DONE]');
     expect(usageRecord.outgoingApiType).toBe('images');
     expect(usageRecord.responseStatus).not.toBe('error');
-    expect(vi.mocked(logger.warn)).not.toHaveBeenCalledWith(
+    expect(mockLogger.warn).not.toHaveBeenCalledWith(
       expect.stringContaining('Unknown providerApiType')
     );
   });

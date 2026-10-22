@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+
 import Fastify from 'fastify';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { type PlexusConfig, setConfigForTesting } from '../../../config';

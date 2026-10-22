@@ -63,4 +63,4 @@ pre-commit:
     # --- Backend tests (only when backend source changes) --------------------
     backend-tests:
       glob: 'packages/backend/src/**'
-      run: bun run test
+      run: bun test --parallel --changed=HEAD

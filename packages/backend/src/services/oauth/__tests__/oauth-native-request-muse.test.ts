@@ -11,7 +11,7 @@
  *   - apiKey mode is rejected — only the minted OAuth key may be used.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   isNativeOAuthProvider,

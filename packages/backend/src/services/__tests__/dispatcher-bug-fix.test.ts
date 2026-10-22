@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import { UnifiedChatRequest } from '../../types/unified';
@@ -7,7 +7,7 @@ import { Dispatcher } from '../dispatch/dispatcher';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
 // Mock fetch to prevent actual network calls
-const fetchMock = vi.fn(async (url: string, options: any) => {
+const fetchMock = mock(async (url: string, options: any) => {
   return new Response(
     JSON.stringify({
       id: 'chatcmpl-123',
@@ -36,7 +36,9 @@ const fetchMock = vi.fn(async (url: string, options: any) => {
     }
   );
 });
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 describe('Dispatcher Bug Fixes', () => {
   beforeEach(async () => {

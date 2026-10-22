@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { suppressUnsupportedGpt5OptionsAdapter } from '../suppress-unsupported-gpt5-options.adapter';
 

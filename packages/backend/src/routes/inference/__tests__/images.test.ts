@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { DebugManager } from '../../../services/observability/debug-manager';
 import { formatOpenRouterImageResponse, ImageTransformer } from '../../../transformers/image';

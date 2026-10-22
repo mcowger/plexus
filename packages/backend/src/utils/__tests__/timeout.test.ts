@@ -1,11 +1,12 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, jest, mock, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
+import * as configModule from '../../config';
 import { logger } from '../logger';
 
-vi.mock('../../config', () => ({
-  getConfig: () => ({ timeout: { defaultSeconds: 4 } }),
-}));
+beforeEach(() => {
+  spyOn(configModule, 'getConfig').mockReturnValue({ timeout: { defaultSeconds: 4 } } as any);
+});
 
 import { wireEarlyDisconnectDetection, wireUpstreamTimeout } from '../timeout';
 
@@ -26,7 +27,7 @@ describe('wireUpstreamTimeout', () => {
   });
 
   test('defers cancellation when bunHandle.closed is observed before dispatch', () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       const infoSpy = registerSpy(logger, 'info');
       infoSpy.mockClear();
@@ -39,8 +40,7 @@ describe('wireUpstreamTimeout', () => {
         true
       );
 
-      vi.advanceTimersByTime(1_000);
-
+      jest.advanceTimersByTime(1_000);
       expect(abortController.signal.aborted).toBe(false);
       expect(infoSpy).toHaveBeenCalledTimes(1);
       expect(infoSpy).toHaveBeenCalledWith(
@@ -49,12 +49,12 @@ describe('wireUpstreamTimeout', () => {
       );
       cleanup();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 
   test('keeps aborting on bunHandle.closed when cancellation is not deferred', () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
     try {
       const abortController = new AbortController();
       const socket = { [Symbol('handle')]: { closed: true } };
@@ -64,12 +64,11 @@ describe('wireUpstreamTimeout', () => {
         'request-with-immediate-socket-close'
       );
 
-      vi.advanceTimersByTime(250);
-
+      jest.advanceTimersByTime(250);
       expect(abortController.signal.aborted).toBe(true);
       cleanup();
     } finally {
-      vi.useRealTimers();
+      jest.useRealTimers();
     }
   });
 });

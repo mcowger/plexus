@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, jest, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -234,14 +234,14 @@ async function drain(stream: ReadableStream): Promise<string> {
 }
 
 describe('Native OAuth pass-through', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
       'sk-ant-oat-fake-token-for-test'
     );
-    fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    fetchSpy = spyOn(global, 'fetch').mockResolvedValue(
       new Response(UPSTREAM_SSE, {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
@@ -250,7 +250,7 @@ describe('Native OAuth pass-through', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

@@ -1,7 +1,3 @@
-import { EventEmitter } from 'events';
-
-import { encode } from 'eventsource-encoder';
-import Fastify from 'fastify';
 /**
  * Integration test: verify server shuts down promptly with active SSE connections.
  *
@@ -13,7 +9,11 @@ import Fastify from 'fastify';
  * the sockets → reply.raw.destroyed → true → while loops break → fastify.close()
  * resolves → process exits.
  */
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
+import { EventEmitter } from 'events';
+
+import { encode } from 'eventsource-encoder';
+import Fastify from 'fastify';
 
 describe('SSE shutdown behavior', () => {
   test('fastify.close() completes promptly when SSE while-loop is active', async () => {

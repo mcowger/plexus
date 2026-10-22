@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../../../test/test-utils';
 import { OAuthAuthManager } from '../../../oauth/oauth-auth-manager';
@@ -19,11 +19,11 @@ const makeToken = (payload: unknown): string => {
 
 describe('openai-codex checker', () => {
   const setFetchMock = (impl: () => Promise<Response>): void => {
-    global.fetch = vi.fn(impl) as unknown as typeof fetch;
+    spyOn(globalThis, 'fetch').mockImplementation(mock(impl) as unknown as typeof fetch);
   };
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
   });
 

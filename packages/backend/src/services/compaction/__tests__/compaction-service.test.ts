@@ -1,6 +1,8 @@
-import type { AssistantMessage, Context, UserMessage } from '@earendil-works/pi-ai';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, it, jest, mock, test } from 'bun:test';
 
+import type { AssistantMessage, Context, UserMessage } from '@earendil-works/pi-ai';
+
+import { advanceTimersByTimeAsync } from '../../../../test/test-utils';
 import { CompactionService } from '../compaction-service';
 import type {
   CompactionResult,
@@ -62,7 +64,7 @@ function makeFakeStrategy(
   const obj = {
     name: 'native' as const,
     callCount: 0,
-    compact: vi.fn(async (_ctx: Context, _settings: ResolvedCompactionSettings, _stratCtx: any) => {
+    compact: mock(async (_ctx: Context, _settings: ResolvedCompactionSettings, _stratCtx: any) => {
       obj.callCount++;
       if (throws) throw throws;
       return messages;
@@ -89,7 +91,7 @@ function makeEstimateQueue(...values: number[]): (ctx: Context) => number {
 
 describe('CompactionService.maybeCompact', () => {
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   test('1. disabled: returns reason=disabled, strategy NOT called', async () => {
@@ -341,7 +343,7 @@ describe('CompactionService.maybeCompact', () => {
   });
 
   test('8. timeout aborts the strategy signal before failing open', async () => {
-    vi.useFakeTimers();
+    jest.useFakeTimers();
 
     const seenSignals: AbortSignal[] = [];
     const neverFinishes: CompactionStrategy = {
@@ -374,7 +376,7 @@ describe('CompactionService.maybeCompact', () => {
     expect(seenSignals).toHaveLength(1);
     expect(seenSignals[0]!.aborted).toBe(false);
 
-    await vi.advanceTimersByTimeAsync(100);
+    await advanceTimersByTimeAsync(100);
     const result = await resultPromise;
 
     expect(result.reason).toBe('error');

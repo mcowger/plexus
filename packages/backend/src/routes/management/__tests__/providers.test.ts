@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it, spyOn, test } from 'bun:test';
+
 import Fastify, { type FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registerProviderRoutes } from '../providers';
 
@@ -14,19 +15,15 @@ describe('management provider routes', () => {
 
   afterEach(async () => {
     await fastify.close();
-    vi.unstubAllGlobals();
   });
 
   it('does not expose an upstream unauthorized response as a management auth failure', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error' } }), {
-          status: 401,
-          statusText: 'Unauthorized',
-          headers: { 'Content-Type': 'application/json' },
-        })
-      )
+    spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error' } }), {
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: { 'Content-Type': 'application/json' },
+      })
     );
 
     const response = await fastify.inject({

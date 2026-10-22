@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, test } from 'bun:test';
 
 import { registerSpy } from '../../../../../test/test-utils';
 import { OAuthAuthManager } from '../../../oauth/oauth-auth-manager';

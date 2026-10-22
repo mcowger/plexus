@@ -8,7 +8,7 @@
  * Preservation is the only supported behavior.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { stripDescriptionsAndInjectSyntheticTools } from '../cc-tools';
 import type { RenamePair } from '../types';

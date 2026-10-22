@@ -1,5 +1,6 @@
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
+
 import Fastify, { FastifyInstance } from 'fastify';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';

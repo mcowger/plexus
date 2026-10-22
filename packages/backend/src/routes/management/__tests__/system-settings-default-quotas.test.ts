@@ -1,25 +1,28 @@
-import Fastify, { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-const serviceState = vi.hoisted(() => {
+import Fastify, { FastifyInstance } from 'fastify';
+
+import { ConfigService } from '../../../services/configuration/config-service';
+
+const serviceState = (() => {
   const state = {
     quotas: {} as Record<string, unknown>,
-    setSettingsBulk: vi.fn(async () => {}),
-    getAllUserQuotas: vi.fn(async () => state.quotas),
+    setSettingsBulk: mock(async () => {}),
+    getAllUserQuotas: mock(async () => state.quotas),
   };
   return state;
-});
+})();
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => ({
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(
+    mock(() => ({
       setSettingsBulk: serviceState.setSettingsBulk,
-      getRepository: vi.fn(() => ({
+      getRepository: mock(() => ({
         getAllUserQuotas: serviceState.getAllUserQuotas,
       })),
-    })),
-  },
-}));
+    })) as any
+  );
+});
 
 import { registerConfigRoutes } from '../config';
 

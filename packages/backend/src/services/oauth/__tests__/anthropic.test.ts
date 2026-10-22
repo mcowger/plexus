@@ -1,6 +1,8 @@
-import type { AuthPrompt, OAuthAuth, ProviderAuthInteraction } from '@earendil-works/pi-ai';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, spyOn } from 'bun:test';
 
+import type { AuthPrompt, OAuthAuth, ProviderAuthInteraction } from '@earendil-works/pi-ai';
+
+import { asFetch } from '../../../../test/test-utils';
 import { parseAuthorizationInput, withCopyCodeLogin } from '../anthropic';
 
 const neverAbortedSignal = new AbortController().signal;
@@ -37,24 +39,21 @@ const makeInteraction = (onPrompt?: (prompt: AuthPrompt) => void) => {
   return { interaction, getAuthUrl: () => authUrl };
 };
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 describe('Anthropic copy-code login', () => {
   it('uses the copy-code redirect URI and exchanges the pasted code', async () => {
-    const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
-      expect(String(input)).toBe('https://platform.claude.com/v1/oauth/token');
-      const body = JSON.parse(String(init?.body)) as Record<string, string>;
-      const state = new URL(getAuthUrl()).searchParams.get('state');
-      expect(body.grant_type).toBe('authorization_code');
-      expect(body.redirect_uri).toBe('https://platform.claude.com/oauth/code/callback');
-      expect(body.code).toBe('copied-code');
-      expect(body.state).toBe(state);
-      expect(body.code_verifier).toBe(state);
-      return jsonResponse({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600 });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async (input: unknown, init?: RequestInit) => {
+        expect(String(input)).toBe('https://platform.claude.com/v1/oauth/token');
+        const body = JSON.parse(String(init?.body)) as Record<string, string>;
+        const state = new URL(getAuthUrl()).searchParams.get('state');
+        expect(body.grant_type).toBe('authorization_code');
+        expect(body.redirect_uri).toBe('https://platform.claude.com/oauth/code/callback');
+        expect(body.code).toBe('copied-code');
+        expect(body.state).toBe<unknown>(state);
+        expect(body.code_verifier).toBe<unknown>(state);
+        return jsonResponse({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600 });
+      })
+    );
 
     const prompts: AuthPrompt[] = [];
     const { interaction, getAuthUrl } = makeInteraction((prompt) => prompts.push(prompt));
@@ -83,7 +82,11 @@ describe('Anthropic copy-code login', () => {
   });
 
   it('rejects a state that does not match the PKCE verifier', async () => {
-    vi.stubGlobal('fetch', vi.fn());
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => {
+        throw new Error('fetch should not be called');
+      })
+    );
     const interaction: ProviderAuthInteraction = {
       signal: neverAbortedSignal,
       notify: () => {},
@@ -96,7 +99,11 @@ describe('Anthropic copy-code login', () => {
   });
 
   it('rejects when no code is provided', async () => {
-    vi.stubGlobal('fetch', vi.fn());
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => {
+        throw new Error('fetch should not be called');
+      })
+    );
     const interaction: ProviderAuthInteraction = {
       signal: neverAbortedSignal,
       notify: () => {},
@@ -109,9 +116,8 @@ describe('Anthropic copy-code login', () => {
   });
 
   it('surfaces a token-exchange failure with the response status', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => jsonResponse({ error: 'invalid_grant' }, 400))
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => jsonResponse({ error: 'invalid_grant' }, 400))
     );
     const { interaction } = makeInteraction();
 
@@ -119,9 +125,8 @@ describe('Anthropic copy-code login', () => {
   });
 
   it('rejects a token response that is not JSON', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('<html>oops</html>', { status: 200 }))
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => new Response('<html>oops</html>', { status: 200 }))
     );
     const { interaction } = makeInteraction();
 
@@ -131,9 +136,8 @@ describe('Anthropic copy-code login', () => {
   });
 
   it('rejects a token response missing required fields', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => jsonResponse({ access_token: 'only-access' }))
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => jsonResponse({ access_token: 'only-access' }))
     );
     const { interaction } = makeInteraction();
 

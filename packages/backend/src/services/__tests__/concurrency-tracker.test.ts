@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { setConfigForTesting } from '../../config';
 import { ConcurrencyTracker } from '../runtime/concurrency-tracker';

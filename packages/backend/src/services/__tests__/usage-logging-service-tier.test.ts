@@ -1,6 +1,5 @@
+import { afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
 import { PassThrough } from 'stream';
-
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registerSpy } from '../../../test/test-utils';
 import type { UsageRecord } from '../../types/usage';
@@ -18,8 +17,8 @@ describe('UsageInspector service-tier capture', () => {
 
   beforeEach(() => {
     mockStorage = {
-      saveRequest: vi.fn(() => Promise.resolve()),
-      updatePerformanceMetrics: vi.fn(() => Promise.resolve()),
+      saveRequest: mock(() => Promise.resolve()),
+      updatePerformanceMetrics: mock(() => Promise.resolve()),
     };
     const dm = DebugManager.getInstance();
     dm.resetForTesting();

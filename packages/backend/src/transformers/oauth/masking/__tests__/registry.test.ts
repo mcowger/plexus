@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import { namespaceNonCcToolName, NON_CC_TOOL_NAMESPACE } from '../cc-namespace-shape';
 import { CC_TOOL_REFERENCE } from '../cc-reference-tools';

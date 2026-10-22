@@ -1,16 +1,17 @@
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+
 import Fastify from 'fastify';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockConfigService = vi.hoisted(() => ({
-  flush: vi.fn(),
-  getConfig: vi.fn(),
-}));
+import { ConfigService } from '../../../services/configuration/config-service';
 
-vi.mock('../../../services/configuration/config-service', () => ({
-  ConfigService: {
-    getInstance: vi.fn(() => mockConfigService),
-  },
-}));
+const mockConfigService = {
+  flush: mock(),
+  getConfig: mock(),
+};
+
+beforeEach(() => {
+  spyOn(ConfigService, 'getInstance').mockImplementation(mock(() => mockConfigService) as any);
+});
 
 import { registerQuotaEnforcementRoutes } from '../quota-enforcement';
 
@@ -49,7 +50,7 @@ describe('quota enforcement management routes', () => {
     }));
 
     const quotaEnforcer = {
-      loadQuotaContext: vi.fn(async () => ({
+      loadQuotaContext: mock(async () => ({
         keyName: 'new-key',
         checks: [
           {
@@ -68,8 +69,8 @@ describe('quota enforcement management routes', () => {
         ],
         blockedGlobal: null,
       })),
-      clearQuota: vi.fn(),
-      recomputeQuota: vi.fn(),
+      clearQuota: mock(),
+      recomputeQuota: mock(),
     };
 
     await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -122,7 +123,7 @@ describe('quota enforcement management routes', () => {
 
       const resetsAtMs = new Date('2026-02-01T00:00:00.000Z').getTime();
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(async () => ({
+        loadQuotaContext: mock(async () => ({
           keyName: 'bare-key',
           checks: [
             {
@@ -154,8 +155,8 @@ describe('quota enforcement management routes', () => {
           ],
           blockedGlobal: null,
         })),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -193,9 +194,9 @@ describe('quota enforcement management routes', () => {
       mockConfigService.flush.mockResolvedValue(undefined);
       mockConfigService.getConfig.mockReturnValue({ keys: {} });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -217,9 +218,9 @@ describe('quota enforcement management routes', () => {
         keys: { 'my-key': { secret: 'sk', quotas: ['q1', 'q2'] } },
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -248,9 +249,9 @@ describe('quota enforcement management routes', () => {
         keys: { 'my-key': { secret: 'sk', quotas: ['q1', 'q2'] } },
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -275,9 +276,9 @@ describe('quota enforcement management routes', () => {
         default_quotas: ['def-quota'],
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -300,9 +301,9 @@ describe('quota enforcement management routes', () => {
         keys: { 'my-key': { secret: 'sk', quotas: ['q1'] } },
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -325,9 +326,9 @@ describe('quota enforcement management routes', () => {
       mockConfigService.flush.mockResolvedValue(undefined);
       mockConfigService.getConfig.mockReturnValue({ keys: {} });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -352,9 +353,9 @@ describe('quota enforcement management routes', () => {
         keys: { 'my-key': { secret: 'sk', quotas: ['daily-cost'] } },
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(async () => ({
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(async () => ({
           recomputed: true,
           usage: 42,
           windowStartMs: new Date('2026-02-01T00:00:00.000Z').getTime(),
@@ -387,9 +388,9 @@ describe('quota enforcement management routes', () => {
         keys: { 'my-key': { secret: 'sk', quotas: ['leaky-tokens'] } },
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(async () => ({
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(async () => ({
           recomputed: false,
           reason: 'unsupported_quota_type',
         })),
@@ -417,9 +418,9 @@ describe('quota enforcement management routes', () => {
         keys: { 'my-key': { secret: 'sk', quotas: ['q1'] } },
       });
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);
@@ -439,9 +440,9 @@ describe('quota enforcement management routes', () => {
     it('requires both key and quota', async () => {
       const fastify = Fastify();
       const quotaEnforcer = {
-        loadQuotaContext: vi.fn(),
-        clearQuota: vi.fn(),
-        recomputeQuota: vi.fn(),
+        loadQuotaContext: mock(),
+        clearQuota: mock(),
+        recomputeQuota: mock(),
       };
 
       await registerQuotaEnforcementRoutes(fastify, quotaEnforcer as any);

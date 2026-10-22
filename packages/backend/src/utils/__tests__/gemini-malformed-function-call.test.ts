@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, mock, test } from 'bun:test';
 
 import {
   detectGeminiMalformedFunctionCall,
@@ -6,7 +6,7 @@ import {
   rewriteGeminiMalformedFunctionCallStream,
 } from '../gemini-malformed-function-call';
 
-async function rewrite(input: string, onDetected = vi.fn()): Promise<string> {
+async function rewrite(input: string, onDetected = mock()): Promise<string> {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -69,7 +69,7 @@ describe('Gemini MALFORMED_FUNCTION_CALL detection', () => {
   });
 
   test('rewrites only the malformed terminal frame with a retryable message', async () => {
-    const onDetected = vi.fn();
+    const onDetected = mock();
     const payload = {
       candidates: [
         {

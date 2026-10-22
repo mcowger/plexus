@@ -1,18 +1,21 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
+import { mockLogger } from '../../../test/mocks';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
-// Globally mocked in test/vitest.setup.ts — imported here only to assert on
+// Globally mocked in test/bun-test.setup.ts — imported here only to assert on
 // the warn calls the strip-and-retry paths emit.
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../dispatch/dispatcher';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
-const fetchMock: any = vi.fn(async (): Promise<any> => {
+const fetchMock: any = mock(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');
 });
 
-global.fetch = fetchMock as any;
+beforeEach(() => {
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock as any);
+});
 
 function makeConfig(options?: { failoverEnabled?: boolean; targetCount?: number }) {
   const failoverEnabled = options?.failoverEnabled ?? true;
@@ -591,9 +594,8 @@ describe('Dispatcher Failover', () => {
     // The strip warn is the only operator-visible trace that the outbound
     // payload was modified mid-request — it must name both the target
     // (provider/model) and the exact param that was removed.
-    const paramStripWarn = vi
-      .mocked(logger.warn)
-      .mock.calls.map((call) => String(call[0]))
+    const paramStripWarn = mockLogger.warn.mock.calls
+      .map((call) => String(call[0]))
       .find((message) => message.includes('rejected unsupported parameter'));
     expect(paramStripWarn).toBeDefined();
     expect(paramStripWarn).toContain('p1/model-1');
@@ -816,9 +818,8 @@ describe('Dispatcher Failover', () => {
     // content was modified mid-request — it must name the target
     // (provider/model) and how many thinking blocks were stripped (the
     // fixture carries exactly one).
-    const signatureStripWarn = vi
-      .mocked(logger.warn)
-      .mock.calls.map((call) => String(call[0]))
+    const signatureStripWarn = mockLogger.warn.mock.calls
+      .map((call) => String(call[0]))
       .find((message) => message.includes('stale thinking-block'));
     expect(signatureStripWarn).toBeDefined();
     expect(signatureStripWarn).toContain('p1/model-1');
@@ -1124,13 +1125,13 @@ describe('Dispatcher Failover', () => {
       .mockImplementationOnce(async () => errorResponse(500, 'first failed'))
       .mockImplementationOnce(async () => successChatResponse('model-2'));
 
-    const saveErrorSpy = vi.fn();
+    const saveErrorSpy = mock();
     const dispatcher = new Dispatcher();
     dispatcher.setUsageStorage({
       saveError: saveErrorSpy,
-      recordFailedAttempt: vi.fn(),
-      recordSuccessfulAttempt: vi.fn(),
-      emitUpdatedAsync: vi.fn(),
+      recordFailedAttempt: mock(),
+      recordSuccessfulAttempt: mock(),
+      emitUpdatedAsync: mock(),
     } as any);
 
     const response = await dispatcher.dispatch({

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'bun:test';
 
 import {
   DecisionsIngressSchema,
@@ -168,7 +168,7 @@ describe('Decisions upstream response boundary', () => {
       provider: 'TypeSafe',
       usage: { input_tokens: 476, output_tokens: 70, cost: 0.000019992 },
     };
-    expect(parseDecisionsUpstreamResponse(body)).toEqual(body);
+    expect(parseDecisionsUpstreamResponse(body)).toEqual<unknown>(body);
   });
 
   test('accepts minimal TypeSafe answers without optional fields', () => {

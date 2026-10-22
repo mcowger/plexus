@@ -1,5 +1,3 @@
-import { PassThrough, Readable } from 'node:stream';
-
 /**
  * Tests for the upstream fetch cancellation chain in handleResponse().
  *
@@ -18,7 +16,8 @@ import { PassThrough, Readable } from 'node:stream';
  * See packages/backend/src/__tests__/disconnect-detection/ for the exploratory
  * test scripts that established these findings.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock, test } from 'bun:test';
+import { PassThrough, Readable } from 'node:stream';
 
 import { OpenAITransformer } from '../../transformers/openai';
 import type { UnifiedChatResponse } from '../../types/unified';
@@ -180,7 +179,7 @@ describe('signal abort listener -> nodeStream.destroy() pattern', () => {
     const { nodeStream, pipeline } = makePipeline(stream);
 
     const ac = new AbortController();
-    const listenerSpy = vi.fn(() => {
+    const listenerSpy = mock(() => {
       nodeStream.destroy();
       pipeline.destroy();
     });
@@ -225,7 +224,7 @@ describe('signal abort listener -> nodeStream.destroy() pattern', () => {
     const { nodeStream, pipeline } = makePipeline(stream);
 
     const ac = new AbortController();
-    const listenerSpy = vi.fn(() => {
+    const listenerSpy = mock(() => {
       nodeStream.destroy();
       pipeline.destroy();
     });
@@ -335,18 +334,18 @@ describe('handleResponse cancellation records usage from live captures (no pre-s
     const usageRecord: Partial<UsageRecord> = { requestId: 'req-cancel-e2e' };
     const savedRecords: UsageRecord[] = [];
     const mockStorage = {
-      saveRequest: vi.fn(async (record: UsageRecord) => {
+      saveRequest: mock(async (record: UsageRecord) => {
         savedRecords.push(record);
       }),
-      updatePerformanceMetrics: vi.fn(async () => {}),
-      saveError: vi.fn(),
+      updatePerformanceMetrics: mock(async () => {}),
+      saveError: mock(),
     };
     const reply = {
-      header: vi.fn(function (this: any) {
+      header: mock(function (this: any) {
         return this;
       }),
-      send: vi.fn((pipeline: any) => pipeline),
-      code: vi.fn(function (this: any) {
+      send: mock((pipeline: any) => pipeline),
+      code: mock(function (this: any) {
         return this;
       }),
     };
@@ -416,24 +415,24 @@ describe('handleResponse chat terminal finalization (client closes after [DONE])
   const makeRequest = () => ({ headers: {}, raw: {} });
 
   const makeReply = (sendCalls: any[]) => ({
-    header: vi.fn(function (this: any) {
+    header: mock(function (this: any) {
       return this;
     }),
-    send: vi.fn((pipeline: any) => {
+    send: mock((pipeline: any) => {
       sendCalls.push(pipeline);
       return pipeline;
     }),
-    code: vi.fn(function (this: any) {
+    code: mock(function (this: any) {
       return this;
     }),
   });
 
   const makeStorage = (savedRecords: UsageRecord[]) => ({
-    saveRequest: vi.fn(async (record: UsageRecord) => {
+    saveRequest: mock(async (record: UsageRecord) => {
       savedRecords.push(record);
     }),
-    updatePerformanceMetrics: vi.fn(async () => {}),
-    saveError: vi.fn(),
+    updatePerformanceMetrics: mock(async () => {}),
+    saveError: mock(),
   });
 
   const makeUnifiedResponse = (providerStream: ReadableStream<Uint8Array>) =>

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, it, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
@@ -374,10 +374,6 @@ describe('MCP Proxy Service', () => {
   });
 
   describe('upstream response streaming', () => {
-    afterEach(() => {
-      vi.unstubAllGlobals();
-    });
-
     beforeEach(() => {
       setConfigForTesting({
         providers: {},
@@ -406,13 +402,12 @@ describe('MCP Proxy Service', () => {
     test.each(['text/event-stream', 'TEXT/EVENT-STREAM;charset=utf-8'])(
       'returns an SSE response body as a stream for %s',
       async (contentType) => {
-        const fetchMock = vi.fn().mockResolvedValue(
+        const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
           new Response('data: {"jsonrpc":"2.0"}\n\n', {
             status: 200,
             headers: { 'content-type': contentType },
           })
         );
-        vi.stubGlobal('fetch', fetchMock);
 
         const result = await proxyMcpRequest(
           'local-server',
@@ -445,13 +440,12 @@ describe('MCP Proxy Service', () => {
           ],
         },
       };
-      const fetchMock = vi.fn().mockResolvedValue(
+      const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify(body), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
       );
-      vi.stubGlobal('fetch', fetchMock);
 
       const result = await proxyMcpRequest('local-server', 'GET', {
         accept: 'application/json, text/event-stream',
@@ -467,13 +461,12 @@ describe('MCP Proxy Service', () => {
         id: 1,
         result: { ttlMs: 0, cacheScope: 'public', tools: [{ name: 'example_tool' }] },
       };
-      const fetchMock = vi.fn().mockResolvedValue(
+      const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify(body), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
       );
-      vi.stubGlobal('fetch', fetchMock);
 
       const result = await proxyMcpRequest(
         'local-server',
@@ -499,13 +492,12 @@ describe('MCP Proxy Service', () => {
         id: 1,
         result: { ttlMs: 0, tools: [{ name: 'example_tool' }] },
       };
-      const fetchMock = vi.fn().mockResolvedValue(
+      const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify(body), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
       );
-      vi.stubGlobal('fetch', fetchMock);
 
       const result = await proxyMcpRequest(
         'local-server',
@@ -521,13 +513,12 @@ describe('MCP Proxy Service', () => {
       const sse =
         'event: message\n' +
         'data: {"jsonrpc":"2.0","id":1,"result":{"ttlMs":0,"cacheScope":"public","tools":[{"name":"example_tool"}]}}\n\n';
-      const fetchMock = vi.fn().mockResolvedValue(
+      const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(sse, {
           status: 200,
           headers: { 'content-type': 'text/event-stream' },
         })
       );
-      vi.stubGlobal('fetch', fetchMock);
 
       const result = await proxyMcpRequest(
         'local-server',
@@ -549,13 +540,12 @@ describe('MCP Proxy Service', () => {
       const sse =
         'event: message\n' +
         'data: {"jsonrpc":"2.0","id":1,"result":{"ttlMs":0,"tools":[{"name":"example_tool"}]}}\n\n';
-      const fetchMock = vi.fn().mockResolvedValue(
+      const fetchMock = spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(sse, {
           status: 200,
           headers: { 'content-type': 'text/event-stream' },
         })
       );
-      vi.stubGlobal('fetch', fetchMock);
 
       const result = await proxyMcpRequest(
         'local-server',
@@ -597,14 +587,14 @@ describe('MCP Proxy Service', () => {
       };
 
       expect(stripZeroTtlFromToolsListResult(payload)).toBe(true);
-      expect(payload.result).toEqual({ cacheScope: 'public', tools: [] });
+      expect(payload.result).toEqual<unknown>({ cacheScope: 'public', tools: [] });
     });
 
     test('removes a negative ttlMs from tools/list results', () => {
       const payload = { jsonrpc: '2.0', id: 1, result: { ttlMs: -1, tools: [] } };
 
       expect(stripZeroTtlFromToolsListResult(payload)).toBe(true);
-      expect(payload.result).toEqual({ tools: [] });
+      expect(payload.result).toEqual<unknown>({ tools: [] });
     });
 
     test('keeps a positive ttlMs on tools/list results', () => {
@@ -632,7 +622,7 @@ describe('MCP Proxy Service', () => {
 
       expect(stripZeroTtlFromToolsListResult(payload)).toBe(true);
       expect(payload[0]!.result).toEqual({ ttlMs: 60000, tools: [] });
-      expect(payload[1]!.result).toEqual({ tools: [] });
+      expect(payload[1]!.result).toEqual<unknown>({ tools: [] });
     });
 
     test('sanitizeToolsListTtlStream passes non-JSON events through unchanged', async () => {

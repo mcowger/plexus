@@ -1,9 +1,8 @@
-import Fastify from 'fastify';
 /**
  * Tests for the logging level management routes.
  *
  * Reliability design (isolate: false):
- *   - No vi.mock for utils/logger in this file.  vitest.setup.ts owns that
+ *   - No mock.module for utils/logger in this file.  bun-test.setup.ts owns that
  *     mock globally.  Per-file overrides race against the setup mock and lose
  *     intermittently because the route handler captures whichever binding was
  *     active at module-load time.
@@ -15,7 +14,9 @@ import Fastify from 'fastify';
  *   - beforeEach/afterEach both reset via the DELETE route so every test
  *     starts and leaves the level at 'info' (the startup default).
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
+
+import Fastify from 'fastify';
 
 import { SUPPORTED_LOG_LEVELS } from '../../../utils/logger';
 import { registerLoggingRoutes } from '../logging';

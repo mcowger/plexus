@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
@@ -49,12 +49,14 @@ describe('Dispatcher Error Logging', () => {
       error: { type: 'invalid_request_error', message: 'invalid params' },
     });
 
-    global.fetch = vi.fn(async () => {
-      return new Response(errorBody, {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }) as any;
+    spyOn(globalThis, 'fetch').mockImplementation(
+      mock(async () => {
+        return new Response(errorBody, {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }) as any
+    );
 
     const dispatcher = new Dispatcher();
     const requestId = 'test-request-id';

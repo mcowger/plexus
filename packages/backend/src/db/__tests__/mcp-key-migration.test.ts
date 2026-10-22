@@ -1,5 +1,6 @@
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { decryptJson, encrypt } from '../../utils/encryption';
 import { toDbBoolean } from '../../utils/normalize';
@@ -22,7 +23,7 @@ describe('MCP key migration', () => {
     process.env.DATABASE_URL = process.env.PLEXUS_TEST_DB_URL ?? process.env.DATABASE_URL;
     initializeDatabase(process.env.DATABASE_URL);
     await runMigrations();
-    expect(getCurrentDialect()).toBe(process.env.PLEXUS_TEST_DIALECT);
+    expect(getCurrentDialect()).toBe<unknown>(process.env.PLEXUS_TEST_DIALECT);
     db = getDatabase();
     schema = getSchema();
     await db.delete(schema.mcpServers);
