@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM oven/bun:1.4.3 AS builder
+FROM oven/bun:1.4.4 AS builder
 
 WORKDIR /app
 
@@ -42,7 +42,7 @@ RUN case "${TARGETPLATFORM}" in \
 
 # Stage 2: Production image with local MCP runtime tooling.
 # Includes Bun/bunx and uv/uvx so Plexus can manage local HTTP MCP servers.
-FROM oven/bun:1.4.3
+FROM oven/bun:1.4.4
 
 WORKDIR /app
 
