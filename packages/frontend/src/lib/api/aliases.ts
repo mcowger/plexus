@@ -1,6 +1,3 @@
-import { normalizeApiAccessList } from '../apiFormats';
-import { dedupeAliasTargets, dedupeById, dedupeModels, dedupeStrings } from '../modelOptions';
-import { API_BASE, fetchWithAuth, inferProviderTypes } from './core';
 import type {
   Alias,
   AliasTargetGroup,
@@ -12,6 +9,9 @@ import type {
   ModelResolutionPreview,
   NormalizedModelMetadata,
 } from '../../types/aliases';
+import { normalizeApiAccessList } from '../apiFormats';
+import { dedupeAliasTargets, dedupeById, dedupeModels, dedupeStrings } from '../modelOptions';
+import { API_BASE, fetchWithAuth, inferProviderTypes } from './core';
 
 export function aliasToConfigPayload(alias: Alias): Record<string, unknown> {
   const targetGroups = dedupeAliasTargets(alias.target_groups);

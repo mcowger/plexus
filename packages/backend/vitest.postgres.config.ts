@@ -1,4 +1,5 @@
 import { defineProject } from 'vitest/config';
+
 import baseConfig from './vitest.config.ts';
 import { DB_TEST_FILES } from './vitest.db-tests.ts';
 

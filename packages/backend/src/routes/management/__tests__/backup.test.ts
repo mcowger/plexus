@@ -1,3 +1,4 @@
+import Fastify from 'fastify';
 /**
  * Tests for backup and restore routes.
  *
@@ -7,7 +8,6 @@
  * content-type handling, and input validation.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import Fastify from 'fastify';
 
 // Mock the database and config to avoid needing a real DB
 vi.mock('../../../db/client', () => ({

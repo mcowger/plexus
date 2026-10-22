@@ -1,11 +1,12 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { StickySessionManager } from '../routing/sticky-session-manager';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
-import { registerSpy } from '../../../test/test-utils';
+import { StickySessionManager } from '../routing/sticky-session-manager';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');

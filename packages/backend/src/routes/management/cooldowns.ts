@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+
 import { CooldownManager } from '../../services/runtime/cooldown-manager';
 import { logger } from '../../utils/logger';
 import { requireAdmin } from './_principal';

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, jsonb } from 'drizzle-orm/pg-core';
+import { bigint, jsonb, pgTable, serial, text } from 'drizzle-orm/pg-core';
 
 export const piAiCustomModels = pgTable('pi_ai_custom_models', {
   id: serial('id').primaryKey(),

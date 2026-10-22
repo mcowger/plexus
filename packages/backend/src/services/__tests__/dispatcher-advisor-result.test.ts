@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   createAdvisorResultStripState,
   matchAdvisorResultError,
+  MAX_ADVISOR_RESULT_STRIP_RETRIES,
   planAdvisorResultStrip,
   refundAdvisorResultStrip,
   stripAdvisorResultBlocks,
-  MAX_ADVISOR_RESULT_STRIP_RETRIES,
 } from '../dispatch/dispatcher-auto-compat';
 import {
   ADVISOR_DROP_PAYLOAD,

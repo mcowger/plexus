@@ -7,13 +7,13 @@ import {
   CURRENCY_RATES_URL,
   DEFAULT_CURRENCY,
   DISPLAY_CURRENCY_STORAGE_KEY,
-  SUPPORTED_CURRENCIES,
   fetchRates,
   getCachedRates,
   getCurrency,
   getSelectedCurrency,
   isCurrencyRateCacheFresh,
   setSelectedCurrency,
+  SUPPORTED_CURRENCIES,
 } from '../currency';
 
 function createStorage(): Storage {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
 import type { LocalHttpMcpServerConfig } from '../../../types/mcp';
 import { mcpProcessManager } from '../mcp-process-manager';

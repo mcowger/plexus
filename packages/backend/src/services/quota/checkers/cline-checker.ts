@@ -1,6 +1,7 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
 import { logger } from '../../../utils/logger';
+import { defineChecker } from '../checker-registry';
 
 // Cline balances are denominated in microcredits; 1,000,000 microcredits = 1 USD credit.
 const MICROCREDITS_PER_USD = 1_000_000;

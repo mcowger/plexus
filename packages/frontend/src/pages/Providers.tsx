@@ -1,26 +1,27 @@
+import { Code2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Button } from '../components/ui/Button';
-import { Modal } from '../components/ui/Modal';
-import { Input } from '../components/ui/Input';
-import { Card } from '../components/ui/Card';
-import { Switch } from '../components/ui/Switch';
-import { PageHeader } from '../components/layout/PageHeader';
+import { useNavigate } from 'react-router-dom';
+
 import { PageContainer } from '../components/layout/PageContainer';
-import { useProviderForm } from '../hooks/useProviderForm';
-import { ProviderList } from '../components/providers/ProviderList';
-import { ProviderApiUrlsEditor } from '../components/providers/ProviderApiUrlsEditor';
-import { ProviderOAuthEditor } from '../components/providers/ProviderOAuthEditor';
-import { ProviderQuotaEditor } from '../components/providers/ProviderQuotaEditor';
+import { PageHeader } from '../components/layout/PageHeader';
+import { DeleteProviderModal } from '../components/providers/DeleteProviderModal';
+import { FetchModelsModal } from '../components/providers/FetchModelsModal';
 import { ProviderAdvancedEditor } from '../components/providers/ProviderAdvancedEditor';
+import { ProviderApiUrlsEditor } from '../components/providers/ProviderApiUrlsEditor';
+import { ProviderList } from '../components/providers/ProviderList';
 import { ProviderModelsEditor } from '../components/providers/ProviderModelsEditor';
+import { ProviderOAuthEditor } from '../components/providers/ProviderOAuthEditor';
 import {
   ApplyPresetButton,
   ProviderPresetPicker,
 } from '../components/providers/ProviderPresetPicker';
-import { FetchModelsModal } from '../components/providers/FetchModelsModal';
-import { DeleteProviderModal } from '../components/providers/DeleteProviderModal';
-import { Code2, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ProviderQuotaEditor } from '../components/providers/ProviderQuotaEditor';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { Switch } from '../components/ui/Switch';
+import { useProviderForm } from '../hooks/useProviderForm';
 
 export const Providers = () => {
   const f = useProviderForm();
@@ -35,7 +36,7 @@ export const Providers = () => {
   }, [f.isModalOpen]);
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title="Providers"
         subtitle="Upstream LLM providers routed by the gateway"
@@ -128,7 +129,7 @@ export const Providers = () => {
                 disabled={f.isOAuthMode}
               />
               <div className="flex flex-col gap-2">
-                <label className="font-body text-[13px] font-medium text-text-secondary">
+                <label className="font-body text-text-secondary text-[13px] font-medium">
                   Enabled
                 </label>
                 <div style={{ height: '38px', display: 'flex', alignItems: 'center' }}>

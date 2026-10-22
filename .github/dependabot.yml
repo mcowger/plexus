@@ -6,31 +6,31 @@
 version: 2
 updates:
   # Enable version updates for npm
-  - package-ecosystem: "bun"
+  - package-ecosystem: 'bun'
     # Look for `package.json` and `lock` files in the `root` directory
-    directory: "/"
+    directory: '/'
     # Check the npm registry for updates every day (weekdays)
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     # Group minor + patch updates into a single PR (lower breaking-change risk).
     # Major updates are left ungrouped, so each gets its own PR for careful review.
     groups:
       minor-and-patch:
         update-types:
-          - "minor"
-          - "patch"
+          - 'minor'
+          - 'patch'
 
   # Enable version updates for GitHub Actions
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: 'github-actions'
     # Workflow files stored in the default location of `.github/workflows`
     # You don't need to specify `/.github/workflows` for `directory`. You can use `directory: "/"`.
-    directory: "/"
+    directory: '/'
     schedule:
-      interval: "weekly"
+      interval: 'weekly'
     # Group minor + patch updates into a single PR (lower breaking-change risk).
     # Major updates are left ungrouped, so each gets its own PR for careful review.
     groups:
       minor-and-patch:
         update-types:
-          - "minor"
-          - "patch"
+          - 'minor'
+          - 'patch'

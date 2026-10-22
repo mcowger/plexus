@@ -1,7 +1,8 @@
-import { describe, test, expect } from 'vitest';
+import { describe, expect, test } from 'vitest';
+
+import type { UsageRecord } from '../../types/usage';
 import { applyProviderReportedCost, applyUsageCostDetails } from '../provider-cost';
 import { extractUsageCostDetails } from '../usage-normalizer';
-import type { UsageRecord } from '../../types/usage';
 import type { ProviderCostDetails } from '../usage-normalizer';
 
 function createUsageRecord(overrides: Partial<UsageRecord> = {}): Partial<UsageRecord> {

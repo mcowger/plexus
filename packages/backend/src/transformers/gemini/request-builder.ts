@@ -1,5 +1,6 @@
 import { Content, Part, Tool } from '@google/genai';
-import { UnifiedChatRequest, GoogleBuiltInToolType, ThinkLevel } from '../../types/unified';
+
+import { GoogleBuiltInToolType, ThinkLevel, UnifiedChatRequest } from '../../types/unified';
 import { convertUnifiedPartsToGemini } from './part-mapper';
 import { ensureContentsEndWithUser } from './utils/model-tail';
 

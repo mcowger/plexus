@@ -1,7 +1,8 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
+import { runMigrations } from '../migrate';
 
 describe('config-repository compaction round-trips', () => {
   let db: ReturnType<typeof getDatabase>;

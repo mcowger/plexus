@@ -1,17 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
+import type { UnifiedChatRequest } from '../../../types/unified';
+import type { StallConfig } from '../../inspectors/stall-inspector';
+import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
+import type { RouteResult } from '../../routing/router';
+import { isRetryableOAuthError, isRetryableStatus } from '../failover-policy';
+import type { RequestManagerHost } from '../request-manager';
+import { NATIVE_OAUTH_STASH } from '../request-payload-builder';
 import {
   deriveProbeStallConfig,
   executeStandardAttempt,
   type StandardAttemptContext,
 } from '../standard-attempt-request';
-import { isRetryableStatus, isRetryableOAuthError } from '../failover-policy';
-import type { RequestManagerHost } from '../request-manager';
-import type { RouteResult } from '../../routing/router';
-import type { UnifiedChatRequest } from '../../../types/unified';
-import type { StallConfig } from '../../inspectors/stall-inspector';
-import { NATIVE_OAUTH_STASH } from '../request-payload-builder';
-import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 
 function makeStallConfig(overrides: Partial<StallConfig> = {}): StallConfig {
   return {

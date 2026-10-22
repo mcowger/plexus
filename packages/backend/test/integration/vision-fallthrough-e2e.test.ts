@@ -1,9 +1,10 @@
-import { expect, test, describe, beforeEach, afterEach, vi } from 'vitest';
-import { registerSpy } from '../test-utils';
-import { Dispatcher } from '../../src/services/dispatch/dispatcher';
-import { VisionDescriptorService } from '../../src/services/vision/vision-descriptor-service';
-import { Router } from '../../src/services/routing/router';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import * as configModule from '../../src/config';
+import { Dispatcher } from '../../src/services/dispatch/dispatcher';
+import { Router } from '../../src/services/routing/router';
+import { VisionDescriptorService } from '../../src/services/vision/vision-descriptor-service';
+import { registerSpy } from '../test-utils';
 
 const BASE_TEST_CONFIG = {
   providers: {},

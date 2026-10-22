@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   createUnsupportedParamStripState,
   deleteDottedPath,
   matchUnsupportedParameter,
-  planUnsupportedParamStrip,
   MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
+  planUnsupportedParamStrip,
 } from '../dispatch/dispatcher-auto-compat';
 import {
   ARRAY_FIELD_PAYLOAD,

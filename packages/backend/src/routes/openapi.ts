@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+
 import type { FastifyInstance } from 'fastify';
+
 import openApi from '../assets/openapi.json' with { type: 'json' };
 
 const body = JSON.stringify(openApi);

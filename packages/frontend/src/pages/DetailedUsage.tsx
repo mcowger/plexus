@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CustomDateRange } from '../lib/date';
+
 import { useCurrency } from '../lib/CurrencyContext';
-import {
-  createMetrics,
-  parseCustomDateRange,
-  parsePresetFromQuery,
-} from './detailed-usage/helpers';
+import type { CustomDateRange } from '../lib/date';
 import { DetailedUsageBreakdown } from './detailed-usage/DetailedUsageBreakdown';
 import { DetailedUsageCharts } from './detailed-usage/DetailedUsageCharts';
 import { DetailedUsageControls } from './detailed-usage/DetailedUsageControls';
 import { DetailedUsageHeader } from './detailed-usage/DetailedUsageHeader';
 import { DetailedUsageRequestLog } from './detailed-usage/DetailedUsageRequestLog';
 import { DetailedUsageStats } from './detailed-usage/DetailedUsageStats';
-import { useDetailedUsageData } from './detailed-usage/useDetailedUsageData';
+import {
+  createMetrics,
+  parseCustomDateRange,
+  parsePresetFromQuery,
+} from './detailed-usage/helpers';
 import type { DetailedUsageProps, MetricKey } from './detailed-usage/types';
+import { useDetailedUsageData } from './detailed-usage/useDetailedUsageData';
 
 export const DetailedUsage = ({
   embedded = false,
@@ -75,8 +76,8 @@ export const DetailedUsage = ({
     <div
       className={
         embedded
-          ? 'h-full p-2 bg-bg-card'
-          : 'min-h-screen p-6 transition-all duration-300 bg-linear-to-br from-bg-deep to-bg-surface'
+          ? 'bg-bg-card h-full p-2'
+          : 'from-bg-deep to-bg-surface min-h-screen bg-linear-to-br p-6 transition-all duration-300'
       }
     >
       <DetailedUsageHeader embedded={embedded} onBack={onBack} lastUpdated={lastUpdated} />

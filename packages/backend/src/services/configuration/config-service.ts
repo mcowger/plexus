@@ -1,26 +1,25 @@
-import { ConfigRepository, OAuthCredentialsData } from '../../db/config-repository';
-import { logger } from '../../utils/logger';
 import {
   assertNoAliasRefCycles,
   isOAuthPlaceholderUrl,
   normalizeSystemOneProviderConfig,
 } from '../../config';
 import type {
+  CooldownPolicy,
+  FailoverPolicy,
+  KeyConfig,
+  McpServerConfig,
+  ModelConfig,
   PlexusConfig,
   ProviderConfig,
-  ModelConfig,
-  KeyConfig,
-  QuotaDefinition,
-  McpServerConfig,
-  FailoverPolicy,
-  CooldownPolicy,
   QuotaConfig,
-  TimeoutConfig,
+  QuotaDefinition,
   StallConfigType,
+  TimeoutConfig,
 } from '../../config';
-
-import { QuotaScheduler } from '../quota/quota-scheduler';
+import { ConfigRepository, OAuthCredentialsData } from '../../db/config-repository';
+import { logger } from '../../utils/logger';
 import { ModelAutosyncScheduler } from '../models/model-autosync-scheduler';
+import { QuotaScheduler } from '../quota/quota-scheduler';
 
 /**
  * OAuth provider ids that were removed from Plexus (Gemini CLI / Antigravity).

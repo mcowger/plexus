@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
@@ -22,7 +22,7 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={clsx(
-        'bg-bg-card border border-border rounded-lg overflow-hidden transition-all duration-fast max-w-full',
+        'bg-bg-card border-border duration-fast max-w-full overflow-hidden rounded-lg border transition-all',
         className
       )}
       {...props}
@@ -33,17 +33,17 @@ export const Card: React.FC<CardProps> = ({
             // flex-wrap so a long `extra` (e.g. "Analyze Concurrency" + auto-refresh
             // status) drops to its own line on narrow viewports instead of
             // overflowing the card.
-            'flex items-start justify-between gap-2 sm:gap-3 flex-wrap border-b border-border sm:items-center',
+            'border-border flex flex-wrap items-start justify-between gap-2 border-b sm:items-center sm:gap-3',
             dense ? 'px-3 py-2.5 sm:px-4 sm:py-3' : 'px-3 py-2.5 sm:px-5 sm:py-3'
           )}
         >
           {title && (
-            <h3 className="font-heading text-[13px] sm:text-sm font-semibold text-text m-0 truncate min-w-0 leading-tight">
+            <h3 className="font-heading text-text m-0 min-w-0 truncate text-[13px] leading-tight font-semibold sm:text-sm">
               {title}
             </h3>
           )}
           {extra && (
-            <div className="min-w-0 max-w-full flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+            <div className="flex max-w-full min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
               {extra}
             </div>
           )}

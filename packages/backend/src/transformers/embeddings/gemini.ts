@@ -1,5 +1,5 @@
-import { UnifiedEmbeddingsRequest, UnifiedEmbeddingsResponse } from '../../types/unified';
 import { EmbeddingsTransformer } from '../../types/embeddings-transformer';
+import { UnifiedEmbeddingsRequest, UnifiedEmbeddingsResponse } from '../../types/unified';
 
 export class GeminiEmbeddingsTransformer implements EmbeddingsTransformer {
   readonly name = 'gemini';

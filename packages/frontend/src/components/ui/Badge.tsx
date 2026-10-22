@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 type BadgeStatus =
   | 'connected'
@@ -56,18 +56,18 @@ export const Badge: React.FC<BadgeProps> = ({
       title={title}
       style={style}
       className={clsx(
-        'inline-flex items-center gap-1.5 rounded-full border whitespace-nowrap tnum',
+        'tnum inline-flex items-center gap-1.5 rounded-full border whitespace-nowrap',
         secondaryText ? 'px-2 py-1 text-[11px]' : 'px-2 py-0.5 text-[11px] font-medium',
-        onClick && 'cursor-pointer hover:opacity-80 transition-opacity duration-fast',
+        onClick && 'duration-fast cursor-pointer transition-opacity hover:opacity-80',
         statusClasses[status],
         className
       )}
     >
-      {!noDot && <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />}
+      {!noDot && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-current" />}
       {secondaryText ? (
         <div className="flex flex-col items-start leading-tight">
           <span className="font-semibold">{children}</span>
-          <span className="text-[9px] opacity-70 mt-0.5">{secondaryText}</span>
+          <span className="mt-0.5 text-[9px] opacity-70">{secondaryText}</span>
         </div>
       ) : (
         <span className="font-medium">{children}</span>

@@ -1,13 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
 import {
+  type CurrencyCode,
+  type CurrencyRates,
   DEFAULT_CURRENCY,
   fetchRates,
   getCachedRates,
   getCurrency,
   getSelectedCurrency,
   setSelectedCurrency,
-  type CurrencyCode,
-  type CurrencyRates,
 } from './currency';
 
 export type CurrencyContextValue = {

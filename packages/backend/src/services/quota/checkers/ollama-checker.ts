@@ -1,6 +1,7 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
 import { logger } from '../../../utils/logger';
+import { defineChecker } from '../checker-registry';
 
 function extractUsage(html: string, label: string): { percent: number; resetsAt?: string } | null {
   // Primary: use aria-label (e.g. 'Session usage 4.4% used') — most robust against HTML changes

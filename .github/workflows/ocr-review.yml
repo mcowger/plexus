@@ -16,7 +16,7 @@
 #   no option to drop findings by severity.
 
 name: OpenCodeReview PR Review
-run-name: "OCR Review: PR #${{ github.event.pull_request.number || github.event.issue.number }}"
+run-name: 'OCR Review: PR #${{ github.event.pull_request.number || github.event.issue.number }}'
 
 # Matching events share a per-PR group; unrelated comments use a unique noop group.
 # Only explicit reruns cancel an active review. Automatic repeats queue behind it

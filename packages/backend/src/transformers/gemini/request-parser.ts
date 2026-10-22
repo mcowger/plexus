@@ -1,7 +1,8 @@
 import { Content } from '@google/genai';
+
 import { MessageContent, UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
-import { convertGeminiPartsToUnified } from './part-mapper';
 import { logger } from '../../utils/logger';
+import { convertGeminiPartsToUnified } from './part-mapper';
 import { isValidThoughtSignature, normalizeJsonSchemaTypes } from './utils';
 
 /**

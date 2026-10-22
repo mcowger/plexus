@@ -1,7 +1,8 @@
-import { describe, expect, test, beforeEach } from 'vitest';
-import { StickySessionManager } from '../routing/sticky-session-manager';
-import type { UnifiedChatRequest } from '../../types/unified';
+import { beforeEach, describe, expect, test } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
+import type { UnifiedChatRequest } from '../../types/unified';
+import { StickySessionManager } from '../routing/sticky-session-manager';
 
 function mgr() {
   const m = StickySessionManager.getInstance();

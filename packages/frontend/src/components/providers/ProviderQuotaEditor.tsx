@@ -1,33 +1,33 @@
 import { Provider } from '../../lib/api';
-import { NagaQuotaConfig } from '../quota/NagaQuotaConfig';
-import { SyntheticQuotaConfig } from '../quota/SyntheticQuotaConfig';
-import { NanoGPTQuotaConfig } from '../quota/NanoGPTQuotaConfig';
-import { ZAIQuotaConfig } from '../quota/ZAIQuotaConfig';
-import { MoonshotQuotaConfig } from '../quota/MoonshotQuotaConfig';
-import { NovitaQuotaConfig } from '../quota/NovitaQuotaConfig';
-import { MiniMaxQuotaConfig } from '../quota/MiniMaxQuotaConfig';
-import { MiniMaxCodingQuotaConfig } from '../quota/MiniMaxCodingQuotaConfig';
-import { OpenRouterQuotaConfig } from '../quota/OpenRouterQuotaConfig';
-import { KiloQuotaConfig } from '../quota/KiloQuotaConfig';
-import { WisdomGateQuotaConfig } from '../quota/WisdomGateQuotaConfig';
-import { GeminiCliQuotaConfig } from '../quota/GeminiCliQuotaConfig';
 import { AntigravityQuotaConfig } from '../quota/AntigravityQuotaConfig';
 import { ApertisQuotaConfig } from '../quota/ApertisQuotaConfig';
+import { ClaudeCodeQuotaConfig } from '../quota/ClaudeCodeQuotaConfig';
+import { ClineQuotaConfig } from '../quota/ClineQuotaConfig';
+import { CrofQuotaConfig } from '../quota/CrofQuotaConfig';
+import { CustomQuotaConfig } from '../quota/CustomQuotaConfig';
+import { DevPassQuotaConfig } from '../quota/DevPassQuotaConfig';
+import { ExeDevQuotaConfig } from '../quota/ExeDevQuotaConfig';
+import { GeminiCliQuotaConfig } from '../quota/GeminiCliQuotaConfig';
+import { HyperQuotaConfig } from '../quota/HyperQuotaConfig';
+import { KiloQuotaConfig } from '../quota/KiloQuotaConfig';
 import { KimiCodeQuotaConfig } from '../quota/KimiCodeQuotaConfig';
+import { MiniMaxCodingQuotaConfig } from '../quota/MiniMaxCodingQuotaConfig';
+import { MiniMaxQuotaConfig } from '../quota/MiniMaxQuotaConfig';
+import { MoonshotQuotaConfig } from '../quota/MoonshotQuotaConfig';
+import { NagaQuotaConfig } from '../quota/NagaQuotaConfig';
+import { NanoGPTQuotaConfig } from '../quota/NanoGPTQuotaConfig';
+import { NeuralwattQuotaConfig } from '../quota/NeuralwattQuotaConfig';
+import { NovitaQuotaConfig } from '../quota/NovitaQuotaConfig';
+import { OllamaQuotaConfig } from '../quota/OllamaQuotaConfig';
+import { OpenCodeGoQuotaConfig } from '../quota/OpenCodeGoQuotaConfig';
+import { OpenRouterQuotaConfig } from '../quota/OpenRouterQuotaConfig';
 import { PoeQuotaConfig } from '../quota/PoeQuotaConfig';
 import { RoutingRunQuotaConfig } from '../quota/RoutingRunQuotaConfig';
-import { OllamaQuotaConfig } from '../quota/OllamaQuotaConfig';
-import { DevPassQuotaConfig } from '../quota/DevPassQuotaConfig';
-import { NeuralwattQuotaConfig } from '../quota/NeuralwattQuotaConfig';
-import { ZenmuxQuotaConfig } from '../quota/ZenmuxQuotaConfig';
-import { OpenCodeGoQuotaConfig } from '../quota/OpenCodeGoQuotaConfig';
-import { CrofQuotaConfig } from '../quota/CrofQuotaConfig';
-import { ExeDevQuotaConfig } from '../quota/ExeDevQuotaConfig';
-import { HyperQuotaConfig } from '../quota/HyperQuotaConfig';
 import { SakanaQuotaConfig } from '../quota/SakanaQuotaConfig';
-import { ClineQuotaConfig } from '../quota/ClineQuotaConfig';
-import { ClaudeCodeQuotaConfig } from '../quota/ClaudeCodeQuotaConfig';
-import { CustomQuotaConfig } from '../quota/CustomQuotaConfig';
+import { SyntheticQuotaConfig } from '../quota/SyntheticQuotaConfig';
+import { WisdomGateQuotaConfig } from '../quota/WisdomGateQuotaConfig';
+import { ZAIQuotaConfig } from '../quota/ZAIQuotaConfig';
+import { ZenmuxQuotaConfig } from '../quota/ZenmuxQuotaConfig';
 
 interface Props {
   editingProvider: Provider;
@@ -127,13 +127,13 @@ export function ProviderQuotaEditor({
     : null;
 
   return (
-    <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
-      <label className="font-body text-[13px] font-medium text-text-secondary">Quota Checker</label>
+    <div className="border-border-glass bg-bg-subtle flex flex-col gap-1 rounded-md border p-3">
+      <label className="font-body text-text-secondary text-[13px] font-medium">Quota Checker</label>
       <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_120px] sm:items-end">
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[11px] font-medium text-text-secondary">Type</label>
+          <label className="font-body text-text-secondary text-[11px] font-medium">Type</label>
           <select
-            className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+            className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
             value={selectedQuotaCheckerType}
             onChange={(e) => setQuotaType(e.target.value)}
           >
@@ -146,11 +146,11 @@ export function ProviderQuotaEditor({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[11px] font-medium text-text-secondary">
+          <label className="font-body text-text-secondary text-[11px] font-medium">
             Interval (min)
           </label>
           <input
-            className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+            className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
             type="number"
             min={1}
             step={1}
@@ -178,7 +178,7 @@ export function ProviderQuotaEditor({
       </div>
 
       {QuotaConfigComponent && (
-        <div className="mt-3 p-3 border border-border-glass rounded-md bg-bg-subtle">
+        <div className="border-border-glass bg-bg-subtle mt-3 rounded-md border p-3">
           <QuotaConfigComponent
             options={editingProvider.quotaChecker?.options || {}}
             onChange={setQuotaOptions}
@@ -186,7 +186,7 @@ export function ProviderQuotaEditor({
         </div>
       )}
       {customCheckerIds.includes(selectedQuotaCheckerType) && editingProvider.quotaChecker && (
-        <div className="mt-3 rounded-md border border-border-glass bg-bg-subtle p-3">
+        <div className="border-border-glass bg-bg-subtle mt-3 rounded-md border p-3">
           <CustomQuotaConfig
             checkerId={selectedQuotaCheckerType}
             provider={editingProvider.id}
@@ -197,7 +197,7 @@ export function ProviderQuotaEditor({
       )}
 
       {quotaValidationError && (
-        <div className="mt-2 text-xs text-danger bg-danger/10 border border-danger/20 rounded px-3 py-2">
+        <div className="text-danger bg-danger/10 border-danger/20 mt-2 rounded border px-3 py-2 text-xs">
           {quotaValidationError}
         </div>
       )}

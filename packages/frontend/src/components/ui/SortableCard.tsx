@@ -39,12 +39,13 @@
  * animations even with many cards on screen.
  */
 
-import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
-import { Card } from './Card';
 import { clsx } from 'clsx';
+import { GripVertical } from 'lucide-react';
+import React, { useState } from 'react';
+
+import { Card } from './Card';
 
 /**
  * Data structure describing a single sortable card's content and behaviour.
@@ -164,7 +165,7 @@ export const SortableCard: React.FC<SortableCardProps> = ({ card, isOverlay = fa
       style={style}
       data-testid={`sortable-card-${card.id}`}
       data-dragging={isDragging ? 'true' : 'false'}
-      className={clsx('relative group min-w-0 max-w-full', isDragging && 'opacity-50')}
+      className={clsx('group relative max-w-full min-w-0', isDragging && 'opacity-50')}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -197,7 +198,7 @@ export const SortableCard: React.FC<SortableCardProps> = ({ card, isOverlay = fa
       <div
         data-testid="drag-handle"
         className={clsx(
-          'absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 rounded p-1 cursor-grab transition-opacity duration-200 active:cursor-grabbing md:block',
+          'absolute top-1/2 left-2 z-10 hidden -translate-y-1/2 cursor-grab rounded p-1 transition-opacity duration-200 active:cursor-grabbing md:block',
           isHovered || isDragging ? 'opacity-100' : 'opacity-0'
         )}
         {...listeners}
@@ -217,7 +218,7 @@ export const SortableCard: React.FC<SortableCardProps> = ({ card, isOverlay = fa
        * The `pl-8` (padding-left: 2rem) creates space for the absolutely-positioned
        * grip handle so that card content does not overlap with it.
        */}
-      <div data-testid="sortable-card" className="min-w-0 max-w-full md:pl-8">
+      <div data-testid="sortable-card" className="max-w-full min-w-0 md:pl-8">
         <Card
           title={card.title}
           extra={card.extra}

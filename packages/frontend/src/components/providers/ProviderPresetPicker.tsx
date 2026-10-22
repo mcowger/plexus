@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, ExternalLink, Wand2 } from 'lucide-react';
 import {
   applyProviderPreset,
   findProviderPreset,
   findUnresolvedPresetVars,
-  substitutePresetVars,
   type PiAiQuirks,
   type ProviderCacheKeyInjection,
   type ProviderPreset,
   type ResponsesExtension,
+  substitutePresetVars,
 } from '@plexus/shared';
+import { AlertTriangle, ExternalLink, Wand2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { api, type Provider } from '../../lib/api';
 
 const SELECT_CLASS =
@@ -40,7 +41,7 @@ export function ApplyPresetButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       title="Apply endpoints and quirks. Keeps the provider ID, name, API key, and models."
-      className="inline-flex items-center gap-1 px-3 py-1 font-body text-[12px] text-text-muted bg-transparent border border-border-glass rounded-md transition-colors hover:bg-bg-hover hover:text-text focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+      className="font-body text-text-muted border-border-glass hover:bg-bg-hover hover:text-text focus-visible:outline-primary inline-flex items-center gap-1 rounded-md border bg-transparent px-3 py-1 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
     >
       <Wand2 size={12} />
       Apply Preset
@@ -282,15 +283,15 @@ export function ProviderPresetPicker({
   if (isLoading) blankOptionLabel = 'Loading presets…';
 
   return (
-    <div className="flex flex-col gap-2 border border-border-glass rounded-md p-3 bg-bg-subtle">
+    <div className="border-border-glass bg-bg-subtle flex flex-col gap-2 rounded-md border p-3">
       {isEditing && (
-        <span className="text-[11px] text-text-muted">
+        <span className="text-text-muted text-[11px]">
           Replaces endpoints and preset settings. Keeps the provider ID, name, API key, and models.
           Review before saving.
         </span>
       )}
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           {isEditing ? 'Apply a preset' : 'Start from a preset'}
         </label>
         <select
@@ -307,7 +308,7 @@ export function ProviderPresetPicker({
           ))}
         </select>
         {loadError && (
-          <div className="text-[11px] text-text-secondary" style={{ fontStyle: 'italic' }}>
+          <div className="text-text-secondary text-[11px]" style={{ fontStyle: 'italic' }}>
             Couldn&apos;t load provider presets ({loadError}). You can still configure a provider
             manually below.
           </div>
@@ -315,12 +316,12 @@ export function ProviderPresetPicker({
       </div>
 
       {selectedPreset && (
-        <div className="flex flex-col gap-2 text-[11px] text-text-secondary leading-relaxed">
+        <div className="text-text-secondary flex flex-col gap-2 text-[11px] leading-relaxed">
           {selectedPreset.description && <div>{selectedPreset.description}</div>}
 
           {selectedPreset.experimentalApis.length > 0 && (
-            <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
-              <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
+            <div className="bg-warning/10 border-warning/30 flex items-start gap-2 rounded-sm border px-2 py-1.5">
+              <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
               <span className="text-warning">
                 Unverified endpoints, confirm before relying on them:{' '}
                 <span style={{ fontWeight: 600 }}>
@@ -334,7 +335,7 @@ export function ProviderPresetPicker({
             <div className="flex flex-col gap-1">
               {selectedPreset.templateVars.map((variable) => (
                 <div key={variable.key} className="flex flex-col gap-1">
-                  <label className="font-body text-[12px] font-medium text-text-secondary">
+                  <label className="font-body text-text-secondary text-[12px] font-medium">
                     {variable.label}
                   </label>
                   <input
@@ -349,8 +350,8 @@ export function ProviderPresetPicker({
           )}
 
           {unresolvedVars.length > 0 && (
-            <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
-              <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
+            <div className="bg-warning/10 border-warning/30 flex items-start gap-2 rounded-sm border px-2 py-1.5">
+              <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
               <span className="text-warning">
                 Unfilled template values ({unresolvedVars.join(', ')}) — fill them in above or edit
                 the URLs directly. Saving is blocked until they are resolved.
@@ -362,7 +363,7 @@ export function ProviderPresetPicker({
             <div style={{ fontStyle: 'italic' }}>{selectedPreset.notes}</div>
           )}
 
-          <div className="text-[11px] text-text-secondary">
+          <div className="text-text-secondary text-[11px]">
             Pre-fills {Object.keys(selectedPreset.apiBaseUrl).join(', ')} endpoints.{' '}
             {selectedPreset.piAiProvider ? (
               <>

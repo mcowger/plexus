@@ -1,13 +1,14 @@
 import {
+  boolean,
+  integer,
+  jsonb,
+  pgEnum,
   pgTable,
   serial,
   text,
-  integer,
-  jsonb,
   unique,
-  pgEnum,
-  boolean,
 } from 'drizzle-orm/pg-core';
+
 import { providers } from './providers';
 
 export const modelTypeEnum = pgEnum('model_type', [

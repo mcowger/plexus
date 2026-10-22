@@ -1,9 +1,9 @@
+import { PassThrough, Readable } from 'node:stream';
+
 /**
  * Test: does writing to a disconnected client's response cause an error we can catch?
  */
 import Fastify from 'fastify';
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
 
 const fastify = Fastify();
 const t0 = Date.now();

@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from 'vitest';
+
 import {
-  GEMINI_MALFORMED_FUNCTION_CALL_MESSAGE,
   detectGeminiMalformedFunctionCall,
+  GEMINI_MALFORMED_FUNCTION_CALL_MESSAGE,
   rewriteGeminiMalformedFunctionCallStream,
 } from '../gemini-malformed-function-call';
 

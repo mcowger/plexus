@@ -1,7 +1,7 @@
-import { logger } from '../../utils/logger';
-import { EmbeddingsTransformer } from '../../types/embeddings-transformer';
-import { OpenAIEmbeddingsTransformer } from '../../transformers/embeddings/openai';
 import { GeminiEmbeddingsTransformer } from '../../transformers/embeddings/gemini';
+import { OpenAIEmbeddingsTransformer } from '../../transformers/embeddings/openai';
+import { EmbeddingsTransformer } from '../../types/embeddings-transformer';
+import { logger } from '../../utils/logger';
 
 /**
  * EmbeddingsTransformerFactory

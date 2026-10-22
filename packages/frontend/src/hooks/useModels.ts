@@ -1,7 +1,8 @@
 import Fuse from 'fuse.js';
-import { useState, useEffect, useCallback } from 'react';
-import { api, Alias, Provider, Model, Cooldown } from '../lib/api';
+import { useCallback, useEffect, useState } from 'react';
+
 import { useToast } from '../contexts/ToastContext';
+import { Alias, api, Cooldown, Model, Provider } from '../lib/api';
 
 export interface AliasMatch {
   alias: Alias;

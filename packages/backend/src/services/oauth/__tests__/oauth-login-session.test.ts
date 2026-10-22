@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { OAuthLoginSessionManager } from '../oauth-login-session';
-import { OAuthAuthManager } from '../oauth-auth-manager';
-import type { OAuthProviderDescriptor } from '../oauth-providers';
+
 import { registerSpy } from '../../../../test/test-utils';
+import { OAuthAuthManager } from '../oauth-auth-manager';
+import { OAuthLoginSessionManager } from '../oauth-login-session';
+import type { OAuthProviderDescriptor } from '../oauth-providers';
 
 // A provider whose login mimics pi-ai's Anthropic flow: it waits on a
 // manual-code prompt and only releases its (fake) callback resource when that

@@ -1,12 +1,13 @@
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
-import { registerModelRoutes } from '../models';
+import { type PlexusConfig, setConfigForTesting } from '../../../config';
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';
-import { getModelCatalog, resetModelCatalogForTesting } from '../../../services/pi-ai/catalog';
-import { CodexVersionService } from '../../../services/oauth/codex-version-service';
 import { ClaudeCodeVersionService } from '../../../services/oauth/claude-code-version-service';
-import { setConfigForTesting, type PlexusConfig } from '../../../config';
+import { CodexVersionService } from '../../../services/oauth/codex-version-service';
+import { getModelCatalog, resetModelCatalogForTesting } from '../../../services/pi-ai/catalog';
+import { registerModelRoutes } from '../models';
 
 describe('management model routes', () => {
   let fastify: ReturnType<typeof Fastify>;

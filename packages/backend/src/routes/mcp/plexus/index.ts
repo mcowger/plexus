@@ -1,15 +1,16 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 import { ConfigService } from '../../../services/configuration/config-service';
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
-import { ManagementAuthError, authenticate, requireAdmin } from '../../management/_principal';
+import { authenticate, ManagementAuthError, requireAdmin } from '../../management/_principal';
 import { handleToolCall } from './dispatch';
 import { createPlexusMcpRequestContext, handlePlexusMcpHttpRequest } from './http';
 import { buildShimHeaders } from './management';
-import { PLEXUS_MANAGEMENT_PROMPT, TOOL_NAMES, getToolDescription } from './metadata';
+import { getToolDescription, PLEXUS_MANAGEMENT_PROMPT, TOOL_NAMES } from './metadata';
 import { toToolResult } from './responses';
-import { ToolInputSchema, type ManagementShimContext, type ToolInput } from './types';
+import { type ManagementShimContext, type ToolInput, ToolInputSchema } from './types';
 
 export async function registerPlexusMcpRoutes(
   fastify: FastifyInstance,

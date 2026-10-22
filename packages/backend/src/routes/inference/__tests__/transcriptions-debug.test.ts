@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import Fastify, { FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
-import { setConfigForTesting } from '../../../config';
-import { registerInferenceRoutes } from '../index';
-import { Dispatcher } from '../../../services/dispatch/dispatcher';
-import { UsageStorageService } from '../../../services/observability/usage-storage';
-import { DebugManager } from '../../../services/observability/debug-manager';
-import { SelectorFactory } from '../../../services/routing/selectors/factory';
+import Fastify, { FastifyInstance } from 'fastify';
 import FormData from 'form-data';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { setConfigForTesting } from '../../../config';
+import { Dispatcher } from '../../../services/dispatch/dispatcher';
+import { DebugManager } from '../../../services/observability/debug-manager';
+import { UsageStorageService } from '../../../services/observability/usage-storage';
+import { SelectorFactory } from '../../../services/routing/selectors/factory';
+import { registerInferenceRoutes } from '../index';
 
 /**
  * Test suite to verify that binary audio files are NOT stored in debug logs

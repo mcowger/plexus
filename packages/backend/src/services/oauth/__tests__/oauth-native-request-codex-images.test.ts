@@ -18,6 +18,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
 import { CodexVersionService } from '../codex-version-service';
 import { OAuthAuthManager } from '../oauth-auth-manager';

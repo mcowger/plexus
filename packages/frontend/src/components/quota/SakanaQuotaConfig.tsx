@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface SakanaQuotaConfigProps {
@@ -16,7 +17,7 @@ export const SakanaQuotaConfig: React.FC<SakanaQuotaConfigProps> = ({ options, o
       <div className="flex flex-col gap-1">
         <label
           htmlFor="sakana-session-cookie"
-          className="font-body text-[13px] font-medium text-text-secondary"
+          className="font-body text-text-secondary text-[13px] font-medium"
         >
           Session Cookie <span className="text-danger">*</span>
         </label>
@@ -27,7 +28,7 @@ export const SakanaQuotaConfig: React.FC<SakanaQuotaConfigProps> = ({ options, o
           onChange={(e) => handleChange('sessionCookie', e.target.value)}
           placeholder="Paste your __Secure-authjs.session-token cookie"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Required. Found in browser DevTools (F12) → Application → Cookies → console.sakana.ai →
           copy the <span className="font-mono">__Secure-authjs.session-token</span> value. Treat it
           like a password — it expires and must be refreshed periodically.
@@ -37,7 +38,7 @@ export const SakanaQuotaConfig: React.FC<SakanaQuotaConfigProps> = ({ options, o
       <div className="flex flex-col gap-1">
         <label
           htmlFor="sakana-endpoint"
-          className="font-body text-[13px] font-medium text-text-secondary"
+          className="font-body text-text-secondary text-[13px] font-medium"
         >
           Endpoint (optional)
         </label>
@@ -47,7 +48,7 @@ export const SakanaQuotaConfig: React.FC<SakanaQuotaConfigProps> = ({ options, o
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://console.sakana.ai/billing"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Custom billing page URL. Defaults to the standard Sakana billing console.
         </span>
       </div>

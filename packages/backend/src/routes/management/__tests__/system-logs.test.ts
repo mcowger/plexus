@@ -1,5 +1,6 @@
-import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+
 import { registerSystemLogRoutes } from '../system-logs';
 
 vi.mock('../../../utils/logger', async (importOriginal) => {

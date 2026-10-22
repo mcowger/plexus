@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, boolean, unique } from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, serial, text, unique } from 'drizzle-orm/pg-core';
+
 import { modelAliases } from './model-aliases';
 
 export const modelAliasTargets = pgTable(

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../../test/test-utils';
+import { OAuthAuthManager } from '../../../oauth/oauth-auth-manager';
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../openai-codex-checker';
-import { OAuthAuthManager } from '../../../oauth/oauth-auth-manager';
 
 const makeCtx = (apiKey?: string) =>
   createMeterContext('codex-test', 'openai', apiKey ? { apiKey } : {});

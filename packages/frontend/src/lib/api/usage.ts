@@ -1,13 +1,3 @@
-import { formatNumber } from '../format';
-import {
-  API_BASE,
-  fetchWithAuth,
-  fetchConfigCached,
-  formatLargeNumber,
-  getAuthCacheKey,
-  STAT_LABELS,
-} from './core';
-import { getCooldowns } from './settings';
 import type {
   BackendResponse,
   ConcurrencyData,
@@ -25,6 +15,16 @@ import type {
   UsageSummaryExclusion,
   UsageSummaryResponse,
 } from '../../types/usage';
+import { formatNumber } from '../format';
+import {
+  API_BASE,
+  fetchConfigCached,
+  fetchWithAuth,
+  formatLargeNumber,
+  getAuthCacheKey,
+  STAT_LABELS,
+} from './core';
+import { getCooldowns } from './settings';
 
 export const USAGE_CACHE_TTL_MS = 20000;
 export const usageRequestCache = new Map<

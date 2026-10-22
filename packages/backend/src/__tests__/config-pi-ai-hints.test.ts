@@ -1,8 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { validateConfig } from '../config';
-import { logger } from '../utils/logger';
-import { resetModelCatalogForTesting } from '../services/pi-ai/catalog';
+import { afterEach, describe, expect, it } from 'vitest';
+
 import { registerSpy } from '../../test/test-utils';
+import { validateConfig } from '../config';
+import { resetModelCatalogForTesting } from '../services/pi-ai/catalog';
+import { logger } from '../utils/logger';
 
 // pi-ai and logger are globally mocked in test/vitest.setup.ts
 

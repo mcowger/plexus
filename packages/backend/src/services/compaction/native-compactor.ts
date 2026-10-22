@@ -1,14 +1,15 @@
 import type {
-  Context,
-  UserMessage,
   AssistantMessage,
-  ToolResultMessage,
-  TextContent,
+  Context,
   ImageContent,
+  JsonObject,
+  TextContent,
   ThinkingContent,
   ToolCall,
-  JsonObject,
+  ToolResultMessage,
+  UserMessage,
 } from '@earendil-works/pi-ai';
+
 import type {
   CompactionStrategy,
   CompactionStrategyContext,

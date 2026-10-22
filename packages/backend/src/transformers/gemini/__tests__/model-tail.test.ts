@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+
+import type { UnifiedChatRequest } from '../../../types/unified';
 import { buildGeminiRequest } from '../request-builder';
 import {
   appendUserAfterTextOnlyModelTail,
   ensureContentsEndWithUser,
   isTextOnlyModelContent,
 } from '../utils/model-tail';
-import type { UnifiedChatRequest } from '../../../types/unified';
 
 describe('Gemini model-tail normalization', () => {
   describe('isTextOnlyModelContent', () => {

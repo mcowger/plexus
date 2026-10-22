@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+
 import {
-  stripUnsupportedToolSearchAdapter,
   isToolSearchShorthand,
+  stripUnsupportedToolSearchAdapter,
 } from '../strip-unsupported-tool-search.adapter';
 
 // ── isToolSearchShorthand ──────────────────────────────────────────────────

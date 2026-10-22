@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerProviderRoutes } from '../providers';
 
 describe('management provider routes', () => {

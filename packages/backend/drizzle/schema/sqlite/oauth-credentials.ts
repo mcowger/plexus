@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, unique } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 
 export const oauthCredentials = sqliteTable(
   'oauth_credentials',

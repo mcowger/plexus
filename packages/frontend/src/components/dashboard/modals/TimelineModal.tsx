@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+
 import type { MinuteBucket } from '../liveTypes';
 
 export interface TimelineModalProps {

@@ -5,8 +5,7 @@
  * This would be the pattern for wiring up timeout support properly:
  *   signal.addEventListener('abort', () => { nodeStream.destroy(); pipeline.destroy(); })
  */
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 let chunkCount = 0;
 let cancelFired = false;

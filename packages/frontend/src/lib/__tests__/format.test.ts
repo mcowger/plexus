@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { countdownTickMs, formatResetCountdown } from '../format';
 
 const NOW = Date.parse('2026-08-06T12:00:00.000Z');

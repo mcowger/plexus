@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+
+import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedImageGenerationRequest } from '../../types/unified';
-import { CooldownManager } from '../runtime/cooldown-manager';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { CodexVersionService } from '../oauth/codex-version-service';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
-import { registerSpy } from '../../../test/test-utils';
 import { DebugManager } from '../observability/debug-manager';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 const fetchMock = vi.fn();
 global.fetch = fetchMock as any;

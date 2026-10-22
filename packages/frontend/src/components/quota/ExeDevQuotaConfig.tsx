@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface ExeDevQuotaConfigProps {
@@ -19,7 +20,7 @@ export const ExeDevQuotaConfig: React.FC<ExeDevQuotaConfigProps> = ({ options, o
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input
@@ -27,7 +28,7 @@ export const ExeDevQuotaConfig: React.FC<ExeDevQuotaConfigProps> = ({ options, o
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://exe.dev/exec"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Custom endpoint URL. Defaults to exe.dev&apos;s exec endpoint.
         </span>
       </div>

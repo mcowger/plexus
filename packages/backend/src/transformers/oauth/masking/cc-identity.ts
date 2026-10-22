@@ -28,7 +28,7 @@
  * `injectClaudeCodeSystemPrompt` / `sanitizeForwardedSystemPrompt`.
  */
 
-import { buildBillingHeaderText, BILLING_HEADER_PREFIX } from './cc-billing';
+import { BILLING_HEADER_PREFIX, buildBillingHeaderText } from './cc-billing';
 
 /**
  * Agent introduction section. Must be the first static-prompt block after

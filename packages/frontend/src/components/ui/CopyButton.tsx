@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
 import { clsx } from 'clsx';
-import { isClipboardAvailable, copyToClipboard } from '../../lib/clipboard';
+import { Check, Copy } from 'lucide-react';
+import React, { useState } from 'react';
+
+import { copyToClipboard, isClipboardAvailable } from '../../lib/clipboard';
 
 interface CopyButtonProps {
   value: string;
@@ -54,7 +55,7 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
         aria-label={copied ? 'Copied' : label}
         title={!canCopy ? 'Copy requires HTTPS connection' : copied ? 'Copied!' : label}
         className={clsx(
-          'inline-flex items-center justify-center rounded-md transition-colors duration-fast focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2',
+          'duration-fast focus-visible:outline-primary inline-flex items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
           size === 'sm' ? 'h-6 w-6' : 'h-7 w-7',
           !canCopy
             ? 'text-text-muted cursor-not-allowed opacity-50'
@@ -74,7 +75,7 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
       disabled={!canCopy}
       title={!canCopy ? 'Copy requires HTTPS connection' : undefined}
       className={clsx(
-        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-all duration-fast focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2',
+        'duration-fast focus-visible:outline-primary inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         !canCopy
           ? 'border-border-glass/30 bg-bg-glass/30 text-text-muted cursor-not-allowed opacity-50'
           : 'border-border-glass bg-bg-glass text-text-secondary hover:text-text hover:border-primary cursor-pointer',

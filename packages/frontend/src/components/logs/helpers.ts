@@ -1,5 +1,5 @@
-import type { UsageRecord } from '../../types/usage';
 import { getApiBaseType, isDecisionsTargetAccess } from '../../lib/apiFormats';
+import type { UsageRecord } from '../../types/usage';
 
 /** True when `apiType` is the Decisions ingress type or a Decisions target protocol. */
 export const isDecisionsApiType = (apiType?: string | null): boolean => {

@@ -1,9 +1,12 @@
-import React from 'react';
 import { Search, X } from 'lucide-react';
+import React from 'react';
+
 import { Input } from './Input';
 
-interface SearchInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
+interface SearchInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'value' | 'onChange'
+> {
   value: string;
   onChange: (value: string) => void;
   onClear?: () => void;
@@ -38,7 +41,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             type="button"
             onClick={handleClear}
             aria-label="Clear search"
-            className="flex items-center justify-center h-7 w-7 rounded-md text-text-muted hover:text-text hover:bg-bg-hover transition-colors duration-fast"
+            className="text-text-muted hover:text-text hover:bg-bg-hover duration-fast flex h-7 w-7 items-center justify-center rounded-md transition-colors"
           >
             <X size={14} />
           </button>

@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
+
+import { setConfigForTesting } from '../../config';
 import { Router } from '../routing/router';
 import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
 import { CooldownManager } from '../runtime/cooldown-manager';
-import { setConfigForTesting } from '../../config';
 
 // We use resolveCandidates (plural) because it returns the full ordered
 // list of healthy targets — this lets us assert on ordering and filtering.

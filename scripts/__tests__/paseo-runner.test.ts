@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { join } from 'path';
-import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
+import { join } from 'path';
+
+import { describe, expect, it } from 'vitest';
+
 import {
-  isPaseoScriptAvailable,
   getPaseoScriptStatus,
+  isPaseoScriptAvailable,
   startPaseoScript,
   stopPaseoScript,
 } from '../lib/paseo';

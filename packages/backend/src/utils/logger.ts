@@ -1,7 +1,8 @@
-import winston from 'winston';
-import Transport from 'winston-transport';
 import { EventEmitter } from 'events';
 import path from 'path';
+
+import winston from 'winston';
+import Transport from 'winston-transport';
 
 const { combine, timestamp, printf, colorize, splat, json } = winston.format;
 

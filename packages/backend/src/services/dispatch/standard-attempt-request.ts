@@ -1,19 +1,21 @@
+import type { ResolvedAdapter } from '../../types/provider-adapter';
 import type { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
 import { logger } from '../../utils/logger';
-import type { ResolvedAdapter } from '../../types/provider-adapter';
-import type { RouteResult } from '../routing/router';
-import type { RetryAttemptRecord } from './dispatcher-types';
 import type { StallConfig } from '../inspectors/stall-inspector';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import type { RequestManagerHost } from './request-manager';
-import { applyAutoAnthropicBetas, refreshOAuthRoute } from './request-payload-builder';
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
+import type { RouteResult } from '../routing/router';
+import { CooldownManager } from '../runtime/cooldown-manager';
+import { resolveStickyCacheTtlMs } from './cache-retention';
 import {
   createAdvisorResultStripState,
   createLiteToolStripState,
   createThinkingSignatureStripState,
   createUnsupportedParamStripState,
   deleteDottedPath,
+  MAX_ADVISOR_RESULT_STRIP_RETRIES,
+  MAX_LITE_TOOL_STRIP_RETRIES,
+  MAX_THINKING_SIGNATURE_STRIP_RETRIES,
+  MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
   planAdvisorResultStrip,
   planLiteToolStrip,
   planThinkingSignatureStrip,
@@ -23,14 +25,12 @@ import {
   stripAdvisorResultBlocks,
   stripLiteUnsupportedTools,
   stripThinkingSignatureBlocks,
-  MAX_ADVISOR_RESULT_STRIP_RETRIES,
-  MAX_LITE_TOOL_STRIP_RETRIES,
-  MAX_THINKING_SIGNATURE_STRIP_RETRIES,
-  MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
 } from './dispatcher-auto-compat';
+import type { RetryAttemptRecord } from './dispatcher-types';
 import { EMPTY_COMPLETION_REASON, isEmptyUnifiedResponse } from './empty-completion';
+import type { RequestManagerHost } from './request-manager';
+import { applyAutoAnthropicBetas, refreshOAuthRoute } from './request-payload-builder';
 import { extractRequestedServiceTier, type ServiceTierCapture } from './service-tier-metadata';
-import { resolveStickyCacheTtlMs } from './cache-retention';
 
 function attachRequestedServiceTier(
   response: UnifiedChatResponse,
@@ -62,8 +62,7 @@ function attachRequestedServiceTierToError(error: any, capture: ServiceTierCaptu
 }
 
 export type StandardAttemptResult =
-  | { outcome: 'success'; response: UnifiedChatResponse }
-  | { outcome: 'retry'; error: any };
+  { outcome: 'success'; response: UnifiedChatResponse } | { outcome: 'retry'; error: any };
 
 /**
  * Derives the stall config to hand the post-fetch streaming probe: the

@@ -1,6 +1,7 @@
 import React from 'react';
-import { formatCostIn, formatPointsFull, type FormatCostInOptions } from '../../lib/format';
+
 import { useCurrency } from '../../lib/CurrencyContext';
+import { formatCostIn, type FormatCostInOptions, formatPointsFull } from '../../lib/format';
 
 type MeterCurrencyOptions = Pick<FormatCostInOptions, 'currency' | 'rate' | 'symbol'>;
 

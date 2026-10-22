@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Database, Loader2, Network, RefreshCw, Save, XCircle } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { Disclosure } from '../ui/Disclosure';
-import { TagSelect } from '../ui/TagSelect';
+import { useEffect, useRef, useState } from 'react';
+
 import { useToast } from '../../contexts/ToastContext';
 import { api } from '../../lib/api';
 import type { CatalogRefreshAllResult, CatalogStatus } from '../../types/aliases';
+import { Button } from '../ui/Button';
+import { Disclosure } from '../ui/Disclosure';
+import { TagSelect } from '../ui/TagSelect';
 
 interface NetworkSettingsProps {
   trustedProxies: string[];
@@ -172,12 +173,12 @@ function ExternalDataRefresh() {
   const resultRows = result ? buildResultRows(result) : [];
 
   return (
-    <div className="border-t border-border-glass mt-2 pt-3">
+    <div className="border-border-glass mt-2 border-t pt-3">
       <div className="flex items-center gap-2">
         <Database size={16} className="text-primary" />
         <div className="flex-1">
-          <p className="font-body text-[12px] font-medium text-text">External Data Refresh</p>
-          <p className="font-body text-[11px] text-text-muted">
+          <p className="font-body text-text text-[12px] font-medium">External Data Refresh</p>
+          <p className="font-body text-text-muted text-[11px]">
             Force an immediate reload of every interval-fetched resource — OpenRouter, models.dev,
             and Catwalk metadata
             {status ? ` (${formatInterval(status.intervals.metadataMinutes)} auto-refresh)` : ''},
@@ -201,18 +202,18 @@ function ExternalDataRefresh() {
       </div>
 
       {refreshing && (
-        <div className="mt-3 rounded-md border border-border-2 bg-bg-hover/50 px-3 py-2">
+        <div className="border-border-2 bg-bg-hover/50 mt-3 rounded-md border px-3 py-2">
           <div className="flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin text-primary shrink-0" />
-            <span className="font-body text-[12px] font-medium text-text">
+            <Loader2 size={14} className="text-primary shrink-0 animate-spin" />
+            <span className="font-body text-text text-[12px] font-medium">
               Refreshing external data… {(elapsedMs / 1000).toFixed(1)}s
             </span>
           </div>
           <ul className="mt-2 flex flex-col gap-1">
             {REFRESHING_SOURCES.map((name) => (
               <li key={name} className="flex items-center gap-2">
-                <Loader2 size={12} className="animate-spin text-text-muted shrink-0" />
-                <span className="font-body text-[11px] text-text-muted">{name} — fetching…</span>
+                <Loader2 size={12} className="text-text-muted shrink-0 animate-spin" />
+                <span className="font-body text-text-muted text-[11px]">{name} — fetching…</span>
               </li>
             ))}
           </ul>
@@ -220,21 +221,21 @@ function ExternalDataRefresh() {
       )}
 
       {!refreshing && error && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border border-danger/30 bg-danger/10 px-3 py-2">
+        <div className="border-danger/30 bg-danger/10 mt-3 flex items-center gap-2 rounded-md border px-3 py-2">
           <XCircle size={14} className="text-danger shrink-0" />
-          <span className="font-body text-[12px] text-text">{error}</span>
+          <span className="font-body text-text text-[12px]">{error}</span>
         </div>
       )}
 
       {!refreshing && result && (
-        <div className="mt-3 rounded-md border border-border-2 bg-bg-hover/50 px-3 py-2">
+        <div className="border-border-2 bg-bg-hover/50 mt-3 rounded-md border px-3 py-2">
           <div className="flex items-center gap-2">
             {result.hadErrors ? (
               <XCircle size={14} className="text-secondary shrink-0" />
             ) : (
               <CheckCircle2 size={14} className="text-success shrink-0" />
             )}
-            <span className="font-body text-[12px] font-medium text-text">
+            <span className="font-body text-text text-[12px] font-medium">
               {result.message} in {formatDuration(result.durationMs)} —{' '}
               {new Date(result.refreshedAt).toLocaleString()}
             </span>
@@ -243,12 +244,12 @@ function ExternalDataRefresh() {
             {resultRows.map((row) => (
               <li key={row.key} className="flex items-start gap-2">
                 {row.ok ? (
-                  <CheckCircle2 size={12} className="text-success shrink-0 mt-[2px]" />
+                  <CheckCircle2 size={12} className="text-success mt-[2px] shrink-0" />
                 ) : (
-                  <XCircle size={12} className="text-danger shrink-0 mt-[2px]" />
+                  <XCircle size={12} className="text-danger mt-[2px] shrink-0" />
                 )}
-                <span className="font-body text-[11px] text-text-muted">
-                  <span className="font-medium text-text">{row.name}:</span> {row.detail}
+                <span className="font-body text-text-muted text-[11px]">
+                  <span className="text-text font-medium">{row.name}:</span> {row.detail}
                 </span>
               </li>
             ))}
@@ -287,8 +288,8 @@ export function NetworkSettings({
         <div className="flex items-center gap-2">
           <Network size={16} className="text-primary" />
           <div>
-            <p className="font-body text-[12px] font-medium text-text">Trusted Proxies</p>
-            <p className="font-body text-[11px] text-text-muted">
+            <p className="font-body text-text text-[12px] font-medium">Trusted Proxies</p>
+            <p className="font-body text-text-muted text-[11px]">
               IPs/CIDRs of reverse proxies whose forwarding headers (X-Forwarded-For,
               CF-Connecting-IP, …) are believed when resolving a client&apos;s IP. Requests arriving
               directly from any other address use their real connection IP instead, so spoofed
@@ -307,7 +308,7 @@ export function NetworkSettings({
             splitOnSpace
             onChange={onChange}
           />
-          <p className="text-xs text-text-muted mt-2">
+          <p className="text-text-muted mt-2 text-xs">
             Type entries separated by spaces. The default trust-all list is <code>0.0.0.0/0</code>{' '}
             plus <code>::/0</code> — keep this only if Plexus is not publicly reachable except
             through your proxy. An empty list trusts no proxies. Accepts IPv4/IPv6, CIDR, and

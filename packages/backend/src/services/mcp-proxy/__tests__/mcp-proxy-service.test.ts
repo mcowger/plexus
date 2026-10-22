@@ -1,24 +1,25 @@
-import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../../test/test-utils';
+import { setConfigForTesting } from '../../../config';
+import { mcpProcessManager } from '../../mcp-local/mcp-process-manager';
 import {
-  getMcpServerConfig,
-  validateServerName,
-  filterHopByHopHeaders,
-  filterClientAuthHeaders,
-  mergeUpstreamHeaders,
-  redactSensitiveHeaders,
   extractJsonRpcMethod,
   extractJsonRpcMethods,
+  filterClientAuthHeaders,
+  filterHopByHopHeaders,
   getEffectiveUpstreamUrl,
-  proxyMcpRequest,
-  selectMcpKeyRoundRobin,
+  getMcpServerConfig,
   injectMcpKeyAuth,
+  mergeUpstreamHeaders,
+  proxyMcpRequest,
+  redactSensitiveHeaders,
   requestsToolsList,
   sanitizeToolsListTtlStream,
+  selectMcpKeyRoundRobin,
   stripZeroTtlFromToolsListResult,
+  validateServerName,
 } from '../mcp-proxy-service';
-import { setConfigForTesting } from '../../../config';
-import { registerSpy } from '../../../../test/test-utils';
-import { mcpProcessManager } from '../../mcp-local/mcp-process-manager';
 
 describe('MCP Proxy Service', () => {
   describe('validateServerName', () => {

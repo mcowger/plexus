@@ -1,6 +1,7 @@
-import { describe, expect, test, vi } from 'vitest';
-import { getClientIp, getTrustedClientIp } from '../ip';
 import { FastifyRequest } from 'fastify';
+import { describe, expect, test, vi } from 'vitest';
+
+import { getClientIp, getTrustedClientIp } from '../ip';
 
 // Helper to create a mock Fastify Request
 function createMockRequest(

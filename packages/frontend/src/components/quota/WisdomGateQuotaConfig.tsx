@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface WisdomGateQuotaConfigProps {
@@ -17,7 +18,7 @@ export const WisdomGateQuotaConfig: React.FC<WisdomGateQuotaConfigProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Session Cookie <span className="text-danger">*</span>
         </label>
         <Input
@@ -26,13 +27,13 @@ export const WisdomGateQuotaConfig: React.FC<WisdomGateQuotaConfigProps> = ({
           onChange={(e) => handleChange('session', e.target.value)}
           placeholder="Paste your Wisdom Gate session cookie"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Required. Found in browser cookies after logging in to wisgate.ai.
         </span>
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input
@@ -40,7 +41,7 @@ export const WisdomGateQuotaConfig: React.FC<WisdomGateQuotaConfigProps> = ({
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://wisgate.ai/api/dashboard/billing/usage/details"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Leave blank to use the default endpoint.
         </span>
       </div>

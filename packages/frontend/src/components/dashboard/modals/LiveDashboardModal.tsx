@@ -5,19 +5,20 @@
  * Renders either an expanded card view or an embedded DetailedUsage analytics page.
  */
 
-import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import React, { useEffect } from 'react';
+
+import type { LiveDashboardData } from '../../../hooks/useLiveDashboardData';
 import { DetailedUsage } from '../../../pages/DetailedUsage';
 import type { ModalCardId } from '../liveTypes';
-import type { LiveDashboardData } from '../../../hooks/useLiveDashboardData';
-import { VelocityModal } from './VelocityModal';
-import { ProviderPulseModal } from './ProviderPulseModal';
-import { ModelPulseModal } from './ModelPulseModal';
-import { TimelineModal } from './TimelineModal';
-import { ModelTimelineModal } from './ModelTimelineModal';
-import { RequestsModal } from './RequestsModal';
 import { ConcurrencyModal } from './ConcurrencyModal';
+import { ModelPulseModal } from './ModelPulseModal';
+import { ModelTimelineModal } from './ModelTimelineModal';
+import { ProviderPulseModal } from './ProviderPulseModal';
+import { RequestsModal } from './RequestsModal';
 import { StatsModal } from './StatsModal';
+import { TimelineModal } from './TimelineModal';
+import { VelocityModal } from './VelocityModal';
 
 export interface LiveDashboardModalProps {
   isOpen: boolean;
@@ -130,14 +131,14 @@ export const LiveDashboardModal: React.FC<LiveDashboardModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-6xl max-h-[90vh] overflow-auto rounded-lg border border-border-glass bg-bg-card p-6"
+        className="border-border-glass bg-bg-card relative max-h-[90vh] w-full max-w-6xl overflow-auto rounded-lg border p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-text">{title}</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-text text-xl font-semibold">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-bg-hover transition-colors cursor-pointer"
+            className="hover:bg-bg-hover cursor-pointer rounded-lg p-2 transition-colors"
             aria-label="Close modal"
           >
             <X size={24} className="text-text-secondary" />

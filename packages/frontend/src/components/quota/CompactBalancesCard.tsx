@@ -1,11 +1,12 @@
+import { AlertTriangle } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
-import type { QuotaCheckerInfo } from '../../types/quota';
-import { formatMeterValue } from './MeterValue';
-import { getCheckerDisplayName } from './checker-presentation';
-import { getStaleReadingMessage } from './StaleReadingNotice';
+
 import { useCurrency } from '../../lib/CurrencyContext';
+import type { QuotaCheckerInfo } from '../../types/quota';
+import { getCheckerDisplayName } from './checker-presentation';
+import { formatMeterValue } from './MeterValue';
+import { getStaleReadingMessage } from './StaleReadingNotice';
 
 interface CompactBalancesCardProps {
   balanceQuotas: QuotaCheckerInfo[];
@@ -23,7 +24,7 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
 
   return (
     <div
-      className="px-2 py-1 space-y-0.5 cursor-pointer hover:bg-bg-hover transition-colors"
+      className="hover:bg-bg-hover cursor-pointer space-y-0.5 px-2 py-1 transition-colors"
       onClick={() => navigate('/quotas')}
       role="button"
       tabIndex={0}
@@ -48,16 +49,16 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
             : undefined;
 
         return (
-          <div key={quota.checkerId} className="flex items-center justify-between min-w-0">
-            <span className="text-xs text-text-secondary truncate">{displayName}:</span>
+          <div key={quota.checkerId} className="flex min-w-0 items-center justify-between">
+            <span className="text-text-secondary truncate text-xs">{displayName}:</span>
             {!quota.success ? (
-              <span className="text-xs text-danger flex-shrink-0 ml-2">Error</span>
+              <span className="text-danger ml-2 flex-shrink-0 text-xs">Error</span>
             ) : formattedBalance !== undefined ? (
-              <span className="text-xs font-semibold text-text-secondary tabular-nums flex-shrink-0 ml-2">
+              <span className="text-text-secondary ml-2 flex-shrink-0 text-xs font-semibold tabular-nums">
                 {formattedBalance}
                 {quota.stale && (
                   <span
-                    className="ml-1 inline-flex text-warning"
+                    className="text-warning ml-1 inline-flex"
                     role="img"
                     title={getStaleReadingMessage(quota.error)}
                     aria-label={getStaleReadingMessage(quota.error)}
@@ -67,7 +68,7 @@ export const CompactBalancesCard: React.FC<CompactBalancesCardProps> = ({
                 )}
               </span>
             ) : (
-              <span className="text-xs text-text-muted flex-shrink-0">—</span>
+              <span className="text-text-muted flex-shrink-0 text-xs">—</span>
             )}
           </div>
         );

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PerformanceSelector } from '../performance';
+
+import { ModelTarget, PlexusConfig, setConfigForTesting } from '../../../../config';
 import { UsageStorageService } from '../../../observability/usage-storage';
-import { ModelTarget, setConfigForTesting, PlexusConfig } from '../../../../config';
+import { PerformanceSelector } from '../performance';
 
 const makeConfig = (performanceExplorationRate = 0): PlexusConfig => ({
   providers: {},
@@ -19,8 +20,8 @@ const makeConfig = (performanceExplorationRate = 0): PlexusConfig => ({
 describe('PerformanceSelector', () => {
   // Mock usage storage
   // Explicitly type the mock return to allow any array of objects
-  const mockGetProviderPerformance = vi.fn(
-    (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
+  const mockGetProviderPerformance = vi.fn((provider?: string, model?: string): Promise<any[]> =>
+    Promise.resolve([])
   );
   const mockStorage = {
     getProviderPerformance: mockGetProviderPerformance,

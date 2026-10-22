@@ -1,8 +1,10 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
-import { logger } from '../../utils/logger';
+
+import { FastifyReply, FastifyRequest } from 'fastify';
+
 import { getConfig, isKeyDisabled } from '../../config';
 import { isRequestIpAllowed } from '../../utils/auth';
+import { logger } from '../../utils/logger';
 
 /**
  * Sentinel error thrown by authenticate/requireAdmin so that Fastify's error

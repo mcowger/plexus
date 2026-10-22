@@ -1,25 +1,36 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Alias } from '../lib/api';
-import { getModelOptionKey } from '../lib/modelOptions';
-import { useModels } from '../hooks/useModels';
-import { AliasTableRow } from '../components/models/AliasTableRow';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Plus,
+  Trash2,
+  Zap,
+} from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+
+import { PageContainer } from '../components/layout/PageContainer';
+import { PageHeader } from '../components/layout/PageHeader';
 import { AliasMobileCard } from '../components/models/AliasMobileCard';
-import { TargetGroupEditor } from '../components/models/TargetGroupEditor';
+import { AliasTableRow } from '../components/models/AliasTableRow';
+import { AutoAddModal } from '../components/models/AutoAddModal';
+import { ConfirmDeleteModal } from '../components/models/ConfirmDeleteModal';
+import { ImportModelsModal } from '../components/models/ImportModelsModal';
 import { ModelBehaviorsEditor } from '../components/models/ModelBehaviorsEditor';
 import { ModelMetadataEditor } from '../components/models/ModelMetadataEditor';
-import { AutoAddModal } from '../components/models/AutoAddModal';
-import { ImportModelsModal } from '../components/models/ImportModelsModal';
-import { ConfirmDeleteModal } from '../components/models/ConfirmDeleteModal';
+import { TargetGroupEditor } from '../components/models/TargetGroupEditor';
 import { VisionFallthroughSelector } from '../components/models/VisionFallthroughSelector';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Disclosure } from '../components/ui/Disclosure';
 import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
 import { TagSelect } from '../components/ui/TagSelect';
-import { Disclosure } from '../components/ui/Disclosure';
-import { PageHeader } from '../components/layout/PageHeader';
-import { PageContainer } from '../components/layout/PageContainer';
 import { useToast } from '../contexts/ToastContext';
+import { useModels } from '../hooks/useModels';
+import { Alias } from '../lib/api';
 import {
   filterAndSortAliasesForModelsPage,
   getDefaultModelListSortDirection,
@@ -27,17 +38,7 @@ import {
   type ModelListSortDirection,
   type ModelListSortField,
 } from '../lib/modelList';
-import {
-  Plus,
-  Trash2,
-  Zap,
-  Download,
-  ChevronDown,
-  ChevronRight,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-} from 'lucide-react';
+import { getModelOptionKey } from '../lib/modelOptions';
 
 // Model alias types grouped into accordions on the Models page. Order
 // follows rough frequency of use.
@@ -233,7 +234,7 @@ export const Models = () => {
         : 'No aliases found';
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title="Models"
         subtitle="Aliases that map gateway models to upstream provider models"
@@ -298,17 +299,17 @@ export const Models = () => {
       <PageContainer>
         {visibleAliases.length === 0 ? (
           <Card className="mb-6">
-            <div className="py-10 text-center text-sm text-text-muted">{emptyStateMessage}</div>
+            <div className="text-text-muted py-10 text-center text-sm">{emptyStateMessage}</div>
           </Card>
         ) : (
-          <div className="flex flex-col gap-3 mb-6">
+          <div className="mb-6 flex flex-col gap-3">
             {aliasesByType.map(({ group, aliases: groupAliases }) => (
               <Disclosure
                 key={group.type}
                 title={
                   <span className="flex items-center gap-2">
                     <span>{group.label}</span>
-                    <span className="text-xs font-normal text-text-muted">
+                    <span className="text-text-muted text-xs font-normal">
                       {groupAliases.length}
                     </span>
                   </span>
@@ -335,19 +336,19 @@ export const Models = () => {
 
                 {/* Desktop table */}
                 <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full border-collapse font-body text-[13px]">
+                  <table className="font-body w-full border-collapse text-[13px]">
                     <thead>
                       <tr>
                         <th
                           scope="col"
                           aria-sort={getSortAriaLabel('alias')}
-                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                          className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                           style={{ paddingLeft: '24px' }}
                         >
                           <button
                             type="button"
                             onClick={() => handleSort('alias')}
-                            className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                            className="hover:text-text inline-flex items-center gap-1 transition-colors"
                           >
                             <span>Alias</span>
                             {sortField === 'alias' ? (
@@ -364,12 +365,12 @@ export const Models = () => {
                         <th
                           scope="col"
                           aria-sort={getSortAriaLabel('provider')}
-                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                          className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                         >
                           <button
                             type="button"
                             onClick={() => handleSort('provider')}
-                            className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                            className="hover:text-text inline-flex items-center gap-1 transition-colors"
                           >
                             <span>Provider</span>
                             {sortField === 'provider' ? (
@@ -386,13 +387,13 @@ export const Models = () => {
                         <th
                           scope="col"
                           aria-sort={getSortAriaLabel('targets')}
-                          className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                          className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                           style={{ paddingRight: '24px' }}
                         >
                           <button
                             type="button"
                             onClick={() => handleSort('targets')}
-                            className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                            className="hover:text-text inline-flex items-center gap-1 transition-colors"
                           >
                             <span>Targets</span>
                             {sortField === 'targets' ? (
@@ -451,11 +452,11 @@ export const Models = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '-8px' }}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[13px] font-medium text-text-secondary">
+                <label className="font-body text-text-secondary text-[13px] font-medium">
                   Primary Name (ID)
                 </label>
                 <input
-                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-3 py-2 text-sm backdrop-blur-md transition-all duration-200 outline-none focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                   value={editingAlias.id}
                   onChange={(e) => setEditingAlias({ ...editingAlias, id: e.target.value })}
                   placeholder="e.g. gpt-4-turbo"
@@ -463,22 +464,17 @@ export const Models = () => {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[13px] font-medium text-text-secondary">
+                <label className="font-body text-text-secondary text-[13px] font-medium">
                   Model Type
                 </label>
                 <select
-                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-3 py-2 text-sm backdrop-blur-md transition-all duration-200 outline-none focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                   value={editingAlias.type ?? 'text'}
                   onChange={(e) =>
                     setEditingAlias({
                       ...editingAlias,
                       type: e.target.value as
-                        | 'text'
-                        | 'embeddings'
-                        | 'transcriptions'
-                        | 'speech'
-                        | 'image'
-                        | 'decisions',
+                        'text' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'decisions',
                     })
                   }
                 >
@@ -492,11 +488,11 @@ export const Models = () => {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[13px] font-medium text-text-secondary">
+                <label className="font-body text-text-secondary text-[13px] font-medium">
                   Priority
                 </label>
                 <select
-                  className="w-full py-2 px-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+                  className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-3 py-2 text-sm backdrop-blur-md transition-all duration-200 outline-none focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
                   value={editingAlias.priority || 'selector'}
                   onChange={(e) =>
                     setEditingAlias({ ...editingAlias, priority: e.target.value as any })
@@ -508,21 +504,21 @@ export const Models = () => {
               </div>
             </div>
 
-            <p className="text-xs text-text-muted" style={{ marginTop: '-4px' }}>
+            <p className="text-text-muted text-xs" style={{ marginTop: '-4px' }}>
               Priority: &ldquo;Selector&rdquo; uses the strategy above. &ldquo;API Match&rdquo;
               matches provider type to incoming request format.
             </p>
 
-            <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+            <div className="bg-border-glass h-px" style={{ margin: '4px 0' }}></div>
 
             {/* Additional Aliases disclosure */}
-            <div className="border border-border-glass rounded-sm overflow-hidden">
+            <div className="border-border-glass overflow-hidden rounded-sm border">
               <button
                 type="button"
                 onClick={() => setIsAliasesOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+                className="bg-bg-subtle hover:bg-bg-hover flex w-full items-center justify-between px-3 py-2 text-left transition-colors duration-150"
               >
-                <span className="font-body text-[13px] font-medium text-text-secondary">
+                <span className="font-body text-text-secondary text-[13px] font-medium">
                   Additional Aliases
                 </span>
                 {isAliasesOpen ? (
@@ -532,9 +528,9 @@ export const Models = () => {
                 )}
               </button>
               {isAliasesOpen && (
-                <div className="px-3 py-3 border-t border-border-glass flex flex-col gap-1">
+                <div className="border-border-glass flex flex-col gap-1 border-t px-3 py-3">
                   {(!editingAlias.aliases || editingAlias.aliases.length === 0) && (
-                    <div className="text-text-muted italic text-center text-sm py-1">
+                    <div className="text-text-muted py-1 text-center text-sm italic">
                       No additional aliases
                     </div>
                   )}
@@ -542,7 +538,7 @@ export const Models = () => {
                     <div key={idx} className="flex gap-2">
                       <div className="min-w-0 flex-1">
                         <input
-                          className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
                           value={alias}
                           onChange={(e) => {
                             const next = [...(editingAlias.aliases || [])];
@@ -559,7 +555,7 @@ export const Models = () => {
                           next.splice(idx, 1);
                           setEditingAlias({ ...editingAlias, aliases: next });
                         }}
-                        className="text-danger opacity-60 hover:opacity-100 px-1"
+                        className="text-danger px-1 opacity-60 hover:opacity-100"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -586,7 +582,7 @@ export const Models = () => {
             {/* Advanced accordion (behaviors + architecture) */}
             <ModelBehaviorsEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
 
-            <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+            <div className="bg-border-glass h-px" style={{ margin: '4px 0' }}></div>
 
             {/* Metadata accordion */}
             <ModelMetadataEditor
@@ -595,11 +591,11 @@ export const Models = () => {
               isModalOpen={isModalOpen}
             />
 
-            <div className="h-px bg-border-glass" style={{ margin: '4px 0' }}></div>
+            <div className="bg-border-glass h-px" style={{ margin: '4px 0' }}></div>
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="font-body text-[13px] font-medium text-text-secondary">
+                <label className="font-body text-text-secondary text-[13px] font-medium">
                   Target Groups
                 </label>
                 <div className="flex flex-wrap gap-2">

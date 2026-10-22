@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { KeyConfigSchema, ProviderConfigSchema } from '../config';
 
 describe('raw passthrough config schemas', () => {

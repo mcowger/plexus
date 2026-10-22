@@ -1,22 +1,23 @@
 import { FastifyInstance } from 'fastify';
-import { logger } from '../../utils/logger';
+
 import { Dispatcher } from '../../services/dispatch/dispatcher';
-import { GeminiTransformer } from '../../transformers';
-import { UsageStorageService } from '../../services/observability/usage-storage';
-import { UsageRecord } from '../../types/usage';
-import { handleResponse } from '../../services/responses/response-handler';
 import { applyRequestedServiceTierFromError } from '../../services/dispatch/service-tier-metadata';
-import { getClientIp } from '../../utils/ip';
 import { DebugManager } from '../../services/observability/debug-manager';
-import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { checkQuotaMiddleware, attachQuotaContext } from '../../services/quota/quota-middleware';
-import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
-import { attachKeyAccessPolicy } from '../../utils/auth';
-import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
-import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
-import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { UsageStorageService } from '../../services/observability/usage-storage';
 import { getReasoningLogValue } from '../../services/pi-ai/reasoning';
+import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
+import { attachQuotaContext, checkQuotaMiddleware } from '../../services/quota/quota-middleware';
+import { handleResponse } from '../../services/responses/response-handler';
+import { GeminiTransformer } from '../../transformers';
+import { UsageRecord } from '../../types/usage';
+import { attachKeyAccessPolicy } from '../../utils/auth';
+import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getClientIp } from '../../utils/ip';
+import { logger } from '../../utils/logger';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { getGlobalStallConfig, wireStallDetection } from '../../utils/stall';
+import { wireEarlyDisconnectDetection, wireUpstreamTimeout } from '../../utils/timeout';
+import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
 
 export async function registerGeminiRoute(
   fastify: FastifyInstance,

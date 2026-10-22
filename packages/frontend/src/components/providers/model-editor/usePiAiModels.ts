@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+
 import type { Provider } from '../../../lib/api';
 import { api } from '../../../lib/api';
-import { renameRecordKey, removeRecordKey } from './adapter-utils';
+import { removeRecordKey, renameRecordKey } from './adapter-utils';
 
 export interface PiAiModel {
   id: string;

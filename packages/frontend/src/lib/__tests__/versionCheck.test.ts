@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+
 import {
+  type BlockingFormDocument,
   hasBlockingForm,
   hashText,
   isServerVersionNewer,
   parseHealthzVersion,
   parseVersion,
-  type BlockingFormDocument,
 } from '../versionCheck';
 
 describe('parseHealthzVersion', () => {

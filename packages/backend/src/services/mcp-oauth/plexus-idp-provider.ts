@@ -1,11 +1,15 @@
 import crypto from 'node:crypto';
+
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+
 import { getConfig, isKeyDisabled } from '../../config';
 import { McpOauthRepository } from '../../db/mcp-oauth-repository';
+import { resolvePrincipal } from '../../routes/management/_principal';
 import { hashSecret } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
-import { resolvePrincipal } from '../../routes/management/_principal';
+import * as mcpProxyService from '../mcp-proxy/mcp-proxy-service';
+import type { AuthProvider, OAuthDiscoveryMetadata, ProtectedResourceMetadata } from './types';
 import {
   getMcpResourceUrl,
   getMcpServerNameFromRequest,
@@ -14,8 +18,6 @@ import {
   isAllowedRedirectUri,
   resourceMatchesExpected,
 } from './url';
-import * as mcpProxyService from '../mcp-proxy/mcp-proxy-service';
-import type { AuthProvider, OAuthDiscoveryMetadata, ProtectedResourceMetadata } from './types';
 
 /*
  * OAuth implementation note:

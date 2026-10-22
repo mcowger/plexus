@@ -1,11 +1,11 @@
-import { logger } from '../../utils/logger';
-import { deriveShortName } from './short-name';
 import type {
   MetadataOverrides,
   ModelConfig,
   ModelProviderConfig,
   ProviderConfig,
 } from '../../config';
+import { logger } from '../../utils/logger';
+import { deriveShortName } from './short-name';
 
 type MetadataSourceId = 'openrouter' | 'models.dev' | 'catwalk';
 

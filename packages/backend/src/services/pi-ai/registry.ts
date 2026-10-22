@@ -15,15 +15,14 @@
 import { clampThinkingLevel, getSupportedThinkingLevels } from '@earendil-works/pi-ai';
 import type { Model as PiAiModel, ModelThinkingLevel } from '@earendil-works/pi-ai';
 
-import { getCatalogModel } from './catalog';
 import { logger } from '../../utils/logger';
-
-import type { RouteResult } from '../routing/router';
-import type { ReasoningEffort, ReasoningIntent } from './reasoning';
-import { clampEffortToWindow, effortToBudget, intentToEffort } from './reasoning';
-import type { GenerationIntent } from './generation';
 import type { ServiceTierFormat, ServiceTierMap } from '../dispatch/service-tier-selection';
 import { inferServiceTierFormat, resolveServiceTier } from '../dispatch/service-tier-selection';
+import type { RouteResult } from '../routing/router';
+import { getCatalogModel } from './catalog';
+import type { GenerationIntent } from './generation';
+import type { ReasoningEffort, ReasoningIntent } from './reasoning';
+import { clampEffortToWindow, effortToBudget, intentToEffort } from './reasoning';
 
 // ─── resolveBaseUrl ───────────────────────────────────────────────────────────
 //

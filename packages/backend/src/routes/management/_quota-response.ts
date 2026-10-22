@@ -1,5 +1,5 @@
-import { QuotaCheckSnapshot, resolveQuotaNames } from '../../services/quota/quota-enforcer';
 import type { KeyConfig, PlexusConfig } from '../../config';
+import { QuotaCheckSnapshot, resolveQuotaNames } from '../../services/quota/quota-enforcer';
 
 /** Wire shape for one entry of the `quotas` array — see task-5 brief. Scope
  * lists are omitted when empty rather than serialized as `[]`. */

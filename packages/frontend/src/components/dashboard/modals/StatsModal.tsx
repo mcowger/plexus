@@ -4,10 +4,11 @@
  * Full-height two-column layout with EntityRow lists for providers and models.
  */
 
-import React from 'react';
 import { Cpu, Server } from 'lucide-react';
-import type { EntityStats } from '../liveTypes';
+import React from 'react';
+
 import { EntityRow } from '../cards/EntityRow';
+import type { EntityStats } from '../liveTypes';
 
 export interface StatsModalProps {
   providerStats: EntityStats[];
@@ -16,14 +17,14 @@ export interface StatsModalProps {
 
 export const StatsModal: React.FC<StatsModalProps> = ({ providerStats, modelStats }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-text flex items-center gap-2">
+        <h3 className="text-text flex items-center gap-2 text-base font-semibold">
           <Server size={18} className="text-primary" />
           Top Providers
         </h3>
         {providerStats.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+          <div className="text-text-secondary flex h-32 items-center justify-center text-sm">
             No provider activity in window
           </div>
         ) : (
@@ -35,12 +36,12 @@ export const StatsModal: React.FC<StatsModalProps> = ({ providerStats, modelStat
         )}
       </div>
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-text flex items-center gap-2">
+        <h3 className="text-text flex items-center gap-2 text-base font-semibold">
           <Cpu size={18} className="text-secondary" />
           Top Models
         </h3>
         {modelStats.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+          <div className="text-text-secondary flex h-32 items-center justify-center text-sm">
             No model activity in window
           </div>
         ) : (

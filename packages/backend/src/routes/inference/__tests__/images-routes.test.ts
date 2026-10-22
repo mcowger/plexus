@@ -1,10 +1,11 @@
-import { setConfigForTesting } from '../../../config';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
-import { registerImagesRoute } from '../images';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { setConfigForTesting } from '../../../config';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
 import { UsageStorageService } from '../../../services/observability/usage-storage';
 import type { UnifiedImageGenerationRequest } from '../../../types/unified';
+import { registerImagesRoute } from '../images';
 
 type MultipartFilePart = {
   type: 'file';

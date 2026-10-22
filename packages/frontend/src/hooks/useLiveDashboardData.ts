@@ -6,23 +6,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import {
-  api,
-  STAT_LABELS,
-  type Cooldown,
-  type Stat,
-  type TodayMetrics,
-  type UsageRecord,
-  type ConcurrencyData,
-} from '../lib/api';
-import { formatNumber, formatTokens } from '../lib/format';
-import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
-import {
-  MODEL_TIMELINE_COLORS,
-  MODEL_TIMELINE_MAX_SERIES,
   type EntityStats,
   type MinuteBucket,
+  MODEL_TIMELINE_COLORS,
+  MODEL_TIMELINE_MAX_SERIES,
   type ModelTimelineBucket,
   type ModelTimelineSeries,
   type StreamFilter,
@@ -33,6 +22,18 @@ import {
   getModelLabel,
   getProviderLabel,
 } from '../components/dashboard/liveUtils';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import {
+  api,
+  type ConcurrencyData,
+  type Cooldown,
+  type Stat,
+  STAT_LABELS,
+  type TodayMetrics,
+  type UsageRecord,
+} from '../lib/api';
+import { formatNumber, formatTokens } from '../lib/format';
 
 export interface UseLiveDashboardDataOptions {
   /** Initial or controlled poll interval in milliseconds */

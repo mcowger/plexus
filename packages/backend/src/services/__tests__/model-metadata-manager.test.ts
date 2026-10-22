@@ -1,12 +1,14 @@
-import { describe, expect, test, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import path from 'path';
+
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+
+import type { MetadataOverrides, ModelConfig, ProviderConfig } from '../../config';
 import {
-  ModelMetadataManager,
   mergeOverrides,
+  ModelMetadataManager,
   resolveModelMetadata,
 } from '../models/model-metadata-manager';
 import type { NormalizedModelMetadata } from '../models/model-metadata-manager';
-import type { MetadataOverrides, ModelConfig, ProviderConfig } from '../../config';
 
 const FIXTURES = path.join(__dirname, '../../utils/__tests__/fixtures');
 

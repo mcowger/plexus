@@ -1,12 +1,13 @@
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { setConfigForTesting } from '../../src/config';
 import { registerDecisionsRoute } from '../../src/routes/inference/decisions';
 import { registerInferenceRoutes } from '../../src/routes/inference/index';
-import { buildQuotaExceededError } from '../../src/services/quota/quota-middleware';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';
-import { setConfigForTesting } from '../../src/config';
-import { CooldownManager } from '../../src/services/runtime/cooldown-manager';
+import { buildQuotaExceededError } from '../../src/services/quota/quota-middleware';
 import { ConcurrencyTracker } from '../../src/services/runtime/concurrency-tracker';
+import { CooldownManager } from '../../src/services/runtime/cooldown-manager';
 
 const fetchMock = vi.fn();
 global.fetch = fetchMock as any;

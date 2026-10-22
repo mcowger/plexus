@@ -60,7 +60,8 @@ $defs:
     properties:
       thinkingFormat:
         type: string
-        enum: [zai, qwen, qwen-chat-template, deepseek, openrouter, ant-ling, together, string-thinking]
+        enum:
+          [zai, qwen, qwen-chat-template, deepseek, openrouter, ant-ling, together, string-thinking]
       supportsTemperature: { type: boolean }
       maxTokensField: { type: string, enum: [max_tokens, max_completion_tokens] }
       forceAdaptiveThinking: { type: boolean }

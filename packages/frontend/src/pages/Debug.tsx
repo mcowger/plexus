@@ -1,30 +1,31 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../lib/api';
 import Editor from '@monaco-editor/react';
+import { clsx } from 'clsx';
 import {
-  RefreshCw,
-  Clock,
-  Database,
+  Check,
   ChevronDown,
   ChevronRight,
+  Clock,
   Copy,
-  Check,
-  Trash2,
+  Database,
   Download,
   Filter,
-  X,
-  Minimize2,
   Maximize2,
+  Minimize2,
+  RefreshCw,
+  Trash2,
+  X,
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { Button } from '../components/ui/Button';
-import { Switch } from '../components/ui/Switch';
-import { Modal } from '../components/ui/Modal';
-import { PageHeader } from '../components/layout/PageHeader';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import type { Alias, KeyConfig, Provider } from '../lib/api';
-import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
+
+import { PageHeader } from '../components/layout/PageHeader';
+import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
+import { Switch } from '../components/ui/Switch';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
+import type { Alias, KeyConfig, Provider } from '../lib/api';
+import { copyToClipboard, isClipboardAvailable } from '../lib/clipboard';
 
 interface DebugLogMeta {
   requestId: string;
@@ -345,7 +346,7 @@ export const Debug: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-3rem)]">
+    <div className="flex min-h-[calc(100vh-3rem)] flex-col">
       <div className="shrink-0">
         <PageHeader
           title="Traces"
@@ -358,7 +359,7 @@ export const Debug: React.FC = () => {
             <>
               {/* Capture-trace-on-error — admin-only persisted setting. */}
               {isAdmin && (
-                <label className="flex items-center gap-2 text-sm text-text-muted">
+                <label className="text-text-muted flex items-center gap-2 text-sm">
                   <span className="hidden sm:inline">Capture on Error</span>
                   <Switch
                     checked={captureTraceOnError}
@@ -370,7 +371,7 @@ export const Debug: React.FC = () => {
               )}
               {/* Capture targets — admin-only, in-memory DebugManager state. */}
               {isAdmin && (
-                <div className="relative provider-filter-dropdown">
+                <div className="provider-filter-dropdown relative">
                   <Button
                     variant="secondary"
                     className={clsx(
@@ -382,51 +383,51 @@ export const Debug: React.FC = () => {
                   >
                     Targets
                     {selectedCaptureTargetCount > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-white rounded-full">
+                      <span className="bg-primary ml-1 rounded-full px-1.5 py-0.5 text-xs text-white">
                         {selectedCaptureTargetCount}
                       </span>
                     )}
                   </Button>
 
                   {isFilterOpen && (
-                    <div className="absolute left-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-[34rem] rounded-lg border border-border-glass bg-bg-surface p-4 shadow-lg sm:left-auto sm:right-0">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-text">Trace Capture Targets</span>
+                    <div className="border-border-glass bg-bg-surface absolute top-full left-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[34rem] rounded-lg border p-4 shadow-lg sm:right-0 sm:left-auto">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-text text-sm font-medium">Trace Capture Targets</span>
                         {selectedCaptureTargetCount > 0 && (
                           <button
                             onClick={clearCaptureTargets}
-                            className="text-xs text-text-muted hover:text-text transition-colors flex items-center gap-1"
+                            className="text-text-muted hover:text-text flex items-center gap-1 text-xs transition-colors"
                           >
                             <X size={12} />
                             Clear
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-text-muted mb-3">
+                      <p className="text-text-muted mb-3 text-xs">
                         Capture traces when any selected key, alias, provider, or global mode
                         matches.
                       </p>
                       <div className="grid max-h-80 grid-cols-1 gap-4 overflow-y-auto md:grid-cols-3">
                         <div>
-                          <div className="mb-2 text-xs font-medium uppercase text-text-muted">
+                          <div className="text-text-muted mb-2 text-xs font-medium uppercase">
                             Keys
                           </div>
                           <div className="space-y-1">
                             {keys.length === 0 ? (
-                              <div className="p-2 text-xs text-text-muted">No keys</div>
+                              <div className="text-text-muted p-2 text-xs">No keys</div>
                             ) : (
                               keys.map((key) => (
                                 <label
                                   key={key.key}
-                                  className="flex items-center gap-2 rounded p-2 hover:bg-bg-hover cursor-pointer"
+                                  className="hover:bg-bg-hover flex cursor-pointer items-center gap-2 rounded p-2"
                                 >
                                   <input
                                     type="checkbox"
                                     checked={selectedKeys.includes(key.key)}
                                     onChange={() => toggleSelection(key.key, setSelectedKeys)}
-                                    className="rounded border-border-glass text-primary focus:ring-primary"
+                                    className="border-border-glass text-primary focus:ring-primary rounded"
                                   />
-                                  <span className="min-w-0 truncate text-sm text-text">
+                                  <span className="text-text min-w-0 truncate text-sm">
                                     {key.key}
                                   </span>
                                 </label>
@@ -435,25 +436,25 @@ export const Debug: React.FC = () => {
                           </div>
                         </div>
                         <div>
-                          <div className="mb-2 text-xs font-medium uppercase text-text-muted">
+                          <div className="text-text-muted mb-2 text-xs font-medium uppercase">
                             Aliases
                           </div>
                           <div className="space-y-1">
                             {aliases.length === 0 ? (
-                              <div className="p-2 text-xs text-text-muted">No aliases</div>
+                              <div className="text-text-muted p-2 text-xs">No aliases</div>
                             ) : (
                               aliases.map((alias) => (
                                 <label
                                   key={alias.id}
-                                  className="flex items-center gap-2 rounded p-2 hover:bg-bg-hover cursor-pointer"
+                                  className="hover:bg-bg-hover flex cursor-pointer items-center gap-2 rounded p-2"
                                 >
                                   <input
                                     type="checkbox"
                                     checked={selectedAliases.includes(alias.id)}
                                     onChange={() => toggleSelection(alias.id, setSelectedAliases)}
-                                    className="rounded border-border-glass text-primary focus:ring-primary"
+                                    className="border-border-glass text-primary focus:ring-primary rounded"
                                   />
-                                  <span className="min-w-0 truncate text-sm text-text">
+                                  <span className="text-text min-w-0 truncate text-sm">
                                     {alias.id}
                                   </span>
                                 </label>
@@ -462,17 +463,17 @@ export const Debug: React.FC = () => {
                           </div>
                         </div>
                         <div>
-                          <div className="mb-2 text-xs font-medium uppercase text-text-muted">
+                          <div className="text-text-muted mb-2 text-xs font-medium uppercase">
                             Providers
                           </div>
                           <div className="space-y-1">
                             {providers.length === 0 ? (
-                              <div className="p-2 text-xs text-text-muted">No providers</div>
+                              <div className="text-text-muted p-2 text-xs">No providers</div>
                             ) : (
                               providers.map((provider) => (
                                 <label
                                   key={provider.id}
-                                  className="flex items-center gap-2 rounded p-2 hover:bg-bg-hover cursor-pointer"
+                                  className="hover:bg-bg-hover flex cursor-pointer items-center gap-2 rounded p-2"
                                 >
                                   <input
                                     type="checkbox"
@@ -480,9 +481,9 @@ export const Debug: React.FC = () => {
                                     onChange={() =>
                                       toggleSelection(provider.id, setSelectedProviders)
                                     }
-                                    className="rounded border-border-glass text-primary focus:ring-primary"
+                                    className="border-border-glass text-primary focus:ring-primary rounded"
                                   />
-                                  <span className="min-w-0 truncate text-sm text-text">
+                                  <span className="text-text min-w-0 truncate text-sm">
                                     {provider.name || provider.id}
                                   </span>
                                 </label>
@@ -491,7 +492,7 @@ export const Debug: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2 mt-4 pt-3 border-t border-border-glass">
+                      <div className="border-border-glass mt-4 flex gap-2 border-t pt-3">
                         <Button
                           variant="secondary"
                           className="flex-1 text-xs"
@@ -561,41 +562,41 @@ export const Debug: React.FC = () => {
         />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border-glass md:flex-row">
+      <div className="border-border-glass flex min-h-0 flex-1 flex-col overflow-hidden border-t md:flex-row">
         {/* Left Pane: Request List */}
-        <div className="flex max-h-[34vh] w-full shrink-0 flex-col border-b border-border-glass bg-bg-surface md:max-h-none md:w-[320px] md:border-b-0 md:border-r">
-          <div className="border-b border-border-glass p-3 sm:p-4">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+        <div className="border-border-glass bg-bg-surface flex max-h-[34vh] w-full shrink-0 flex-col border-b md:max-h-none md:w-[320px] md:border-r md:border-b-0">
+          <div className="border-border-glass border-b p-3 sm:p-4">
+            <span className="text-text-muted text-xs font-bold tracking-wider uppercase">
               Recent Requests
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
             {logs.map((log) => (
               <div
                 key={log.requestId}
                 onClick={() => setSelectedId(log.requestId)}
                 className={clsx(
-                  'p-3 rounded-md cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover group',
+                  'hover:bg-bg-hover group cursor-pointer rounded-md border border-transparent p-3 transition-all duration-200',
                   selectedId === log.requestId && 'bg-bg-glass border-border-glass shadow-sm'
                 )}
               >
                 <div className="w-full">
-                  <div className="flex items-center gap-2 mb-1 justify-between items-center">
+                  <div className="mb-1 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Clock size={14} className="text-[var(--color-text-muted)]" />
-                      <span className="text-xs font-mono text-text-muted">
+                      <span className="text-text-muted font-mono text-xs">
                         {new Date(log.createdAt).toLocaleTimeString()}
                       </span>
                     </div>
                     <button
                       onClick={(e) => handleDelete(e, log.requestId)}
-                      className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                      className="text-text-muted hover:text-danger flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 opacity-100 transition-all duration-200 hover:bg-red-600/10 md:opacity-0 md:group-hover:opacity-100"
                       title="Delete log"
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
-                  <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1">
+                  <div className="text-primary mt-1 overflow-hidden font-mono text-[13px] text-ellipsis whitespace-nowrap">
                     {log.requestId?.substring(0, 8) ?? '-'}...
                   </div>
                   <div className="mt-2">
@@ -612,7 +613,7 @@ export const Debug: React.FC = () => {
               </div>
             ))}
             {logs.length === 0 && (
-              <div className="text-center p-8 text-[var(--color-text-muted)] italic text-sm">
+              <div className="p-8 text-center text-sm text-[var(--color-text-muted)] italic">
                 No debug logs found. Ensure Debug Mode is enabled.
               </div>
             )}
@@ -620,19 +621,19 @@ export const Debug: React.FC = () => {
         </div>
 
         {/* Right Pane: Details */}
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg-deep">
+        <div className="bg-bg-deep relative flex min-h-0 flex-1 flex-col overflow-y-auto">
           {selectedId && detail ? (
             <div className="flex flex-col">
-              <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-border-glass bg-bg-surface px-3 py-3 sm:px-4">
+              <div className="border-border-glass bg-bg-surface sticky top-0 z-10 flex flex-col gap-2 border-b px-3 py-3 sm:px-4">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                  <span className="text-text-muted text-xs font-bold tracking-wider uppercase">
                     Selected Trace
                   </span>
-                  <span className="break-all text-xs font-mono text-text-secondary">
+                  <span className="text-text-secondary font-mono text-xs break-all">
                     {detail.requestId}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-text-secondary">
+                <div className="text-text-secondary flex flex-wrap gap-x-4 gap-y-2 text-xs">
                   <div className="min-w-0">
                     <span className="text-text-muted">Captured:</span>
                     <span className="ml-2 font-mono">
@@ -704,14 +705,14 @@ export const Debug: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">
+            <div className="text-text-muted flex h-full flex-col items-center justify-center gap-4">
               <Database size={48} opacity={0.2} />
               <p>Select a request trace to inspect details</p>
             </div>
           )}
 
           {loadingDetail && (
-            <div className="absolute inset-0 bg-[rgba(15,23,42,0.5)] backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[rgba(15,23,42,0.5)] backdrop-blur-sm">
               <RefreshCw className="animate-spin text-[var(--color-primary)]" size={32} />
             </div>
           )}
@@ -803,18 +804,18 @@ const AccordionPanel: React.FC<{
   };
 
   return (
-    <div className="border-b border-border-glass bg-bg-surface">
+    <div className="border-border-glass bg-bg-surface border-b">
       <div
-        className="flex cursor-pointer items-center justify-between gap-3 bg-bg-hover px-3 py-3 transition-colors duration-200 select-none hover:bg-bg-glass sm:px-4"
+        className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center justify-between gap-3 px-3 py-3 transition-colors duration-200 select-none sm:px-4"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex min-w-0 items-center gap-2">
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <span className={clsx('truncate text-[11px] font-bold uppercase tracking-wider', color)}>
+          <span className={clsx('truncate text-[11px] font-bold tracking-wider uppercase', color)}>
             {title}
           </span>
           <button
-            className="bg-transparent border-0 text-text-muted p-0.5 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
+            className="text-text-muted hover:text-text flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0.5 transition-all duration-200 hover:bg-white/10"
             onClick={handleToggleFold}
             title={folded ? 'Unfold all' : 'Fold all'}
           >
@@ -822,7 +823,7 @@ const AccordionPanel: React.FC<{
           </button>
         </div>
         <button
-          className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
+          className="text-text-muted hover:text-text flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 transition-all duration-200 hover:bg-white/10"
           onClick={handleCopy}
           title="Copy to clipboard"
         >

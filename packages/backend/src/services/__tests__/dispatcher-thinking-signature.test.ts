@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   createThinkingSignatureStripState,
   isAnthropicMessagesPayload,
   matchThinkingSignatureError,
+  MAX_THINKING_SIGNATURE_STRIP_RETRIES,
   planThinkingSignatureStrip,
   refundThinkingSignatureStrip,
   stripThinkingSignatureBlocks,
-  MAX_THINKING_SIGNATURE_STRIP_RETRIES,
 } from '../dispatch/dispatcher-auto-compat';
 import {
   ANTHROPIC_MESSAGES_PAYLOAD,

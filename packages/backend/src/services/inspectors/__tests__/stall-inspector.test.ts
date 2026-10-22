@@ -1,6 +1,8 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { StallInspector, type StallConfig } from '../stall-inspector';
 import { PassThrough } from 'stream';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { type StallConfig, StallInspector } from '../stall-inspector';
 
 function createConfig(overrides: Partial<StallConfig> = {}): StallConfig {
   return {

@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import { UnifiedChatRequest } from '../../types/unified';
 import { logger } from '../../utils/logger';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
 // Mock fetch to prevent actual network calls

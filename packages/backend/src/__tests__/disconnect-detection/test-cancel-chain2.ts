@@ -5,8 +5,7 @@
  * Option B: abortController.abort() on the upstream fetch signal — does it cancel the stream?
  * Option C: manually calling reader.cancel() on the web stream's reader?
  */
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 function makeUpstreamStream(label: string) {
   let cancelFired = false;

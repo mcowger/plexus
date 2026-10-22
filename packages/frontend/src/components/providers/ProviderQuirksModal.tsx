@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import {
   getDefaultResponsesExtensions,
+  type PiAiQuirks,
   PiAiQuirksSchema,
   RESPONSES_EXTENSION_OPTIONS,
-  type PiAiQuirks,
   type ResponsesExtension,
 } from '@plexus/shared';
-import { Modal } from '../ui/Modal';
+import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 import { Switch } from '../ui/Switch';
 
 /**
@@ -500,7 +501,7 @@ function LevelMapEditor({
         const entry = levels[level];
         return (
           <div key={level} className="flex items-center gap-2">
-            <span className="w-16 shrink-0 font-body text-[11px] text-text-secondary">{level}</span>
+            <span className="font-body text-text-secondary w-16 shrink-0 text-[11px]">{level}</span>
             <select
               className={`${FIELD_CLASS} w-32 shrink-0`}
               aria-label={`${level} thinking level mode`}
@@ -549,7 +550,7 @@ function ServiceTierMapEditor({
         const entry = tiers[tier];
         return (
           <div key={tier} className="flex items-center gap-2">
-            <span className="w-20 shrink-0 font-body text-[11px] text-text-secondary">{tier}</span>
+            <span className="font-body text-text-secondary w-20 shrink-0 text-[11px]">{tier}</span>
             <select
               className={`${FIELD_CLASS} w-32 shrink-0`}
               aria-label={`${tier} service tier mode`}
@@ -733,7 +734,7 @@ function TraitsEditor({
       <div className="flex flex-col gap-1.5">
         <span className={LABEL_CLASS}>Thinking level map</span>
         {effectiveReasoning !== 'true' && (
-          <span className="font-body text-[10px] text-text-muted">
+          <span className="font-body text-text-muted text-[10px]">
             {inheritedReasoning !== 'unset'
               ? 'Requires Reasoning = true here or on the base traits to apply.'
               : 'Requires Reasoning = true here or inherited from the builtin model.'}
@@ -753,7 +754,7 @@ function TraitsEditor({
       {api !== 'google-generative-ai' && (
         <div className="flex flex-col gap-1.5">
           <span className={LABEL_CLASS}>Service tier map</span>
-          <span className="font-body text-[10px] leading-[1.35] text-text-muted">
+          <span className="font-body text-text-muted text-[10px] leading-[1.35]">
             Canonical tier to upstream value for this API (auto, standard, flex, priority,
             ultrafast). Default means unset; Unsupported means this API has no exact tier. Neither
             is an error: Plexus sends the nearest supported equivalent instead (ultrafast to
@@ -791,7 +792,7 @@ function ModelOverrideCard({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border-glass bg-bg-glass p-3">
+    <div className="border-border-glass bg-bg-glass flex flex-col gap-3 rounded-md border p-3">
       <div className="flex items-end gap-2">
         <label className="flex min-w-0 flex-1 flex-col gap-1">
           <span className={LABEL_CLASS}>Model ID</span>
@@ -1016,9 +1017,9 @@ export function ProviderQuirksModal({
     >
       <div className="flex flex-col gap-3">
         {errors.length > 0 && (
-          <div className="flex gap-2 rounded-md border border-danger/30 bg-danger/10 p-3">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-danger" />
-            <ul className="flex list-disc flex-col gap-1 pl-4 font-body text-[11px] text-red-300">
+          <div className="border-danger/30 bg-danger/10 flex gap-2 rounded-md border p-3">
+            <AlertTriangle size={16} className="text-danger mt-0.5 shrink-0" />
+            <ul className="font-body flex list-disc flex-col gap-1 pl-4 text-[11px] text-red-300">
               {errors.map((error, index) => (
                 <li key={`${index}-${error}`}>{error}</li>
               ))}
@@ -1037,14 +1038,14 @@ export function ProviderQuirksModal({
                 onClick={() => setActiveKey(def.key)}
                 className={
                   active
-                    ? 'inline-flex items-center gap-1.5 rounded-md border border-border-glass bg-bg-glass px-3 py-1.5 font-body text-xs font-medium text-primary'
-                    : 'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-xs font-medium text-text-secondary hover:bg-bg-hover hover:text-text'
+                    ? 'border-border-glass bg-bg-glass font-body text-primary inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium'
+                    : 'font-body text-text-secondary hover:bg-bg-hover hover:text-text inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium'
                 }
                 aria-pressed={active}
               >
                 {def.label}
                 {configured && (
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+                  <span className="bg-primary h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden />
                 )}
               </button>
             );
@@ -1053,7 +1054,7 @@ export function ProviderQuirksModal({
 
         {!target ? (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <p className="font-body text-sm text-text-secondary">
+            <p className="font-body text-text-secondary text-sm">
               No {targetDef.label} quirks configured.
             </p>
             <Button
@@ -1069,10 +1070,10 @@ export function ProviderQuirksModal({
           <div className="flex flex-col gap-4">
             <div className={`${SECTION_CLASS} flex items-center justify-between gap-3`}>
               <div className="flex min-w-0 flex-col">
-                <span className="font-body text-[12px] text-text">
+                <span className="font-body text-text text-[12px]">
                   Fixed dialect: <span className="font-mono text-[11px]">{targetDef.api}</span>
                 </span>
-                <span className="font-body text-[10px] text-text-muted">
+                <span className="font-body text-text-muted text-[10px]">
                   {targetDef.description}
                 </span>
               </div>
@@ -1107,13 +1108,13 @@ export function ProviderQuirksModal({
                   Add override
                 </Button>
               </div>
-              <p className="font-body text-[10px] text-text-muted">
+              <p className="font-body text-text-muted text-[10px]">
                 Overrides start from the base traits above: omitted traits inherit, compat fields
                 merge per field, and a thinking level map or service tier map here replaces the base
                 map entirely. Setting Reasoning = false removes the inherited thinking level map.
               </p>
               {target.models.length === 0 ? (
-                <span className="font-body text-[11px] text-text-muted">
+                <span className="font-body text-text-muted text-[11px]">
                   No model overrides. Base traits apply to every model.
                 </span>
               ) : (
@@ -1141,7 +1142,7 @@ export function ProviderQuirksModal({
               {extensionsExplicit && (
                 <button
                   type="button"
-                  className="font-body text-[11px] text-primary hover:underline"
+                  className="font-body text-primary text-[11px] hover:underline"
                   onClick={useDefaultExtensions}
                 >
                   Use default
@@ -1152,7 +1153,7 @@ export function ProviderQuirksModal({
               {RESPONSES_EXTENSION_OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  className="flex items-center justify-between gap-3 cursor-pointer"
+                  className="flex cursor-pointer items-center justify-between gap-3"
                   title={option.description}
                 >
                   <span className={LABEL_CLASS}>{option.label}</span>
@@ -1164,7 +1165,7 @@ export function ProviderQuirksModal({
                 </label>
               ))}
             </div>
-            <p className="font-body text-[10px] leading-[1.35] text-text-muted">
+            <p className="font-body text-text-muted text-[10px] leading-[1.35]">
               Responses API extensions this provider's Responses endpoint accepts verbatim. Requests
               using any other extension are flattened to plain function tools and split back on the
               response. The default follows the OAuth provider or Responses endpoint (Codex,

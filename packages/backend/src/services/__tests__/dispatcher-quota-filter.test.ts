@@ -1,9 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
+import { Dispatcher } from '../dispatch/dispatcher';
+import type { QuotaCheckSnapshot, QuotaContext } from '../quota/quota-enforcer';
 import { CooldownManager } from '../runtime/cooldown-manager';
-import type { QuotaContext, QuotaCheckSnapshot } from '../quota/quota-enforcer';
 
 const fetchMock: any = vi.fn(async (): Promise<any> => {
   throw new Error('fetch mock not configured for test');

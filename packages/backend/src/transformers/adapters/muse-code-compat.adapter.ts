@@ -1,5 +1,5 @@
-import type { ProviderAdapter } from '../../types/provider-adapter';
 import type { RouteResult } from '../../services/routing/router';
+import type { ProviderAdapter } from '../../types/provider-adapter';
 import { logger } from '../../utils/logger';
 
 /**

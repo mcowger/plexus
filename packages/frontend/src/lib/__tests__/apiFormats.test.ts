@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { legacyDecisionsAccessKind, stripDecisionsAccess } from '../apiFormats';
 
 describe('legacyDecisionsAccessKind', () => {

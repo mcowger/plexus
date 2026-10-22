@@ -239,11 +239,6 @@ export interface UsageQueryParams<T extends UsageRecordField> {
 }
 
 export type UsageSortField =
-  | 'date'
-  | 'apiKey'
-  | 'provider'
-  | 'incomingModelAlias'
-  | 'costTotal'
-  | 'durationMs';
+  'date' | 'apiKey' | 'provider' | 'incomingModelAlias' | 'costTotal' | 'durationMs';
 
 export type UsageSortDirection = 'asc' | 'desc';

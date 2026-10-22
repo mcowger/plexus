@@ -1,14 +1,15 @@
+import { formatMsToMinSec } from '@plexus/shared';
+import { AlertTriangle, CheckCircle, Link2, Loader2, Play, Trash2 } from 'lucide-react';
 import React from 'react';
-import { Trash2, Loader2, CheckCircle, AlertTriangle, Play, Link2 } from 'lucide-react';
-import { CopyButton } from '../ui/CopyButton';
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Switch } from '../ui/Switch';
-import { ModelTypeBadge } from './ModelTypeBadge';
-import type { Alias, Provider, Cooldown } from '../../lib/api';
+
+import type { Alias, Cooldown, Provider } from '../../lib/api';
 import { getAliasProviderLabels, getAliasTargetCount } from '../../lib/modelList';
 import { dedupeStrings } from '../../lib/modelOptions';
-import { formatMsToMinSec } from '@plexus/shared';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { CopyButton } from '../ui/CopyButton';
+import { Switch } from '../ui/Switch';
+import { ModelTypeBadge } from './ModelTypeBadge';
 
 interface Props {
   alias: Alias;
@@ -49,7 +50,7 @@ export const AliasMobileCard: React.FC<Props> = ({
   const firstTargetGroup = alias.target_groups[0];
 
   return (
-    <article key={alias.id} className="rounded-md border border-border-glass bg-bg-subtle p-3">
+    <article key={alias.id} className="border-border-glass bg-bg-subtle rounded-md border p-3">
       <div className="flex items-start justify-between gap-3">
         <div
           role="button"
@@ -64,13 +65,13 @@ export const AliasMobileCard: React.FC<Props> = ({
           className="min-w-0 flex-1 cursor-pointer text-left"
         >
           <div className="flex items-center gap-2">
-            <div className="truncate font-heading text-sm font-semibold text-text">{alias.id}</div>
+            <div className="font-heading text-text truncate text-sm font-semibold">{alias.id}</div>
             <CopyButton value={alias.id} size="sm" />
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <ModelTypeBadge type={alias.type} />
             {alias.metadata && (
-              <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+              <span className="border-border-glass text-primary inline-flex rounded border px-2 py-0.5 text-[10px] font-medium tracking-wider uppercase">
                 {alias.metadata.source}
               </span>
             )}
@@ -88,15 +89,15 @@ export const AliasMobileCard: React.FC<Props> = ({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Selector</div>
-          <div className="truncate font-medium capitalize text-text-secondary">
+        <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+          <div className="text-text-muted text-[10px] tracking-wider uppercase">Selector</div>
+          <div className="text-text-secondary truncate font-medium capitalize">
             {alias.target_groups.map((g) => `${g.name}: ${g.selector}`).join(', ')} /{' '}
             {alias.priority || 'selector'}
           </div>
         </div>
-        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Providers</div>
+        <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+          <div className="text-text-muted text-[10px] tracking-wider uppercase">Providers</div>
           <div className="mt-1 flex flex-wrap gap-1">
             {providerLabels.length > 0 ? (
               providerLabels.map((providerLabel) => (
@@ -108,13 +109,13 @@ export const AliasMobileCard: React.FC<Props> = ({
               <span className="text-text-muted">No providers</span>
             )}
           </div>
-          <div className="mt-1 text-[11px] text-text-muted">
+          <div className="text-text-muted mt-1 text-[11px]">
             {targetCount} target{targetCount === 1 ? '' : 's'}
           </div>
         </div>
-        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-text-muted">Aliases</div>
-          <div className="flex flex-wrap gap-1 font-medium text-text-secondary">
+        <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+          <div className="text-text-muted text-[10px] tracking-wider uppercase">Aliases</div>
+          <div className="text-text-secondary flex flex-wrap gap-1 font-medium">
             {alias.aliases?.length
               ? dedupeStrings(alias.aliases).map((a) => (
                   <span key={a} className="inline-flex items-center gap-1">
@@ -125,12 +126,12 @@ export const AliasMobileCard: React.FC<Props> = ({
               : '-'}
           </div>
         </div>
-        <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+        <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+          <div className="text-text-muted mb-2 flex items-center gap-2 text-[10px] font-semibold tracking-wider uppercase">
             <span>Targets</span>
             {firstTargetGroup && (
               <>
-                <span className="opacity-40 normal-case">
+                <span className="normal-case opacity-40">
                   direct/{alias.id}/{firstTargetGroup.name}
                 </span>
                 <CopyButton value={`direct/${alias.id}/${firstTargetGroup.name}`} size="sm" />
@@ -140,7 +141,7 @@ export const AliasMobileCard: React.FC<Props> = ({
           {alias.target_groups.length === 0 ||
           !firstTargetGroup ||
           firstTargetGroup.targets.length === 0 ? (
-            <div className="rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs italic text-text-muted">
+            <div className="border-border-glass bg-bg-glass text-text-muted rounded border px-2 py-2 text-xs italic">
               No targets configured
             </div>
           ) : (
@@ -151,7 +152,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                   return (
                     <div
                       key={`alias-${t.alias}-${i}`}
-                      className={`rounded border border-border-glass bg-bg-glass px-2 py-2 ${
+                      className={`border-border-glass bg-bg-glass rounded border px-2 py-2 ${
                         isTargetDisabled ? 'opacity-70' : ''
                       }`}
                     >
@@ -192,7 +193,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                 return (
                   <div
                     key={`${t.provider}-${t.model}-${i}`}
-                    className={`rounded border border-border-glass bg-bg-glass px-2 py-2 ${
+                    className={`border-border-glass bg-bg-glass rounded border px-2 py-2 ${
                       isDisabled ? 'opacity-70' : ''
                     }`}
                   >
@@ -207,10 +208,10 @@ export const AliasMobileCard: React.FC<Props> = ({
                           <span className="text-text-muted">-&gt;</span> {t.model || 'No model'}
                         </div>
                         {isProviderDisabled && (
-                          <div className="mt-1 text-[11px] text-danger">Provider disabled</div>
+                          <div className="text-danger mt-1 text-[11px]">Provider disabled</div>
                         )}
                         {cooldown && (
-                          <div className="mt-1 text-[11px] font-medium text-warning">
+                          <div className="text-warning mt-1 text-[11px] font-medium">
                             Cooldown ({cooldownText})
                           </div>
                         )}
@@ -237,7 +238,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                             onTestTarget(alias.id, testKey, t.provider, t.model, testApiTypes);
                           }}
                           disabled={isDisabled}
-                          className="flex h-7 w-7 items-center justify-center rounded text-primary transition-colors hover:bg-bg-hover disabled:cursor-not-allowed disabled:opacity-40"
+                          className="text-primary hover:bg-bg-hover flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={`Test ${alias.id} target ${i + 1}`}
                         >
                           {testState?.loading ? (

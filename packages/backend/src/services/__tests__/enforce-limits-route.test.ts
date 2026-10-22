@@ -6,15 +6,16 @@
  * helper was added to enforce-limits.ts (GREEN).
  */
 
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { Context } from '@earendil-works/pi-ai';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+
 import type { ModelConfig } from '../../config';
-import { ModelMetadataManager } from '../models/model-metadata-manager';
 import {
   ContextLengthExceededError,
   enforceContextLimitForRoute,
   type EnforceRouteInfo,
 } from '../models/enforce-limits';
+import { ModelMetadataManager } from '../models/model-metadata-manager';
 
 // ---------------------------------------------------------------------------
 // Helpers

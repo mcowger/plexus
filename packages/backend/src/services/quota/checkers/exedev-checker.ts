@@ -1,6 +1,7 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
 import { logger } from '../../../utils/logger';
+import { defineChecker } from '../checker-registry';
 
 interface ExeDevCreditsResponse {
   monthly_allowance_usd: number;

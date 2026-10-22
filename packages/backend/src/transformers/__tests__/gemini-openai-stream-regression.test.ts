@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'vitest';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import { describe, expect, test } from 'vitest';
+
 import { transformGeminiStream } from '../gemini/stream-transformer';
 import { OpenAITransformer } from '../openai';
 

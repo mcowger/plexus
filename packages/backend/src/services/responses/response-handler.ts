@@ -1,29 +1,8 @@
-import { FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
-import { UnifiedChatResponse } from '../../types/unified';
-import { Transformer } from '../../types/transformer';
-import { UsageRecord } from '../../types/usage';
-import { UsageStorageService } from '../observability/usage-storage';
-import { logger } from '../../utils/logger';
-import { calculateCosts, type CostAttribution } from '../../utils/calculate-costs';
-import { TransformerFactory } from '../dispatch/transformer-factory';
-import { DebugLoggingInspector, UsageInspector } from '../inspectors/index';
 import { Readable } from 'stream';
-import { DebugManager } from '../observability/debug-manager';
-import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
-import { extractUsageCostDetails } from '../../utils/usage-normalizer';
-import { StallInspector, type StallConfig } from '../inspectors/stall-inspector';
-import { QuotaEnforcer } from '../quota/quota-enforcer';
-import { recordQuotaUsage, buildQuotaHeaders } from '../quota/quota-middleware';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import { getApiBaseType } from '../../utils/api-format';
-import { rewriteGeminiMalformedFunctionCallStream } from '../../utils/gemini-malformed-function-call';
-import {
-  createStreamVisibilityTracker,
-  isStreamEmpty,
-  observeStreamChunk,
-} from '../dispatch/empty-completion';
+
+import { FastifyReply, FastifyRequest } from 'fastify';
+
 import {
   buildSyntheticSafeguardResults,
   collectUnifiedToolIds,
@@ -32,6 +11,29 @@ import {
   shouldSynthesizeSafeguards,
   wrapUnifiedStreamWithSyntheticSafeguards,
 } from '../../transformers/anthropic/synthetic-safeguards';
+import { Transformer } from '../../types/transformer';
+import { UnifiedChatResponse } from '../../types/unified';
+import { UsageRecord } from '../../types/usage';
+import { getApiBaseType } from '../../utils/api-format';
+import { calculateCosts, type CostAttribution } from '../../utils/calculate-costs';
+import { rewriteGeminiMalformedFunctionCallStream } from '../../utils/gemini-malformed-function-call';
+import { logger } from '../../utils/logger';
+import { applyProviderReportedCost, applyUsageCostDetails } from '../../utils/provider-cost';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { extractUsageCostDetails } from '../../utils/usage-normalizer';
+import {
+  createStreamVisibilityTracker,
+  isStreamEmpty,
+  observeStreamChunk,
+} from '../dispatch/empty-completion';
+import { TransformerFactory } from '../dispatch/transformer-factory';
+import { DebugLoggingInspector, UsageInspector } from '../inspectors/index';
+import { type StallConfig, StallInspector } from '../inspectors/stall-inspector';
+import { DebugManager } from '../observability/debug-manager';
+import { UsageStorageService } from '../observability/usage-storage';
+import { QuotaEnforcer } from '../quota/quota-enforcer';
+import { buildQuotaHeaders, recordQuotaUsage } from '../quota/quota-middleware';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];

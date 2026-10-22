@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Input } from '../ui/Input';
-import { Button } from '../ui/Button';
-import { Modal } from '../ui/Modal';
-import type { Provider, Model, AliasTargetGroup } from '../../lib/api';
+
+import type { AliasTargetGroup, Model, Provider } from '../../lib/api';
 import { dedupeModels } from '../../lib/modelOptions';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   isOpen: boolean;
@@ -143,7 +144,7 @@ export function AutoAddModal({
               borderRadius: 'var(--radius-sm)',
             }}
           >
-            <table className="w-full border-collapse font-body text-[13px]">
+            <table className="font-body w-full border-collapse text-[13px]">
               <thead
                 style={{
                   position: 'sticky',
@@ -154,7 +155,7 @@ export function AutoAddModal({
               >
                 <tr>
                   <th
-                    className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    className="text-text-secondary px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                     style={{ width: '40px' }}
                   >
                     <input
@@ -197,10 +198,10 @@ export function AutoAddModal({
                       }}
                     />
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="text-text-secondary px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Provider
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="text-text-secondary px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Model
                   </th>
                 </tr>
@@ -220,7 +221,7 @@ export function AutoAddModal({
                       className="hover:bg-bg-hover"
                       style={{ opacity: isDisabled ? 0.5 : 1 }}
                     >
-                      <td className="px-4 py-3 text-left text-text">
+                      <td className="text-text px-4 py-3 text-left">
                         <input
                           type="checkbox"
                           checked={isSelected || alreadyExists}
@@ -228,8 +229,8 @@ export function AutoAddModal({
                           onChange={() => handleToggleModelSelection(model.id, provider.id)}
                         />
                       </td>
-                      <td className="px-4 py-3 text-left text-text">{provider.name}</td>
-                      <td className="px-4 py-3 text-left text-text">
+                      <td className="text-text px-4 py-3 text-left">{provider.name}</td>
+                      <td className="text-text px-4 py-3 text-left">
                         {model.name}
                         {alreadyExists && (
                           <span
@@ -251,11 +252,11 @@ export function AutoAddModal({
             </table>
           </div>
         ) : substring ? (
-          <div className="text-text-muted italic text-center text-sm py-8">
+          <div className="text-text-muted py-8 text-center text-sm italic">
             No models found matching &quot;{substring}&quot;
           </div>
         ) : (
-          <div className="text-text-muted italic text-center text-sm py-8">
+          <div className="text-text-muted py-8 text-center text-sm italic">
             Enter a search term to find models
           </div>
         )}

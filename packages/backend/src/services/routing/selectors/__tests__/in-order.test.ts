@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { InOrderSelector } from '../in-order';
+
 import { ModelTarget } from '../../../../config';
+import { InOrderSelector } from '../in-order';
 
 describe('InOrderSelector', () => {
   const selector = new InOrderSelector();

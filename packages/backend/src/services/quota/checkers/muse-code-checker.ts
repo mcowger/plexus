@@ -38,12 +38,13 @@
  * rate-limit error, and the scheduler retries on interval.
  */
 
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
+import type { Meter } from '../../../types/meter';
+import { logger } from '../../../utils/logger';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import type { OAuthProvider } from '../../oauth/oauth-providers';
-import { logger } from '../../../utils/logger';
-import type { Meter } from '../../../types/meter';
+import { defineChecker } from '../checker-registry';
 import type { MeterContext } from '../checker-registry';
 
 const MUSE_RESPONSES_URL = 'https://api.meta.ai/v1/responses';

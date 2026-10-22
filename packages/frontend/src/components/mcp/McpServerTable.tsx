@@ -1,8 +1,9 @@
 import { Copy, Edit2, Trash2 } from 'lucide-react';
+
+import type { McpServer } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Switch } from '../ui/Switch';
-import type { McpServer } from '../../lib/api';
 
 interface McpServerTableProps {
   servers: Record<string, McpServer>;
@@ -32,7 +33,7 @@ export function McpServerTable({
   return (
     <Card title="MCP Servers">
       {serverNames.length === 0 ? (
-        <div className="p-4 text-text-secondary text-center">
+        <div className="text-text-secondary p-4 text-center">
           No MCP servers configured. Click "Add MCP Server" to create one.
         </div>
       ) : (
@@ -45,7 +46,7 @@ export function McpServerTable({
               return (
                 <article
                   key={name}
-                  className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                  className="border-border-glass bg-bg-subtle rounded-md border p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <button
@@ -55,11 +56,11 @@ export function McpServerTable({
                     >
                       <div className="flex min-w-0 items-center gap-2">
                         <Edit2 size={12} className="shrink-0 opacity-60" />
-                        <span className="truncate font-heading text-sm font-semibold text-text">
+                        <span className="font-heading text-text truncate text-sm font-semibold">
                           {name}
                         </span>
                       </div>
-                      <div className="mt-1 break-all text-xs text-text-muted">
+                      <div className="text-text-muted mt-1 text-xs break-all">
                         {server.mode === 'local_http'
                           ? `${server.launcher} ${server.package} → 127.0.0.1:${server.port}${server.path || '/mcp'}`
                           : server.upstream_url}
@@ -87,9 +88,9 @@ export function McpServerTable({
                       </Button>
                     </div>
                   </div>
-                  <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-1.5 text-xs">
+                  <div className="border-border-glass bg-bg-glass mt-3 rounded border px-2 py-1.5 text-xs">
                     <span className="text-text-muted">Headers: </span>
-                    <span className="font-medium text-text-secondary">
+                    <span className="text-text-secondary font-medium">
                       {headerCount > 0 ? `${headerCount} configured` : '-'}
                     </span>
                   </div>
@@ -99,26 +100,26 @@ export function McpServerTable({
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full border-collapse font-body text-[13px]">
+            <table className="font-body w-full border-collapse text-[13px]">
               <thead>
                 <tr>
                   <th
-                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                     style={{ paddingLeft: '24px' }}
                   >
                     Name
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Upstream
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Path
                   </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Status
                   </th>
                   <th
-                    className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                     style={{ paddingRight: '24px', textAlign: 'right' }}
                   >
                     Actions
@@ -127,19 +128,19 @@ export function McpServerTable({
               </thead>
               <tbody>
                 {/* Plexus Management MCP — fixed row */}
-                <tr className="bg-primary/5 border-b border-primary/30">
+                <tr className="bg-primary/5 border-primary/30 border-b">
                   <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
+                    className="border-border-glass text-text border-b px-4 py-3 text-left"
                     style={{ paddingLeft: '24px' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ fontWeight: 600 }}>Plexus Management</div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
+                  <td className="border-border-glass text-text-muted border-b px-4 py-3 text-left text-xs">
                     —
                   </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text whitespace-nowrap">
+                  <td className="border-border-glass text-text border-b px-4 py-3 text-left whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs">/mcp/plexus</span>
                       <button
@@ -148,7 +149,7 @@ export function McpServerTable({
                           e.stopPropagation();
                           onCopyMcpPath('/mcp/plexus');
                         }}
-                        className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text"
+                        className="text-text-muted hover:bg-bg-hover hover:text-text rounded p-1"
                         title="Copy path"
                         aria-label="Copy /mcp/plexus"
                       >
@@ -156,11 +157,11 @@ export function McpServerTable({
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                  <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                     <Switch checked={mcpEnabled} onChange={onToggleMcpEnabled} size="sm" />
                   </td>
                   <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
+                    className="border-border-glass text-text border-b px-4 py-3 text-left"
                     style={{ paddingRight: '24px', textAlign: 'right' }}
                   />
                 </tr>
@@ -175,7 +176,7 @@ export function McpServerTable({
                       className="hover:bg-bg-hover"
                     >
                       <td
-                        className="px-4 py-3 text-left border-b border-border-glass text-text"
+                        className="border-border-glass text-text border-b px-4 py-3 text-left"
                         style={{ paddingLeft: '24px' }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -183,7 +184,7 @@ export function McpServerTable({
                           <div style={{ fontWeight: 600 }}>{name}</div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                         <div
                           style={{
                             maxWidth: '400px',
@@ -197,7 +198,7 @@ export function McpServerTable({
                             : server.upstream_url}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text whitespace-nowrap">
+                      <td className="border-border-glass text-text border-b px-4 py-3 text-left whitespace-nowrap">
                         <div
                           className="flex items-center gap-2"
                           onClick={(e) => e.stopPropagation()}
@@ -206,7 +207,7 @@ export function McpServerTable({
                           <button
                             type="button"
                             onClick={() => onCopyMcpPath(mcpPathForServer(name))}
-                            className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text"
+                            className="text-text-muted hover:bg-bg-hover hover:text-text rounded p-1"
                             title="Copy path"
                             aria-label={`Copy ${mcpPathForServer(name)}`}
                           >
@@ -214,7 +215,7 @@ export function McpServerTable({
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                      <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                         <div onClick={(e) => e.stopPropagation()}>
                           <Switch
                             checked={server.enabled !== false}
@@ -224,7 +225,7 @@ export function McpServerTable({
                         </div>
                       </td>
                       <td
-                        className="px-4 py-3 text-left border-b border-border-glass text-text"
+                        className="border-border-glass text-text border-b px-4 py-3 text-left"
                         style={{ paddingRight: '24px', textAlign: 'right' }}
                       >
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

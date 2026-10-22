@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'vitest';
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
+import { describe, expect, test } from 'vitest';
+
 import { getProviderTypes, ProviderConfigSchema, validateConfig } from '../config';
 
 const oauthProvider = {

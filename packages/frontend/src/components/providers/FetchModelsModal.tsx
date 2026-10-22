@@ -1,10 +1,11 @@
-import { Modal } from '../ui/Modal';
+import { Download } from 'lucide-react';
+
+import type { FetchedModel } from '../../hooks/useProviderForm';
+import { ModelTypeBadge } from '../models/ModelTypeBadge';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Badge } from '../ui/Badge';
-import { Download } from 'lucide-react';
-import { ModelTypeBadge } from '../models/ModelTypeBadge';
-import type { FetchedModel } from '../../hooks/useProviderForm';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   isOpen: boolean;
@@ -98,14 +99,14 @@ export function FetchModelsModal({
           </div>
         )}
         {fetchWarning && (
-          <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 p-3 font-body text-[13px] text-amber-400">
+          <div className="font-body rounded-sm border border-amber-500/30 bg-amber-500/10 p-3 text-[13px] text-amber-400">
             {fetchWarning}
           </div>
         )}
         {fetchedModels.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="font-body text-[13px] font-medium text-text-secondary">
+              <label className="font-body text-text-secondary text-[13px] font-medium">
                 Available Models ({fetchedModels.length})
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -185,7 +186,7 @@ export function FetchModelsModal({
                           )}
                           {isHidden && (
                             <span
-                              className="font-body text-[10px] tracking-wider text-text-muted uppercase"
+                              className="font-body text-text-muted text-[10px] tracking-wider uppercase"
                               title="Served by the provider but not advertised in its own model picker"
                             >
                               hidden

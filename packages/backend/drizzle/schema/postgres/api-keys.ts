@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { bigint, boolean, jsonb, pgTable, serial, text } from 'drizzle-orm/pg-core';
 
 export const apiKeys = pgTable('api_keys', {
   id: serial('id').primaryKey(),

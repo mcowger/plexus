@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
+
 import { ProviderConfigSchema, setConfigForTesting } from '../../../config';
 import { AnthropicTransformer } from '../../../transformers/anthropic';
 import { OpenAITransformer } from '../../../transformers/openai';
 import type { UnifiedChatRequest } from '../../../types/unified';
-import type { RouteResult } from '../../routing/router';
-import { buildRequestPayload, applyAutoAnthropicBetas } from '../request-payload-builder';
 import { setupProviderHeaders } from '../../providers/provider-request-headers';
+import type { RouteResult } from '../../routing/router';
+import { applyAutoAnthropicBetas, buildRequestPayload } from '../request-payload-builder';
 import {
   applyServiceTierSelection,
   normalizeServiceTier,

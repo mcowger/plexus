@@ -1,8 +1,9 @@
-import { UsageStorageService } from './usage-storage';
-import { logger } from '../../utils/logger';
-import { createParser, EventSourceMessage } from 'eventsource-parser';
 import { encode } from 'eventsource-encoder';
+import { createParser, EventSourceMessage } from 'eventsource-parser';
+
+import { logger } from '../../utils/logger';
 import { getCurrentKeyName, setCurrentRequestId } from './request-context';
+import { UsageStorageService } from './usage-storage';
 
 export interface DebugLogRecord {
   requestId: string;

@@ -4,6 +4,7 @@ import {
   List,
   PieChart as PieChartIcon,
 } from 'lucide-react';
+
 import { TimeRangeSelector } from '../../components/dashboard/TimeRangeSelector';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -44,7 +45,7 @@ export const DetailedUsageControls = ({
   <Card className="mb-6" title="Chart Configuration">
     <div className="grid grid-cols-1 gap-4 lg:flex lg:flex-wrap">
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-semibold text-text-muted uppercase">Time Range</span>
+        <span className="text-text-muted text-xs font-semibold uppercase">Time Range</span>
         <TimeRangeSelector
           value={timeRange}
           onChange={(range) => {
@@ -58,7 +59,7 @@ export const DetailedUsageControls = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-semibold text-text-muted uppercase">Group By</span>
+        <span className="text-text-muted text-xs font-semibold uppercase">Group By</span>
         <div className="flex flex-wrap gap-2">
           {[
             { k: 'time', l: 'Time' },
@@ -80,7 +81,7 @@ export const DetailedUsageControls = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-semibold text-text-muted uppercase">Chart Type</span>
+        <span className="text-text-muted text-xs font-semibold uppercase">Chart Type</span>
         <div className="flex flex-wrap gap-2">
           {[
             { k: 'area', i: LineChartIcon, l: 'Area' },
@@ -104,7 +105,7 @@ export const DetailedUsageControls = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-semibold text-text-muted uppercase">View</span>
+        <span className="text-text-muted text-xs font-semibold uppercase">View</span>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -127,13 +128,13 @@ export const DetailedUsageControls = ({
 
       {groupBy === 'time' && (
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-text-muted uppercase">Metrics</span>
-          <div className="flex gap-2 flex-wrap">
+          <span className="text-text-muted text-xs font-semibold uppercase">Metrics</span>
+          <div className="flex flex-wrap gap-2">
             {metrics.map((metric) => (
               <button
                 key={metric.key}
                 onClick={() => onToggleMetric(metric.key)}
-                className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${selectedMetrics.includes(metric.key) ? 'bg-primary text-white' : 'bg-bg-hover text-text-secondary'}`}
+                className={`rounded-md px-2 py-1 text-xs font-medium transition-all ${selectedMetrics.includes(metric.key) ? 'bg-primary text-white' : 'bg-bg-hover text-text-secondary'}`}
               >
                 {metric.label}
               </button>

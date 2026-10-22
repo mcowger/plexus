@@ -7,7 +7,7 @@
 - Keep this directive in `packages/frontend/src/globals.css`:
 
   ```css
-  @source "../src/**/*.{tsx,ts,jsx,js}";
+  @source '../src/**/*.{tsx,ts,jsx,js}';
   ```
 
 - Put assets in `packages/frontend/src/assets/`.
@@ -18,6 +18,7 @@
 **Do not use emoji characters in the codebase.** Instead, use Lucide icons from the `lucide-react` library.
 
 For example, replace:
+
 - `ℹ️` → `<Info />`
 - `⚠️` → `<AlertTriangle />`
 - `✅` → `<CheckCircle />`

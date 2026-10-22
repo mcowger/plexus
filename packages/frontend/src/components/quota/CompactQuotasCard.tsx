@@ -1,10 +1,11 @@
-import React from 'react';
 import { clsx } from 'clsx';
-import { useNavigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
-import type { QuotaCheckerInfo, Meter } from '../../types/quota';
-import { getCheckerDisplayName } from './checker-presentation';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import type { Meter, QuotaCheckerInfo } from '../../types/quota';
 import { AllowanceMeterRow } from './AllowanceMeterRow';
+import { getCheckerDisplayName } from './checker-presentation';
 import { getStaleReadingMessage } from './StaleReadingNotice';
 
 interface CompactQuotasCardProps {
@@ -26,7 +27,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
 
   return (
     <div
-      className="px-2 py-1 space-y-1 cursor-pointer hover:bg-bg-hover transition-colors"
+      className="hover:bg-bg-hover cursor-pointer space-y-1 px-2 py-1 transition-colors"
       onClick={() => navigate('/quotas')}
       role="button"
       tabIndex={0}
@@ -51,12 +52,12 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
             <div
               key={quota.checkerId}
               className={clsx(
-                'flex items-center gap-2 min-w-0 py-1',
-                !isLast && 'border-b border-border pb-1.5'
+                'flex min-w-0 items-center gap-2 py-1',
+                !isLast && 'border-border border-b pb-1.5'
               )}
             >
-              <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
-              <AlertTriangle className="w-3 h-3 text-danger flex-shrink-0" />
+              <span className="text-text-secondary flex-1 truncate text-[11px]">{displayName}</span>
+              <AlertTriangle className="text-danger h-3 w-3 flex-shrink-0" />
             </div>
           );
         }
@@ -66,12 +67,12 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
             <div
               key={quota.checkerId}
               className={clsx(
-                'flex items-center gap-2 min-w-0 py-1',
-                !isLast && 'border-b border-border pb-1.5'
+                'flex min-w-0 items-center gap-2 py-1',
+                !isLast && 'border-border border-b pb-1.5'
               )}
             >
-              <span className="text-[11px] text-text-secondary truncate flex-1">{displayName}</span>
-              <span className="text-[11px] text-text-muted">—</span>
+              <span className="text-text-secondary flex-1 truncate text-[11px]">{displayName}</span>
+              <span className="text-text-muted text-[11px]">—</span>
             </div>
           );
         }
@@ -80,10 +81,10 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
         return (
           <div
             key={quota.checkerId}
-            className={clsx('min-w-0 py-1', !isLast && 'border-b border-border pb-1.5')}
+            className={clsx('min-w-0 py-1', !isLast && 'border-border border-b pb-1.5')}
           >
-            <div className="flex min-w-0 items-center gap-1 mb-0.5">
-              <span className="min-w-0 flex-1 truncate text-[11px] text-text-muted pl-0">
+            <div className="mb-0.5 flex min-w-0 items-center gap-1">
+              <span className="text-text-muted min-w-0 flex-1 truncate pl-0 text-[11px]">
                 {displayName}
               </span>
               {quota.stale && (
@@ -93,7 +94,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
                   title={getStaleReadingMessage(quota.error)}
                   aria-label={getStaleReadingMessage(quota.error)}
                 >
-                  <AlertTriangle className="w-3 h-3 text-warning" aria-hidden="true" />
+                  <AlertTriangle className="text-warning h-3 w-3" aria-hidden="true" />
                 </span>
               )}
             </div>

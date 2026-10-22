@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CostSelector } from '../cost';
+
 import { EnrichedModelTarget } from '../base';
+import { CostSelector } from '../cost';
 
 describe('CostSelector', () => {
   const selector = new CostSelector();

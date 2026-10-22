@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+
 import { formatNumber } from '../../../lib/format';
 import { CONCURRENCY_COLORS } from '../liveTypes';
 
@@ -31,14 +32,14 @@ export const ConcurrencyModal: React.FC<ConcurrencyModalProps> = ({
   return (
     <div className="h-[60vh]">
       {concurrencyHistory.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-text-secondary">
+        <div className="text-text-secondary flex h-full items-center justify-center">
           Collecting concurrency data...
         </div>
       ) : (
-        <div className="h-full flex flex-col">
-          <div className="flex items-center justify-between p-4 bg-bg-subtle rounded-lg mb-4">
-            <span className="text-sm text-text-muted">Current In-Flight</span>
-            <span className="text-2xl font-semibold text-text tabular-nums">
+        <div className="flex h-full flex-col">
+          <div className="bg-bg-subtle mb-4 flex items-center justify-between rounded-lg p-4">
+            <span className="text-text-muted text-sm">Current In-Flight</span>
+            <span className="text-text text-2xl font-semibold tabular-nums">
               {formatNumber(totalConcurrentRequests, 0)}
             </span>
           </div>

@@ -1,20 +1,21 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { RefreshCw, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
-  ResponsiveContainer,
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
 } from 'recharts';
-import { X, RefreshCw } from 'lucide-react';
-import { createPortal } from 'react-dom';
+
 import { api } from '../../lib/api';
-import { formatMeterValue } from './MeterValue';
+import { useCurrency } from '../../lib/CurrencyContext';
 import type { Meter, QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
-import { useCurrency } from '../../lib/CurrencyContext';
+import { formatMeterValue } from './MeterValue';
 
 type TimeRange = '1h' | '3h' | '6h' | '12h' | '24h' | '1w' | '4w';
 
@@ -169,40 +170,40 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border border-border-glass bg-bg-card shadow-2xl sm:max-h-[90vh]">
+      <div className="border-border-glass bg-bg-card flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl sm:max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 border-b border-border-glass px-4 py-3 sm:px-5 sm:py-4">
+        <div className="border-border-glass flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0">
-            <h2 className="font-heading text-h2 font-semibold text-text truncate">{meter.label}</h2>
-            <p className="text-xs text-text-muted mt-0.5 truncate">
+            <h2 className="font-heading text-h2 text-text truncate font-semibold">{meter.label}</h2>
+            <p className="text-text-muted mt-0.5 truncate text-xs">
               {displayName}
               {quota.oauthAccountId && ` · ${quota.oauthAccountId}`}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="ml-3 flex-shrink-0 p-1.5 rounded-md text-text-muted hover:bg-bg-hover hover:text-text transition-colors"
+            className="text-text-muted hover:bg-bg-hover hover:text-text ml-3 flex-shrink-0 rounded-md p-1.5 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Time-range selector */}
-        <div className="flex items-center gap-1 overflow-x-auto border-b border-border-glass px-4 py-3 sm:px-5">
+        <div className="border-border-glass flex items-center gap-1 overflow-x-auto border-b px-4 py-3 sm:px-5">
           {TIME_RANGES.map((r) => (
             <button
               key={r.key}
               onClick={() => setRange(r.key)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                 range === r.key
-                  ? 'bg-primary/20 text-primary border border-primary/40'
+                  ? 'bg-primary/20 text-primary border-primary/40 border'
                   : 'text-text-secondary hover:bg-bg-hover'
               }`}
             >
               {r.label}
             </button>
           ))}
-          {loading && <RefreshCw size={14} className="animate-spin text-text-muted ml-auto" />}
+          {loading && <RefreshCw size={14} className="text-text-muted ml-auto animate-spin" />}
         </div>
 
         {/* Body */}
@@ -217,12 +218,12 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
               ].map(({ label, value }) => (
                 <div
                   key={label}
-                  className="rounded-lg border border-border-glass bg-bg-subtle px-3 py-2"
+                  className="border-border-glass bg-bg-subtle rounded-lg border px-3 py-2"
                 >
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">
                     {label}
                   </div>
-                  <div className="text-sm font-semibold text-text tabular-nums mt-0.5">{value}</div>
+                  <div className="text-text mt-0.5 text-sm font-semibold tabular-nums">{value}</div>
                 </div>
               ))}
             </div>
@@ -231,16 +232,16 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
           {/* Chart */}
           <div className="h-48 w-full sm:h-52">
             {error ? (
-              <div className="h-full flex items-center justify-center text-sm text-danger">
+              <div className="text-danger flex h-full items-center justify-center text-sm">
                 {error}
               </div>
             ) : loading && chartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center gap-2 text-sm text-text-secondary">
+              <div className="text-text-secondary flex h-full items-center justify-center gap-2 text-sm">
                 <RefreshCw size={16} className="animate-spin" />
                 Loading…
               </div>
             ) : chartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-text-muted">
+              <div className="text-text-muted flex h-full items-center justify-center text-sm">
                 No data for this period
               </div>
             ) : (
@@ -306,7 +307,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end border-t border-border-glass px-4 py-3 sm:px-5">
+        <div className="border-border-glass flex justify-end border-t px-4 py-3 sm:px-5">
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>

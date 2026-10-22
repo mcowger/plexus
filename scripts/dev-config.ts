@@ -8,15 +8,16 @@
  *   bun run dev:get:frp-url     → prints the FRP URL
  */
 
-import { join, basename } from 'path';
 import { tmpdir } from 'os';
+import { basename, join } from 'path';
+
 import { deriveDevPort } from './dev-port-allocator';
 import {
   buildFrpcEndpoint,
+  type FrpcEndpoint,
   getFrpcUrlFilePath,
   getRepositoryName,
   isFrpcAvailable,
-  type FrpcEndpoint,
 } from './frpc';
 import { getPaseoScriptStatus } from './lib/paseo';
 

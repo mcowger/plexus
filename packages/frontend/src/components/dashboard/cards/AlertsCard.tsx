@@ -4,13 +4,14 @@
  * Draggable card showing active provider cooldowns and top provider activity.
  */
 
-import React from 'react';
-import { AlertTriangle } from 'lucide-react';
 import { formatMsToMinSec, INDEFINITE_COOLDOWN_THRESHOLD_MS } from '@plexus/shared';
-import { SortableCard } from '../../ui/SortableCard';
+import { AlertTriangle } from 'lucide-react';
+import React from 'react';
+
+import type { Cooldown } from '../../../lib/api';
 import { useCurrency } from '../../../lib/CurrencyContext';
 import { formatCostIn, formatMs, formatNumber } from '../../../lib/format';
-import type { Cooldown } from '../../../lib/api';
+import { SortableCard } from '../../ui/SortableCard';
 import { normalizeTelemetryLabel } from '../liveUtils';
 import { CooldownRow } from './CooldownRow';
 
@@ -65,7 +66,7 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({
                   e.stopPropagation();
                   void onClearCooldowns();
                 }}
-                className="text-[11px] text-warning hover:text-warning/80 transition-colors cursor-pointer"
+                className="text-warning hover:text-warning/80 cursor-pointer text-[11px] transition-colors"
               >
                 Clear All
               </button>
@@ -76,9 +77,9 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({
         style: { cursor: 'pointer' },
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         content: (
-          <div className="h-48 sm:h-56 flex flex-col overflow-hidden">
+          <div className="flex h-48 flex-col overflow-hidden sm:h-56">
             {cooldowns.length > 0 && (
-              <div className="divide-y divide-border border-b border-warning/30 bg-warning/5 max-h-30 overflow-y-auto">
+              <div className="divide-border border-warning/30 bg-warning/5 max-h-30 divide-y overflow-y-auto border-b">
                 {Object.entries(groupedCooldowns).map(([key, modelCooldowns]) => {
                   const [provider, model] = key.split(':');
                   const maxTime = Math.max(...modelCooldowns.map((c) => c.timeRemainingMs));
@@ -112,21 +113,21 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({
                 })}
               </div>
             )}
-            <div className="flex-1 divide-y divide-border overflow-y-auto">
+            <div className="divide-border flex-1 divide-y overflow-y-auto">
               {providerRows.length === 0 ? (
-                <div className="px-3 py-3 text-xs text-text-muted">
+                <div className="text-text-muted px-3 py-3 text-xs">
                   No provider activity in the last {liveWindowMinutes} minutes.
                 </div>
               ) : (
                 providerRows.map((row) => (
                   <div key={row.provider} className="px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-text">{row.provider}</span>
-                      <span className="text-xs text-text-muted tabular-nums">
+                      <span className="text-text text-xs font-medium">{row.provider}</span>
+                      <span className="text-text-muted text-xs tabular-nums">
                         {formatNumber(row.requests, 0)} req
                       </span>
                     </div>
-                    <div className="flex gap-3 mt-0.5 text-[11px] text-text-muted">
+                    <div className="text-text-muted mt-0.5 flex gap-3 text-[11px]">
                       <span>{row.successRate.toFixed(1)}% ok</span>
                       <span>{formatMs(row.avgLatency)}</span>
                       <span className="text-info">

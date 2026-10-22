@@ -1,21 +1,22 @@
+import { Plus, Search } from 'lucide-react';
 import { useState } from 'react';
-import { Search, Plus } from 'lucide-react';
-import { Input } from '../components/ui/Input';
-import { TagSelect } from '../components/ui/TagSelect';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Tabs } from '../components/ui/Tabs';
-import { PageHeader } from '../components/layout/PageHeader';
+
 import { PageContainer } from '../components/layout/PageContainer';
+import { PageHeader } from '../components/layout/PageHeader';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Tabs } from '../components/ui/Tabs';
+import { TagSelect } from '../components/ui/TagSelect';
 import { useCurrency } from '../lib/CurrencyContext';
 import { filterKeys, filterQuotas, isKeyDisabled } from './keys/helpers';
-import { KeyLists } from './keys/KeyLists';
-import { QuotaLists } from './keys/QuotaLists';
 import { KeyEditorModal } from './keys/KeyEditorModal';
+import { KeyLists } from './keys/KeyLists';
 import { QuotaEditorModal } from './keys/QuotaEditorModal';
+import { QuotaLists } from './keys/QuotaLists';
 import { QuotaStatusModal } from './keys/QuotaStatusModal';
-import { useKeysPageData } from './keys/useKeysPageData';
 import { useKeyActions } from './keys/useKeyActions';
+import { useKeysPageData } from './keys/useKeysPageData';
 import { useQuotaActions } from './keys/useQuotaActions';
 
 export const Keys = () => {
@@ -38,7 +39,7 @@ export const Keys = () => {
   const filteredQuotas = filterQuotas(pageData.quotas, search);
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title="Access Control"
         subtitle="API keys issued for downstream consumers"
@@ -76,9 +77,9 @@ export const Keys = () => {
         <div className="hidden">
           <div>
             <button
-              className={`px-4 py-2 font-body text-sm font-medium transition-colors ${
+              className={`font-body px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'keys'
-                  ? 'text-primary border-b-2 border-primary'
+                  ? 'text-primary border-primary border-b-2'
                   : 'text-text-secondary hover:text-text'
               }`}
               onClick={() => setActiveTab('keys')}
@@ -86,9 +87,9 @@ export const Keys = () => {
               API Keys ({pageData.keys.filter((key) => !isKeyDisabled(key)).length})
             </button>
             <button
-              className={`px-4 py-2 font-body text-sm font-medium transition-colors ${
+              className={`font-body px-4 py-2 text-sm font-medium transition-colors ${
                 activeTab === 'quotas'
-                  ? 'text-primary border-b-2 border-primary'
+                  ? 'text-primary border-primary border-b-2'
                   : 'text-text-secondary hover:text-text'
               }`}
               onClick={() => setActiveTab('quotas')}
@@ -143,7 +144,7 @@ export const Keys = () => {
         {activeTab === 'quotas' && (
           <>
             <Card title="Default quotas" className="mb-6 !overflow-visible">
-              <p className="text-xs text-text-muted mb-3">
+              <p className="text-text-muted mb-3 text-xs">
                 Applied to any key with no quotas of its own (non-stacking — a key's own{' '}
                 <code>quotas</code> always wins over this fallback when set).
               </p>
@@ -154,7 +155,7 @@ export const Keys = () => {
                 onChange={quotaActions.handleSaveDefaultQuotas}
               />
               {quotaActions.isSavingDefaults && (
-                <p className="mt-2 text-xs text-text-muted">Saving…</p>
+                <p className="text-text-muted mt-2 text-xs">Saving…</p>
               )}
             </Card>
             <QuotaLists

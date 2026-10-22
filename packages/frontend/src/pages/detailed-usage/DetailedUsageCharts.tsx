@@ -17,6 +17,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -252,7 +253,7 @@ export const DetailedUsageCharts = ({
   >
     {loading && hasSummary && (
       <div
-        className="mb-3 inline-flex items-center gap-1 text-xs text-text-secondary"
+        className="text-text-secondary mb-3 inline-flex items-center gap-1 text-xs"
         role="status"
       >
         <Loader2 size={13} className="animate-spin" aria-hidden="true" />
@@ -262,7 +263,7 @@ export const DetailedUsageCharts = ({
     {loading && !hasSummary ? (
       <Skeleton height={400} className="w-full" />
     ) : aggregatedData.length === 0 ? (
-      <div className="h-96 flex items-center justify-center text-text-secondary">
+      <div className="text-text-secondary flex h-96 items-center justify-center">
         No data available
       </div>
     ) : chartType === 'pie' ? (

@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface NeuralwattQuotaConfigProps {
@@ -17,7 +18,7 @@ export const NeuralwattQuotaConfig: React.FC<NeuralwattQuotaConfigProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input
@@ -25,7 +26,7 @@ export const NeuralwattQuotaConfig: React.FC<NeuralwattQuotaConfigProps> = ({
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://api.neuralwatt.com/v1/quota"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Uses the provider's API key automatically. No additional configuration needed.
         </span>
       </div>

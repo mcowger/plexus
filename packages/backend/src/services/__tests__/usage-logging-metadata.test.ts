@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { registerSpy } from '../../../test/test-utils';
 import { PassThrough } from 'stream';
-import { UsageInspector } from '../inspectors/usage-logging';
-import { DebugLoggingInspector } from '../inspectors/debug-logging';
-import { DebugManager } from '../observability/debug-manager';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { registerSpy } from '../../../test/test-utils';
 import type { UsageRecord } from '../../types/usage';
+import { DebugLoggingInspector } from '../inspectors/debug-logging';
+import { UsageInspector } from '../inspectors/usage-logging';
+import { DebugManager } from '../observability/debug-manager';
 
 describe('UsageInspector Metadata Robustness', () => {
   let mockStorage: any;

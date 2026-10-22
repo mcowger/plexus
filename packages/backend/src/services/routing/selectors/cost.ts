@@ -1,5 +1,5 @@
-import { Selector, EnrichedModelTarget } from './base';
 import { ModelTarget } from '../../../config';
+import { EnrichedModelTarget, Selector } from './base';
 
 function calculatePriceForTarget(
   pricing: any,

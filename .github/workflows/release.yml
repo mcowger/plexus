@@ -4,7 +4,7 @@ run-name: Release ${{ github.event_name == 'push' && github.ref_name || 'auto-ca
 on:
   push:
     tags:
-      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].[0-9]+'  # CalVer: YYYY.MM.DD.N
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].[0-9]+' # CalVer: YYYY.MM.DD.N
   workflow_dispatch:
     # No inputs — the tag is auto-calculated (CalVer YYYY.MM.DD.N) from
     # existing git tags, mirroring scripts/release.ts.

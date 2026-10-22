@@ -1,18 +1,19 @@
-import { useEffect, useState, useMemo } from 'react';
-import { RefreshCw, Cpu, Gauge, AlertTriangle } from 'lucide-react';
 import { clsx } from 'clsx';
-import { api, fetchQuotaCheckers } from '../lib/api';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { EmptyState } from '../components/ui/EmptyState';
-import { PageHeader } from '../components/layout/PageHeader';
+import { AlertTriangle, Cpu, Gauge, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+
 import { PageContainer } from '../components/layout/PageContainer';
-import type { QuotaCheckerInfo, Meter } from '../types/quota';
-import { CombinedBalancesCard } from '../components/quota/CombinedBalancesCard';
+import { PageHeader } from '../components/layout/PageHeader';
 import { AllowanceMeterRow } from '../components/quota/AllowanceMeterRow';
-import { MeterHistoryModal } from '../components/quota/MeterHistoryModal';
 import { getCheckerDisplayName } from '../components/quota/checker-presentation';
+import { CombinedBalancesCard } from '../components/quota/CombinedBalancesCard';
+import { MeterHistoryModal } from '../components/quota/MeterHistoryModal';
 import { StaleReadingNotice } from '../components/quota/StaleReadingNotice';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { api, fetchQuotaCheckers } from '../lib/api';
+import type { Meter, QuotaCheckerInfo } from '../types/quota';
 
 export const Quotas = () => {
   const [quotas, setQuotas] = useState<(QuotaCheckerInfo & { pending?: boolean })[]>([]);
@@ -95,14 +96,14 @@ export const Quotas = () => {
     const allowances = quota.meters.filter((m) => m.kind === 'allowance');
     const renderCheckerStatus = () => {
       if (quota.pending) {
-        return <span className="text-xs text-text-muted">Pending first check...</span>;
+        return <span className="text-text-muted text-xs">Pending first check...</span>;
       }
       if (!quota.success) {
         return (
-          <div className="flex items-center gap-2 text-danger">
+          <div className="text-danger flex items-center gap-2">
             <AlertTriangle size={14} />
             <span className="text-xs">Check failed</span>
-            {quota.error && <span className="text-xs text-text-muted truncate">{quota.error}</span>}
+            {quota.error && <span className="text-text-muted truncate text-xs">{quota.error}</span>}
           </div>
         );
       }
@@ -113,7 +114,7 @@ export const Quotas = () => {
             <StaleReadingNotice error={quota.error} hasReading={allowances.length > 0} />
           )}
           {allowances.length === 0 && !quota.stale && (
-            <span className="text-xs text-text-muted">No data yet</span>
+            <span className="text-text-muted text-xs">No data yet</span>
           )}
           {allowances.map((meter) => (
             <AllowanceMeterRow
@@ -135,14 +136,14 @@ export const Quotas = () => {
     return (
       <div
         key={quota.checkerId}
-        className="relative rounded-lg border border-border-glass bg-bg-card/60 p-4"
+        className="border-border-glass bg-bg-card/60 relative rounded-lg border p-4"
       >
         <button
           type="button"
           onClick={() => handleRefresh(quota.checkerId)}
           disabled={refreshing.has(quota.checkerId) || quota.pending}
           aria-label="Refresh"
-          className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-bg-hover hover:text-text transition-colors duration-fast disabled:opacity-50"
+          className="text-text-muted hover:bg-bg-hover hover:text-text duration-fast absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:opacity-50"
         >
           <RefreshCw
             size={14}
@@ -156,7 +157,7 @@ export const Quotas = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title="Quotas"
         subtitle="Provider balances and rate-quota allowances"
@@ -175,8 +176,8 @@ export const Quotas = () => {
 
       <PageContainer>
         {loading && quotas.length === 0 ? (
-          <div className="flex items-center justify-center h-64 gap-3">
-            <RefreshCw size={20} className="animate-spin text-primary" />
+          <div className="flex h-64 items-center justify-center gap-3">
+            <RefreshCw size={20} className="text-primary animate-spin" />
             <span className="text-text-secondary">Loading quotas...</span>
           </div>
         ) : quotas.length === 0 ? (
@@ -202,11 +203,11 @@ export const Quotas = () => {
 
             {allowanceGroups.length > 0 && (
               <section>
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border-glass">
+                <div className="border-border-glass mb-4 flex items-center gap-2 border-b pb-2">
                   <Cpu size={18} className="text-primary" />
-                  <h2 className="font-heading text-h2 font-semibold text-text">Rate Limits</h2>
+                  <h2 className="font-heading text-h2 text-text font-semibold">Rate Limits</h2>
                 </div>
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {allowanceGroups.map(([checkerType, quotasList]) => {
                     const displayName = getCheckerDisplayName(
                       checkerType,
@@ -215,7 +216,7 @@ export const Quotas = () => {
                     );
                     return (
                       <div key={checkerType} className="flex flex-col gap-3">
-                        <h3 className="font-heading text-xs font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border-glass pb-2">
+                        <h3 className="font-heading text-text-secondary border-border-glass border-b px-1 pb-2 text-xs font-semibold tracking-wider uppercase">
                           {displayName}
                         </h3>
                         <div className="flex flex-col gap-3">
@@ -230,11 +231,11 @@ export const Quotas = () => {
 
             {failedQuotas.length > 0 && (
               <section>
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border-glass">
+                <div className="border-border-glass mb-4 flex items-center gap-2 border-b pb-2">
                   <AlertTriangle size={18} className="text-danger" />
-                  <h2 className="font-heading text-h2 font-semibold text-text">Needs attention</h2>
+                  <h2 className="font-heading text-h2 text-text font-semibold">Needs attention</h2>
                 </div>
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {failedQuotas.map((quota) => {
                     const displayName = getCheckerDisplayName(
                       quota.checkerType,
@@ -243,7 +244,7 @@ export const Quotas = () => {
                     );
                     return (
                       <div key={quota.checkerId} className="flex flex-col gap-3">
-                        <h3 className="font-heading text-xs font-semibold text-text-secondary uppercase tracking-wider px-1 border-b border-border-glass pb-2">
+                        <h3 className="font-heading text-text-secondary border-border-glass border-b px-1 pb-2 text-xs font-semibold tracking-wider uppercase">
                           {displayName}
                         </h3>
                         <div className="flex flex-col gap-3">

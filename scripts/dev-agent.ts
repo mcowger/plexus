@@ -19,17 +19,18 @@
  *   bun run dev:agent stop --all        # stop all background stacks for this worktree
  */
 
-import { basename, join } from 'path';
-import { tmpdir } from 'os';
-import { openSync, existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { spawn } from 'child_process';
+import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { basename, join } from 'path';
+
 import { deriveDevPort } from './dev-port-allocator';
-import { buildFrpcEndpoint, getRepositoryName, isFrpcAvailable, type FrpcEndpoint } from './frpc';
+import { buildFrpcEndpoint, type FrpcEndpoint, getRepositoryName, isFrpcAvailable } from './frpc';
 import {
+  attachPaseoTerminal,
   isPaseoScriptAvailable,
   startPaseoScript,
   stopPaseoScript,
-  attachPaseoTerminal,
   type WorkspaceScriptPayload,
 } from './lib/paseo';
 import { loadPaseoScriptConfig, resolveFallbackCommand } from './lib/script-runner';

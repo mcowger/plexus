@@ -1,4 +1,5 @@
-import { test, expect, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
+
 import { OpenAIEmbeddingsTransformer } from '../embeddings/openai';
 
 describe('OpenAIEmbeddingsTransformer', () => {

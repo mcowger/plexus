@@ -1,11 +1,12 @@
 import type { Context } from '@earendil-works/pi-ai';
-import { logger } from '../../utils/logger';
+
 import { getConfig, type ModelConfig } from '../../config';
-import { resolveContextLength } from '../models/enforce-limits';
 import { estimateContextTokens } from '../../utils/estimate-tokens';
+import { logger } from '../../utils/logger';
+import { resolveContextLength } from '../models/enforce-limits';
 import type { RouteResult } from '../routing/router';
-import { NativeCompactor } from './native-compactor';
 import { HeadroomCompactor } from './headroom-compactor';
+import { NativeCompactor } from './native-compactor';
 import { resolveCompactionSettings } from './resolve-settings';
 import type {
   CompactionResult,

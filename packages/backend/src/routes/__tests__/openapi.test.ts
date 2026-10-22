@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import { describe, expect, test } from 'vitest';
+
 import { registerOpenApiRoute } from '../openapi';
 
 describe('public OpenAPI route', () => {

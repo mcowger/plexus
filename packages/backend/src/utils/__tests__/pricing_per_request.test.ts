@@ -1,12 +1,13 @@
-import { describe, expect, test, vi } from 'vitest';
-import { calculateCosts } from '../calculate-costs';
-import { handleResponse } from '../../services/responses/response-handler';
-import { validateConfig } from '../../config';
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { describe, expect, test, vi } from 'vitest';
+
+import { validateConfig } from '../../config';
 import { UsageStorageService } from '../../services/observability/usage-storage';
+import { handleResponse } from '../../services/responses/response-handler';
 import { Transformer } from '../../types/transformer';
 import { UnifiedChatResponse } from '../../types/unified';
 import { UsageRecord } from '../../types/usage';
+import { calculateCosts } from '../calculate-costs';
 
 // ---------------------------------------------------------------------------
 // Direct unit tests for calculateCosts with per_request pricing

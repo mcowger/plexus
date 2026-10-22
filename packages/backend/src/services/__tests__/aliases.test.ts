@@ -1,7 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
-import { Router } from '../routing/router';
 import { setConfigForTesting } from '../../config';
+import { Router } from '../routing/router';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
 describe('Router Aliases', () => {

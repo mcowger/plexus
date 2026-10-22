@@ -1,8 +1,9 @@
-import React from 'react';
-import { Card } from '../ui/Card';
-import { AlertTriangle } from 'lucide-react';
-import type { Cooldown } from '../../lib/api';
 import { formatMsToMinSec, INDEFINITE_COOLDOWN_THRESHOLD_MS } from '@plexus/shared';
+import { AlertTriangle } from 'lucide-react';
+import React from 'react';
+
+import type { Cooldown } from '../../lib/api';
+import { Card } from '../ui/Card';
 
 interface ServiceAlertsCardProps {
   cooldowns: Cooldown[];
@@ -34,7 +35,7 @@ export const ServiceAlertsCard: React.FC<ServiceAlertsCardProps> = ({ cooldowns,
       style={{ borderColor: 'var(--color-warning)' }}
       extra={
         <button
-          className="bg-transparent text-text border-0 hover:bg-amber-500/10 py-1.5! px-3.5! text-xs!"
+          className="text-text border-0 bg-transparent px-3.5! py-1.5! text-xs! hover:bg-amber-500/10"
           onClick={onClearAll}
           style={{ color: 'var(--color-warning)' }}
         >

@@ -16,9 +16,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isCustomTool, isMuseTarget, museCodeCompatAdapter } from '../muse-code-compat.adapter';
+
 import { resolveAdapters } from '../../../services/dispatch/adapter-resolver';
 import type { RouteResult } from '../../../services/routing/router';
+import { isCustomTool, isMuseTarget, museCodeCompatAdapter } from '../muse-code-compat.adapter';
 
 function makeRoute(configOverrides: Record<string, any> = {}): RouteResult {
   return {

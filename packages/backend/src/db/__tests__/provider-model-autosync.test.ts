@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { closeDatabase, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
-import { ConfigRepository } from '../config-repository';
+
 import type { ProviderConfig } from '../../config';
+import { closeDatabase, initializeDatabase } from '../client';
+import { ConfigRepository } from '../config-repository';
+import { runMigrations } from '../migrate';
 
 describe('provider model autosync persistence', () => {
   let repo: ConfigRepository;

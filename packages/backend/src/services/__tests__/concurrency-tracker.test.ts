@@ -1,6 +1,7 @@
-import { describe, expect, test, beforeEach } from 'vitest';
-import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
+import { beforeEach, describe, expect, test } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
+import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
 
 describe('ConcurrencyTracker', () => {
   beforeEach(() => {

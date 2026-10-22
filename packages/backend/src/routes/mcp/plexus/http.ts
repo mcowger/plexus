@@ -1,7 +1,8 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { getClientIp } from '../../../utils/ip';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
+import { getClientIp } from '../../../utils/ip';
 
 export type PlexusMcpRequestContext = {
   startTime: number;

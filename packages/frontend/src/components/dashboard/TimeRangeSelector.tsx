@@ -1,14 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Button } from '../ui/Button';
 import { Calendar, ChevronDown } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+
 import {
-  getPresetRange,
+  type CustomDateRange,
+  type DateRangePreset,
   formatDateRange,
+  getPresetRange,
   isValidDateRange,
   parseISODate,
-  type DateRangePreset,
-  type CustomDateRange,
 } from '../../lib/date';
+import { Button } from '../ui/Button';
 
 export type TimeRange = 'live' | 'hour' | 'day' | 'week' | 'month' | 'custom';
 

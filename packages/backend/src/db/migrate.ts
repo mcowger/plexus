@@ -1,11 +1,13 @@
-import { sql } from 'drizzle-orm';
-import { getDatabase, getCurrentDialect } from './client';
-import { logger } from '../utils/logger';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { sql } from 'drizzle-orm';
+
 import sqliteJournal from '../../drizzle/migrations/meta/_journal.json';
 import pgJournal from '../../drizzle/migrations_pg/meta/_journal.json';
+import { logger } from '../utils/logger';
+import { getCurrentDialect, getDatabase } from './client';
 
 const DRIZZLE_MIGRATIONS_SCHEMA = 'drizzle';
 const DRIZZLE_MIGRATIONS_TABLE = '__drizzle_migrations';

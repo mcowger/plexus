@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
+
 import { decryptJson, encrypt } from '../utils/encryption';
 import { logger } from '../utils/logger';
+import { getDatabase, getSchema } from './client';
 
 const AUTH_HEADERS = new Map([
   ['x-api-key', 'x-api-key'],
@@ -14,8 +15,7 @@ type AuthScheme = 'bearer' | 'x-api-key' | 'x-goog-api-key' | 'x-subscription-to
 function extractLegacyCredential(
   headers: unknown
 ):
-  | { key: string; scheme: AuthScheme; header: string; headers: Record<string, string> }
-  | undefined {
+  { key: string; scheme: AuthScheme; header: string; headers: Record<string, string> } | undefined {
   const parsed = decryptJson(headers);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
 

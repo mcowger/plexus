@@ -1,9 +1,9 @@
+import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import type {
   ImageResolution,
   UnifiedImageGenerationRequest,
   UnifiedImageGenerationResponse,
 } from '../../types/unified';
-import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import { ImageRequestValidationError, resolveImageReference } from '../image';
 
 const MIME_TYPES: Record<string, string> = {

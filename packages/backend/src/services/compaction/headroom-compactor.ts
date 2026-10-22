@@ -1,3 +1,15 @@
+import type {
+  AssistantMessage,
+  Context,
+  ImageContent,
+  JsonObject,
+  Message,
+  TextContent,
+  ToolCall,
+  ToolResultMessage,
+  Usage,
+  UserMessage,
+} from '@earendil-works/pi-ai';
 /**
  * headroom-compactor.ts
  *
@@ -14,18 +26,7 @@
  */
 import { compress as sdkCompress } from 'headroom-ai';
 import type { CompressOptions, CompressResult } from 'headroom-ai';
-import type {
-  Context,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
-  TextContent,
-  ImageContent,
-  ToolCall,
-  Message,
-  Usage,
-  JsonObject,
-} from '@earendil-works/pi-ai';
+
 import type {
   CompactionStrategy,
   CompactionStrategyContext,

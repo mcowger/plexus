@@ -1,5 +1,4 @@
 import { getProviderTypes, isOAuthPlaceholderUrl } from '../../config';
-import { logger } from '../../utils/logger';
 import {
   getApiBaseType,
   isApiSubtype,
@@ -7,6 +6,7 @@ import {
   isImageTargetApiType,
   normalizeApiAccessList,
 } from '../../utils/api-format';
+import { logger } from '../../utils/logger';
 import type { RouteResult } from '../routing/router';
 
 /**

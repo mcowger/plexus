@@ -16,12 +16,13 @@
  * Uses PLEXUS_DB_BACKUP_DIR environment variable for output (default: ./backups)
  */
 
+import { writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
-import { logger } from '../utils/logger';
+
+import { getCurrentDialect, initializeDatabase } from '../db/client';
 import { BackupService } from '../services/configuration/backup-service';
-import { initializeDatabase, getCurrentDialect } from '../db/client';
+import { logger } from '../utils/logger';
 
 const DEFAULT_BACKUP_DIR = './backups';
 

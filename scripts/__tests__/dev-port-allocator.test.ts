@@ -1,6 +1,8 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'child_process';
 import { join } from 'path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { getPaseoPort } from '../dev-config';
 import { deriveDevPort } from '../dev-port-allocator';
 

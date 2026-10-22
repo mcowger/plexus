@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { detectResponsesApiType } from '../responses';
 
 describe('Responses API subtype detection', () => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { sanitizeHeaders } from '../sanitize-headers';
 
 describe('sanitizeHeaders', () => {

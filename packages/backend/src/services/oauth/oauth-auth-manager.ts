@@ -1,5 +1,6 @@
-import { logger } from '../../utils/logger';
 import type { OAuthAuth, OAuthCredential, OAuthCredentials } from '@earendil-works/pi-ai';
+
+import { logger } from '../../utils/logger';
 import { ConfigService } from '../configuration/config-service';
 import { getOAuthProviderAuth, LEGACY_ACCOUNT_ID, type OAuthProvider } from './oauth-providers';
 const REFRESH_RETRY_BACKOFF_INITIAL_MS = 60 * 1000;

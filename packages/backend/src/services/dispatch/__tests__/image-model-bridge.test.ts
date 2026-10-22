@@ -19,6 +19,14 @@
  */
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../../test/test-utils';
+import type { PlexusConfig } from '../../../config';
+import { ImageRequestValidationError } from '../../../transformers/image';
+import { MAX_INLINE_IMAGE_BASE64_CHARS } from '../../../transformers/image-rendering';
+import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../../types/unified';
+import { logger } from '../../../utils/logger';
+import type { RouteResult } from '../../routing/router';
 import type { ImageBridgeHost } from '../image-model-bridge';
 import {
   bridgeChatToImageGeneration,
@@ -28,13 +36,6 @@ import {
   synthesizeChatResponse,
   synthesizeChatStream,
 } from '../image-model-bridge';
-import { ImageRequestValidationError } from '../../../transformers/image';
-import { MAX_INLINE_IMAGE_BASE64_CHARS } from '../../../transformers/image-rendering';
-import { logger } from '../../../utils/logger';
-import { registerSpy } from '../../../../test/test-utils';
-import type { PlexusConfig } from '../../../config';
-import type { RouteResult } from '../../routing/router';
-import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../../types/unified';
 
 /** base64 for "hello" — small enough to inline, sniffs to the png default. */
 const TINY_IMAGE_B64 = 'aGVsbG8=';

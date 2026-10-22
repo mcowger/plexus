@@ -17,12 +17,12 @@ This slice does not add a model-listing URL, change Fetch Models or autosync, or
 
 Retain the existing catalog file and its endpoint map. Add `piAiQuirks` as an alternative to `piAiProvider`; allow both to be absent. The names below are the proposed public JSON names; the persisted provider-config names follow the existing snake_case convention.
 
-| Catalog field | Meaning |
-| --- | --- |
-| `piAiProvider` | Existing, real pi-ai builtin ID. Continue using pi-ai's model catalog and per-model links. Optional in the revised schema. |
-| `piAiQuirks` | Explicit, typed pi-ai-style behavior for a provider without a pi-ai catalog definition. Optional. Mutually exclusive with `piAiProvider`. |
-| Neither field | No registry-based quirk handling. Ordinary configured endpoint routing still works. |
-| `autoCompat` | Existing opt-in. Keep it for the first two cases. It must be false or omitted when both quirk sources are absent; an omitted value becomes false. |
+| Catalog field  | Meaning                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `piAiProvider` | Existing, real pi-ai builtin ID. Continue using pi-ai's model catalog and per-model links. Optional in the revised schema.                        |
+| `piAiQuirks`   | Explicit, typed pi-ai-style behavior for a provider without a pi-ai catalog definition. Optional. Mutually exclusive with `piAiProvider`.         |
+| Neither field  | No registry-based quirk handling. Ordinary configured endpoint routing still works.                                                               |
+| `autoCompat`   | Existing opt-in. Keep it for the first two cases. It must be false or omitted when both quirk sources are absent; an omitted value becomes false. |
 
 `piAiQuirks` needs a bounded shape, not `Record<string, unknown>`. Its keys are target API types from `apiBaseUrl` (`chat`, `messages`, `responses`, and only other types the compatibility code explicitly supports). Each entry declares the corresponding pi-ai API dialect and only the pi-ai-style attributes the gateway actually reads, such as `reasoning`, `thinkingLevelMap`, `maxTokens`, and supported `compat` flags (`thinkingFormat`, `supportsTemperature`, `maxTokensField`, `forceAdaptiveThinking`, and `supportsReasoningEffort`). The schema should constrain enum values to those handled by the existing projections. Do not pass arbitrary JSON straight into a pi-ai `Model` cast or silently accept unimplemented quirk keys.
 

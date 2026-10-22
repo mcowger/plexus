@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   KeyConfigSchema,
-  QuotaDefinitionSchema,
   normalizeKeyConfig,
+  QuotaDefinitionSchema,
   validateConfig,
 } from '../config';
 

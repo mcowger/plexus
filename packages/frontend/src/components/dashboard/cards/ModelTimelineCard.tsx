@@ -5,8 +5,8 @@
  * with avg TTFT and avg TPS lines.
  */
 
-import React from 'react';
 import { Clock } from 'lucide-react';
+import React from 'react';
 import {
   Bar,
   CartesianGrid,
@@ -18,9 +18,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { SortableCard } from '../../ui/SortableCard';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+
 import { formatMs, formatNumber, formatTPS } from '../../../lib/format';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { SortableCard } from '../../ui/SortableCard';
 import type { ModelTimelineBucket, ModelTimelineSeries } from '../liveTypes';
 
 export interface ModelTimelineCardProps {
@@ -62,11 +63,11 @@ export const ModelTimelineCard: React.FC<ModelTimelineCardProps> = ({
         style: { cursor: 'pointer' },
         className: 'min-w-0 hover:shadow-lg hover:border-primary/30 transition-all',
         content: loading ? (
-          <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+          <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
             Loading...
           </div>
         ) : modelTimeline.series.length === 0 ? (
-          <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+          <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
             No model stack data in the last {liveWindowMinutes} minutes
           </div>
         ) : (

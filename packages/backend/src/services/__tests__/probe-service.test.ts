@@ -1,9 +1,10 @@
-import { describe, expect, test, beforeEach, vi } from 'vitest';
-import { ProbeService } from '../probes/probe-service';
-import { Dispatcher } from '../dispatch/dispatcher';
-import { UsageStorageService } from '../observability/usage-storage';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import { DecisionsIngressSchema } from '../../types/decisions';
+import { Dispatcher } from '../dispatch/dispatcher';
+import { UsageStorageService } from '../observability/usage-storage';
+import { ProbeService } from '../probes/probe-service';
 
 function makeMocks() {
   const usageStorage = {

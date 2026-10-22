@@ -1,7 +1,8 @@
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { registerModelRoutes } from '../models';
+
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';
+import { registerModelRoutes } from '../models';
 
 // NOTE: @earendil-works/pi-ai is globally mocked (see test/vitest.setup.ts):
 // getBuiltinProviders() returns ['anthropic', 'openai-codex', 'openai',

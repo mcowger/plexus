@@ -1,8 +1,9 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
+import { logger } from '../../../utils/logger';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import type { OAuthProvider } from '../../oauth/oauth-providers';
-import { logger } from '../../../utils/logger';
+import { defineChecker } from '../checker-registry';
 
 interface CopilotUsageResponse {
   quota_reset_date_utc?: string;

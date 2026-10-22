@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { Principal } from '../_principal';
 
 const mockConfigService = vi.hoisted(() => ({

@@ -1,4 +1,5 @@
-import { sqliteTable, integer, text, unique } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+
 import { modelAliases } from './model-aliases';
 
 export const modelAliasTargets = sqliteTable(

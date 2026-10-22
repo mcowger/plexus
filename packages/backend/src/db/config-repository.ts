@@ -1,6 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
-import { decrypt, decryptField, encrypt, encryptField } from '../utils/encryption';
+
 import type {
   BackgroundExplorationConfig,
   CompactionSettingsConfig,
@@ -15,11 +14,13 @@ import type {
   StallConfigType,
   TimeoutConfig,
 } from '../config';
-import { decryptJsonField, encryptJsonField, fromBool, now, toBool } from './repository-utils';
+import { decrypt, decryptField, encrypt, encryptField } from '../utils/encryption';
 import { AliasRepository } from './alias-repository';
+import { getDatabase, getSchema } from './client';
 import { KeyRepository } from './key-repository';
 import { ProviderRepository } from './provider-repository';
 import { QuotaRepository } from './quota-repository';
+import { decryptJsonField, encryptJsonField, fromBool, now, toBool } from './repository-utils';
 import { SystemSettingsRepository } from './system-settings-repository';
 
 export interface CustomCheckerRecord {

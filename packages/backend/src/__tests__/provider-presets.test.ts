@@ -1,29 +1,31 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeAll, describe, expect, test } from 'vitest';
-import Ajv2020 from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
+
 import {
-  ProviderPresetSchema,
-  PiAiQuirksSchema,
   applyProviderPreset,
   findProviderPreset,
   findUnresolvedPresetVars,
-  substitutePresetVars,
+  PiAiQuirksSchema,
   type ProviderPreset,
   type ProviderPresetDraft,
+  ProviderPresetSchema,
+  substitutePresetVars,
 } from '@plexus/shared';
+import addFormats from 'ajv-formats';
+import Ajv2020 from 'ajv/dist/2020.js';
+import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+
 import editorSchema from '../../data/provider-presets.schema.json' with { type: 'json' };
+import { applyRegistryAutoCompat } from '../services/dispatch/dispatcher-auto-compat';
 import {
-  REMOTE_PRESETS_URL,
   defaultPresetsPath,
   diskFileEditedSinceStartup,
   loadLocalPresets,
   loadProviderPresets,
   parseAndValidatePresets,
+  REMOTE_PRESETS_URL,
 } from '../services/provider-presets';
-import { applyRegistryAutoCompat } from '../services/dispatch/dispatcher-auto-compat';
 
 let catalog: ProviderPreset[] = [];
 

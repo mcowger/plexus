@@ -12,14 +12,15 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
+import type { ProviderConfig } from '../../../config';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import {
   discoverProviderModels,
   listMuseOAuthModels,
   MUSE_STATIC_MODELS,
 } from '../provider-model-discovery';
-import type { ProviderConfig } from '../../../config';
 
 const MINTED_KEY = 'mk_live_abc';
 

@@ -1,3 +1,4 @@
+import Fastify from 'fastify';
 /**
  * Tests for the logging level management routes.
  *
@@ -15,9 +16,9 @@
  *     starts and leaves the level at 'info' (the startup default).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import Fastify from 'fastify';
-import { registerLoggingRoutes } from '../logging';
+
 import { SUPPORTED_LOG_LEVELS } from '../../../utils/logger';
+import { registerLoggingRoutes } from '../logging';
 
 describe('Logging management routes', () => {
   let fastify: ReturnType<typeof Fastify>;

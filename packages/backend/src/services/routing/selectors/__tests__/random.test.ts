@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { RandomSelector } from '../random';
+
 import { ModelTarget } from '../../../../config';
+import { RandomSelector } from '../random';
 
 describe('RandomSelector', () => {
   const selector = new RandomSelector();

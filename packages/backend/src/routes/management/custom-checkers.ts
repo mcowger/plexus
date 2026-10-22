@@ -1,12 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+
 import { ConfigService } from '../../services/configuration/config-service';
-import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 import { createMeterContext, getCheckerDefinition } from '../../services/quota/checker-registry';
 import {
   runCustomChecker,
   validateCustomCheckerCode,
 } from '../../services/quota/custom-checker-runtime';
+import { QuotaScheduler } from '../../services/quota/quota-scheduler';
 
 const CustomCheckerSchema = z.object({
   id: z

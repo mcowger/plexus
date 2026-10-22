@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
+
 import type { QuotaDefinition } from '../config';
+import { getDatabase, getSchema } from './client';
 import { now, parseStringArray, stringifyStringArray, toBool } from './repository-utils';
 
 export class QuotaRepository {

@@ -1,6 +1,7 @@
 import { eq, inArray, sql } from 'drizzle-orm';
-import { getCurrentDialect, getDatabase, getSchema } from './client';
+
 import type { MetadataOverrides, ModelConfig, ModelTargetGroup, SelectorType } from '../config';
+import { getCurrentDialect, getDatabase, getSchema } from './client';
 import {
   fromBool,
   getAffectedRowCount,

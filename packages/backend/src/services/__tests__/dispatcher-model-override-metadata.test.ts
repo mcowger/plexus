@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { executeStandardAttempt } from '../dispatch/standard-attempt-request';
+
 import type { RequestManagerHost } from '../dispatch/request-manager';
+import { executeStandardAttempt } from '../dispatch/standard-attempt-request';
 import type { RouteResult } from '../routing/router';
 
 function makeRoute(): RouteResult {

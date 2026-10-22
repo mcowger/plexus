@@ -6,9 +6,10 @@
 
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { SortableCard } from '../../ui/SortableCard';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+
 import { formatNumber } from '../../../lib/format';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { SortableCard } from '../../ui/SortableCard';
 
 export interface ProviderPulseCardProps {
   index: number;
@@ -33,7 +34,7 @@ export const ProviderPulseCard: React.FC<ProviderPulseCardProps> = ({
         title: 'Provider Pulse (5m)',
         extra: (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-xs text-text-secondary">Top 8 providers</span>
+            <span className="text-text-secondary text-xs">Top 8 providers</span>
             <AnalyzeButton cardType="provider" size="sm" onClick={onAnalyze} />
           </div>
         ),
@@ -42,7 +43,7 @@ export const ProviderPulseCard: React.FC<ProviderPulseCardProps> = ({
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         content:
           providerPulseRows.length === 0 ? (
-            <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+            <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
               No provider traffic in the selected live window.
             </div>
           ) : (

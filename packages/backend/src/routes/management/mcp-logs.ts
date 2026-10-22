@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 
 export async function registerMcpLogRoutes(

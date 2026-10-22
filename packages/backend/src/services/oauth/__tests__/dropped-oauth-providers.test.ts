@@ -1,9 +1,10 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../../db/client';
-import { runMigrations } from '../../../db/migrate';
-import { ConfigRepository } from '../../../db/config-repository';
-import { ConfigService } from '../../configuration/config-service';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { ProviderConfigSchema } from '../../../config';
+import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../../db/client';
+import { ConfigRepository } from '../../../db/config-repository';
+import { runMigrations } from '../../../db/migrate';
+import { ConfigService } from '../../configuration/config-service';
 
 // Gemini CLI / Antigravity OAuth were removed. The removal
 // is now COMPLETE (no retained-but-inert enum values):

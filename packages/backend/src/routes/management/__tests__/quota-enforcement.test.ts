@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockConfigService = vi.hoisted(() => ({
   flush: vi.fn(),

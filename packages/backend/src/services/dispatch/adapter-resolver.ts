@@ -1,16 +1,16 @@
-import type { ResolvedAdapter } from '../../types/provider-adapter';
-import type { RouteResult } from '../routing/router';
-import { isOAuthPlaceholderUrl, type AdapterEntry } from '../../config';
+import { type AdapterEntry, isOAuthPlaceholderUrl } from '../../config';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
+import {
+  isMuseTarget,
+  museCodeCompatAdapter,
+} from '../../transformers/adapters/muse-code-compat.adapter';
 import { normalizeAnthropicToolIdsAdapter } from '../../transformers/adapters/normalize-anthropic-tool-ids.adapter';
 import { stripUnsupportedToolSearchAdapter } from '../../transformers/adapters/strip-unsupported-tool-search.adapter';
-import {
-  museCodeCompatAdapter,
-  isMuseTarget,
-} from '../../transformers/adapters/muse-code-compat.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
+import type { ResolvedAdapter } from '../../types/provider-adapter';
 import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
+import type { RouteResult } from '../routing/router';
 
 /**
  * Resolves the ordered list of ProviderAdapters for a given route.

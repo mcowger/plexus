@@ -1,3 +1,4 @@
+import { clsx } from 'clsx';
 import {
   AlertTriangle,
   CheckCircle,
@@ -9,12 +10,12 @@ import {
   Zap,
   ZapOff,
 } from 'lucide-react';
-import { clsx } from 'clsx';
+
+import type { McpLogRecord } from '../../lib/api';
+import { formatMs } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
-import type { McpLogRecord } from '../../lib/api';
-import { formatMs } from '../../lib/format';
 
 export interface McpLogsFilters {
   serverName: string;
@@ -59,9 +60,9 @@ export function McpUsageLogsCard({
   const logsCurrentPage = Math.floor(logsOffset / logsLimit) + 1;
 
   return (
-    <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-2">
+    <Card className="glass-bg flex max-w-full flex-col gap-2 overflow-hidden rounded-lg p-3 shadow-xl">
       <div className="mb-2">
-        <h2 className="font-heading text-lg font-semibold text-text m-0 mb-3">MCP Usage Logs</h2>
+        <h2 className="font-heading text-text m-0 mb-3 text-lg font-semibold">MCP Usage Logs</h2>
         <form onSubmit={onSearch} className="flex flex-col gap-2 lg:flex-row lg:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative w-full sm:w-50">
@@ -119,21 +120,21 @@ export function McpUsageLogsCard({
 
       <div className="space-y-3 lg:hidden">
         {logsLoading ? (
-          <div className="py-8 text-center text-sm text-text-secondary">Loading...</div>
+          <div className="text-text-secondary py-8 text-center text-sm">Loading...</div>
         ) : logs.length === 0 ? (
-          <div className="py-8 text-center text-sm text-text-secondary">No MCP logs found</div>
+          <div className="text-text-secondary py-8 text-center text-sm">No MCP logs found</div>
         ) : (
           logs.map((log) => (
             <article
               key={log.request_id}
-              className="rounded-md border border-border-glass bg-bg-subtle p-3"
+              className="border-border-glass bg-bg-subtle rounded-md border p-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs font-medium text-text">
+                  <div className="text-text text-xs font-medium">
                     {new Date(log.created_at).toLocaleString()}
                   </div>
-                  <div className="mt-1 truncate text-xs text-text-muted">
+                  <div className="text-text-muted mt-1 truncate text-xs">
                     {log.api_key || '-'} {log.attribution ? `(${log.attribution})` : ''}
                   </div>
                 </div>
@@ -149,36 +150,36 @@ export function McpUsageLogsCard({
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">Server</div>
-                  <div className="truncate font-medium text-text-secondary">{log.server_name}</div>
+                <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">Server</div>
+                  <div className="text-text-secondary truncate font-medium">{log.server_name}</div>
                 </div>
-                <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">Method</div>
-                  <div className="truncate font-medium text-text-secondary">
+                <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">Method</div>
+                  <div className="text-text-secondary truncate font-medium">
                     {log.method} {log.is_streamed ? 'streamed' : 'buffered'}
                   </div>
                 </div>
-                <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">RPC</div>
-                  <div className="truncate font-mono text-text">{log.jsonrpc_method || '-'}</div>
+                <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">RPC</div>
+                  <div className="text-text truncate font-mono">{log.jsonrpc_method || '-'}</div>
                 </div>
-                <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">
                     Duration
                   </div>
-                  <div className="truncate font-medium text-text">
+                  <div className="text-text truncate font-medium">
                     {log.duration_ms != null ? formatMs(log.duration_ms) : '-'}
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-3 rounded border border-border-glass bg-bg-glass px-2 py-2 text-xs">
+              <div className="border-border-glass bg-bg-glass mt-3 flex items-center justify-between gap-3 rounded border px-2 py-2 text-xs">
                 <span className={clsx('font-semibold', statusColor(log.response_status))}>
                   Status {log.response_status ?? '?'}
                 </span>
                 {log.error_message && (
-                  <span className="min-w-0 truncate text-danger" title={log.error_message}>
+                  <span className="text-danger min-w-0 truncate" title={log.error_message}>
                     {log.error_message}
                   </span>
                 )}
@@ -189,31 +190,31 @@ export function McpUsageLogsCard({
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full border-collapse font-body text-[13px]">
+        <table className="font-body w-full border-collapse text-[13px]">
           <thead>
-            <tr className="text-center border-b border-border">
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+            <tr className="border-border border-b text-center">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 Date
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 Key
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 Server
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 Method
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 RPC Method
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 Duration
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 Status
               </th>
-              <th className="px-2 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-2 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                 <div className="flex justify-center">
                   <Trash2 size={12} />
                 </div>
@@ -229,7 +230,7 @@ export function McpUsageLogsCard({
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-5 text-center text-text-secondary">
+                <td colSpan={8} className="text-text-secondary p-5 text-center">
                   No MCP logs found
                 </td>
               </tr>
@@ -237,10 +238,10 @@ export function McpUsageLogsCard({
               logs.map((log) => (
                 <tr
                   key={log.request_id}
-                  className="group border-b border-border-glass hover:bg-bg-hover"
+                  className="group border-border-glass hover:bg-bg-hover border-b"
                 >
                   {/* Date */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle whitespace-nowrap">
                     <div className="flex flex-col">
                       <span className="font-medium">
                         {new Date(log.created_at).toLocaleTimeString()}
@@ -252,7 +253,7 @@ export function McpUsageLogsCard({
                   </td>
 
                   {/* Key / Attribution */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle">
                     <div className="flex flex-col">
                       <span className="font-medium">{log.api_key || '-'}</span>
                       {log.attribution && (
@@ -264,7 +265,7 @@ export function McpUsageLogsCard({
                   </td>
 
                   {/* Server */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle whitespace-nowrap">
                     <div className="flex flex-col">
                       <span className="font-medium">{log.server_name}</span>
                       <span
@@ -283,7 +284,7 @@ export function McpUsageLogsCard({
                   </td>
 
                   {/* HTTP Method */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle whitespace-nowrap">
                     <div className="flex flex-col gap-1">
                       <span
                         className={clsx(
@@ -311,13 +312,13 @@ export function McpUsageLogsCard({
                   </td>
 
                   {/* JSON-RPC Method + Tool Name */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle whitespace-nowrap">
                     <div className="flex flex-col gap-0.5">
                       <span className="font-mono text-xs">
                         {log.jsonrpc_method || <span className="text-text-secondary">-</span>}
                       </span>
                       {log.tool_name && (
-                        <span className="font-mono text-xs text-info" title={log.tool_name}>
+                        <span className="text-info font-mono text-xs" title={log.tool_name}>
                           {log.tool_name}
                         </span>
                       )}
@@ -325,17 +326,17 @@ export function McpUsageLogsCard({
                   </td>
 
                   {/* Duration */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle whitespace-nowrap">
                     <span>{log.duration_ms != null ? formatMs(log.duration_ms) : '-'}</span>
                   </td>
 
                   {/* Status */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle">
                     <div className="flex flex-col gap-1">
                       {log.error_code ? (
                         <div
                           className={clsx(
-                            'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                            'inline-flex items-center justify-center gap-1.5 rounded-xl border px-2 py-1 text-xs font-medium',
                             'text-danger border-danger/30 bg-red-500/15'
                           )}
                           style={{ width: '52px' }}
@@ -346,7 +347,7 @@ export function McpUsageLogsCard({
                       ) : (
                         <div
                           className={clsx(
-                            'inline-flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-xs font-medium border',
+                            'inline-flex items-center justify-center gap-1.5 rounded-xl border px-2 py-1 text-xs font-medium',
                             log.response_status != null &&
                               log.response_status >= 200 &&
                               log.response_status < 300
@@ -381,10 +382,10 @@ export function McpUsageLogsCard({
                   </td>
 
                   {/* Delete */}
-                  <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle">
+                  <td className="border-border-glass text-text border-b px-2 py-1.5 text-left align-middle">
                     <button
                       onClick={() => onDeleteLog(log.request_id)}
-                      className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                      className="text-text-muted hover:text-danger flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 opacity-100 transition-all duration-200 hover:bg-red-600/10 lg:opacity-0 lg:group-hover:opacity-100"
                       title="Delete log"
                     >
                       <Trash2 size={14} />
@@ -397,7 +398,7 @@ export function McpUsageLogsCard({
         </table>
       </div>
 
-      <div className="flex flex-col items-stretch gap-3 mt-3 sm:flex-row sm:items-center sm:justify-end">
+      <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
         <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
           Page {logsCurrentPage} of {Math.max(1, logsTotalPages)}
         </span>

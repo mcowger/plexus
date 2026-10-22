@@ -1,5 +1,5 @@
-import type { CustomDateRange } from '../../lib/date';
 import type { UsageRecord, UsageSummaryResponse } from '../../lib/api';
+import type { CustomDateRange } from '../../lib/date';
 
 export type TimeRange = 'live' | 'hour' | 'day' | 'week' | 'month' | 'custom';
 export type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'composed';
@@ -13,14 +13,7 @@ export interface DetailedUsageProps {
 }
 
 export type MetricKey =
-  | 'requests'
-  | 'tokens'
-  | 'cost'
-  | 'duration'
-  | 'ttft'
-  | 'tps'
-  | 'errors'
-  | 'velocity';
+  'requests' | 'tokens' | 'cost' | 'duration' | 'ttft' | 'tps' | 'errors' | 'velocity';
 
 export interface MetricConfig {
   key: MetricKey;

@@ -4,8 +4,7 @@
  *
  * This is what our onDisconnect() does — confirms the same fix works for timeouts.
  */
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 let chunkCount = 0;
 let cancelFired = false;

@@ -1,15 +1,16 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { SelectorFactory } from '../factory';
-import { RandomSelector } from '../random';
-import { CostSelector } from '../cost';
-import { PerformanceSelector } from '../performance';
-import { E2EPerformanceSelector } from '../e2e-performance';
-import { LatencySelector } from '../latency';
-import { InOrderSelector } from '../in-order';
-import { UsageSelector } from '../usage';
-import { QuotaSelector } from '../quota';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { UsageStorageService } from '../../../observability/usage-storage';
 import { QuotaScheduler } from '../../../quota/quota-scheduler';
+import { CostSelector } from '../cost';
+import { E2EPerformanceSelector } from '../e2e-performance';
+import { SelectorFactory } from '../factory';
+import { InOrderSelector } from '../in-order';
+import { LatencySelector } from '../latency';
+import { PerformanceSelector } from '../performance';
+import { QuotaSelector } from '../quota';
+import { RandomSelector } from '../random';
+import { UsageSelector } from '../usage';
 
 describe('SelectorFactory', () => {
   const mockStorage = {} as unknown as UsageStorageService;

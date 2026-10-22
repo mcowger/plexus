@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   AudioLines,
   BadgeQuestionMark,
@@ -9,6 +8,8 @@ import {
   Variable,
   Volume2,
 } from 'lucide-react';
+import React from 'react';
+
 import { formatApiTypeLabel, getApiBaseType } from '../../lib/apiFormats';
 import { API_LOGOS } from './constants';
 import { isDecisionsApiType } from './helpers';
@@ -20,7 +21,7 @@ interface ApiTypeIconProps {
 }
 
 export const ApiTypeIcon: React.FC<ApiTypeIconProps> = ({ apiType, size }) => {
-  if (!apiType) return <span className="text-[10px] text-text-muted">?</span>;
+  if (!apiType) return <span className="text-text-muted text-[10px]">?</span>;
   if (apiType === 'embeddings') return <Variable size={size} className="text-green-500" />;
   if (apiType === 'transcriptions') return <AudioLines size={size} className="text-purple-500" />;
   if (apiType === 'speech') return <Volume2 size={size} className="text-orange-500" />;
@@ -36,5 +37,5 @@ export const ApiTypeIcon: React.FC<ApiTypeIconProps> = ({ apiType, size }) => {
     return <img src={logo} alt={label} title={label} width={size} height={size} />;
   }
 
-  return <span className="text-[10px] text-text-muted">?</span>;
+  return <span className="text-text-muted text-[10px]">?</span>;
 };

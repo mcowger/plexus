@@ -1,29 +1,30 @@
+import { McpKeyCreateSchema } from '@plexus/shared';
 import { FastifyInstance } from 'fastify';
-import { logger } from '../../utils/logger';
+
 import {
-  ProviderConfigSchema,
-  ModelConfigSchema,
+  assertNoAliasRefCycles,
+  CompactionConfigSchema,
   KeyConfigSchema,
   McpServerConfigSchema,
-  CompactionConfigSchema,
+  ModelConfigSchema,
   normalizeKeyConfig,
-  assertNoAliasRefCycles,
+  ProviderConfigSchema,
 } from '../../config';
-import { validateRawProviderSlug } from '../../services/dispatch/raw-passthrough';
 import { ConfigService } from '../../services/configuration/config-service';
+import { validateRawProviderSlug } from '../../services/dispatch/raw-passthrough';
+import { mcpProcessManager } from '../../services/mcp-local/mcp-process-manager';
+import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
+import { OAuthAuthManager } from '../../services/oauth/oauth-auth-manager';
 import { DebugManager } from '../../services/observability/debug-manager';
-import { isValidIpRule } from '../../utils/ip-match';
+import { UsageStorageService } from '../../services/observability/usage-storage';
 import {
   getCheckerDefinitions,
   validateCheckerOptions,
 } from '../../services/quota/checker-registry';
-import { UsageStorageService } from '../../services/observability/usage-storage';
-import { OAuthAuthManager } from '../../services/oauth/oauth-auth-manager';
-import { validateServerName } from '../../services/mcp-proxy/mcp-proxy-service';
-import { mcpProcessManager } from '../../services/mcp-local/mcp-process-manager';
 import { VisionDescriptorService } from '../../services/vision/vision-descriptor-service';
 import { decryptField } from '../../utils/encryption';
-import { McpKeyCreateSchema } from '@plexus/shared';
+import { isValidIpRule } from '../../utils/ip-match';
+import { logger } from '../../utils/logger';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

@@ -1,9 +1,9 @@
-import { getApiBaseType } from '../../utils/api-format';
-import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import { ImageTransformer } from '../../transformers/image';
+import { CodexImageTransformer } from '../../transformers/images/codex';
 import { GeminiImageTransformer } from '../../transformers/images/gemini';
 import { OpenRouterImageTransformer } from '../../transformers/images/openrouter';
-import { CodexImageTransformer } from '../../transformers/images/codex';
+import type { ImageGenerationTransformer } from '../../types/image-transformer';
+import { getApiBaseType } from '../../utils/api-format';
 
 /**
  * Resolves the target-protocol image transformer independently of the

@@ -1,4 +1,5 @@
 import { LockKeyhole, Save } from 'lucide-react';
+
 import type { McpOAuthSettings as McpOAuthConfig } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
@@ -48,10 +49,10 @@ export function McpOAuthSettings({
           <div className="flex items-center gap-2">
             <LockKeyhole size={16} className="text-primary" />
             <div>
-              <p className="font-body text-[12px] font-medium text-text">
+              <p className="font-body text-text text-[12px] font-medium">
                 Enable OAuth for MCP clients
               </p>
-              <p className="font-body text-[11px] text-text-muted">
+              <p className="font-body text-text-muted text-[11px]">
                 Shared OAuth authorization for each configured MCP server.
               </p>
             </div>
@@ -64,7 +65,7 @@ export function McpOAuthSettings({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="mcpOAuthIssuer" className="font-body text-[12px] font-medium text-text">
+          <label htmlFor="mcpOAuthIssuer" className="font-body text-text text-[12px] font-medium">
             External issuer URL
           </label>
           <input
@@ -73,12 +74,12 @@ export function McpOAuthSettings({
             value={issuerInput}
             onChange={(event) => onIssuerChange(event.target.value)}
             placeholder="https://your-instance.example.com"
-            className="w-full h-[32px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+            className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[32px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
           />
           {!issuerValidation.valid && (
-            <span className="text-[11px] text-warning">{issuerValidation.error}</span>
+            <span className="text-warning text-[11px]">{issuerValidation.error}</span>
           )}
-          <p className="font-body text-[11px] text-text-muted leading-relaxed">
+          <p className="font-body text-text-muted text-[11px] leading-relaxed">
             Use the externally reachable URL for this Plexus instance, such as a Tailscale Funnel
             URL. Each MCP server derives its protected resource from this issuer, such as{' '}
             <code>/mcp/exa</code>. If this does not match the actual external URL, OAuth discovery

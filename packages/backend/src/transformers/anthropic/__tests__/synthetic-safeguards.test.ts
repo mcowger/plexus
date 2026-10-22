@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+
+import { formatAnthropicStream } from '../stream-formatter';
 import {
   buildSyntheticSafeguardResults,
   collectStreamToolIds,
@@ -8,7 +10,6 @@ import {
   SYNTHETIC_SAFEGUARD_EXPLANATION,
   wrapUnifiedStreamWithSyntheticSafeguards,
 } from '../synthetic-safeguards';
-import { formatAnthropicStream } from '../stream-formatter';
 
 function safeguardsBody() {
   return {

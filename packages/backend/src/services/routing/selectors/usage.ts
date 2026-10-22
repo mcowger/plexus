@@ -1,7 +1,7 @@
-import { Selector } from './base';
 import { ModelTarget } from '../../../config';
-import { UsageStorageService } from '../../observability/usage-storage';
 import { logger } from '../../../utils/logger';
+import { UsageStorageService } from '../../observability/usage-storage';
+import { Selector } from './base';
 
 export class UsageSelector extends Selector {
   private storage: UsageStorageService;

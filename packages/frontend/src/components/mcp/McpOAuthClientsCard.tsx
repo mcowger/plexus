@@ -1,7 +1,8 @@
 import { KeyRound, RefreshCw, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react';
+
+import type { McpOAuthClientRecord } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import type { McpOAuthClientRecord } from '../../lib/api';
 
 interface McpOAuthClientsCardProps {
   oauthClients: McpOAuthClientRecord[];
@@ -31,13 +32,13 @@ export function McpOAuthClientsCard({
   onDeleteClient,
 }: McpOAuthClientsCardProps) {
   return (
-    <Card className="glass-bg rounded-lg p-3 max-w-full shadow-xl overflow-hidden flex flex-col gap-3">
+    <Card className="glass-bg flex max-w-full flex-col gap-3 overflow-hidden rounded-lg p-3 shadow-xl">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-heading text-lg font-semibold text-text m-0 mb-1">
+          <h2 className="font-heading text-text m-0 mb-1 text-lg font-semibold">
             MCP OAuth Clients
           </h2>
-          <p className="text-xs text-text-muted">
+          <p className="text-text-muted text-xs">
             Registered OAuth clients and their active tokens. Tokens show the bound Plexus API key
             name only; raw secrets are never displayed.
           </p>
@@ -54,9 +55,9 @@ export function McpOAuthClientsCard({
       </div>
 
       {oauthClientsLoading ? (
-        <div className="py-8 text-center text-sm text-text-secondary">Loading...</div>
+        <div className="text-text-secondary py-8 text-center text-sm">Loading...</div>
       ) : oauthClients.length === 0 ? (
-        <div className="rounded-md border border-border-glass bg-bg-subtle p-4 text-sm text-text-secondary">
+        <div className="border-border-glass bg-bg-subtle text-text-secondary rounded-md border p-4 text-sm">
           No MCP OAuth clients registered yet.
         </div>
       ) : (
@@ -64,41 +65,41 @@ export function McpOAuthClientsCard({
           {oauthClients.map((client) => (
             <article
               key={client.clientId}
-              className={`rounded-md border border-border-glass bg-bg-subtle p-3 ${
+              className={`border-border-glass bg-bg-subtle rounded-md border p-3 ${
                 client.status === 'disabled' ? 'opacity-60' : ''
               }`}
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                  <div className="text-text flex items-center gap-2 text-sm font-semibold">
                     <KeyRound size={15} className="text-primary" />
                     <span>{client.clientName || 'Unnamed client'}</span>
                     {client.status === 'disabled' ? (
-                      <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-red-500">
+                      <span className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-red-500 uppercase">
                         Disabled
                       </span>
                     ) : (
-                      <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-emerald-500">
+                      <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-emerald-500 uppercase">
                         Active
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 font-mono text-xs text-text-secondary break-all">
+                  <div className="text-text-secondary mt-1 font-mono text-xs break-all">
                     {client.clientId}
                   </div>
-                  <div className="mt-2 text-xs text-text-muted">
+                  <div className="text-text-muted mt-2 text-xs">
                     Created {new Date(client.createdAt).toLocaleString()}
                   </div>
                 </div>
                 <div className="min-w-0 lg:max-w-[45%]">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">
                     Redirect URIs
                   </div>
                   <div className="mt-1 flex flex-col gap-1">
                     {client.redirectUris.map((uri) => (
                       <code
                         key={uri}
-                        className="rounded border border-border-glass bg-bg-glass px-2 py-1 text-[11px] text-text-secondary break-all"
+                        className="border-border-glass bg-bg-glass text-text-secondary rounded border px-2 py-1 text-[11px] break-all"
                       >
                         {uri}
                       </code>
@@ -107,30 +108,30 @@ export function McpOAuthClientsCard({
                 </div>
               </div>
 
-              <div className="mt-3 border-t border-border-glass pt-3">
-                <div className="mb-2 text-[10px] uppercase tracking-wider text-text-muted">
+              <div className="border-border-glass mt-3 border-t pt-3">
+                <div className="text-text-muted mb-2 text-[10px] tracking-wider uppercase">
                   Active tokens
                 </div>
                 {client.tokens.length === 0 ? (
-                  <div className="text-xs text-text-muted">No active tokens for this client.</div>
+                  <div className="text-text-muted text-xs">No active tokens for this client.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse font-body text-[12px]">
+                    <table className="font-body w-full border-collapse text-[12px]">
                       <thead>
                         <tr>
-                          <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                          <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-2 py-2 text-left text-[10px] font-semibold tracking-wider uppercase">
                             Key name
                           </th>
-                          <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                          <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-2 py-2 text-left text-[10px] font-semibold tracking-wider uppercase">
                             Scope
                           </th>
-                          <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                          <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-2 py-2 text-left text-[10px] font-semibold tracking-wider uppercase">
                             Access expires
                           </th>
-                          <th className="px-2 py-2 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                          <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-2 py-2 text-left text-[10px] font-semibold tracking-wider uppercase">
                             Issued
                           </th>
-                          <th className="px-2 py-2 text-right border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[10px] uppercase tracking-wider">
+                          <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-2 py-2 text-right text-[10px] font-semibold tracking-wider uppercase">
                             Action
                           </th>
                         </tr>
@@ -138,19 +139,19 @@ export function McpOAuthClientsCard({
                       <tbody>
                         {client.tokens.map((token) => (
                           <tr key={token.id} className="hover:bg-bg-hover">
-                            <td className="px-2 py-2 border-b border-border-glass text-text">
+                            <td className="border-border-glass text-text border-b px-2 py-2">
                               <span className="font-mono">{token.keyName}</span>
                             </td>
-                            <td className="px-2 py-2 border-b border-border-glass text-text-secondary">
+                            <td className="border-border-glass text-text-secondary border-b px-2 py-2">
                               {token.scope || '-'}
                             </td>
-                            <td className="px-2 py-2 border-b border-border-glass text-text-secondary whitespace-nowrap">
+                            <td className="border-border-glass text-text-secondary border-b px-2 py-2 whitespace-nowrap">
                               {new Date(token.accessTokenExpiresAt).toLocaleString()}
                             </td>
-                            <td className="px-2 py-2 border-b border-border-glass text-text-secondary whitespace-nowrap">
+                            <td className="border-border-glass text-text-secondary border-b px-2 py-2 whitespace-nowrap">
                               {new Date(token.createdAt).toLocaleString()}
                             </td>
-                            <td className="px-2 py-2 border-b border-border-glass text-right">
+                            <td className="border-border-glass border-b px-2 py-2 text-right">
                               <Button
                                 size="sm"
                                 variant="danger"
@@ -169,7 +170,7 @@ export function McpOAuthClientsCard({
                 )}
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2 border-t border-border-glass pt-3">
+              <div className="border-border-glass mt-3 flex flex-wrap gap-2 border-t pt-3">
                 {client.status === 'disabled' ? (
                   <Button
                     size="sm"

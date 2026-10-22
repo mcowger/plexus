@@ -1,26 +1,28 @@
-import React from 'react';
 import { clsx } from 'clsx';
 import {
-  CheckCircle,
-  Plane,
+  AlertTriangle,
   Ban,
-  Timer,
-  XCircle,
-  KeyRound,
-  MessagesSquare,
-  Wrench,
+  BrainCog,
+  Bug,
+  CheckCircle,
   Coins,
   Gauge,
+  KeyRound,
+  MessagesSquare,
+  Plane,
+  Timer,
+  Wrench,
+  XCircle,
   Zap,
-  AlertTriangle,
-  Bug,
-  BrainCog,
 } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { useCurrency } from '../../lib/CurrencyContext';
+import React from 'react';
+
 import { formatLargeNumber } from '../../lib/api';
-import { formatCostIn, formatMs, formatTPS, getEstimatedBytesPerToken } from '../../lib/format';
 import { formatApiTypeLabel } from '../../lib/apiFormats';
+import { useCurrency } from '../../lib/CurrencyContext';
+import { formatCostIn, formatMs, formatTPS, getEstimatedBytesPerToken } from '../../lib/format';
+import { Button } from '../ui/Button';
+import { ApiTypeIcon } from './ApiTypeIcon';
 import {
   formatDateSafely,
   formatReasoningEffort,
@@ -28,7 +30,6 @@ import {
   getServiceTierDisplay,
   hasUpstreamRewrite,
 } from './helpers';
-import { ApiTypeIcon } from './ApiTypeIcon';
 import { ServiceTierIndicator } from './ServiceTierIndicator';
 import type { LogRowProps } from './types';
 
@@ -95,27 +96,27 @@ export const MobileLogRow = React.memo(
     return (
       <article
         className={clsx(
-          'rounded-lg border border-border-glass bg-bg-card p-1.5 shadow-sm',
+          'border-border-glass bg-bg-card rounded-lg border p-1.5 shadow-sm',
           isNewest && 'animate-slide-in',
           log.responseStatus === 'pending' && 'bg-yellow-500/5'
         )}
       >
         <div className="flex min-w-0 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1 text-xs">
-            <span className="shrink-0 font-mono text-[11px] font-medium text-text">
+            <span className="text-text shrink-0 font-mono text-[11px] font-medium">
               {formatted.time}
             </span>
-            <span className="shrink-0 text-text-muted" aria-hidden="true">
+            <span className="text-text-muted shrink-0" aria-hidden="true">
               ·
             </span>
-            <span className="min-w-0 truncate font-medium text-text">
+            <span className="text-text min-w-0 truncate font-medium">
               {log.incomingModelAlias || '-'}
             </span>
-            <span className="shrink-0 text-text-muted" aria-hidden="true">
+            <span className="text-text-muted shrink-0" aria-hidden="true">
               ·
             </span>
             <span
-              className="min-w-0 truncate font-normal text-text-secondary"
+              className="text-text-secondary min-w-0 truncate font-normal"
               title={(() => {
                 const routeModel = log.finalAttemptModel ?? log.selectedModelName ?? '-';
                 return hasUpstreamRewrite(log)
@@ -173,7 +174,7 @@ export const MobileLogRow = React.memo(
             const tier = getServiceTierDisplay(log);
             if (!reasoning && !tier) return null;
             return (
-              <div className="flex items-center gap-1 text-[10px] font-normal text-text-secondary">
+              <div className="text-text-secondary flex items-center gap-1 text-[10px] font-normal">
                 {reasoning && (
                   <>
                     <BrainCog
@@ -191,26 +192,26 @@ export const MobileLogRow = React.memo(
           })()}
           <div className="grid grid-cols-4 gap-1 text-[11px]">
             <div
-              className="min-w-0 overflow-hidden rounded bg-bg-subtle px-1 py-0.5"
+              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
               title={`Key: ${log.apiKey || '-'}`}
             >
-              <div className="flex min-w-0 items-center gap-1 truncate text-text">
-                <KeyRound size={12} className="shrink-0 text-text-muted" aria-hidden="true" />
+              <div className="text-text flex min-w-0 items-center gap-1 truncate">
+                <KeyRound size={12} className="text-text-muted shrink-0" aria-hidden="true" />
                 {log.apiKey || '-'}
               </div>
             </div>
             <div
-              className="min-w-0 overflow-hidden rounded bg-bg-subtle px-1 py-0.5"
+              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
               title={`Messages: ${(log.messageCount || 0) === 0 ? '-' : log.messageCount} • Tool calls: ${(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount}`}
             >
-              <div className="flex min-w-0 items-center gap-0.5 whitespace-nowrap text-text">
+              <div className="text-text flex min-w-0 items-center gap-0.5 whitespace-nowrap">
                 <div
                   className="flex w-3 shrink-0 justify-center"
                   title={formatApiTypeLabel(log.incomingApiType || '')}
                 >
                   <ApiTypeIcon apiType={log.incomingApiType} size={12} />
                 </div>
-                <span className="text-[9px] text-text-muted" aria-hidden="true">
+                <span className="text-text-muted text-[9px]" aria-hidden="true">
                   →
                 </span>
                 <div
@@ -229,11 +230,11 @@ export const MobileLogRow = React.memo(
               </div>
             </div>
             <div
-              className="min-w-0 overflow-hidden rounded bg-bg-subtle px-1 py-0.5"
+              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
               title={`Tokens: ${formatLargeNumber(totalTokens)} • Cost: ${log.costTotal == null || log.costTotal === 0 ? '-' : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 2 })}`}
             >
-              <div className="flex min-w-0 items-center gap-1 truncate text-text">
-                <Coins size={12} className="shrink-0 text-text-muted" aria-hidden="true" />
+              <div className="text-text flex min-w-0 items-center gap-1 truncate">
+                <Coins size={12} className="text-text-muted shrink-0" aria-hidden="true" />
                 {formatLargeNumber(totalTokens)}
                 <span className="text-text-muted" aria-hidden="true">
                   ·
@@ -244,15 +245,15 @@ export const MobileLogRow = React.memo(
               </div>
             </div>
             <div
-              className="min-w-0 overflow-hidden rounded bg-bg-subtle px-1 py-0.5"
+              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
               title={
                 status === 'pending'
                   ? `Duration: ${mobileDuration}${estimatedTokensPerSec != null ? ` • Estimated tokens/sec: ${formatTPS(estimatedTokensPerSec)}` : ''}`
                   : `End-to-end throughput: ${log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0 ? formatTPS(e2eOutputTokens / (log.durationMs / 1000)) : '-'}`
               }
             >
-              <div className="flex min-w-0 items-center gap-1 truncate text-text">
-                <Gauge size={12} className="shrink-0 text-text-muted" aria-hidden="true" />
+              <div className="text-text flex min-w-0 items-center gap-1 truncate">
+                <Gauge size={12} className="text-text-muted shrink-0" aria-hidden="true" />
                 {status === 'pending' ? (
                   <>
                     {mobileDuration}

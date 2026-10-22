@@ -1,13 +1,14 @@
-import { expect, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
+import { expect, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
-import { getConfig, setConfigForTesting, type PlexusConfig } from '../../../config';
-import { registerMcpRoutes } from '../index';
-import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
-import { UsageStorageService } from '../../../services/observability/usage-storage';
+import { getConfig, type PlexusConfig, setConfigForTesting } from '../../../config';
 import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
-import { DebugManager } from '../../../services/observability/debug-manager';
+import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';
+import { DebugManager } from '../../../services/observability/debug-manager';
+import { UsageStorageService } from '../../../services/observability/usage-storage';
+import { registerMcpRoutes } from '../index';
 
 const TEST_ADMIN_KEY = 'test-admin-key';
 

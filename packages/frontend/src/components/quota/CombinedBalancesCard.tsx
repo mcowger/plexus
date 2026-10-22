@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
 import { clsx } from 'clsx';
-import { Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Wallet } from 'lucide-react';
+import React, { useState } from 'react';
+
 import { toTitleCase } from '../../lib/format';
-import type { QuotaCheckerInfo, Meter } from '../../types/quota';
+import type { Meter, QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
-import { getCheckerDisplayName } from './checker-presentation';
 import { BalanceMeterRow } from './BalanceMeterRow';
+import { getCheckerDisplayName } from './checker-presentation';
 import { MeterHistoryModal } from './MeterHistoryModal';
 import { StaleReadingNotice } from './StaleReadingNotice';
 
@@ -42,14 +43,14 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
     return (
       <div
         key={quota.checkerId}
-        className="flex flex-col gap-3 px-3 py-3 transition-colors hover:bg-bg-hover sm:flex-row sm:items-center sm:justify-between sm:px-4"
+        className="hover:bg-bg-hover flex flex-col gap-3 px-3 py-3 transition-colors sm:flex-row sm:items-center sm:justify-between sm:px-4"
       >
-        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Wallet size={14} className="text-info flex-shrink-0" />
-            <span className="text-sm font-semibold text-text">{toTitleCase(quota.checkerId)}</span>
+            <span className="text-text text-sm font-semibold">{toTitleCase(quota.checkerId)}</span>
           </div>
-          <div className="text-xs text-text-muted pl-5 truncate">
+          <div className="text-text-muted truncate pl-5 text-xs">
             {displayName}
             {quota.oauthAccountId && ` • Account: ${quota.oauthAccountId}`}
           </div>
@@ -57,7 +58,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
 
         <div className="min-w-0 px-0 sm:px-4">
           {!quota.success ? (
-            <div className="flex items-center gap-2 text-danger">
+            <div className="text-danger flex items-center gap-2">
               <AlertTriangle size={14} />
               <span className="text-xs">Error</span>
             </div>
@@ -83,7 +84,7 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
               ))}
             </div>
           ) : (
-            <span className="text-xs text-text-muted">No data</span>
+            <span className="text-text-muted text-xs">No data</span>
           )}
         </div>
 
@@ -107,18 +108,18 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
 
   return (
     <>
-      <div className="bg-bg-card border border-border rounded-lg overflow-hidden">
-        <div className="px-4 py-3 bg-bg-subtle border-b border-border flex items-center gap-2">
+      <div className="bg-bg-card border-border overflow-hidden rounded-lg border">
+        <div className="bg-bg-subtle border-border flex items-center gap-2 border-b px-4 py-3">
           <Wallet size={18} className="text-info" />
-          <h3 className="font-heading text-base font-semibold text-text">Account Balances</h3>
+          <h3 className="font-heading text-text text-base font-semibold">Account Balances</h3>
         </div>
 
         <div
           className={clsx('grid gap-0', shouldSplit ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}
         >
-          <div className="divide-y divide-border">{leftColumn.map(renderRow)}</div>
+          <div className="divide-border divide-y">{leftColumn.map(renderRow)}</div>
           {rightColumn.length > 0 && (
-            <div className="divide-y divide-border lg:border-l border-border">
+            <div className="divide-border border-border divide-y lg:border-l">
               {rightColumn.map(renderRow)}
             </div>
           )}

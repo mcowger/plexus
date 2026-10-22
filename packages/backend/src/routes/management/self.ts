@@ -1,14 +1,16 @@
+import crypto from 'node:crypto';
+
+import { mostConstrained } from '@plexus/shared';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import crypto from 'node:crypto';
-import { logger } from '../../utils/logger';
-import { DebugManager } from '../../services/observability/debug-manager';
-import { ConfigService } from '../../services/configuration/config-service';
+
 import { ConfigRepository } from '../../db/config-repository';
+import { ConfigService } from '../../services/configuration/config-service';
+import { DebugManager } from '../../services/observability/debug-manager';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { mostConstrained } from '@plexus/shared';
-import { serializeQuotaSnapshot } from './_quota-response';
+import { logger } from '../../utils/logger';
 import type { Principal } from './_principal';
+import { serializeQuotaSnapshot } from './_quota-response';
 
 const toggleSchema = z.object({
   enabled: z.boolean(),

@@ -5,8 +5,7 @@
  * had already started — the abort signal has already been consumed by fetch(),
  * so aborting it again has no effect on the ongoing body read.
  */
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 let chunkCount = 0;
 let cancelFired = false;

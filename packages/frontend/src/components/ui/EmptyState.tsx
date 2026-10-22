@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -22,18 +22,18 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     <div
       className={clsx(
         'flex flex-col items-center justify-center text-center',
-        dense ? 'py-8 px-4' : 'py-12 sm:py-16 px-6',
+        dense ? 'px-4 py-8' : 'px-6 py-12 sm:py-16',
         className
       )}
     >
       {icon && (
-        <div className="mb-4 text-text-muted [&>svg]:h-10 [&>svg]:w-10 [&>svg]:sm:h-12 [&>svg]:sm:w-12">
+        <div className="text-text-muted mb-4 [&>svg]:h-10 [&>svg]:w-10 [&>svg]:sm:h-12 [&>svg]:sm:w-12">
           {icon}
         </div>
       )}
-      <h3 className="font-heading text-h3 font-semibold text-text m-0">{title}</h3>
+      <h3 className="font-heading text-h3 text-text m-0 font-semibold">{title}</h3>
       {description && (
-        <p className="mt-2 max-w-md font-body text-sm text-text-secondary">{description}</p>
+        <p className="font-body text-text-secondary mt-2 max-w-md text-sm">{description}</p>
       )}
       {action && <div className="mt-6">{action}</div>}
     </div>

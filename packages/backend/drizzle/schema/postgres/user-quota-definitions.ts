@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, bigint, pgEnum, boolean, real } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, pgEnum, pgTable, real, serial, text } from 'drizzle-orm/pg-core';
 
 export const quotaTypeEnum = pgEnum('quota_type', ['rolling', 'daily', 'weekly', 'monthly']);
 export const limitTypeEnum = pgEnum('limit_type', ['requests', 'tokens', 'cost']);

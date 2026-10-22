@@ -1,6 +1,7 @@
 import { execSync, spawn } from 'node:child_process';
-import { Octokit } from 'octokit';
 import { createInterface } from 'node:readline';
+
+import { Octokit } from 'octokit';
 
 const rl = createInterface({
   input: process.stdin,

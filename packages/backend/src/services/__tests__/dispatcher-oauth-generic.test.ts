@@ -1,9 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
+import type { UnifiedChatRequest } from '../../types/unified';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { genericOAuthApiType, prepareGenericOAuthDispatch } from '../oauth/oauth-native-request';
-import { registerSpy } from '../../../test/test-utils';
-import type { UnifiedChatRequest } from '../../types/unified';
 
 // Generic OAuth dispatch — every pi-ai OAuth provider that ISN'T one of the
 // hand-ported native providers (Anthropic/Codex/Copilot). These are plain

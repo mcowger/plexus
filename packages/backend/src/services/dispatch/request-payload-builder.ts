@@ -1,11 +1,12 @@
-import type { UnifiedChatRequest } from '../../types/unified';
 import { getConfig } from '../../config';
+import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
+import { appendUserAfterTextOnlyModelTail } from '../../transformers/gemini/utils/model-tail';
+import type { ResolvedAdapter } from '../../types/provider-adapter';
+import type { UnifiedChatRequest } from '../../types/unified';
 import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
 import { applyModelBehaviors } from '../models/model-behaviors';
-import type { RouteResult } from '../routing/router';
-import type { ResolvedAdapter } from '../../types/provider-adapter';
-import { applyGeminiThinkingConfig, getApiMetadata } from '../providers/provider-api-selection';
+import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { isClaudeMaskingApiKeyRoute, isOAuthRoute, isPiAiRoute } from '../oauth/oauth-dispatcher';
 import {
   copilotEndpoint,
@@ -13,22 +14,21 @@ import {
   isCodexCliShapedBody,
   isGenuineClaudeCodeRequest,
   isNativeOAuthProvider,
+  type PreparedOAuthRequest,
   prepareGenericOAuthDispatch,
   prepareNativeOAuthDispatch,
   resolveCopilotBaseUrl,
-  type PreparedOAuthRequest,
 } from '../oauth/oauth-native-request';
-import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import { applyGeminiThinkingConfig, getApiMetadata } from '../providers/provider-api-selection';
+import type { RouteResult } from '../routing/router';
+import { isAnthropicTargetProvider } from './adapter-resolver';
+import { applyBodyCacheKeyInjection } from './cache-key-injection';
 import { applyRegistryAutoCompat, stripLiteUnsupportedTools } from './dispatcher-auto-compat';
+import { applyEagerToolInputStreaming } from './eager-tool-streaming';
 import {
   detectResponsesExtensions,
   hasUnsupportedResponsesExtensions,
 } from './responses-extensions';
-import { appendUserAfterTextOnlyModelTail } from '../../transformers/gemini/utils/model-tail';
-import { isAnthropicTargetProvider } from './adapter-resolver';
-import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
-import { applyEagerToolInputStreaming } from './eager-tool-streaming';
-import { applyBodyCacheKeyInjection } from './cache-key-injection';
 import { applyServiceTierSelection } from './service-tier-selection';
 
 /** Symbol stash for the native OAuth prep, read by the standard dispatch seams. */

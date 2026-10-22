@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const piAiCustomProviders = sqliteTable('pi_ai_custom_providers', {
   id: integer('id').primaryKey({ autoIncrement: true }),

@@ -1,9 +1,10 @@
+import { encode } from 'eventsource-encoder';
+import { createParser, EventSourceMessage } from 'eventsource-parser';
+
 import { Transformer } from '../types/transformer';
 import { UnifiedChatRequest, UnifiedChatResponse } from '../types/unified';
-import { createParser, EventSourceMessage } from 'eventsource-parser';
-import { encode } from 'eventsource-encoder';
-import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { getApiBaseType } from '../utils/api-format';
+import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { composeContentWithImageMarkdown } from './image-rendering';
 
 const FIM_PREFIX_TOKEN = '<|fim_prefix|>';

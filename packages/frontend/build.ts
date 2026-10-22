@@ -1,8 +1,8 @@
-import { build } from 'bun';
-import { readFile, writeFile, mkdir, cp } from 'fs/promises';
-import { existsSync } from 'fs';
-import { watch } from 'fs';
 import { spawn } from 'child_process';
+import { existsSync, watch } from 'fs';
+import { cp, mkdir, readFile, writeFile } from 'fs/promises';
+
+import { build } from 'bun';
 
 const buildCSS = async () => {
   console.log('Building CSS...');

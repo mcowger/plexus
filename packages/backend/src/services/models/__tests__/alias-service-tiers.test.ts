@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+
 import presets from '../../../../data/provider-presets.json';
-import type { ModelConfig, ProviderConfig } from '../../../config';
 import { registerSpy } from '../../../../test/test-utils';
+import type { ModelConfig, ProviderConfig } from '../../../config';
 import * as registry from '../../pi-ai/registry';
 import { resolveAliasServiceTiers } from '../alias-service-tiers';
 

@@ -46,7 +46,7 @@ post:
           additionalProperties: true
           description: JSON-RPC 2.0 request object.
         example:
-          jsonrpc: "2.0"
+          jsonrpc: '2.0'
           id: 1
           method: tools/list
           params: {}

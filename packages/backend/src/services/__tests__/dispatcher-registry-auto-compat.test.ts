@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
-import { Dispatcher } from '../dispatch/dispatcher';
 import { ProviderConfigSchema } from '../../config';
+import type { UnifiedChatRequest } from '../../types/unified';
+import { logger } from '../../utils/logger';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { applyQuirkOverlay, applyRegistryAutoCompat } from '../dispatch/dispatcher-auto-compat';
 import * as piAiRegistry from '../pi-ai/registry';
-import { logger } from '../../utils/logger';
 import type { RouteResult } from '../routing/router';
-import type { UnifiedChatRequest } from '../../types/unified';
 
 function route(overrides: Partial<RouteResult> = {}): RouteResult {
   return {

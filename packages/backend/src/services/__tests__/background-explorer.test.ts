@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { BackgroundExplorer } from '../routing/background-explorer';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { ModelTargetGroup, setConfigForTesting } from '../../config';
 import { ProbeService } from '../probes/probe-service';
+import { BackgroundExplorer } from '../routing/background-explorer';
 import { CooldownManager } from '../runtime/cooldown-manager';
-import { setConfigForTesting, ModelTargetGroup } from '../../config';
 
 function makeGroup(
   selector: ModelTargetGroup['selector'],

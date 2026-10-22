@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
+
 import { Badge } from '../../ui/Badge';
 import { FIELD_CLS } from './constants';
 import type { ModelConfig } from './types';
@@ -24,13 +25,13 @@ export function ModelAdvanced({
 }: Props) {
   const mappingReady = !!piAiProvider || inlineQuirksAvailable;
   return (
-    <div className="border border-border-glass rounded-md overflow-hidden">
+    <div className="border-border-glass overflow-hidden rounded-md border">
       <div
-        className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+        className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center gap-2 p-2 px-3"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span className="font-body text-[12px] font-medium text-text-secondary flex-1">
+        <span className="font-body text-text-secondary flex-1 text-[12px] font-medium">
           Advanced
         </span>
         {modelConfig.maxConcurrency != null && (
@@ -57,7 +58,7 @@ export function ModelAdvanced({
         >
           <div className="flex flex-col gap-0.5">
             <label
-              className="flex items-start gap-2 py-1 cursor-pointer"
+              className="flex cursor-pointer items-start gap-2 py-1"
               title={
                 !mappingReady && modelConfig.auto_compat !== true
                   ? 'Select a pi-ai provider or inline quirks first'
@@ -75,8 +76,8 @@ export function ModelAdvanced({
                 }
               />
               <div>
-                <div className="font-body text-[12px] text-text">Auto Compat</div>
-                <div className="font-body text-[11px] text-text-muted" style={{ lineHeight: 1.35 }}>
+                <div className="font-body text-text text-[12px]">Auto Compat</div>
+                <div className="font-body text-text-muted text-[11px]" style={{ lineHeight: 1.35 }}>
                   Translates this model's reasoning and generation options using its mapped pi-ai
                   model or the provider's inline quirks. Requires Auto Compat here or on the
                   provider.
@@ -85,9 +86,9 @@ export function ModelAdvanced({
             </label>
           </div>
           <div className="flex flex-col gap-0.5">
-            <label className="font-body text-[11px] font-medium text-text-secondary">
+            <label className="font-body text-text-secondary text-[11px] font-medium">
               Max Concurrency
-              <span className="font-normal text-[10px] text-text-muted ml-1">this model only</span>
+              <span className="text-text-muted ml-1 text-[10px] font-normal">this model only</span>
             </label>
             <input
               className={FIELD_CLS}
@@ -108,7 +109,7 @@ export function ModelAdvanced({
                 }
               }}
             />
-            <span className="font-body text-[11px] text-text-muted italic">
+            <span className="font-body text-text-muted text-[11px] italic">
               Limit in-flight requests for this model. Leave empty to use the provider-wide limit or
               no limit.
             </span>

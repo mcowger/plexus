@@ -10,8 +10,8 @@
  */
 
 import { getConfig } from '../config';
+import { type StallConfig, StallInspector } from '../services/inspectors/stall-inspector';
 import { logger } from './logger';
-import { StallInspector, type StallConfig } from '../services/inspectors/stall-inspector';
 
 export const DEFAULT_STALL_CONFIG: StallConfig = {
   ttfbMs: null,

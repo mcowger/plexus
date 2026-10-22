@@ -14,9 +14,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { SortableCard } from '../../ui/SortableCard';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+
 import { formatNumber } from '../../../lib/format';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { SortableCard } from '../../ui/SortableCard';
 
 export interface VelocityCardProps {
   index: number;
@@ -41,7 +42,7 @@ export const VelocityCard: React.FC<VelocityCardProps> = ({
         title: 'Request Velocity (Last 5 Minutes)',
         extra: (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="hidden text-xs text-text-secondary sm:inline">
+            <span className="text-text-secondary hidden text-xs sm:inline">
               Minute-over-minute delta
             </span>
             <AnalyzeButton cardType="velocity" size="sm" onClick={onAnalyze} />
@@ -52,7 +53,7 @@ export const VelocityCard: React.FC<VelocityCardProps> = ({
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         content:
           velocitySeries.length === 0 ? (
-            <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+            <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
               No velocity data available
             </div>
           ) : (

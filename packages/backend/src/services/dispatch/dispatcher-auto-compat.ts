@@ -1,20 +1,21 @@
 import type { PiAiQuirks } from '@plexus/shared';
+
+import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
+import { projectReasoningForResponses } from '../../transformers/utils';
 import type { UnifiedChatRequest } from '../../types/unified';
+import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
-import type { RouteResult } from '../routing/router';
-import { buildGenerationOptions, resolvePiAiModel } from '../pi-ai/registry';
 import type { GenerationIntent } from '../pi-ai/generation';
 import { normalizeVerbosity } from '../pi-ai/generation';
 import type { ReasoningIntent, ReasoningVisibility } from '../pi-ai/reasoning';
 import { clampEffortToWindow, normalizeEffort, normalizeVisibility } from '../pi-ai/reasoning';
-import { projectReasoningForResponses } from '../../transformers/utils';
-import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
-import { getApiBaseType } from '../../utils/api-format';
+import { buildGenerationOptions, resolvePiAiModel } from '../pi-ai/registry';
+import type { RouteResult } from '../routing/router';
 import { LITE_ALLOWED_TOOL_TYPES } from './responses-extensions';
 import {
-  SERVICE_TIER_API_TYPES,
   getDefaultServiceTier,
   hasExplicitTier,
+  SERVICE_TIER_API_TYPES,
   stripKeyDefaultTier,
 } from './service-tier-selection';
 

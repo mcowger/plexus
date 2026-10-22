@@ -1,8 +1,9 @@
-import type { ChangeEvent, RefObject } from 'react';
 import { Download, Upload } from 'lucide-react';
+import type { ChangeEvent, RefObject } from 'react';
+
+import type { CardLayout } from '../../types/card';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import type { CardLayout } from '../../types/card';
 
 interface CardLayoutCardProps {
   cardLayout: CardLayout;
@@ -38,7 +39,7 @@ export function CardLayoutCard({
         </div>
       }
     >
-      <p className="text-sm text-text-secondary mb-4">
+      <p className="text-text-secondary mb-4 text-sm">
         Import or export your Live Metrics card layout configuration.
       </p>
 
@@ -51,19 +52,19 @@ export function CardLayoutCard({
       />
 
       <div>
-        <h4 className="font-heading text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
+        <h4 className="font-heading text-text-muted mb-3 text-xs font-semibold tracking-wider uppercase">
           Current Card Order
         </h4>
         <div className="flex flex-wrap gap-2">
           {cardLayout.length === 0 && (
-            <p className="text-xs text-text-muted italic">
+            <p className="text-text-muted text-xs italic">
               Default layout — no customizations saved.
             </p>
           )}
           {cardLayout.map((card, index) => (
             <div
               key={card.id}
-              className="px-3 py-1.5 bg-bg-glass rounded-md border border-border-glass text-xs text-text"
+              className="bg-bg-glass border-border-glass text-text rounded-md border px-3 py-1.5 text-xs"
             >
               <span className="text-text-muted mr-2">{index + 1}.</span>
               {card.id}

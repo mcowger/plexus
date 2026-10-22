@@ -1,15 +1,15 @@
 // @ts-ignore
-import messagesLogo from '../../assets/messages.svg';
-// @ts-ignore
 import antigravityLogo from '../../assets/antigravity.svg';
 // @ts-ignore
 import chatLogo from '../../assets/chat.svg';
 // @ts-ignore
 import geminiLogo from '../../assets/gemini.svg';
 // @ts-ignore
-import responsesLogo from '../../assets/responses.svg';
+import messagesLogo from '../../assets/messages.svg';
 // @ts-ignore
 import ollamaLogo from '../../assets/ollama.svg';
+// @ts-ignore
+import responsesLogo from '../../assets/responses.svg';
 
 export const DESKTOP_STATUS_COLUMN_WIDTH = '32px';
 export const DESKTOP_DATE_COLUMN_WIDTH = '96px';

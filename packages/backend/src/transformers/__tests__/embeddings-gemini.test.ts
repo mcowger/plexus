@@ -1,4 +1,5 @@
-import { test, expect, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
+
 import { GeminiEmbeddingsTransformer } from '../embeddings/gemini';
 
 describe('GeminiEmbeddingsTransformer', () => {

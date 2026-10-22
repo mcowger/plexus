@@ -24,14 +24,8 @@
  * translation.
  */
 
-import { getCatalogModel, getCatalogModels } from '../pi-ai/catalog';
-import type { OAuthProvider } from './oauth-providers';
-import { logger } from '../../utils/logger';
-import { OAuthAuthManager } from './oauth-auth-manager';
-import {
-  applyClaudeOAuthTransform,
-  canonicalizeOAuthToolName,
-} from '../../transformers/oauth/oauth-claude';
+import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
+import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
 import {
   applyClaudeCodeMasking,
   getStainlessHeaders,
@@ -39,11 +33,17 @@ import {
   reverseToolRenames,
 } from '../../transformers/oauth/masking';
 import type { RenamePair } from '../../transformers/oauth/masking/types';
+import {
+  applyClaudeOAuthTransform,
+  canonicalizeOAuthToolName,
+} from '../../transformers/oauth/oauth-claude';
 import type { UnifiedChatRequest } from '../../types/unified';
-import { CodexVersionService } from './codex-version-service';
-import { stripUnsupportedGpt5Options } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
-import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
+import { logger } from '../../utils/logger';
 import { detectResponsesExtensions } from '../dispatch/responses-extensions';
+import { getCatalogModel, getCatalogModels } from '../pi-ai/catalog';
+import { CodexVersionService } from './codex-version-service';
+import { OAuthAuthManager } from './oauth-auth-manager';
+import type { OAuthProvider } from './oauth-providers';
 
 /**
  * Auth for a native Anthropic request. Two modes, mirroring the old executor:
@@ -53,8 +53,7 @@ import { detectResponsesExtensions } from '../dispatch/responses-extensions';
  *     via a `sk-ant-oat-mask-` shim token so the masking's OAuth codepath ran).
  */
 export type NativeAnthropicAuth =
-  | { mode: 'oauth'; token: string }
-  | { mode: 'apiKey'; apiKey: string };
+  { mode: 'oauth'; token: string } | { mode: 'apiKey'; apiKey: string };
 
 export interface PreparedOAuthRequest {
   /** Fully-resolved upstream URL (real provider endpoint, not `oauth://`). */

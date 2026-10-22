@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { formatCost, formatCostIn, getEstimatedBytesPerToken } from './format';
 
 describe('getEstimatedBytesPerToken', () => {

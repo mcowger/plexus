@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { clsx } from 'clsx';
-import { ResponsiveTable, type ResponsiveTableColumn } from './ResponsiveTable';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+
 import { Button } from './Button';
 import { EmptyState } from './EmptyState';
+import { ResponsiveTable, type ResponsiveTableColumn } from './ResponsiveTable';
 import { Skeleton } from './Skeleton';
 
 export interface DataTableColumn<T> extends ResponsiveTableColumn<T> {
@@ -93,7 +94,7 @@ export function DataTable<T>({
     return (
       <div
         className={clsx(
-          'p-4 sm:p-6 rounded-lg border border-danger/40 bg-danger/10 text-danger font-body text-sm',
+          'border-danger/40 bg-danger/10 text-danger font-body rounded-lg border p-4 text-sm sm:p-6',
           className
         )}
       >
@@ -111,7 +112,7 @@ export function DataTable<T>({
         <button
           type="button"
           onClick={() => handleSort(col.key)}
-          className="inline-flex items-center gap-1 hover:text-text transition-colors duration-fast"
+          className="hover:text-text duration-fast inline-flex items-center gap-1 transition-colors"
         >
           {col.header}
           {isSorted && sort?.direction === 'asc' && <ArrowUp size={12} />}
@@ -140,7 +141,7 @@ export function DataTable<T>({
       />
       {pageSize > 0 && sortedData.length > pageSize && (
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-text-muted">
+          <div className="text-text-muted text-xs">
             Page {page + 1} of {totalPages} · {sortedData.length} items
           </div>
           <div className="flex items-center gap-2">

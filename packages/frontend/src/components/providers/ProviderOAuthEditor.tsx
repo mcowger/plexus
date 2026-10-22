@@ -1,11 +1,12 @@
-import { useState } from 'react';
 import { Info } from 'lucide-react';
+import { useState } from 'react';
+
+import type { OAuthSession, Provider } from '../../lib/api';
+import { formatResetsIn, formatTimeAgo } from '../../lib/format';
+import type { OAuthCredentialStatus } from '../../types/settings';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import type { Provider, OAuthSession } from '../../lib/api';
-import type { OAuthCredentialStatus } from '../../types/settings';
-import { formatResetsIn, formatTimeAgo } from '../../lib/format';
 
 function describeAge(epochMs: number, nowMs: number): string {
   return formatTimeAgo(Math.max(0, Math.floor((nowMs - epochMs) / 1000)));
@@ -113,7 +114,7 @@ export function ProviderOAuthEditor({
   };
   return (
     <div
-      className="border border-border-glass rounded-md p-3 bg-bg-subtle"
+      className="border-border-glass bg-bg-subtle rounded-md border p-3"
       style={{ marginTop: '4px' }}
     >
       <div
@@ -126,8 +127,8 @@ export function ProviderOAuthEditor({
         }}
       >
         <div>
-          <div className="font-body text-[13px] font-medium text-text">OAuth Authentication</div>
-          <div className="text-[11px] text-text-secondary">
+          <div className="font-body text-text text-[13px] font-medium">OAuth Authentication</div>
+          <div className="text-text-secondary text-[11px]">
             Tokens are stored securely on the server after login.
           </div>
         </div>
@@ -147,7 +148,7 @@ export function ProviderOAuthEditor({
             }}
           />
           <span
-            className="text-[11px] font-medium text-text-secondary"
+            className="text-text-secondary text-[11px] font-medium"
             style={{ textTransform: 'lowercase' }}
           >
             {oauthStatusLabel}
@@ -157,7 +158,7 @@ export function ProviderOAuthEditor({
 
       {credentialAge && oauthCredentialStatus && (
         <div
-          className="text-[11px] text-text-secondary"
+          className="text-text-secondary text-[11px]"
           style={{ marginBottom: '8px' }}
           title={describeCredentialDates(oauthCredentialStatus)}
         >
@@ -166,7 +167,7 @@ export function ProviderOAuthEditor({
       )}
 
       {oauthError && (
-        <div className="text-[11px] text-danger" style={{ marginBottom: '8px' }}>
+        <div className="text-danger text-[11px]" style={{ marginBottom: '8px' }}>
           {oauthError}
         </div>
       )}
@@ -194,7 +195,7 @@ export function ProviderOAuthEditor({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
           <Input label="Authorization URL" value={oauthSession.authInfo.url} readOnly />
           {oauthSession.authInfo.instructions && (
-            <div className="text-[11px] text-text-secondary flex items-center gap-1">
+            <div className="text-text-secondary flex items-center gap-1 text-[11px]">
               <Info size={12} />
               <span>{oauthSession.authInfo.instructions}</span>
             </div>
@@ -240,8 +241,8 @@ export function ProviderOAuthEditor({
 
       {oauthSession?.progress && oauthSession.progress.length > 0 && (
         <div style={{ marginBottom: '8px' }}>
-          <div className="text-[11px] text-text-secondary">Progress</div>
-          <div className="text-[11px] text-text" style={{ marginTop: '4px' }}>
+          <div className="text-text-secondary text-[11px]">Progress</div>
+          <div className="text-text text-[11px]" style={{ marginTop: '4px' }}>
             {(oauthSession.progress ?? []).slice(-3).map((message, idx) => (
               <div key={`${message}-${idx}`}>{message}</div>
             ))}
@@ -250,7 +251,7 @@ export function ProviderOAuthEditor({
       )}
 
       {oauthStatus === 'success' && (
-        <div className="text-[11px] text-success" style={{ marginBottom: '8px' }}>
+        <div className="text-success text-[11px]" style={{ marginBottom: '8px' }}>
           Authentication complete. Tokens stored securely on the server.
         </div>
       )}

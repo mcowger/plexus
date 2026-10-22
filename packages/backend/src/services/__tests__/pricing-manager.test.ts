@@ -1,10 +1,12 @@
-import { describe, expect, test, beforeEach } from 'vitest';
-import { PricingManager } from '../observability/pricing-manager';
-import { ModelMetadataManager } from '../models/model-metadata-manager';
-import path from 'path';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
+import path from 'path';
+
+import { beforeEach, describe, expect, test } from 'vitest';
+
 import { calculateCosts } from '../../utils/calculate-costs';
+import { ModelMetadataManager } from '../models/model-metadata-manager';
+import { PricingManager } from '../observability/pricing-manager';
 
 const FIXTURES = path.join(__dirname, '../../utils/__tests__/fixtures');
 const pricingFixture = path.join(FIXTURES, 'openrouter-models.json');

@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import { Input } from './Input';
 
-interface DebouncedInputProps
-  extends Omit<React.ComponentProps<typeof Input>, 'onChange' | 'value'> {
+interface DebouncedInputProps extends Omit<
+  React.ComponentProps<typeof Input>,
+  'onChange' | 'value'
+> {
   value: string;
   onChange: (val: string) => void;
   debounce?: number;

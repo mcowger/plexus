@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import type { ProviderConfig } from '../../config';
 import {
   deriveModelsUrl,
   discoverProviderModels,
@@ -6,7 +8,6 @@ import {
   normalizeModelsResponse,
   validateUrlSafety,
 } from '../providers/provider-model-discovery';
-import type { ProviderConfig } from '../../config';
 
 describe('provider model discovery', () => {
   afterEach(() => {

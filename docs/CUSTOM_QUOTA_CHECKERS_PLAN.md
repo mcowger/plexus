@@ -59,7 +59,7 @@ keeps the execution model simple and avoids a whole class of footguns.
 
 ## Design update: `type` becomes plain text, not an enum/discriminated union
 
-This applies to *all* checkers (built-in and custom), not just the plugin
+This applies to _all_ checkers (built-in and custom), not just the plugin
 path, and is a bigger simplification than originally scoped:
 
 - **Postgres**: `quotaCheckerType` is currently `quotaCheckerTypeEnum(...)`
@@ -77,7 +77,7 @@ path, and is a bigger simplification than originally scoped:
     intervalMinutes: z.number().min(1).default(30),
     id: z.string().trim().min(1).optional(),
     options: z.record(z.string(), z.any()).default({}),
-  })
+  });
   ```
 - **Validation moves from static schema to the registry.** Each checker
   already declares `optionsSchema` on its `CheckerDefinition`
@@ -93,7 +93,7 @@ path, and is a bigger simplification than originally scoped:
   registry) is rejected here too.
 
 **Net effect on the existing 8-step checklist**: this removes the
-`config.ts` schema step *and* the Postgres enum step for **every** checker,
+`config.ts` schema step _and_ the Postgres enum step for **every** checker,
 not just custom ones. New built-in checkers drop to 2 backend steps (file +
 `loadAllCheckers()` import) until `import.meta.glob` lands, then 1.
 

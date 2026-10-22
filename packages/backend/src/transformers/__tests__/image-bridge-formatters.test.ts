@@ -15,13 +15,14 @@
  */
 
 import { describe, expect, test } from 'vitest';
+
 import {
   synthesizeChatResponse,
   synthesizeChatStream,
 } from '../../services/dispatch/image-model-bridge';
+import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../types/unified';
 import { AnthropicTransformer, GeminiTransformer, OpenAITransformer } from '../index';
 import { ResponsesTransformer } from '../responses';
-import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../types/unified';
 
 const TINY_IMAGE_B64 = 'aGVsbG8=';
 const EXPECTED_MARKDOWN = `![generated image](data:image/png;base64,${TINY_IMAGE_B64})`;

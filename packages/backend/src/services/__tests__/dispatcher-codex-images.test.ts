@@ -15,15 +15,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
-import { setConfigForTesting } from '../../config';
-import { CodexVersionService } from '../oauth/codex-version-service';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { DebugManager } from '../observability/debug-manager';
-import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+
 import { registerSpy } from '../../../test/test-utils';
-import { logger } from '../../utils/logger';
+import { setConfigForTesting } from '../../config';
 import type { UnifiedImageGenerationRequest } from '../../types/unified';
+import { logger } from '../../utils/logger';
+import { Dispatcher } from '../dispatch/dispatcher';
+import { CodexVersionService } from '../oauth/codex-version-service';
+import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import { DebugManager } from '../observability/debug-manager';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 const ACCOUNT_ID = 'acc_images_4242';
 

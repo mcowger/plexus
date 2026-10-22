@@ -1,15 +1,16 @@
 import React from 'react';
 import {
-  ResponsiveContainer,
-  ComposedChart,
-  Line,
   Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
 } from 'recharts';
+
 import { UsageData } from '../../lib/api';
 import { formatNumber, formatTokens } from '../../lib/format';
 
@@ -20,7 +21,7 @@ interface RecentActivityChartProps {
 export const RecentActivityChart: React.FC<RecentActivityChartProps> = ({ data }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-text-muted italic p-8">
+      <div className="text-text-muted flex h-full items-center justify-center p-8 italic">
         No activity data available
       </div>
     );

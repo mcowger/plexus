@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, real } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const userQuotaDefinitions = sqliteTable('user_quota_definitions', {
   id: integer('id').primaryKey({ autoIncrement: true }),

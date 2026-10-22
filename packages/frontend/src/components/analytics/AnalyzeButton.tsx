@@ -31,9 +31,10 @@
  *   />
  */
 
-import React from 'react';
-import { Button } from '../ui/Button';
 import { BarChart3, ExternalLink } from 'lucide-react';
+import React from 'react';
+
+import { Button } from '../ui/Button';
 
 /**
  * Supported card types from Live Metrics that can navigate to Detailed Usage.
@@ -48,13 +49,7 @@ import { BarChart3, ExternalLink } from 'lucide-react';
  * - `'concurrency'` - Concurrency/error card showing rate limits and cooldowns.
  */
 export type CardType =
-  | 'velocity'
-  | 'provider'
-  | 'model'
-  | 'timeline'
-  | 'modelstack'
-  | 'requests'
-  | 'concurrency';
+  'velocity' | 'provider' | 'model' | 'timeline' | 'modelstack' | 'requests' | 'concurrency';
 
 /** Context data passed from Live Metrics cards to pre-configure Detailed Usage */
 export interface AnalyzeContext {
@@ -264,7 +259,7 @@ export const AnalyzeButton: React.FC<AnalyzeButtonProps> = ({
       <BarChart3 size={size === 'sm' ? 14 : 16} />
       <span className="xl:hidden">{short}</span>
       <span className="hidden xl:inline">{full}</span>
-      <ExternalLink size={size === 'sm' ? 12 : 14} className="hidden sm:block opacity-70" />
+      <ExternalLink size={size === 'sm' ? 12 : 14} className="hidden opacity-70 sm:block" />
     </Button>
   );
 };

@@ -1,6 +1,7 @@
+import { clsx } from 'clsx';
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { clsx } from 'clsx';
+
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface DrawerProps {
@@ -37,7 +38,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   return createPortal(
     <div className="fixed inset-0 z-[300]" role="dialog" aria-modal="true" aria-label={ariaLabel}>
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
+        className="absolute inset-0 animate-[fadeIn_0.2s_ease] bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
       <div
@@ -45,11 +46,11 @@ export const Drawer: React.FC<DrawerProps> = ({
           // Solid background — glass-bg let underlying page content (Dashboard
           // title, page tabs) bleed through the drawer when open. Backdrop blur
           // alone isn't enough on mobile browsers.
-          'absolute top-0 bottom-0 z-[310] flex bg-bg-card border-border shadow-2xl outline-none',
+          'bg-bg-card border-border absolute top-0 bottom-0 z-[310] flex shadow-2xl outline-none',
           side === 'left' &&
-            'left-0 w-[260px] max-w-[85vw] border-r animate-[drawerSlideLeft_250ms_cubic-bezier(0.22,1,0.36,1)] flex-col',
+            'left-0 w-[260px] max-w-[85vw] animate-[drawerSlideLeft_250ms_cubic-bezier(0.22,1,0.36,1)] flex-col border-r',
           side === 'right' &&
-            'right-0 w-full max-w-[560px] border-l animate-[drawerSlideRight_250ms_cubic-bezier(0.22,1,0.36,1)] flex-col',
+            'right-0 w-full max-w-[560px] animate-[drawerSlideRight_250ms_cubic-bezier(0.22,1,0.36,1)] flex-col border-l',
           className
         )}
         onClick={(e) => e.stopPropagation()}

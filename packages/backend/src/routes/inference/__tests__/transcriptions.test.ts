@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import Fastify, { FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
-import { setConfigForTesting } from '../../../config';
-import { registerInferenceRoutes } from '../index';
-import { Dispatcher } from '../../../services/dispatch/dispatcher';
-import { UsageStorageService } from '../../../services/observability/usage-storage';
-import { DebugManager } from '../../../services/observability/debug-manager';
-import { SelectorFactory } from '../../../services/routing/selectors/factory';
+import Fastify, { FastifyInstance } from 'fastify';
 import FormData from 'form-data';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { setConfigForTesting } from '../../../config';
+import { Dispatcher } from '../../../services/dispatch/dispatcher';
+import { DebugManager } from '../../../services/observability/debug-manager';
+import { UsageStorageService } from '../../../services/observability/usage-storage';
+import { SelectorFactory } from '../../../services/routing/selectors/factory';
+import { registerInferenceRoutes } from '../index';
 
 // Helper to create multipart form-data payload using form-data package
 function createMultipartPayload(

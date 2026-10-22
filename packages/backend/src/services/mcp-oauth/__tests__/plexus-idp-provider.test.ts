@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import crypto from 'node:crypto';
+
+import formbody from '@fastify/formbody';
 import Fastify, { FastifyInstance } from 'fastify';
 import type { FastifyRequest } from 'fastify';
-import formbody from '@fastify/formbody';
-import crypto from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { setConfigForTesting } from '../../../config';
-import { hashSecret } from '../../../utils/encryption';
 import type {
   McpOauthAuthorizationCodeRecord,
   McpOauthClientRecord,
@@ -13,6 +14,7 @@ import type {
   NewMcpOauthClient,
   NewMcpOauthToken,
 } from '../../../db/mcp-oauth-repository';
+import { hashSecret } from '../../../utils/encryption';
 import { PlexusIdpProvider } from '../plexus-idp-provider';
 
 function pkcePair() {

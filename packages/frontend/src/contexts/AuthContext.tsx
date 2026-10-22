@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { verifyAdminKey, type Principal } from '../lib/api';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+
+import { type Principal, verifyAdminKey } from '../lib/api';
 
 interface AuthContextType {
   /**

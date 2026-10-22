@@ -1,5 +1,6 @@
 import http, { type IncomingHttpHeaders, type IncomingMessage } from 'node:http';
 import https from 'node:https';
+
 import type { ProviderConfig } from '../../config';
 
 const CLIENT_CREDENTIAL_HEADERS = new Set([

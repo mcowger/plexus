@@ -1,20 +1,21 @@
-import { useEffect, useState } from 'react';
 import { ArrowLeft, Code2, Plus, Save, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import { PageContainer } from '../components/layout/PageContainer';
+import { PageHeader } from '../components/layout/PageHeader';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { useToast } from '../contexts/ToastContext';
 import {
-  CustomQuotaChecker,
   api,
+  CustomQuotaChecker,
   deleteCustomQuotaChecker,
   fetchCustomQuotaCheckers,
   saveCustomQuotaChecker,
   testCustomQuotaChecker,
 } from '../lib/api';
 import type { Provider } from '../lib/api';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { PageContainer } from '../components/layout/PageContainer';
-import { PageHeader } from '../components/layout/PageHeader';
-import { useToast } from '../contexts/ToastContext';
 
 const DEFAULT_CODE = `const response = await ctx.fetch(
   ctx.getOption('endpoint', 'https://openrouter.ai/api/v1/credits'),
@@ -175,7 +176,7 @@ export function CustomQuotaCheckers() {
         <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
           <Card className="h-fit p-2">
             {checkers.length === 0 ? (
-              <p className="p-3 text-xs text-text-secondary">No custom quota checkers yet.</p>
+              <p className="text-text-secondary p-3 text-xs">No custom quota checkers yet.</p>
             ) : (
               checkers.map((checker) => (
                 <button
@@ -192,25 +193,25 @@ export function CustomQuotaCheckers() {
           </Card>
           <Card className="p-4">
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-xs text-text-secondary">
+              <label className="text-text-secondary text-xs">
                 Type / ID
                 <input
-                  className="mt-1 h-8 w-full rounded border border-border-glass bg-bg-glass px-2 text-sm text-text"
+                  className="border-border-glass bg-bg-glass text-text mt-1 h-8 w-full rounded border px-2 text-sm"
                   value={draft.id}
                   disabled={Boolean(selectedId)}
                   onChange={(event) => setDraft({ ...draft, id: event.target.value })}
                 />
               </label>
-              <label className="text-xs text-text-secondary">
+              <label className="text-text-secondary text-xs">
                 Display name
                 <input
-                  className="mt-1 h-8 w-full rounded border border-border-glass bg-bg-glass px-2 text-sm text-text"
+                  className="border-border-glass bg-bg-glass text-text mt-1 h-8 w-full rounded border px-2 text-sm"
                   value={draft.displayName}
                   onChange={(event) => setDraft({ ...draft, displayName: event.target.value })}
                 />
               </label>
             </div>
-            <label className="mt-3 flex items-center gap-2 text-xs text-text-secondary">
+            <label className="text-text-secondary mt-3 flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={draft.enabled}
@@ -218,20 +219,20 @@ export function CustomQuotaCheckers() {
               />
               Enabled
             </label>
-            <label className="mt-3 block text-xs text-text-secondary">
+            <label className="text-text-secondary mt-3 block text-xs">
               JavaScript function body
               <textarea
-                className="mt-1 min-h-[420px] w-full rounded border border-border-glass bg-bg-deep p-3 font-mono text-xs leading-relaxed text-text outline-none focus:border-primary"
+                className="border-border-glass bg-bg-deep text-text focus:border-primary mt-1 min-h-[420px] w-full rounded border p-3 font-mono text-xs leading-relaxed outline-none"
                 value={draft.code}
                 onChange={(event) => setDraft({ ...draft, code: event.target.value })}
                 spellCheck={false}
               />
             </label>
             <div className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="min-w-48 flex-1 text-xs text-text-secondary">
+              <label className="text-text-secondary min-w-48 flex-1 text-xs">
                 Test against provider
                 <select
-                  className="mt-1 h-8 w-full rounded border border-border-glass bg-bg-glass px-2 text-sm text-text"
+                  className="border-border-glass bg-bg-glass text-text mt-1 h-8 w-full rounded border px-2 text-sm"
                   value={testProvider}
                   onChange={(event) => setTestProvider(event.target.value)}
                 >
@@ -243,10 +244,10 @@ export function CustomQuotaCheckers() {
                   ))}
                 </select>
               </label>
-              <label className="min-w-48 flex-1 text-xs text-text-secondary">
+              <label className="text-text-secondary min-w-48 flex-1 text-xs">
                 Test options (JSON)
                 <input
-                  className="mt-1 h-8 w-full rounded border border-border-glass bg-bg-glass px-2 font-mono text-xs text-text"
+                  className="border-border-glass bg-bg-glass text-text mt-1 h-8 w-full rounded border px-2 font-mono text-xs"
                   value={testOptionsText}
                   onChange={(event) => setTestOptionsText(event.target.value)}
                   spellCheck={false}
@@ -263,7 +264,7 @@ export function CustomQuotaCheckers() {
               >
                 Test code
               </Button>
-              {testMessage && <span className="text-xs text-text-secondary">{testMessage}</span>}
+              {testMessage && <span className="text-text-secondary text-xs">{testMessage}</span>}
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
               {selectedId && (

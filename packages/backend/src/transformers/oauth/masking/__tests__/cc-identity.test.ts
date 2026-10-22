@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { injectClaudeCodeIdentity } from '../cc-identity';
 
 describe('injectClaudeCodeIdentity — non-mutation', () => {

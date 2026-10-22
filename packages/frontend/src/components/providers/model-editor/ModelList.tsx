@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, Download, Plus } from 'lucide-react';
+
 import type { Provider } from '../../../lib/api';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -72,9 +73,9 @@ export function ModelList({
   isCodexOAuthProvider,
 }: Props) {
   return (
-    <div className="border border-border-glass rounded-md">
+    <div className="border-border-glass rounded-md border">
       <div
-        className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+        className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center gap-2 p-2 px-3 transition-colors duration-200 select-none"
         onClick={() => setIsModelsOpen(!isModelsOpen)}
       >
         {isModelsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}

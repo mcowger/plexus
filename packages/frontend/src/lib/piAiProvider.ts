@@ -1,4 +1,5 @@
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
+
 import type { Provider } from './api';
 
 /**

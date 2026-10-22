@@ -1,9 +1,10 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
+
 import { Badge } from '../../ui/Badge';
 import { ReasoningRewriteRulesEditor } from '../ReasoningRewriteRulesEditor';
-import { ModelOverrideRules } from './ModelOverrideRules';
 import { getAdapterName, KNOWN_ADAPTERS, normalizeAdapterEntries } from './adapter-utils';
 import { GPT5_SUPPRESSION_ADAPTER, isGpt5Model } from './constants';
+import { ModelOverrideRules } from './ModelOverrideRules';
 import type { ModelConfig } from './types';
 
 interface Props {
@@ -24,13 +25,13 @@ export function ModelAdapters({
   const modelAdapters = normalizeAdapterEntries(modelConfig.adapter);
 
   return (
-    <div className="border border-border-glass rounded-md overflow-hidden">
+    <div className="border-border-glass overflow-hidden rounded-md border">
       <div
-        className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+        className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center gap-2 p-2 px-3"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span className="font-body text-[12px] font-medium text-text-secondary flex-1">
+        <span className="font-body text-text-secondary flex-1 text-[12px] font-medium">
           Model Adapters
         </span>
         {modelAdapters.length > 0 ? (
@@ -108,11 +109,11 @@ export function ModelAdapters({
                 }}
               />
               <div>
-                <div className="font-body text-[12px] font-medium text-text">
+                <div className="font-body text-text text-[12px] font-medium">
                   Suppress Unsupported GPT-5 Options
                 </div>
                 <div
-                  className="font-body text-[11px] text-text-secondary"
+                  className="font-body text-text-secondary text-[11px]"
                   style={{ lineHeight: 1.35 }}
                 >
                   Enabled by default. Removes generation options GPT-5 does not accept.
@@ -160,9 +161,9 @@ export function ModelAdapters({
                   }}
                 />
                 <div>
-                  <div className="font-body text-[12px] font-medium text-text">{adapter.label}</div>
+                  <div className="font-body text-text text-[12px] font-medium">{adapter.label}</div>
                   <div
-                    className="font-body text-[11px] text-text-secondary"
+                    className="font-body text-text-secondary text-[11px]"
                     style={{ lineHeight: 1.35 }}
                   >
                     {adapter.description}

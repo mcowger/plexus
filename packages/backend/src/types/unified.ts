@@ -126,11 +126,7 @@ export interface UnifiedChatRequest {
   stream?: boolean;
   tools?: UnifiedTool[];
   tool_choice?:
-    | 'auto'
-    | 'none'
-    | 'required'
-    | string
-    | { type: 'function'; function: { name: string } };
+    'auto' | 'none' | 'required' | string | { type: 'function'; function: { name: string } };
   toolConfig?: UnifiedToolConfig; // Gemini's toolConfig (function calling configuration)
   reasoning?: {
     effort?: ThinkLevel;

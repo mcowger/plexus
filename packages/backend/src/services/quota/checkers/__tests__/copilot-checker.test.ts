@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+
 import { registerSpy } from '../../../../../test/test-utils';
 import { OAuthAuthManager } from '../../../oauth/oauth-auth-manager';
 import { createMeterContext } from '../../checker-registry';

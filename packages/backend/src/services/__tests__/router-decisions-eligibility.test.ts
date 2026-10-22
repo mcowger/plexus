@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { Router } from '../routing/router';
+
 import { setConfigForTesting } from '../../config';
+import { Router } from '../routing/router';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
 function decisionsConfig() {

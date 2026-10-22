@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { applyToolRenames } from '../rename-apply';
 import type { RenamePair } from '../types';
 

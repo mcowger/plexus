@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 export interface ResponsiveTableColumn<T> {
   key: string;
@@ -50,11 +50,11 @@ export function ResponsiveTable<T>({
       {/* Desktop / tablet table */}
       <div
         className={clsx(
-          'overflow-x-auto border border-border-glass rounded-lg',
+          'border-border-glass overflow-x-auto rounded-lg border',
           noMobileCards ? 'block' : 'hidden md:block'
         )}
       >
-        <table className="w-full border-collapse font-body text-sm">
+        <table className="font-body w-full border-collapse text-sm">
           <thead>
             <tr className="bg-bg-glass/40">
               {columns.map((col) => (
@@ -62,7 +62,7 @@ export function ResponsiveTable<T>({
                   key={col.key}
                   style={col.width ? { width: col.width } : undefined}
                   className={clsx(
-                    'px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted border-b border-border-glass',
+                    'text-text-muted border-border-glass border-b px-4 py-3 text-xs font-semibold tracking-wider uppercase',
                     alignClass[col.align ?? 'left'],
                     col.priority === 'low' && 'hidden lg:table-cell',
                     col.priority === 'medium' && 'hidden md:table-cell'
@@ -79,15 +79,15 @@ export function ResponsiveTable<T>({
                 key={getRowKey(row, rowIdx)}
                 onClick={onRowClick ? () => onRowClick(row, rowIdx) : undefined}
                 className={clsx(
-                  'border-b border-border-glass/50 last:border-b-0 transition-colors duration-fast',
-                  onRowClick && 'cursor-pointer hover:bg-bg-hover'
+                  'border-border-glass/50 duration-fast border-b transition-colors last:border-b-0',
+                  onRowClick && 'hover:bg-bg-hover cursor-pointer'
                 )}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
                     className={clsx(
-                      'px-4 py-3 text-text',
+                      'text-text px-4 py-3',
                       alignClass[col.align ?? 'left'],
                       col.priority === 'low' && 'hidden lg:table-cell',
                       col.priority === 'medium' && 'hidden md:table-cell'
@@ -104,7 +104,7 @@ export function ResponsiveTable<T>({
 
       {/* Mobile card layout */}
       {!noMobileCards && (
-        <div className="md:hidden flex flex-col gap-3">
+        <div className="flex flex-col gap-3 md:hidden">
           {data.map((row, rowIdx) => {
             const titleCol = columns.find((c) => c.mobileTitle);
             const detailCols = columns.filter((c) => !c.mobileTitle && c.priority !== 'low');
@@ -113,20 +113,20 @@ export function ResponsiveTable<T>({
                 key={getRowKey(row, rowIdx)}
                 onClick={onRowClick ? () => onRowClick(row, rowIdx) : undefined}
                 className={clsx(
-                  'glass-bg rounded-lg p-4 border border-border-glass flex flex-col gap-2',
+                  'glass-bg border-border-glass flex flex-col gap-2 rounded-lg border p-4',
                   onRowClick &&
-                    'cursor-pointer hover:border-primary/40 transition-colors duration-fast'
+                    'hover:border-primary/40 duration-fast cursor-pointer transition-colors'
                 )}
               >
                 {titleCol && (
-                  <div className="font-heading text-sm font-semibold text-text break-words">
+                  <div className="font-heading text-text text-sm font-semibold break-words">
                     {titleCol.render(row, rowIdx)}
                   </div>
                 )}
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                   {detailCols.map((col) => (
                     <React.Fragment key={col.key}>
-                      <dt className="text-text-muted font-medium uppercase tracking-wider text-[10px] self-center">
+                      <dt className="text-text-muted self-center text-[10px] font-medium tracking-wider uppercase">
                         {col.mobileLabel ?? col.header}
                       </dt>
                       <dd className="text-text break-words">{col.render(row, rowIdx)}</dd>

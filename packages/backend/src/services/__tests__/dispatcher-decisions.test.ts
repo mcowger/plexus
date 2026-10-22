@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+
 import { setConfigForTesting } from '../../config';
 import type { UnifiedDecisionsRequest } from '../../types/unified';
-import { CooldownManager } from '../runtime/cooldown-manager';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 const fetchMock = vi.fn();
 global.fetch = fetchMock as any;

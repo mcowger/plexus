@@ -1,35 +1,9 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { finished, pipeline } from 'node:stream/promises';
+
 import bearerAuth from '@fastify/bearer-auth';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 import { getConfig } from '../config';
-import { createAuthHook } from '../utils/auth';
-import { getClientIp } from '../utils/ip';
-import { sanitizeHeaders } from '../utils/sanitize-headers';
-import { getClientRequestId } from '../utils/client-request-id';
-import { logger } from '../utils/logger';
-import { listAllows } from '../services/routing/scope-match';
-import { UsageStorageService } from '../services/observability/usage-storage';
-import type { UsageRecord } from '../types/usage';
-import { DebugManager } from '../services/observability/debug-manager';
-import { QuotaEnforcer } from '../services/quota/quota-enforcer';
-import {
-  buildQuotaExceededBody,
-  buildQuotaHeaders,
-  checkQuotaMiddleware,
-  recordQuotaUsage,
-} from '../services/quota/quota-middleware';
-import { ConcurrencyTracker } from '../services/runtime/concurrency-tracker';
-import { wireEarlyDisconnectDetection } from '../utils/timeout';
-import { DEFAULT_STALL_CONFIG } from '../utils/stall';
-import {
-  BedrockEventStreamMetadataObserver,
-  DebugLoggingInspector,
-  extractUsageFromReconstructed,
-  StallInspector,
-} from '../services/inspectors';
-import { calculateCosts } from '../utils/calculate-costs';
-import { applyProviderReportedCost, applyUsageCostDetails } from '../utils/provider-cost';
-import { extractUsageCostDetails } from '../utils/usage-normalizer';
 import {
   buildRawUpstreamHeaders,
   buildRawUpstreamUrl,
@@ -41,6 +15,34 @@ import {
   extractActualServiceTier,
   extractRequestedServiceTier,
 } from '../services/dispatch/service-tier-metadata';
+import {
+  BedrockEventStreamMetadataObserver,
+  DebugLoggingInspector,
+  extractUsageFromReconstructed,
+  StallInspector,
+} from '../services/inspectors';
+import { DebugManager } from '../services/observability/debug-manager';
+import { UsageStorageService } from '../services/observability/usage-storage';
+import { QuotaEnforcer } from '../services/quota/quota-enforcer';
+import {
+  buildQuotaExceededBody,
+  buildQuotaHeaders,
+  checkQuotaMiddleware,
+  recordQuotaUsage,
+} from '../services/quota/quota-middleware';
+import { listAllows } from '../services/routing/scope-match';
+import { ConcurrencyTracker } from '../services/runtime/concurrency-tracker';
+import type { UsageRecord } from '../types/usage';
+import { createAuthHook } from '../utils/auth';
+import { calculateCosts } from '../utils/calculate-costs';
+import { getClientRequestId } from '../utils/client-request-id';
+import { getClientIp } from '../utils/ip';
+import { logger } from '../utils/logger';
+import { applyProviderReportedCost, applyUsageCostDetails } from '../utils/provider-cost';
+import { sanitizeHeaders } from '../utils/sanitize-headers';
+import { DEFAULT_STALL_CONFIG } from '../utils/stall';
+import { wireEarlyDisconnectDetection } from '../utils/timeout';
+import { extractUsageCostDetails } from '../utils/usage-normalizer';
 
 const RAW_METHODS = ['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'] as const;
 

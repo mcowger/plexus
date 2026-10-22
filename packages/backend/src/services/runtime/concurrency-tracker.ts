@@ -1,5 +1,5 @@
-import { logger } from '../../utils/logger';
 import { getConfig } from '../../config';
+import { logger } from '../../utils/logger';
 
 export interface ConcurrencySnapshot {
   providers: Record<string, number>;

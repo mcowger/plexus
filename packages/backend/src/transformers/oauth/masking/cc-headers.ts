@@ -17,6 +17,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+
 import { ClaudeCodeVersionService } from '../../../services/oauth/claude-code-version-service';
 
 // Generated once per process — mirrors the vendored pipeline's

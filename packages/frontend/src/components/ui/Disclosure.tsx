@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
+import { ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface DisclosureProps {
   title: React.ReactNode;
@@ -32,25 +32,25 @@ export const Disclosure: React.FC<DisclosureProps> = ({
   };
 
   return (
-    <div className={clsx('border border-border rounded-lg bg-bg-card overflow-hidden', className)}>
+    <div className={clsx('border-border bg-bg-card overflow-hidden rounded-lg border', className)}>
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-fast hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:-outline-offset-2"
+        className="duration-fast hover:bg-bg-hover focus-visible:outline-primary flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2"
       >
         <ChevronRight
           size={14}
           className={clsx(
-            'text-text-muted flex-shrink-0 transition-transform duration-fast',
+            'text-text-muted duration-fast flex-shrink-0 transition-transform',
             open && 'rotate-90'
           )}
         />
-        <span className="flex-1 font-heading text-sm font-medium text-text">{title}</span>
+        <span className="font-heading text-text flex-1 text-sm font-medium">{title}</span>
         {extra && <span onClick={(e) => e.stopPropagation()}>{extra}</span>}
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-2 border-t border-border-glass animate-[fadeIn_0.15s_ease]">
+        <div className="border-border-glass animate-[fadeIn_0.15s_ease] border-t px-4 pt-2 pb-4">
           {children}
         </div>
       )}

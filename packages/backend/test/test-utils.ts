@@ -1,4 +1,4 @@
-import { vi, afterEach, describe, test, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Using any for spy types since vitest v4+ doesn't export SpyInstance consistently
 /* eslint-disable @typescript-eslint/no-explicit-any */

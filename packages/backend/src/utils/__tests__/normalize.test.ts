@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   toBoolean,
   toDbBoolean,
-  toEpochMs,
-  toIsoString,
   toDbTimestamp,
   toDbTimestampMs,
+  toEpochMs,
+  toIsoString,
 } from '../normalize';
 
 describe('toBoolean', () => {

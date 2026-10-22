@@ -1,16 +1,17 @@
+import { RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { RefreshCw } from 'lucide-react';
-import { Button } from './ui/Button';
+
 import {
   DEV_VERSION,
-  VERSION_POLL_INTERVAL_MS,
   getBundledVersion,
   hasBlockingForm,
   hashText,
   isServerVersionNewer,
   parseHealthzVersion,
+  VERSION_POLL_INTERVAL_MS,
 } from '../lib/versionCheck';
+import { Button } from './ui/Button';
 
 /** sessionStorage key for the once-per-version reload guard. */
 const RELOAD_GUARD_KEY = 'plexus:reloadedForVersion';
@@ -133,9 +134,9 @@ export const VersionReloader: React.FC = () => {
 
   return createPortal(
     <div className="fixed bottom-4 left-1/2 z-[500] w-max max-w-[92vw] -translate-x-1/2">
-      <div className="flex items-center gap-3 rounded-lg border border-info/40 bg-bg-surface px-4 py-3 shadow-modal backdrop-blur-md">
-        <RefreshCw size={16} className="flex-shrink-0 text-info" />
-        <div className="font-body text-xs text-text-secondary">
+      <div className="border-info/40 bg-bg-surface shadow-modal flex items-center gap-3 rounded-lg border px-4 py-3 backdrop-blur-md">
+        <RefreshCw size={16} className="text-info flex-shrink-0" />
+        <div className="font-body text-text-secondary text-xs">
           A new version (<span className="text-text">{update.label}</span>) is available.
         </div>
         <Button size="sm" onClick={() => window.location.reload()}>

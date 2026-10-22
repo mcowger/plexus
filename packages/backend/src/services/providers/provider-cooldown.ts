@@ -1,7 +1,7 @@
 import { getProviderTypes } from '../../config';
 import { logger } from '../../utils/logger';
-import { CooldownParserRegistry } from '../runtime/cooldown-parsers';
 import type { RouteResult } from '../routing/router';
+import { CooldownParserRegistry } from '../runtime/cooldown-parsers';
 
 export function resolveCooldownProviderType(route: RouteResult): string | undefined {
   if (typeof route.config.oauth_provider === 'string' && route.config.oauth_provider.trim()) {

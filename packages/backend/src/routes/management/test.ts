@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify';
-import { logger } from '../../utils/logger';
-import { ProbeService, ProbeApiType } from '../../services/probes/probe-service';
+
+import { ProbeApiType, ProbeService } from '../../services/probes/probe-service';
 import { getClientIp } from '../../utils/ip';
+import { logger } from '../../utils/logger';
 
 const VALID_API_TYPES: ProbeApiType[] = [
   'chat',

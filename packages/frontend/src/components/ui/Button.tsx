@@ -1,6 +1,6 @@
-import React from 'react';
 import { clsx } from 'clsx';
 import { Loader2 } from 'lucide-react';
+import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -22,19 +22,19 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={clsx(
-        'inline-flex items-center justify-center gap-2 font-body font-medium leading-normal border-0 rounded-md cursor-pointer transition-all duration-fast whitespace-nowrap select-none outline-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0',
+        'font-body duration-fast inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border-0 leading-normal font-medium whitespace-nowrap transition-all outline-none select-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0',
         {
-          'text-[#1A1006] bg-gradient-to-br from-secondary to-primary shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_6px_20px_-10px_rgba(245,158,11,0.5)] hover:brightness-105 hover:-translate-y-px hover:shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_12px_28px_-10px_rgba(245,158,11,0.65)]':
+          'from-secondary to-primary bg-gradient-to-br text-[#1A1006] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_6px_20px_-10px_rgba(245,158,11,0.5)] hover:-translate-y-px hover:shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_12px_28px_-10px_rgba(245,158,11,0.65)] hover:brightness-105':
             variant === 'primary',
-          'bg-slate-700/50 text-text border border-border-2 hover:bg-slate-600/60':
+          'text-text border-border-2 border bg-slate-700/50 hover:bg-slate-600/60':
             variant === 'secondary',
-          'bg-transparent text-text-secondary hover:bg-bg-hover hover:text-text':
+          'text-text-secondary hover:bg-bg-hover hover:text-text bg-transparent':
             variant === 'ghost',
-          'bg-danger/12 text-red-300 border border-danger/30 hover:bg-danger/20':
+          'bg-danger/12 border-danger/30 hover:bg-danger/20 border text-red-300':
             variant === 'danger',
-          'py-1.5 px-2.5 text-xs gap-1.5': size === 'sm',
-          'py-2 px-3.5 text-sm gap-1.5': size === 'md',
-          'py-2.5 px-4 text-sm': size === 'lg',
+          'gap-1.5 px-2.5 py-1.5 text-xs': size === 'sm',
+          'gap-1.5 px-3.5 py-2 text-sm': size === 'md',
+          'px-4 py-2.5 text-sm': size === 'lg',
           'h-8 w-8 p-0': size === 'icon',
         },
         className

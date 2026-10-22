@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   isGlobalScope,
   listAllows,
   listAllowsAny,
-  scopeMatches,
   type ScopeLists,
+  scopeMatches,
 } from '../routing/scope-match';
 
 describe('listAllows', () => {

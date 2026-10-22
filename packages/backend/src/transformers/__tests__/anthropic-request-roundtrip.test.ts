@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { parseAnthropicRequest } from '../anthropic/request-parser';
-import { buildAnthropicRequest } from '../anthropic/request-builder';
+import { describe, expect, it } from 'vitest';
+
 import type { UnifiedChatRequest } from '../../types/unified';
+import { buildAnthropicRequest } from '../anthropic/request-builder';
+import { parseAnthropicRequest } from '../anthropic/request-parser';
 
 /**
  * Round-trip tests for the Anthropic (messages) transformer.

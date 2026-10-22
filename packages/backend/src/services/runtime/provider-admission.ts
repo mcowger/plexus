@@ -1,10 +1,9 @@
 import type { RouteResult } from '../routing/router';
-import { CooldownManager } from './cooldown-manager';
 import { ConcurrencyTracker } from './concurrency-tracker';
+import { CooldownManager } from './cooldown-manager';
 
 export type ProviderAdmission =
-  | { admitted: true; release: () => void }
-  | { admitted: false; reason: string };
+  { admitted: true; release: () => void } | { admitted: false; reason: string };
 
 /**
  * Checks whether a provider can accept a request and reserves its concurrency

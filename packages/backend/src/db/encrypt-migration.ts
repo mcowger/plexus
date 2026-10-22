@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
-import { logger } from '../utils/logger';
+
 import {
   encrypt,
   encryptField,
@@ -8,6 +7,8 @@ import {
   isEncrypted,
   isEncryptionEnabled,
 } from '../utils/encryption';
+import { logger } from '../utils/logger';
+import { getDatabase, getSchema } from './client';
 
 /**
  * Migrate existing plaintext sensitive data to encrypted form.

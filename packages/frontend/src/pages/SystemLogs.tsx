@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Pause, Play, Trash2, RotateCcw } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
+import { clsx } from 'clsx';
+import { Pause, Play, RotateCcw, Terminal, Trash2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+
+import { PageContainer } from '../components/layout/PageContainer';
+import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
-import { PageHeader } from '../components/layout/PageHeader';
-import { PageContainer } from '../components/layout/PageContainer';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { api } from '../lib/api';
-import { clsx } from 'clsx';
 
 interface LogEntry {
   level: string;
@@ -212,7 +213,7 @@ export const SystemLogs: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
@@ -223,9 +224,9 @@ export const SystemLogs: React.FC = () => {
         subtitle="Live tail · stderr+stdout"
       />
       <PageContainer>
-        <div className="flex flex-col gap-3 glass-bg rounded-lg overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-border-glass px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-            <h3 className="font-heading text-h3 font-semibold text-text m-0">Live Output</h3>
+        <div className="glass-bg flex flex-col gap-3 overflow-hidden rounded-lg">
+          <div className="border-border-glass flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <h3 className="font-heading text-h3 text-text m-0 font-semibold">Live Output</h3>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="w-full sm:min-w-[120px]">
                 <Select
@@ -275,8 +276,8 @@ export const SystemLogs: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 border-b border-border-glass px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-            <div className="text-xs text-text-secondary">
+          <div className="border-border-glass flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div className="text-text-secondary text-xs">
               Current level: <span className="text-text font-semibold">{currentLevel}</span> ·
               Startup default: <span className="text-text font-semibold">{startupLevel}</span> ·
               Runtime changes reset on restart.
@@ -288,7 +289,7 @@ export const SystemLogs: React.FC = () => {
                   moduleFilter.map((m) => (
                     <span
                       key={m}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary border border-primary/30"
+                      className="bg-primary/15 text-primary border-primary/30 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
                     >
                       {m}
                       <button
@@ -306,14 +307,14 @@ export const SystemLogs: React.FC = () => {
                             setModuleFilterState(moduleFilter);
                           }
                         }}
-                        className="bg-transparent border-0 p-0 cursor-pointer text-primary/60 hover:text-primary leading-none"
+                        className="text-primary/60 hover:text-primary cursor-pointer border-0 bg-transparent p-0 leading-none"
                       >
                         ×
                       </button>
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-text-muted italic">All modules</span>
+                  <span className="text-text-muted text-xs italic">All modules</span>
                 )}
               </div>
               <input
@@ -339,7 +340,7 @@ export const SystemLogs: React.FC = () => {
                   }
                 }}
                 placeholder="Add module..."
-                className="h-8 w-full rounded-md border border-border-glass bg-bg px-2 text-xs text-text outline-none transition-colors focus:border-primary sm:h-7 sm:w-32"
+                className="border-border-glass bg-bg text-text focus:border-primary h-8 w-full rounded-md border px-2 text-xs transition-colors outline-none sm:h-7 sm:w-32"
                 disabled={false}
               />
               {moduleFilter.length > 0 && (
@@ -353,7 +354,7 @@ export const SystemLogs: React.FC = () => {
                       // ignore
                     }
                   }}
-                  className="text-xs text-text-secondary hover:text-danger transition-colors bg-transparent border-0 cursor-pointer"
+                  className="text-text-secondary hover:text-danger cursor-pointer border-0 bg-transparent text-xs transition-colors"
                 >
                   Clear
                 </button>
@@ -361,16 +362,16 @@ export const SystemLogs: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-[55vh] min-h-[280px] max-h-[700px] overflow-y-auto bg-terminal-bg p-2 font-mono text-xs text-terminal-fg sm:h-[60vh] sm:min-h-[320px] sm:p-3">
+          <div className="bg-terminal-bg text-terminal-fg h-[55vh] max-h-[700px] min-h-[280px] overflow-y-auto p-2 font-mono text-xs sm:h-[60vh] sm:min-h-[320px] sm:p-3">
             {logs.length === 0 && (
-              <div className="text-text-muted italic text-center mt-8">Waiting for logs...</div>
+              <div className="text-text-muted mt-8 text-center italic">Waiting for logs...</div>
             )}
             {logs.map((log, i) => (
-              <div key={i} className="mb-1 break-all py-0.5 px-1 rounded-sm hover:bg-white/5">
+              <div key={i} className="mb-1 rounded-sm px-1 py-0.5 break-all hover:bg-white/5">
                 <span className="text-text-muted mr-2">[{log.timestamp}]</span>
                 <span
                   className={clsx(
-                    'font-bold mr-2',
+                    'mr-2 font-bold',
                     LEVEL_CLASS[log.level?.toLowerCase()] ?? 'text-text-muted'
                   )}
                 >
@@ -379,7 +380,7 @@ export const SystemLogs: React.FC = () => {
                 <span>{log.message}</span>
                 {Object.keys(log).filter((k) => !['level', 'message', 'timestamp'].includes(k))
                   .length > 0 && (
-                  <pre className="text-text-muted text-[11px] ml-8 mt-1 whitespace-pre-wrap">
+                  <pre className="text-text-muted mt-1 ml-8 text-[11px] whitespace-pre-wrap">
                     {JSON.stringify(
                       Object.fromEntries(
                         Object.entries(log).filter(

@@ -14,8 +14,10 @@
  */
 
 import crypto from 'crypto';
+
 import { eq } from 'drizzle-orm';
-import { initializeDatabase, getDatabase, getSchema } from '../db/client';
+
+import { getDatabase, getSchema, initializeDatabase } from '../db/client';
 import { runMigrations } from '../db/migrate';
 import { logger } from '../utils/logger';
 

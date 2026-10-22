@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { OpenAITransformer } from '../openai';
-import { buildAnthropicRequest } from '../anthropic/request-builder';
+
 import type { UnifiedChatRequest } from '../../types/unified';
+import { buildAnthropicRequest } from '../anthropic/request-builder';
+import { OpenAITransformer } from '../openai';
 
 /**
  * Regression tests for https://github.com/mcowger/plexus/issues/849:

@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
 import {
-  fetchWithSession,
   closeFetchSessions,
+  fetchWithSession,
   overrideSessionFactoryForTesting,
 } from '../fetch-sessions';
 

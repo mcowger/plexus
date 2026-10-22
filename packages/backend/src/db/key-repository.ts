@@ -1,9 +1,11 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
-import { McpOauthRepository } from './mcp-oauth-repository';
+
+import type { KeyConfig } from '../config';
+import { SERVICE_TIER_SUFFIXES } from '../services/routing/service-tier-suffix';
 import { decrypt, encrypt, hashSecret } from '../utils/encryption';
 import { logger } from '../utils/logger';
-import type { KeyConfig } from '../config';
+import { getDatabase, getSchema } from './client';
+import { McpOauthRepository } from './mcp-oauth-repository';
 import {
   fromBool,
   now,
@@ -15,7 +17,6 @@ import {
   toBool,
   toJson,
 } from './repository-utils';
-import { SERVICE_TIER_SUFFIXES } from '../services/routing/service-tier-suffix';
 
 /**
  * Read the per-key default service tier out of the api_keys.generation JSON

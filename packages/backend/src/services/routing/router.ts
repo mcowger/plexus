@@ -1,20 +1,12 @@
-import { logger } from '../../utils/logger';
 import {
   getConfig,
-  ModelTarget,
-  ProviderConfig,
-  ModelProviderConfig,
   getProviderTypes,
   type ModelConfig,
+  ModelProviderConfig,
+  ModelTarget,
   type ModelTargetGroup,
+  ProviderConfig,
 } from '../../config';
-import { BackgroundExplorer } from './background-explorer';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
-import { SelectorFactory } from './selectors/factory';
-import { EnrichedModelTarget } from './selectors/base';
-import { StickySessionManager } from './sticky-session-manager';
-import { splitServiceTierSuffix, type ServiceTierSplit } from './service-tier-suffix';
 import {
   getApiBaseType,
   hasDecisionsProtocol,
@@ -23,6 +15,14 @@ import {
   isImageTargetApiType,
   normalizeApiAccessList,
 } from '../../utils/api-format';
+import { logger } from '../../utils/logger';
+import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
+import { CooldownManager } from '../runtime/cooldown-manager';
+import { BackgroundExplorer } from './background-explorer';
+import { EnrichedModelTarget } from './selectors/base';
+import { SelectorFactory } from './selectors/factory';
+import { type ServiceTierSplit, splitServiceTierSuffix } from './service-tier-suffix';
+import { StickySessionManager } from './sticky-session-manager';
 
 export interface RouteResult {
   provider: string;

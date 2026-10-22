@@ -15,8 +15,9 @@
  *     + context with a long toolResult text → compacted:true (real native strategy)
  */
 
-import { describe, expect, test, vi, beforeEach } from 'vitest';
 import type { Context, ToolResultMessage, UserMessage } from '@earendil-works/pi-ai';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import type { RouteResult } from '../../routing/router';
 
 // ---------------------------------------------------------------------------

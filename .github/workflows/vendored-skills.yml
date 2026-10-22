@@ -5,7 +5,7 @@ name: Vendored skills refresh
 # (waits for CI), so updates land on main without manual intervention.
 on:
   schedule:
-    - cron: "0 9 * * 1" # Mondays 09:00 UTC
+    - cron: '0 9 * * 1' # Mondays 09:00 UTC
   workflow_dispatch:
 
 permissions:

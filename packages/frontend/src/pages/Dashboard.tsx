@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { BarChart3, Gauge, LayoutDashboard, Zap } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Zap, BarChart3, Gauge, LayoutDashboard } from 'lucide-react';
+
 import { LiveTab } from '../components/dashboard/tabs/LiveTab';
-import { UsageTab } from '../components/dashboard/tabs/UsageTab';
-import { PerformanceTab } from '../components/dashboard/tabs/PerformanceTab';
 import { OverallTab } from '../components/dashboard/tabs/OverallTab';
+import { PerformanceTab } from '../components/dashboard/tabs/PerformanceTab';
+import { UsageTab } from '../components/dashboard/tabs/UsageTab';
 import { Tabs } from '../components/ui/Tabs';
 import { useAuth } from '../contexts/AuthContext';
 import type { CustomDateRange } from '../lib/date';
@@ -77,15 +78,15 @@ export const Dashboard = () => {
   }, [activeTab]);
 
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="sticky top-12 md:top-0 z-20 bg-bg-card border-b border-border">
-        <div className="px-3 sm:px-6 lg:px-8 pt-3 sm:pt-4">
-          <div className="flex items-center justify-between gap-3 mb-2.5 sm:mb-3 flex-wrap">
+    <div className="flex min-h-full flex-col">
+      <div className="bg-bg-card border-border sticky top-12 z-20 border-b md:top-0">
+        <div className="px-3 pt-3 sm:px-6 sm:pt-4 lg:px-8">
+          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3 sm:mb-3">
             <div>
-              <h1 className="font-heading text-lg sm:text-2xl font-semibold tracking-tight m-0 leading-tight">
+              <h1 className="font-heading m-0 text-lg leading-tight font-semibold tracking-tight sm:text-2xl">
                 Dashboard
               </h1>
-              <p className="text-[11px] sm:text-xs text-text-secondary mt-0.5">
+              <p className="text-text-secondary mt-0.5 text-[11px] sm:text-xs">
                 Real-time gateway traffic across all providers
               </p>
             </div>

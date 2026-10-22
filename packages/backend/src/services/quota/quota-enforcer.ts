@@ -1,11 +1,12 @@
+import { mostConstrained } from '@plexus/shared';
 import { and, eq, gte, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
 import parseDuration from 'parse-duration';
-import { mostConstrained } from '@plexus/shared';
+
+import { getConfig, KeyConfig, PlexusConfig, QuotaDefinition } from '../../config';
+import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
 import { logger } from '../../utils/logger';
-import { getConfig, PlexusConfig, QuotaDefinition, KeyConfig } from '../../config';
-import { getDatabase, getSchema, getCurrentDialect } from '../../db/client';
 import { toDbTimestampMs } from '../../utils/normalize';
-import { ScopeLists, scopeMatches, isGlobalScope } from '../routing/scope-match';
+import { isGlobalScope, ScopeLists, scopeMatches } from '../routing/scope-match';
 
 /** Sentinel `key_name` used for `shared: true` quota definitions — a single
  * pooled bucket accrued across every key that references the quota, instead

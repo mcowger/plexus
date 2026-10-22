@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
 import type { ReasoningIntent } from '../reasoning';
 
 // buildReasoningOptionsForModel calls into pi-ai's clampThinkingLevel /
@@ -39,8 +40,8 @@ vi.mock('@earendil-works/pi-ai', () => {
   };
 });
 
-import { buildReasoningOptionsForModel, buildGenerationOptions } from '../registry';
 import type { GenerationIntent } from '../generation';
+import { buildGenerationOptions, buildReasoningOptionsForModel } from '../registry';
 
 const intent = (o: Partial<ReasoningIntent>): ReasoningIntent => ({ source: 'client', ...o });
 

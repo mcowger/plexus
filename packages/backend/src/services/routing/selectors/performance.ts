@@ -1,7 +1,7 @@
-import { Selector, CandidateStats } from './base';
-import { ModelTarget, getConfig } from '../../../config';
-import { UsageStorageService } from '../../observability/usage-storage';
+import { getConfig, ModelTarget } from '../../../config';
 import { logger } from '../../../utils/logger';
+import { UsageStorageService } from '../../observability/usage-storage';
+import { CandidateStats, Selector } from './base';
 
 export class PerformanceSelector extends Selector {
   private storage: UsageStorageService;

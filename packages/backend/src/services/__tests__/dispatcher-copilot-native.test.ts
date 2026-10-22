@@ -1,10 +1,11 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { setConfigForTesting } from '../../config';
-import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
-import { copilotWireApiType, isNativeOAuthProvider } from '../oauth/oauth-native-request';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
+import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { NATIVE_OAUTH_STASH, refreshOAuthRoute } from '../dispatch/request-payload-builder';
+import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import { copilotWireApiType, isNativeOAuthProvider } from '../oauth/oauth-native-request';
 
 // Native GitHub Copilot OAuth.
 //

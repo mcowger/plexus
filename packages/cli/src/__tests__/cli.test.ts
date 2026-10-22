@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   buildRequest,
   discoverOperations,
   formatOutput,
   isRisky,
-  parseArgs,
-  run,
   type Json,
   type Operation,
+  parseArgs,
+  run,
 } from '../cli';
 
 const document = {

@@ -1,5 +1,5 @@
-import { logger } from '../../utils/logger';
 import { McpServerConfig } from '../../types/mcp';
+import { logger } from '../../utils/logger';
 
 export type LocalMcpStatus = 'stopped' | 'starting' | 'running' | 'failed';
 

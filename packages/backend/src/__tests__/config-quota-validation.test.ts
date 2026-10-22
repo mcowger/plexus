@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { validateConfig } from '../config';
 
 const makeConfigJson = (quotaCheckerOptions: Record<string, unknown>): string =>

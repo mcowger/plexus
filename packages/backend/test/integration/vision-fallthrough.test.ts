@@ -1,8 +1,9 @@
-import { expect, test, describe, beforeEach, vi } from 'vitest';
-import { VisionDescriptorService } from '../../src/services/vision/vision-descriptor-service';
-import { Dispatcher } from '../../src/services/dispatch/dispatcher';
-import { UnifiedChatRequest } from '../../src/types/unified';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import * as configModule from '../../src/config';
+import { Dispatcher } from '../../src/services/dispatch/dispatcher';
+import { VisionDescriptorService } from '../../src/services/vision/vision-descriptor-service';
+import { UnifiedChatRequest } from '../../src/types/unified';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../../src/utils/constants';
 
 describe('Vision Fallthrough', () => {

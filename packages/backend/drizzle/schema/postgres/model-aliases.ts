@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, bigint, jsonb, pgEnum } from 'drizzle-orm/pg-core';
+import { bigint, boolean, jsonb, pgEnum, pgTable, serial, text } from 'drizzle-orm/pg-core';
 
 export const selectorStrategyEnum = pgEnum('selector_strategy', [
   'random',

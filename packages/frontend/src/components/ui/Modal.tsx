@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface ModalProps {
@@ -36,14 +37,14 @@ export const Modal: React.FC<ModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[410] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease]"
+      className="fixed inset-0 z-[410] flex animate-[fadeIn_0.2s_ease] items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-5"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
         className={clsx(
-          'glass-bg w-full max-h-[92vh] overflow-hidden rounded-xl flex flex-col shadow-2xl animate-[slideUp_0.3s_ease] sm:max-h-[90vh] sm:rounded-2xl',
+          'glass-bg flex max-h-[92vh] w-full animate-[slideUp_0.3s_ease] flex-col overflow-hidden rounded-xl shadow-2xl sm:max-h-[90vh] sm:rounded-2xl',
           {
             'max-w-md': size === 'sm',
             'max-w-xl': size === 'md',
@@ -51,22 +52,22 @@ export const Modal: React.FC<ModalProps> = ({
           }
         )}
       >
-        <div className="flex items-center justify-between gap-3 p-4 border-b border-white/5 sm:p-5">
-          <h2 className="min-w-0 font-heading text-base font-semibold text-text m-0 truncate">
+        <div className="flex items-center justify-between gap-3 border-b border-white/5 p-4 sm:p-5">
+          <h2 className="font-heading text-text m-0 min-w-0 truncate text-base font-semibold">
             {title}
           </h2>
           <button
             type="button"
-            className="flex-shrink-0 bg-transparent border-0 text-text-secondary cursor-pointer rounded-md p-1.5 transition-colors duration-fast hover:text-text hover:bg-bg-hover focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="text-text-secondary duration-fast hover:text-text hover:bg-bg-hover focus-visible:outline-primary flex-shrink-0 cursor-pointer rounded-md border-0 bg-transparent p-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             onClick={onClose}
             aria-label="Close"
           >
             <X size={16} />
           </button>
         </div>
-        <div className="p-4 overflow-y-auto flex-1 sm:p-5">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">{children}</div>
         {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/5 sm:px-5 sm:py-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-white/5 px-4 py-3 sm:px-5 sm:py-4">
             {footer}
           </div>
         )}

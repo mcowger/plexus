@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, bigint } from 'drizzle-orm/pg-core';
+import { bigint, boolean, pgTable, text } from 'drizzle-orm/pg-core';
 
 export const customCheckers = pgTable('custom_checkers', {
   id: text('id').primaryKey(),

@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'vitest';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
-import { OpenAITransformer } from '../openai';
+import { describe, expect, test } from 'vitest';
+
 import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../../utils/gemini-malformed-function-call';
+import { OpenAITransformer } from '../openai';
 
 function unifiedStreamFromChunks(chunks: any[]): ReadableStream {
   return new ReadableStream({

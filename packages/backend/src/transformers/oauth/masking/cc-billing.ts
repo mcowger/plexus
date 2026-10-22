@@ -14,8 +14,9 @@
  */
 
 import { createHash } from 'node:crypto';
-import { BILLING_HASH_INDICES, BILLING_HASH_SALT } from './cc-constants';
+
 import { ClaudeCodeVersionService } from '../../../services/oauth/claude-code-version-service';
+import { BILLING_HASH_INDICES, BILLING_HASH_SALT } from './cc-constants';
 
 const BILLING_HEADER_PREFIX = 'x-anthropic-billing-header:';
 

@@ -1,8 +1,8 @@
-import { getCatalogModels } from '../pi-ai/catalog';
 import { getProviderTypes, type ProviderConfig } from '../../config';
 import { logger } from '../../utils/logger';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { buildCodexModelsUrl, buildCodexOAuthHeaders } from '../oauth/oauth-native-request';
+import { getCatalogModels } from '../pi-ai/catalog';
 
 export interface DiscoveredModel {
   id: string;

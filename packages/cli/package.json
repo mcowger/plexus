@@ -6,7 +6,6 @@
     "type": "git",
     "url": "https://github.com/mcowger/plexus"
   },
-  "type": "module",
   "bin": {
     "plexuscli": "src/index.ts"
   },
@@ -17,6 +16,7 @@
     "src/index.ts",
     "src/skill.ts"
   ],
+  "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
     "prepack": "bun run --cwd ../.. sync:cli-skill",

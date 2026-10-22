@@ -1,8 +1,9 @@
 import { createParser, EventSourceMessage } from 'eventsource-parser';
-import { logger } from '../../utils/logger';
+
 import type { StreamBlockEventType } from '../../types/unified';
-import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
 import { detectGeminiMalformedFunctionCall } from '../../utils/gemini-malformed-function-call';
+import { logger } from '../../utils/logger';
+import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
 
 /**
  * Transforms a Gemini stream (Server-Sent Events) into unified stream format.

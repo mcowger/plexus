@@ -1,14 +1,15 @@
 import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  jsonb,
   pgTable,
+  real,
   serial,
   text,
-  real,
-  integer,
-  boolean,
-  bigint,
-  jsonb,
-  index,
 } from 'drizzle-orm/pg-core';
+
 import { oauthCredentials } from './oauth-credentials';
 
 export const providers = pgTable(

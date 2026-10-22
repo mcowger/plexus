@@ -1,9 +1,10 @@
+import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
-import { GripVertical, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
-import { Switch } from '../ui/Switch';
-import { Button } from '../ui/Button';
+
 import { AliasTargetGroup } from '../../lib/api';
 import { dedupeModels, getModelOptionKey } from '../../lib/modelOptions';
+import { Button } from '../ui/Button';
+import { Switch } from '../ui/Switch';
 
 interface TargetGroupEditorProps {
   groups: AliasTargetGroup[];
@@ -246,20 +247,20 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
           >
             {/* Group header */}
             <div
-              className="flex items-center gap-2 px-3 py-2 border-b"
+              className="flex items-center gap-2 border-b px-3 py-2"
               style={{ borderColor: 'var(--color-border-glass)' }}
             >
               <div className="text-text-secondary opacity-60">
                 <GripVertical size={14} />
               </div>
               <input
-                className="flex-1 min-w-0 py-1 px-2 font-body text-sm font-medium text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border px-2 py-1 text-sm font-medium outline-none"
                 value={group.name}
                 onChange={(e) => updateGroupField(groupIdx, 'name', e.target.value)}
                 placeholder="Group name"
               />
               <select
-                className="py-1 px-2 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="font-body text-text bg-bg-glass border-border-glass focus:border-primary rounded-sm border px-2 py-1 text-xs outline-none"
                 value={group.selector}
                 onChange={(e) => updateGroupField(groupIdx, 'selector', e.target.value)}
               >
@@ -274,7 +275,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   type="button"
                   onClick={() => moveGroup(groupIdx, 'up')}
                   disabled={groupIdx === 0}
-                  className="hover:text-primary disabled:opacity-30 disabled:hover:text-text-secondary transition-colors p-1"
+                  className="hover:text-primary disabled:hover:text-text-secondary p-1 transition-colors disabled:opacity-30"
                   title="Move group up"
                 >
                   <ChevronUp size={14} />
@@ -283,7 +284,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   type="button"
                   onClick={() => moveGroup(groupIdx, 'down')}
                   disabled={groupIdx === groups.length - 1}
-                  className="hover:text-primary disabled:opacity-30 disabled:hover:text-text-secondary transition-colors p-1"
+                  className="hover:text-primary disabled:hover:text-text-secondary p-1 transition-colors disabled:opacity-30"
                   title="Move group down"
                 >
                   <ChevronDown size={14} />
@@ -293,7 +294,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                 <button
                   type="button"
                   onClick={() => removeGroup(groupIdx)}
-                  className="hover:text-danger text-text-secondary transition-colors p-1"
+                  className="hover:text-danger text-text-secondary p-1 transition-colors"
                   title="Remove group"
                 >
                   <Trash2 size={13} />
@@ -302,9 +303,9 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
             </div>
 
             {/* Targets list */}
-            <div className="px-3 py-2 flex flex-col gap-1">
+            <div className="flex flex-col gap-1 px-3 py-2">
               {group.targets.length === 0 && (
-                <div className="text-text-muted italic text-xs py-1">No targets in this group</div>
+                <div className="text-text-muted py-1 text-xs italic">No targets in this group</div>
               )}
               {group.targets.map((target, targetIdx) => {
                 const isTargetDrag =
@@ -392,7 +393,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                         type="button"
                         onClick={() => moveTarget(groupIdx, targetIdx, 'up')}
                         disabled={targetIdx === 0}
-                        className="hover:text-primary disabled:opacity-20 transition-colors p-0.5"
+                        className="hover:text-primary p-0.5 transition-colors disabled:opacity-20"
                       >
                         <ChevronUp size={13} />
                       </button>
@@ -400,13 +401,13 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                         type="button"
                         onClick={() => moveTarget(groupIdx, targetIdx, 'down')}
                         disabled={targetIdx === group.targets.length - 1}
-                        className="hover:text-primary disabled:opacity-20 transition-colors p-0.5"
+                        className="hover:text-primary p-0.5 transition-colors disabled:opacity-20"
                       >
                         <ChevronDown size={13} />
                       </button>
                     </div>
                     <select
-                      className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      className="font-body text-text bg-bg-glass border-border-glass focus:border-primary rounded-sm border text-xs outline-none"
                       style={{ padding: '3px 6px', height: '26px' }}
                       value={isAliasTarget ? 'alias' : 'model'}
                       onChange={(e) =>
@@ -418,7 +419,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                     </select>
                     {isAliasTarget ? (
                       <select
-                        className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border text-xs outline-none"
                         style={{ padding: '3px 6px', height: '26px' }}
                         value={target.alias ?? ''}
                         onChange={(e) => setTargetAlias(groupIdx, targetIdx, e.target.value)}
@@ -433,7 +434,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                     ) : (
                       <>
                         <select
-                          className="flex-1 min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border text-xs outline-none"
                           style={{ padding: '3px 6px', height: '26px' }}
                           value={target.provider ?? ''}
                           onChange={(e) =>
@@ -448,7 +449,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                           ))}
                         </select>
                         <select
-                          className="flex-[2] min-w-0 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-[2] rounded-sm border text-xs outline-none"
                           style={{ padding: '3px 6px', height: '26px' }}
                           value={target.model ?? ''}
                           onChange={(e) =>
@@ -476,7 +477,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                     <button
                       type="button"
                       onClick={() => removeTarget(groupIdx, targetIdx)}
-                      className="hover:text-danger text-text-secondary transition-colors p-1"
+                      className="hover:text-danger text-text-secondary p-1 transition-colors"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -489,7 +490,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                 variant="ghost"
                 onClick={() => addTarget(groupIdx)}
                 leftIcon={<Plus size={13} />}
-                className="mt-1 justify-start text-xs text-text-secondary hover:text-text"
+                className="text-text-secondary hover:text-text mt-1 justify-start text-xs"
               >
                 Add target
               </Button>

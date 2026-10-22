@@ -1,12 +1,11 @@
 import { UnifiedChatRequest } from '../../types/unified';
-import { convertUnifiedToolsToAnthropic } from './tool-mapper';
 import { clampAnthropicEffortAndThinking } from './thinking-clamp';
+import { convertUnifiedToolsToAnthropic } from './tool-mapper';
 
 const BASE64_DATA_URL_PATTERN = /^data:([^;,]*)(?:;[^;,]*)*;base64,([\s\S]+)$/i;
 
 type AnthropicImageSource =
-  | { type: 'base64'; media_type: string; data: string }
-  | { type: 'url'; url: string };
+  { type: 'base64'; media_type: string; data: string } | { type: 'url'; url: string };
 
 /**
  * Converts a unified `image_url` into an Anthropic image source.

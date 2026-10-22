@@ -1,7 +1,8 @@
 import { relations } from 'drizzle-orm';
-import { requestUsage } from './request-usage';
+
 import { debugLogs } from './debug-logs';
 import { inferenceErrors } from './inference-errors';
+import { requestUsage } from './request-usage';
 
 export const requestUsageRelations = relations(requestUsage, ({ one }) => ({
   debugLog: one(debugLogs, {

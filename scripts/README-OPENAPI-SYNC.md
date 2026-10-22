@@ -48,9 +48,9 @@ Only outputs errors, useful for CI/CD pipelines.
 The script scans TypeScript files for Fastify route registrations:
 
 ```typescript
-fastify.get('/path', handler)
-mgmt.post('/path', handler)
-app.put('/path', handler)
+fastify.get('/path', handler);
+mgmt.post('/path', handler);
+app.put('/path', handler);
 ```
 
 It handles both single-line and multi-line route definitions.
@@ -59,11 +59,11 @@ It handles both single-line and multi-line route definitions.
 
 The script normalizes path parameters for comparison:
 
-| Code Pattern | OpenAPI Pattern | Normalized |
-|-------------|----------------|------------|
-| `:id` | `{id}` | `{id}` |
-| `:slug` | `{slug}` | `{slug}` |
-| `*` | `{wildcard}` | `{wildcard}` |
+| Code Pattern | OpenAPI Pattern | Normalized   |
+| ------------ | --------------- | ------------ |
+| `:id`        | `{id}`          | `{id}`       |
+| `:slug`      | `{slug}`        | `{slug}`     |
+| `*`          | `{wildcard}`    | `{wildcard}` |
 
 ### Tag Assignment
 
@@ -184,16 +184,16 @@ Check that your routes follow the expected pattern:
 
 ```typescript
 // ✅ Detected
-fastify.get('/path', handler)
-mgmt.post('/path', handler)
+fastify.get('/path', handler);
+mgmt.post('/path', handler);
 
 // ❌ Not detected (dynamic path)
 const path = '/path';
-fastify.get(path, handler)
+fastify.get(path, handler);
 
 // ❌ Not detected (variable method)
 const method = 'get';
-fastify[method](path, handler)
+fastify[method](path, handler);
 ```
 
 ### False positives for wildcard routes

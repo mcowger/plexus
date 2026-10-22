@@ -1,6 +1,7 @@
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
-import { Button } from '../../ui/Button';
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+
 import { Badge } from '../../ui/Badge';
+import { Button } from '../../ui/Button';
 import { DebouncedInput } from '../../ui/DebouncedInput';
 import type { ModelConfig } from './types';
 
@@ -24,13 +25,13 @@ export function ModelExtraBody({
   removeModelKV,
 }: Props) {
   return (
-    <div className="border border-border-glass rounded-md overflow-hidden">
+    <div className="border-border-glass overflow-hidden rounded-md border">
       <div
-        className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+        className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center gap-2 p-2 px-3"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span className="font-body text-[12px] font-medium text-text-secondary flex-1">
+        <span className="font-body text-text-secondary flex-1 text-[12px] font-medium">
           Extra Body Fields
         </span>
         <Badge status="neutral" style={{ fontSize: '10px', padding: '2px 8px' }}>
@@ -61,7 +62,7 @@ export function ModelExtraBody({
           }}
         >
           {Object.entries(modelConfig.extraBody || {}).length === 0 && (
-            <div className="font-body text-[11px] text-text-secondary italic">
+            <div className="font-body text-text-secondary text-[11px] italic">
               No extra body fields configured.
             </div>
           )}

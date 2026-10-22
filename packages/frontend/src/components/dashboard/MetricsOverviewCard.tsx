@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Card } from '../ui/Card';
 
 export interface MetricItem {
@@ -30,21 +31,21 @@ export const MetricsOverviewCard: React.FC<MetricsOverviewCardProps> = ({
         {metrics.map((metric, index) => (
           <div
             key={index}
-            className="glass-bg rounded-lg p-4 flex flex-col gap-1 transition-all duration-300"
+            className="glass-bg flex flex-col gap-1 rounded-lg p-4 transition-all duration-300"
           >
-            <div className="flex justify-between items-start">
-              <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+            <div className="flex items-start justify-between">
+              <span className="font-body text-text-muted text-xs font-semibold tracking-wider uppercase">
                 {metric.label}
               </span>
               <div
-                className="w-8 h-8 rounded-sm flex items-center justify-center text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-sm text-white"
                 style={{ background: 'var(--color-bg-hover)' }}
               >
                 {metric.icon}
               </div>
             </div>
-            <div className="font-heading text-3xl font-bold text-text my-1">{metric.value}</div>
-            {metric.subtitle && <div className="text-xs text-text-muted">{metric.subtitle}</div>}
+            <div className="font-heading text-text my-1 text-3xl font-bold">{metric.value}</div>
+            {metric.subtitle && <div className="text-text-muted text-xs">{metric.subtitle}</div>}
             {metric.trend !== undefined && (
               <div
                 className={`text-sm leading-normal ${metric.trend > 0 ? 'text-success' : 'text-danger'}`}

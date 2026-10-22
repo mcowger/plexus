@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProviderConfig } from '../../config';
+
 import { registerSpy } from '../../../test/test-utils';
+import type { ProviderConfig } from '../../config';
 import { ModelAutosyncScheduler } from '../models/model-autosync-scheduler';
 
 const makeProvider = (intervalMinutes: number): ProviderConfig => ({

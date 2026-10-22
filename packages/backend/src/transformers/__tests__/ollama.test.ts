@@ -1,6 +1,7 @@
-import { test, expect, describe } from 'vitest';
-import { OllamaTransformer } from '../ollama';
+import { describe, expect, test } from 'vitest';
+
 import { UnifiedChatRequest, UnifiedChatStreamChunk } from '../../types/unified';
+import { OllamaTransformer } from '../ollama';
 
 describe('OllamaTransformer', () => {
   const transformer = new OllamaTransformer();

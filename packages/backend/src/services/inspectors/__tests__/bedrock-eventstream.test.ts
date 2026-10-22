@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'vitest';
 import { EventStreamCodec } from '@smithy/core/event-streams';
+import { describe, expect, test } from 'vitest';
+
 import { BedrockEventStreamMetadataObserver } from '../bedrock-eventstream';
 
 // Smithy's Encoder turns bytes into a string; Decoder turns a string into bytes.

@@ -1,4 +1,5 @@
 import { Save, Shield } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
 import { Switch } from '../ui/Switch';
@@ -50,8 +51,8 @@ export function FailoverSettings({
           <div className="flex items-center gap-2">
             <Shield size={16} className="text-primary" />
             <div>
-              <p className="font-body text-[12px] font-medium text-text">Enable Failover</p>
-              <p className="font-body text-[11px] text-text-muted">
+              <p className="font-body text-text text-[12px] font-medium">Enable Failover</p>
+              <p className="font-body text-text-muted text-[11px]">
                 When enabled, failed requests are automatically retried on the next available
                 provider.
               </p>
@@ -68,11 +69,11 @@ export function FailoverSettings({
         <div>
           <label
             htmlFor="retryableStatusCodes"
-            className="font-body text-[12px] font-medium text-text"
+            className="font-body text-text text-[12px] font-medium"
           >
             Retryable Status Codes
           </label>
-          <p className="text-xs text-text-muted mb-2">
+          <p className="text-text-muted mb-2 text-xs">
             HTTP status codes that trigger a retry on the next provider. Enter comma-separated
             values (100–599). Defaults to all non-2xx codes except 413 and 422 when empty.
           </p>
@@ -82,16 +83,16 @@ export function FailoverSettings({
             onChange={(event) => onStatusCodesChange(event.target.value)}
             placeholder="e.g. 429, 500, 502, 503"
             rows={3}
-            className="w-full py-1 px-2 font-mono text-[12px] text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted resize-y"
+            className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted w-full resize-y rounded-sm border px-2 py-1 font-mono text-[12px] outline-none"
           />
         </div>
 
         {/* Retryable Errors */}
         <div>
-          <label htmlFor="retryableErrors" className="font-body text-[12px] font-medium text-text">
+          <label htmlFor="retryableErrors" className="font-body text-text text-[12px] font-medium">
             Retryable Network Errors
           </label>
-          <p className="text-xs text-text-muted mb-2">
+          <p className="text-text-muted mb-2 text-xs">
             Network error codes that trigger a retry on the next provider. Enter comma-separated
             values. Defaults to ECONNREFUSED, ETIMEDOUT, ENOTFOUND when empty.
           </p>
@@ -101,7 +102,7 @@ export function FailoverSettings({
             onChange={(event) => onErrorsChange(event.target.value)}
             placeholder="e.g. ECONNREFUSED, ETIMEDOUT, ENOTFOUND"
             rows={2}
-            className="w-full py-1 px-2 font-mono text-[12px] text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted resize-y"
+            className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted w-full resize-y rounded-sm border px-2 py-1 font-mono text-[12px] outline-none"
           />
         </div>
       </div>

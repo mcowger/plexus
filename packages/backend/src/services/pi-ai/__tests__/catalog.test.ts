@@ -1,8 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+
 import type { ModelsStore, ModelsStoreEntry, MutableModels, Provider } from '@earendil-works/pi-ai';
+import { describe, expect, it, vi } from 'vitest';
+
 import {
   createModelCatalog,
   defaultModelsStorePath,

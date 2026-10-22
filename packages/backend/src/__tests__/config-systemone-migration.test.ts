@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { normalizeSystemOneProviderConfig, validateConfig } from '../config';
 import type { ProviderConfig } from '../config';
 

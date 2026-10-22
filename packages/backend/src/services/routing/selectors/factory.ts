@@ -1,14 +1,14 @@
-import { Selector } from './base';
-import { RandomSelector } from './random';
-import { CostSelector } from './cost';
-import { PerformanceSelector } from './performance';
-import { E2EPerformanceSelector } from './e2e-performance';
-import { LatencySelector } from './latency';
-import { InOrderSelector } from './in-order';
-import { UsageSelector } from './usage';
 import { UsageStorageService } from '../../observability/usage-storage';
 import { QuotaScheduler } from '../../quota/quota-scheduler';
+import { Selector } from './base';
+import { CostSelector } from './cost';
+import { E2EPerformanceSelector } from './e2e-performance';
+import { InOrderSelector } from './in-order';
+import { LatencySelector } from './latency';
+import { PerformanceSelector } from './performance';
 import { QuotaSelector } from './quota';
+import { RandomSelector } from './random';
+import { UsageSelector } from './usage';
 
 export class SelectorFactory {
   private static usageStorage: UsageStorageService | null = null;

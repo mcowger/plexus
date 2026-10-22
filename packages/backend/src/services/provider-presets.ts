@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
+
+import { type ProviderPreset, ProviderPresetSchema } from '@plexus/shared';
 import { z } from 'zod';
-import { ProviderPresetSchema, type ProviderPreset } from '@plexus/shared';
+
 import builtinPresetsJson from '../../data/provider-presets.json' with { type: 'json' };
 import { logger } from '../utils/logger';
 

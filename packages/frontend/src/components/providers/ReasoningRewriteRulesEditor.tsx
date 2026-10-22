@@ -1,7 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
+
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { DebouncedInput } from '../ui/DebouncedInput';
+import { Input } from '../ui/Input';
 import { getAdapterName, normalizeAdapterEntries } from './model-editor/adapter-utils';
 
 interface Props {
@@ -46,10 +47,10 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
         paddingTop: '6px',
       }}
     >
-      <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
+      <div className="font-body text-text-secondary mb-1 text-[11px] font-medium">
         Reasoning Rewrite Rules
       </div>
-      <div className="font-body text-[10px] text-text-muted mb-2" style={{ lineHeight: 1.3 }}>
+      <div className="font-body text-text-muted mb-2 text-[10px]" style={{ lineHeight: 1.3 }}>
         Map unified reasoning fields to provider-specific formats. Each rule reads a source field
         and writes one or more targets.
       </div>
@@ -90,7 +91,7 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
             {/* When operator */}
             <div style={{ flex: 0.7 }}>
               <select
-                className="w-full py-1 pl-2 pr-2 font-body text-[11px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border py-1 pr-2 pl-2 text-[11px] outline-none"
                 value={rule.when?.op ?? ''}
                 onChange={(e) => {
                   const op = e.target.value;
@@ -172,7 +173,7 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
             </Button>
           </div>
           {/* Rewrites */}
-          <div className="font-body text-[10px] font-medium text-text-muted mb-1">Rewrites</div>
+          <div className="font-body text-text-muted mb-1 text-[10px] font-medium">Rewrites</div>
           {(rule.rewrites ?? []).map((rw: any, rwIdx: number) => (
             <div
               key={rwIdx}
@@ -206,7 +207,7 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
               {/* Value type selector */}
               <div style={{ flex: 0.7 }}>
                 <select
-                  className="w-full py-1 pl-2 pr-2 font-body text-[11px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                  className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border py-1 pr-2 pl-2 text-[11px] outline-none"
                   value={
                     rw.value === null
                       ? 'null'
@@ -271,11 +272,11 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
                 {(() => {
                   if (rw.value === null)
                     return (
-                      <span className="font-body text-[11px] text-text-muted italic">null</span>
+                      <span className="font-body text-text-muted text-[11px] italic">null</span>
                     );
                   if (rw.value?.from === 'source')
                     return (
-                      <span className="font-body text-[11px] text-text-muted italic">
+                      <span className="font-body text-text-muted text-[11px] italic">
                         passthrough
                       </span>
                     );
@@ -430,7 +431,7 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
               margin: '6px 0 4px 0',
             }}
           />
-          <div className="font-body text-[10px] font-medium text-text-muted mb-1">
+          <div className="font-body text-text-muted mb-1 text-[10px] font-medium">
             Strip paths (remove from payload after rewrite)
           </div>
           <div
@@ -444,7 +445,7 @@ export function ReasoningRewriteRulesEditor({ adapters, onChange }: Props) {
             {(rule.strip ?? []).map((stripPath: string, sIdx: number) => (
               <div key={sIdx} style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
                 <div
-                  className="font-body text-[11px] text-text"
+                  className="font-body text-text text-[11px]"
                   style={{
                     padding: '2px 8px',
                     background: 'var(--color-bg-glass)',

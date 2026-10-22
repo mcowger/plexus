@@ -1,4 +1,5 @@
 import type { FastifyRequest } from 'fastify';
+
 import { getConfig } from '../../config';
 
 function normalizeBaseUrl(value: string): string {

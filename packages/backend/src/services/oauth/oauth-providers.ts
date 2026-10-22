@@ -15,8 +15,9 @@
  * doesn't fit the "pick a provider, log in" model this facade assumes.
  */
 
-import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type { OAuthAuth } from '@earendil-works/pi-ai';
+import { builtinModels } from '@earendil-works/pi-ai/providers/all';
+
 import { withCopyCodeLogin } from './anthropic';
 
 /** Provider id of an OAuth provider (e.g. 'anthropic', 'openai-codex'). */

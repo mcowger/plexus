@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
@@ -23,7 +24,7 @@ export function ModelMetadataCard({ loading, onRefresh }: ModelMetadataCardProps
         </Button>
       }
     >
-      <p className="text-sm text-text-secondary">
+      <p className="text-text-secondary text-sm">
         Catalog metadata for model aliases auto-refreshes every 60 minutes. Use this to trigger an
         immediate reload from OpenRouter, models.dev, and Catwalk.
       </p>

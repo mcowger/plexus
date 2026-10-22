@@ -1,3 +1,5 @@
+import { PassThrough, Readable } from 'node:stream';
+
 /**
  * Mimics EXACTLY what response-handler.ts does:
  * - POST route (not GET)
@@ -6,8 +8,6 @@
  * - SSE headers
  */
 import Fastify from 'fastify';
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
 
 const fastify = Fastify();
 

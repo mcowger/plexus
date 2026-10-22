@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { hashSecret } from '../../utils/encryption';
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
 import { McpOauthRepository } from '../mcp-oauth-repository';
-import { hashSecret } from '../../utils/encryption';
+import { runMigrations } from '../migrate';
 
 describe('MCP OAuth token eager revocation on API key changes', () => {
   let db: ReturnType<typeof getDatabase>;

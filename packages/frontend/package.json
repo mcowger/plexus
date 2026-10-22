@@ -1,20 +1,12 @@
 {
   "name": "frontend",
-  "module": "index.ts",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "module": "index.ts",
   "scripts": {
     "build": "bun run build.ts",
     "typecheck": "bun check",
     "dev": "bun run build.ts --watch"
-  },
-  "devDependencies": {
-    "@tailwindcss/cli": "^4.3.3",
-    "@types/bun": "latest",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "postcss": "^8.5.31",
-    "tailwindcss": "^4.3.0"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.29",
@@ -35,5 +27,13 @@
     "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
     "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "@types/bun": "latest",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postcss": "^8.5.31",
+    "tailwindcss": "^4.3.0"
   }
 }

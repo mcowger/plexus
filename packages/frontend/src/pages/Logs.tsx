@@ -1,44 +1,45 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
-import { SearchInput } from '../components/ui/SearchInput';
-import { Select } from '../components/ui/Select';
-import { PageHeader } from '../components/layout/PageHeader';
-import { PageContainer } from '../components/layout/PageContainer';
-import { api, UsageRecord, type UsageSortDirection, type UsageSortField } from '../lib/api';
-import { DateTimePicker } from '../components/ui/DateTimePicker';
-import { Drawer } from '../components/ui/Drawer';
+import { clsx } from 'clsx';
 import {
-  ChevronRight,
-  Trash2,
   ChevronDown,
-  PlayCircle,
+  ChevronRight,
   Circle,
-  X,
+  ListFilter,
+  Loader,
+  PlayCircle,
+  Trash2,
   Wifi,
   WifiOff,
-  Loader,
-  ListFilter,
+  X,
 } from 'lucide-react';
-import { clsx } from 'clsx';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+
+import { PageContainer } from '../components/layout/PageContainer';
+import { PageHeader } from '../components/layout/PageHeader';
 import {
+  DESKTOP_API_COLUMN_WIDTH,
+  DESKTOP_COST_COLUMN_WIDTH,
+  DESKTOP_DATE_COLUMN_WIDTH,
+  DESKTOP_DELETE_COLUMN_WIDTH,
+  DESKTOP_PERF_COLUMN_WIDTH,
+  DESKTOP_STATUS_COLUMN_WIDTH,
+  DESKTOP_TABLE_MIN_WIDTH,
+  DESKTOP_TOKENS_COLUMN_WIDTH,
   DesktopLogRow,
   MobileLogRow,
   PaginationControls,
   type ProgressUpdate,
-  DESKTOP_STATUS_COLUMN_WIDTH,
-  DESKTOP_DATE_COLUMN_WIDTH,
-  DESKTOP_API_COLUMN_WIDTH,
-  DESKTOP_TOKENS_COLUMN_WIDTH,
-  DESKTOP_COST_COLUMN_WIDTH,
-  DESKTOP_PERF_COLUMN_WIDTH,
-  DESKTOP_DELETE_COLUMN_WIDTH,
-  DESKTOP_TABLE_MIN_WIDTH,
 } from '../components/logs';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { DateTimePicker } from '../components/ui/DateTimePicker';
+import { Drawer } from '../components/ui/Drawer';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { SearchInput } from '../components/ui/SearchInput';
+import { Select } from '../components/ui/Select';
+import { useAuth } from '../contexts/AuthContext';
+import { api, UsageRecord, type UsageSortDirection, type UsageSortField } from '../lib/api';
 
 const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
 const LIVE_DURATION_UPDATE_INTERVAL_MS = 500;
@@ -584,7 +585,7 @@ export const Logs = () => {
       <button
         type="button"
         onClick={() => handleSort(field)}
-        className="inline-flex items-center justify-center gap-1 bg-transparent border-0 p-0 m-0 font-inherit text-inherit uppercase tracking-wider cursor-pointer"
+        className="font-inherit m-0 inline-flex cursor-pointer items-center justify-center gap-1 border-0 bg-transparent p-0 tracking-wider text-inherit uppercase"
         title={`Sort by ${label.toLowerCase()}`}
       >
         <span>{label}</span>
@@ -608,7 +609,7 @@ export const Logs = () => {
   const showLiveStatus = !!adminKey && offset === 0 && sortBy === 'date' && sortDir === 'desc';
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title="Logs"
         subtitle={
@@ -624,11 +625,11 @@ export const Logs = () => {
               <span
                 className={clsx(
                   'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium select-none sm:px-2.5',
-                  sseStatus === 'connected' && 'bg-green-500/10 text-green-400 border-green-500/20',
+                  sseStatus === 'connected' && 'border-green-500/20 bg-green-500/10 text-green-400',
                   sseStatus === 'reconnecting' &&
-                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                    'border-yellow-500/20 bg-yellow-500/10 text-yellow-400',
                   sseStatus === 'disconnected' &&
-                    'bg-red-500/10 text-text-muted border-border-glass'
+                    'text-text-muted border-border-glass bg-red-500/10'
                 )}
                 title={
                   sseStatus === 'connected'
@@ -734,7 +735,7 @@ export const Logs = () => {
               <button
                 type="button"
                 onClick={() => setFilters({ ...filters, startDate: '', endDate: '' })}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-text-muted transition-colors duration-fast hover:bg-bg-hover hover:text-text"
+                className="text-text-muted duration-fast hover:bg-bg-hover hover:text-text inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent transition-colors"
                 title="Clear date filters"
                 aria-label="Clear date filters"
               >
@@ -747,7 +748,7 @@ export const Logs = () => {
               Search
             </Button>
             <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-              <label htmlFor="logs-per-page" className="text-xs font-medium text-text-secondary">
+              <label htmlFor="logs-per-page" className="text-text-secondary text-xs font-medium">
                 Per page
               </label>
               <div className="w-[4.5rem]">
@@ -755,7 +756,7 @@ export const Logs = () => {
                   id="logs-per-page"
                   value={String(limit)}
                   onChange={handleLimitChange}
-                  className="!h-8 !py-0 !pl-2 !pr-7 text-xs"
+                  className="!h-8 !py-0 !pr-7 !pl-2 text-xs"
                   options={[
                     { value: '20', label: '20' },
                     { value: '50', label: '50' },
@@ -776,15 +777,15 @@ export const Logs = () => {
         aria-label="Log filters"
       >
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-start justify-between gap-4 border-b border-border-glass p-4">
+          <div className="border-border-glass flex items-start justify-between gap-4 border-b p-4">
             <div>
-              <h2 className="m-0 font-heading text-lg font-semibold text-text">Filters</h2>
-              <p className="mt-1 text-xs text-text-secondary">Narrow down the request logs.</p>
+              <h2 className="font-heading text-text m-0 text-lg font-semibold">Filters</h2>
+              <p className="text-text-secondary mt-1 text-xs">Narrow down the request logs.</p>
             </div>
             <button
               type="button"
               onClick={() => setIsMobileFiltersOpen(false)}
-              className="rounded-md border-0 bg-transparent p-1 text-text-muted transition-colors hover:bg-bg-hover hover:text-text"
+              className="text-text-muted hover:bg-bg-hover hover:text-text rounded-md border-0 bg-transparent p-1 transition-colors"
               aria-label="Close filters"
             >
               <X size={18} />
@@ -817,7 +818,7 @@ export const Logs = () => {
                 className="h-10 text-sm"
               />
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
+                <div className="text-text-secondary flex items-center gap-2 text-xs font-medium">
                   <PlayCircle size={15} />
                   <span>Start date</span>
                 </div>
@@ -829,7 +830,7 @@ export const Logs = () => {
                 />
               </div>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
+                <div className="text-text-secondary flex items-center gap-2 text-xs font-medium">
                   <Circle size={15} />
                   <span>End date</span>
                 </div>
@@ -852,7 +853,7 @@ export const Logs = () => {
                 ]}
               />
             </div>
-            <div className="flex gap-2 border-t border-border-glass p-4">
+            <div className="border-border-glass flex gap-2 border-t p-4">
               <Button
                 type="button"
                 variant="ghost"
@@ -886,11 +887,11 @@ export const Logs = () => {
           {!isDesktop && (
             <div className="space-y-1.5 p-2">
               {loading ? (
-                <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
+                <div className="border-border-glass bg-bg-subtle text-text-secondary rounded-lg border p-4 text-center text-sm">
                   Loading...
                 </div>
               ) : logs.length === 0 ? (
-                <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
+                <div className="border-border-glass bg-bg-subtle text-text-secondary rounded-lg border p-4 text-center text-sm">
                   No logs found
                 </div>
               ) : (
@@ -923,7 +924,7 @@ export const Logs = () => {
           {isDesktop && (
             <div className="overflow-x-auto">
               <table
-                className="w-full table-fixed border-collapse font-body text-[13px]"
+                className="font-body w-full table-fixed border-collapse text-[13px]"
                 style={{ minWidth: DESKTOP_TABLE_MIN_WIDTH }}
               >
                 <colgroup>
@@ -939,47 +940,47 @@ export const Logs = () => {
                   <col style={{ width: DESKTOP_DELETE_COLUMN_WIDTH }} />
                 </colgroup>
                 <thead>
-                  <tr className="text-center border-b border-border">
+                  <tr className="border-border border-b text-center">
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{ width: DESKTOP_STATUS_COLUMN_WIDTH }}
                     >
                       <span className="sr-only">Status</span>
                       <Circle size={12} className="mx-auto" aria-hidden="true" />
                     </th>
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{ width: DESKTOP_DATE_COLUMN_WIDTH }}
                     >
                       {renderSortableHeader('Date', 'date')}
                     </th>
-                    <th className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                       {renderSortableHeader('Key', 'apiKey')}
                     </th>
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{ width: DESKTOP_API_COLUMN_WIDTH }}
                     >
                       API
                     </th>
-                    <th className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap">
+                    <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase">
                       {renderSortableHeader('Model', 'incomingModelAlias')}
                     </th>
                     {/* <th style={{ padding: '6px' }}>Provider</th> */}
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{ width: DESKTOP_TOKENS_COLUMN_WIDTH }}
                     >
                       Tokens
                     </th>
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{ width: DESKTOP_COST_COLUMN_WIDTH }}
                     >
                       {renderSortableHeader('Cost', 'costTotal')}
                     </th>
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{
                         width: DESKTOP_PERF_COLUMN_WIDTH,
                         minWidth: DESKTOP_PERF_COLUMN_WIDTH,
@@ -987,11 +988,11 @@ export const Logs = () => {
                     >
                       {renderSortableHeader('Perf', 'durationMs')}
                     </th>
-                    <th className="hidden px-1 py-1.5 text-center border-b border-border-glass border-r border-r-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap min-[1150px]:table-cell">
+                    <th className="border-border-glass border-r-border-glass bg-bg-hover text-text-secondary hidden border-r border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase min-[1150px]:table-cell">
                       Meta
                     </th>
                     <th
-                      className="px-1 py-1.5 text-center border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider whitespace-nowrap"
+                      className="border-border-glass bg-bg-hover text-text-secondary border-b px-1 py-1.5 text-center text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase"
                       style={{ width: DESKTOP_DELETE_COLUMN_WIDTH }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1064,7 +1065,7 @@ export const Logs = () => {
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="text-sm text-text-secondary">
+          <div className="text-text-secondary text-sm">
             <div>
               Request: <span className="text-text">{selectedRetryLog?.requestId || '-'}</span>
             </div>
@@ -1091,11 +1092,11 @@ export const Logs = () => {
           </div>
 
           {selectedRetryHistory.length === 0 ? (
-            <div className="text-sm text-text-secondary">
+            <div className="text-text-secondary text-sm">
               No retry history is available for this request.
             </div>
           ) : (
-            <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
+            <div className="flex max-h-96 flex-col gap-3 overflow-y-auto">
               {selectedRetryHistory.map((attempt) => (
                 <div
                   key={`${attempt.index}-${attempt.provider}-${attempt.model}`}
@@ -1108,24 +1109,24 @@ export const Logs = () => {
                         : 'border-red-500/30 bg-red-500/10'
                   )}
                 >
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="font-medium text-sm text-text">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="text-text text-sm font-medium">
                       Attempt {attempt.index}: {attempt.provider}/{attempt.model}
                       {attempt.upstreamModel && attempt.upstreamModel !== attempt.model
                         ? ` → ${attempt.upstreamModel}`
                         : null}
                     </div>
-                    <div className="text-xs uppercase tracking-wide text-text-secondary">
+                    <div className="text-text-secondary text-xs tracking-wide uppercase">
                       {attempt.status}
                     </div>
                   </div>
-                  <div className="text-sm text-text-secondary">
+                  <div className="text-text-secondary text-sm">
                     <div>API: {attempt.apiType || '-'}</div>
                     {attempt.statusCode ? <div>Status Code: {attempt.statusCode}</div> : null}
                     {attempt.retryable !== undefined ? (
                       <div>Retryable: {attempt.retryable ? 'yes' : 'no'}</div>
                     ) : null}
-                    <div className="mt-2 text-text">{attempt.reason}</div>
+                    <div className="text-text mt-2">{attempt.reason}</div>
                   </div>
                 </div>
               ))}

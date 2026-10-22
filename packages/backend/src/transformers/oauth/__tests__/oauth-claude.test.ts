@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
+
 import {
+  applyClaudeOAuthTransform,
+  injectClaudeCodeSystemPrompt,
   isClaudeOAuthToken,
   remapOAuthToolNames,
   reverseRemapOAuthToolNames,
   reverseRemapOAuthToolNamesFromStreamLine,
-  injectClaudeCodeSystemPrompt,
-  applyClaudeOAuthTransform,
 } from '../oauth-claude';
 
 describe('Claude OAuth', () => {

@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   createLiteToolStripState,
   matchLiteUnsupportedToolsError,
+  MAX_LITE_TOOL_STRIP_RETRIES,
   planLiteToolStrip,
   stripLiteUnsupportedTools,
-  MAX_LITE_TOOL_STRIP_RETRIES,
 } from '../dispatch/dispatcher-auto-compat';
 import {
   LITE_MIXED_TOOLS_PAYLOAD,

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { logger } from '../../../utils/logger';
 import {
   normalizeAnthropicToolIds,
   normalizeAnthropicToolIdsAdapter,
   sanitizeAnthropicToolId,
 } from '../normalize-anthropic-tool-ids.adapter';
-import { logger } from '../../../utils/logger';
 
 const VALID_ANTHROPIC_TOOL_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 

@@ -1,4 +1,5 @@
-import { describe, expect, test, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+
 import { DebugManager } from '../observability/debug-manager';
 import { UsageStorageService } from '../observability/usage-storage';
 

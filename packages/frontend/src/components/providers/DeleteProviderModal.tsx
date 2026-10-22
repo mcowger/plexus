@@ -1,6 +1,6 @@
-import { Modal } from '../ui/Modal';
-import { Button } from '../ui/Button';
 import type { Provider } from '../../lib/api';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   provider: Provider | null;

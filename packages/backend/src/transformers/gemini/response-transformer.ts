@@ -1,8 +1,8 @@
 import { UnifiedChatResponse } from '../../types/unified';
-import { logger } from '../../utils/logger';
-import { isValidThoughtSignature } from './utils';
-import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
 import { detectGeminiMalformedFunctionCall } from '../../utils/gemini-malformed-function-call';
+import { logger } from '../../utils/logger';
+import { normalizeGeminiUsage } from '../../utils/usage-normalizer';
+import { isValidThoughtSignature } from './utils';
 
 /**
  * Transforms a Gemini API response into unified format.

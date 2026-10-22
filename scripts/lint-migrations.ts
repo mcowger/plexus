@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+
 import {
   loadJournal,
   loadPreviousSnapshot,

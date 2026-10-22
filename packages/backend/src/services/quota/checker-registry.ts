@@ -1,7 +1,8 @@
-import { z } from 'zod';
-import type { Meter, MeterStatus, Utilization, MeterKind } from '../../types/meter';
-import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+
+import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
+import type { Meter, MeterKind, MeterStatus, Utilization } from '../../types/meter';
 import {
   buildCustomCheckerHeaders,
   createCustomCheckerFetch,

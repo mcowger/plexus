@@ -15,9 +15,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { SortableCard } from '../../ui/SortableCard';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+
 import { formatNumber } from '../../../lib/format';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { SortableCard } from '../../ui/SortableCard';
 import { CONCURRENCY_COLORS } from '../liveTypes';
 
 export interface ConcurrencyCardProps {
@@ -49,7 +50,7 @@ export const ConcurrencyCard: React.FC<ConcurrencyCardProps> = ({
         title: 'Concurrency',
         extra: (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-xs text-text-muted">
+            <span className="text-text-muted text-xs">
               <span className="sm:hidden">10s</span>
               <span className="hidden sm:inline">Auto-refresh: 10s</span>
             </span>
@@ -61,18 +62,18 @@ export const ConcurrencyCard: React.FC<ConcurrencyCardProps> = ({
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         content:
           concurrencyLoading && concurrencyHistory.length === 0 ? (
-            <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary text-sm">
+            <div className="text-text-secondary flex h-48 items-center justify-center text-sm sm:h-56">
               Loading concurrency data...
             </div>
           ) : concurrencyHistory.length === 0 ? (
-            <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary text-sm">
+            <div className="text-text-secondary flex h-48 items-center justify-center text-sm sm:h-56">
               Collecting concurrency data...
             </div>
           ) : (
             <div className="h-48 sm:h-56">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-text-muted">In-Flight by Provider</span>
-                <span className="text-sm font-semibold text-text tabular-nums">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-text-muted text-xs">In-Flight by Provider</span>
+                <span className="text-text text-sm font-semibold tabular-nums">
                   {formatNumber(totalConcurrentRequests, 0)}
                 </span>
               </div>

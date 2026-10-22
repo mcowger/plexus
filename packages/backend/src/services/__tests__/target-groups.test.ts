@@ -1,7 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
-import { Router } from '../routing/router';
 import { setConfigForTesting } from '../../config';
+import { Router } from '../routing/router';
 import { CooldownManager, type Target } from '../runtime/cooldown-manager';
 
 const cooldownManager = CooldownManager.getInstance();

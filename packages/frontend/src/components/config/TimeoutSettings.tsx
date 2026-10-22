@@ -1,4 +1,5 @@
 import { Save } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
 import type { FieldValidation, TimeoutConfig } from './types';
@@ -47,7 +48,7 @@ export function TimeoutSettings({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="timeoutDefaultSeconds"
-            className="font-body text-[12px] font-medium text-text"
+            className="font-body text-text text-[12px] font-medium"
           >
             Default Timeout (seconds){' '}
             <span className="text-text-muted font-normal">— global default, 1–3600s</span>
@@ -61,9 +62,9 @@ export function TimeoutSettings({
               step={1}
               value={defaultInput}
               onChange={(event) => onDefaultChange(event.target.value)}
-              className="w-48 h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-48 rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
-            <span className="text-[11px] text-text-muted tabular-nums">
+            <span className="text-text-muted text-[11px] tabular-nums">
               {validation.valid && validation.value != null
                 ? formatTimeout(validation.value)
                 : loaded
@@ -72,7 +73,7 @@ export function TimeoutSettings({
             </span>
           </div>
           {!validation.valid && defaultInput !== '' && (
-            <span className="text-[11px] text-warning">{validation.error}</span>
+            <span className="text-warning text-[11px]">{validation.error}</span>
           )}
         </div>
       </div>

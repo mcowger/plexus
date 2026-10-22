@@ -1,6 +1,6 @@
-import { readdirSync, existsSync } from 'fs';
-import { resolve } from 'path';
 import { spawnSync } from 'child_process';
+import { existsSync, readdirSync } from 'fs';
+import { resolve } from 'path';
 
 const target = process.argv[2];
 const outfile = process.argv[3];

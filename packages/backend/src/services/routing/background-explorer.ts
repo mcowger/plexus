@@ -1,4 +1,3 @@
-import { logger } from '../../utils/logger';
 import {
   getConfig,
   ModelConfig,
@@ -6,8 +5,9 @@ import {
   ProviderConfig,
   SelectorType,
 } from '../../config';
-import { CooldownManager } from '../runtime/cooldown-manager';
+import { logger } from '../../utils/logger';
 import { ProbeService } from '../probes/probe-service';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 type TargetKey = `${string}:${string}`;
 type ModelKind = NonNullable<ModelConfig['type']>;

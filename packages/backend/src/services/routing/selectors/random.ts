@@ -1,5 +1,5 @@
-import { Selector } from './base';
 import { ModelTarget } from '../../../config';
+import { Selector } from './base';
 
 export class RandomSelector extends Selector {
   select(targets: ModelTarget[]): ModelTarget | null {

@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 
@@ -15,7 +16,7 @@ export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({ options,
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input
@@ -23,12 +24,12 @@ export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({ options,
           onChange={(e) => handleChange('endpoint', e.target.value)}
           placeholder="https://api.apertis.ai/v1/dashboard/billing/credits"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Uses the provider's API key automatically. No additional configuration needed.
         </span>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Quota Source
         </label>
         <Select
@@ -39,7 +40,7 @@ export const ApertisQuotaConfig: React.FC<ApertisQuotaConfigProps> = ({ options,
             { value: 'payg', label: 'PAYG (balance only)' },
           ]}
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Subscription mode monitors the plan quota and triggers cooldowns when exhausted. PAYG mode
           only tracks the prepaid balance, ignoring the subscription.
         </span>

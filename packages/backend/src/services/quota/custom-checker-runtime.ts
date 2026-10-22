@@ -53,8 +53,7 @@ type WorkerRequest = {
 };
 
 type WorkerResponse =
-  | { ok: true; meters: unknown }
-  | { ok: false; error: string; errorType: 'syntax' | 'runtime' };
+  { ok: true; meters: unknown } | { ok: false; error: string; errorType: 'syntax' | 'runtime' };
 
 export class CustomCheckerError extends Error {
   constructor(

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { OAuthAuthManager } from '../oauth-auth-manager';
 
 const mocks = vi.hoisted(() => ({

@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { reverseToolRenames } from '../reverse-rename';
 
 describe('reverseToolRenames', () => {

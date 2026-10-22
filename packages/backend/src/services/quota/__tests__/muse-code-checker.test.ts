@@ -19,6 +19,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import { createMeterContext } from '../checker-registry';

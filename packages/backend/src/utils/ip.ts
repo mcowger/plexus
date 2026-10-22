@@ -1,4 +1,5 @@
 import { FastifyRequest } from 'fastify';
+
 import { isIpAllowed } from './ip-match';
 
 /**

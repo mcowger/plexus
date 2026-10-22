@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { prepareOAuthNativeRequest } from '../oauth-native-request';
 
 const AUTH_OAUTH = { mode: 'oauth', token: 'sk-ant-oat-test-token' } as const;

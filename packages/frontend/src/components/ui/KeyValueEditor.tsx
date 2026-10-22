@@ -1,7 +1,8 @@
-import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Input } from './Input';
+import React from 'react';
+
 import { Button } from './Button';
+import { Input } from './Input';
 
 type Entries = Record<string, string>;
 
@@ -58,25 +59,25 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
   return (
     <div className="flex flex-col gap-2">
       {keys.length === 0 && emptyText && (
-        <p className="text-xs text-text-muted italic">{emptyText}</p>
+        <p className="text-text-muted text-xs italic">{emptyText}</p>
       )}
       {keys.map((key) => (
-        <div key={key} className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2">
-          <div className="flex-1 min-w-0">
+        <div key={key} className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start">
+          <div className="min-w-0 flex-1">
             <Input
               defaultValue={key}
               onBlur={(e) => updateKey(key, e.target.value)}
               placeholder={keyPlaceholder}
             />
           </div>
-          <div className="flex-[2] min-w-0">
+          <div className="min-w-0 flex-[2]">
             {multilineValue ? (
               <textarea
                 value={entries[key] ?? ''}
                 onChange={(e) => updateValue(key, e.target.value)}
                 placeholder={valuePlaceholder}
                 rows={2}
-                className="w-full py-2.5 px-3.5 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-md outline-none transition-all duration-fast backdrop-blur-md placeholder:text-text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 resize-y"
+                className="font-body text-text bg-bg-glass border-border-glass duration-fast placeholder:text-text-muted focus-visible:border-primary focus-visible:ring-primary/25 w-full resize-y rounded-md border px-3.5 py-2.5 text-sm backdrop-blur-md transition-all outline-none focus-visible:ring-2"
               />
             ) : (
               <Input
@@ -90,7 +91,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
             type="button"
             onClick={() => removeEntry(key)}
             aria-label={`Remove ${key}`}
-            className="inline-flex items-center justify-center h-10 w-10 flex-shrink-0 rounded-md text-text-muted hover:text-danger hover:bg-red-500/10 transition-colors duration-fast focus-visible:outline-2 focus-visible:outline focus-visible:outline-danger focus-visible:outline-offset-2"
+            className="text-text-muted hover:text-danger duration-fast focus-visible:outline-danger inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:bg-red-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <Trash2 size={16} />
           </button>

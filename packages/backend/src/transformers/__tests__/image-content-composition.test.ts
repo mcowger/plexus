@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { composeContentWithImageMarkdown } from '../image-rendering';
-import { OpenAITransformer } from '../openai';
-import { AnthropicTransformer } from '../anthropic';
-import { GeminiTransformer } from '../gemini';
-import { OllamaTransformer } from '../ollama';
-import { OpenAICompletionTransformer } from '../completions';
+
 import type { UnifiedChatResponse } from '../../types/unified';
+import { AnthropicTransformer } from '../anthropic';
+import { OpenAICompletionTransformer } from '../completions';
+import { GeminiTransformer } from '../gemini';
+import { composeContentWithImageMarkdown } from '../image-rendering';
+import { OllamaTransformer } from '../ollama';
+import { OpenAITransformer } from '../openai';
 
 // Consumer audit for the pure-content split: unified `content` carries ONLY
 // authored text, and every CHAT-FORMAT unary formatter (chat, anthropic

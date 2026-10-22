@@ -10,20 +10,20 @@ Plexus stores all configuration in the database and manages it via the **Admin U
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `ADMIN_KEY` | Password for admin dashboard and management API. Server refuses to start if unset. | Yes |
-| `DATABASE_URL` | Connection string. Supports `sqlite://` and `postgres://` URIs. | No |
-| `ENCRYPTION_KEY` | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32` | No |
-| `DATA_DIR` | Directory for SQLite database. | No |
-| `LOG_LEVEL` | Verbosity: `error`, `warn`, `info`, `debug`, `silly` | No |
-| `PLEXUS_USAGE_RETENTION_DAYS` | Retention for request usage, debug, error, MCP, and quota meter-snapshot logs in days (default 365). Older rows are pruned daily. | No |
-| `PORT` | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`). | No |
-| `HOST` | Address to bind to. | No |
-| `FRPC_SERVER_ADDR` | Development-only LAN address of the frps server. | No |
-| `FRPC_AUTH_TOKEN` | Development-only token shared with frps. | No |
-| `FRPC_SERVER_PORT` | Development-only frps control port (defaults to 7000). | No |
-| `FRPC_SUBDOMAIN_HOST` | Optional development-only host suffix used to print the full HTTPS tunnel URL. | No |
+| Variable                      | Description                                                                                                                       | Required |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `ADMIN_KEY`                   | Password for admin dashboard and management API. Server refuses to start if unset.                                                | Yes      |
+| `DATABASE_URL`                | Connection string. Supports `sqlite://` and `postgres://` URIs.                                                                   | No       |
+| `ENCRYPTION_KEY`              | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32`                                          | No       |
+| `DATA_DIR`                    | Directory for SQLite database.                                                                                                    | No       |
+| `LOG_LEVEL`                   | Verbosity: `error`, `warn`, `info`, `debug`, `silly`                                                                              | No       |
+| `PLEXUS_USAGE_RETENTION_DAYS` | Retention for request usage, debug, error, MCP, and quota meter-snapshot logs in days (default 365). Older rows are pruned daily. | No       |
+| `PORT`                        | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`).                              | No       |
+| `HOST`                        | Address to bind to.                                                                                                               | No       |
+| `FRPC_SERVER_ADDR`            | Development-only LAN address of the frps server.                                                                                  | No       |
+| `FRPC_AUTH_TOKEN`             | Development-only token shared with frps.                                                                                          | No       |
+| `FRPC_SERVER_PORT`            | Development-only frps control port (defaults to 7000).                                                                            | No       |
+| `FRPC_SUBDOMAIN_HOST`         | Optional development-only host suffix used to print the full HTTPS tunnel URL.                                                    | No       |
 
 ### Quick Start
 
@@ -59,28 +59,28 @@ validation.
 
 For programmatic configuration, use the Management API (`/v0/management/*`). All endpoints require the `x-admin-key` header.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /v0/management/providers` | List all providers |
-| `PUT /v0/management/providers/{slug}` | Create/update provider |
-| `DELETE /v0/management/providers/{slug}` | Remove provider |
-| `GET /v0/management/aliases` | List all model aliases |
-| `PUT /v0/management/aliases/{slug}` | Create/update alias |
-| `DELETE /v0/management/aliases/{slug}` | Remove alias |
-| `GET /v0/management/keys` | List all API keys |
-| `PUT /v0/management/keys/{name}` | Create/update key |
-| `DELETE /v0/management/keys/{name}` | Remove key |
-| `GET /v0/management/debug` | Read in-memory debug capture state |
-| `PATCH /v0/management/debug` | Update in-memory global/key/alias/provider debug capture targets |
-| `GET /v0/management/user-quotas` | List quota definitions |
-| `PUT /v0/management/user-quotas/{name}` | Create/update quota |
-| `DELETE /v0/management/user-quotas/{name}` | Remove quota |
-| `GET /v0/management/custom-checkers` | List custom provider quota checkers |
-| `PUT /v0/management/custom-checkers/{id}` | Create/update a custom quota checker |
-| `POST /v0/management/custom-checkers/{id}/test` | Test custom checker code without persisting a snapshot |
-| `DELETE /v0/management/custom-checkers/{id}` | Remove a custom quota checker |
-| `GET /v0/management/config/export` | Export full config as JSON |
-| `PUT /v0/management/config` | Import config (replace all) |
+| Endpoint                                        | Description                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| `GET /v0/management/providers`                  | List all providers                                               |
+| `PUT /v0/management/providers/{slug}`           | Create/update provider                                           |
+| `DELETE /v0/management/providers/{slug}`        | Remove provider                                                  |
+| `GET /v0/management/aliases`                    | List all model aliases                                           |
+| `PUT /v0/management/aliases/{slug}`             | Create/update alias                                              |
+| `DELETE /v0/management/aliases/{slug}`          | Remove alias                                                     |
+| `GET /v0/management/keys`                       | List all API keys                                                |
+| `PUT /v0/management/keys/{name}`                | Create/update key                                                |
+| `DELETE /v0/management/keys/{name}`             | Remove key                                                       |
+| `GET /v0/management/debug`                      | Read in-memory debug capture state                               |
+| `PATCH /v0/management/debug`                    | Update in-memory global/key/alias/provider debug capture targets |
+| `GET /v0/management/user-quotas`                | List quota definitions                                           |
+| `PUT /v0/management/user-quotas/{name}`         | Create/update quota                                              |
+| `DELETE /v0/management/user-quotas/{name}`      | Remove quota                                                     |
+| `GET /v0/management/custom-checkers`            | List custom provider quota checkers                              |
+| `PUT /v0/management/custom-checkers/{id}`       | Create/update a custom quota checker                             |
+| `POST /v0/management/custom-checkers/{id}/test` | Test custom checker code without persisting a snapshot           |
+| `DELETE /v0/management/custom-checkers/{id}`    | Remove a custom quota checker                                    |
+| `GET /v0/management/config/export`              | Export full config as JSON                                       |
+| `PUT /v0/management/config`                     | Import config (replace all)                                      |
 
 See the [API Reference](openapi/openapi.yaml) for complete endpoint documentation.
 
@@ -114,44 +114,44 @@ A **provider** represents an upstream AI service that Plexus routes requests to.
 
 ### Provider Settings
 
-| Setting | Description | Required |
-|---------|-------------|----------|
-| **Slug** | Unique identifier (e.g., `openai_direct`, `anthropic-prod`) | Yes |
-| **Display Name** | Friendly name for logs and UI | No |
-| **API Base URL** | Provider's endpoint. Common values: | Yes |
-| | `https://api.openai.com/v1` | |
-| | `https://api.anthropic.com/v1` | |
-| | `https://generativelanguage.googleapis.com/v1beta` | |
-| | `https://openrouter.ai/api/v1` | |
-| | `oauth://` (for OAuth-backed providers) | |
-| **API Key** | Authentication token | Yes |
-| **Enabled** | Whether this provider is active for routing | No (default: true) |
-| **Headers** | Custom HTTP headers sent with every request | No |
-| **Extra Body** | Additional fields merged into every request | No |
-| **Upstream Timeout** | Per-provider request timeout override in milliseconds. If unset, the global timeout is used. | No |
-| **Disable Cooldown** | Exclude from automatic cooldown on errors | No |
-| **Allow 100% Utilization** | Allow quota usage to reach 100% instead of cooling down at 99% | No (default: false) |
-| **Stall Detection Overrides** | Optional per-provider overrides for TTFB/throughput stall detection. Empty = inherit global setting for that field. | No |
-| **pi-ai Provider** | Builtin pi-ai provider ID used for registry model lookup (for example, `anthropic`, `openai`, `google`) | No |
-| **pi-ai Quirks** | Inline compatibility traits by API and model, an alternative to pi-ai Provider. | No |
-| **Auto Compat** | Opt-in reasoning and generation mapping from either a pi-ai model link or inline quirks. With neither, no registry-driven quirk handling occurs. | No (default: false) |
-| **Adapters** | Request/response rewrite hooks applied to every model under this provider (see [Provider Adapters](#provider-adapters)) | No |
-| **Native Responses Extensions** | Responses API extensions this provider accepts verbatim (see [Responses API Extensions](#responses-api-extensions)) | No |
+| Setting                         | Description                                                                                                                                      | Required            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| **Slug**                        | Unique identifier (e.g., `openai_direct`, `anthropic-prod`)                                                                                      | Yes                 |
+| **Display Name**                | Friendly name for logs and UI                                                                                                                    | No                  |
+| **API Base URL**                | Provider's endpoint. Common values:                                                                                                              | Yes                 |
+|                                 | `https://api.openai.com/v1`                                                                                                                      |                     |
+|                                 | `https://api.anthropic.com/v1`                                                                                                                   |                     |
+|                                 | `https://generativelanguage.googleapis.com/v1beta`                                                                                               |                     |
+|                                 | `https://openrouter.ai/api/v1`                                                                                                                   |                     |
+|                                 | `oauth://` (for OAuth-backed providers)                                                                                                          |                     |
+| **API Key**                     | Authentication token                                                                                                                             | Yes                 |
+| **Enabled**                     | Whether this provider is active for routing                                                                                                      | No (default: true)  |
+| **Headers**                     | Custom HTTP headers sent with every request                                                                                                      | No                  |
+| **Extra Body**                  | Additional fields merged into every request                                                                                                      | No                  |
+| **Upstream Timeout**            | Per-provider request timeout override in milliseconds. If unset, the global timeout is used.                                                     | No                  |
+| **Disable Cooldown**            | Exclude from automatic cooldown on errors                                                                                                        | No                  |
+| **Allow 100% Utilization**      | Allow quota usage to reach 100% instead of cooling down at 99%                                                                                   | No (default: false) |
+| **Stall Detection Overrides**   | Optional per-provider overrides for TTFB/throughput stall detection. Empty = inherit global setting for that field.                              | No                  |
+| **pi-ai Provider**              | Builtin pi-ai provider ID used for registry model lookup (for example, `anthropic`, `openai`, `google`)                                          | No                  |
+| **pi-ai Quirks**                | Inline compatibility traits by API and model, an alternative to pi-ai Provider.                                                                  | No                  |
+| **Auto Compat**                 | Opt-in reasoning and generation mapping from either a pi-ai model link or inline quirks. With neither, no registry-driven quirk handling occurs. | No (default: false) |
+| **Adapters**                    | Request/response rewrite hooks applied to every model under this provider (see [Provider Adapters](#provider-adapters))                          | No                  |
+| **Native Responses Extensions** | Responses API extensions this provider accepts verbatim (see [Responses API Extensions](#responses-api-extensions))                              | No                  |
 
 ### Multi-Protocol Providers
 
 Some providers support multiple API formats (OpenAI chat, Anthropic messages, embeddings). Configure them with a map of protocol → URL:
 
-| Protocol | Use Case |
-|----------|----------|
-| `chat` | OpenAI-compatible chat completions |
-| `messages` | Anthropic Claude Messages API |
-| `embeddings` | OpenAI-compatible embeddings (Gemini providers auto-transformed) |
-| `openai-images` | OpenAI-compatible image generation and edits (`/images/generations`, `/images/edits`) |
-| `openrouter-images` | Dedicated OpenRouter image endpoint (`/images`) |
-| `codex-images` | ChatGPT-subscription Codex Images backend; only valid on an `openai-codex` OAuth provider |
-| `transcriptions` | Speech-to-text (Whisper) |
-| `speech` | Text-to-speech |
+| Protocol            | Use Case                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| `chat`              | OpenAI-compatible chat completions                                                        |
+| `messages`          | Anthropic Claude Messages API                                                             |
+| `embeddings`        | OpenAI-compatible embeddings (Gemini providers auto-transformed)                          |
+| `openai-images`     | OpenAI-compatible image generation and edits (`/images/generations`, `/images/edits`)     |
+| `openrouter-images` | Dedicated OpenRouter image endpoint (`/images`)                                           |
+| `codex-images`      | ChatGPT-subscription Codex Images backend; only valid on an `openai-codex` OAuth provider |
+| `transcriptions`    | Speech-to-text (Whisper)                                                                  |
+| `speech`            | Text-to-speech                                                                            |
 
 When combined with `priority: api_match` on a model alias, Plexus prefers providers that natively support the incoming API format.
 
@@ -165,6 +165,7 @@ OAuth provider declares `oauth://` through the string form instead.
 Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai) library. Every OAuth-capable provider pi-ai ships is supported — new flows pi-ai adds become available without a Plexus update. These require authentication through the Admin UI.
 
 **Supported OAuth providers (as of the current pi-ai dependency):**
+
 - Anthropic Claude
 - GitHub Copilot
 - OpenAI Codex
@@ -176,6 +177,7 @@ Plexus supports OAuth-backed providers via the [pi-ai](https://www.npmjs.com/pac
 `radius` is the one pi-ai OAuth flow Plexus excludes — it's a configurable gateway factory rather than a fixed identity provider, so it doesn't fit this list. The current set is always available from the Admin UI's OAuth provider dropdown, or via `GET /v0/management/oauth/providers`.
 
 **Configuration:**
+
 - Set API Base URL to `oauth://`
 - Set API Key to `oauth`
 - Set OAuth Provider if the provider key differs from pi-ai's expected ID
@@ -190,25 +192,24 @@ Once configured, log in via the Admin UI to authorize Plexus. Tokens are stored 
 
 An `openai-codex` OAuth provider can also serve image generation through the ChatGPT Images backend.
 Mark the provider model `type: image` and give it `access_via: ["codex-images"]`. That is the only
-image protocol an OAuth route accepts; any other image target on an OAuth provider is rejected with a
-400.
+image protocol an OAuth route accepts; any other image target on an OAuth provider is rejected with a 400.
 
 ```yaml
 providers:
   codex:
-    api_base_url: "oauth://"
-    api_key: "oauth"
-    oauth_provider: "openai-codex"
+    api_base_url: 'oauth://'
+    api_key: 'oauth'
+    oauth_provider: 'openai-codex'
     models:
       gpt-5.5: {}
       gpt-image-2:
         type: image
-        access_via: ["codex-images"]
+        access_via: ['codex-images']
         pricing: { source: per_request, amount: 0 }
         extraBody: { quality: low }
       gpt-image-2.5-flare:
         type: image
-        access_via: ["codex-images"]
+        access_via: ['codex-images']
 models:
   codex-image:
     type: image
@@ -335,15 +336,15 @@ Avoid enabling both for the same model and field.
 
 Agent clients such as Codex CLI and Muse Code send OpenAI Responses API extensions that many Responses-compatible upstreams reject:
 
-| Extension | Wire shape |
-|-----------|------------|
-| `namespace_tools` | `tools[]` entries of type `namespace` grouping sub-tools |
-| `namespaced_calls` | `function_call` history with a `namespace` field (`{namespace, name}`) |
-| `dotted_calls` | `function_call` history named `<namespace>.<tool>` (Muse Code's `muse.bash`) |
-| `custom_tools` | `tools[]` entries of type `custom` taking raw string input (e.g. `apply_patch`) |
-| `custom_calls` | `custom_tool_call` / `custom_tool_call_output` history items |
-| `additional_tools` | `additional_tools` input items (Codex lite mode) |
-| `tool_search` | client-executed `tool_search` tools and history items |
+| Extension          | Wire shape                                                                      |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `namespace_tools`  | `tools[]` entries of type `namespace` grouping sub-tools                        |
+| `namespaced_calls` | `function_call` history with a `namespace` field (`{namespace, name}`)          |
+| `dotted_calls`     | `function_call` history named `<namespace>.<tool>` (Muse Code's `muse.bash`)    |
+| `custom_tools`     | `tools[]` entries of type `custom` taking raw string input (e.g. `apply_patch`) |
+| `custom_calls`     | `custom_tool_call` / `custom_tool_call_output` history items                    |
+| `additional_tools` | `additional_tools` input items (Codex lite mode)                                |
+| `tool_search`      | client-executed `tool_search` tools and history items                           |
 
 Plexus forwards a Responses request verbatim only when the target accepts every extension the request carries. Otherwise it flattens them: namespace tools become `namespace__name` function tools, custom tools become functions with a single string `input`, and tool calls are split back into the client's original shape on the response. Any client can use any Responses or Chat target this way.
 
@@ -352,12 +353,12 @@ The accepted set depends on the target:
 - **`responses:lite` targets** use the fixed lite contract: every extension except top-level `namespace` tools and dotted names. The upstream enforces it, so the provider setting doesn't change it.
 - **Plain `responses` targets** use the provider's **Native Responses Extensions** setting (`responses_extensions`) when set (an empty list flattens everything), otherwise the provider default, from its OAuth provider or the host of its Responses endpoint:
 
-| Provider | Default |
-|----------|---------|
-| Codex OAuth | everything except `dotted_calls` |
-| Meta OAuth, or a Responses URL on `api.meta.ai` | `namespace_tools`, `namespaced_calls`, `dotted_calls` |
-| Responses URL on `api.openai.com` | `namespace_tools`, `namespaced_calls`, `custom_tools`, `custom_calls` |
-| Anything else | `custom_tools` |
+| Provider                                        | Default                                                               |
+| ----------------------------------------------- | --------------------------------------------------------------------- |
+| Codex OAuth                                     | everything except `dotted_calls`                                      |
+| Meta OAuth, or a Responses URL on `api.meta.ai` | `namespace_tools`, `namespaced_calls`, `dotted_calls`                 |
+| Responses URL on `api.openai.com`               | `namespace_tools`, `namespaced_calls`, `custom_tools`, `custom_calls` |
+| Anything else                                   | `custom_tools`                                                        |
 
 The defaults track the endpoint, so a provider pointed at api.openai.com or api.meta.ai needs no configuration. Set the field only to override a default or to opt a compatible third-party endpoint in, for example:
 
@@ -410,17 +411,18 @@ Adapters rewrite request payloads outbound to a provider and raw response payloa
 
 Adapters can be set at **provider level** (applied to every model under the provider) or at **model level** (appended after provider-level adapters for a specific model). Both accept a single name or a list. Use `{ "name": "...", "enabled": false }` at provider or model level to disable an inherited or automatic adapter; a later enabled entry restores it.
 
-| Adapter | Description |
-|---------|-------------|
-| `reasoning_content` | Renames `reasoning` / `thinking.content` → `reasoning_content` on outbound assistant messages for providers that use Fireworks/DeepSeek field naming (e.g. Fireworks DeepSeek-R1). Fixes *"Extra inputs are not permitted, field: messages[N].reasoning"* errors. |
-| `suppress_developer_role` | Rewrites the `developer` role to `system` on outbound messages for providers that do not support the newer OpenAI `developer` role. |
-| `model_override` | Conditionally rewrites the provider model name based on request payload fields. Used for providers that expose reasoning variants as separate model names rather than respecting reasoning-related fields in the request body. See [Model Override Adapter](#model-override-adapter) below. |
-| `reasoning_rewrite` | Manually rewrites reasoning/thinking request fields for providers with bespoke compatibility requirements. Prefer `auto_compat` for models linked to the pi-ai builtin registry; this adapter is now best treated as an escape hatch. |
-| `web_search_coercion` | Translates server-side web search tool entries to the format expected by the target provider. Clients can use any web search format; Plexus rewrites it transparently. See [Web Search Coercion Adapter](#web-search-coercion-adapter) below. |
-| `suppress_unsupported_gpt5_options` | Removes generation options unsupported by GPT-5 models. Enabled automatically for the GPT-5 family; set `enabled: false` for a model to opt out. |
-| `normalize_anthropic_tool_ids` | Rewrites `tool_use` / `tool_result` ids that violate Anthropic's `^[a-zA-Z0-9_-]+$` charset (e.g. Moonshot's `functions.WebSearch:3`), which Anthropic rejects with a hard HTTP 400. Enabled automatically when the outbound wire format is Anthropic Messages **and** the provider looks Anthropic (base URL containing `anthropic.com`, Anthropic OAuth, or Claude masking). Add `{ "name": "normalize_anthropic_tool_ids", "options": {}, "enabled": true }` to force it on for an Anthropic-compatible gateway hosted on another domain; set `enabled: false` to opt out. |
+| Adapter                             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reasoning_content`                 | Renames `reasoning` / `thinking.content` → `reasoning_content` on outbound assistant messages for providers that use Fireworks/DeepSeek field naming (e.g. Fireworks DeepSeek-R1). Fixes _"Extra inputs are not permitted, field: messages[N].reasoning"_ errors.                                                                                                                                                                                                                                                                                                             |
+| `suppress_developer_role`           | Rewrites the `developer` role to `system` on outbound messages for providers that do not support the newer OpenAI `developer` role.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `model_override`                    | Conditionally rewrites the provider model name based on request payload fields. Used for providers that expose reasoning variants as separate model names rather than respecting reasoning-related fields in the request body. See [Model Override Adapter](#model-override-adapter) below.                                                                                                                                                                                                                                                                                   |
+| `reasoning_rewrite`                 | Manually rewrites reasoning/thinking request fields for providers with bespoke compatibility requirements. Prefer `auto_compat` for models linked to the pi-ai builtin registry; this adapter is now best treated as an escape hatch.                                                                                                                                                                                                                                                                                                                                         |
+| `web_search_coercion`               | Translates server-side web search tool entries to the format expected by the target provider. Clients can use any web search format; Plexus rewrites it transparently. See [Web Search Coercion Adapter](#web-search-coercion-adapter) below.                                                                                                                                                                                                                                                                                                                                 |
+| `suppress_unsupported_gpt5_options` | Removes generation options unsupported by GPT-5 models. Enabled automatically for the GPT-5 family; set `enabled: false` for a model to opt out.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `normalize_anthropic_tool_ids`      | Rewrites `tool_use` / `tool_result` ids that violate Anthropic's `^[a-zA-Z0-9_-]+$` charset (e.g. Moonshot's `functions.WebSearch:3`), which Anthropic rejects with a hard HTTP 400. Enabled automatically when the outbound wire format is Anthropic Messages **and** the provider looks Anthropic (base URL containing `anthropic.com`, Anthropic OAuth, or Claude masking). Add `{ "name": "normalize_anthropic_tool_ids", "options": {}, "enabled": true }` to force it on for an Anthropic-compatible gateway hosted on another domain; set `enabled: false` to opt out. |
 
 **Example — provider-level:**
+
 ```json
 PUT /v0/management/providers/fireworks
 {
@@ -431,6 +433,7 @@ PUT /v0/management/providers/fireworks
 ```
 
 **Example — model-level override:**
+
 ```json
 {
   "models": {
@@ -485,20 +488,21 @@ The `model_override` adapter is configured at **model level** only (not provider
 
 **Rule fields:**
 
-| Field | Description |
-|-------|-------------|
-| `model` | The provider model name to match against (must match the resolved target model) |
-| `rewriteTo` | The model name to send to the provider instead |
-| `conditions` | Array of conditions; **any** match triggers the rewrite |
+| Field        | Description                                                                     |
+| ------------ | ------------------------------------------------------------------------------- |
+| `model`      | The provider model name to match against (must match the resolved target model) |
+| `rewriteTo`  | The model name to send to the provider instead                                  |
+| `conditions` | Array of conditions; **any** match triggers the rewrite                         |
 
 **Condition fields:**
 
-| Field | Description |
-|-------|-------------|
-| `field` | Dotted path into the request payload (e.g. `reasoning.enabled`, `chat_template_kwargs.enable_thinking`) |
+| Field   | Description                                                                                               |
+| ------- | --------------------------------------------------------------------------------------------------------- |
+| `field` | Dotted path into the request payload (e.g. `reasoning.enabled`, `chat_template_kwargs.enable_thinking`)   |
 | `value` | Value to match (strict equality). If omitted, the condition matches when the field is present (any value) |
 
 **Notes:**
+
 - The adapter operates on the **transformed provider payload**, so fields must survive API transformation to be matchable. For chat-to-chat requests, all fields from the original request body are preserved (including non-standard fields like `enable_thinking`, `thinking_budget`, etc.).
 - Multiple rules are evaluated in order; only the first matching rule applies.
 - The rewrite is transparent to the client — billing and usage tracking still reference the original canonical model name.
@@ -509,21 +513,21 @@ Different providers expose server-side web search under completely different too
 
 **Supported incoming formats** (any of these will be recognised and coerced):
 
-| Provider | Tool entry |
-|----------|-----------|
-| Anthropic | `{ "type": "web_search_20250305", "name": "web_search", "max_uses": N }` |
-| OpenAI | `{ "type": "web_search" }` |
-| OpenRouter | `{ "type": "openrouter:web_search" }` |
-| Google | `{ "googleSearch": {} }` / `{ "type": "googleSearch" }` |
+| Provider   | Tool entry                                                               |
+| ---------- | ------------------------------------------------------------------------ |
+| Anthropic  | `{ "type": "web_search_20250305", "name": "web_search", "max_uses": N }` |
+| OpenAI     | `{ "type": "web_search" }`                                               |
+| OpenRouter | `{ "type": "openrouter:web_search" }`                                    |
+| Google     | `{ "googleSearch": {} }` / `{ "type": "googleSearch" }`                  |
 
 **Supported targets** (the format Plexus rewrites to):
 
-| `target` | Output tool entry | Provider |
-|----------|------------------|---------|
-| `anthropic` | `{ "type": "web_search_20250305", "name": "web_search" }` | Anthropic API |
-| `openai` | `{ "type": "web_search" }` | OpenAI Responses API |
-| `openrouter` | `{ "type": "openrouter:web_search" }` | OpenRouter |
-| `google` | `{ "googleSearch": {} }` | Google Gemini native API |
+| `target`     | Output tool entry                                         | Provider                 |
+| ------------ | --------------------------------------------------------- | ------------------------ |
+| `anthropic`  | `{ "type": "web_search_20250305", "name": "web_search" }` | Anthropic API            |
+| `openai`     | `{ "type": "web_search" }`                                | OpenAI Responses API     |
+| `openrouter` | `{ "type": "openrouter:web_search" }`                     | OpenRouter               |
+| `google`     | `{ "googleSearch": {} }`                                  | Google Gemini native API |
 
 The adapter operates transparently across **all four incoming API surfaces** (Chat Completions, Anthropic Messages, OpenAI Responses, and Gemini native) — a client using any of these APIs and any web search format will have its request correctly rewritten for the target provider.
 
@@ -559,12 +563,13 @@ For the Anthropic target, an optional `max_uses` limits how many web searches ar
 
 **Options:**
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `target` | `"anthropic"` \| `"openai"` \| `"openrouter"` \| `"google"` | Yes | The provider's expected web search tool format |
-| `max_uses` | integer | No | Maximum web searches per request. Anthropic target only; ignored for other targets. |
+| Option     | Type                                                        | Required | Description                                                                         |
+| ---------- | ----------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `target`   | `"anthropic"` \| `"openai"` \| `"openrouter"` \| `"google"` | Yes      | The provider's expected web search tool format                                      |
+| `max_uses` | integer                                                     | No       | Maximum web searches per request. Anthropic target only; ignored for other targets. |
 
 **Notes:**
+
 - Non-web-search tools (regular function tools) in the same request are left untouched.
 - The adapter only fires when a web search tool is present; requests without web search tools have zero overhead.
 - For Google providers, web search coercion requires the **native Gemini API** endpoint (`/v1beta/models/...`). The OpenAI-compatible endpoint Google exposes does not support any web search tool format.
@@ -574,19 +579,20 @@ For the Anthropic target, an optional `max_uses` limits how many web searches ar
 
 Quota checkers monitor upstream provider rate limits and prevent routing to exhausted providers.
 
-| Checker Type | Description | Options |
-|--------------|-------------|---------|
-| `synthetic` | Usage from Synthetic API | `apiKey` (defaults to provider's key) |
-| `naga` | Naga AI balance |
-| `nanogpt` | NanoGPT usage |
-| `openai-codex` | Codex quota (OAuth) | Reads token from database |
-| `claude-code` | Claude Code quota (OAuth) | Reads token from database |
-| `zai` | ZAI balance |
-| `moonshot` | Moonshot balance |
-| `novita` | Novita balance |
-| `minimax` | Minimax balance | Requires `groupid`, `hertzSession` |
+| Checker Type   | Description               | Options                               |
+| -------------- | ------------------------- | ------------------------------------- |
+| `synthetic`    | Usage from Synthetic API  | `apiKey` (defaults to provider's key) |
+| `naga`         | Naga AI balance           |
+| `nanogpt`      | NanoGPT usage             |
+| `openai-codex` | Codex quota (OAuth)       | Reads token from database             |
+| `claude-code`  | Claude Code quota (OAuth) | Reads token from database             |
+| `zai`          | ZAI balance               |
+| `moonshot`     | Moonshot balance          |
+| `novita`       | Novita balance            |
+| `minimax`      | Minimax balance           | Requires `groupid`, `hertzSession`    |
 
 **Settings:**
+
 - `enabled`: Enable/disable polling
 - `intervalMinutes`: Polling frequency (minimum 1)
 - `maxUtilizationPercent`: Treat provider as exhausted when any window reaches this % (default 99)
@@ -629,14 +635,14 @@ A **model alias** is a virtual model name that clients use in requests. Each ali
 
 ### Alias Settings
 
-| Setting | Description | Required |
-|---------|-------------|----------|
-| **Slug** | Name clients send (e.g., `fast-model`) | Yes |
-| **Type** | `chat` (default), `embeddings`, `transcriptions`, `speech`, `image` | No |
-| **Additional Aliases** | Alternative names that also route here | No |
-| **Priority** | Routing order: `selector` (default) or `api_match` | No |
-| **Target Groups** | Ordered groups of targets, each with its own selector | Yes |
-| **Metadata** | External catalog for model info | No |
+| Setting                | Description                                                         | Required |
+| ---------------------- | ------------------------------------------------------------------- | -------- |
+| **Slug**               | Name clients send (e.g., `fast-model`)                              | Yes      |
+| **Type**               | `chat` (default), `embeddings`, `transcriptions`, `speech`, `image` | No       |
+| **Additional Aliases** | Alternative names that also route here                              | No       |
+| **Priority**           | Routing order: `selector` (default) or `api_match`                  | No       |
+| **Target Groups**      | Ordered groups of targets, each with its own selector               | Yes      |
+| **Metadata**           | External catalog for model info                                     | No       |
 
 ### Target Groups
 
@@ -648,26 +654,26 @@ Aliases contain one or more **target groups**. The dispatcher exhausts all healt
 
 This allows you to organise targets by preference. For example:
 
-| Group | Name | Selector | Purpose |
-|-------|------|----------|---------|
-| 1 | `subscription` | `e2e_performance` | Use paid subscriptions first (sunk cost) |
-| 2 | `payg` | `cost` | Fall back to cheapest pay-as-you-go option |
-| 3 | `backup` | `in_order` | Last-resort backup target |
+| Group | Name           | Selector          | Purpose                                    |
+| ----- | -------------- | ----------------- | ------------------------------------------ |
+| 1     | `subscription` | `e2e_performance` | Use paid subscriptions first (sunk cost)   |
+| 2     | `payg`         | `cost`            | Fall back to cheapest pay-as-you-go option |
+| 3     | `backup`       | `in_order`        | Last-resort backup target                  |
 
 If no groups are explicitly configured, all targets live in a single `default` group.
 
 ### Selector Strategies
 
-| Strategy | Behavior |
-|----------|----------|
-| `random` (default) | Distributes requests randomly across healthy targets in the group |
-| `in_order` | Tries targets in order, skips unhealthy ones |
-| `cost` | Routes to cheapest provider (requires pricing) |
-| `performance` | Routes to highest post-TTFT throughput (output tokens / streaming time) |
-| `latency` | Routes to lowest time-to-first-token |
-| `usage` | Routes to provider with least recent usage (last 24 hours) |
-| `quota` | Favors tracked targets with the most quota headroom to consume before reset; utilization is scored continuously, while non-expiring balances rank after resettable quotas |
-| `e2e_performance` | Routes to highest end-to-end throughput (output tokens / total request time) |
+| Strategy           | Behavior                                                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `random` (default) | Distributes requests randomly across healthy targets in the group                                                                                                         |
+| `in_order`         | Tries targets in order, skips unhealthy ones                                                                                                                              |
+| `cost`             | Routes to cheapest provider (requires pricing)                                                                                                                            |
+| `performance`      | Routes to highest post-TTFT throughput (output tokens / streaming time)                                                                                                   |
+| `latency`          | Routes to lowest time-to-first-token                                                                                                                                      |
+| `usage`            | Routes to provider with least recent usage (last 24 hours)                                                                                                                |
+| `quota`            | Favors tracked targets with the most quota headroom to consume before reset; utilization is scored continuously, while non-expiring balances rank after resettable quotas |
+| `e2e_performance`  | Routes to highest end-to-end throughput (output tokens / total request time)                                                                                              |
 
 #### Inline Exploration (default)
 
@@ -681,9 +687,9 @@ To keep performance data fresh **without** ever diverting live requests, enable 
 
 ```yaml
 backgroundExploration:
-  enabled: true                  # default: false
+  enabled: true # default: false
   stalenessThresholdSeconds: 600 # default: 600 (10 minutes), minimum: 1
-  workerConcurrency: 2           # default: 2, range: 1–16
+  workerConcurrency: 2 # default: 2, range: 1–16
 ```
 
 How it works:
@@ -719,6 +725,7 @@ Non-text aliases do not receive an inferred preferred API.
 ### Targets
 
 Each target specifies:
+
 - **Provider**: Must match an existing provider slug
 - **Model**: Upstream model name
 - **Enabled**: Whether this target is active
@@ -759,8 +766,8 @@ metadata:
     pricing:
       tiers:
         - input_tokens_above: 272000
-          prompt: "0.000005"
-          completion: "0.000015"
+          prompt: '0.000005'
+          completion: '0.000015'
 ```
 
 Pricing tiers are optional. OpenRouter and models.dev tiers are included when the
@@ -787,11 +794,11 @@ metadata:
 
 Available external catalogs:
 
-| Source | URL | Format |
-|--------|-----|--------|
-| `openrouter` | openrouter.ai | `provider/model` |
-| `models.dev` | models.dev | `providerid.modelid` |
-| `catwalk` | catwalk.charm.sh | `providerid.modelid` |
+| Source       | URL              | Format               |
+| ------------ | ---------------- | -------------------- |
+| `openrouter` | openrouter.ai    | `provider/model`     |
+| `models.dev` | models.dev       | `providerid.modelid` |
+| `catwalk`    | catwalk.charm.sh | `providerid.modelid` |
 
 Metadata loads at startup. Failures are non-fatal; automatic resolution falls back to the
 safe name-based defaults when no exact catalog entry is available.
@@ -832,16 +839,17 @@ API keys authenticate clients to inference endpoints (`/v1/*`).
 
 ### Key Settings
 
-| Setting | Description | Required |
-|---------|-------------|----------|
-| **Name** | Unique identifier | Yes |
-| **Secret** | Bearer token (clients send in `Authorization` header) | Yes |
-| **Comment** | Description or owner | No |
-| **Quota** | Name of a quota definition to enforce | No |
+| Setting     | Description                                           | Required |
+| ----------- | ----------------------------------------------------- | -------- |
+| **Name**    | Unique identifier                                     | Yes      |
+| **Secret**  | Bearer token (clients send in `Authorization` header) | Yes      |
+| **Comment** | Description or owner                                  | No       |
+| **Quota**   | Name of a quota definition to enforce                 | No       |
 
 ### Authentication Methods
 
 Clients can provide credentials via:
+
 - `Authorization: Bearer <secret>`
 - `Authorization: <secret>` (prefix added automatically)
 - `x-api-key: <secret>`
@@ -875,20 +883,20 @@ User quotas enforce per-key usage limits. Unlike provider quota checkers (which 
 
 ### Quota Types
 
-| Type | Reset Behavior |
-|------|----------------|
+| Type      | Reset Behavior                        |
+| --------- | ------------------------------------- |
 | `rolling` | Continuous window (e.g., "last hour") |
-| `daily` | Resets at UTC midnight |
-| `weekly` | Resets at UTC midnight Sunday |
-| `monthly` | Resets at 00:00 UTC on the 1st |
+| `daily`   | Resets at UTC midnight                |
+| `weekly`  | Resets at UTC midnight Sunday         |
+| `monthly` | Resets at 00:00 UTC on the 1st        |
 
 ### Limit Types
 
-| Type | What It Counts |
-|------|----------------|
-| `requests` | Number of API calls |
-| `tokens` | Input + output + reasoning + cached tokens |
-| `cost` | Dollar spending (requires pricing on models) |
+| Type       | What It Counts                               |
+| ---------- | -------------------------------------------- |
+| `requests` | Number of API calls                          |
+| `tokens`   | Input + output + reasoning + cached tokens   |
+| `cost`     | Dollar spending (requires pricing on models) |
 
 ### Rolling Window Durations
 
@@ -897,11 +905,13 @@ Supported durations: `30s`, `5m`, `10m`, `30m`, `1h`, `2h`, `2h30m`, `6h`, `12h`
 ### How Quotas Work
 
 **Tokens/Requests (leaky bucket):**
+
 1. After each request, usage is recorded.
 2. Before each request, usage "leaks" based on elapsed time: `leaked = elapsed × (limit / duration)`
 3. Remaining capacity determines if the request is allowed.
 
 **Cost (cumulative):**
+
 1. Spending accumulates as requests complete.
 2. Resets when the window expires.
 3. No leak/refill within the window.
@@ -918,17 +928,17 @@ When a provider returns errors, Plexus uses an escalating cooldown system to tem
 
 ### Cooldown Schedule
 
-| Consecutive Failures | Duration |
-|---------------------|----------|
-| 1st | 2 minutes |
-| 2nd | 4 minutes |
-| 3rd | 8 minutes |
-| 4th | 16 minutes |
-| 5th | 32 minutes |
-| 6th | 64 minutes |
-| 7th | 128 minutes |
-| 8th | 256 minutes |
-| 9th+ | 300 minutes (cap) |
+| Consecutive Failures | Duration          |
+| -------------------- | ----------------- |
+| 1st                  | 2 minutes         |
+| 2nd                  | 4 minutes         |
+| 3rd                  | 8 minutes         |
+| 4th                  | 16 minutes        |
+| 5th                  | 32 minutes        |
+| 6th                  | 64 minutes        |
+| 7th                  | 128 minutes       |
+| 8th                  | 256 minutes       |
+| 9th+                 | 300 minutes (cap) |
 
 ### Behavior
 
@@ -939,14 +949,15 @@ When a provider returns errors, Plexus uses an escalating cooldown system to tem
 
 ### Configuration
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `initialMinutes` | First failure duration | 2 |
-| `maxMinutes` | Cap for exponential backoff | 300 |
+| Setting          | Description                 | Default |
+| ---------------- | --------------------------- | ------- |
+| `initialMinutes` | First failure duration      | 2       |
+| `maxMinutes`     | Cap for exponential backoff | 300     |
 
 ### Disabling Per Provider
 
 Set `disable_cooldown: true` on a provider to exclude it from the cooldown system. Recommended for:
+
 - Local model servers (Ollama, LM Studio)
 - Providers with their own rate-limit handling
 - Testing scenarios
@@ -989,14 +1000,14 @@ If the timeout fires before the request completes:
 
 Global timeout settings live in system settings and are exposed through the Admin UI **Config → Timeout Settings** and the management API.
 
-| Field | Type | Default | Range | Meaning |
-|------|------|---------|-------|---------|
-| `defaultSeconds` | integer | `300` | `1–3600` | Default maximum duration for any upstream request unless the selected provider overrides it |
+| Field            | Type    | Default | Range    | Meaning                                                                                     |
+| ---------------- | ------- | ------- | -------- | ------------------------------------------------------------------------------------------- |
+| `defaultSeconds` | integer | `300`   | `1–3600` | Default maximum duration for any upstream request unless the selected provider overrides it |
 
 ### Per-Provider Timeout Configuration
 
-| Field | Type | Default | Meaning |
-|------|------|---------|---------|
+| Field       | Type                   | Default        | Meaning                                                          |
+| ----------- | ---------------------- | -------------- | ---------------------------------------------------------------- |
 | `timeoutMs` | integer (milliseconds) | inherit global | Override the global timeout for requests routed to this provider |
 
 ### Management API
@@ -1077,13 +1088,13 @@ If throughput drops below the configured floor, Plexus aborts the stream and rec
 
 Global stall settings live in the Admin UI under **Config → Stall Detection** and in the management API.
 
-| Field | Type | Default | Range | Meaning |
-|------|------|---------|-------|---------|
-| `ttfbSeconds` | integer or `null` | `null` | `5–120` or `null` | Max time to wait for the first meaningful bytes. `null` disables TTFB stall detection. |
-| `ttfbBytes` | integer | `100` | `50–10000` | Byte threshold that must arrive within `ttfbSeconds` to count as “started”. |
-| `minBytesPerSecond` | integer or `null` | `null` | `50–5000` or `null` | Minimum acceptable streaming throughput. `null` disables throughput stall detection. |
-| `windowSeconds` | integer | `10` | `3–30` | Sliding window width used to calculate throughput. |
-| `gracePeriodSeconds` | integer | `30` | `0–120` | Delay after TTFB success before throughput enforcement starts. |
+| Field                | Type              | Default | Range               | Meaning                                                                                |
+| -------------------- | ----------------- | ------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `ttfbSeconds`        | integer or `null` | `null`  | `5–120` or `null`   | Max time to wait for the first meaningful bytes. `null` disables TTFB stall detection. |
+| `ttfbBytes`          | integer           | `100`   | `50–10000`          | Byte threshold that must arrive within `ttfbSeconds` to count as “started”.            |
+| `minBytesPerSecond`  | integer or `null` | `null`  | `50–5000` or `null` | Minimum acceptable streaming throughput. `null` disables throughput stall detection.   |
+| `windowSeconds`      | integer           | `10`    | `3–30`              | Sliding window width used to calculate throughput.                                     |
+| `gracePeriodSeconds` | integer           | `30`    | `0–120`             | Delay after TTFB success before throughput enforcement starts.                         |
 
 ### Effective Behavior and Inheritance
 
@@ -1139,20 +1150,20 @@ Plexus proxies [Model Context Protocol](https://modelcontextprotocol.io) servers
 
 ### Settings
 
-| Setting | Description | Required |
-|---------|-------------|----------|
-| **Server Name** | Identifier used in URLs | Yes |
-| **Upstream URL** | Full MCP server endpoint | Yes |
-| **Enabled** | Active for routing | No |
-| **Headers** | Static headers forwarded to upstream | No |
+| Setting          | Description                          | Required |
+| ---------------- | ------------------------------------ | -------- |
+| **Server Name**  | Identifier used in URLs              | Yes      |
+| **Upstream URL** | Full MCP server endpoint             | Yes      |
+| **Enabled**      | Active for routing                   | No       |
+| **Headers**      | Static headers forwarded to upstream | No       |
 
 ### Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/mcp/:name` | JSON-RPC messages |
-| `GET` | `/mcp/:name` | SSE streaming |
-| `DELETE` | `/mcp/:name` | End session |
+| Method   | Path         | Description       |
+| -------- | ------------ | ----------------- |
+| `POST`   | `/mcp/:name` | JSON-RPC messages |
+| `GET`    | `/mcp/:name` | SSE streaming     |
+| `DELETE` | `/mcp/:name` | End session       |
 
 ### Authentication
 
@@ -1161,6 +1172,7 @@ All MCP endpoints require a Plexus API key. Client auth headers are NOT forwarde
 ### OAuth Discovery
 
 Plexus exposes standard OAuth 2.0 endpoints for MCP clients:
+
 - `GET /.well-known/oauth-authorization-server`
 - `GET /.well-known/oauth-protected-resource/mcp/:name`
 - `GET /oauth/authorize` and `POST /oauth/authorize`
@@ -1183,6 +1195,7 @@ MCP grant will be bound, even when only one active key exists.
 Vision fallthrough allows image inputs to be preprocessed by a vision-capable model before routing to the actual target.
 
 **Configuration:**
+
 1. Set a global **Descriptor Model** in Settings (Admin UI)
 2. Enable **Use Image Fallthrough** on individual model aliases
 
@@ -1196,16 +1209,17 @@ Configure pricing to enable `cost` selector strategy, cost-based quotas, and usa
 
 ### Pricing Sources
 
-| Source | Description |
-|--------|-------------|
-| `simple` | Fixed per-million token rates |
-| `openrouter` | Live rates from OpenRouter API |
-| `defined` | Tiered rates based on input token volume |
-| `per_request` | Flat fee per API call |
+| Source        | Description                              |
+| ------------- | ---------------------------------------- |
+| `simple`      | Fixed per-million token rates            |
+| `openrouter`  | Live rates from OpenRouter API           |
+| `defined`     | Tiered rates based on input token volume |
+| `per_request` | Flat fee per API call                    |
 
 ### Simple Pricing
 
 Configure via Admin UI or API:
+
 - `input`: dollars per million input tokens (e.g., `3.00`)
 - `output`: dollars per million output tokens (e.g., `15.00`)
 - `cached`: cache read rate (optional)
@@ -1214,6 +1228,7 @@ Configure via Admin UI or API:
 ### OpenRouter Pricing
 
 Fetches live rates from OpenRouter. Configure via Admin UI or API:
+
 - Set source to `openrouter`
 - Set model `slug` (e.g., `anthropic/claude-3.5-sonnet`)
 - Optional `discount` for percentage off all rates
@@ -1222,14 +1237,15 @@ Fetches live rates from OpenRouter. Configure via Admin UI or API:
 
 Useful for providers with volume discounts. Configure tiers via Admin UI or API:
 
-| Lower Bound | Upper Bound | Input Rate | Output Rate |
-|-------------|-------------|------------|-------------|
-| 0 | 200,000 | $3.00/M | $15.00/M |
-| 200,001 | ∞ (infinity) | $1.50/M | $7.50/M |
+| Lower Bound | Upper Bound  | Input Rate | Output Rate |
+| ----------- | ------------ | ---------- | ----------- |
+| 0           | 200,000      | $3.00/M    | $15.00/M    |
+| 200,001     | ∞ (infinity) | $1.50/M    | $7.50/M     |
 
 ### Per-Request Pricing
 
 Flat fee regardless of token count. Configure via Admin UI or API:
+
 - Set source to `per_request`
 - Set `amount` (e.g., `0.04`)
 
@@ -1242,6 +1258,7 @@ Full cost stored in `costInput`; output/cached fields are zero.
 Some providers (especially free-tier models) don't return usage data. Enable token estimation to automatically calculate token counts using a character-based heuristic.
 
 **Enable via:**
+
 - Provider setting: `estimateTokens: true`
 - Admin UI: **Advanced → Estimate Tokens**
 
@@ -1255,12 +1272,12 @@ Plexus can encrypt sensitive data using AES-256-GCM.
 
 ### What Gets Encrypted
 
-| Data | Fields |
-|------|--------|
-| API Keys | secret |
-| OAuth Credentials | accessToken, refreshToken |
-| Providers | apiKey, headers, quotaCheckerOptions |
-| MCP Servers | headers |
+| Data              | Fields                               |
+| ----------------- | ------------------------------------ |
+| API Keys          | secret                               |
+| OAuth Credentials | accessToken, refreshToken            |
+| Providers         | apiKey, headers, quotaCheckerOptions |
+| MCP Servers       | headers                              |
 
 ### Setup
 
@@ -1273,6 +1290,7 @@ export ENCRYPTION_KEY="your-64-character-hex-key"
 ```
 
 Key format accepts:
+
 - 64-character hex string (32 bytes, used directly)
 - Arbitrary passphrase (derived via scrypt)
 

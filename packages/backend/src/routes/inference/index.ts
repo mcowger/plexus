@@ -1,20 +1,21 @@
-import { FastifyInstance } from 'fastify';
 import bearerAuth from '@fastify/bearer-auth';
-import { createAuthHook } from '../../utils/auth';
+import { FastifyInstance } from 'fastify';
+
 import { Dispatcher } from '../../services/dispatch/dispatcher';
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
-import { registerModelsRoute, registerMuseCodeModelsRoute } from './models';
+import { createAuthHook } from '../../utils/auth';
 import { registerChatRoute } from './chat';
-import { registerMessagesRoute } from './messages';
-import { registerGeminiRoute } from './gemini';
-import { registerEmbeddingsRoute } from './embeddings';
-import { registerTranscriptionsRoute } from './transcriptions';
-import { registerSpeechRoute } from './speech';
-import { registerImagesRoute } from './images';
-import { registerResponsesRoute } from './responses';
 import { registerCompletionsRoute } from './completions';
 import { registerDecisionsRoute } from './decisions';
+import { registerEmbeddingsRoute } from './embeddings';
+import { registerGeminiRoute } from './gemini';
+import { registerImagesRoute } from './images';
+import { registerMessagesRoute } from './messages';
+import { registerModelsRoute, registerMuseCodeModelsRoute } from './models';
+import { registerResponsesRoute } from './responses';
+import { registerSpeechRoute } from './speech';
+import { registerTranscriptionsRoute } from './transcriptions';
 
 export async function registerInferenceRoutes(
   fastify: FastifyInstance,

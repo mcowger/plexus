@@ -1,11 +1,13 @@
-import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
-import { CooldownManager } from '../runtime/cooldown-manager';
 // Globally mocked in test/vitest.setup.ts — imported here only to assert on the
 // warn the normalize_anthropic_tool_ids adapter emits when it rewrites ids.
 import { logger } from '../../utils/logger';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 // @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here. Dispatcher is imported dynamically so it

@@ -1,6 +1,7 @@
 import { encode } from 'eventsource-encoder';
+
 import { UnifiedClientToolCall } from '../../types/unified';
-import { ResponsesToolState, customToolInput, resolveOutputToolCall } from './tool-mapper';
+import { customToolInput, resolveOutputToolCall, ResponsesToolState } from './tool-mapper';
 import { buildResponsesUsagePayload, generateItemId, generateResponseId } from './utils';
 
 /**

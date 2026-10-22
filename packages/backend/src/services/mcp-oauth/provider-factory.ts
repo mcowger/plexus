@@ -1,6 +1,6 @@
 import { getConfig } from '../../config';
-import type { AuthProvider } from './types';
 import { PlexusIdpProvider } from './plexus-idp-provider';
+import type { AuthProvider } from './types';
 
 let cachedProvider: AuthProvider | null = null;
 let cachedProviderId: string | null = null;

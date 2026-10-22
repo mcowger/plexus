@@ -37,8 +37,7 @@ export class PricingManager {
 
   public getPricing(slug: string): OpenRouterPricing | undefined {
     const pricing = this.metadataManager.getMetadata('openrouter', slug)?.pricing as
-      | OpenRouterPricing
-      | undefined;
+      OpenRouterPricing | undefined;
     // OpenRouter uses "-1" for routers/variable-priced models (e.g. typesafe/jev-router)
     // to mean "price unknown". Treat those as having no pricing rather than a negative rate.
     if (pricing && (parseFloat(pricing.prompt) < 0 || parseFloat(pricing.completion) < 0)) {

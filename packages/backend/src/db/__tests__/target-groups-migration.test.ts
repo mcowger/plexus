@@ -1,15 +1,16 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { toDbBoolean } from '../../utils/normalize';
 import {
   closeDatabase,
+  getCurrentDialect,
   getDatabase,
   getSchema,
   initializeDatabase,
-  getCurrentDialect,
 } from '../client';
-import { runMigrations } from '../migrate';
-import { eq } from 'drizzle-orm';
 import { ConfigRepository } from '../config-repository';
-import { toDbBoolean } from '../../utils/normalize';
+import { runMigrations } from '../migrate';
 
 function parseStoredGroups(value: unknown) {
   return typeof value === 'string' ? JSON.parse(value) : value;

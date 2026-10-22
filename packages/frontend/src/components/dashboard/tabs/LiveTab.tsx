@@ -13,10 +13,11 @@
  * DetailedUsage page pre-seeded with a query string relevant to that card's data slice.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent, DragOverlay, type DragStartEvent } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
 import { RefreshCw } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
+
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCardPositions } from '../../../hooks/useCardPositions';
 import { useLiveDashboardData } from '../../../hooks/useLiveDashboardData';
@@ -24,7 +25,6 @@ import type { CardId } from '../../../types/card';
 import { buildQueryString, type CardType } from '../../analytics/AnalyzeButton';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
-import { LIVE_WINDOW_OPTIONS, POLL_INTERVAL_OPTIONS, type ModalCardId } from '../liveTypes';
 import {
   AlertsCard,
   ConcurrencyCard,
@@ -37,6 +37,7 @@ import {
   TimelineCard,
   VelocityCard,
 } from '../cards';
+import { LIVE_WINDOW_OPTIONS, type ModalCardId, POLL_INTERVAL_OPTIONS } from '../liveTypes';
 import { LiveDashboardModal } from '../modals';
 
 export interface LiveTabProps {
@@ -286,7 +287,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       {/* ------- Page Header ------- */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 sm:mb-8">
         <div className="header-left">
-          <h1 className="font-heading text-xl sm:text-3xl font-bold text-text m-0 mb-2">
+          <h1 className="font-heading text-text m-0 mb-2 text-xl font-bold sm:text-3xl">
             Live Metrics
           </h1>
         </div>
@@ -305,7 +306,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
       </div>
 
       {/* ------- Toolbar ------- */}
-      <div className="-mx-3 mb-4 flex flex-nowrap items-center gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-3 mb-4 flex [scrollbar-width:none] flex-nowrap items-center gap-1.5 overflow-x-auto px-3 pb-1 [-ms-overflow-style:none] sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
         <Button
           size="sm"
           variant="secondary"
@@ -330,7 +331,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             </Button>
           );
         })}
-        <span className="hidden text-xs text-text-secondary sm:inline">|</span>
+        <span className="text-text-secondary hidden text-xs sm:inline">|</span>
         {LIVE_WINDOW_OPTIONS.map((option) => (
           <Button
             key={option.value}
@@ -343,7 +344,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
             {option.label}
           </Button>
         ))}
-        <span className="hidden text-xs text-text-muted sm:inline">
+        <span className="text-text-muted hidden text-xs sm:inline">
           {data.isVisible ? 'Tab active' : 'Tab hidden'} - data refresh resumes on focus.
         </span>
       </div>
@@ -355,7 +356,7 @@ export const LiveTab: React.FC<LiveTabProps> = ({
         onDragCancel={handleDragCancel}
       >
         <SortableContext items={orderedCardIds}>
-          <div className="grid min-w-0 grid-cols-1 gap-4 mb-4 lg:grid-cols-2">
+          <div className="mb-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             {orderedCardIds.map((cardId, index) => (
               <div key={cardId} className="min-w-0">
                 {renderCard(cardId, index)}

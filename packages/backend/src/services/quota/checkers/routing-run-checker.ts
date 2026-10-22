@@ -1,5 +1,6 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
+import { defineChecker } from '../checker-registry';
 
 interface RoutingRunRequestsResponse {
   requests_used_today: number;

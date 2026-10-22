@@ -1,8 +1,9 @@
 import { useState } from 'react';
+
 import type { Provider } from '../../lib/api';
-import { ModelList } from './model-editor/ModelList';
-import { renameRecordKey, removeRecordKey } from './model-editor/adapter-utils';
+import { removeRecordKey, renameRecordKey } from './model-editor/adapter-utils';
 import { CODEX_OAUTH_PROVIDER } from './model-editor/constants';
+import { ModelList } from './model-editor/ModelList';
 import { usePiAiModels } from './model-editor/usePiAiModels';
 
 interface Props {

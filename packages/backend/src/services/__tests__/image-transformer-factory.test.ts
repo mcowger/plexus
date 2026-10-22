@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { ImageGenerationTransformerFactory } from '../dispatch/image-transformer-factory';
+
 import { CodexImageTransformer } from '../../transformers/images/codex';
+import { ImageGenerationTransformerFactory } from '../dispatch/image-transformer-factory';
 
 describe('ImageGenerationTransformerFactory', () => {
   test('resolves OpenAI Images targets', () => {

@@ -1,5 +1,6 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
+
 import type { MeterStatus } from '../../types/quota';
 
 interface QuotaProgressBarProps {
@@ -39,11 +40,11 @@ export const QuotaProgressBar: React.FC<QuotaProgressBarProps> = ({
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className="text-text-secondary truncate">{label}</span>
         {displayValue && (
-          <span className="text-text tabular-nums flex-shrink-0">{displayValue}</span>
+          <span className="text-text flex-shrink-0 tabular-nums">{displayValue}</span>
         )}
       </div>
       <div
-        className={clsx('rounded-full bg-bg-subtle overflow-hidden border border-border/30', barH)}
+        className={clsx('bg-bg-subtle border-border/30 overflow-hidden rounded-full border', barH)}
       >
         <div
           className={clsx('h-full rounded-full transition-all duration-500', barColor(status))}

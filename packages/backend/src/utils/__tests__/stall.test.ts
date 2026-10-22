@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { wireStallDetection, resolveStallConfig } from '../stall';
+
 import type { StallConfig } from '../../services/inspectors/stall-inspector';
+import { resolveStallConfig, wireStallDetection } from '../stall';
 
 describe('wireStallDetection', () => {
   test('addStallConfig with empty overrides reverts to global config', () => {

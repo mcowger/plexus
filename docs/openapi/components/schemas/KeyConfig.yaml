@@ -15,7 +15,7 @@ properties:
   comment:
     type: string
     description: >
-       Freeform description or notes about this key. Max 500 characters.
+      Freeform description or notes about this key. Max 500 characters.
   expiresInMinutes:
     type: integer
     minimum: 1

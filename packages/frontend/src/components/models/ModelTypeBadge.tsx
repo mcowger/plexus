@@ -1,6 +1,7 @@
 import React from 'react';
-import { Badge as UIBadge } from '../ui/Badge';
+
 import { Alias } from '../../lib/api';
+import { Badge as UIBadge } from '../ui/Badge';
 
 interface ModelTypeBadgeProps {
   type?: Alias['type'];
@@ -37,7 +38,7 @@ export const ModelTypeBadge: React.FC<ModelTypeBadgeProps> = ({ type, className 
   return (
     <UIBadge
       status={status}
-      className={`${customClass} ${className} gap-1 px-2 py-0.5 rounded uppercase tracking-wider text-[10px]`}
+      className={`${customClass} ${className} gap-1 rounded px-2 py-0.5 text-[10px] tracking-wider uppercase`}
     >
       {label}
     </UIBadge>

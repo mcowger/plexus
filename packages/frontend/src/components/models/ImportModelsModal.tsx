@@ -1,6 +1,6 @@
-import { Modal } from '../ui/Modal';
-import { Button } from '../ui/Button';
 import type { OrphanGroup } from '../../hooks/useModels';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   isOpen: boolean;
@@ -73,7 +73,7 @@ export function ImportModelsModal({
           </Button>
         </div>
         {orphanGroups.length === 0 ? (
-          <div className="text-text-muted italic text-center text-sm py-8">
+          <div className="text-text-muted py-8 text-center text-sm italic">
             No orphaned models found. All provider models are covered by aliases or suppressed
             locally.
           </div>
@@ -87,7 +87,7 @@ export function ImportModelsModal({
               borderRadius: 'var(--radius-sm)',
             }}
           >
-            <table className="w-full border-collapse font-body text-[13px]">
+            <table className="font-body w-full border-collapse text-[13px]">
               <thead
                 style={{
                   position: 'sticky',
@@ -98,19 +98,19 @@ export function ImportModelsModal({
               >
                 <tr>
                   <th
-                    className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    className="text-text-secondary px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                     style={{ width: '40px' }}
                   >
                     {' '}
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="text-text-secondary px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Model / Alias
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+                  <th className="text-text-secondary px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                     Providers
                   </th>
                   <th
-                    className="px-4 py-3 text-right font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                    className="text-text-secondary px-4 py-3 text-right text-[11px] font-semibold tracking-wider uppercase"
                     style={{ width: '110px' }}
                   >
                     Actions
@@ -125,7 +125,7 @@ export function ImportModelsModal({
 
                   return (
                     <tr key={group.modelId} className="hover:bg-bg-hover">
-                      <td className="px-4 py-3 text-left text-text">
+                      <td className="text-text px-4 py-3 text-left">
                         <input
                           type="checkbox"
                           checked={isModelSelected}
@@ -140,20 +140,20 @@ export function ImportModelsModal({
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3 text-left text-text">
+                      <td className="text-text px-4 py-3 text-left">
                         <div className="font-medium">{group.modelId}</div>
                         {group.aliasMatches.length > 0 ? (
                           <>
-                            <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                            <span className="border-border-glass text-primary inline-flex rounded border px-2 py-0.5 text-[10px] font-medium tracking-wider uppercase">
                               Existing Alias Match
                             </span>
                             {group.aliasMatches.length === 1 ? (
-                              <div className="text-[11px] text-text-muted mt-0.5">
+                              <div className="text-text-muted mt-0.5 text-[11px]">
                                 {group.aliasMatches[0].alias.id} · {group.aliasMatches[0].reason}
                               </div>
                             ) : (
                               <select
-                                className="mt-1 w-full max-w-xs py-1 px-2 font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                                className="font-body text-text bg-bg-glass border-border-glass focus:border-primary mt-1 w-full max-w-xs rounded-sm border px-2 py-1 text-xs outline-none"
                                 value={selectedAliasId}
                                 onChange={(e) => {
                                   const next = new Map(selectedAliases);
@@ -175,7 +175,7 @@ export function ImportModelsModal({
                             )}
                           </>
                         ) : (
-                          <span className="inline-flex rounded border border-border-glass px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+                          <span className="border-border-glass text-text-muted inline-flex rounded border px-2 py-0.5 text-[10px] font-medium tracking-wider uppercase">
                             New Alias
                           </span>
                         )}
@@ -187,7 +187,7 @@ export function ImportModelsModal({
                             return (
                               <label
                                 key={c.provider.id}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex cursor-pointer items-center gap-2"
                               >
                                 <input
                                   type="checkbox"

@@ -1,10 +1,11 @@
+import { AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, AlertTriangle } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import type { Provider } from '../../lib/api';
+
 import type { OAuthProvidersStatus } from '../../hooks/useProviderForm';
-import { switchConnectionMode, type ConnectionDraftMap } from '../../lib/providerConnectionDraft';
+import type { Provider } from '../../lib/api';
+import { type ConnectionDraftMap, switchConnectionMode } from '../../lib/providerConnectionDraft';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 
 const KNOWN_APIS = [
   'chat',
@@ -65,23 +66,23 @@ export function ProviderApiUrlsEditor({
   const connectionDrafts = useRef<ConnectionDraftMap>({});
 
   return (
-    <div className="flex flex-col gap-1 border border-border-glass rounded-md p-3 bg-bg-subtle">
+    <div className="border-border-glass bg-bg-subtle flex flex-col gap-1 rounded-md border p-3">
       <div className="flex flex-col gap-1" style={{ marginBottom: '6px' }}>
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Connection Type
         </label>
         <div className="flex items-center gap-2">
           <div
             role="group"
             aria-label="Connection Type"
-            className="inline-flex self-start overflow-hidden rounded-md border border-border-glass"
+            className="border-border-glass inline-flex self-start overflow-hidden rounded-md border"
           >
             {(['url', 'oauth'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 aria-pressed={isOAuthMode === (mode === 'oauth')}
-                className={`px-3 py-1 font-body text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 ${mode === 'oauth' ? 'border-l border-border-glass' : ''} ${isOAuthMode === (mode === 'oauth') ? 'bg-bg-hover text-text font-medium' : 'bg-transparent text-text-muted hover:bg-bg-hover hover:text-text'}`}
+                className={`font-body focus-visible:outline-primary px-3 py-1 text-[12px] transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 ${mode === 'oauth' ? 'border-border-glass border-l' : ''} ${isOAuthMode === (mode === 'oauth') ? 'bg-bg-hover text-text font-medium' : 'text-text-muted hover:bg-bg-hover hover:text-text bg-transparent'}`}
                 onClick={() => {
                   if (isOAuthMode === (mode === 'oauth')) return;
                   const result = switchConnectionMode(
@@ -102,7 +103,7 @@ export function ProviderApiUrlsEditor({
         </div>
       </div>
       {presetPanel}
-      <label className="font-body text-[13px] font-medium text-text-secondary">
+      <label className="font-body text-text-secondary text-[13px] font-medium">
         Supported APIs & Base URLs
       </label>
       {isOAuthMode ? (
@@ -117,11 +118,11 @@ export function ProviderApiUrlsEditor({
           }}
         >
           <div className="flex flex-col gap-1">
-            <label className="font-body text-[13px] font-medium text-text-secondary">
+            <label className="font-body text-text-secondary text-[13px] font-medium">
               OAuth Provider
             </label>
             <select
-              className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+              className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
               value={(editingProvider.oauthProvider || OAUTH_PROVIDERS[0]?.value) ?? ''}
               disabled={OAUTH_PROVIDERS.length === 0}
               onChange={(e) =>
@@ -135,12 +136,12 @@ export function ProviderApiUrlsEditor({
               ))}
             </select>
             {oauthProvidersStatus === 'loading' && (
-              <div className="text-[11px] text-text-secondary" style={{ fontStyle: 'italic' }}>
+              <div className="text-text-secondary text-[11px]" style={{ fontStyle: 'italic' }}>
                 Loading OAuth providers…
               </div>
             )}
             {oauthProvidersStatus === 'error' && (
-              <div className="text-[11px] text-warning">
+              <div className="text-warning text-[11px]">
                 Failed to load OAuth providers.{' '}
                 <button type="button" className="underline" onClick={onReloadOAuthProviders}>
                   Retry
@@ -148,19 +149,19 @@ export function ProviderApiUrlsEditor({
               </div>
             )}
           </div>
-          <div className="text-[11px] text-text-secondary" style={{ lineHeight: '1.5' }}>
+          <div className="text-text-secondary text-[11px]" style={{ lineHeight: '1.5' }}>
             Uses the provider ID as its OAuth account — one login per provider.
           </div>
         </div>
       ) : (
-        <div className="border border-border-glass rounded-md overflow-hidden">
+        <div className="border-border-glass overflow-hidden rounded-md border">
           <div
-            className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover transition-colors duration-200 select-none hover:bg-bg-glass"
+            className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center gap-2 p-2 px-3 transition-colors duration-200 select-none"
             onClick={() => setIsApiBaseUrlsOpen(!isApiBaseUrlsOpen)}
           >
             {isApiBaseUrlsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             <label
-              className="font-body text-[13px] font-medium text-text-secondary"
+              className="font-body text-text-secondary text-[13px] font-medium"
               style={{ marginBottom: 0, flex: 1 }}
             >
               Base URL Entries
@@ -194,7 +195,7 @@ export function ProviderApiUrlsEditor({
               }}
             >
               {Object.entries(getApiBaseUrlMap()).length === 0 && (
-                <div className="font-body text-[11px] text-text-secondary italic">
+                <div className="font-body text-text-secondary text-[11px] italic">
                   No base URLs configured yet.
                 </div>
               )}
@@ -216,7 +217,7 @@ export function ProviderApiUrlsEditor({
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <select
-                        className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
                         value={apiType}
                         onChange={(e) =>
                           updateApiBaseUrlEntry(
@@ -242,7 +243,7 @@ export function ProviderApiUrlsEditor({
                         )}
                       </select>
                       <input
-                        className="w-full h-[27px] py-0 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
                         placeholder={
                           apiType === 'ollama'
                             ? 'http://localhost:11434'
@@ -252,9 +253,9 @@ export function ProviderApiUrlsEditor({
                         onChange={(e) => updateApiBaseUrlEntry(apiType, apiType, e.target.value)}
                       />
                       {showOllamaV1Warning && (
-                        <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
-                          <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
-                          <span className="text-[11px] text-warning">
+                        <div className="bg-warning/10 border-warning/30 flex items-start gap-2 rounded-sm border px-2 py-1.5">
+                          <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                          <span className="text-warning text-[11px]">
                             <span style={{ fontWeight: 600 }}>native ollama</span> type expects root
                             URL. URLs with <code>/v1</code> are OpenAI-compatible — use{' '}
                             <span style={{ fontWeight: 600 }}>chat</span> type.
@@ -262,9 +263,9 @@ export function ProviderApiUrlsEditor({
                         </div>
                       )}
                       {showChatOllamaWarning && (
-                        <div className="flex items-start gap-2 py-1.5 px-2 bg-warning/10 border border-warning/30 rounded-sm">
-                          <AlertTriangle size={14} className="text-warning shrink-0 mt-0.5" />
-                          <span className="text-[11px] text-warning">
+                        <div className="bg-warning/10 border-warning/30 flex items-start gap-2 rounded-sm border px-2 py-1.5">
+                          <AlertTriangle size={14} className="text-warning mt-0.5 shrink-0" />
+                          <span className="text-warning text-[11px]">
                             This URL contains <code>/api/</code> paths typical of native Ollama. Use{' '}
                             <span style={{ fontWeight: 600 }}>ollama</span> type if native.
                           </span>

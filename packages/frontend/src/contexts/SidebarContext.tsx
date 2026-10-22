@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 interface SidebarContextType {
   /** Desktop collapsed state (icon-only rail). Persisted to localStorage. */

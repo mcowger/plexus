@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react';
+
 import { Button } from '../../ui/Button';
 import { OpenRouterSlugInput } from '../../ui/OpenRouterSlugInput';
 import { FIELD_CLS } from './constants';
@@ -16,7 +17,7 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[11px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[11px] font-medium">
           Pricing Source
         </label>
         <select
@@ -78,7 +79,7 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
             { label: 'Cache Write $/M', key: 'cache_write' },
           ].map(({ label, key }) => (
             <div key={key} className="flex flex-col gap-0.5">
-              <label className="font-body text-[11px] font-medium text-text-secondary">
+              <label className="font-body text-text-secondary text-[11px] font-medium">
                 {label}
               </label>
               <input
@@ -112,7 +113,7 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
           }}
         >
           <div className="flex flex-col gap-0.5">
-            <label className="font-body text-[11px] font-medium text-text-secondary">
+            <label className="font-body text-text-secondary text-[11px] font-medium">
               OpenRouter Model Slug
             </label>
             <OpenRouterSlugInput
@@ -126,11 +127,11 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
             />
           </div>
           <div className="flex flex-col gap-0.5">
-            <label className="font-body text-[11px] font-medium text-text-secondary">
-              Discount <span className="font-normal text-text-muted">(0.1 = 10% off)</span>
+            <label className="font-body text-text-secondary text-[11px] font-medium">
+              Discount <span className="text-text-muted font-normal">(0.1 = 10% off)</span>
             </label>
             <input
-              className="w-full py-1 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+              className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-2 py-1 text-[12px] leading-none outline-none"
               type="number"
               step="0.01"
               min="0"
@@ -163,7 +164,7 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="font-body text-[11px] font-medium text-text-secondary">
+            <span className="font-body text-text-secondary text-[11px] font-medium">
               Pricing Ranges
             </span>
             <Button
@@ -259,11 +260,11 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
                   },
                 ].map(({ label, field, val }) => (
                   <div key={field} className="flex flex-col gap-0.5">
-                    <label className="font-body text-[10px] font-medium text-text-secondary">
+                    <label className="font-body text-text-secondary text-[10px] font-medium">
                       {label}
                     </label>
                     <input
-                      className="w-full py-1 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-2 py-1 text-[12px] leading-none outline-none"
                       type="number"
                       step="0.000001"
                       value={val}
@@ -290,7 +291,7 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
             </div>
           ))}
           {(!mCfg.pricing.range || mCfg.pricing.range.length === 0) && (
-            <div className="text-text-muted italic text-center text-[11px] py-2">
+            <div className="text-text-muted py-2 text-center text-[11px] italic">
               No ranges defined.
             </div>
           )}
@@ -309,11 +310,11 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
           }}
         >
           <div className="flex flex-col gap-0.5">
-            <label className="font-body text-[11px] font-medium text-text-secondary">
+            <label className="font-body text-text-secondary text-[11px] font-medium">
               Cost Per Request ($)
             </label>
             <input
-              className="w-full py-1 px-2 font-body text-[12px] leading-none text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+              className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-2 py-1 text-[12px] leading-none outline-none"
               type="number"
               step="0.000001"
               min="0"
@@ -328,7 +329,7 @@ export function ModelPricing({ modelId, modelConfig, updateModelConfig }: Props)
               }
             />
           </div>
-          <span className="font-body text-[11px] text-text-muted italic">
+          <span className="font-body text-text-muted text-[11px] italic">
             Flat fee per API call, regardless of token count.
           </span>
         </div>

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+
 import {
-  webSearchCoercionAdapter,
-  isWebSearchTool,
   buildTargetTool,
+  isWebSearchTool,
+  webSearchCoercionAdapter,
 } from '../web-search-coercion.adapter';
 
 // ── isWebSearchTool ────────────────────────────────────────────────────────

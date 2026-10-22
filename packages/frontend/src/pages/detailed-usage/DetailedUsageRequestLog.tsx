@@ -1,4 +1,5 @@
 import { Ban, CheckCircle, Plane, Timer, XCircle } from 'lucide-react';
+
 import { Card } from '../../components/ui/Card';
 import type { UsageRecord } from '../../lib/api';
 import { formatCostIn, formatMs, formatNumber, formatTokens } from '../../lib/format';
@@ -18,20 +19,20 @@ export const DetailedUsageRequestLog = ({
   <Card
     title="Raw Request Log"
     extra={
-      <span className="text-xs text-text-secondary">
+      <span className="text-text-secondary text-xs">
         {records.length} shown of {totalRequests} requests
       </span>
     }
   >
     <div className="max-h-125 space-y-3 overflow-y-auto md:hidden">
       {records.slice(0, 100).map((record, index) => (
-        <article key={index} className="rounded-md border border-border-glass bg-bg-subtle p-3">
+        <article key={index} className="border-border-glass bg-bg-subtle rounded-md border p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-xs font-medium text-text">
+              <div className="text-text text-xs font-medium">
                 {new Date(record.date).toLocaleString()}
               </div>
-              <div className="mt-1 truncate text-xs text-text-muted">
+              <div className="text-text-muted mt-1 truncate text-xs">
                 {record.provider || 'unknown'} /{' '}
                 {record.incomingModelAlias || record.selectedModelName || 'unknown'}
               </div>
@@ -64,15 +65,15 @@ export const DetailedUsageRequestLog = ({
             </span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">Tokens</div>
-              <div className="font-medium text-text">
+            <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+              <div className="text-text-muted text-[10px] tracking-wider uppercase">Tokens</div>
+              <div className="text-text font-medium">
                 {formatTokens((record.tokensInput || 0) + (record.tokensOutput || 0))}
               </div>
             </div>
-            <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
-              <div className="font-medium text-text">
+            <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+              <div className="text-text-muted text-[10px] tracking-wider uppercase">Cost</div>
+              <div className="text-text font-medium">
                 {formatCostIn(record.costTotal || 0, {
                   currency: currency.currency,
                   rate: currency.rate,
@@ -81,13 +82,13 @@ export const DetailedUsageRequestLog = ({
                 })}
               </div>
             </div>
-            <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">Duration</div>
-              <div className="font-medium text-text">{formatMs(record.durationMs || 0)}</div>
+            <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+              <div className="text-text-muted text-[10px] tracking-wider uppercase">Duration</div>
+              <div className="text-text font-medium">{formatMs(record.durationMs || 0)}</div>
             </div>
-            <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">TPS</div>
-              <div className="font-medium text-text">
+            <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+              <div className="text-text-muted text-[10px] tracking-wider uppercase">TPS</div>
+              <div className="text-text font-medium">
                 {formatNumber(record.tokensPerSec || 0, 1)}
               </div>
             </div>
@@ -98,8 +99,8 @@ export const DetailedUsageRequestLog = ({
 
     <div className="hidden max-h-125 overflow-x-auto overflow-y-auto md:block">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 bg-bg-card">
-          <tr className="text-left border-b border-border-glass text-text-secondary">
+        <thead className="bg-bg-card sticky top-0">
+          <tr className="border-border-glass text-text-secondary border-b text-left">
             {[
               'Time',
               'Provider',
@@ -119,7 +120,7 @@ export const DetailedUsageRequestLog = ({
         </thead>
         <tbody>
           {records.slice(0, 100).map((record, index) => (
-            <tr key={index} className="border-b border-border-glass/50">
+            <tr key={index} className="border-border-glass/50 border-b">
               <td className="py-2 pr-3 text-xs">{new Date(record.date).toLocaleTimeString()}</td>
               <td className="py-2 pr-3">{record.provider || 'unknown'}</td>
               <td className="py-2 pr-3 text-xs">

@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 import {
-  api,
   Alias,
   AliasMetadata,
+  api,
   CatalogMetadataSource,
   MetadataOverrides,
   MetadataSource,

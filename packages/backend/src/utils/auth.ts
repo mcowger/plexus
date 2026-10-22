@@ -1,10 +1,11 @@
 import { FastifyRequest } from 'fastify';
+
 import { getConfig, isKeyDisabled } from '../config';
-import { logger } from './logger';
+import { ConfigService } from '../services/configuration/config-service';
+import { enterRequestContext } from '../services/observability/request-context';
 import { getTrustedClientIp } from './ip';
 import { isIpAllowed } from './ip-match';
-import { enterRequestContext } from '../services/observability/request-context';
-import { ConfigService } from '../services/configuration/config-service';
+import { logger } from './logger';
 
 export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any> }>(
   request: FastifyRequest,

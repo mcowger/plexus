@@ -1,4 +1,5 @@
 import { Save } from 'lucide-react';
+
 import type { CompactionSettings as CompactionConfig } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
@@ -42,8 +43,8 @@ export function CompactionSettings({
         {/* enabled toggle */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-body text-[12px] font-medium text-text">Enabled</p>
-            <p className="font-body text-[11px] text-text-muted">
+            <p className="font-body text-text text-[12px] font-medium">Enabled</p>
+            <p className="font-body text-text-muted text-[11px]">
               Automatically compact context when the trigger threshold is reached.
             </p>
           </div>
@@ -58,7 +59,7 @@ export function CompactionSettings({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="compactionStrategy"
-            className="font-body text-[12px] font-medium text-text"
+            className="font-body text-text text-[12px] font-medium"
           >
             Strategy
           </label>
@@ -66,7 +67,7 @@ export function CompactionSettings({
             id="compactionStrategy"
             value={config.strategy ?? 'native'}
             onChange={(event) => update({ strategy: event.target.value as 'native' | 'headroom' })}
-            className="w-48 h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary"
+            className="text-text bg-bg-subtle border-border-glass focus:border-primary h-[27px] w-48 rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
           >
             <option value="native">native</option>
             <option value="headroom">headroom</option>
@@ -78,7 +79,7 @@ export function CompactionSettings({
           <div className="flex flex-col gap-1">
             <label
               htmlFor="compactionTriggerRatio"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Trigger Ratio <span className="text-text-muted font-normal">— fraction 0–1</span>
             </label>
@@ -94,13 +95,13 @@ export function CompactionSettings({
                 const value = event.target.value === '' ? undefined : Number(event.target.value);
                 update({ triggerRatio: value });
               }}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
           </div>
           <div className="flex flex-col gap-1">
             <label
               htmlFor="compactionAbsoluteTrigger"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Absolute Trigger Tokens{' '}
               <span className="text-text-muted font-normal">— empty = off</span>
@@ -116,13 +117,13 @@ export function CompactionSettings({
                 const value = event.target.value === '' ? null : Number(event.target.value);
                 update({ absoluteTriggerTokens: value });
               }}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
           </div>
           <div className="flex flex-col gap-1">
             <label
               htmlFor="compactionMinTokens"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Min Tokens
             </label>
@@ -137,13 +138,13 @@ export function CompactionSettings({
                 const value = event.target.value === '' ? undefined : Number(event.target.value);
                 update({ minTokens: value });
               }}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
           </div>
           <div className="flex flex-col gap-1">
             <label
               htmlFor="compactionProtectRecent"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Protect Recent (messages)
             </label>
@@ -158,7 +159,7 @@ export function CompactionSettings({
                 const value = event.target.value === '' ? undefined : Number(event.target.value);
                 update({ protectRecent: value });
               }}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
           </div>
         </div>
@@ -166,12 +167,12 @@ export function CompactionSettings({
         {/* native sub-settings */}
         {config.strategy === 'native' && (
           <div className="flex flex-col gap-2">
-            <p className="font-body text-[12px] font-medium text-text">Native Settings</p>
+            <p className="font-body text-text text-[12px] font-medium">Native Settings</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="compactionNativeMaxArrayItems"
-                  className="font-body text-[12px] font-medium text-text"
+                  className="font-body text-text text-[12px] font-medium"
                 >
                   Max Array Items
                 </label>
@@ -187,13 +188,13 @@ export function CompactionSettings({
                       event.target.value === '' ? undefined : Number(event.target.value);
                     update({ native: { ...config.native, maxArrayItems: value } });
                   }}
-                  className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="compactionNativeMaxStringChars"
-                  className="font-body text-[12px] font-medium text-text"
+                  className="font-body text-text text-[12px] font-medium"
                 >
                   Max String Chars
                 </label>
@@ -209,7 +210,7 @@ export function CompactionSettings({
                       event.target.value === '' ? undefined : Number(event.target.value);
                     update({ native: { ...config.native, maxStringChars: value } });
                   }}
-                  className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
                 />
               </div>
             </div>
@@ -219,12 +220,12 @@ export function CompactionSettings({
         {/* headroom sub-settings */}
         {config.strategy === 'headroom' && (
           <div className="flex flex-col gap-2">
-            <p className="font-body text-[12px] font-medium text-text">Headroom Settings</p>
+            <p className="font-body text-text text-[12px] font-medium">Headroom Settings</p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1 col-span-2">
+              <div className="col-span-2 flex flex-col gap-1">
                 <label
                   htmlFor="compactionHeadroomBaseUrl"
-                  className="font-body text-[12px] font-medium text-text"
+                  className="font-body text-text text-[12px] font-medium"
                 >
                   Base URL
                 </label>
@@ -241,13 +242,13 @@ export function CompactionSettings({
                       },
                     })
                   }
-                  className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
                 />
               </div>
-              <div className="flex flex-col gap-1 col-span-2">
+              <div className="col-span-2 flex flex-col gap-1">
                 <label
                   htmlFor="compactionHeadroomApiKey"
-                  className="font-body text-[12px] font-medium text-text"
+                  className="font-body text-text text-[12px] font-medium"
                 >
                   API Key
                 </label>
@@ -264,13 +265,13 @@ export function CompactionSettings({
                       },
                     })
                   }
-                  className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="compactionHeadroomTargetRatio"
-                  className="font-body text-[12px] font-medium text-text"
+                  className="font-body text-text text-[12px] font-medium"
                 >
                   Target Ratio{' '}
                   <span className="text-text-muted font-normal">— 0–1, empty = off</span>
@@ -287,13 +288,13 @@ export function CompactionSettings({
                     const value = event.target.value === '' ? null : Number(event.target.value);
                     update({ headroom: { ...config.headroom, targetRatio: value } });
                   }}
-                  className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="compactionHeadroomTimeoutMs"
-                  className="font-body text-[12px] font-medium text-text"
+                  className="font-body text-text text-[12px] font-medium"
                 >
                   Timeout (ms)
                 </label>
@@ -309,7 +310,7 @@ export function CompactionSettings({
                       event.target.value === '' ? undefined : Number(event.target.value);
                     update({ headroom: { ...config.headroom, timeoutMs: value } });
                   }}
-                  className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                  className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
                 />
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, bigint, index, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const mcpRequestUsage = pgTable(
   'mcp_request_usage',

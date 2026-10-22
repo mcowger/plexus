@@ -31,6 +31,7 @@
  */
 
 import { createHash } from 'node:crypto';
+
 import { BILLING_HEADER_PREFIX } from './cc-billing';
 
 const UNSIGNED_CCH_PATTERN = /cch=00000;/;

@@ -1,14 +1,15 @@
-import { FastifyInstance } from 'fastify';
+import { and, eq, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { encode } from 'eventsource-encoder';
-import { and, eq, gte, lte, sql, isNull, isNotNull } from 'drizzle-orm';
+import { FastifyInstance } from 'fastify';
+
 import { getCurrentDialect, getSchema } from '../../db/client';
 import {
-  UsageStorageService,
   type UsageSortDirection,
   type UsageSortField,
+  UsageStorageService,
 } from '../../services/observability/usage-storage';
-import { isLimited, scopedKeyName } from './_principal';
 import { logger } from '../../utils/logger';
+import { isLimited, scopedKeyName } from './_principal';
 
 const USAGE_FIELDS = new Set([
   'requestId',

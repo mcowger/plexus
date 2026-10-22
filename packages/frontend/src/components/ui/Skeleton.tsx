@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 interface SkeletonProps {
   className?: string;
@@ -19,7 +19,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className, height, width, ro
       aria-live="polite"
       style={style}
       className={clsx(
-        'animate-pulse bg-bg-hover/60',
+        'bg-bg-hover/60 animate-pulse',
         {
           'rounded-sm': rounded === 'sm',
           'rounded-md': rounded === 'md',

@@ -1,4 +1,4 @@
-import { pgTable, text, bigint, primaryKey, index } from 'drizzle-orm/pg-core';
+import { bigint, index, pgTable, primaryKey, text } from 'drizzle-orm/pg-core';
 
 export const providerCooldowns = pgTable(
   'provider_cooldowns',

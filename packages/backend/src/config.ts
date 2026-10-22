@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import {
   isOAuthPlaceholderUrl,
   McpServerConfigSchema,
@@ -6,12 +5,14 @@ import {
   ProviderCacheKeyInjectionSchema,
   ResponsesExtensionSchema,
 } from '@plexus/shared';
-import { logger } from './utils/logger';
+import { z } from 'zod';
+
+import { isKnownOAuthProviderId } from './services/oauth/oauth-providers';
+import { getCatalogModel } from './services/pi-ai/catalog';
+import { SERVICE_TIER_SUFFIXES } from './services/routing/service-tier-suffix';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from './utils/constants';
 import { isValidIpRule } from './utils/ip-match';
-import { getCatalogModel } from './services/pi-ai/catalog';
-import { isKnownOAuthProviderId } from './services/oauth/oauth-providers';
-import { SERVICE_TIER_SUFFIXES } from './services/routing/service-tier-suffix';
+import { logger } from './utils/logger';
 
 // --- Zod Schemas ---
 
@@ -395,8 +396,7 @@ const ModelTargetGroupSchema = z.object({
 
 export function findDuplicateAliasTargets(
   targetGroups:
-    | Array<{ targets: Array<{ provider?: string; model?: string; alias?: string }> }>
-    | undefined
+    Array<{ targets: Array<{ provider?: string; model?: string; alias?: string }> }> | undefined
 ): Array<{ provider?: string; model?: string; alias?: string }> {
   const seen = new Set<string>();
   const duplicates = new Map<string, { provider?: string; model?: string; alias?: string }>();

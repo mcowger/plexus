@@ -1,4 +1,5 @@
 import { Part } from '@google/genai';
+
 import { UnifiedChatResponse } from '../../types/unified';
 import { composeContentWithImageMarkdown } from '../image-rendering';
 

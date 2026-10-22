@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, integer, index } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgTable, serial, text } from 'drizzle-orm/pg-core';
 
 export const debugLogs = pgTable(
   'debug_logs',

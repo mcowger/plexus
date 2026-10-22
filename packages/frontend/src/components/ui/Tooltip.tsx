@@ -1,6 +1,6 @@
+import { clsx } from 'clsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { clsx } from 'clsx';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -84,7 +84,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
             role="tooltip"
             style={tooltipStyle}
             className={clsx(
-              'px-2 py-1 bg-bg-surface border border-border-2 rounded-md shadow-lg whitespace-nowrap text-[11px] text-text pointer-events-none font-mono'
+              'bg-bg-surface border-border-2 text-text pointer-events-none rounded-md border px-2 py-1 font-mono text-[11px] whitespace-nowrap shadow-lg'
             )}
           >
             {content}

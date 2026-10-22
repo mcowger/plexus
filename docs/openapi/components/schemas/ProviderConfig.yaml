@@ -202,7 +202,7 @@ properties:
       Static headers forwarded on every request to this provider. Useful for
       custom authentication schemes or provider-specific requirements.
   maxConcurrency:
-    type: [integer, "null"]
+    type: [integer, 'null']
     minimum: 1
     description: >
       Max concurrency across all models. Optional per-provider limit on

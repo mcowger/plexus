@@ -1,4 +1,5 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
 import { McpToolError, type ToolInput, type ToolResponse } from './types';
 
 export function requireId(input: ToolInput, resourceType: string): string {

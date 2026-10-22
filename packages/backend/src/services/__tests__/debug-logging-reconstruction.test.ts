@@ -1,9 +1,11 @@
 import { once } from 'node:events';
-import { describe, expect, test, beforeEach, vi } from 'vitest';
+
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
+import { logger } from '../../utils/logger';
 import { DebugLoggingInspector } from '../inspectors/debug-logging';
 import { DebugManager } from '../observability/debug-manager';
-import { logger } from '../../utils/logger';
 
 describe('DebugLoggingInspector Reconstruction', () => {
   const requestId = 'test-reconstruction-id';

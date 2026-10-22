@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { type ProviderConfig, ProviderConfigSchema } from '../../config';
 import { closeDatabase, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
-import { ProviderConfigSchema, type ProviderConfig } from '../../config';
+import { runMigrations } from '../migrate';
 
 describe('pi-ai quirk source persistence', () => {
   let repo: ConfigRepository;

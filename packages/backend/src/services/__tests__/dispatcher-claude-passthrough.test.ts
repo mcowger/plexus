@@ -8,7 +8,8 @@
  * that fails `isGenuineClaudeCodeRequest` keeps the masking behavior.
  */
 
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 

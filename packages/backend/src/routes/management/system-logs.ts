@@ -1,5 +1,6 @@
-import { FastifyInstance } from 'fastify';
 import { encode } from 'eventsource-encoder';
+import { FastifyInstance } from 'fastify';
+
 import { getRecentLogCount, getRecentLogs, logEmitter } from '../../utils/logger';
 
 export async function registerSystemLogRoutes(fastify: FastifyInstance) {

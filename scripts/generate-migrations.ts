@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
-import { $ } from 'bun';
-import { parseArgs } from 'util';
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseArgs } from 'util';
+
+import { $ } from 'bun';
+
 import {
   loadJournal,
   loadPreviousSnapshot,

@@ -1,5 +1,5 @@
-import { logger } from '../../utils/logger';
 import { CC_VERSION } from '../../transformers/oauth/masking/cc-constants';
+import { logger } from '../../utils/logger';
 
 // Lightweight dist-tags document (~50 bytes) — avoids downloading the full
 // packument on every refresh.

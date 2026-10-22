@@ -4,9 +4,11 @@
  * Full-height scrollable list view of all requests matching the active filter.
  */
 
-import React from 'react';
-import { Ban, CheckCircle, Plane, Timer, XCircle } from 'lucide-react';
 import { clsx } from 'clsx';
+import { Ban, CheckCircle, Plane, Timer, XCircle } from 'lucide-react';
+import React from 'react';
+
+import type { UsageRecord } from '../../../lib/api';
 import { useCurrency } from '../../../lib/CurrencyContext';
 import {
   formatCostIn,
@@ -15,7 +17,6 @@ import {
   formatTokens,
   formatTPS,
 } from '../../../lib/format';
-import type { UsageRecord } from '../../../lib/api';
 import { getModelLabel, getProviderLabel } from '../liveUtils';
 
 export interface RequestsModalProps {
@@ -30,9 +31,9 @@ export const RequestsModal: React.FC<RequestsModalProps> = ({
   const { currency, rate, symbol } = useCurrency();
 
   return (
-    <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+    <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
       {filteredLiveRequests.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-text-secondary">
+        <div className="text-text-secondary flex h-full items-center justify-center">
           {liveRequests.length === 0
             ? 'No requests observed yet.'
             : 'No requests match the current filter.'}
@@ -49,24 +50,24 @@ export const RequestsModal: React.FC<RequestsModalProps> = ({
           return (
             <div
               key={request.requestId}
-              className="rounded-md border border-border-glass bg-bg-glass p-4"
+              className="border-border-glass bg-bg-glass rounded-md border p-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-base text-text font-medium">{providerLabel}</span>
-                  <span className="text-sm text-text-secondary">{modelLabel}</span>
+                  <span className="text-text text-base font-medium">{providerLabel}</span>
+                  <span className="text-text-secondary text-sm">{modelLabel}</span>
                   <span
                     className={clsx(
-                      'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border',
+                      'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs',
                       status === 'success'
-                        ? 'text-success bg-emerald-500/15 border-success/25'
+                        ? 'text-success border-success/25 bg-emerald-500/15'
                         : status === 'pending'
-                          ? 'text-warning bg-yellow-500/15 border-warning/25'
+                          ? 'text-warning border-warning/25 bg-yellow-500/15'
                           : status === 'cancelled'
-                            ? 'text-blue-400 bg-blue-500/15 border-blue-400/25'
+                            ? 'border-blue-400/25 bg-blue-500/15 text-blue-400'
                             : status === 'timeout'
-                              ? 'text-orange-400 bg-orange-500/15 border-orange-400/25'
-                              : 'text-danger bg-red-500/15 border-danger/30'
+                              ? 'border-orange-400/25 bg-orange-500/15 text-orange-400'
+                              : 'text-danger border-danger/30 bg-red-500/15'
                     )}
                   >
                     {status === 'success' ? (
@@ -83,9 +84,9 @@ export const RequestsModal: React.FC<RequestsModalProps> = ({
                     {status}
                   </span>
                 </div>
-                <span className="text-sm text-text-muted">{formatTimeAgo(requestTimeSeconds)}</span>
+                <span className="text-text-muted text-sm">{formatTimeAgo(requestTimeSeconds)}</span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
+              <div className="text-text-secondary mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <span>ID: {request.requestId.slice(0, 8)}...</span>
                 <span>
                   Tokens:{' '}

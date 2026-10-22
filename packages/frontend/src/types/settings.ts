@@ -130,13 +130,7 @@ export interface Cooldown {
  * vocabulary (see packages/backend/src/services/routing/service-tier-suffix.ts).
  */
 export type KeyDefaultServiceTier =
-  | 'auto'
-  | 'default'
-  | 'standard'
-  | 'flex'
-  | 'priority'
-  | 'fast'
-  | 'ultrafast';
+  'auto' | 'default' | 'standard' | 'flex' | 'priority' | 'fast' | 'ultrafast';
 
 export interface KeyConfig {
   key: string; // The user-facing alias/name for the key (e.g. 'my-app')

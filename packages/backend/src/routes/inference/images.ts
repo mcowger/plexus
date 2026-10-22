@@ -1,18 +1,19 @@
-import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { FastifyInstance } from 'fastify';
-import { logger } from '../../utils/logger';
+
 import { Dispatcher } from '../../services/dispatch/dispatcher';
+import { DebugManager } from '../../services/observability/debug-manager';
+import { UsageStorageService } from '../../services/observability/usage-storage';
 import { ImageTransformer } from '../../transformers';
 import { formatOpenRouterImageResponse, imageReferenceFromBuffer } from '../../transformers/image';
-import { UsageStorageService } from '../../services/observability/usage-storage';
-import { UsageRecord } from '../../types/usage';
-import { getClientIp } from '../../utils/ip';
-import { calculateCosts } from '../../utils/calculate-costs';
-import { DebugManager } from '../../services/observability/debug-manager';
 import { UnifiedImageGenerationRequest } from '../../types/unified';
+import { UsageRecord } from '../../types/usage';
 import { attachKeyAccessPolicy } from '../../utils/auth';
-import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { calculateCosts } from '../../utils/calculate-costs';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getClientIp } from '../../utils/ip';
+import { logger } from '../../utils/logger';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { wireEarlyDisconnectDetection, wireUpstreamTimeout } from '../../utils/timeout';
 
 /**
  * Normalised view of a multipart image-edit upload, shared by both ingress

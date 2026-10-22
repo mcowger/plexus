@@ -11,12 +11,14 @@
 ### v0.19.9 provider quota/config hardening and usage telemetry
 
 ## New Features
+
 - Added support for the new Synthetic quota system, including backend/frontend wiring and quota UI integration. The main implementation landed in [8544af9](https://github.com/mcowger/plexus/commit/8544af9), with provider-option support to suppress implicit OAuth quota checkers in [e1c73dd](https://github.com/mcowger/plexus/commit/e1c73dd).
 - Added provider access allowlists and improved log filtering, including a tag-style multi-select UI for key allowlists. See [319011d](https://github.com/mcowger/plexus/commit/319011d) and [c8522d3](https://github.com/mcowger/plexus/commit/c8522d3).
 - Expanded usage accounting for vision fallthrough flows: descriptor model usage is now recorded and surfaced in Logs UI. Key changes are in [6f5bf89](https://github.com/mcowger/plexus/commit/6f5bf89), [d03981c](https://github.com/mcowger/plexus/commit/d03981c), and [0e59eb3](https://github.com/mcowger/plexus/commit/0e59eb3).
 - Added extraction of provider-reported costs from SSE comments so usage records can include more accurate cost data. Implemented in [2e9a4f7](https://github.com/mcowger/plexus/commit/2e9a4f7).
 
 ## Bug Fixes
+
 - Fixed PostgreSQL quota enum coverage for `cost` and `monthly` values to match the new quota types in [ed2bfe9](https://github.com/mcowger/plexus/commit/ed2bfe9).
 - Corrected `disable_quota_check` behavior so it suppresses both implicit and explicit quota checkers, and ensured provider quota config generation respects the flag. See [82a07bc](https://github.com/mcowger/plexus/commit/82a07bc) and [63f73fa](https://github.com/mcowger/plexus/commit/63f73fa).
 - Fixed corrupted `extraBody` reads from the database by discarding invalid `[object Object]` payloads in [08c87bd](https://github.com/mcowger/plexus/commit/08c87bd).
@@ -25,12 +27,14 @@
 - Fixed frontend/backend migration and embedded-file handling for startup and database migrations, including direct VFS migration execution and Bun embedded asset support. See [e2045b1](https://github.com/mcowger/plexus/commit/e2045b1), [82efb5f](https://github.com/mcowger/plexus/commit/82efb5f), and [1bf7f23](https://github.com/mcowger/plexus/commit/1bf7f23).
 
 ## Infrastructure / Refactoring
+
 - Reduced quota-policy duplication by deduplicating key normalization between auth and dispatcher codepaths in [df920bb](https://github.com/mcowger/plexus/commit/df920bb).
 - Modernized CI and build tooling for Node 24, including GitHub Actions updates in [5c98c76](https://github.com/mcowger/plexus/commit/5c98c76).
 - Continued the embedded-binary / filesystem packaging cleanup for migrations and static assets, including migration source logging and use of Bun embedded files. See [63a2287](https://github.com/mcowger/plexus/commit/63a2287), [e2045b1](https://github.com/mcowger/plexus/commit/e2045b1), and [82efb5f](https://github.com/mcowger/plexus/commit/82efb5f).
 - Added broader release/test hygiene: new test-utils spy cleanup, lint enforcement for registerSpy usage, and better test DB ignores. Relevant commits include [ee4146c](https://github.com/mcowger/plexus/commit/ee4146c), [a25c528](https://github.com/mcowger/plexus/commit/a25c528), [6b81f5c](https://github.com/mcowger/plexus/commit/6b81f5c), and [3da03fa](https://github.com/mcowger/plexus/commit/3da03fa).
 
 ## Release Impact
+
 This release strengthens quota configuration correctness, improves visibility into actual provider-reported cost and usage, and makes the system more reliable in CI and embedded deployment scenarios. It also adds useful UI controls for key allowlists and refines how OAuth-related quota checkers are selected and suppressed.
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
@@ -40,21 +44,25 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### 2026.04.12.1: key allowlists, vision fallthrough usage tracking, and logs UI updates
 
 ## New Features
+
 - Added key access allowlists and improved log filtering to support more granular key policy control and easier audit review ([319011d](https://github.com/mcowger/plexus/commit/319011d)).
 - Replaced the key allowlist text inputs with a tag-style multi-select UI, improving usability and making allowlist editing less error-prone ([b5b5a76](https://github.com/mcowger/plexus/commit/b5b5a76)).
 - Added vision fallthrough descriptor model visibility in the Logs UI so child-request model selection is now surfaced directly in log inspection ([d03981c](https://github.com/mcowger/plexus/commit/d03981c)).
 - Recorded vision fallthrough descriptor model data in request usage, and ensured child request usage records are persisted for fallthrough scenarios ([6f5bf89](https://github.com/mcowger/plexus/commit/6f5bf89), [0e59eb3](https://github.com/mcowger/plexus/commit/0e59eb3)).
 
 ## Bug Fixes
+
 - Fixed CI test failures to restore build stability ([84ba200](https://github.com/mcowger/plexus/commit/84ba200)).
 - Added coverage for vision fallthrough usage tracking to prevent regressions in descriptor/model attribution ([7287596](https://github.com/mcowger/plexus/commit/7287596)).
 
 ## Refactoring / Internal Improvements
+
 - Deduplicated key policy normalization logic between `auth.ts` and `dispatcher`, reducing maintenance overhead and keeping policy handling consistent ([df920bb](https://github.com/mcowger/plexus/commit/df920bb)).
 - Updated GitHub Actions to use Node 24, keeping CI aligned with the current runtime baseline ([5c98c76](https://github.com/mcowger/plexus/commit/5c98c76)).
 - Removed the GEMINI file as part of repository cleanup ([039ca33](https://github.com/mcowger/plexus/commit/039ca33)).
 
 ## Release / Packaging
+
 - Release tagged as 2026.04.12.1.
 - Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest.
 
@@ -251,22 +259,26 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ### Plexus v0.9.9: Migration to Database-Backed Configuration and Management API Refactor
 
 ## New Features
+
 - **Database-Driven Configuration**: This release marks a significant architectural shift, moving configuration from legacy YAML files to a robust database-backed storage system ([afba313](https://github.com/mcowger/plexus/commit/afba313)). This includes a new `ConfigService` with in-memory caching for performance ([7928e79](https://github.com/mcowger/plexus/commit/7928e79)).
 - **Expanded Quota Checkers**: Added support for the Apertis Coding Plan quota checker ([03f425a](https://github.com/mcowger/plexus/commit/03f425a)) and updated the WisdomGate provider to utilize the latest billing API and session handling ([c7167d7](https://github.com/mcowger/plexus/commit/c7167d7)).
 - **Application Lifecycle Control**: Introduced a management route to facilitate graceful application restarts directly via the API ([8bd83b4](https://github.com/mcowger/plexus/commit/8bd83b4)).
 - **Security Hardening**: Migrated the `adminKey` to an environment variable (`ADMIN_KEY`) and implemented bootstrap tracking for database initialization ([e6a5afe](https://github.com/mcowger/plexus/commit/e6a5afe), [c633e36](https://github.com/mcowger/plexus/commit/c633e36)).
 
 ## Infrastructure & Refactoring
+
 - **Removal of Legacy File Watchers**: Successfully removed the file-based configuration loading logic and associated file watchers ([dd529e5](https://github.com/mcowger/plexus/commit/dd529e5)).
 - **OAuth Management**: Refactored the `OAuthAuthManager` to persist credentials within the database, ensuring consistency across deployments ([086b809](https://github.com/mcowger/plexus/commit/086b809)).
 - **RESTful API Updates**: Rewrote management routes to standardize on `PUT` and `PATCH` methods with improved request validation ([60b9b34](https://github.com/mcowger/plexus/commit/60b9b34)).
 
 ## Bug Fixes
+
 - **Provider Deletion**: Resolved an issue where deleting providers failed to clean up associated records; implemented cascade cleanup ([a646bd3](https://github.com/mcowger/plexus/commit/a646bd3)).
 - **Test Environment Stability**: Fixed multiple pre-existing test failures and CI-specific 500 errors by improving mock storage and pre-initializing the `DebugManager` ([e3175fc](https://github.com/mcowger/plexus/commit/e3175fc), [089ee73](https://github.com/mcowger/plexus/commit/089ee73)).
 - **Deployment Fixes**: Fixed a bug preventing Docker deployments from being restarted through the settings UI ([e83695f](https://github.com/mcowger/plexus/commit/e83695f)).
 
 ---
+
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
 ## 2026.03.12.2 - 2026-03-12
@@ -300,7 +312,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### Update Gemini Streaming Protocol Compatability
 
-Preserved tool call finish reason in streams when converting to openai-completions.   Also addressed missing function id, which caused problems for some clients like Open WebUI
+Preserved tool call finish reason in streams when converting to openai-completions. Also addressed missing function id, which caused problems for some clients like Open WebUI
 
 ## 2026.03.07.1 - 2026-03-08
 
@@ -365,18 +377,22 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ### 2026.03.06.2: Enhanced Dispatcher Resilience and UI Interaction Logic
 
 ### New Features
+
 - **Restart Functionality:** Added a new manual restart button to the interface ([370a087](https://github.com/mcowger/plexus/commit/370a087)).
 - **Observability:** Logs now include detailed retry history, providing better visibility into request lifecycles ([d48525f](https://github.com/mcowger/plexus/commit/d48525f)).
 
 ### Bug Fixes
+
 - **Dispatcher Error Handling:** Improved robustness of the Dispatcher when encountering malformed JSON responses or non-JSON tool call arguments ([0dd9c9f](https://github.com/mcowger/plexus/commit/0dd9c9f), [97e1eaa](https://github.com/mcowger/plexus/commit/97e1eaa)).
 - **OAuth Reliability:** Fixed an issue where empty-stream quota detection would fail to trigger the appropriate retry logic ([ba7e3de](https://github.com/mcowger/plexus/commit/ba7e3de)).
 - **Frontend Refinement:** Resolved event propagation bugs in the `CooldownRow` component that caused unintended click behaviors and fixed the cooldown details popover display ([18c0038](https://github.com/mcowger/plexus/commit/18c0038), [01c411d](https://github.com/mcowger/plexus/commit/01c411d)).
 
 ### Infrastructure & Refactoring
+
 - **Testing:** Implemented regression tests for Dispatcher failover scenarios and malformed JSON test cases to prevent future regressions ([1a7b3b2](https://github.com/mcowger/plexus/commit/1a7b3b2)).
 
 ---
+
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
 ## 2026.03.06.1 - 2026-03-06
@@ -402,11 +418,11 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ## New Features
 
-* **LLM Filter Rules**: Introduced new filtering capabilities specifically for GitHub Copilot and OpenAI Codex models. ([1dbbbc5](https://github.com/mcowger/plexus/commit/1dbbbc5))
+- **LLM Filter Rules**: Introduced new filtering capabilities specifically for GitHub Copilot and OpenAI Codex models. ([1dbbbc5](https://github.com/mcowger/plexus/commit/1dbbbc5))
 
 ## Bug Fixes & Improvements
 
-* **OAuth Refactoring**: Updated `pi-ai` OAuth logic to support new subpath exports, ensuring compatibility with updated dependency structures. ([1fd5bc6](https://github.com/mcowger/plexus/commit/1fd5bc6))
+- **OAuth Refactoring**: Updated `pi-ai` OAuth logic to support new subpath exports, ensuring compatibility with updated dependency structures. ([1fd5bc6](https://github.com/mcowger/plexus/commit/1fd5bc6))
 
 ---
 
@@ -418,12 +434,12 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### Main Features
 
-* **Model Alias Filtering**: Updated the `/v1/models` endpoint to return only primary aliases, excluding `additional_aliases` for cleaner API responses ([0eef27b](https://github.com/mcowger/plexus/commit/0eef27b)).
+- **Model Alias Filtering**: Updated the `/v1/models` endpoint to return only primary aliases, excluding `additional_aliases` for cleaner API responses ([0eef27b](https://github.com/mcowger/plexus/commit/0eef27b)).
 
 ### Minor Changes & Bug Fixes
 
-* **Gemini & Pi-AI Updates**: Fixed formatting issues in Gemini streams and applied updates to `pi-ai` integration ([d546ba1](https://github.com/mcowger/plexus/commit/d546ba1)).
-* **Logger Serialization**: Improved logger output by ensuring `Error` objects are properly serialized ([4ae47a8](https://github.com/mcowger/plexus/commit/4ae47a8)).
+- **Gemini & Pi-AI Updates**: Fixed formatting issues in Gemini streams and applied updates to `pi-ai` integration ([d546ba1](https://github.com/mcowger/plexus/commit/d546ba1)).
+- **Logger Serialization**: Improved logger output by ensuring `Error` objects are properly serialized ([4ae47a8](https://github.com/mcowger/plexus/commit/4ae47a8)).
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -459,12 +475,12 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 
 ### Main Features
 
-* **Vision Descriptor Service**: Introduced a dedicated service for vision descriptors along with unit tests to support image processing workflows. ([96496c2](https://github.com/mcowger/plexus/commit/96496c2))
+- **Vision Descriptor Service**: Introduced a dedicated service for vision descriptors along with unit tests to support image processing workflows. ([96496c2](https://github.com/mcowger/plexus/commit/96496c2))
 
 ### Smaller Changes
 
-* `d96b5a1`: Documentation update providing details for the Vision Fallthrough feature in README and CONFIGURATION. ([d96b5a1](https://github.com/mcowger/plexus/commit/d96b5a1))
-* `96496c2`: Added vision descriptor service and related tests for image processing. ([96496c2](https://github.com/mcowger/plexus/commit/96496c2))
+- `d96b5a1`: Documentation update providing details for the Vision Fallthrough feature in README and CONFIGURATION. ([d96b5a1](https://github.com/mcowger/plexus/commit/d96b5a1))
+- `96496c2`: Added vision descriptor service and related tests for image processing. ([96496c2](https://github.com/mcowger/plexus/commit/96496c2))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -489,11 +505,13 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### 2026.03.01.1: Analytics Drill-downs, Concurrency Management, and DND Card Reordering
 
 ### Main Features
+
 - **Advanced Analytics**: Introduced a comprehensive `DetailedUsage` analytics page and drill-down capabilities via the new `AnalyzeButton` component and API utilities. ([4f5f6dc](https://github.com/mcowger/plexus/commit/4f5f6dc), [49cf506](https://github.com/mcowger/plexus/commit/49cf506))
 - **Concurrency Control**: Added a new management endpoint and visual usage monitoring for concurrency tracking. ([48b295d](https://github.com/mcowger/plexus/commit/48b295d))
 - **Interactive UI Components**: Integrated `@dnd-kit` for drag-and-drop card reordering in the live view, supplemented by JSON import/export functionality for card layout configurations. ([4bb89c9](https://github.com/mcowger/plexus/commit/4bb89c9), [8699585](https://github.com/mcowger/plexus/commit/8699585), [763d8d8](https://github.com/mcowger/plexus/commit/763d8d8))
 
 ### Minor Changes and Bug Fixes
+
 - **Type Definitions**: Updated card definitions to better support metrics and alerts. ([e07c542](https://github.com/mcowger/plexus/commit/e07c542))
 - **Log Formatting**: Added safe date formatting utilities to the Logs component. ([39b26c7](https://github.com/mcowger/plexus/commit/39b26c7))
 - **Code Quality**: Refactored `LiveTab` and `UsageTab` to remove unused imports and streamline logic. ([28cc3d5](https://github.com/mcowger/plexus/commit/28cc3d5))
@@ -526,6 +544,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 This release addresses functional issues discovered in the Copilot subsystem to ensure improved reliability.
 
 ### Bug Fixes and Minor Changes
+
 - Resolved logic errors and stability issues within the Copilot integration ([ff94b20](https://github.com/mcowger/plexus/commit/ff94b20))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
@@ -543,6 +562,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - feat: enhance Copilot quota display with detailed usage metrics and fallback logic ([a670930](https://github.com/mcowger/plexus/commit/a670930))
 
 ---
+
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
 ## 2026.02.28.1 - 2026-03-01
@@ -551,14 +571,14 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ## Main Features
 
-*   **Cross-Model Reasoning Support**: Implemented `buildThinkingOptions` to enable enhanced reasoning capabilities across supported models. ([f89107f](https://github.com/mcowger/plexus/commit/f89107f))
-*   **Antigravity Quota Monitoring**: Introduced a new Antigravity quota checker with support for multi-model displays and improved component architecture. ([adf8a00](https://github.com/mcowger/plexus/commit/adf8a00), [6575b92](https://github.com/mcowger/plexus/commit/6575b92))
-*   **Gemini 3 Integration**: Enhanced message handling protocols specifically for Gemini 3 models. ([92d210e](https://github.com/mcowger/plexus/commit/92d210e))
+- **Cross-Model Reasoning Support**: Implemented `buildThinkingOptions` to enable enhanced reasoning capabilities across supported models. ([f89107f](https://github.com/mcowger/plexus/commit/f89107f))
+- **Antigravity Quota Monitoring**: Introduced a new Antigravity quota checker with support for multi-model displays and improved component architecture. ([adf8a00](https://github.com/mcowger/plexus/commit/adf8a00), [6575b92](https://github.com/mcowger/plexus/commit/6575b92))
+- **Gemini 3 Integration**: Enhanced message handling protocols specifically for Gemini 3 models. ([92d210e](https://github.com/mcowger/plexus/commit/92d210e))
 
 ## Minor Changes and Bug Fixes
 
-*   **stream-formatter**: Fixed an issue to ensure non-empty parts arrays for model content streams. ([aba0851](https://github.com/mcowger/plexus/commit/aba0851))
-*   **Quota Handling**: Improved handling of multiple windows and enhanced logging within Antigravity quota components. ([5d52f6e](https://github.com/mcowger/plexus/commit/5d52f6e))
+- **stream-formatter**: Fixed an issue to ensure non-empty parts arrays for model content streams. ([aba0851](https://github.com/mcowger/plexus/commit/aba0851))
+- **Quota Handling**: Improved handling of multiple windows and enhanced logging within Antigravity quota components. ([5d52f6e](https://github.com/mcowger/plexus/commit/5d52f6e))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -571,6 +591,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 This release introduces improvements to quota management implementations and general codebase maintenance.
 
 #### Improvements and Bug Fixes
+
 - **Quota Services**:
   - Finalized the `gemini-cli` checker implementation and corrected an issue with the authentication header ([5706bd0](https://github.com/mcowger/plexus/commit/5706bd0)).
   - Configured a default endpoint for the `WisdomGateQuotaChecker` ([beb6479](https://github.com/mcowger/plexus/commit/beb6479)).
@@ -611,14 +632,17 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ## Main Features
 
 ### JSON Schema Normalization and OpenAI Enhancements
+
 - Added JSON Schema normalization utility to improve OpenAI request transformation ([d690ec4](https://github.com/mcowger/plexus/commit/d690ec4))
 
 ### Gemini Provider Improvements
+
 - Enhanced Gemini request and response handling with improved configuration and metadata support ([161e033](https://github.com/mcowger/plexus/commit/161e033))
 - Updated Gemini stream transformer and response formatter to handle `toolUse` finish reason ([7402edc](https://github.com/mcowger/plexus/commit/7402edc))
 - Enhanced Gemini stream transformer with block lifecycle event handling and comprehensive test coverage ([904ade8](https://github.com/mcowger/plexus/commit/904ade8))
 
 ### Authentication Updates
+
 - Replaced WisdomGate cookie authentication with Bearer token authentication and added new balance endpoint ([a27aab2](https://github.com/mcowger/plexus/commit/a27aab2))
 
 ## Additional Changes
@@ -661,13 +685,16 @@ The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:la
 ## v0.17.5 Release Notes
 
 ### Features
+
 - **Dispatcher cooldown logic** ([6f7cffe](https://github.com/mcowger/plexus/commit/6f7cffe)): Enhanced cooldown mechanism to handle quota-related 400 errors with comprehensive test coverage
 
 ### Fixes
+
 - **Quota package details** ([de97fa0](https://github.com/mcowger/plexus/commit/de97fa0)): Handle empty package details by falling back to total usage calculations
 - **Dispatcher error handling** ([dae6508](https://github.com/mcowger/plexus/commit/dae6508)): Expand cooldown trigger conditions to cover additional client error scenarios
 
 ### Docker Image
+
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
 ## 2026.02.24.1 - 2026-02-24
@@ -691,9 +718,11 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ### 2026.02.23.3: POE Point Value Display Fix
 
 ## Bug Fixes
+
 - Fixed display of full POE point values instead of abbreviated k/M suffixes ([6ecd2c5](https://github.com/mcowger/plexus/commit/6ecd2c5))
 
 ---
+
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
 ## 2026.02.23.2 - 2026-02-24
@@ -703,9 +732,11 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ## v0.17.2 Release Notes
 
 ### New Features
+
 - **POE Point Balance Quota Checker**: Added a new quota checker for POE point balance monitoring ([777ad51](https://github.com/mcowger/plexus/commit/777ad51))
 
 ### Improvements
+
 - **Sidebar Integration**: Integrated the POE quota checker into the sidebar for improved visibility ([6621126](https://github.com/mcowger/plexus/commit/6621126))
 - **Export Utilities**: Exported `formatPoints` utility function for external use ([6621126](https://github.com/mcowger/plexus/commit/6621126))
 
@@ -746,13 +777,16 @@ The docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ## New Features
 
 ### Quota Checker Integrations
+
 - Added Kimi Code checker support ([71d4cab](https://github.com/mcowger/plexus/commit/71d4cab))
 - Added MiniMax Coding checker support ([b79ce34](https://github.com/mcowger/plexus/commit/b79ce34))
 
 ### Model Metadata Enrichment
+
 - Enhanced `/v1/models` endpoint with external metadata source integration ([483f6b9](https://github.com/mcowger/plexus/commit/483f6b9)), closes #30
 
 ## Docker Image
+
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
 ## 2026.02.21.1 - 2026-02-22
@@ -762,12 +796,15 @@ The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:la
 ## v0.16.10 Release Notes
 
 ### Features
+
 - **Energy consumption estimation** ([2a7c8d2](https://github.com/mcowger/plexus/commit/2a7c8d2)): Added kWh energy consumption estimation and recording per request, enabling better tracking of resource utilization.
 
 ### Fixes
+
 - **Quota history timestamp handling** ([0b17e8a](https://github.com/mcowger/plexus/commit/0b17e8a)): Fixed conversion of the `since` parameter to dialect-aware timestamps in `getQuotaHistory` endpoint for improved cross-database compatibility.
 
 ### Docker Image
+
 The Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`
 
 ## 2026.02.21.5 - 2026-02-21
@@ -871,13 +908,16 @@ The Docker image has been updated and is available at `ghcr.io/mcowger/plexus:la
 ## What's New in v0.16.2
 
 ### New Features
+
 - **GitHub Copilot Quota Checker**: Added support for monitoring GitHub Copilot quota usage ([a4b1461](https://github.com/mcowger/plexus/commit/a4b1461))
 - **Escalating Cooldown System**: Implemented exponential backoff for cooldown periods to improve rate limiting handling ([ace43ae](https://github.com/mcowger/plexus/commit/ace43ae))
 
 ### Fixes
+
 - **Non-blocking Quota Checks**: Changed initial quota checks to be non-blocking to prevent delays during server startup ([878d4a3](https://github.com/mcowger/plexus/commit/878d4a3))
 
 ### Improvements
+
 - **OAuth Provider Fetching**: Updated OAuth provider fetching logic ([3705e90](https://github.com/mcowger/plexus/commit/3705e90))
 - **UI Enhancements**:
   - Display `checkerId` in CombinedBalancesCard to distinguish between multiple accounts ([f0e672d](https://github.com/mcowger/plexus/commit/f0e672d))
@@ -985,11 +1025,13 @@ Docker image updated and available at ghcr.io/mcowger/plexus:latest
 ### v0.15.0 MCP proxy and management UI
 
 ## Main features
+
 - MCP proxy functionality implemented ([b0dbde7](https://github.com/mcowger/plexus/commitb0dbde7))
 - MCP server management UI added ([83e7dfa](https://github.com/mcowger/plexus/commit83e7dfa))
 - MCP usage logs UI on MCP page ([085d689](https://github.com/mcowger/plexus/commit085d689))
 
 ## Smaller changes
+
 - MCP proxy tests added ([011167b](https://github.com/mcowger/plexus/commit011167b))
 - Test type errors and flaky network tests fixed ([2c4b1ae](https://github.com/mcowger/plexus/commit2c4b1ae))
 - README updated ([2766ffb](https://github.com/mcowger/plexus/commit2766ffb))
@@ -1082,9 +1124,11 @@ Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest
 ### 2026.02.13.2: OAuth cooldown registration fix
 
 ### Main change
+
 - Fixed OAuth cooldown registration behavior to ensure cooldown is correctly recorded during OAuth flows ([e437515](https://github.com/mcowger/plexus/commit/e437515)).
 
 ### Smaller changes
+
 - OAuth cooldown registration fix and stabilization ([e437515](https://github.com/mcowger/plexus/commit/e437515)).
 
 Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest`.
@@ -1094,6 +1138,7 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
 ### 2026.02.13.1: failover alias retries, expanded quota checker support, and OpenAI Codex model updates
 
 ## Main features
+
 - Added an internal retry mechanism for failover model aliases with multiple targets, improving resilience when upstream targets fail ([78841ba](https://github.com/mcowger/plexus/commit/78841ba)).
 - Expanded quota checker coverage:
   - Added OpenRouter balance-style quota checker ([6358585](https://github.com/mcowger/plexus/commit/6358585)).
@@ -1103,6 +1148,7 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
   - Added `gpt-5.3-codex-spark` and set Version header to `0.101.0` ([3677549](https://github.com/mcowger/plexus/commit/3677549)).
 
 ## Fixes and smaller improvements
+
 - Fixed OpenAI Codex request shaping by stripping temperature for `gpt-5.2` ([0ea60eb](https://github.com/mcowger/plexus/commit/0ea60eb)).
 - Frontend UX fix: prevented model ID input focus loss in the providers modal ([a533bd8](https://github.com/mcowger/plexus/commit/a533bd8)).
 - Providers config fix: preserved empty base URL entries when changing API type ([dc142f0](https://github.com/mcowger/plexus/commit/dc142f0)).
@@ -1111,6 +1157,7 @@ Docker image has been updated and can be found at `ghcr.io/mcowger/plexus:latest
 - Backend test reliability improvements for performance metrics and selector stability ([ff69748](https://github.com/mcowger/plexus/commit/ff69748)).
 
 ## Maintenance
+
 - Removed unintended opencode config artifact ([01a0044](https://github.com/mcowger/plexus/commit/01a0044)).
 - Dependency updates ([6d3837b](https://github.com/mcowger/plexus/commit/6d3837b)).
 - Initial commit marker included in range ([38c65d6](https://github.com/mcowger/plexus/commit/38c65d6)).
@@ -1163,9 +1210,11 @@ Docker image updated and available at ghcr.io/mcowger/plexus:latest
 ## Changes
 
 ### New Features
+
 - **Cascade delete option for provider deletion** - Added ability to cascade delete resources when deleting a provider ([3b71f57](https://github.com/mcowger/plexus/commit/3b71f57))
 
 ### Bug Fixes
+
 - **Fix TPS calculation for streaming requests** - TPS (Tokens Per Second) is now calculated excluding TTFT (Time To First Token) for streaming requests ([e89c660](https://github.com/mcowger/plexus/commit/e89c660))
 - **Fix API type testing** - Now only uses alias.type for testing API types instead of target.apiType ([b6207a5](https://github.com/mcowger/plexus/commit/b6207a5))
 
@@ -1203,9 +1252,11 @@ The Docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### 2026.02.11.1: Performance page multi-target bar rendering fix
 
 ### Main change
+
 - Fixed performance visualization for providers with multiple targets so each target now renders as a separate bar ([db98e18](https://github.com/mcowger/plexus/commit/db98e18)).
 
 ### Smaller changes
+
 - No additional commits in this release.
 
 Docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
@@ -1243,6 +1294,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### Add exploration mechanism to selectors
 
 ## New Features
+
 - Added exploration mechanism to performance and latency selectors ([cdd748d](https://github.com/mcowger/plexus/commit/cdd748d))
 
 This release introduces an exploration mechanism to the performance and latency selectors, allowing for more adaptive selection behavior.
@@ -1291,11 +1343,13 @@ Docker image has been updated and is available at `ghcr.io/mcowger/plexus:latest
 ### 2026.02.06.1: Sidebar UI Enhancements and Tool Proxy Adjustments
 
 ### New Features
-* Surface app version and update status in sidebar ([f5fe214](https://github.com/mcowger/plexus/commit/f5fe214))
+
+- Surface app version and update status in sidebar ([f5fe214](https://github.com/mcowger/plexus/commit/f5fe214))
 
 ### Fixes & Improvements
-* Preserve basic tool param types for oauth ([965d8b6](https://github.com/mcowger/plexus/commit/965d8b6))
-* Adjust proxy renaming to only whitelist tools when requestor is claude code ([977dbfd](https://github.com/mcowger/plexus/commit/977dbfd))
+
+- Preserve basic tool param types for oauth ([965d8b6](https://github.com/mcowger/plexus/commit/965d8b6))
+- Adjust proxy renaming to only whitelist tools when requestor is claude code ([977dbfd](https://github.com/mcowger/plexus/commit/977dbfd))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -1306,9 +1360,11 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ## Changes
 
 ### Bug Fixes
+
 - **OAuth:** Guarded OAuth model metadata to ensure stability ([8d05db2](https://github.com/mcowger/plexus/commit/8d05db2))
 
 ### Maintenance and Chores
+
 - Updated the `bun` lockfile to current versions ([e67300b](https://github.com/mcowger/plexus/commit/e67300b))
 - Synchronized `pi-ai` dependency with upstream ([f3c2cb8](https://github.com/mcowger/plexus/commit/f3c2cb8))
 
@@ -1362,7 +1418,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ## 2026.02.04.1 - 2026-02-05
 
-### 2026.02.04.1: Support Oauth/Subscription Providers:  Codex, Claude Pro, Antigravity, GeminiCLI, Github Copilot
+### 2026.02.04.1: Support Oauth/Subscription Providers: Codex, Claude Pro, Antigravity, GeminiCLI, Github Copilot
 
 ## Main Features
 
@@ -1396,14 +1452,14 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### Main New Features
 
-* **Quota Exceedance Estimation**: Introduced server-side logic to estimate quota exhaustion using historical data analysis ([d22a73d](https://github.com/mcowger/plexus/commit/d22a73d)).
+- **Quota Exceedance Estimation**: Introduced server-side logic to estimate quota exhaustion using historical data analysis ([d22a73d](https://github.com/mcowger/plexus/commit/d22a73d)).
 
 ### Technical Changes and Fixes
 
-* **Database Reliability**: Implemented comprehensive error handling for database timeout issues and corrected Drizzle ORM API usage during response cleanup ([aff2e30](https://github.com/mcowger/plexus/commit/aff2e30), [36d9910](https://github.com/mcowger/plexus/commit/36d9910)).
-* **Quota Logic Improvements**: Resolved issues with quota snapshot deduplication, `resetInSeconds` calculation, and schema initialization ([c297f84](https://github.com/mcowger/plexus/commit/c297f84), [0d469b5](https://github.com/mcowger/plexus/commit/0d469b5)).
-* **UI Enhancements**: Refactored quota reset displays into integrated labels and updated the 'Tokens' column with fixed widths and null-set symbols for zero-cost entries ([7973c41](https://github.com/mcowger/plexus/commit/7973c41), [4db76e2](https://github.com/mcowger/plexus/commit/4db76e2)).
-* **Cleanup**: Removed unnecessary code artifacts ([41a3a24](https://github.com/mcowger/plexus/commit/41a3a24)).
+- **Database Reliability**: Implemented comprehensive error handling for database timeout issues and corrected Drizzle ORM API usage during response cleanup ([aff2e30](https://github.com/mcowger/plexus/commit/aff2e30), [36d9910](https://github.com/mcowger/plexus/commit/36d9910)).
+- **Quota Logic Improvements**: Resolved issues with quota snapshot deduplication, `resetInSeconds` calculation, and schema initialization ([c297f84](https://github.com/mcowger/plexus/commit/c297f84), [0d469b5](https://github.com/mcowger/plexus/commit/0d469b5)).
+- **UI Enhancements**: Refactored quota reset displays into integrated labels and updated the 'Tokens' column with fixed widths and null-set symbols for zero-cost entries ([7973c41](https://github.com/mcowger/plexus/commit/7973c41), [4db76e2](https://github.com/mcowger/plexus/commit/4db76e2)).
+- **Cleanup**: Removed unnecessary code artifacts ([41a3a24](https://github.com/mcowger/plexus/commit/41a3a24)).
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -1551,15 +1607,15 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### Main New Features
 
-* **Audio Speech (TTS) API Support**: Added support for OpenAI-compatible text-to-speech API endpoints. ([2b3025a](https://github.com/mcowger/plexus/commit/2b3025a))
-* **Audio Transcriptions API Support**: Added support for OpenAI-compatible audio transcription API endpoints. ([62b019b](https://github.com/mcowger/plexus/commit/62b019b))
+- **Audio Speech (TTS) API Support**: Added support for OpenAI-compatible text-to-speech API endpoints. ([2b3025a](https://github.com/mcowger/plexus/commit/2b3025a))
+- **Audio Transcriptions API Support**: Added support for OpenAI-compatible audio transcription API endpoints. ([62b019b](https://github.com/mcowger/plexus/commit/62b019b))
 
 ### Smaller Changes and Bug Fixes
 
-* **UI Stability**: Added null checks for `request_id` fields in Error and Debug pages to prevent rendering issues. ([8d5bd01](https://github.com/mcowger/plexus/commit/8d5bd01))
-* **Logging Control**: Prevented debug log persistence when the system is not in debug mode. ([93c3909](https://github.com/mcowger/plexus/commit/93c3909))
-* **Embeddings Observability**: Added verbose debug logging for embeddings API requests. ([f9ba993](https://github.com/mcowger/plexus/commit/f9ba993))
-* **Configuration Persistence**: Fixed a bug where the `enabled` field was not correctly saved for model alias targets. ([c132fc6](https://github.com/mcowger/plexus/commit/c132fc6))
+- **UI Stability**: Added null checks for `request_id` fields in Error and Debug pages to prevent rendering issues. ([8d5bd01](https://github.com/mcowger/plexus/commit/8d5bd01))
+- **Logging Control**: Prevented debug log persistence when the system is not in debug mode. ([93c3909](https://github.com/mcowger/plexus/commit/93c3909))
+- **Embeddings Observability**: Added verbose debug logging for embeddings API requests. ([f9ba993](https://github.com/mcowger/plexus/commit/f9ba993))
+- **Configuration Persistence**: Fixed a bug where the `enabled` field was not correctly saved for model alias targets. ([c132fc6](https://github.com/mcowger/plexus/commit/c132fc6))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -1839,9 +1895,9 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 - **Performance Optimizations**: General performance enhancements throughout the system. [[ebc01a9](https://github.com/mcowger/plexus/commit/ebc01a9)]
 - **Transformer Refactoring**: Internal architectural cleanup of the transformer modules. [[56db99b](https://github.com/mcowger/plexus/commit/56db99b)]
 - **UI Improvements**:
-    - Added drag handles for improved layout control. [[32d66be](https://github.com/mcowger/plexus/commit/32d66be)]
-    - Reduced visual footprint of graphs and dialog boxes for higher density views. [[d5d7d88](https://github.com/mcowger/plexus/commit/d5d7d88), [4f2ef0d](https://github.com/mcowger/plexus/commit/4f2ef0d)]
-    - Enhanced testing button visibility and functionality. [[268c1cc](https://github.com/mcowger/plexus/commit/268c1cc)]
+  - Added drag handles for improved layout control. [[32d66be](https://github.com/mcowger/plexus/commit/32d66be)]
+  - Reduced visual footprint of graphs and dialog boxes for higher density views. [[d5d7d88](https://github.com/mcowger/plexus/commit/d5d7d88), [4f2ef0d](https://github.com/mcowger/plexus/commit/4f2ef0d)]
+  - Enhanced testing button visibility and functionality. [[268c1cc](https://github.com/mcowger/plexus/commit/268c1cc)]
 
 ## Bug Fixes and Stability
 
@@ -1883,18 +1939,20 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ## v0.7.5 Release Notes
 
 ### New Features
+
 - **InOrder Selector**: Introduced a new `InOrder` selector to support prioritized provider fallback logic. ([fc913ab](https://github.com/mcowger/plexus/commit/fc913ab))
 - **Usage Visualization**: Added interactive pie charts to provide usage breakdowns by model, provider, and API key. ([357cc8b](https://github.com/mcowger/plexus/commit/357cc8b))
 - **Persistent Collapsible Sidebar**: Implemented a new sidebar with a persistent state across sessions for improved navigation. ([81bbecf](https://github.com/mcowger/plexus/commit/81bbecf))
 
 ### Minor Changes & Bug Fixes
+
 - **Data Handling**: Fixed serialization and parsing for nested objects within Extra Body Fields and Custom Headers. ([435e43e](https://github.com/mcowger/plexus/commit/435e43e))
 - **UI Normalization**: Standardized provider model arrays into object formats for consistent UI rendering. ([86e9071](https://github.com/mcowger/plexus/commit/86e9071))
 - **Log Attribution**: Added attribution display to the key column within the logs table. ([70d7f34](https://github.com/mcowger/plexus/commit/70d7f34))
-- **Layout Refinements**: 
-    - Improved sidebar layout with a dedicated Main navigation section. ([aba668b](https://github.com/mcowger/plexus/commit/aba668b))
-    - Reduced sidebar width to 200px and button padding to 8px for higher information density. ([e8bbade](https://github.com/mcowger/plexus/commit/e8bbade))
-    - Refactored Debug Mode UI within the sidebar. ([00a6bc5](https://github.com/mcowger/plexus/commit/00a6bc5))
+- **Layout Refinements**:
+  - Improved sidebar layout with a dedicated Main navigation section. ([aba668b](https://github.com/mcowger/plexus/commit/aba668b))
+  - Reduced sidebar width to 200px and button padding to 8px for higher information density. ([e8bbade](https://github.com/mcowger/plexus/commit/e8bbade))
+  - Refactored Debug Mode UI within the sidebar. ([00a6bc5](https://github.com/mcowger/plexus/commit/00a6bc5))
 - **Chart Formatting**: Applied consistent number formatting across usage overview charts. ([232f5e9](https://github.com/mcowger/plexus/commit/232f5e9))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
@@ -1905,13 +1963,13 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ## Main Features
 
-*   **Manual OAuth Flow**: Introduced a manual OAuth authentication method to circumvent environment-specific restrictions, specifically targeting limitations in Antigravity and Claude Code environments. ([19a7dd2](https://github.com/mcowger/plexus/commit/19a7dd2), [19c9835](https://github.com/mcowger/plexus/commit/19c9835), [4f2530b](https://github.com/mcowger/plexus/commit/4f2530b))
+- **Manual OAuth Flow**: Introduced a manual OAuth authentication method to circumvent environment-specific restrictions, specifically targeting limitations in Antigravity and Claude Code environments. ([19a7dd2](https://github.com/mcowger/plexus/commit/19a7dd2), [19c9835](https://github.com/mcowger/plexus/commit/19c9835), [4f2530b](https://github.com/mcowger/plexus/commit/4f2530b))
 
 ## Smaller Changes & Bug Fixes
 
-*   **OAuth Logic Correction**: Resolved a bug that restricted OAuth options when an existing account was already configured in the system. ([8b1fe1d](https://github.com/mcowger/plexus/commit/8b1fe1d))
-*   **URL Generation**: Fixed an issue with OAuth URL generation to ensure correct redirect behavior. ([469ce33](https://github.com/mcowger/plexus/commit/469ce33))
-*   **Documentation**: General updates to the project documentation. ([8aea510](https://github.com/mcowger/plexus/commit/8aea510))
+- **OAuth Logic Correction**: Resolved a bug that restricted OAuth options when an existing account was already configured in the system. ([8b1fe1d](https://github.com/mcowger/plexus/commit/8b1fe1d))
+- **URL Generation**: Fixed an issue with OAuth URL generation to ensure correct redirect behavior. ([469ce33](https://github.com/mcowger/plexus/commit/469ce33))
+- **Documentation**: General updates to the project documentation. ([8aea510](https://github.com/mcowger/plexus/commit/8aea510))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -1921,7 +1979,7 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### ✨ New Features
 
-*   **Claude Code OAuth Integration:** Introduced the ability to authenticate with Claude Code using OAuth. This allows for seamless integration with Claude Code environments. ([cc89abe](https://github.com/mcowger/plexus/commit/cc89abe))
+- **Claude Code OAuth Integration:** Introduced the ability to authenticate with Claude Code using OAuth. This allows for seamless integration with Claude Code environments. ([cc89abe](https://github.com/mcowger/plexus/commit/cc89abe))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -1931,8 +1989,8 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### Changes and Improvements
 
-*   **Fix TPS Calculation:** Resolved an issue in the calculation logic for Transactions Per Second (TPS) to ensure accurate performance metrics. ([6375d96](https://github.com/mcowger/plexus/commit/6375d96))
-*   **Documentation:** Updated the README to reflect recent project changes and instructions. ([6375d96](https://github.com/mcowger/plexus/commit/6375d96))
+- **Fix TPS Calculation:** Resolved an issue in the calculation logic for Transactions Per Second (TPS) to ensure accurate performance metrics. ([6375d96](https://github.com/mcowger/plexus/commit/6375d96))
+- **Documentation:** Updated the README to reflect recent project changes and instructions. ([6375d96](https://github.com/mcowger/plexus/commit/6375d96))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest
 
@@ -1985,38 +2043,48 @@ Hotfix: Fix dispatcher when access_via[] is empty.
 ## Major Features
 
 ### Provider and Model Management UI
+
 This release introduces full Provider and Model editing capabilities. Users can now manage AI providers and models directly through the web interface with an enhanced providers page that consolidates provider and model management ([47cd66d](https://github.com/mcowger/plexus/commit/47cd66d), [c2cf12c](https://github.com/mcowger/plexus/commit/c2cf12c), [cd8648d](https://github.com/mcowger/plexus/commit/cd8648d), [1b5d065](https://github.com/mcowger/plexus/commit/1b5d065)).
 
 ### Route Protection and Key Management
+
 Inference routes are now protected, and a Key management UI has been added for better security and credential management ([5723029](https://github.com/mcowger/plexus/commit/5723029)).
 
 ### Multi-Protocol API Routing with Adaptive Matching
+
 The API routing system has been significantly enhanced to support multiple protocols with adaptive matching, providing more flexible and intelligent request routing ([746ebc1](https://github.com/mcowger/plexus/commit/746ebc1)).
 
 ### Gemini Support
+
 Added support for Google's Gemini AI models, expanding the range of supported providers ([2a8bc4e](https://github.com/mcowger/plexus/commit/2a8bc4e), [cbb6096](https://github.com/mcowger/plexus/commit/cbb6096)).
 
 ### Usage Tracking
+
 Implemented comprehensive usage tracking to monitor API consumption and resource utilization ([cbb6096](https://github.com/mcowger/plexus/commit/cbb6096), [c51f4cb](https://github.com/mcowger/plexus/commit/c51f4cb)).
 
 ### Additional Aliases Support
+
 Extended alias functionality to provide more flexible routing and endpoint naming ([f9b2005](https://github.com/mcowger/plexus/commit/f9b2005)).
 
 ### Fastify Migration
+
 The application has been refactored to use Fastify as the web framework, improving performance and developer experience ([3fbb6fa](https://github.com/mcowger/plexus/commit/3fbb6fa)).
 
 ### Tailwind CSS Integration
+
 Completely refactored the frontend styling with Tailwind CSS integration and updated build configurations ([c50c371](https://github.com/mcowger/plexus/commit/c50c371), [ce06349](https://github.com/mcowger/plexus/commit/ce06349)).
 
 ## Improvements and Fixes
 
 ### Core Improvements
+
 - Refactored management routes for better organization ([3610d36](https://github.com/mcowger/plexus/commit/3610d36), [8f26846](https://github.com/mcowger/plexus/commit/8f26846))
 - Streamlined OpenAI transformer and removed usage-extractors ([5974154](https://github.com/mcowger/plexus/commit/5974154))
 - Simplified logging and response handling ([9838f54](https://github.com/mcowger/plexus/commit/9838f54))
 - Fixed caching and Duration display ([b489333](https://github.com/mcowger/plexus/commit/b489333))
 
 ### Bug Fixes
+
 - Fixed paths for compilation ([08490d9](https://github.com/mcowger/plexus/commit/08490d9))
 - Improved mocking reliability ([9764306](https://github.com/mcowger/plexus/commit/9764306))
 - Fixed mocks ([f1a7dca](https://github.com/mcowger/plexus/commit/f1a7dca))
@@ -2026,12 +2094,14 @@ Completely refactored the frontend styling with Tailwind CSS integration and upd
 - Fixed debug logging ([ff18de2](https://github.com/mcowger/plexus/commit/ff18de2))
 
 ### Build and Testing
+
 - Removed HAR file generation ([4af4e02](https://github.com/mcowger/plexus/commit/4af4e02))
 - Updated build configurations ([c8585d6](https://github.com/mcowger/plexus/commit/c8585d6), [4e2a140](https://github.com/mcowger/plexus/commit/4e2a140))
 - Fixed and simplified tests ([6b19516](https://github.com/mcowger/plexus/commit/6b19516), [5a8e477](https://github.com/mcowger/plexus/commit/5a8e477))
 - Removed outdated test suites ([7f109e0](https://github.com/mcowger/plexus/commit/7f109e0))
 
 ### Cleanup and Maintenance
+
 - General code cleanup ([d439f50](https://github.com/mcowger/plexus/commit/d439f50))
 - Updated README documentation ([57f105a](https://github.com/mcowger/plexus/commit/57f105a))
 - Updated dependency locks ([5974154](https://github.com/mcowger/plexus/commit/5974154))
@@ -2050,13 +2120,13 @@ This release introduces Server-Sent Events (SSE) ping events to prevent timeouts
 
 ## New Features
 
-*   **SSE Ping Events for Log Streaming:** Implemented SSE ping events to maintain active connections and avoid timeouts when streaming logs. ([dff6abd](https://github.com/mcowger/plexus/commit/dff6abd))
+- **SSE Ping Events for Log Streaming:** Implemented SSE ping events to maintain active connections and avoid timeouts when streaming logs. ([dff6abd](https://github.com/mcowger/plexus/commit/dff6abd))
 
 ## Smaller Changes
 
-*   **Suppress Builds for Non-Code Changes:** Builds will now be suppressed if only non-code changes are detected. ([2f05172](https://github.com/mcowger/plexus/commit/2f05172))
-*   **Release Script Prompt Updates:** Minor prompt updates in the release script for improved clarity. ([1d27dbf](https://github.com/mcowger/plexus/commit/1d27dbf))
-*   **Release Script Updates:** General updates to the release script. ([3f2103a](https://github.com/mcowger/plexus/commit/3f2103a))
+- **Suppress Builds for Non-Code Changes:** Builds will now be suppressed if only non-code changes are detected. ([2f05172](https://github.com/mcowger/plexus/commit/2f05172))
+- **Release Script Prompt Updates:** Minor prompt updates in the release script for improved clarity. ([1d27dbf](https://github.com/mcowger/plexus/commit/1d27dbf))
+- **Release Script Updates:** General updates to the release script. ([3f2103a](https://github.com/mcowger/plexus/commit/3f2103a))
 
 The docker image has been updated and can be found at ghcr.io/mcowger/plexus:latest.
 
@@ -2065,10 +2135,12 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### Update to re-add /v1/models endpoint lost in refactor
 
 ### 🚀 Main Features
+
 - **Models API Testing Suite**: Introduced a comprehensive testing framework for the Models API, featuring precise timestamp verification (`eeca1cb`).
 - **Developer Guidelines**: New documentation for testing best practices to ensure long-term code quality (`eeca1cb`).
 
 ### 🛠 Improvements & Fixes
+
 - **API Restoration**: Fixed a critical issue where the `v1/models` endpoint was lost or inaccessible (`8e0ac0c`).
 - **Test Isolation**: Significantly refactored the test suite to prevent module leakage and improve environmental isolation (`d413691`, `75dd497`, `8b00fea`).
 - **Observability**: Added enhanced logging to facilitate easier debugging and monitoring (`94ff5ac`).
@@ -2094,9 +2166,11 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### Precision Performance: New Latency & Speed Selectors
 
 ### ✨ New Features
+
 - **Performance & Latency Selectors:** Added powerful new selection capabilities to fine-tune system metrics and optimize for speed and response times.
 
 ### 🛠️ Improvements & Fixes
+
 - **Configuration Updates:** Refined configuration logic to support the new performance parameters (`994c13c`).
 - **Test Suite Enhancements:** Updated existing tests to ensure reliability across all new selector functionalities (`994c13c`).
 
@@ -2105,9 +2179,11 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 ### Precision Performance: Smarter Metrics & Smoother Releases
 
 ### Key Improvements
+
 - **Refined TPS Calculation**: Improved the accuracy of performance metrics by excluding input tokens from the Tokens Per Second (TPS) count, ensuring a more precise measurement of generation throughput.
 
 ### Minor Changes & Fixes
+
 - Fix release automation scripts (`5d369d7`)
 - Resolve logic in TPS counting metrics (`fabdf55`)
 - Update internal testing suite in `test.ts` (`dd784c8`)
@@ -2167,11 +2243,11 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 
 ### Main New Features
 
-*   **Security Hardening**: Re-engineered the authentication middleware to strictly enforce API key requirements, ensuring a more robust security posture.
+- **Security Hardening**: Re-engineered the authentication middleware to strictly enforce API key requirements, ensuring a more robust security posture.
 
 ### Smaller Changes
 
-*   Removed legacy testing bypasses in the auth layer to prevent unauthorized access in production-like environments (129e18b).
+- Removed legacy testing bypasses in the auth layer to prevent unauthorized access in production-like environments (129e18b).
 
 ## 2026.01.02.8 - 2026-01-02
 
@@ -2182,17 +2258,19 @@ The docker image has been updated and can be found at ghcr.io/mcowger/plexus:lat
 This release focuses on refining the internal communication layer to improve data reliability.
 
 ### Minor Changes
+
 - **Adjust response handling** (`dae0008`): Refined the logic for processing system responses to ensure more consistent data delivery.
 
 ## 2026.01.02.7 - 2026-01-02
 
-### 
+###
 
 ## 2026.01.02.6 - 2026-01-02
 
 ### Under-the-Hood Polish
 
 ### 🛠 Smaller Changes
+
 - Performed minor script adjustments and maintenance. (`1512b09`)
 
 ## 2026.01.02.5 - 2026-01-02
@@ -2204,14 +2282,15 @@ Based on the provided commit log, here are the release notes:
 ### **Release Notes**
 
 #### **Main New Features**
-*   *No major user-facing features were introduced in this update.*
+
+- _No major user-facing features were introduced in this update._
 
 #### **Improvements & Bug Fixes**
-*   **CI/CD Enhancements:** Updated the internal release script to improve the deployment process. ([d6c533e](d6c533e))
+
+- **CI/CD Enhancements:** Updated the internal release script to improve the deployment process. ([d6c533e](d6c533e))
 
 ## 2026.01.02.4 - 2026-01-02
 
 ### Add Live System Logs
 
 Added live system logs so you dont need to drop into terminal or docker.
-

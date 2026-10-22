@@ -1,3 +1,5 @@
+import { PassThrough, Readable } from 'node:stream';
+
 /**
  * Tests for the upstream fetch cancellation chain in handleResponse().
  *
@@ -16,14 +18,13 @@
  * See packages/backend/src/__tests__/disconnect-detection/ for the exploratory
  * test scripts that established these findings.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
-import { handleResponse } from '../responses/response-handler';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { OpenAITransformer } from '../../transformers/openai';
-import { DebugManager } from '../observability/debug-manager';
 import type { UnifiedChatResponse } from '../../types/unified';
 import type { UsageRecord } from '../../types/usage';
+import { DebugManager } from '../observability/debug-manager';
+import { handleResponse } from '../responses/response-handler';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,10 +1,11 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
-import { OAuthAuthManager, type GetApiKeyOptions } from '../../oauth/oauth-auth-manager';
-import { CodexVersionService } from '../../oauth/codex-version-service';
-import type { OAuthProvider } from '../../oauth/oauth-providers';
-import { logger } from '../../../utils/logger';
+
 import type { Meter } from '../../../types/meter';
+import { logger } from '../../../utils/logger';
+import { CodexVersionService } from '../../oauth/codex-version-service';
+import { type GetApiKeyOptions, OAuthAuthManager } from '../../oauth/oauth-auth-manager';
+import type { OAuthProvider } from '../../oauth/oauth-providers';
+import { defineChecker } from '../checker-registry';
 import type { MeterContext } from '../checker-registry';
 
 interface CodexUsageWindow {

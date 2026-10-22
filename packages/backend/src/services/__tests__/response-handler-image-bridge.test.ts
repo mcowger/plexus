@@ -17,15 +17,16 @@
  * the bytes a chat client actually receives.
  */
 
-import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { handleResponse } from '../responses/response-handler';
-import { synthesizeChatStream } from '../dispatch/image-model-bridge';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { OpenAITransformer } from '../../transformers/openai';
-import { logger } from '../../utils/logger';
-import type { UsageStorageService } from '../observability/usage-storage';
 import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../types/unified';
 import type { UsageRecord } from '../../types/usage';
+import { logger } from '../../utils/logger';
+import { synthesizeChatStream } from '../dispatch/image-model-bridge';
+import type { UsageStorageService } from '../observability/usage-storage';
+import { handleResponse } from '../responses/response-handler';
 
 const TINY_IMAGE_B64 = 'aGVsbG8=';
 

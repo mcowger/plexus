@@ -1,11 +1,12 @@
-import { describe, expect, test, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
-import { registerSpy } from '../../../../test/test-utils';
 import Fastify, { FastifyInstance } from 'fastify';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
-import { registerMcpRoutes } from '../index';
-import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
-import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
 import * as mcpAuthProviderFactory from '../../../services/mcp-oauth/provider-factory';
+import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
+import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
+import { registerMcpRoutes } from '../index';
 
 const baseConfig = (overrides: Record<string, unknown> = {}) => ({
   providers: {},

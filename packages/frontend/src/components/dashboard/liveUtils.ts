@@ -6,7 +6,7 @@
  */
 
 import type { UsageRecord } from '../../lib/api';
-import { EXCLUDED_PROVIDER_LABELS, PLACEHOLDER_LABELS, type EntityStats } from './liveTypes';
+import { type EntityStats, EXCLUDED_PROVIDER_LABELS, PLACEHOLDER_LABELS } from './liveTypes';
 
 /**
  * Strips whitespace and filters out placeholder telemetry labels.

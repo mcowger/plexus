@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { setConfigForTesting } from '../../config';
-import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
+import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
+import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 
 // Native Meta (Muse Code) OAuth dispatch.
 //

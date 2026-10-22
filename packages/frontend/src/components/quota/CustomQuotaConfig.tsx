@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
 import { Play } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import { testCustomQuotaChecker } from '../../lib/api';
 import { Button } from '../ui/Button';
 
@@ -58,34 +59,34 @@ export function CustomQuotaConfig({ checkerId, provider, options, onChange }: Pr
   return (
     <div className="flex flex-col gap-3">
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="text-[11px] font-medium text-text-secondary">
+        <label className="text-text-secondary text-[11px] font-medium">
           Request endpoint
           <input
-            className="mt-1 h-8 w-full rounded-sm border border-border-glass bg-bg-glass px-2 text-xs text-text outline-none focus:border-primary"
+            className="border-border-glass bg-bg-glass text-text focus:border-primary mt-1 h-8 w-full rounded-sm border px-2 text-xs outline-none"
             value={endpoint}
             onChange={(event) => updateOption('endpoint', event.target.value)}
             placeholder="https://provider.example.com/quota"
           />
         </label>
-        <label className="text-[11px] font-medium text-text-secondary">
+        <label className="text-text-secondary text-[11px] font-medium">
           Authentication header
           <input
-            className="mt-1 h-8 w-full rounded-sm border border-border-glass bg-bg-glass px-2 text-xs text-text outline-none focus:border-primary"
+            className="border-border-glass bg-bg-glass text-text focus:border-primary mt-1 h-8 w-full rounded-sm border px-2 text-xs outline-none"
             value={authHeader}
             onChange={(event) => updateOption('authHeader', event.target.value)}
             placeholder="Authorization"
           />
         </label>
-        <label className="text-[11px] font-medium text-text-secondary">
+        <label className="text-text-secondary text-[11px] font-medium">
           Authentication prefix
           <input
-            className="mt-1 h-8 w-full rounded-sm border border-border-glass bg-bg-glass px-2 text-xs text-text outline-none focus:border-primary"
+            className="border-border-glass bg-bg-glass text-text focus:border-primary mt-1 h-8 w-full rounded-sm border px-2 text-xs outline-none"
             value={authPrefix}
             onChange={(event) => updateOption('authPrefix', event.target.value)}
             placeholder="Bearer"
           />
         </label>
-        <label className="flex items-center gap-2 self-end pb-2 text-[11px] text-text-secondary">
+        <label className="text-text-secondary flex items-center gap-2 self-end pb-2 text-[11px]">
           <input
             type="checkbox"
             checked={useApiKey}
@@ -94,10 +95,10 @@ export function CustomQuotaConfig({ checkerId, provider, options, onChange }: Pr
           Send the provider API key in this header
         </label>
       </div>
-      <label className="text-[11px] font-medium text-text-secondary">
+      <label className="text-text-secondary text-[11px] font-medium">
         Additional request headers (JSON)
         <textarea
-          className="mt-1 min-h-20 w-full rounded-sm border border-border-glass bg-bg-glass p-2 font-mono text-[11px] text-text outline-none focus:border-primary"
+          className="border-border-glass bg-bg-glass text-text focus:border-primary mt-1 min-h-20 w-full rounded-sm border p-2 font-mono text-[11px] outline-none"
           value={configuredHeaders}
           onChange={(event) => {
             try {
@@ -113,11 +114,11 @@ export function CustomQuotaConfig({ checkerId, provider, options, onChange }: Pr
         />
       </label>
       <div>
-        <label className="font-body text-[11px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[11px] font-medium">
           Other options (JSON)
         </label>
         <textarea
-          className="mt-1 min-h-28 w-full rounded-sm border border-border-glass bg-bg-glass p-2 font-mono text-[11px] text-text outline-none focus:border-primary"
+          className="border-border-glass bg-bg-glass text-text focus:border-primary mt-1 min-h-28 w-full rounded-sm border p-2 font-mono text-[11px] outline-none"
           value={optionsText}
           onChange={(event) => updateOptions(event.target.value)}
           spellCheck={false}
@@ -134,9 +135,9 @@ export function CustomQuotaConfig({ checkerId, provider, options, onChange }: Pr
         >
           Test checker
         </Button>
-        {testMessage && <span className="text-[11px] text-text-secondary">{testMessage}</span>}
+        {testMessage && <span className="text-text-secondary text-[11px]">{testMessage}</span>}
       </div>
-      <p className="m-0 text-[11px] italic text-text-secondary">
+      <p className="text-text-secondary m-0 text-[11px] italic">
         In checker code, use ctx.fetch(url, init) to apply these settings automatically, or use
         ctx.requestHeaders() with the regular fetch function. The provider API key is inherited from
         the provider above and is never displayed here.

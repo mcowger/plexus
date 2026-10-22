@@ -1,7 +1,7 @@
+import type { FieldRewrite, MatchCondition, ReasoningRewriteOptions } from '../../config';
 import type { ProviderAdapter } from '../../types/provider-adapter';
-import type { ReasoningRewriteOptions, FieldRewrite, MatchCondition } from '../../config';
-import { resolveDottedPath } from './model-override.adapter';
 import { logger } from '../../utils/logger';
+import { resolveDottedPath } from './model-override.adapter';
 
 /**
  * reasoning_rewrite adapter

@@ -1,4 +1,5 @@
-import { describe, expect, test, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
+
 import { DebugManager } from '../observability/debug-manager';
 
 describe('DebugManager HTTP metadata', () => {

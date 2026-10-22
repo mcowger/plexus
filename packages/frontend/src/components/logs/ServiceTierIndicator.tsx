@@ -2,11 +2,12 @@ import {
   ArrowRight,
   CircleDot,
   Gauge,
+  type LucideIcon,
   Rabbit,
   Rocket,
   Turtle,
-  type LucideIcon,
 } from 'lucide-react';
+
 import type { DisplayServiceTier, ServiceTierDisplay } from './helpers';
 
 const TIER_ICONS: Record<DisplayServiceTier, LucideIcon> = {
@@ -37,11 +38,11 @@ export const ServiceTierIndicator = ({
       aria-label={display.label}
       title={display.tooltip}
     >
-      <Gauge size={size} className="shrink-0 text-text-muted" aria-hidden="true" />
+      <Gauge size={size} className="text-text-muted shrink-0" aria-hidden="true" />
       <TierIcon size={size} className="shrink-0 text-cyan-400" aria-hidden="true" />
       {ActualTierIcon && (
         <>
-          <ArrowRight size={size} className="shrink-0 text-text-muted" aria-hidden="true" />
+          <ArrowRight size={size} className="text-text-muted shrink-0" aria-hidden="true" />
           <ActualTierIcon size={size} className="shrink-0 text-cyan-400" aria-hidden="true" />
         </>
       )}

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { OpenAITransformer } from '../openai';
-import { ResponsesTransformer } from '../responses';
+
 import { buildAnthropicRequest } from '../anthropic/request-builder';
 import { parseAnthropicRequest } from '../anthropic/request-parser';
-import { buildResponsesRequest } from '../responses/request-builder';
 import { buildGeminiRequest } from '../gemini/request-builder';
+import { OpenAITransformer } from '../openai';
+import { ResponsesTransformer } from '../responses';
+import { buildResponsesRequest } from '../responses/request-builder';
 
 /**
  * Regression tests for https://github.com/mcowger/plexus/issues/985:

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { getCacheRoutingHeaders } from '../cache-routing-headers';
 
 describe('getCacheRoutingHeaders', () => {

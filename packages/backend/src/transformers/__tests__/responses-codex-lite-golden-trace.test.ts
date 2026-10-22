@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { ResponsesTransformer } from '../responses';
+
 import { OpenAITransformer } from '../openai';
+import { ResponsesTransformer } from '../responses';
 import requestFixture from './fixtures/codex-lite-openrouter-chat-request.json';
 import responseChunksFixture from './fixtures/codex-lite-openrouter-chat-response-chunks.json';
 

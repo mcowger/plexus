@@ -1,6 +1,7 @@
-import { defineChecker } from '../checker-registry';
 import { z } from 'zod';
+
 import { logger } from '../../../utils/logger';
+import { defineChecker } from '../checker-registry';
 
 const DASHBOARD_BASE_URL = 'https://opencode.ai/workspace/';
 const DASHBOARD_URL_SUFFIX = '/go';

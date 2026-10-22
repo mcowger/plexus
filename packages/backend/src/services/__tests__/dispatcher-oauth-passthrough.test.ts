@@ -1,13 +1,14 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { setConfigForTesting } from '../../config';
-import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
-import { TransformerFactory } from '../dispatch/transformer-factory';
-import { handleResponse } from '../responses/response-handler';
-import type { UsageStorageService } from '../observability/usage-storage';
+import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
 import type { UsageRecord } from '../../types/usage';
+import { TransformerFactory } from '../dispatch/transformer-factory';
+import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
+import type { UsageStorageService } from '../observability/usage-storage';
+import { handleResponse } from '../responses/response-handler';
 
 // Regression test for issue #162 (dispatcher-level):
 //   a multi-turn conversation routed to Claude Code OAuth must succeed, not

@@ -20,6 +20,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { applyClaudeCodeMasking } from '../apply-masking';
 import { buildFixtureTools, buildPiAiOutputFixture } from './fixtures';
 

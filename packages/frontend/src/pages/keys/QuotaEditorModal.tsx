@@ -1,10 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { UserQuota } from '../../lib/api';
-import { Input } from '../../components/ui/Input';
-import { TagSelect } from '../../components/ui/TagSelect';
+
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Switch } from '../../components/ui/Switch';
+import { TagSelect } from '../../components/ui/TagSelect';
+import type { UserQuota } from '../../lib/api';
 import type { EditingQuota } from './types';
 
 interface QuotaEditorModalProps {
@@ -57,7 +58,7 @@ export const QuotaEditorModal = ({
           placeholder="e.g. daily-1000"
           disabled={!!originalQuotaName}
         />
-        <p className="text-xs text-text-muted">
+        <p className="text-text-muted text-xs">
           {originalQuotaName
             ? 'Quota name cannot be changed once created.'
             : 'A unique identifier for this quota. Use lowercase letters, numbers, hyphens.'}
@@ -65,9 +66,9 @@ export const QuotaEditorModal = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="font-body text-[13px] font-medium text-text-secondary">Quota Type</label>
+        <label className="font-body text-text-secondary text-[13px] font-medium">Quota Type</label>
         <select
-          className="w-full px-3 py-2 bg-bg-subtle border border-border-glass rounded-md font-body text-sm text-text focus:border-primary focus:outline-none"
+          className="bg-bg-subtle border-border-glass font-body text-text focus:border-primary w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
           value={editingQuota.type}
           onChange={(event) =>
             setEditingQuota({ ...editingQuota, type: event.target.value as UserQuota['type'] })
@@ -78,7 +79,7 @@ export const QuotaEditorModal = ({
           <option value="weekly">Weekly (UTC)</option>
           <option value="monthly">Monthly (UTC)</option>
         </select>
-        <p className="text-xs text-text-muted">
+        <p className="text-text-muted text-xs">
           {editingQuota.type === 'rolling' && 'Limits usage over a sliding time window'}
           {editingQuota.type === 'daily' && 'Resets at midnight UTC each day'}
           {editingQuota.type === 'weekly' && 'Resets at midnight UTC on Monday'}
@@ -94,16 +95,16 @@ export const QuotaEditorModal = ({
             onChange={(event) => setEditingQuota({ ...editingQuota, duration: event.target.value })}
             placeholder="e.g. 1h, 30m, 1d"
           />
-          <p className="text-xs text-text-muted">
+          <p className="text-text-muted text-xs">
             Duration of the rolling window (e.g., 1h, 30m, 2h30m, 1d)
           </p>
         </div>
       )}
 
       <div className="flex flex-col gap-2">
-        <label className="font-body text-[13px] font-medium text-text-secondary">Limit Type</label>
+        <label className="font-body text-text-secondary text-[13px] font-medium">Limit Type</label>
         <select
-          className="w-full px-3 py-2 bg-bg-subtle border border-border-glass rounded-md font-body text-sm text-text focus:border-primary focus:outline-none"
+          className="bg-bg-subtle border-border-glass font-body text-text focus:border-primary w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
           value={editingQuota.limitType}
           onChange={(event) =>
             setEditingQuota({
@@ -128,16 +129,16 @@ export const QuotaEditorModal = ({
           }
           placeholder="1000"
         />
-        <p className="text-xs text-text-muted">
+        <p className="text-text-muted text-xs">
           Maximum {editingQuota.limitType === 'cost' ? `cost (${symbol})` : editingQuota.limitType}{' '}
           allowed
         </p>
       </div>
 
-      <div className="flex items-start justify-between gap-4 rounded-md border border-border-glass bg-bg-subtle p-3">
+      <div className="border-border-glass bg-bg-subtle flex items-start justify-between gap-4 rounded-md border p-3">
         <div className="min-w-0 flex-1">
-          <div className="font-body text-[13px] font-medium text-text-secondary">Shared bucket</div>
-          <p className="mt-1 text-xs text-text-muted">
+          <div className="font-body text-text-secondary text-[13px] font-medium">Shared bucket</div>
+          <p className="text-text-muted mt-1 text-xs">
             Pool usage across every key that references this quota into a single counter, instead of
             tracking each key independently.
           </p>
@@ -171,14 +172,14 @@ export const QuotaEditorModal = ({
           }}
           placeholder="e.g. 80"
         />
-        <p className="text-xs text-text-muted">
+        <p className="text-text-muted text-xs">
           Percent of the limit at which to flag usage as approaching exhaustion. Leave empty to
           disable early-warning.
         </p>
       </div>
 
-      <div className="flex flex-col gap-2 pt-2 border-t border-border-glass">
-        <p className="text-xs font-medium text-text-secondary">
+      <div className="border-border-glass flex flex-col gap-2 border-t pt-2">
+        <p className="text-text-secondary text-xs font-medium">
           Scope (optional — unscoped applies to every provider/model)
         </p>
       </div>
@@ -213,7 +214,7 @@ export const QuotaEditorModal = ({
         allowCustom
         onChange={(excludedModels) => setEditingQuota({ ...editingQuota, excludedModels })}
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Only requests matching the allowed/not-excluded provider and model count against this quota.
         Model names accept free-typing since not every model is synced into a provider's catalog
         yet.

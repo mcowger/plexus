@@ -1,6 +1,6 @@
+import { PassThrough, Readable } from 'node:stream';
+
 import Fastify from 'fastify';
-import { Readable } from 'node:stream';
-import { PassThrough } from 'node:stream';
 
 const fastify = Fastify();
 const t0 = Date.now();

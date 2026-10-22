@@ -18,6 +18,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { REQUIRED_BETAS } from '../../../transformers/oauth/masking';
 import { prepareOAuthNativeRequest } from '../oauth-native-request';
 

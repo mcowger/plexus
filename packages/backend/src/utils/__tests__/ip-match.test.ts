@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { ipToBigInt, isIpAllowed, isValidIpRule } from '../ip-match';
 
 describe('isValidIpRule', () => {

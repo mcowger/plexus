@@ -1,6 +1,6 @@
 // Helper function to replicate the getLogLevel logic for testing
 // This is needed because the logger module initializes winston at import time
-import { describe, expect, test, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 function getLogLevel(): string {
   if (process.env.LOG_LEVEL) {
     return process.env.LOG_LEVEL;

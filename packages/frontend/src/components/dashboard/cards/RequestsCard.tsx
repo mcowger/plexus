@@ -5,12 +5,11 @@
  * cost, and latency metrics, plus quick filter toggles.
  */
 
-import React from 'react';
-import { Ban, CheckCircle, Plane, Timer, XCircle } from 'lucide-react';
 import { clsx } from 'clsx';
-import { SortableCard } from '../../ui/SortableCard';
-import { Button } from '../../ui/Button';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { Ban, CheckCircle, Plane, Timer, XCircle } from 'lucide-react';
+import React from 'react';
+
+import type { UsageRecord } from '../../../lib/api';
 import { useCurrency } from '../../../lib/CurrencyContext';
 import {
   formatCostIn,
@@ -19,7 +18,9 @@ import {
   formatTokens,
   formatTPS,
 } from '../../../lib/format';
-import type { UsageRecord } from '../../../lib/api';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { Button } from '../../ui/Button';
+import { SortableCard } from '../../ui/SortableCard';
 import type { StreamFilter } from '../liveTypes';
 import { getModelLabel, getProviderLabel } from '../liveUtils';
 
@@ -57,7 +58,7 @@ export const RequestsCard: React.FC<RequestsCardProps> = ({
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         extra: (
           <div className="flex flex-wrap items-center justify-end gap-1">
-            <span className="hidden text-xs text-text-secondary mr-1 sm:inline">Latest 20</span>
+            <span className="text-text-secondary mr-1 hidden text-xs sm:inline">Latest 20</span>
             <Button
               size="sm"
               variant={streamFilter === 'all' ? 'primary' : 'secondary'}
@@ -93,13 +94,13 @@ export const RequestsCard: React.FC<RequestsCardProps> = ({
         ),
         content:
           filteredLiveRequests.length === 0 ? (
-            <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+            <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
               {liveRequests.length === 0
                 ? 'No requests observed yet.'
                 : 'No requests match the current filter.'}
             </div>
           ) : (
-            <div className="h-48 sm:h-56 space-y-2 overflow-y-auto pr-1">
+            <div className="h-48 space-y-2 overflow-y-auto pr-1 sm:h-56">
               {filteredLiveRequests.slice(0, 20).map((request) => {
                 const requestTimeSeconds = Math.max(
                   0,
@@ -112,24 +113,24 @@ export const RequestsCard: React.FC<RequestsCardProps> = ({
                 return (
                   <div
                     key={request.requestId}
-                    className="rounded-md border border-border-glass bg-bg-glass p-3"
+                    className="border-border-glass bg-bg-glass rounded-md border p-3"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm text-text font-medium">{providerLabel}</span>
-                        <span className="text-xs text-text-secondary">{modelLabel}</span>
+                        <span className="text-text text-sm font-medium">{providerLabel}</span>
+                        <span className="text-text-secondary text-xs">{modelLabel}</span>
                         <span
                           className={clsx(
-                            'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border',
+                            'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px]',
                             status === 'success'
-                              ? 'text-success bg-emerald-500/15 border-success/25'
+                              ? 'text-success border-success/25 bg-emerald-500/15'
                               : status === 'pending'
-                                ? 'text-warning bg-yellow-500/15 border-warning/25'
+                                ? 'text-warning border-warning/25 bg-yellow-500/15'
                                 : status === 'cancelled'
-                                  ? 'text-blue-400 bg-blue-500/15 border-blue-400/25'
+                                  ? 'border-blue-400/25 bg-blue-500/15 text-blue-400'
                                   : status === 'timeout'
-                                    ? 'text-orange-400 bg-orange-500/15 border-orange-400/25'
-                                    : 'text-danger bg-red-500/15 border-danger/30'
+                                    ? 'border-orange-400/25 bg-orange-500/15 text-orange-400'
+                                    : 'text-danger border-danger/30 bg-red-500/15'
                           )}
                         >
                           {status === 'success' ? (
@@ -146,11 +147,11 @@ export const RequestsCard: React.FC<RequestsCardProps> = ({
                           {status}
                         </span>
                       </div>
-                      <span className="text-xs text-text-muted">
+                      <span className="text-text-muted text-xs">
                         {formatTimeAgo(requestTimeSeconds)}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+                    <div className="text-text-secondary mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                       <span>ID: {request.requestId.slice(0, 8)}...</span>
                       <span>
                         Tokens:{' '}

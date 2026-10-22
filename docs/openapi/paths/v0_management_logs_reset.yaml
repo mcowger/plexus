@@ -23,7 +23,7 @@ delete:
                 example: true
               message:
                 type: string
-                example: "All logs have been reset successfully"
+                example: 'All logs have been reset successfully'
             required:
               - success
               - message

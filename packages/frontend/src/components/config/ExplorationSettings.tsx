@@ -1,4 +1,5 @@
 import { Radar, Save } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
 import { Switch } from '../ui/Switch';
@@ -74,8 +75,8 @@ export function ExplorationSettings({
           <div className="flex items-center gap-2">
             <Radar size={16} className="text-primary" />
             <div>
-              <p className="font-body text-[12px] font-medium text-text">Background Exploration</p>
-              <p className="font-body text-[11px] text-text-muted">
+              <p className="font-body text-text text-[12px] font-medium">Background Exploration</p>
+              <p className="font-body text-text-muted text-[11px]">
                 Fire background probe requests instead of diverting live traffic. Probes use
                 apiKey="probe".
               </p>
@@ -94,7 +95,7 @@ export function ExplorationSettings({
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="bgExplorationStaleness"
-                className="font-body text-[12px] font-medium text-text"
+                className="font-body text-text text-[12px] font-medium"
               >
                 Staleness Threshold (s){' '}
                 <span className="text-text-muted font-normal">— min 1, default 600</span>
@@ -106,16 +107,16 @@ export function ExplorationSettings({
                 step={1}
                 value={stalenessInput}
                 onChange={(event) => onStalenessChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
               {!stalenessValidation.valid && stalenessInput !== '' && (
-                <span className="text-[11px] text-warning">{stalenessValidation.error}</span>
+                <span className="text-warning text-[11px]">{stalenessValidation.error}</span>
               )}
             </div>
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="bgExplorationConcurrency"
-                className="font-body text-[12px] font-medium text-text"
+                className="font-body text-text text-[12px] font-medium"
               >
                 Worker Concurrency{' '}
                 <span className="text-text-muted font-normal">— 1–16, default 2</span>
@@ -128,10 +129,10 @@ export function ExplorationSettings({
                 step={1}
                 value={concurrencyInput}
                 onChange={(event) => onConcurrencyChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
               {!concurrencyValidation.valid && concurrencyInput !== '' && (
-                <span className="text-[11px] text-warning">{concurrencyValidation.error}</span>
+                <span className="text-warning text-[11px]">{concurrencyValidation.error}</span>
               )}
             </div>
           </div>
@@ -143,7 +144,7 @@ export function ExplorationSettings({
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="performanceExplorationRate"
-                className="font-body text-[12px] font-medium text-text"
+                className="font-body text-text text-[12px] font-medium"
               >
                 Performance Rate{' '}
                 <span className="text-text-muted font-normal">— 0–1, default 0.05</span>
@@ -156,16 +157,16 @@ export function ExplorationSettings({
                 step={0.01}
                 value={performanceInput}
                 onChange={(event) => onPerformanceChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
               {!performanceValidation.valid && performanceInput !== '' && (
-                <span className="text-[11px] text-warning">{performanceValidation.error}</span>
+                <span className="text-warning text-[11px]">{performanceValidation.error}</span>
               )}
             </div>
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="latencyExplorationRate"
-                className="font-body text-[12px] font-medium text-text"
+                className="font-body text-text text-[12px] font-medium"
               >
                 Latency Rate{' '}
                 <span className="text-text-muted font-normal">— 0–1, default 0.05</span>
@@ -178,16 +179,16 @@ export function ExplorationSettings({
                 step={0.01}
                 value={latencyInput}
                 onChange={(event) => onLatencyChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
               {!latencyValidation.valid && latencyInput !== '' && (
-                <span className="text-[11px] text-warning">{latencyValidation.error}</span>
+                <span className="text-warning text-[11px]">{latencyValidation.error}</span>
               )}
             </div>
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="e2ePerformanceExplorationRate"
-                className="font-body text-[12px] font-medium text-text"
+                className="font-body text-text text-[12px] font-medium"
               >
                 E2E Rate <span className="text-text-muted font-normal">— 0–1, default 0.05</span>
               </label>
@@ -199,10 +200,10 @@ export function ExplorationSettings({
                 step={0.01}
                 value={e2eInput}
                 onChange={(event) => onE2EChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
               {!e2eValidation.valid && e2eInput !== '' && (
-                <span className="text-[11px] text-warning">{e2eValidation.error}</span>
+                <span className="text-warning text-[11px]">{e2eValidation.error}</span>
               )}
             </div>
           </div>

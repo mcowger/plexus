@@ -1,6 +1,6 @@
+import { logger } from '../../utils/logger';
 import type { RouteResult } from '../routing/router';
 import type { RetryAttemptRecord } from './dispatcher-types';
-import { logger } from '../../utils/logger';
 
 export type FailureReasonFormatter = (error: any, includeStatusCode?: boolean) => string;
 export type ErrorSummaryFormatter = (value: unknown) => string;

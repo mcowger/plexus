@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { UsageStorageService } from '../observability/usage-storage';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
+import { UsageStorageService } from '../observability/usage-storage';
 
 describe('UsageStorageService.saveError', () => {
   beforeEach(async () => {

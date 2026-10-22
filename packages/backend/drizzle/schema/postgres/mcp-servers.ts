@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, bigint, integer } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, pgTable, serial, text } from 'drizzle-orm/pg-core';
 
 export const mcpServers = pgTable('mcp_servers', {
   id: serial('id').primaryKey(),

@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
-import { logger } from '../../utils/logger';
+
 import { BackupService } from '../../services/configuration/backup-service';
-import type { UsageStorageService } from '../../services/observability/usage-storage';
 import type { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
+import type { UsageStorageService } from '../../services/observability/usage-storage';
+import { logger } from '../../utils/logger';
 
 const RESTORE_BODY_LIMIT = 100 * 1024 * 1024;
 

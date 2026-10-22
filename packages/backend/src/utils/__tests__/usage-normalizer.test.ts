@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
+
 import {
+  extractUsageCostDetails,
+  normalizeAnthropicUsage,
   normalizeGeminiUsage,
   normalizeOpenAIChatUsage,
   normalizeOpenAIResponsesUsage,
-  normalizeAnthropicUsage,
-  extractUsageCostDetails,
 } from '../usage-normalizer';
 
 describe('usage-normalizer - OpenAI Responses usage', () => {

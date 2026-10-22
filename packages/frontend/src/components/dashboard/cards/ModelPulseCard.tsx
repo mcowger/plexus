@@ -6,9 +6,10 @@
 
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { SortableCard } from '../../ui/SortableCard';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+
 import { formatNumber } from '../../../lib/format';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { SortableCard } from '../../ui/SortableCard';
 
 export interface ModelPulseCardProps {
   index: number;
@@ -33,7 +34,7 @@ export const ModelPulseCard: React.FC<ModelPulseCardProps> = ({
         title: 'Model Pulse (5m)',
         extra: (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-xs text-text-secondary">Top 8 models</span>
+            <span className="text-text-secondary text-xs">Top 8 models</span>
             <AnalyzeButton cardType="model" size="sm" onClick={onAnalyze} />
           </div>
         ),
@@ -42,7 +43,7 @@ export const ModelPulseCard: React.FC<ModelPulseCardProps> = ({
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         content:
           modelPulseRows.length === 0 ? (
-            <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+            <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
               No model traffic in the selected live window.
             </div>
           ) : (

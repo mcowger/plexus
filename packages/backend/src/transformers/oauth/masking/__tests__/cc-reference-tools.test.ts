@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { CC_TOOL_REFERENCE, matchesReferenceShape } from '../cc-reference-tools';
 
 describe('matchesReferenceShape', () => {

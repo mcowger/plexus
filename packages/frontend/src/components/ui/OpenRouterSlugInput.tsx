@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import { Check, ChevronsUpDown } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface OpenRouterSlugInputProps {
   label?: string;
@@ -127,15 +127,15 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-2 relative">
+    <div className="relative flex flex-col gap-2">
       {label && (
-        <label className="font-body text-[13px] font-medium text-text-secondary">{label}</label>
+        <label className="font-body text-text-secondary text-[13px] font-medium">{label}</label>
       )}
       <div className="relative">
         <input
           ref={inputRef}
           type="text"
-          className="w-full py-2.5 px-3.5 pr-10 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
+          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border px-3.5 py-2.5 pr-10 text-sm backdrop-blur-md transition-all duration-200 outline-none focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]"
           placeholder={placeholder}
           value={inputValue}
           onChange={handleInputChange}
@@ -149,19 +149,19 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
         <button
           type="button"
           onClick={toggleDropdown}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-bg-subtle rounded transition-colors"
+          className="hover:bg-bg-subtle absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 transition-colors"
         >
           {isLoading ? (
-            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
           ) : (
-            <ChevronsUpDown className="w-4 h-4 text-text-secondary" />
+            <ChevronsUpDown className="text-text-secondary h-4 w-4" />
           )}
         </button>
       </div>
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-bg-glass border border-border-glass rounded-sm shadow-lg backdrop-blur-md z-50 max-h-60 overflow-y-auto"
+          className="bg-bg-glass border-border-glass absolute top-full right-0 left-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-sm border shadow-lg backdrop-blur-md"
         >
           {suggestions.map((slug, index) => {
             const isSelected = slug === value;
@@ -171,7 +171,7 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
               <div
                 key={slug}
                 className={clsx(
-                  'px-3.5 py-2.5 cursor-pointer font-body text-sm transition-colors flex items-center justify-between',
+                  'font-body flex cursor-pointer items-center justify-between px-3.5 py-2.5 text-sm transition-colors',
                   isHighlighted
                     ? 'bg-primary/20 text-text'
                     : 'text-text-secondary hover:bg-bg-subtle hover:text-text'
@@ -179,8 +179,8 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
                 onClick={() => selectSuggestion(slug)}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
-                <span className={clsx(isSelected && 'font-medium text-text')}>{slug}</span>
-                {isSelected && <Check className="w-4 h-4 text-primary" />}
+                <span className={clsx(isSelected && 'text-text font-medium')}>{slug}</span>
+                {isSelected && <Check className="text-primary h-4 w-4" />}
               </div>
             );
           })}
@@ -189,9 +189,9 @@ export const OpenRouterSlugInput: React.FC<OpenRouterSlugInputProps> = ({
       {showSuggestions && suggestions.length === 0 && !isLoading && inputValue.length >= 2 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-bg-glass border border-border-glass rounded-sm shadow-lg backdrop-blur-md z-50 px-3.5 py-2.5"
+          className="bg-bg-glass border-border-glass absolute top-full right-0 left-0 z-50 mt-1 rounded-sm border px-3.5 py-2.5 shadow-lg backdrop-blur-md"
         >
-          <span className="font-body text-sm text-text-secondary italic">
+          <span className="font-body text-text-secondary text-sm italic">
             No models found matching "{inputValue}"
           </span>
         </div>

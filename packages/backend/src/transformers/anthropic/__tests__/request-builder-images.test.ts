@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { buildAnthropicRequest } from '../request-builder';
+import { describe, expect, it } from 'vitest';
+
 import type { MessageContent, UnifiedChatRequest } from '../../../types/unified';
+import { buildAnthropicRequest } from '../request-builder';
 
 const PNG_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';

@@ -20,12 +20,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
-import { setConfigForTesting } from '../../config';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { StickySessionManager } from '../routing/sticky-session-manager';
+
 import { registerSpy } from '../../../test/test-utils';
+import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest, UnifiedImageGenerationResponse } from '../../types/unified';
+import { Dispatcher } from '../dispatch/dispatcher';
+import { StickySessionManager } from '../routing/sticky-session-manager';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 const TINY_IMAGE_B64 = 'aGVsbG8=';
 

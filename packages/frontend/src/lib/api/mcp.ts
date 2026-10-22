@@ -1,4 +1,3 @@
-import { API_BASE, fetchWithAuth } from './core';
 import type {
   LocalMcpRuntimeStatus,
   McpLogRecord,
@@ -6,6 +5,7 @@ import type {
   McpServer,
   McpServerKey,
 } from '../../types/mcp';
+import { API_BASE, fetchWithAuth } from './core';
 
 export const getMcpServers = async (): Promise<Record<string, McpServer>> => {
   try {

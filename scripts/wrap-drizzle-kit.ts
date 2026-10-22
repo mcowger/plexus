@@ -7,9 +7,9 @@
  *
  * Cross-platform: writes shell wrappers on Unix and .cmd wrappers on Windows.
  */
-import { existsSync, renameSync, writeFileSync, chmodSync, readdirSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { chmodSync, existsSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 const isWindows = platform() === 'win32';
 

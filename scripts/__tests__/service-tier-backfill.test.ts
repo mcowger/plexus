@@ -1,10 +1,12 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+
 import { describe, expect, it } from 'vitest';
-import { backfillServiceTiers } from '../lib/service-tier-backfill';
+
 import { parseArgs } from '../backfill-service-tiers';
+import { backfillServiceTiers } from '../lib/service-tier-backfill';
 
 const mode = (body: Record<string, unknown>, headers?: Record<string, string>) => ({
   provider: { body, ...(headers && { headers }) },

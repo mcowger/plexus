@@ -1,8 +1,8 @@
-import path from 'node:path';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
 
 function copyDirectory(sourceDir: string, targetDir: string) {
   fs.mkdirSync(targetDir, { recursive: true });

@@ -1,5 +1,6 @@
+import type { AssistantMessage, Context, UserMessage } from '@earendil-works/pi-ai';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { Context, UserMessage, AssistantMessage } from '@earendil-works/pi-ai';
+
 import { CompactionService } from '../compaction-service';
 import type {
   CompactionResult,

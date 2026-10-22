@@ -17,6 +17,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+
 import { formatMs, formatNumber, formatTPS } from '../../../lib/format';
 import type { ModelTimelineBucket, ModelTimelineSeries } from '../liveTypes';
 
@@ -32,7 +33,7 @@ export const ModelTimelineModal: React.FC<ModelTimelineModalProps> = ({ modelTim
   return (
     <div className="h-[70vh]">
       {modelTimeline.series.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-text-secondary">
+        <div className="text-text-secondary flex h-full items-center justify-center">
           No model stack data in the selected live window.
         </div>
       ) : (

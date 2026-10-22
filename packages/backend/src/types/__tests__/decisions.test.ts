@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import {
   DecisionsIngressSchema,
   MAX_DECISIONS_CHOICE_OPTIONS,

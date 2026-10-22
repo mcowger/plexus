@@ -1,7 +1,8 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import { UnifiedSpeechRequest } from '../../types/unified';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { CooldownManager } from '../runtime/cooldown-manager';
 
 const fetchMock = vi.fn(async (url: string, options: any) => {

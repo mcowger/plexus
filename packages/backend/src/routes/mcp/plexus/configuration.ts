@@ -1,9 +1,3 @@
-import {
-  McpToolError,
-  type ManagementShimContext,
-  type ToolInput,
-  type ToolResponse,
-} from './types';
 import { callManagementRoute, encodePathPreservingSlashes } from './management';
 import {
   asObject,
@@ -14,6 +8,12 @@ import {
   unsupportedOperation,
 } from './responses';
 import { redactSecrets } from './security';
+import {
+  type ManagementShimContext,
+  McpToolError,
+  type ToolInput,
+  type ToolResponse,
+} from './types';
 
 export async function handleConfigTool(
   input: ToolInput,

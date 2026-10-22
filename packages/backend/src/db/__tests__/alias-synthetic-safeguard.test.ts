@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { closeDatabase, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
+import { runMigrations } from '../migrate';
 
 describe('alias synthetic_safeguard_approval persistence', () => {
   let repo: ConfigRepository;

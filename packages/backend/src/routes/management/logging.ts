@@ -1,6 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+
 import {
+  clearModuleFilter,
   getCurrentLogLevel,
   getModuleFilter,
   getStartupLogLevel,
@@ -8,7 +10,6 @@ import {
   resetCurrentLogLevel,
   setCurrentLogLevel,
   setModuleFilter,
-  clearModuleFilter,
   SUPPORTED_LOG_LEVELS,
 } from '../../utils/logger';
 

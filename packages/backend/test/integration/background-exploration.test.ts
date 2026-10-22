@@ -1,12 +1,13 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
-import { Router } from '../../src/services/routing/router';
-import { BackgroundExplorer } from '../../src/services/routing/background-explorer';
-import { ProbeService } from '../../src/services/probes/probe-service';
-import { CooldownManager } from '../../src/services/runtime/cooldown-manager';
-import { SelectorFactory } from '../../src/services/routing/selectors/factory';
-import { UsageStorageService } from '../../src/services/observability/usage-storage';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { PlexusConfig, setConfigForTesting } from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';
-import { setConfigForTesting, PlexusConfig } from '../../src/config';
+import { UsageStorageService } from '../../src/services/observability/usage-storage';
+import { ProbeService } from '../../src/services/probes/probe-service';
+import { BackgroundExplorer } from '../../src/services/routing/background-explorer';
+import { Router } from '../../src/services/routing/router';
+import { SelectorFactory } from '../../src/services/routing/selectors/factory';
+import { CooldownManager } from '../../src/services/runtime/cooldown-manager';
 
 /**
  * Integration: live request → Router → BackgroundExplorer.maybeTrigger →

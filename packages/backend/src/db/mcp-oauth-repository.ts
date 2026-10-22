@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
+
 import { decryptField, encryptField, hashSecret } from '../utils/encryption';
+import { getDatabase, getSchema } from './client';
 
 function now(): number {
   return Date.now();

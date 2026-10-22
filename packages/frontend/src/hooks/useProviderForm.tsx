@@ -1,7 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { findUnresolvedPresetVars, isOAuthPlaceholderUrl } from '@plexus/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, Provider, OAuthSession, OAuthProviderInfo, fetchQuotaCheckers } from '../lib/api';
+
+import { formatMeterValue } from '../components/quota/MeterValue';
+import { Badge } from '../components/ui/Badge';
+import { useToast } from '../contexts/ToastContext';
+import { api, fetchQuotaCheckers, OAuthProviderInfo, OAuthSession, Provider } from '../lib/api';
+import {
+  isDecisionsTargetAccess,
+  legacyDecisionsAccessKind,
+  migrateLegacyDecisionsAccess,
+  migrateLegacyDecisionsBaseUrls,
+} from '../lib/apiFormats';
+import { useCurrency } from '../lib/CurrencyContext';
 import {
   collectProviderEndpointUrls,
   isOAuthProviderDraft,
@@ -9,16 +20,6 @@ import {
 } from '../lib/piAiProvider';
 import type { QuotaCheckerInfo } from '../types/quota';
 import type { OAuthCredentialStatus } from '../types/settings';
-import {
-  isDecisionsTargetAccess,
-  legacyDecisionsAccessKind,
-  migrateLegacyDecisionsAccess,
-  migrateLegacyDecisionsBaseUrls,
-} from '../lib/apiFormats';
-import { formatMeterValue } from '../components/quota/MeterValue';
-import { Badge } from '../components/ui/Badge';
-import { useToast } from '../contexts/ToastContext';
-import { useCurrency } from '../lib/CurrencyContext';
 
 const KNOWN_APIS = [
   'chat',
@@ -1140,7 +1141,7 @@ export function useProviderForm() {
         <Badge
           status="error"
           noDot
-          className="cursor-pointer text-[10px] py-0.5 px-2"
+          className="cursor-pointer px-2 py-0.5 text-[10px]"
           onClick={handleQuotaClick}
           title={quota.error}
         >
@@ -1161,7 +1162,7 @@ export function useProviderForm() {
         <Badge
           key="balance"
           status="neutral"
-          className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2 bg-bg-subtle border border-border text-text-secondary"
+          className="bg-bg-subtle border-border text-text-secondary cursor-pointer border px-2 py-0.5 text-[10px] [&_.connection-dot]:hidden"
           onClick={handleQuotaClick}
         >
           {formatMeterValue(balanceMeter.remaining, balanceMeter.unit, false, {
@@ -1188,7 +1189,7 @@ export function useProviderForm() {
         <Badge
           key="allowance"
           status={status}
-          className="[&_.connection-dot]:hidden cursor-pointer text-[10px] py-0.5 px-2"
+          className="cursor-pointer px-2 py-0.5 text-[10px] [&_.connection-dot]:hidden"
           onClick={handleQuotaClick}
         >
           {pct}%

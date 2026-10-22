@@ -1,11 +1,12 @@
 import type { PiAiQuirks } from '@plexus/shared';
+
 import { getProviderTypes } from '../../config';
 import type { ModelConfig, ProviderConfig } from '../../config';
 import { getApiBaseType, normalizeApiAccessList } from '../../utils/api-format';
 import { applyQuirkOverlay, resolveInlineQuirks } from '../dispatch/dispatcher-auto-compat';
 import {
-  inferServiceTierFormat,
   type CanonicalServiceTier,
+  inferServiceTierFormat,
   type ServiceTierFormat,
   type ServiceTierMap,
 } from '../dispatch/service-tier-selection';

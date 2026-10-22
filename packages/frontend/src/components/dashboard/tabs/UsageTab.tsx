@@ -13,7 +13,6 @@
  * `useEffect` whose sole dependency is `timeRange`.
  */
 
-import { useEffect, useMemo, useState } from 'react';
 /**
  * `ConcurrencyData` is imported as a **type-only** import from the API layer.
  * Its shape is:
@@ -28,39 +27,41 @@ import { useEffect, useMemo, useState } from 'react';
  * Each record represents a single (provider, model, timestamp) data point returned
  * from the `GET /v0/management/concurrency?timeRange=...` endpoint.
  */
-import { PieChart as PieChartIcon, BarChart3, Loader2 } from 'lucide-react';
+import { BarChart3, Loader2, PieChart as PieChartIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  api,
-  UsageData,
-  PieChartDataPoint,
-  type ConcurrencyData,
-  type UsageSummaryBreakdown,
-} from '../../../lib/api';
-import {
-  formatNumber,
-  formatTokens,
-  formatTimeLabel,
-  formatDateTimeLabel,
-} from '../../../lib/format';
-import { Card } from '../../ui/Card';
-import { TimeRangeSelector } from '../TimeRangeSelector';
-import type { CustomDateRange } from '../../../lib/date';
-import { Skeleton } from '../../ui/Skeleton';
-import {
-  AreaChart,
   Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
+
+import {
+  api,
+  type ConcurrencyData,
+  PieChartDataPoint,
+  UsageData,
+  type UsageSummaryBreakdown,
+} from '../../../lib/api';
+import type { CustomDateRange } from '../../../lib/date';
+import {
+  formatDateTimeLabel,
+  formatNumber,
+  formatTimeLabel,
+  formatTokens,
+} from '../../../lib/format';
+import { Card } from '../../ui/Card';
+import { Skeleton } from '../../ui/Skeleton';
+import { TimeRangeSelector } from '../TimeRangeSelector';
 
 /** Supported time windows for usage and concurrency queries. */
 type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
@@ -535,8 +536,8 @@ export const UsageTab: React.FC<UsageTabProps> = ({
   return (
     <div className="p-6 transition-all duration-300">
       <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Usage Analytics</h1>
-        <p className="text-[15px] text-text-secondary m-0">
+        <h1 className="font-heading text-text m-0 mb-2 text-3xl font-bold">Usage Analytics</h1>
+        <p className="text-text-secondary m-0 text-[15px]">
           Token usage and request statistics over time.
         </p>
       </div>
@@ -550,7 +551,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
         />
         {loading && data.length > 0 && (
           <span
-            className="ml-3 inline-flex items-center gap-1 text-xs text-text-secondary"
+            className="text-text-secondary ml-3 inline-flex items-center gap-1 text-xs"
             role="status"
           >
             <Loader2 size={13} className="animate-spin" aria-hidden="true" />
@@ -565,14 +566,14 @@ export const UsageTab: React.FC<UsageTabProps> = ({
       </div>
 
       {/* All Charts in 4-Column Grid */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* Time Series - Requests */}
         <Card className="min-w-0" title="Requests over Time">
           <div style={{ height: 300, marginTop: '12px' }}>
             {loading && data.length === 0 ? (
               <Skeleton height={280} className="w-full" />
             ) : error && data.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-red-400 text-sm">
+              <div className="flex h-full items-center justify-center text-sm text-red-400">
                 Unable to load usage data.
               </div>
             ) : (
@@ -636,7 +637,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             {loading && concurrencyByProviderTimeline.length === 0 ? (
               <Skeleton height={280} className="w-full" />
             ) : concurrencyByProviderTimeline.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-text-secondary text-sm">
+              <div className="text-text-secondary flex h-full items-center justify-center text-sm">
                 No concurrency data available
               </div>
             ) : (
@@ -692,7 +693,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             {loading && concurrencyByModelTimeline.length === 0 ? (
               <Skeleton height={280} className="w-full" />
             ) : concurrencyByModelTimeline.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-text-secondary text-sm">
+              <div className="text-text-secondary flex h-full items-center justify-center text-sm">
                 No concurrency data available
               </div>
             ) : (
@@ -733,7 +734,7 @@ export const UsageTab: React.FC<UsageTabProps> = ({
             {loading && data.length === 0 ? (
               <Skeleton height={280} className="w-full" />
             ) : error && data.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-red-400 text-sm">
+              <div className="flex h-full items-center justify-center text-sm text-red-400">
                 Unable to load token data.
               </div>
             ) : (

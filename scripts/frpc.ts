@@ -1,6 +1,6 @@
-import { createHash } from 'crypto';
 import { execFileSync } from 'child_process';
-import { unlinkSync, renameSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { renameSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
 

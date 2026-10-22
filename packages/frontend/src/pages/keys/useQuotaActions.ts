@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+
+import { useToast } from '../../contexts/ToastContext';
 import { api } from '../../lib/api';
 import type { UserQuota } from '../../lib/api';
-import type { Dispatch, SetStateAction } from 'react';
-import { useToast } from '../../contexts/ToastContext';
 import type { EditingQuota, LoadKeysData, QuotaStatusResponse } from './types';
 import { EMPTY_QUOTA } from './types';
 

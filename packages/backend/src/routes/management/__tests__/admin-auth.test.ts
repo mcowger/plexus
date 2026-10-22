@@ -1,13 +1,14 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../../config';
-import { registerManagementRoutes } from '../../management';
-import { registerInferenceRoutes } from '../../inference';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
+import { DebugManager } from '../../../services/observability/debug-manager';
 import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { ProbeService } from '../../../services/probes/probe-service';
-import { DebugManager } from '../../../services/observability/debug-manager';
 import { SelectorFactory } from '../../../services/routing/selectors/factory';
+import { registerInferenceRoutes } from '../../inference';
+import { registerManagementRoutes } from '../../management';
 
 // Helper to close Fastify instances after tests
 const closeFastify = async (fastify: FastifyInstance | undefined) => {

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+
 import { McpOauthRepository } from '../../db/mcp-oauth-repository';
 
 const revokeTokenParamsSchema = z.object({

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, unique } from 'drizzle-orm/pg-core';
+import { bigint, pgTable, serial, text, unique } from 'drizzle-orm/pg-core';
 
 export const oauthCredentials = pgTable(
   'oauth_credentials',

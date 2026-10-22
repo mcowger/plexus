@@ -1,6 +1,7 @@
 import { CheckCircle, ChevronDown, ChevronRight, Loader2, Play, X, XCircle } from 'lucide-react';
-import { CopyButton } from '../../ui/CopyButton';
+
 import { Button } from '../../ui/Button';
+import { CopyButton } from '../../ui/CopyButton';
 import { ModelAdapters } from './ModelAdapters';
 import { ModelAdvanced } from './ModelAdvanced';
 import { ModelExtraBody } from './ModelExtraBody';
@@ -100,13 +101,13 @@ export function ModelCard({
           }}
           className={
             isNewProvider
-              ? 'flex items-center cursor-not-allowed opacity-40'
-              : 'flex items-center cursor-pointer'
+              ? 'flex cursor-not-allowed items-center opacity-40'
+              : 'flex cursor-pointer items-center'
           }
           title={isNewProvider ? 'Save the provider first to probe models' : 'Test this model'}
         >
           {testState?.loading ? (
-            <Loader2 size={14} className="animate-spin text-text-secondary" />
+            <Loader2 size={14} className="text-text-secondary animate-spin" />
           ) : testState?.showResult && testState.result === 'success' ? (
             <CheckCircle size={14} className="text-success" />
           ) : testState?.showResult && testState.result === 'error' ? (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { api, type UsageRecord, type UsageSummaryResponse } from '../../lib/api';
 import {
   calcVelocity,

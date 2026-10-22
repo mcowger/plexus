@@ -32,7 +32,8 @@
  * so that this hook can be imported in SSR / Node.js test environments without errors.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
 import type { CardId, CardLayout } from '../types/card';
 import { DEFAULT_CARD_ORDER, LAYOUT_STORAGE_KEY } from '../types/card';
 

@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { ChevronDown, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface TagSelectProps {
   label?: string;
@@ -151,13 +151,13 @@ export const TagSelect: React.FC<TagSelectProps> = ({
   return (
     <div className={clsx('flex flex-col gap-2', className)} ref={containerRef}>
       {label && (
-        <label className="font-body text-[13px] font-medium text-text-secondary whitespace-nowrap">
+        <label className="font-body text-text-secondary text-[13px] font-medium whitespace-nowrap">
           {label}
         </label>
       )}
       <div
         className={clsx(
-          'w-full py-2.5 px-3.5 font-body text-sm bg-bg-glass border rounded-sm outline-none transition-all duration-200 backdrop-blur-md cursor-text min-h-[42px] flex flex-wrap items-center gap-1.5',
+          'font-body bg-bg-glass flex min-h-[42px] w-full cursor-text flex-wrap items-center gap-1.5 rounded-sm border px-3.5 py-2.5 text-sm backdrop-blur-md transition-all duration-200 outline-none',
           isOpen
             ? 'border-primary shadow-[0_0_0_3px_rgba(245,158,11,0.15)]'
             : 'border-border-glass hover:border-border-glass'
@@ -167,12 +167,12 @@ export const TagSelect: React.FC<TagSelectProps> = ({
         {selected.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-primary/15 text-primary border border-primary/30 whitespace-nowrap"
+            className="bg-primary/15 text-primary border-primary/30 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap"
           >
             {tag}
             <button
               type="button"
-              className="bg-transparent border-0 p-0 m-0 cursor-pointer text-primary/70 hover:text-primary leading-none"
+              className="text-primary/70 hover:text-primary m-0 cursor-pointer border-0 bg-transparent p-0 leading-none"
               onClick={(e) => handleRemove(tag, e)}
               title={`Remove ${tag}`}
             >
@@ -183,7 +183,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
         {isOpen ? (
           <input
             ref={searchInputRef}
-            className="flex-1 min-w-[80px] bg-transparent border-0 outline-none text-text text-sm p-0 placeholder:text-text-muted"
+            className="text-text placeholder:text-text-muted min-w-[80px] flex-1 border-0 bg-transparent p-0 text-sm outline-none"
             value={search}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
@@ -202,7 +202,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
             }
           />
         ) : (
-          <span className="text-text-muted text-sm flex-1">
+          <span className="text-text-muted flex-1 text-sm">
             {selected.length === 0 ? placeholder : ''}
           </span>
         )}
@@ -217,9 +217,9 @@ export const TagSelect: React.FC<TagSelectProps> = ({
 
       {isOpen && (
         <div className="relative -mt-1">
-          <div className="absolute z-50 w-full max-h-52 overflow-y-auto bg-bg-surface border border-border-glass rounded-sm shadow-lg">
+          <div className="bg-bg-surface border-border-glass absolute z-50 max-h-52 w-full overflow-y-auto rounded-sm border shadow-lg">
             {filteredOptions.length === 0 && !showCreateOption && (
-              <div className="px-3.5 py-2.5 text-xs text-text-muted">
+              <div className="text-text-muted px-3.5 py-2.5 text-xs">
                 {search
                   ? 'No matches found'
                   : allowCustom
@@ -232,7 +232,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
                 type="button"
                 key={option}
                 className={clsx(
-                  'w-full text-left px-3.5 py-2 text-sm font-body cursor-pointer transition-colors',
+                  'font-body w-full cursor-pointer px-3.5 py-2 text-left text-sm transition-colors',
                   'hover:bg-bg-hover text-text'
                 )}
                 onClick={() => handleToggle(option)}
@@ -244,7 +244,7 @@ export const TagSelect: React.FC<TagSelectProps> = ({
               <button
                 type="button"
                 key={`__create__${searchTrimmed}`}
-                className="w-full text-left px-3.5 py-2 text-sm font-body cursor-pointer transition-colors hover:bg-bg-hover text-text border-t border-border-glass"
+                className="font-body hover:bg-bg-hover text-text border-border-glass w-full cursor-pointer border-t px-3.5 py-2 text-left text-sm transition-colors"
                 onClick={() => commitCustom(searchTrimmed)}
               >
                 <span className="text-text-muted">Create </span>

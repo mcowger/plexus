@@ -1,32 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { clsx } from 'clsx';
 import {
-  LayoutDashboard,
-  Settings,
-  Server,
-  Boxes,
-  ScrollText,
-  Route,
-  Terminal,
-  LogOut,
   AlertTriangle,
+  Boxes,
+  FlaskConical,
+  Gauge,
   Key,
+  LayoutDashboard,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Gauge,
   PlugZap,
+  Route,
+  ScrollText,
+  Server,
+  Settings,
+  Terminal,
   UserCircle2,
-  FlaskConical,
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { api, fetchQuotaCheckers } from '../../lib/api';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
-import { Modal } from '../ui/Modal';
-import { Button } from '../ui/Button';
-import { Tooltip } from '../ui/Tooltip';
-import { CompactBalancesCard, CompactQuotasCard } from '../quota';
+import { api, fetchQuotaCheckers } from '../../lib/api';
 import type { QuotaCheckerInfo } from '../../types/quota';
+import { CompactBalancesCard, CompactQuotasCard } from '../quota';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
+import { Tooltip } from '../ui/Tooltip';
 import { PlexusMark } from './PlexusMark';
 
 interface SidebarProps {
@@ -47,14 +48,14 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, collapsed }) =
       end={to === '/'}
       className={({ isActive }) =>
         clsx(
-          'group relative flex items-center gap-2.5 py-2 px-2.5 rounded-md font-body text-[13px] font-medium no-underline cursor-pointer transition-all duration-fast',
+          'group font-body duration-fast relative flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium no-underline transition-all',
           'text-text-secondary hover:bg-bg-hover hover:text-text',
           collapsed && 'justify-center',
           // Active state: amber tint + a left rail via :before pseudo-element
           // (cleaner than a sibling <span> and avoids NavLink render-prop quirks).
           isActive &&
             !collapsed &&
-            'bg-amber-500/10 text-amber-300 before:content-[""] before:absolute before:-left-3 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-sm before:bg-gradient-to-b before:from-secondary before:to-primary',
+            'before:from-secondary before:to-primary bg-amber-500/10 text-amber-300 before:absolute before:top-1.5 before:bottom-1.5 before:-left-3 before:w-0.5 before:rounded-sm before:bg-gradient-to-b before:content-[""]',
           isActive && collapsed && 'bg-amber-500/10 text-amber-300'
         )
       }
@@ -62,8 +63,8 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, collapsed }) =
       <Icon size={16} className="flex-shrink-0" />
       <span
         className={clsx(
-          'transition-opacity duration-fast',
-          collapsed && 'opacity-0 w-0 overflow-hidden'
+          'duration-fast transition-opacity',
+          collapsed && 'w-0 overflow-hidden opacity-0'
         )}
       >
         {label}
@@ -83,8 +84,8 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon: Icon, label, collapsed }) =
 const NavSection: React.FC<{ title: string; collapsed: boolean }> = ({ title, collapsed }) => (
   <div
     className={clsx(
-      'px-2.5 pt-2 pb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-text-muted font-medium transition-opacity duration-fast',
-      collapsed && 'opacity-0 h-0 overflow-hidden pt-0 pb-0'
+      'text-text-muted duration-fast px-2.5 pt-2 pb-1 font-mono text-[10px] font-medium tracking-[0.08em] uppercase transition-opacity',
+      collapsed && 'h-0 overflow-hidden pt-0 pb-0 opacity-0'
     )}
   >
     {title}
@@ -185,8 +186,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
 
   const isOutdated = Boolean(
     latestVersion &&
-      parseVersionTag(appVersion) &&
-      compareVersionTags(appVersion, latestVersion) < 0
+    parseVersionTag(appVersion) &&
+    compareVersionTags(appVersion, latestVersion) < 0
   );
 
   const handleToggleClick = () => setShowConfirm(true);
@@ -225,32 +226,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
       className={clsx(
         // Solid background — glass-bg used to let the page content scroll
         // through visibly. Sidebar must fully obscure what's underneath.
-        'bg-bg-card border-border flex flex-col overflow-y-auto overflow-x-hidden',
+        'bg-bg-card border-border flex flex-col overflow-x-hidden overflow-y-auto',
         isDrawer
           ? 'h-full w-full'
-          : 'hidden md:flex fixed left-0 top-0 h-screen z-[200] border-r transition-[width] duration-300',
+          : 'fixed top-0 left-0 z-[200] hidden h-screen border-r transition-[width] duration-300 md:flex',
         !isDrawer && (collapsed ? 'w-[64px]' : 'w-[220px]')
       )}
     >
       {/* Brand header */}
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-3">
         <div
           className={clsx(
-            'flex items-center gap-2.5 min-w-0 transition-opacity duration-fast',
-            collapsed && 'opacity-0 w-0 overflow-hidden'
+            'duration-fast flex min-w-0 items-center gap-2.5 transition-opacity',
+            collapsed && 'w-0 overflow-hidden opacity-0'
           )}
         >
           <PlexusMark size={28} />
-          <div className="flex flex-col leading-tight min-w-0">
-            <span className="text-[1.05rem] font-semibold amber-grad-text font-heading tracking-tight truncate">
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="amber-grad-text font-heading truncate text-[1.05rem] font-semibold tracking-tight">
               Plexus
             </span>
-            <div className="flex items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-text-muted font-mono leading-none">
+            <div className="text-text-muted flex items-center gap-1 font-mono text-[9px] leading-none tracking-[0.16em] uppercase">
               <span>{appVersion}</span>
               {isOutdated && (
                 <Tooltip content={`Update available: ${latestVersion}`} position="bottom">
                   <span
-                    className="inline-flex text-primary"
+                    className="text-primary inline-flex"
                     aria-label={`Outdated version. Latest is ${latestVersion}`}
                   >
                     <AlertTriangle size={10} />
@@ -263,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
         {!isDrawer && (
           <button
             onClick={toggleSidebar}
-            className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0 focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2"
+            className="hover:bg-bg-hover duration-fast text-text-secondary hover:text-text focus-visible:outline-primary flex-shrink-0 rounded-md p-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
@@ -272,7 +273,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
         {isDrawer && (
           <button
             onClick={closeMobile}
-            className="p-1.5 rounded-md hover:bg-bg-hover transition-colors duration-fast text-text-secondary hover:text-text flex-shrink-0"
+            className="hover:bg-bg-hover duration-fast text-text-secondary hover:text-text flex-shrink-0 rounded-md p-1.5 transition-colors"
             aria-label="Close navigation"
           >
             <PanelLeftClose size={16} />
@@ -281,7 +282,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 px-3 pb-2 flex flex-col gap-0.5">
+      <nav className="flex flex-1 flex-col gap-0.5 px-3 pb-2">
         <NavSection title="Main" collapsed={collapsed} />
         <NavItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
         <NavItem to="/logs" icon={ScrollText} label="Logs" collapsed={collapsed} />
@@ -290,9 +291,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
 
         {/* Balances widget */}
         {isAdmin && balanceQuotas.length > 0 && !collapsed && (
-          <div className="mt-3 px-2.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
+          <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-2.5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-text-muted text-[10px] font-medium tracking-wider uppercase">
                 Balances
               </span>
             </div>
@@ -302,9 +303,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
 
         {/* Quotas widget */}
         {isAdmin && allowanceQuotas.length > 0 && !collapsed && (
-          <div className="mt-2 px-2.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
+          <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-2.5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-text-muted text-[10px] font-medium tracking-wider uppercase">
                 Quotas
               </span>
             </div>
@@ -333,10 +334,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
             <button
               onClick={handleToggleClick}
               className={clsx(
-                'mr-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all duration-fast flex-shrink-0 font-mono',
+                'duration-fast mr-1 flex-shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold transition-all',
                 debugMode
                   ? 'bg-danger text-white hover:bg-red-700'
-                  : 'bg-slate-700/40 text-text-muted hover:bg-slate-700/60'
+                  : 'text-text-muted bg-slate-700/40 hover:bg-slate-700/60'
               )}
             >
               {debugMode ? 'ON' : 'OFF'}
@@ -352,24 +353,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
       </nav>
 
       {/* User pill + logout */}
-      <div className="p-3 border-t border-slate-800/80 mt-auto space-y-2">
+      <div className="mt-auto space-y-2 border-t border-slate-800/80 p-3">
         {principal && !collapsed && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <div className="w-7 h-7 rounded-full amber-grad-bg grid place-items-center text-[11px] font-semibold text-amber-950 flex-shrink-0">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-1.5">
+            <div className="amber-grad-bg grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-[11px] font-semibold text-amber-950">
               {initials}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-text truncate">
+            <div className="min-w-0 flex-1">
+              <div className="text-text truncate text-xs font-medium">
                 {principal.role === 'admin' ? 'Admin' : principal.keyName}
               </div>
-              <div className="text-[10px] text-text-muted uppercase tracking-wider font-mono">
+              <div className="text-text-muted font-mono text-[10px] tracking-wider uppercase">
                 {principal.role === 'admin' ? 'full access' : 'limited'}
               </div>
             </div>
             <Tooltip content="Sign out" position="top">
               <button
                 onClick={handleLogout}
-                className="p-1 rounded text-text-secondary hover:text-danger hover:bg-red-500/10 transition-colors"
+                className="text-text-secondary hover:text-danger rounded p-1 transition-colors hover:bg-red-500/10"
                 aria-label="Sign out"
               >
                 <LogOut size={14} />
@@ -381,7 +382,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           <Tooltip content="Sign out" position="right">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center py-2 rounded-md text-danger hover:bg-red-500/10 transition-colors"
+              className="text-danger flex w-full items-center justify-center rounded-md py-2 transition-colors hover:bg-red-500/10"
               aria-label="Sign out"
             >
               <LogOut size={16} />
@@ -406,7 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mode = 'desktop' }) => {
           </>
         }
       >
-        <p className="text-sm text-text-secondary">
+        <p className="text-text-secondary text-sm">
           {debugMode
             ? 'Disabling debug mode will stop capturing full request/response payloads.'
             : 'Enabling debug mode will capture FULL raw request and response payloads, including personal data if present. This can consume significant storage.'}

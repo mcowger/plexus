@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../client-request-id';
 
 describe('getClientRequestId', () => {

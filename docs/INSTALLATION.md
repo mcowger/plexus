@@ -11,11 +11,13 @@ Plexus can be run via Docker, as a standalone binary, or from source using Bun.
 The easiest way to run Plexus is using the pre-built Docker image.
 
 **Pull the image:**
+
 ```bash
 docker pull ghcr.io/mcowger/plexus:latest
 ```
 
 **Run the container:**
+
 ```bash
 docker run -p 4000:4000 \
   -v plexus-data:/app/data \
@@ -25,22 +27,24 @@ docker run -p 4000:4000 \
   ghcr.io/mcowger/plexus:latest
 ```
 
--   Mount a volume to `/app/data` to persist usage logs, configuration, and other data.
--   `ADMIN_KEY` is required — set it to a secure password for accessing the admin dashboard and management API.
--   `DATABASE_URL` is optional (defaults to SQLite at `./data/plexus.db` when unset) — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string when connecting to PostgreSQL or custom locations.
--   Set `LOG_LEVEL` to control verbosity.
--   The Docker image includes `bunx` and `uvx` so Plexus can run configured Local HTTP MCP servers inside the container.
+- Mount a volume to `/app/data` to persist usage logs, configuration, and other data.
+- `ADMIN_KEY` is required — set it to a secure password for accessing the admin dashboard and management API.
+- `DATABASE_URL` is optional (defaults to SQLite at `./data/plexus.db` when unset) — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string when connecting to PostgreSQL or custom locations.
+- Set `LOG_LEVEL` to control verbosity.
+- The Docker image includes `bunx` and `uvx` so Plexus can run configured Local HTTP MCP servers inside the container.
 
 ## Building the Docker Image
 
 If you want to build the image yourself:
 
 **Build the image:**
+
 ```bash
 docker build -t plexus .
 ```
 
 **Run the container:**
+
 ```bash
 docker run -p 4000:4000 \
   -v plexus-data:/app/data \
@@ -57,21 +61,23 @@ Plexus can be compiled into a single, self-contained binary that includes the Bu
 ### Build Commands
 
 1. **Clone the repository**:
+
    ```bash
    git clone https://github.com/mcowger/plexus.git
    cd plexus
    ```
 
 2. **Install dependencies**:
+
    ```bash
    bun install
    ```
 
 3. **Compile**:
-    - **macOS (ARM64/Apple Silicon):** `bun run compile:macos`
-    - **Linux (x64):** `bun run compile:linux-amd64`
-    - **Linux (ARM64):** `bun run compile:linux-arm64`
-    - **Windows (x64):** `bun run compile:windows`
+   - **macOS (ARM64/Apple Silicon):** `bun run compile:macos`
+   - **Linux (x64):** `bun run compile:linux-amd64`
+   - **Linux (ARM64):** `bun run compile:linux-arm64`
+   - **Windows (x64):** `bun run compile:windows`
 
 The resulting executable will be named `plexus-macos`, `plexus-linux-amd64`,
 `plexus-linux-arm64`, or `plexus.exe` in the project root.
@@ -83,6 +89,7 @@ The binary is fully self-contained: migration SQL files are embedded inside it a
 If `plexus.exe` opens and closes immediately, run it from a terminal so startup errors remain visible. `ADMIN_KEY` must be set before starting the server.
 
 **Windows PowerShell:**
+
 ```powershell
 $env:ADMIN_KEY = "your-admin-password"
 $env:DATABASE_URL = "sqlite://./data/plexus.db"
@@ -90,6 +97,7 @@ $env:DATABASE_URL = "sqlite://./data/plexus.db"
 ```
 
 **Windows Command Prompt:**
+
 ```cmd
 set ADMIN_KEY=your-admin-password
 set DATABASE_URL=sqlite://./data/plexus.db
@@ -99,17 +107,20 @@ plexus.exe
 ## Running from Source
 
 1. **Clone the repository**:
+
    ```bash
    git clone https://github.com/mcowger/plexus.git
    cd plexus
    ```
 
 2. **Install dependencies**:
+
    ```bash
    bun install
    ```
 
 3. **Start Development Stack**:
+
    ```bash
    ADMIN_KEY="your-admin-key" DATABASE_URL=sqlite://./data/plexus.db bun run dev
    ```
@@ -121,6 +132,7 @@ plexus.exe
    stopped with the direct dev process, or when Paseo stops its managed service.
 
    To run the background lifecycle instead:
+
    ```bash
    bun run dev:agent --detach
    bun run dev:stop
@@ -135,19 +147,19 @@ plexus.exe
 When running Plexus, you can use the following environment variables to control its behavior:
 
 - **`ADMIN_KEY`** (**Required**): Password for the admin dashboard and management API.
-    - Must be set before starting the server. Server will refuse to start without it.
+  - Must be set before starting the server. Server will refuse to start without it.
 - **`DATABASE_URL`** (Optional): Database connection string (defaults to SQLite at `./data/plexus.db`).
-    - SQLite: `sqlite:///app/data/plexus.db` or `sqlite://./data/plexus.db`
-    - PostgreSQL: `postgres://user:password@host:5432/dbname`
+  - SQLite: `sqlite:///app/data/plexus.db` or `sqlite://./data/plexus.db`
+  - PostgreSQL: `postgres://user:password@host:5432/dbname`
 - **`ENCRYPTION_KEY`** (Optional): Encryption key for sensitive data at rest (API keys, OAuth tokens, provider credentials).
-    - Generate with: `openssl rand -hex 32`
-    - If not set, data is stored in plaintext. A warning is logged at startup.
-    - See [Configuration: Encryption at Rest](CONFIGURATION.md#encryption-at-rest-optional) for details.
+  - Generate with: `openssl rand -hex 32`
+  - If not set, data is stored in plaintext. A warning is logged at startup.
+  - See [Configuration: Encryption at Rest](CONFIGURATION.md#encryption-at-rest-optional) for details.
 - **`LOG_LEVEL`**: The verbosity of the server logs.
-    - Supported values: `error`, `warn`, `info`, `debug`, `silly`.
-    - Default: `info`.
-    - Note: `silly` logs all request/response/transformations.
-    - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
+  - Supported values: `error`, `warn`, `info`, `debug`, `silly`.
+  - Default: `info`.
+  - Note: `silly` logs all request/response/transformations.
+  - Runtime override: You can change log level live via the management API/UI (`/v0/management/logging/level`). This override is ephemeral and resets on restart.
 - **`PORT`** (Optional): HTTP server port. Default: `4000` (Note: When running `bun run dev` locally, the port is automatically derived from the git worktree directory name).
 - **`HOST`** (Optional): Address to bind to. Default: `0.0.0.0`
 - **`DATA_DIR`** (Optional): Directory for SQLite database. Default: `./data`

@@ -8,10 +8,10 @@ export const QuotaChip: React.FC<{ children: React.ReactNode; tone?: 'default' |
   tone = 'default',
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-md ${
+    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium tracking-wider uppercase ${
       tone === 'muted'
-        ? 'bg-bg-subtle text-text-muted border border-border-glass'
-        : 'bg-primary/10 text-primary border border-primary/20'
+        ? 'bg-bg-subtle text-text-muted border-border-glass border'
+        : 'bg-primary/10 text-primary border-primary/20 border'
     }`}
   >
     {children}
@@ -32,8 +32,8 @@ export function hasScope(scope: QuotaScopeFields | undefined): boolean {
   if (!scope) return false;
   return Boolean(
     scope.allowedProviders?.length ||
-      scope.excludedProviders?.length ||
-      scope.allowedModels?.length ||
-      scope.excludedModels?.length
+    scope.excludedProviders?.length ||
+    scope.allowedModels?.length ||
+    scope.excludedModels?.length
   );
 }

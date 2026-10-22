@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 interface FormFieldProps {
   label?: React.ReactNode;
@@ -33,7 +33,7 @@ export const FormField: React.FC<FormFieldProps> = ({
         <label
           htmlFor={htmlFor}
           className={clsx(
-            'font-body text-xs font-medium text-text-secondary',
+            'font-body text-text-secondary text-xs font-medium',
             inline && 'flex-shrink-0'
           )}
         >
@@ -42,8 +42,8 @@ export const FormField: React.FC<FormFieldProps> = ({
       )}
       <div className={clsx('flex flex-col gap-1', inline && 'min-w-0 flex-1')}>
         {children}
-        {error && <span className="text-xs text-danger">{error}</span>}
-        {!error && hint && <span className="text-xs text-text-muted">{hint}</span>}
+        {error && <span className="text-danger text-xs">{error}</span>}
+        {!error && hint && <span className="text-text-muted text-xs">{hint}</span>}
       </div>
     </div>
   );

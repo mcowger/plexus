@@ -1,26 +1,27 @@
-import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { FastifyInstance } from 'fastify';
-import { logger } from '../../utils/logger';
+
 import { Dispatcher } from '../../services/dispatch/dispatcher';
-import { DecisionsIngressSchema } from '../../types/decisions';
-import type { UnifiedDecisionsRequest } from '../../types/unified';
-import { UsageStorageService } from '../../services/observability/usage-storage';
-import { UsageRecord } from '../../types/usage';
-import { getClientIp } from '../../utils/ip';
-import { calculateCosts } from '../../utils/calculate-costs';
+import { applyRequestedServiceTierFromError } from '../../services/dispatch/service-tier-metadata';
 import { DebugManager } from '../../services/observability/debug-manager';
-import { attachKeyAccessPolicy } from '../../utils/auth';
+import { UsageStorageService } from '../../services/observability/usage-storage';
 import { QuotaEnforcer } from '../../services/quota/quota-enforcer';
 import {
-  checkQuotaMiddleware,
   attachQuotaContext,
   buildQuotaHeaders,
+  checkQuotaMiddleware,
   recordQuotaUsage,
 } from '../../services/quota/quota-middleware';
-import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
-import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import { applyRequestedServiceTierFromError } from '../../services/dispatch/service-tier-metadata';
+import { DecisionsIngressSchema } from '../../types/decisions';
+import type { UnifiedDecisionsRequest } from '../../types/unified';
+import { UsageRecord } from '../../types/usage';
+import { attachKeyAccessPolicy } from '../../utils/auth';
+import { calculateCosts } from '../../utils/calculate-costs';
 import { CLIENT_REQUEST_ID_HEADER, getClientRequestId } from '../../utils/client-request-id';
+import { getClientIp } from '../../utils/ip';
+import { logger } from '../../utils/logger';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { wireEarlyDisconnectDetection, wireUpstreamTimeout } from '../../utils/timeout';
+import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
 
 export async function registerDecisionsRoute(
   fastify: FastifyInstance,

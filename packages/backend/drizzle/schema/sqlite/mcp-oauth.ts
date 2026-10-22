@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, index } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const mcpOauthClients = sqliteTable('mcp_oauth_clients', {
   id: integer('id').primaryKey({ autoIncrement: true }),

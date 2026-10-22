@@ -1,16 +1,16 @@
+import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import type {
   ImageResolution,
   UnifiedImageGenerationRequest,
   UnifiedImageGenerationResponse,
   UnifiedImageReference,
 } from '../../types/unified';
-import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import {
   ImageRequestValidationError,
-  OPENAI_TIER_SIZES,
-  TIER_SIZE_PATTERN,
   normalizeImageUsage,
+  OPENAI_TIER_SIZES,
   resolveImageReference,
+  TIER_SIZE_PATTERN,
 } from '../image';
 
 /** Codex `/images/edits` accepts at most five reference images per request. */

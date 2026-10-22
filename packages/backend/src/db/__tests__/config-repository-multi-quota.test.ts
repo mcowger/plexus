@@ -1,8 +1,9 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
-import { ConfigRepository } from '../config-repository';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import type { KeyConfig, QuotaDefinition } from '../../config';
+import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
+import { ConfigRepository } from '../config-repository';
+import { runMigrations } from '../migrate';
 
 describe('config-repository multi-quota round-trips', () => {
   let db: ReturnType<typeof getDatabase>;

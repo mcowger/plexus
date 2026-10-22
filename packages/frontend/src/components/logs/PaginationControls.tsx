@@ -1,5 +1,6 @@
 import { clsx } from 'clsx';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import type { PaginationControlsProps } from './types';
 
@@ -15,10 +16,10 @@ export const PaginationControls = ({
   <div
     className={clsx(
       'flex items-center justify-between gap-2 px-2 py-2 sm:justify-end sm:gap-3 sm:px-3 sm:py-3',
-      position === 'top' ? 'border-b border-border' : 'border-t border-border'
+      position === 'top' ? 'border-border border-b' : 'border-border border-t'
     )}
   >
-    <span className="text-xs text-text-secondary font-mono">
+    <span className="text-text-secondary font-mono text-xs">
       Page {currentPage} of {Math.max(1, totalPages)}
     </span>
     <div className="flex gap-1">

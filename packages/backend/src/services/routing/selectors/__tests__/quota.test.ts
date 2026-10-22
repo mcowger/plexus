@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import type { ModelTarget } from '../../../../config';
 import type { MeterCheckResult } from '../../../../types/meter';
 import { QuotaSelector, QuotaSnapshotProvider } from '../quota';

@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import type { OAuthAuth, OAuthCredential, ProviderAuthInteraction } from '@earendil-works/pi-ai';
+import { z } from 'zod';
 
 /**
  * Anthropic (Claude Pro/Max) OAuth with the copy-code login method.

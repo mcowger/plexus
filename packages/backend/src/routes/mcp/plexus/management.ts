@@ -1,6 +1,7 @@
 import type { FastifyRequest } from 'fastify';
-import { McpToolError, type ManagementShimContext } from './types';
+
 import { toMcpToolError } from './responses';
+import { type ManagementShimContext, McpToolError } from './types';
 
 export function buildShimHeaders(request: FastifyRequest): Record<string, string> {
   const headers: Record<string, string> = {};

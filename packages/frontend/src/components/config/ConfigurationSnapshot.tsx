@@ -1,6 +1,7 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
 import { AlertTriangle, Download, RefreshCw, RotateCcw } from 'lucide-react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
 
@@ -18,11 +19,11 @@ class EditorErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   render() {
     if (this.state.error) {
       return (
-        <div className="h-[400px] sm:h-[500px] flex items-center justify-center bg-bg-glass/30 text-text-secondary rounded-md">
-          <div className="text-center p-6">
-            <AlertTriangle className="mx-auto mb-3 text-warning" size={32} />
-            <p className="text-sm font-semibold mb-1">Editor failed to load</p>
-            <p className="font-body text-[11px] text-text-muted">{this.state.error.message}</p>
+        <div className="bg-bg-glass/30 text-text-secondary flex h-[400px] items-center justify-center rounded-md sm:h-[500px]">
+          <div className="p-6 text-center">
+            <AlertTriangle className="text-warning mx-auto mb-3" size={32} />
+            <p className="mb-1 text-sm font-semibold">Editor failed to load</p>
+            <p className="font-body text-text-muted text-[11px]">{this.state.error.message}</p>
           </div>
         </div>
       );
@@ -83,7 +84,7 @@ export function ConfigurationSnapshot({
         </div>
       }
     >
-      <div className="h-[400px] sm:h-[500px] lg:h-[600px] rounded-sm overflow-hidden">
+      <div className="h-[400px] overflow-hidden rounded-sm sm:h-[500px] lg:h-[600px]">
         <EditorErrorBoundary>
           <Editor
             height="100%"

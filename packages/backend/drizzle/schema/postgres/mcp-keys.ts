@@ -1,4 +1,5 @@
 import { boolean, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+
 import { mcpServers } from './mcp-servers';
 
 export const mcpKeys = pgTable('mcp_keys', {

@@ -1,5 +1,6 @@
-import { PassThrough } from 'stream';
 import { StringDecoder } from 'node:string_decoder';
+import { PassThrough } from 'stream';
+
 import { logger } from '../../utils/logger';
 
 /**

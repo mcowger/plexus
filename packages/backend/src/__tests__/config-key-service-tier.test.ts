@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { KeyConfigSchema, validateConfig } from '../config';
 
 function baseConfigJson(overrides: Record<string, unknown> = {}): string {

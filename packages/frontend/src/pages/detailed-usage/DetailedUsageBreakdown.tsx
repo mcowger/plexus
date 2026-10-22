@@ -19,24 +19,24 @@ export const DetailedUsageBreakdown = ({
     <Card className="mt-6" title="Detailed Breakdown">
       <div className="space-y-3 md:hidden">
         {aggregatedData.map((row, index) => (
-          <article key={index} className="rounded-md border border-border-glass bg-bg-subtle p-3">
-            <div className="truncate font-heading text-sm font-semibold text-text">{row.name}</div>
+          <article key={index} className="border-border-glass bg-bg-subtle rounded-md border p-3">
+            <div className="font-heading text-text truncate text-sm font-semibold">{row.name}</div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                <div className="text-[10px] uppercase tracking-wider text-text-muted">Requests</div>
-                <div className="font-medium text-text">{formatNumber(row.requests, 0)}</div>
+              <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+                <div className="text-text-muted text-[10px] tracking-wider uppercase">Requests</div>
+                <div className="text-text font-medium">{formatNumber(row.requests, 0)}</div>
               </div>
-              <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                <div className="text-[10px] uppercase tracking-wider text-text-muted">Success</div>
+              <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+                <div className="text-text-muted text-[10px] tracking-wider uppercase">Success</div>
                 <div className="font-medium text-green-500">{row.successRate.toFixed(1)}%</div>
               </div>
-              <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                <div className="text-[10px] uppercase tracking-wider text-text-muted">Tokens</div>
-                <div className="font-medium text-text">{formatTokens(row.tokens)}</div>
+              <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+                <div className="text-text-muted text-[10px] tracking-wider uppercase">Tokens</div>
+                <div className="text-text font-medium">{formatTokens(row.tokens)}</div>
               </div>
-              <div className="rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                <div className="text-[10px] uppercase tracking-wider text-text-muted">Cost</div>
-                <div className="font-medium text-text">
+              <div className="border-border-glass bg-bg-glass rounded border px-2 py-1.5">
+                <div className="text-text-muted text-[10px] tracking-wider uppercase">Cost</div>
+                <div className="text-text font-medium">
                   {formatCostIn(row.cost, {
                     currency: currency.currency,
                     rate: currency.rate,
@@ -53,7 +53,7 @@ export const DetailedUsageBreakdown = ({
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left border-b border-border-glass text-text-secondary">
+            <tr className="border-border-glass text-text-secondary border-b text-left">
               <th className="py-3 pr-4">{groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}</th>
               {[
                 'Requests',
@@ -73,7 +73,7 @@ export const DetailedUsageBreakdown = ({
           </thead>
           <tbody>
             {aggregatedData.map((row, index) => (
-              <tr key={index} className="border-b border-border-glass/50">
+              <tr key={index} className="border-border-glass/50 border-b">
                 <td className="py-3 pr-4 font-medium">{row.name}</td>
                 <td className="py-3 pr-4">{formatNumber(row.requests, 0)}</td>
                 <td className="py-3 pr-4 text-red-500">{formatNumber(row.errors, 0)}</td>

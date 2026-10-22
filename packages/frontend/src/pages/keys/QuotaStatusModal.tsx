@@ -1,9 +1,10 @@
 import { AlertCircle } from 'lucide-react';
+
+import { QuotaStatusCard } from '../../components/quota';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { QuotaStatusCard } from '../../components/quota';
-import { sortMostConstrainedFirst } from '../../lib/quota';
 import type { UserQuota } from '../../lib/api';
+import { sortMostConstrainedFirst } from '../../lib/quota';
 import { isLeakyRollingDef } from './helpers';
 import type { QuotaStatusResponse } from './types';
 
@@ -49,9 +50,9 @@ export const QuotaStatusModal = ({
     {selectedQuotaStatus && (
       <div className="flex flex-col gap-4">
         {selectedQuotaStatus.quotas.length === 0 ? (
-          <div className="flex items-center gap-3 p-3 bg-bg-subtle rounded-md">
+          <div className="bg-bg-subtle flex items-center gap-3 rounded-md p-3">
             <AlertCircle className="text-text-muted" size={20} />
-            <p className="text-sm text-text-secondary">
+            <p className="text-text-secondary text-sm">
               No quota assigned to this key, and no default quotas are configured.
             </p>
           </div>

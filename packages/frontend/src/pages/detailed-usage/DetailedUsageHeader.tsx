@@ -1,7 +1,8 @@
 import { ArrowLeft } from 'lucide-react';
+
+import { PageHeader } from '../../components/layout/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { PageHeader } from '../../components/layout/PageHeader';
 import { formatTimeAgo } from '../../lib/format';
 
 interface DetailedUsageHeaderProps {

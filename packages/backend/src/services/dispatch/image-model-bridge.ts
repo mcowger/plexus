@@ -1,4 +1,4 @@
-import type { ResolveTimeoutMs } from './upstream-execution';
+import type { PlexusConfig } from '../../config';
 /**
  * Auto-bridge: a CHAT-SHAPED request that names an IMAGE-TYPE model.
  *
@@ -32,10 +32,6 @@ import type { ResolveTimeoutMs } from './upstream-execution';
  * the Responses-format client re-emits the native item and structurally skips
  * the paired delta. No formatter needed a change for this bridge.
  */
-
-import type { PlexusConfig } from '../../config';
-import { logger } from '../../utils/logger';
-import type { RouteResult } from '../routing/router';
 import { ImageRequestValidationError, resolveImageReference } from '../../transformers/image';
 import { imageGenerationCallMarkdown } from '../../transformers/image-rendering';
 import type {
@@ -50,6 +46,9 @@ import type {
   UnifiedMessage,
   UnifiedUsage,
 } from '../../types/unified';
+import { logger } from '../../utils/logger';
+import type { RouteResult } from '../routing/router';
+import type { ResolveTimeoutMs } from './upstream-execution';
 
 /**
  * The single operation the bridge needs from the Dispatcher facade: the same

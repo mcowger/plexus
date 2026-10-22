@@ -1,8 +1,8 @@
+import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import type {
   UnifiedImageGenerationRequest,
   UnifiedImageGenerationResponse,
 } from '../../types/unified';
-import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import { ImageRequestValidationError, normalizeImageUsage } from '../image';
 
 export class OpenRouterImageTransformer implements ImageGenerationTransformer {

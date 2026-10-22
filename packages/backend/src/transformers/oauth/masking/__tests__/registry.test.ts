@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildToolRenamePairs } from '../registry';
-import { dedupeSyntheticToolCollisions } from '../dedupe';
+
+import { namespaceNonCcToolName, NON_CC_TOOL_NAMESPACE } from '../cc-namespace-shape';
 import { CC_TOOL_REFERENCE } from '../cc-reference-tools';
-import { NON_CC_TOOL_NAMESPACE, namespaceNonCcToolName } from '../cc-namespace-shape';
+import { dedupeSyntheticToolCollisions } from '../dedupe';
+import { buildToolRenamePairs } from '../registry';
 import type { ToolDescriptor } from '../types';
 
 function tool(name: string, required: string[] = [], type?: string): ToolDescriptor {

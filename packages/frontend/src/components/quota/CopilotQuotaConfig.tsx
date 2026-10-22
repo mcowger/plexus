@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface CopilotQuotaConfigProps {
@@ -14,7 +15,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input
@@ -24,7 +25,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           User-Agent (optional)
         </label>
         <Input
@@ -34,7 +35,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Editor-Version (optional)
         </label>
         <Input
@@ -44,7 +45,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           API Version (optional)
         </label>
         <Input
@@ -54,7 +55,7 @@ export const CopilotQuotaConfig: React.FC<CopilotQuotaConfigProps> = ({ options,
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Timeout (ms) (optional)
         </label>
         <Input

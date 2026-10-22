@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { registerSpy } from '../../../../../test/test-utils';
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../opencode-go-checker';

@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { parseGeminiRequest } from '../gemini/request-parser';
-import { buildGeminiRequest } from '../gemini/request-builder';
+import { describe, expect, it } from 'vitest';
+
 import type { UnifiedChatRequest } from '../../types/unified';
+import { buildGeminiRequest } from '../gemini/request-builder';
+import { parseGeminiRequest } from '../gemini/request-parser';
 
 /**
  * Round-trip tests for the Gemini transformer.

@@ -1,5 +1,5 @@
-import type { ProviderAdapter } from '../../types/provider-adapter';
 import type { WebSearchCoercionOptions } from '../../config';
+import type { ProviderAdapter } from '../../types/provider-adapter';
 import { logger } from '../../utils/logger';
 
 /**

@@ -1,4 +1,5 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+
 import { mcpServers } from './mcp-servers';
 
 export const mcpKeys = sqliteTable('mcp_keys', {

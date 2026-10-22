@@ -12,8 +12,9 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { TransformerFactory } from '../transformer-factory';
+
 import { ImageBridgeTransformer } from '../../../transformers/image-bridge';
+import { TransformerFactory } from '../transformer-factory';
 
 describe('TransformerFactory', () => {
   test('resolves the no-op images transformer for bridged image output', () => {

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { E2EPerformanceSelector } from '../e2e-performance';
+
+import { ModelTarget, PlexusConfig, setConfigForTesting } from '../../../../config';
 import { UsageStorageService } from '../../../observability/usage-storage';
-import { ModelTarget, setConfigForTesting, PlexusConfig } from '../../../../config';
+import { E2EPerformanceSelector } from '../e2e-performance';
 
 const makeConfig = (
   performanceExplorationRate = 0,
@@ -21,8 +22,8 @@ const makeConfig = (
 });
 
 describe('E2EPerformanceSelector', () => {
-  const mockGetProviderPerformance = vi.fn(
-    (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
+  const mockGetProviderPerformance = vi.fn((provider?: string, model?: string): Promise<any[]> =>
+    Promise.resolve([])
   );
   const mockStorage = {
     getProviderPerformance: mockGetProviderPerformance,

@@ -87,17 +87,18 @@ This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future ca
 
 **Environment variables:**
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PLEXUS_STAGING_URL` | For --save/--live | URL of staging instance |
-| `PLEXUS_STAGING_ADMIN_KEY` | For --save/--live | Admin key for staging |
-| `PLEXUS_DEV_DATA_PATH` | No | Path for saved data (default: `.dev-data/`) |
-| `PLEXUS_URL` | No | Local base URL (default: `http://localhost`) |
-| `PLEXUS_PORT` | No | Local port (auto-derived from cwd) |
-| `PLEXUS_ADMIN_KEY` | No | Admin key for local (default: `password`) |
-| `PLEXUS_EXCLUDE_OAUTH` | No | Exclude OAuth providers (default: `true`) |
+| Variable                   | Required          | Description                                  |
+| -------------------------- | ----------------- | -------------------------------------------- |
+| `PLEXUS_STAGING_URL`       | For --save/--live | URL of staging instance                      |
+| `PLEXUS_STAGING_ADMIN_KEY` | For --save/--live | Admin key for staging                        |
+| `PLEXUS_DEV_DATA_PATH`     | No                | Path for saved data (default: `.dev-data/`)  |
+| `PLEXUS_URL`               | No                | Local base URL (default: `http://localhost`) |
+| `PLEXUS_PORT`              | No                | Local port (auto-derived from cwd)           |
+| `PLEXUS_ADMIN_KEY`         | No                | Admin key for local (default: `password`)    |
+| `PLEXUS_EXCLUDE_OAUTH`     | No                | Exclude OAuth providers (default: `true`)    |
 
 **Notes:**
+
 - The local port is auto-derived from your directory name (matches `bun run dev`)
 - OAuth providers are excluded by default to avoid credential conflicts
 - After restore, restart the dev server if needed. Use `bun run dev:stop` to
@@ -107,23 +108,23 @@ This downloads staging data to `.dev-data/backup.tar.gz` (gitignored). Future ca
 
 Backend tests run on **Vitest** with three parallel projects (`vitest.unit.config.ts`, `vitest.sqlite.config.ts`, `vitest.postgres.config.ts`) wired through the `projects` key in `packages/backend/vitest.config.ts`:
 
-| Project | Purpose | DB Setup |
-|---------|---------|----------|
-| `unit` | General unit tests (DB mocked) | None |
-| `sqlite` | DB-layer tests against SQLite | Temp SQLite DB + migrations |
+| Project    | Purpose                                  | DB Setup                    |
+| ---------- | ---------------------------------------- | --------------------------- |
+| `unit`     | General unit tests (DB mocked)           | None                        |
+| `sqlite`   | DB-layer tests against SQLite            | Temp SQLite DB + migrations |
 | `postgres` | DB-layer tests against Postgres (pglite) | Temp pglite DB + migrations |
 
 The `DB_TEST_FILES` list in `vitest.db-tests.ts` determines which files run in the `sqlite` and `postgres` projects. All other test files run only in the `unit` project.
 
 ### Key Vitest Settings
 
-| Setting | Value | Effect |
-|---------|-------|--------|
-| `pool` | `forks` | Each test file runs in a child process fork |
-| `isolate` | `true` | Each test file gets a fresh module registry |
-| `mockReset` | `true` | `vi.resetAllMocks()` before every test — clears `vi.fn()` call history and resets implementations to original |
-| `clearMocks` | `true` | Clears call history (redundant with mockReset but explicit) |
-| `restoreMocks` | `true` | Restores `vi.spyOn` mocks to originals after every test |
+| Setting        | Value   | Effect                                                                                                        |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `pool`         | `forks` | Each test file runs in a child process fork                                                                   |
+| `isolate`      | `true`  | Each test file gets a fresh module registry                                                                   |
+| `mockReset`    | `true`  | `vi.resetAllMocks()` before every test — clears `vi.fn()` call history and resets implementations to original |
+| `clearMocks`   | `true`  | Clears call history (redundant with mockReset but explicit)                                                   |
+| `restoreMocks` | `true`  | Restores `vi.spyOn` mocks to originals after every test                                                       |
 
 ### Global Setup
 
@@ -152,6 +153,7 @@ packages/backend/
 ```
 
 **Rules:**
+
 - **Unit tests** go in a `__tests__/` subdirectory alongside the source file they test under `packages/backend/src/`. Use relative imports.
 - **Integration tests** (tests that exercise multiple services/components together) go in `packages/backend/test/integration/`.
 - **Infrastructure** (setup files, shared utilities) stays in `packages/backend/test/` directly.

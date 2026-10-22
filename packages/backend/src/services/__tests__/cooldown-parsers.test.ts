@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { CooldownParserRegistry } from '../runtime/cooldown-parsers';
+
 import {
-  resolveCooldownProviderType,
   parseCooldownDurationForProvider,
+  resolveCooldownProviderType,
 } from '../providers/provider-cooldown';
+import { CooldownParserRegistry } from '../runtime/cooldown-parsers';
 
 describe('CooldownParserRegistry', () => {
   test('Returns null for unregistered provider type', () => {

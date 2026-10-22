@@ -7,7 +7,7 @@ import { formatResponsesResponse } from './response-formatter';
 import { transformResponsesResponse } from './response-transformer';
 import { formatResponsesStream } from './stream-formatter';
 import { transformResponsesStream } from './stream-transformer';
-import { ResponsesToolState, createResponsesToolState } from './tool-mapper';
+import { createResponsesToolState, ResponsesToolState } from './tool-mapper';
 import { generateItemId, generateResponseId } from './utils';
 
 export * from './normalization';

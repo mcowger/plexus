@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { modelOverrideAdapter, resolveDottedPath } from '../model-override.adapter';
 
 // ── resolveDottedPath ────────────────────────────────────────────────────

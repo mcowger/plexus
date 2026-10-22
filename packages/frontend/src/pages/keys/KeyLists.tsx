@@ -1,6 +1,6 @@
 import {
-  BarChart3,
   Ban,
+  BarChart3,
   Check,
   ChevronDown,
   Copy,
@@ -9,14 +9,15 @@ import {
   Shield,
   Trash2,
 } from 'lucide-react';
-import type { KeyConfig } from '../../lib/api';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
+
 import { QuotaChip } from '../../components/quota';
-import { formatQuotaValue, mostConstrained, quotaUsagePercent } from '../../lib/quota';
-import { getQuotaStatusColor, formatExpiry } from './helpers';
-import type { QuotaStatusResponse } from './types';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import type { KeyConfig } from '../../lib/api';
 import type { CurrencyCode } from '../../lib/currency';
+import { formatQuotaValue, mostConstrained, quotaUsagePercent } from '../../lib/quota';
+import { formatExpiry, getQuotaStatusColor } from './helpers';
+import type { QuotaStatusResponse } from './types';
 
 interface KeyListsProps {
   activeKeys: KeyConfig[];
@@ -59,7 +60,7 @@ export const KeyLists = ({
     <Card title="Active Keys" className="mb-6">
       <div className="space-y-3 md:hidden">
         {activeKeys.length === 0 ? (
-          <div className="py-10 text-center text-sm text-text-muted">No keys found</div>
+          <div className="text-text-muted py-10 text-center text-sm">No keys found</div>
         ) : (
           activeKeys.map((key) => {
             const status = quotaStatuses[key.key];
@@ -71,7 +72,7 @@ export const KeyLists = ({
             return (
               <article
                 key={key.key}
-                className="rounded-md border border-border-glass bg-bg-subtle p-3"
+                className="border-border-glass bg-bg-subtle rounded-md border p-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
@@ -80,12 +81,12 @@ export const KeyLists = ({
                     className="min-w-0 flex-1 text-left"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="truncate font-heading text-sm font-semibold text-text">
+                      <div className="font-heading text-text truncate text-sm font-semibold">
                         {key.key}
                       </div>
                     </div>
                     {key.comment && (
-                      <div className="mt-1 truncate text-xs text-text-muted">{key.comment}</div>
+                      <div className="text-text-muted mt-1 truncate text-xs">{key.comment}</div>
                     )}
                   </button>
                   <div className="flex shrink-0 items-center gap-1">
@@ -122,16 +123,16 @@ export const KeyLists = ({
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                  <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                  <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+                    <div className="text-text-muted text-[10px] tracking-wider uppercase">
                       Secret
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="min-w-0 truncate font-mono text-text">
+                      <span className="text-text min-w-0 truncate font-mono">
                         {key.secret.substring(0, 5)}...
                       </span>
                       <button
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-primary"
+                        className="text-text-muted hover:bg-bg-hover hover:text-primary flex h-6 w-6 shrink-0 items-center justify-center rounded-sm transition-colors"
                         onClick={() => onCopy(key.secret, key.key)}
                         title="Copy secret"
                         type="button"
@@ -140,8 +141,8 @@ export const KeyLists = ({
                       </button>
                     </div>
                   </div>
-                  <div className="min-w-0 rounded border border-border-glass bg-bg-glass px-2 py-1.5">
-                    <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                  <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
+                    <div className="text-text-muted text-[10px] tracking-wider uppercase">
                       Quota
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -163,12 +164,12 @@ export const KeyLists = ({
                   </div>
                 </div>
 
-                <div className="mt-3 rounded border border-border-glass bg-bg-glass px-2 py-2">
+                <div className="border-border-glass bg-bg-glass mt-3 rounded border px-2 py-2">
                   {primary ? (
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between gap-2 text-xs">
                         <span className="text-text-muted truncate">{primary.name}</span>
-                        <span className="font-medium text-text">
+                        <span className="text-text font-medium">
                           {formatQuotaValue(primary.currentUsage, primary.limitType, {
                             currency,
                             rate,
@@ -182,7 +183,7 @@ export const KeyLists = ({
                           })}
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-bg-hover">
+                      <div className="bg-bg-hover h-1.5 overflow-hidden rounded-full">
                         <div
                           className="h-full rounded-full"
                           style={{
@@ -192,7 +193,7 @@ export const KeyLists = ({
                         />
                       </div>
                       {status && status.quotas.length > 1 && (
-                        <p className="text-[11px] text-text-muted">
+                        <p className="text-text-muted text-[11px]">
                           +{status.quotas.length - 1} more quota
                           {status.quotas.length - 1 !== 1 ? 's' : ''}
                         </p>
@@ -217,7 +218,7 @@ export const KeyLists = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs text-text-muted">
+                    <div className="text-text-muted text-xs">
                       {quotaNames || usingDefaults
                         ? 'Loading quota status...'
                         : 'No quota assigned'}
@@ -231,26 +232,26 @@ export const KeyLists = ({
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse font-body text-[13px]">
+        <table className="font-body w-full border-collapse text-[13px]">
           <thead>
             <tr>
               <th
-                className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                 style={{ paddingLeft: '24px' }}
               >
                 Key Name
               </th>
-              <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                 Secret
               </th>
-              <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                 Quota
               </th>
-              <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                 Status
               </th>
               <th
-                className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                 style={{ paddingRight: '24px', textAlign: 'right' }}
               >
                 Actions
@@ -268,14 +269,14 @@ export const KeyLists = ({
               return (
                 <tr key={key.key} className="hover:bg-bg-hover">
                   <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
+                    className="border-border-glass text-text border-b px-4 py-3 text-left"
                     style={{ fontWeight: 600, paddingLeft: '24px' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span>{key.key}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                  <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span
                         style={{
@@ -289,7 +290,7 @@ export const KeyLists = ({
                         {key.secret.substring(0, 5)}...
                       </span>
                       <button
-                        className="bg-transparent border-0 text-text-muted p-1.5 rounded-sm cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-bg-hover hover:text-primary active:scale-95"
+                        className="text-text-muted hover:bg-bg-hover hover:text-primary flex cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-1.5 transition-all duration-200 active:scale-95"
                         onClick={() => onCopy(key.secret, key.key)}
                         title="Copy Secret"
                         style={copiedKey === key.key ? { color: 'var(--color-success)' } : {}}
@@ -298,13 +299,13 @@ export const KeyLists = ({
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                  <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                     {quotaNames ? (
                       <div className="flex flex-wrap items-center gap-1">
                         {quotaNames.map((name) => (
                           <span
                             key={name}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary"
+                            className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
                           >
                             <Shield size={12} />
                             {name}
@@ -324,7 +325,7 @@ export const KeyLists = ({
                       <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>-</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                  <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                     {primary ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div
@@ -349,12 +350,12 @@ export const KeyLists = ({
                           })}
                         </span>
                         {status && status.quotas.length > 1 && (
-                          <span className="text-[11px] text-text-muted">
+                          <span className="text-text-muted text-[11px]">
                             (+{status.quotas.length - 1})
                           </span>
                         )}
                         <button
-                          className="bg-transparent border-0 text-text-muted p-1 rounded-sm cursor-pointer hover:text-primary"
+                          className="text-text-muted hover:text-primary cursor-pointer rounded-sm border-0 bg-transparent p-1"
                           onClick={() => onViewQuotaStatus(key.key)}
                           title="View details"
                         >
@@ -370,7 +371,7 @@ export const KeyLists = ({
                     )}
                   </td>
                   <td
-                    className="px-4 py-3 text-left border-b border-border-glass text-text"
+                    className="border-border-glass text-text border-b px-4 py-3 text-left"
                     style={{ paddingRight: '24px', textAlign: 'right' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -413,7 +414,7 @@ export const KeyLists = ({
             })}
             {activeKeys.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center text-text-muted p-12">
+                <td colSpan={5} className="text-text-muted p-12 text-center">
                   No keys found
                 </td>
               </tr>
@@ -430,7 +431,7 @@ export const KeyLists = ({
         onClick={() => onSetShowDisabledKeys(!showDisabledKeys)}
         aria-expanded={showDisabledKeys}
       >
-        <span className="font-heading text-sm font-semibold text-text">
+        <span className="font-heading text-text text-sm font-semibold">
           Disabled Keys ({disabledKeys.length})
         </span>
         <ChevronDown
@@ -441,11 +442,11 @@ export const KeyLists = ({
       {showDisabledKeys && (
         <div className="mt-4 overflow-x-auto">
           {disabledKeys.length === 0 ? (
-            <div className="py-6 text-center text-sm text-text-muted">No disabled keys found</div>
+            <div className="text-text-muted py-6 text-center text-sm">No disabled keys found</div>
           ) : (
-            <table className="w-full border-collapse font-body text-[13px]">
+            <table className="font-body w-full border-collapse text-[13px]">
               <thead>
-                <tr className="border-b border-border-glass text-left text-[11px] uppercase tracking-wider text-text-secondary">
+                <tr className="border-border-glass text-text-secondary border-b text-left text-[11px] tracking-wider uppercase">
                   <th className="px-3 py-2">Key Name</th>
                   <th className="px-3 py-2">Expiration</th>
                   <th className="px-3 py-2">Disabled</th>
@@ -454,7 +455,7 @@ export const KeyLists = ({
               </thead>
               <tbody>
                 {disabledKeys.map((key) => (
-                  <tr key={key.key} className="border-b border-border-glass text-text">
+                  <tr key={key.key} className="border-border-glass text-text border-b">
                     <td className="px-3 py-3 font-medium">{key.key}</td>
                     <td className="px-3 py-3">
                       {key.expiresAt ? formatExpiry(key.expiresAt) : '-'}
@@ -462,7 +463,7 @@ export const KeyLists = ({
                     <td className="px-3 py-3">
                       {key.disabledAt ? formatExpiry(key.disabledAt) : 'Expired'}
                     </td>
-                    <td className="px-3 py-3 text-text-muted">{key.comment || '-'}</td>
+                    <td className="text-text-muted px-3 py-3">{key.comment || '-'}</td>
                   </tr>
                 ))}
               </tbody>

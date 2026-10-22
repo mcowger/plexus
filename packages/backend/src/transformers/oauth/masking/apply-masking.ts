@@ -42,12 +42,12 @@
  *      body. Must run last so the signature covers everything above.
  */
 
-import { buildToolRenamePairs } from './registry';
-import { applyToolRenames } from './rename-apply';
-import { stripDescriptionsAndInjectSyntheticTools } from './cc-tools';
-import { dedupeSyntheticToolCollisions } from './dedupe';
 import { injectClaudeCodeIdentity } from './cc-identity';
 import { injectClaudeCodeMetadata } from './cc-metadata';
+import { stripDescriptionsAndInjectSyntheticTools } from './cc-tools';
+import { dedupeSyntheticToolCollisions } from './dedupe';
+import { buildToolRenamePairs } from './registry';
+import { applyToolRenames } from './rename-apply';
 import { signBillingHeader } from './sign-billing';
 import type { RenamePair } from './types';
 

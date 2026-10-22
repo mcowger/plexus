@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../../config';
-import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
-import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { DebugManager } from '../../../services/observability/debug-manager';
+import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { SelectorFactory } from '../../../services/routing/selectors/factory';
+import { registerInferenceRoutes } from '../index';
 
 const EMBEDDINGS_TEST_CONFIG = {
   providers: {

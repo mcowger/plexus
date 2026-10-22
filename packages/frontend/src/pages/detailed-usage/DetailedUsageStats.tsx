@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
 import { Activity, AlertTriangle, Clock, Database, DollarSign, TrendingUp } from 'lucide-react';
-import type { UsageSummaryResponse } from '../../lib/api';
+import { useMemo } from 'react';
+
 import { Skeleton } from '../../components/ui/Skeleton';
+import type { UsageSummaryResponse } from '../../lib/api';
 import { formatCostIn, formatMs, formatNumber, formatTokens } from '../../lib/format';
 
 interface DetailedUsageStatsProps {
@@ -58,9 +59,9 @@ export const DetailedUsageStats = ({
             <Skeleton key={index} height={76} className="w-full" />
           ))
         : stats.map((stat, index) => (
-            <div key={index} className="glass-bg rounded-lg p-3 flex flex-col gap-1">
-              <div className="flex justify-between items-start">
-                <span className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+            <div key={index} className="glass-bg flex flex-col gap-1 rounded-lg p-3">
+              <div className="flex items-start justify-between">
+                <span className="font-body text-text-muted text-xs font-semibold tracking-wider uppercase">
                   {stat.label}
                 </span>
                 <stat.icon size={16} className={`text-text-secondary ${stat.color || ''}`} />

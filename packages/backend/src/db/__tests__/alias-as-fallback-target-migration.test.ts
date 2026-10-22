@@ -1,11 +1,13 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
 import { Database } from 'bun:sqlite';
-import { closeDatabase, initializeDatabase, getDatabase, getSchema } from '../client';
-import { ConfigRepository } from '../config-repository';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { toDbBoolean } from '../../utils/normalize';
+import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
+import { ConfigRepository } from '../config-repository';
 
 /**
  * Regression suite for the `model_alias_targets` table-recreation migration

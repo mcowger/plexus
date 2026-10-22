@@ -21,6 +21,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+
 import { stripDescriptionsAndInjectSyntheticTools } from '../cc-tools';
 
 const serverTools = () => [

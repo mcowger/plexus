@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { deriveDevPort, resolveApiRoot } from '../populate-dev';
 
 describe('resolveApiRoot', () => {

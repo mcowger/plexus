@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
+import type { UnifiedChatRequest, UnifiedToolConfig } from '../../../types/unified';
 import { buildGeminiRequest } from '../request-builder';
 import { parseGeminiRequest } from '../request-parser';
-import type { UnifiedChatRequest, UnifiedToolConfig } from '../../../types/unified';
 
 // Helper to get first element with type narrowing
 function first<T>(arr: T[]): T {

@@ -1,30 +1,31 @@
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import {
   BookOpen,
+  CheckCircle,
   ChevronDown,
   ChevronRight,
-  CheckCircle,
-  X,
   Loader2,
   RotateCcw,
+  X,
 } from 'lucide-react';
-import { Input } from '../ui/Input';
-import { Button } from '../ui/Button';
-import { Switch } from '../ui/Switch';
-import { MetadataOverrideForm } from './MetadataOverrideForm';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+
+import { useToast } from '../../contexts/ToastContext';
 import { useMetadataEditor } from '../../hooks/useMetadataEditor';
 import { api } from '../../lib/api';
-import { dedupeById } from '../../lib/modelOptions';
-import { useToast } from '../../contexts/ToastContext';
 import type {
   Alias,
   AliasMetadata,
-  MetadataSource,
   MetadataOverrides,
+  MetadataSource,
   ModelResolutionPreview,
   PreferredApiValue,
 } from '../../lib/api';
+import { dedupeById } from '../../lib/modelOptions';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Switch } from '../ui/Switch';
+import { MetadataOverrideForm } from './MetadataOverrideForm';
 
 interface Props {
   editingAlias: Alias;
@@ -206,16 +207,16 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
 
   return (
     <>
-      <div className="border border-border-glass rounded-sm overflow-hidden">
+      <div className="border-border-glass overflow-hidden rounded-sm border">
         <button
           type="button"
           onClick={() => setIsOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-3 py-2 bg-bg-subtle hover:bg-bg-hover transition-colors duration-150 text-left"
+          className="bg-bg-subtle hover:bg-bg-hover flex w-full items-center justify-between px-3 py-2 text-left transition-colors duration-150"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <BookOpen size={13} className="text-text-muted" />
-            <span className="font-body text-[13px] font-medium text-text-secondary">Metadata</span>
-            <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary bg-bg-hover">
+            <span className="font-body text-text-secondary text-[13px] font-medium">Metadata</span>
+            <span className="border-border-glass text-primary bg-bg-hover inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium">
               {metadataSource === 'auto' ? 'automatic' : metadataSource}
             </span>
           </div>
@@ -228,27 +229,27 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
 
         {isOpen && (
           <div
-            className="px-3 py-3 border-t border-border-glass"
+            className="border-border-glass border-t px-3 py-3"
             style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
           >
             <div
-              className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-3"
+              className="border-border-glass bg-bg-subtle rounded-sm border px-3 py-3"
               style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}
             >
               <div>
                 <div
-                  className="font-body text-[12px] font-medium text-text-secondary"
+                  className="font-body text-text-secondary text-[12px] font-medium"
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <CheckCircle size={13} className="text-success" />
                   {metadataStatus.label}
                 </div>
-                <p className="font-body text-[11px] text-text-muted mt-1">
+                <p className="font-body text-text-muted mt-1 text-[11px]">
                   {metadataStatus.description}
                 </p>
                 {metadataSource === 'auto' && (
                   <div
-                    className="font-body text-[11px] text-text-muted mt-2"
+                    className="font-body text-text-muted mt-2 text-[11px]"
                     style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
@@ -334,19 +335,19 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
 
             {showAdvancedMetadata && (
               <div
-                className="border-t border-border-glass pt-3"
+                className="border-border-glass border-t pt-3"
                 style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
               >
                 {/* Source selector */}
                 <div>
                   <label
-                    className="font-body text-[12px] font-medium text-text-secondary"
+                    className="font-body text-text-secondary text-[12px] font-medium"
                     style={{ display: 'block', marginBottom: '4px' }}
                   >
                     Source
                   </label>
                   <select
-                    className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                    className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border text-xs backdrop-blur-md transition-all duration-200 outline-none"
                     style={{ padding: '5px 8px', height: '30px' }}
                     value={metadataSource}
                     onChange={(e) => {
@@ -433,12 +434,12 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                 {isCatalogSource && (
                   <div style={{ position: 'relative' }}>
                     <label
-                      className="font-body text-[12px] font-medium text-text-secondary"
+                      className="font-body text-text-secondary text-[12px] font-medium"
                       style={{ display: 'block', marginBottom: '4px' }}
                     >
                       Model
                       {catalogMetadata?.source_path && (
-                        <span className="ml-2 font-normal text-text-muted">
+                        <span className="text-text-muted ml-2 font-normal">
                           ({catalogMetadata.source_path})
                         </span>
                       )}
@@ -478,7 +479,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                         {isMetadataSearching && (
                           <Loader2
                             size={14}
-                            className="animate-spin text-text-muted"
+                            className="text-text-muted animate-spin"
                             style={{
                               position: 'absolute',
                               right: '8px',
@@ -515,7 +516,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                     ('source_path' in editingAlias.metadata && editingAlias.metadata.source_path) ||
                     editingAlias.metadata.overrides) && (
                     <div
-                      className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
+                      className="border-border-glass bg-bg-subtle rounded-sm border px-3 py-2"
                       style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -547,7 +548,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                             </>
                           )}
                           {countOverrides(editingAlias.metadata) > 0 && (
-                            <span className="ml-2 text-text-muted">
+                            <span className="text-text-muted ml-2">
                               + {countOverrides(editingAlias.metadata)} field
                               {countOverrides(editingAlias.metadata) === 1 ? '' : 's'} overridden
                             </span>
@@ -560,13 +561,13 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                 {/* Pi model */}
                 <div>
                   <label
-                    className="font-body text-[12px] font-medium text-text-secondary"
+                    className="font-body text-text-secondary text-[12px] font-medium"
                     style={{ display: 'block', marginBottom: '4px' }}
                   >
                     Pi model
                   </label>
                   <p
-                    className="font-body text-[11px] text-text-muted"
+                    className="font-body text-text-muted text-[11px]"
                     style={{ marginBottom: '6px' }}
                   >
                     Automatic derives the model from enabled targets. Choose a pi-ai model only to
@@ -576,7 +577,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     {/* Provider dropdown */}
                     <select
-                      className="font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                      className="font-body text-text bg-bg-glass border-border-glass focus:border-primary rounded-sm border text-xs backdrop-blur-md transition-all duration-200 outline-none"
                       style={{
                         padding: '5px 8px',
                         height: '30px',
@@ -609,7 +610,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                     {editingAlias.pi_model?.provider && (
                       <div style={{ position: 'relative', flex: 1 }}>
                         <select
-                          className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border text-xs backdrop-blur-md transition-all duration-200 outline-none"
                           style={{
                             padding: '5px 8px',
                             height: '30px',
@@ -634,7 +635,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                         {piModelsLoading && (
                           <Loader2
                             size={14}
-                            className="animate-spin text-text-muted"
+                            className="text-text-muted animate-spin"
                             style={{
                               position: 'absolute',
                               right: '8px',
@@ -672,7 +673,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   {/* Confirmation badge */}
                   {editingAlias.pi_model?.model_id && (
                     <div
-                      className="rounded-sm border border-border-glass bg-bg-subtle px-3 py-2"
+                      className="border-border-glass bg-bg-subtle rounded-sm border px-3 py-2"
                       style={{
                         fontSize: '11px',
                         color: 'var(--color-text-secondary)',
@@ -696,13 +697,13 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                   !!editingAlias.preferred_api?.length) && (
                   <div>
                     <label
-                      className="font-body text-[12px] font-medium text-text-secondary"
+                      className="font-body text-text-secondary text-[12px] font-medium"
                       style={{ display: 'block', marginBottom: '4px' }}
                     >
                       Preferred API
                     </label>
                     <p
-                      className="font-body text-[11px] text-text-muted"
+                      className="font-body text-text-muted text-[11px]"
                       style={{ marginBottom: '6px' }}
                     >
                       Advertised in <code className="text-primary">/v1/models</code>. Automatic uses
@@ -710,7 +711,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                       Completions for everything else.
                     </p>
                     <select
-                      className="w-full font-body text-xs text-text bg-bg-glass border border-border-glass rounded-sm outline-none transition-all duration-200 backdrop-blur-md focus:border-primary"
+                      className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border text-xs backdrop-blur-md transition-all duration-200 outline-none"
                       style={{ padding: '5px 8px', height: '30px' }}
                       value={(editingAlias.preferred_api ?? [])[0] ?? ''}
                       onChange={(e) => {
@@ -744,7 +745,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                         }}
                       >
                         <label
-                          className="font-body text-[12px] font-medium text-text-secondary"
+                          className="font-body text-text-secondary text-[12px] font-medium"
                           style={{ marginBottom: 0 }}
                         >
                           Override metadata fields
@@ -847,8 +848,8 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                 }}
                 className="hover:bg-bg-hover transition-colors"
               >
-                <div className="font-body text-[12px] font-medium text-text">{result.name}</div>
-                <div className="font-body text-[10px] text-text-muted">{result.id}</div>
+                <div className="font-body text-text text-[12px] font-medium">{result.name}</div>
+                <div className="font-body text-text-muted text-[10px]">{result.id}</div>
               </button>
             ))}
           </div>,

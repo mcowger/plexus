@@ -1,5 +1,6 @@
-import type { ChangeEvent, RefObject } from 'react';
 import { AlertTriangle, Archive, HardDrive, Trash2, Upload } from 'lucide-react';
+import type { ChangeEvent, RefObject } from 'react';
+
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
@@ -31,9 +32,9 @@ export function BackupRestoreCard({
   return (
     <Card title="Backup & Restore">
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 mr-1">
+        <div className="border-warning/30 bg-warning/10 mr-1 flex items-center gap-1.5 rounded-md border px-2 py-1">
           <AlertTriangle size={13} className="text-warning shrink-0" />
-          <span className="font-body text-[11px] text-text-muted">
+          <span className="font-body text-text-muted text-[11px]">
             Sensitive data — store securely
           </span>
         </div>

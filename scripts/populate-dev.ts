@@ -18,9 +18,10 @@
  *   scripts/user-populate.json      — optional local overrides (git-ignored)
  */
 
-import { join, basename } from 'path';
-import type { components } from './openapi-types';
+import { basename, join } from 'path';
+
 import { deriveDevPort } from './dev-port-allocator';
+import type { components } from './openapi-types';
 
 export { deriveDevPort };
 

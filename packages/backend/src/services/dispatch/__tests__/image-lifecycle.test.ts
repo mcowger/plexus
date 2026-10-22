@@ -1,11 +1,12 @@
-import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
-import { Dispatcher } from '../dispatcher';
+import type { UnifiedImageGenerationRequest } from '../../../types/unified';
+import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import { ConcurrencyTracker } from '../../runtime/concurrency-tracker';
 import { CooldownManager } from '../../runtime/cooldown-manager';
-import { registerSpy } from '../../../../test/test-utils';
-import type { UnifiedImageGenerationRequest } from '../../../types/unified';
+import { Dispatcher } from '../dispatcher';
 
 const request: UnifiedImageGenerationRequest = {
   model: 'images',

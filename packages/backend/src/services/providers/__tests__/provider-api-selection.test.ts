@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest';
+
+import type { RouteResult } from '../../routing/router';
 import {
   applyGeminiThinkingConfig,
   resolveProviderBaseUrl,
   selectTargetApiType,
 } from '../provider-api-selection';
-import type { RouteResult } from '../../routing/router';
 
 function route(config: any, modelConfig?: any): RouteResult {
   return {

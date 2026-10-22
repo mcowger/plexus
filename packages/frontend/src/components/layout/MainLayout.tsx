@@ -1,9 +1,10 @@
-import React from 'react';
 import { clsx } from 'clsx';
-import { Sidebar } from './Sidebar';
-import { AppBar } from './AppBar';
-import { Drawer } from '../ui/Drawer';
+import React from 'react';
+
 import { useSidebar } from '../../contexts/SidebarContext';
+import { Drawer } from '../ui/Drawer';
+import { AppBar } from './AppBar';
+import { Sidebar } from './Sidebar';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isCollapsed, isMobileOpen, closeMobile } = useSidebar();
@@ -12,7 +13,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     // No overflow-x-clip here — the AppBar lives in this wrapper as a sticky
     // child, and clip-on-the-parent can break sticky positioning in some
     // browsers. Horizontal overflow is contained one level down on <main>.
-    <div className="min-h-screen bg-bg-deep">
+    <div className="bg-bg-deep min-h-screen">
       <AppBar />
 
       {/* Desktop fixed sidebar. Hidden below md. */}

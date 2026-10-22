@@ -1,6 +1,7 @@
-import { test, expect, describe } from 'vitest';
-import { transformGeminiStream } from '../stream-transformer';
+import { describe, expect, test } from 'vitest';
+
 import type { UnifiedChatStreamChunk } from '../../../types/unified';
+import { transformGeminiStream } from '../stream-transformer';
 
 /**
  * Helper to convert array of SSE data strings (raw data lines) into a ReadableStream

@@ -22,8 +22,8 @@
 
 import { mkdir, rename } from 'node:fs/promises';
 import path from 'node:path';
+
 import { createProvider } from '@earendil-works/pi-ai';
-import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 import type {
   AnyModel,
   Api,
@@ -41,8 +41,10 @@ import type {
   Provider,
   ProviderStreams,
 } from '@earendil-works/pi-ai';
-import { logger } from '../../utils/logger';
+import { builtinModels } from '@earendil-works/pi-ai/providers/all';
+
 import { fetchWithSession } from '../../utils/fetch-sessions';
+import { logger } from '../../utils/logger';
 
 const DEFAULT_CATALOG_BASE_URL = 'https://pi.dev';
 const CATALOG_USER_AGENT = 'plexus-gateway';

@@ -3,13 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "scripts": {
-    "typecheck": "bun check"
-  },
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "bun check"
   },
   "dependencies": {
     "zod": "^4.6.6"

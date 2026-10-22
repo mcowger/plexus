@@ -1,8 +1,9 @@
-import { expect, test, describe, afterEach } from 'vitest';
-import { registerSpy } from '../test-utils';
+import { afterEach, describe, expect, test } from 'vitest';
+
+import { setConfigForTesting } from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';
 import { VisionDescriptorService } from '../../src/services/vision/vision-descriptor-service';
-import { setConfigForTesting } from '../../src/config';
+import { registerSpy } from '../test-utils';
 
 describe('Vision Fallthrough Full Logic', () => {
   afterEach(() => {

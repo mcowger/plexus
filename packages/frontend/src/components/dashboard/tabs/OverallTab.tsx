@@ -18,17 +18,18 @@
  * a manual refresh is triggered by changing the time range.
  */
 
+import { Activity, AlertTriangle, Boxes, Gauge, Key, Layers } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Key, Layers, Boxes, Gauge, Activity, AlertTriangle } from 'lucide-react';
+
 import { api, type PieChartDataPoint, type QuotaStatusEntry } from '../../../lib/api';
-import { formatNumber, formatTokens, formatCostIn } from '../../../lib/format';
 import { useCurrency } from '../../../lib/CurrencyContext';
-import { Card } from '../../ui/Card';
-import { QuotaStatusCard } from '../../quota';
-import { TimeRangeSelector } from '../TimeRangeSelector';
-import { sortMostConstrainedFirst } from '../../../lib/quota';
 import type { CustomDateRange } from '../../../lib/date';
+import { formatCostIn, formatNumber, formatTokens } from '../../../lib/format';
+import { sortMostConstrainedFirst } from '../../../lib/quota';
+import { QuotaStatusCard } from '../../quota';
+import { Card } from '../../ui/Card';
 import { Skeleton } from '../../ui/Skeleton';
+import { TimeRangeSelector } from '../TimeRangeSelector';
 
 type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'custom';
 
@@ -64,9 +65,9 @@ const Metric: React.FC<{ label: string; value: string; sub?: string }> = ({
   sub,
 }) => (
   <div className="flex flex-col gap-0.5">
-    <span className="text-xs uppercase tracking-wide text-text-muted">{label}</span>
-    <span className="text-2xl font-semibold text-text leading-none">{value}</span>
-    {sub && <span className="text-xs text-text-muted">{sub}</span>}
+    <span className="text-text-muted text-xs tracking-wide uppercase">{label}</span>
+    <span className="text-text text-2xl leading-none font-semibold">{value}</span>
+    {sub && <span className="text-text-muted text-xs">{sub}</span>}
   </div>
 );
 
@@ -81,7 +82,7 @@ const BreakdownList: React.FC<{
   metric: 'requests' | 'tokens';
 }> = ({ data, emptyLabel, metric }) => {
   if (!data.length) {
-    return <p className="text-sm text-text-muted">{emptyLabel}</p>;
+    return <p className="text-text-muted text-sm">{emptyLabel}</p>;
   }
   const total = data.reduce((sum, d) => sum + ((d[metric] as number) || 0), 0);
   const sorted = [...data].sort(
@@ -96,16 +97,16 @@ const BreakdownList: React.FC<{
         return (
           <div key={row.name}>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-text font-medium truncate" title={row.name}>
+              <span className="text-text truncate font-medium" title={row.name}>
                 {row.name}
               </span>
               <span className="text-text-muted tabular-nums">
                 {display}
-                <span className="ml-2 text-xs text-text-muted">({pct.toFixed(0)}%)</span>
+                <span className="text-text-muted ml-2 text-xs">({pct.toFixed(0)}%)</span>
               </span>
             </div>
-            <div className="mt-1 h-1 w-full bg-bg-hover rounded-full overflow-hidden">
-              <div className="h-full bg-accent" style={{ width: `${Math.min(100, pct)}%` }} />
+            <div className="bg-bg-hover mt-1 h-1 w-full overflow-hidden rounded-full">
+              <div className="bg-accent h-full" style={{ width: `${Math.min(100, pct)}%` }} />
             </div>
           </div>
         );
@@ -221,11 +222,11 @@ export const OverallTab: React.FC = () => {
   const allowedModels = info?.allowedModels ?? [];
 
   return (
-    <div className="p-6 transition-all duration-300 space-y-6">
+    <div className="space-y-6 p-6 transition-all duration-300">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Overall</h1>
-          <p className="text-[15px] text-text-secondary m-0">
+          <h1 className="font-heading text-text m-0 mb-2 text-3xl font-bold">Overall</h1>
+          <p className="text-text-secondary m-0 text-[15px]">
             Access, usage, and quota summary for your API key.
           </p>
         </div>
@@ -251,11 +252,11 @@ export const OverallTab: React.FC = () => {
         <Card title="Key" extra={<Key size={16} className="text-text-muted" />} className="min-w-0">
           <dl className="grid grid-cols-1 gap-3 text-sm">
             <div className="flex">
-              <dt className="w-32 text-text-muted">Name</dt>
-              <dd className="font-mono text-text break-all">{info?.keyName || '—'}</dd>
+              <dt className="text-text-muted w-32">Name</dt>
+              <dd className="text-text font-mono break-all">{info?.keyName || '—'}</dd>
             </div>
             <div className="flex">
-              <dt className="w-32 text-text-muted">Quota</dt>
+              <dt className="text-text-muted w-32">Quota</dt>
               <dd className="text-text">
                 {info?.quotaNames && info.quotaNames.length > 0
                   ? info.quotaNames.join(', ')
@@ -264,7 +265,7 @@ export const OverallTab: React.FC = () => {
             </div>
             {info?.comment && (
               <div className="flex">
-                <dt className="w-32 text-text-muted">Comment</dt>
+                <dt className="text-text-muted w-32">Comment</dt>
                 <dd className="text-text">{info.comment}</dd>
               </div>
             )}
@@ -277,9 +278,9 @@ export const OverallTab: React.FC = () => {
           className="min-w-0"
         >
           {loading && !quotas && !quotaError ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-text-muted text-sm">Loading…</p>
           ) : quotaError ? (
-            <div className="flex items-start gap-2 text-sm text-warning">
+            <div className="text-warning flex items-start gap-2 text-sm">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
               <span>
                 Could not load quota status. If this key has a quota assigned, its current usage is
@@ -287,7 +288,7 @@ export const OverallTab: React.FC = () => {
               </span>
             </div>
           ) : !quotas || quotas.length === 0 ? (
-            <p className="text-sm text-text-muted">
+            <p className="text-text-muted text-sm">
               No quota is assigned to this key — requests are unrestricted by quota policy.
             </p>
           ) : (
@@ -311,7 +312,7 @@ export const OverallTab: React.FC = () => {
           className="min-w-0"
         >
           {allowedProviders.length === 0 ? (
-            <p className="text-sm text-text-muted">
+            <p className="text-text-muted text-sm">
               Any provider (unrestricted) — this key can route to every provider the gateway knows.
             </p>
           ) : (
@@ -319,7 +320,7 @@ export const OverallTab: React.FC = () => {
               {allowedProviders.map((p) => (
                 <span
                   key={p}
-                  className="px-2 py-1 text-xs font-mono rounded-md bg-bg-hover border border-border text-text"
+                  className="bg-bg-hover border-border text-text rounded-md border px-2 py-1 font-mono text-xs"
                 >
                   {p}
                 </span>
@@ -334,7 +335,7 @@ export const OverallTab: React.FC = () => {
           className="min-w-0"
         >
           {allowedModels.length === 0 ? (
-            <p className="text-sm text-text-muted">
+            <p className="text-text-muted text-sm">
               Any model (unrestricted) — this key can request every model alias configured on the
               gateway.
             </p>
@@ -343,7 +344,7 @@ export const OverallTab: React.FC = () => {
               {allowedModels.map((m) => (
                 <span
                   key={m}
-                  className="px-2 py-1 text-xs font-mono rounded-md bg-bg-hover border border-border text-text"
+                  className="bg-bg-hover border-border text-text rounded-md border px-2 py-1 font-mono text-xs"
                 >
                   {m}
                 </span>
@@ -361,7 +362,7 @@ export const OverallTab: React.FC = () => {
         {loading && !summary ? (
           <Skeleton height={120} className="w-full" />
         ) : !summary ? (
-          <p className="text-sm text-text-muted">No usage recorded in this range.</p>
+          <p className="text-text-muted text-sm">No usage recorded in this range.</p>
         ) : (
           <div
             className="grid gap-6"

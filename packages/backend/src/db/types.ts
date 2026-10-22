@@ -1,4 +1,5 @@
-import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
+import { InferInsertModel, InferSelectModel } from 'drizzle-orm';
+
 import * as schema from '../../drizzle/schema';
 
 export type RequestUsage = InferSelectModel<typeof schema.requestUsage>;

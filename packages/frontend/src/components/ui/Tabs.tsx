@@ -1,5 +1,5 @@
-import React from 'react';
 import { clsx } from 'clsx';
+import React from 'react';
 
 interface TabItem<V extends string = string> {
   value: V;
@@ -43,8 +43,8 @@ export function Tabs<V extends string = string>({
       role="tablist"
       aria-label={ariaLabel}
       className={clsx(
-        'flex items-center gap-0.5 sm:gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
-        variant === 'underline' && 'border-b border-border-glass',
+        'flex [scrollbar-width:none] items-center gap-0.5 overflow-x-auto [-ms-overflow-style:none] sm:gap-1 [&::-webkit-scrollbar]:hidden',
+        variant === 'underline' && 'border-border-glass border-b',
         className
       )}
     >
@@ -62,16 +62,16 @@ export function Tabs<V extends string = string>({
             onKeyDown={(e) => handleKeyDown(e, idx)}
             disabled={item.disabled}
             className={clsx(
-              'flex-shrink-0 inline-flex items-center gap-1.5 sm:gap-2 font-body text-xs sm:text-sm font-medium transition-all duration-fast whitespace-nowrap focus-visible:outline-2 focus-visible:outline focus-visible:outline-primary focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
-              variant === 'underline' && 'px-3 py-2 sm:px-4 sm:py-2.5 border-b-2 -mb-px',
+              'font-body duration-fast focus-visible:outline-primary inline-flex flex-shrink-0 items-center gap-1.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40 sm:gap-2 sm:text-sm',
+              variant === 'underline' && '-mb-px border-b-2 px-3 py-2 sm:px-4 sm:py-2.5',
               variant === 'underline' && active && 'text-primary border-primary',
               variant === 'underline' &&
                 !active &&
-                'text-text-secondary border-transparent hover:text-text',
-              variant === 'pills' && 'px-3 py-1.5 sm:px-3.5 rounded-md',
+                'text-text-secondary hover:text-text border-transparent',
+              variant === 'pills' && 'rounded-md px-3 py-1.5 sm:px-3.5',
               variant === 'pills' &&
                 active &&
-                'bg-bg-glass text-primary border border-border-glass',
+                'bg-bg-glass text-primary border-border-glass border',
               variant === 'pills' &&
                 !active &&
                 'text-text-secondary hover:bg-bg-hover hover:text-text'

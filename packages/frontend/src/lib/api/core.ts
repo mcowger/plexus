@@ -1,6 +1,7 @@
 import { isOAuthPlaceholderUrl } from '@plexus/shared';
-import { formatNumber, formatPoints } from '../format';
+
 import type { Principal } from '../../types/settings';
+import { formatNumber, formatPoints } from '../format';
 
 export const API_BASE = ''; // Proxied via server.ts
 

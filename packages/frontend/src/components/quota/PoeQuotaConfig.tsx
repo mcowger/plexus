@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface PoeQuotaConfigProps {
@@ -14,7 +15,7 @@ export const PoeQuotaConfig: React.FC<PoeQuotaConfigProps> = ({ options, onChang
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input

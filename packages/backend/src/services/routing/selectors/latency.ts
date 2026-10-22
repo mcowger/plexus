@@ -1,8 +1,7 @@
-import { Selector, CandidateStats } from './base';
-import { ModelTarget } from '../../../config';
-import { UsageStorageService } from '../../observability/usage-storage';
+import { getConfig, ModelTarget } from '../../../config';
 import { logger } from '../../../utils/logger';
-import { getConfig } from '../../../config';
+import { UsageStorageService } from '../../observability/usage-storage';
+import { CandidateStats, Selector } from './base';
 
 export class LatencySelector extends Selector {
   private storage: UsageStorageService;

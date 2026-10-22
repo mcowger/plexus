@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
+
 import Fastify from 'fastify';
-import { registerModelsRoute } from '../models';
-import { setConfigForTesting, PlexusConfig } from '../../../config';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { PlexusConfig, setConfigForTesting } from '../../../config';
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';
+import { registerModelsRoute } from '../models';
 
 const FIXTURES = path.join(__dirname, '../../../utils/__tests__/fixtures');
 const openrouterMetadataFixture = path.join(FIXTURES, 'openrouter-metadata-sample.json');

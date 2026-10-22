@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   extractRecreationInserts,
   rewriteTableRecreationInserts,
-  validateTableRecreationInserts,
-  snapshotTableColumns,
   type Snapshot,
+  snapshotTableColumns,
+  validateTableRecreationInserts,
 } from '../lib/sqlite-migration-rewrite';
 
 /**

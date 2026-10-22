@@ -4,8 +4,8 @@
  * Draggable card rendering an AreaChart of requests, errors, and tokens over time.
  */
 
-import React from 'react';
 import { Clock } from 'lucide-react';
+import React from 'react';
 import {
   Area,
   AreaChart,
@@ -15,9 +15,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { SortableCard } from '../../ui/SortableCard';
-import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+
 import { formatNumber, formatTokens } from '../../../lib/format';
+import { AnalyzeButton } from '../../analytics/AnalyzeButton';
+import { SortableCard } from '../../ui/SortableCard';
 import type { MinuteBucket } from '../liveTypes';
 
 export interface TimelineCardProps {
@@ -55,11 +56,11 @@ export const TimelineCard: React.FC<TimelineCardProps> = ({
         style: { cursor: 'pointer' },
         className: 'min-w-0 hover:shadow-lg hover:border-primary/30 transition-all',
         content: loading ? (
-          <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+          <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
             Loading...
           </div>
         ) : minuteSeries.length === 0 ? (
-          <div className="h-48 sm:h-56 flex items-center justify-center text-text-secondary">
+          <div className="text-text-secondary flex h-48 items-center justify-center sm:h-56">
             No requests in the last {liveWindowMinutes} minutes
           </div>
         ) : (

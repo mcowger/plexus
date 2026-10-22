@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { setupProviderHeaders } from '../provider-request-headers';
 
 describe('setupProviderHeaders', () => {

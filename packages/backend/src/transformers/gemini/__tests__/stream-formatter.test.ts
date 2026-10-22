@@ -1,5 +1,6 @@
-import { test, expect, describe } from 'vitest';
 import { createParser, EventSourceMessage } from 'eventsource-parser';
+import { describe, expect, test } from 'vitest';
+
 import { formatGeminiStream } from '../stream-formatter';
 
 async function readAllChunks(stream: ReadableStream): Promise<any[]> {

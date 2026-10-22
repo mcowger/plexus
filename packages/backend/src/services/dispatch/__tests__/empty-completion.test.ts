@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+
+import { ResponsesTransformer } from '../../../transformers/responses';
+import type { UnifiedChatResponse } from '../../../types/unified';
 import {
   createStreamVisibilityTracker,
   EMPTY_COMPLETION_REASON,
@@ -9,8 +12,6 @@ import {
   observeStreamChunk,
   type StreamVisibilityTracker,
 } from '../empty-completion';
-import { ResponsesTransformer } from '../../../transformers/responses';
-import type { UnifiedChatResponse } from '../../../types/unified';
 
 // A bare, all-absent UnifiedChatResponse — the "truly empty" fixture shared
 // by several tests below.

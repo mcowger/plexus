@@ -26,12 +26,20 @@
  *   PLEXUS_EXCLUDE_OAUTH        Exclude OAuth providers (default: true)
  */
 
-import { createWriteStream, unlinkSync, rmSync, existsSync, mkdirSync, readFileSync } from 'fs';
-import { mkdtempSync } from 'fs';
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { basename, join } from 'path';
-import { pipeline } from 'stream/promises';
 import readline from 'readline';
+import { pipeline } from 'stream/promises';
+
 import { deriveDevPort } from './dev-port-allocator';
 
 // ---------------------------------------------------------------------------

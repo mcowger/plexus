@@ -1,7 +1,8 @@
 import { Edit2, Trash2 } from 'lucide-react';
+
+import type { Provider } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { Switch } from '../ui/Switch';
-import type { Provider } from '../../lib/api';
 
 interface Props {
   providers: Provider[];
@@ -30,7 +31,7 @@ export function ProviderList({
       {/* Mobile cards */}
       <div className="space-y-3 p-3 md:hidden">
         {providers.length === 0 ? (
-          <div className="rounded-lg border border-border-glass bg-bg-subtle p-4 text-center text-sm text-text-secondary">
+          <div className="border-border-glass bg-bg-subtle text-text-secondary rounded-lg border p-4 text-center text-sm">
             No providers configured
           </div>
         ) : (
@@ -38,15 +39,15 @@ export function ProviderList({
             <article
               key={p.id}
               onClick={() => onEdit(p)}
-              className="rounded-lg border border-border-glass bg-bg-card p-3 transition-colors hover:border-primary/30 hover:bg-bg-hover"
+              className="border-border-glass bg-bg-card hover:border-primary/30 hover:bg-bg-hover rounded-lg border p-3 transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Edit2 size={12} className="shrink-0 text-text-muted" />
-                    <h3 className="truncate text-sm font-semibold text-text">{p.id}</h3>
+                    <Edit2 size={12} className="text-text-muted shrink-0" />
+                    <h3 className="text-text truncate text-sm font-semibold">{p.id}</h3>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-text-secondary">{p.name}</p>
+                  <p className="text-text-secondary mt-0.5 truncate text-xs">{p.name}</p>
                 </div>
                 <div onClick={(e) => e.stopPropagation()}>
                   <Switch
@@ -57,18 +58,18 @@ export function ProviderList({
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-md bg-bg-subtle p-2">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">Models</div>
+                <div className="bg-bg-subtle rounded-md p-2">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">Models</div>
                   <div className="text-text">{countModels(p)}</div>
                 </div>
-                <div className="rounded-md bg-bg-subtle p-2">
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted">
+                <div className="bg-bg-subtle rounded-md p-2">
+                  <div className="text-text-muted text-[10px] tracking-wider uppercase">
                     Quota/Balance
                   </div>
                   <div className="mt-1 min-h-5">{getQuotaDisplay(p) || '-'}</div>
                 </div>
               </div>
-              <div className="mt-3 flex justify-end border-t border-border-glass pt-3">
+              <div className="border-border-glass mt-3 flex justify-end border-t pt-3">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -88,26 +89,26 @@ export function ProviderList({
 
       {/* Desktop table */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse font-body text-[13px]">
+        <table className="font-body w-full border-collapse text-[13px]">
           <thead>
             <tr>
               <th
-                className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                 style={{ paddingLeft: '24px' }}
               >
                 ID / Name
               </th>
-              <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                 Status
               </th>
-              <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                 Models
               </th>
-              <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
+              <th className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase">
                 Quota/Balance
               </th>
               <th
-                className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
+                className="border-border-glass bg-bg-hover text-text-secondary border-b px-4 py-3 text-left text-[11px] font-semibold tracking-wider uppercase"
                 style={{ paddingRight: '24px', textAlign: 'right' }}
               >
                 Actions
@@ -123,7 +124,7 @@ export function ProviderList({
                 className="hover:bg-bg-hover"
               >
                 <td
-                  className="px-4 py-3 text-left border-b border-border-glass text-text"
+                  className="border-border-glass text-text border-b px-4 py-3 text-left"
                   style={{ paddingLeft: '24px' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -134,7 +135,7 @@ export function ProviderList({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                   <div onClick={(e) => e.stopPropagation()}>
                     <Switch
                       checked={p.enabled !== false}
@@ -143,14 +144,14 @@ export function ProviderList({
                     />
                   </div>
                 </td>
-                <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                   {countModels(p)}
                 </td>
-                <td className="px-4 py-3 text-left border-b border-border-glass text-text">
+                <td className="border-border-glass text-text border-b px-4 py-3 text-left">
                   {getQuotaDisplay(p)}
                 </td>
                 <td
-                  className="px-4 py-3 text-left border-b border-border-glass text-text"
+                  className="border-border-glass text-text border-b px-4 py-3 text-left"
                   style={{ paddingRight: '24px', textAlign: 'right' }}
                 >
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

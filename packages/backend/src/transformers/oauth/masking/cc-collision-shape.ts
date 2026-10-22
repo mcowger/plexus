@@ -31,8 +31,8 @@
  * caller will actually execute.
  */
 
-import { CC_TOOL_REFERENCE, matchesReferenceShape } from './cc-reference-tools';
 import { namespaceNonCcToolName } from './cc-namespace-shape';
+import { CC_TOOL_REFERENCE, matchesReferenceShape } from './cc-reference-tools';
 import type { RenamePair, ToolDescriptor, ToolShape } from './types';
 
 function requiredParamsOf(tool: ToolDescriptor): string[] | undefined {

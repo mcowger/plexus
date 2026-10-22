@@ -1,18 +1,19 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import formbody from '@fastify/formbody';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 import { getConfig } from '../../config';
-import { attachPlexusApiKeyAuth, isRequestIpAllowed, validatePlexusApiKey } from '../../utils/auth';
-import { logger } from '../../utils/logger';
-import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
-import { getClientIp } from '../../utils/ip';
-import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
-import { registerPlexusMcpRoutes } from './plexus';
+import { MCP_OAUTH_ACCESS_TOKEN_PREFIX } from '../../services/mcp-oauth/plexus-idp-provider';
 import { getMcpAuthProvider } from '../../services/mcp-oauth/provider-factory';
 import {
   getMcpProtectedResourceMetadataUrl,
   getMcpServerNameFromRequest,
 } from '../../services/mcp-oauth/url';
-import { MCP_OAUTH_ACCESS_TOKEN_PREFIX } from '../../services/mcp-oauth/plexus-idp-provider';
+import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
+import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
+import { attachPlexusApiKeyAuth, isRequestIpAllowed, validatePlexusApiKey } from '../../utils/auth';
+import { getClientIp } from '../../utils/ip';
+import { logger } from '../../utils/logger';
+import { registerPlexusMcpRoutes } from './plexus';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 

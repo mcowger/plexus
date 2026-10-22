@@ -1,9 +1,10 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import { registerUsageRoutes } from '../usage';
-import { UsageStorageService } from '../../../services/observability/usage-storage';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../../../db/client';
 import { runMigrations } from '../../../db/migrate';
+import { UsageStorageService } from '../../../services/observability/usage-storage';
+import { registerUsageRoutes } from '../usage';
 
 describe('Usage summary route', () => {
   let fastify: ReturnType<typeof Fastify>;

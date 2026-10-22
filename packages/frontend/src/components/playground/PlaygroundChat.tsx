@@ -1,35 +1,35 @@
 import {
   ActionBarPrimitive,
   AssistantRuntimeProvider,
-  AuiIf,
   AttachmentPrimitive,
+  AuiIf,
+  type ChatModelAdapter,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePartPrimitive,
   MessagePrimitive,
   SimpleImageAttachmentAdapter,
-  ThreadPrimitive,
-  useLocalRuntime,
-  type ChatModelAdapter,
   type ThreadAssistantMessagePart,
   type ThreadMessage,
+  ThreadPrimitive,
+  useLocalRuntime,
 } from '@assistant-ui/react';
 import { MarkdownTextPrimitive } from '@assistant-ui/react-markdown';
 import {
-  Type,
-  normalizeContext,
   type Api,
   type AssistantMessage,
   type Context,
+  type ImageContent,
   type JsonObject,
   type Message,
   type Model,
+  normalizeContext,
   type ProviderStreams,
   type TextContent,
-  type ImageContent,
   type Tool,
   type ToolCall,
   type ToolResultMessage,
+  Type,
 } from '@earendil-works/pi-ai';
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy';
 import { googleGenerativeAIApi } from '@earendil-works/pi-ai/api/google-generative-ai.lazy';
@@ -37,14 +37,12 @@ import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy';
 import { ArrowDown, Copy, Paperclip, SendHorizontal, Square, Wrench, X } from 'lucide-react';
 import { memo, useMemo, useRef, useState } from 'react';
+
 import type { KeyConfig } from '../../lib/api';
 import { generateUUID } from '../../lib/clipboard';
 
 export type PlaygroundApi =
-  | 'openai-completions'
-  | 'openai-responses'
-  | 'anthropic-messages'
-  | 'gemini';
+  'openai-completions' | 'openai-responses' | 'anthropic-messages' | 'gemini';
 export type ToolMode = 'off' | 'sample-tools';
 
 export type PlaygroundToolCall = {
@@ -497,28 +495,28 @@ const ToolCard = ({
 }: {
   part: Extract<ThreadAssistantMessagePart, { type: 'tool-call' }>;
 }) => (
-  <div className="my-2 overflow-hidden rounded-md border border-primary/40 bg-slate-950/60">
-    <div className="flex items-center gap-2 border-b border-primary/20 bg-primary/10 px-3 py-2">
-      <Wrench className="h-3.5 w-3.5 text-primary" />
-      <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
+  <div className="border-primary/40 my-2 overflow-hidden rounded-md border bg-slate-950/60">
+    <div className="border-primary/20 bg-primary/10 flex items-center gap-2 border-b px-3 py-2">
+      <Wrench className="text-primary h-3.5 w-3.5" />
+      <span className="text-primary font-mono text-[10px] font-bold tracking-wider uppercase">
         Tool
       </span>
-      <span className="font-mono text-xs font-semibold text-text">{part.toolName}</span>
+      <span className="text-text font-mono text-xs font-semibold">{part.toolName}</span>
     </div>
     <div className="grid gap-2 p-2 sm:grid-cols-2">
       <div>
-        <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+        <div className="text-text-muted mb-1 font-mono text-[9px] tracking-wider uppercase">
           Arguments
         </div>
-        <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950/70 p-2 font-mono text-[10px] text-text-secondary">
+        <pre className="text-text-secondary max-h-32 overflow-auto rounded bg-slate-950/70 p-2 font-mono text-[10px] break-words whitespace-pre-wrap">
           {JSON.stringify(part.args, null, 2)}
         </pre>
       </div>
       <div>
-        <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-text-muted">
+        <div className="text-text-muted mb-1 font-mono text-[9px] tracking-wider uppercase">
           Result
         </div>
-        <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950/70 p-2 font-mono text-[10px] text-text-secondary">
+        <pre className="text-text-secondary max-h-32 overflow-auto rounded bg-slate-950/70 p-2 font-mono text-[10px] break-words whitespace-pre-wrap">
           {part.result === undefined ? 'Running…' : String(part.result)}
         </pre>
       </div>
@@ -531,19 +529,19 @@ const AssistantParts = () => (
     {({ part }) => {
       if (part.type === 'text') {
         if (part.status?.type === 'running' && part.text === '') {
-          return <div className="py-1 text-text-muted">Thinking…</div>;
+          return <div className="text-text-muted py-1">Thinking…</div>;
         }
         return (
-          <MarkdownTextPrimitive className="space-y-2 break-words [&_a]:text-primary [&_code]:rounded [&_code]:bg-slate-950/70 [&_code]:px-1 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-slate-950/70 [&_pre]:p-3" />
+          <MarkdownTextPrimitive className="[&_a]:text-primary space-y-2 break-words [&_code]:rounded [&_code]:bg-slate-950/70 [&_code]:px-1 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-slate-950/70 [&_pre]:p-3" />
         );
       }
       if (part.type === 'reasoning') {
         return (
-          <details className="my-2 rounded-md border border-border bg-slate-950/30 px-3 py-2 text-text-secondary">
-            <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-text-muted">
+          <details className="border-border text-text-secondary my-2 rounded-md border bg-slate-950/30 px-3 py-2">
+            <summary className="text-text-muted cursor-pointer font-mono text-[10px] tracking-wider uppercase">
               Reasoning
             </summary>
-            <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[11px]">
+            <pre className="mt-2 font-mono text-[11px] break-words whitespace-pre-wrap">
               {part.text}
             </pre>
           </details>
@@ -559,7 +557,7 @@ const AssistantParts = () => (
 
 const UserMessage = () => (
   <MessagePrimitive.Root className="mx-auto flex w-full max-w-3xl justify-end px-3 py-2">
-    <div className="max-w-[85%] rounded-lg bg-primary px-3 py-2 text-sm leading-relaxed text-slate-950">
+    <div className="bg-primary max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed text-slate-950">
       <MessagePrimitive.Parts>
         {({ part }) => {
           if (part.type === 'text') return <MessagePartPrimitive.Text />;
@@ -575,20 +573,20 @@ const UserMessage = () => (
 
 const AssistantMessageView = () => (
   <MessagePrimitive.Root className="group mx-auto w-full max-w-3xl px-3 py-2">
-    <div className="max-w-[92%] rounded-lg border border-border bg-bg-subtle px-3 py-2 text-sm leading-relaxed text-text">
+    <div className="border-border bg-bg-subtle text-text max-w-[92%] rounded-lg border px-3 py-2 text-sm leading-relaxed">
       <AssistantParts />
       <AuiIf
         condition={(state) =>
           state.message.status?.type === 'incomplete' && state.message.status.reason === 'error'
         }
       >
-        <ErrorPrimitive.Root className="mt-2 rounded-md border border-danger/30 bg-danger/10 p-2 text-xs text-danger">
+        <ErrorPrimitive.Root className="border-danger/30 bg-danger/10 text-danger mt-2 rounded-md border p-2 text-xs">
           <ErrorPrimitive.Message />
         </ErrorPrimitive.Root>
       </AuiIf>
     </div>
     <ActionBarPrimitive.Root className="mt-1 flex h-7 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-      <ActionBarPrimitive.Copy className="rounded p-1 text-text-muted hover:bg-bg-hover hover:text-text">
+      <ActionBarPrimitive.Copy className="text-text-muted hover:bg-bg-hover hover:text-text rounded p-1">
         <Copy className="h-3.5 w-3.5" />
       </ActionBarPrimitive.Copy>
     </ActionBarPrimitive.Root>
@@ -596,16 +594,16 @@ const AssistantMessageView = () => (
 );
 
 const Composer = () => (
-  <div className="border-t border-border bg-bg-subtle/90 p-3">
-    <ComposerPrimitive.Root className="mx-auto max-w-3xl rounded-lg border border-border bg-slate-950/70 p-2">
+  <div className="border-border bg-bg-subtle/90 border-t p-3">
+    <ComposerPrimitive.Root className="border-border mx-auto max-w-3xl rounded-lg border bg-slate-950/70 p-2">
       <ComposerPrimitive.Attachments>
         {({ attachment }) => (
-          <AttachmentPrimitive.Root className="mb-2 inline-flex items-center gap-2 rounded border border-border bg-bg-subtle p-1.5 text-xs text-text-secondary">
+          <AttachmentPrimitive.Root className="border-border bg-bg-subtle text-text-secondary mb-2 inline-flex items-center gap-2 rounded border p-1.5 text-xs">
             {attachment.content?.[0]?.type === 'image' && (
               <img src={attachment.content[0].image} className="h-10 w-10 rounded object-cover" />
             )}
             <AttachmentPrimitive.Name />
-            <AttachmentPrimitive.Remove className="rounded p-1 hover:bg-bg-hover">
+            <AttachmentPrimitive.Remove className="hover:bg-bg-hover rounded p-1">
               <X className="h-3 w-3" />
             </AttachmentPrimitive.Remove>
           </AttachmentPrimitive.Root>
@@ -614,20 +612,20 @@ const Composer = () => (
       <ComposerPrimitive.Input
         rows={2}
         placeholder="Send a test prompt through Plexus…"
-        className="max-h-40 min-h-14 w-full resize-none bg-transparent px-1 py-1 text-sm text-text outline-none placeholder:text-text-muted"
+        className="text-text placeholder:text-text-muted max-h-40 min-h-14 w-full resize-none bg-transparent px-1 py-1 text-sm outline-none"
         style={{ outline: 'none', boxShadow: 'none' }}
       />
       <div className="mt-1 flex items-center justify-between">
-        <ComposerPrimitive.AddAttachment className="rounded-md p-2 text-text-muted hover:bg-bg-hover hover:text-text">
+        <ComposerPrimitive.AddAttachment className="text-text-muted hover:bg-bg-hover hover:text-text rounded-md p-2">
           <Paperclip className="h-4 w-4" />
         </ComposerPrimitive.AddAttachment>
         <ThreadPrimitive.If running={false}>
-          <ComposerPrimitive.Send className="rounded-md bg-primary p-2 text-slate-950 hover:bg-primary-hover disabled:opacity-40">
+          <ComposerPrimitive.Send className="bg-primary hover:bg-primary-hover rounded-md p-2 text-slate-950 disabled:opacity-40">
             <SendHorizontal className="h-4 w-4" />
           </ComposerPrimitive.Send>
         </ThreadPrimitive.If>
         <ThreadPrimitive.If running>
-          <ComposerPrimitive.Cancel className="rounded-md bg-danger p-2 text-white hover:opacity-90">
+          <ComposerPrimitive.Cancel className="bg-danger rounded-md p-2 text-white hover:opacity-90">
             <Square className="h-4 w-4 fill-current" />
           </ComposerPrimitive.Cancel>
         </ThreadPrimitive.If>
@@ -640,15 +638,15 @@ const PlaygroundThread = ({
   selectedKey,
   selectedModel,
 }: Pick<PlaygroundChatProps, 'selectedKey' | 'selectedModel'>) => (
-  <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-bg">
+  <ThreadPrimitive.Root className="border-border bg-bg flex h-full min-h-0 flex-col overflow-hidden rounded-lg border">
     <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <ThreadPrimitive.Empty>
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center text-sm text-text-secondary">
-          <div className="mb-3 rounded-full border border-primary/30 bg-primary/10 p-3 text-primary">
+        <div className="text-text-secondary flex flex-1 flex-col items-center justify-center px-6 py-16 text-center text-sm">
+          <div className="border-primary/30 bg-primary/10 text-primary mb-3 rounded-full border p-3">
             <Wrench className="h-5 w-5" />
           </div>
-          <div className="font-medium text-text">Plexus simulation is active</div>
-          <div className="mt-1 text-xs text-text-muted">
+          <div className="text-text font-medium">Plexus simulation is active</div>
+          <div className="text-text-muted mt-1 text-xs">
             Key “{selectedKey.key}” · model “{selectedModel}”
           </div>
         </div>
@@ -662,7 +660,7 @@ const PlaygroundThread = ({
           ) : null
         }
       </ThreadPrimitive.Messages>
-      <ThreadPrimitive.ScrollToBottom className="sticky bottom-2 mx-auto rounded-full border border-border bg-bg-subtle p-2 text-text-secondary shadow-lg hover:text-text disabled:hidden">
+      <ThreadPrimitive.ScrollToBottom className="border-border bg-bg-subtle text-text-secondary hover:text-text sticky bottom-2 mx-auto rounded-full border p-2 shadow-lg disabled:hidden">
         <ArrowDown className="h-4 w-4" />
       </ThreadPrimitive.ScrollToBottom>
     </ThreadPrimitive.Viewport>

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { getDatabase, getSchema } from './client';
+
 import type {
   BackgroundExplorationConfig,
   CompactionSettingsConfig,
@@ -9,6 +9,7 @@ import type {
   StallConfigType,
   TimeoutConfig,
 } from '../config';
+import { getDatabase, getSchema } from './client';
 import { now, parseJson, toJson } from './repository-utils';
 
 export class SystemSettingsRepository {

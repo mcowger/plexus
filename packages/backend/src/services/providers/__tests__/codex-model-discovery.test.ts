@@ -20,7 +20,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
+import type { ProviderConfig } from '../../../config';
 import { CodexVersionService } from '../../oauth/codex-version-service';
 import { OAuthAuthManager } from '../../oauth/oauth-auth-manager';
 import {
@@ -29,7 +31,6 @@ import {
   discoverProviderModels,
   listCodexOAuthModels,
 } from '../provider-model-discovery';
-import type { ProviderConfig } from '../../../config';
 
 const ACCOUNT_ID = 'acc_models_4242';
 

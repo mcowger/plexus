@@ -1,6 +1,6 @@
-import type { QuotaStatusEntry } from './api';
-import { formatCostIn, formatNumber, type FormatCostInOptions } from './format';
 import type { MeterStatus } from '../types/quota';
+import type { QuotaStatusEntry } from './api';
+import { formatCostIn, type FormatCostInOptions, formatNumber } from './format';
 
 type CostDisplayOptions = Pick<FormatCostInOptions, 'currency' | 'rate' | 'symbol'>;
 

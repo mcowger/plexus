@@ -1,29 +1,20 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { api } from '../lib/api';
-import type {
-  CompactionSettings as CompactionConfig,
-  McpOAuthSettings as McpOAuthConfig,
-} from '../lib/api';
-import { useToast } from '../contexts/ToastContext';
-import { PageHeader } from '../components/layout/PageHeader';
-import { PageContainer } from '../components/layout/PageContainer';
-import type { CardLayout } from '../types/card';
-import { DEFAULT_CARD_ORDER, LAYOUT_STORAGE_KEY } from '../types/card';
-import { DisplayPreferencesCard } from '../components/config/DisplayPreferencesCard';
-import { FailoverSettings } from '../components/config/FailoverSettings';
-import { TraceCaptureSettings } from '../components/config/TraceCaptureSettings';
-import { CooldownSettings } from '../components/config/CooldownSettings';
-import { TimeoutSettings } from '../components/config/TimeoutSettings';
-import { StallDetectionSettings } from '../components/config/StallDetectionSettings';
-import { CompactionSettings } from '../components/config/CompactionSettings';
-import { McpOAuthSettings } from '../components/config/McpOAuthSettings';
-import { ExplorationSettings } from '../components/config/ExplorationSettings';
-import { NetworkSettings } from '../components/config/NetworkSettings';
-import { ModelMetadataCard } from '../components/config/ModelMetadataCard';
+
 import { BackupRestoreCard } from '../components/config/BackupRestoreCard';
 import { CardLayoutCard } from '../components/config/CardLayoutCard';
+import { CompactionSettings } from '../components/config/CompactionSettings';
 import { ConfigurationSnapshot } from '../components/config/ConfigurationSnapshot';
+import { CooldownSettings } from '../components/config/CooldownSettings';
+import { DisplayPreferencesCard } from '../components/config/DisplayPreferencesCard';
+import { ExplorationSettings } from '../components/config/ExplorationSettings';
+import { FailoverSettings } from '../components/config/FailoverSettings';
+import { McpOAuthSettings } from '../components/config/McpOAuthSettings';
+import { ModelMetadataCard } from '../components/config/ModelMetadataCard';
+import { NetworkSettings } from '../components/config/NetworkSettings';
+import { StallDetectionSettings } from '../components/config/StallDetectionSettings';
+import { TimeoutSettings } from '../components/config/TimeoutSettings';
+import { TraceCaptureSettings } from '../components/config/TraceCaptureSettings';
 import {
   DEFAULT_BACKGROUND_EXPLORATION,
   DEFAULT_COMPACTION_CONFIG,
@@ -42,6 +33,16 @@ import type {
   StallConfig,
   TimeoutConfig,
 } from '../components/config/types';
+import { PageContainer } from '../components/layout/PageContainer';
+import { PageHeader } from '../components/layout/PageHeader';
+import { useToast } from '../contexts/ToastContext';
+import { api } from '../lib/api';
+import type {
+  CompactionSettings as CompactionConfig,
+  McpOAuthSettings as McpOAuthConfig,
+} from '../lib/api';
+import type { CardLayout } from '../types/card';
+import { DEFAULT_CARD_ORDER, LAYOUT_STORAGE_KEY } from '../types/card';
 
 export const Config = () => {
   const toast = useToast();
@@ -627,8 +628,7 @@ export const Config = () => {
       const results = await Promise.all(tasks);
       const updatedBg = results[0] as Awaited<ReturnType<typeof api.patchBackgroundExploration>>;
       const updatedRates = results[1] as
-        | Awaited<ReturnType<typeof api.patchExplorationRates>>
-        | undefined;
+        Awaited<ReturnType<typeof api.patchExplorationRates>> | undefined;
 
       setBgExploration(updatedBg);
       setBgStalenessInput(String(updatedBg.stalenessThresholdSeconds));
@@ -890,7 +890,7 @@ export const Config = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       <PageHeader
         title="Configuration"
         subtitle="View current system configuration (read-only). Use the Providers, Models, and Keys pages to make changes."

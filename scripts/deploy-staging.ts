@@ -16,9 +16,9 @@
  *   PLEXUS_TARGETPLATFORM           Docker target platform (linux/amd64)
  */
 
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 function requireEnv(name: string): string {
   const value = process.env[name];

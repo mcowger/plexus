@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Input } from '../ui/Input';
 
 export interface MiniMaxQuotaConfigProps {
@@ -14,7 +15,7 @@ export const MiniMaxQuotaConfig: React.FC<MiniMaxQuotaConfigProps> = ({ options,
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Group ID <span className="text-danger">*</span>
         </label>
         <Input
@@ -25,7 +26,7 @@ export const MiniMaxQuotaConfig: React.FC<MiniMaxQuotaConfigProps> = ({ options,
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           _token Cookie <span className="text-danger">*</span>
         </label>
         <Input
@@ -34,7 +35,7 @@ export const MiniMaxQuotaConfig: React.FC<MiniMaxQuotaConfigProps> = ({ options,
           onChange={(e) => handleChange('token', e.target.value)}
           placeholder="Paste _token cookie value"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Treated as a password. Used to query MiniMax balance.
         </span>
       </div>

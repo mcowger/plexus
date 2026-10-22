@@ -1,42 +1,43 @@
-import React from 'react';
 import { clsx } from 'clsx';
 import {
-  Trash2,
+  AlertTriangle,
+  Ban,
+  Braces,
+  BrainCog,
   Bug,
+  CheckCircle,
+  ChevronDown,
+  CirclePause,
+  CloudDownload,
+  CloudUpload,
+  Copy,
+  Eye,
+  Hammer,
+  Languages,
+  MessagesSquare,
+  MoveHorizontal,
+  Octagon,
+  PackageOpen,
+  PencilLine,
+  Pi,
+  Plane,
+  PlugZap,
+  RotateCcw,
+  RulerDimensionLine,
+  ScanSearch,
+  Timer,
+  Trash2,
+  Wrench,
+  XCircle,
   Zap,
   ZapOff,
-  AlertTriangle,
-  Languages,
-  MoveHorizontal,
-  CloudUpload,
-  CloudDownload,
-  BrainCog,
-  PackageOpen,
-  Copy,
-  Wrench,
-  MessagesSquare,
-  PlugZap,
-  CirclePause,
-  Octagon,
-  Hammer,
-  RulerDimensionLine,
-  ChevronDown,
-  Braces,
-  RotateCcw,
-  PencilLine,
-  Plane,
-  Eye,
-  ScanSearch,
-  Ban,
-  Timer,
-  CheckCircle,
-  XCircle,
-  Pi,
 } from 'lucide-react';
-import { CostToolTip } from '../ui/CostToolTip';
-import { PerformanceToolTip } from '../ui/PerformanceToolTip';
-import { useCurrency } from '../../lib/CurrencyContext';
+import React from 'react';
+
 import { formatLargeNumber } from '../../lib/api';
+import { formatApiTypeLabel } from '../../lib/apiFormats';
+import { copyToClipboard, isClipboardAvailable } from '../../lib/clipboard';
+import { useCurrency } from '../../lib/CurrencyContext';
 import {
   formatBytes,
   formatCostIn,
@@ -44,17 +45,18 @@ import {
   formatTPS,
   getEstimatedBytesPerToken,
 } from '../../lib/format';
-import { formatApiTypeLabel } from '../../lib/apiFormats';
-import { isClipboardAvailable, copyToClipboard } from '../../lib/clipboard';
+import { CostToolTip } from '../ui/CostToolTip';
+import { PerformanceToolTip } from '../ui/PerformanceToolTip';
+import { ApiTypeIcon } from './ApiTypeIcon';
 import {
-  PI_AI_OUTGOING_TYPES,
-  DESKTOP_STATUS_COLUMN_WIDTH,
-  DESKTOP_DATE_COLUMN_WIDTH,
   DESKTOP_API_COLUMN_WIDTH,
-  DESKTOP_TOKENS_COLUMN_WIDTH,
   DESKTOP_COST_COLUMN_WIDTH,
-  DESKTOP_PERF_COLUMN_WIDTH,
+  DESKTOP_DATE_COLUMN_WIDTH,
   DESKTOP_DELETE_COLUMN_WIDTH,
+  DESKTOP_PERF_COLUMN_WIDTH,
+  DESKTOP_STATUS_COLUMN_WIDTH,
+  DESKTOP_TOKENS_COLUMN_WIDTH,
+  PI_AI_OUTGOING_TYPES,
 } from './constants';
 import {
   formatDateSafely,
@@ -63,7 +65,6 @@ import {
   getServiceTierDisplay,
   hasUpstreamRewrite,
 } from './helpers';
-import { ApiTypeIcon } from './ApiTypeIcon';
 import { ServiceTierIndicator } from './ServiceTierIndicator';
 import type { DesktopLogRowProps } from './types';
 
@@ -100,7 +101,7 @@ export const DesktopLogRow = React.memo(
     return (
       <tr
         className={clsx(
-          'group border-b border-border-glass hover:bg-bg-hover',
+          'group border-border-glass hover:bg-bg-hover border-b',
           isNewest && 'animate-slide-in'
         )}
         style={{
@@ -109,7 +110,7 @@ export const DesktopLogRow = React.memo(
         }}
       >
         <td
-          className="px-0 py-1.5 text-center border-b border-border-glass text-text align-middle"
+          className="border-border-glass text-text border-b px-0 py-1.5 text-center align-middle"
           style={{
             width: DESKTOP_STATUS_COLUMN_WIDTH,
             minWidth: DESKTOP_STATUS_COLUMN_WIDTH,
@@ -121,7 +122,7 @@ export const DesktopLogRow = React.memo(
               <button
                 type="button"
                 onClick={() => onDebug(log.requestId)}
-                className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-blue-400/30 bg-blue-500/15 text-blue-400 transition-colors hover:bg-blue-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-blue-400/30 bg-blue-500/15 text-blue-400 transition-colors hover:bg-blue-500/25 focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:outline-none"
                 title={
                   log.hasError ? 'View Debug Trace (error also available)' : 'View Debug Trace'
                 }
@@ -135,7 +136,7 @@ export const DesktopLogRow = React.memo(
                 {log.hasError && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-0 top-0 h-1 w-1 rounded-full bg-danger"
+                    className="bg-danger absolute top-0 right-0 h-1 w-1 rounded-full"
                   />
                 )}
               </button>
@@ -143,7 +144,7 @@ export const DesktopLogRow = React.memo(
               <button
                 type="button"
                 onClick={() => onError(log.requestId)}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-danger/30 bg-red-500/15 text-danger transition-colors hover:bg-red-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60"
+                className="border-danger/30 text-danger focus-visible:ring-danger/60 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-red-500/15 transition-colors hover:bg-red-500/25 focus-visible:ring-2 focus-visible:outline-none"
                 title="View Error Details"
                 aria-label="View Error Details"
               >
@@ -154,14 +155,14 @@ export const DesktopLogRow = React.memo(
                 className={clsx(
                   'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
                   log.responseStatus === 'success'
-                    ? 'border-success/30 bg-emerald-500/15 text-success'
+                    ? 'border-success/30 text-success bg-emerald-500/15'
                     : log.responseStatus === 'pending'
-                      ? 'border-warning/30 bg-yellow-500/15 text-warning'
+                      ? 'border-warning/30 text-warning bg-yellow-500/15'
                       : log.responseStatus === 'cancelled'
                         ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
                         : log.responseStatus === 'timeout'
                           ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
-                          : 'border-danger/30 bg-red-500/15 text-danger'
+                          : 'border-danger/30 text-danger bg-red-500/15'
                 )}
                 role="img"
                 aria-label={`Status: ${log.responseStatus || 'unknown'}`}
@@ -188,7 +189,7 @@ export const DesktopLogRow = React.memo(
                 <button
                   type="button"
                   onClick={() => onRetryDetails(log)}
-                  className="inline-flex shrink-0 items-center gap-0 border-0 bg-transparent p-0 text-orange-500 transition-colors hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60"
+                  className="inline-flex shrink-0 items-center gap-0 border-0 bg-transparent p-0 text-orange-500 transition-colors hover:text-orange-400 focus-visible:ring-2 focus-visible:ring-orange-400/60 focus-visible:outline-none"
                   title={
                     hasRewrite
                       ? 'View retry history (model rewritten upstream)'
@@ -204,7 +205,7 @@ export const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          className="border-border-glass text-text min-w-0 overflow-hidden border-b px-1 py-1.5 text-left align-middle whitespace-nowrap"
           style={{ width: DESKTOP_DATE_COLUMN_WIDTH }}
         >
           <div className="flex min-w-0 flex-col">
@@ -228,7 +229,7 @@ export const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          className="border-border-glass text-text min-w-0 overflow-hidden border-b px-1 py-1.5 text-left align-middle"
           title={log.sourceIp ? `IP: ${log.sourceIp}` : undefined}
           style={log.sourceIp ? { cursor: 'help' } : undefined}
         >
@@ -252,7 +253,7 @@ export const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          className="border-border-glass text-text min-w-0 overflow-hidden border-b px-1 py-1.5 text-left align-middle whitespace-nowrap"
           style={{ width: DESKTOP_API_COLUMN_WIDTH, cursor: 'help' }}
           title={`Incoming: ${formatApiTypeLabel(log.incomingApiType)} → Outgoing: ${formatApiTypeLabel(log.outgoingApiType)} • ${log.isStreamed ? 'Streamed' : 'Non-streamed'} • ${log.isRaw ? `Raw ${log.requestMethod || ''} ${log.requestPath || ''}` : Boolean(log.outgoingApiType && PI_AI_OUTGOING_TYPES[log.outgoingApiType]) ? 'pi-ai native' : log.isPassthrough ? 'Direct/Passthrough' : 'Translated'}`}
         >
@@ -330,7 +331,7 @@ export const DesktopLogRow = React.memo(
             </div>
           </div>
         </td>
-        <td className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
+        <td className="border-border-glass text-text min-w-0 overflow-hidden border-b px-1 py-1.5 text-left align-middle whitespace-nowrap">
           <div className="flex min-w-0 flex-col gap-0.5">
             <div className="group/model flex min-w-0 items-center gap-1">
               <span className="min-w-0 truncate" title={log.incomingModelAlias || undefined}>
@@ -343,7 +344,7 @@ export const DesktopLogRow = React.memo(
                     if (!isClipboardAvailable()) return;
                     await copyToClipboard(log.incomingModelAlias || '');
                   }}
-                  className="flex shrink-0 items-center border-0 bg-transparent p-0 opacity-0 cursor-pointer transition-opacity group-hover/model:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
+                  className="flex shrink-0 cursor-pointer items-center border-0 bg-transparent p-0 opacity-0 transition-opacity group-hover/model:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
                   title={
                     isClipboardAvailable() ? 'Copy incoming model alias' : 'Copy requires HTTPS'
                   }
@@ -378,7 +379,7 @@ export const DesktopLogRow = React.memo(
                     if (!isClipboardAvailable()) return;
                     await copyToClipboard(log.selectedModelName || '');
                   }}
-                  className="flex shrink-0 items-center border-0 bg-transparent p-0 opacity-0 cursor-pointer transition-opacity group-hover/selected:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
+                  className="flex shrink-0 cursor-pointer items-center border-0 bg-transparent p-0 opacity-0 transition-opacity group-hover/selected:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
                   title={
                     isClipboardAvailable() ? 'Copy selected model name' : 'Copy requires HTTPS'
                   }
@@ -419,7 +420,7 @@ export const DesktopLogRow = React.memo(
                 className="group/vft flex min-w-0 items-center gap-1"
                 title="Vision fallthrough descriptor model"
               >
-                <ScanSearch size={10} className="text-amber-500 shrink-0" />
+                <ScanSearch size={10} className="shrink-0 text-amber-500" />
                 <span
                   className="min-w-0 truncate"
                   style={{ color: 'var(--color-text-secondary)', fontSize: '0.8em' }}
@@ -433,7 +434,7 @@ export const DesktopLogRow = React.memo(
                     if (!isClipboardAvailable()) return;
                     await copyToClipboard(log.visionFallthroughModel || '');
                   }}
-                  className="flex shrink-0 items-center border-0 bg-transparent p-0 opacity-0 cursor-pointer transition-opacity group-hover/vft:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
+                  className="flex shrink-0 cursor-pointer items-center border-0 bg-transparent p-0 opacity-0 transition-opacity group-hover/vft:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:opacity-0"
                   title={
                     isClipboardAvailable() ? 'Copy fallthrough model name' : 'Copy requires HTTPS'
                   }
@@ -446,7 +447,7 @@ export const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          className="border-border-glass text-text min-w-0 overflow-hidden border-b px-1 py-1.5 text-left align-middle"
           style={{ width: DESKTOP_TOKENS_COLUMN_WIDTH, cursor: 'help' }}
           title={`Input: ${(log.tokensInput || 0) === 0 ? '-' : formatLargeNumber(log.tokensInput || 0)} • Output: ${(log.tokensOutput || 0) === 0 ? '-' : formatLargeNumber(log.tokensOutput || 0)} • Reasoning: ${(log.tokensReasoning || 0) === 0 ? '-' : formatLargeNumber(log.tokensReasoning || 0)} • Cached: ${(log.tokensCached || 0) === 0 ? '-' : formatLargeNumber(log.tokensCached || 0)} • Cache Write: ${(log.tokensCacheWrite || 0) === 0 ? '-' : formatLargeNumber(log.tokensCacheWrite || 0)}${log.tokensEstimated ? ' • * = Estimated' : ''}`}
         >
@@ -537,7 +538,7 @@ export const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="min-w-0 px-1 py-1.5 border-b border-border-glass text-text align-middle"
+          className="border-border-glass text-text min-w-0 border-b px-1 py-1.5 align-middle"
           style={{ width: DESKTOP_COST_COLUMN_WIDTH }}
         >
           {log.costTotal !== undefined && log.costTotal !== null ? (
@@ -567,7 +568,7 @@ export const DesktopLogRow = React.memo(
           )}
         </td>
         <td
-          className="min-w-0 overflow-hidden px-1 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap"
+          className="border-border-glass text-text min-w-0 overflow-hidden border-b px-1 py-1.5 text-left align-middle whitespace-nowrap"
           style={{
             width: DESKTOP_PERF_COLUMN_WIDTH,
             minWidth: DESKTOP_PERF_COLUMN_WIDTH,
@@ -702,7 +703,7 @@ export const DesktopLogRow = React.memo(
             );
           })()}
         </td>
-        <td className="hidden px-1 py-1.5 text-center border-b border-border-glass text-text align-middle min-[1150px]:table-cell">
+        <td className="border-border-glass text-text hidden border-b px-1 py-1.5 text-center align-middle min-[1150px]:table-cell">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {/* Row 1: Messages and Tool calls */}
             <div style={{ display: 'flex', gap: '6px' }}>
@@ -768,13 +769,13 @@ export const DesktopLogRow = React.memo(
           </div>
         </td>
         <td
-          className="px-1 py-1.5 text-left border-b border-border-glass text-text align-middle"
+          className="border-border-glass text-text border-b px-1 py-1.5 text-left align-middle"
           style={{ width: DESKTOP_DELETE_COLUMN_WIDTH }}
         >
           <button
             type="button"
             onClick={() => onDelete(log.requestId)}
-            className="flex items-center justify-center rounded border-0 bg-transparent p-1 text-text-muted opacity-0 cursor-pointer transition-all duration-200 hover:bg-red-600/10 hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+            className="text-text-muted hover:text-danger flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-red-600/10 focus-visible:opacity-100 focus-visible:outline-none"
             title="Delete log"
             aria-label="Delete log"
           >

@@ -1,9 +1,10 @@
 import { z } from 'zod';
+
 import {
-  ProviderCacheKeyInjectionSchema,
-  ResponsesExtensionSchema,
   type ProviderCacheKeyInjection,
+  ProviderCacheKeyInjectionSchema,
   type ResponsesExtension,
+  ResponsesExtensionSchema,
 } from './provider';
 
 /**
@@ -118,10 +119,7 @@ const PiAiQuirkTraitsSchema = z
 
 const PiAiQuirkTargetSchema = <
   T extends
-    | 'openai-completions'
-    | 'openai-responses'
-    | 'anthropic-messages'
-    | 'google-generative-ai',
+    'openai-completions' | 'openai-responses' | 'anthropic-messages' | 'google-generative-ai',
 >(
   api: T
 ) =>

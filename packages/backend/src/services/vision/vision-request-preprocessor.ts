@@ -1,9 +1,9 @@
-import type { UnifiedChatRequest } from '../../types/unified';
 import type { getConfig } from '../../config';
-import type { RouteResult } from '../routing/router';
-import type { UsageStorageService } from '../observability/usage-storage';
-import { logger } from '../../utils/logger';
+import type { UnifiedChatRequest } from '../../types/unified';
 import { DEFAULT_VISION_DESCRIPTION_PROMPT } from '../../utils/constants';
+import { logger } from '../../utils/logger';
+import type { UsageStorageService } from '../observability/usage-storage';
+import type { RouteResult } from '../routing/router';
 import { VisionDescriptorService } from './vision-descriptor-service';
 
 /** Applies optional image-to-text fallthrough before an upstream attempt. */

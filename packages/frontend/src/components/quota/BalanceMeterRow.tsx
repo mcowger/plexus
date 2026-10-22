@@ -1,8 +1,9 @@
-import React from 'react';
 import { Wallet } from 'lucide-react';
+import React from 'react';
+
+import { useCurrency } from '../../lib/CurrencyContext';
 import type { Meter } from '../../types/quota';
 import { formatMeterValue } from './MeterValue';
-import { useCurrency } from '../../lib/CurrencyContext';
 
 interface BalanceMeterRowProps {
   meter: Meter;
@@ -20,20 +21,20 @@ export const BalanceMeterRow: React.FC<BalanceMeterRowProps> = ({ meter, onClick
 
   return (
     <div
-      className={`flex items-center justify-between gap-3 py-0.5 rounded${onClick ? ' cursor-pointer hover:bg-bg-hover px-1 -mx-1 transition-colors' : ''}`}
+      className={`flex items-center justify-between gap-3 py-0.5 rounded${onClick ? ' hover:bg-bg-hover -mx-1 cursor-pointer px-1 transition-colors' : ''}`}
       onClick={onClick}
       title={onClick ? 'Click to view history' : undefined}
     >
-      <div className="flex items-center gap-1.5 min-w-0">
+      <div className="flex min-w-0 items-center gap-1.5">
         <Wallet size={12} className="text-info flex-shrink-0" />
-        <span className="text-xs text-text-secondary truncate">{meter.label}</span>
+        <span className="text-text-secondary truncate text-xs">{meter.label}</span>
       </div>
       {displayValue !== undefined ? (
-        <span className="text-xs font-semibold text-info tabular-nums flex-shrink-0">
+        <span className="text-info flex-shrink-0 text-xs font-semibold tabular-nums">
           {formatMeterValue(displayValue, meter.unit, false, { currency, rate, symbol })}
         </span>
       ) : (
-        <span className="text-xs text-text-muted flex-shrink-0">—</span>
+        <span className="text-text-muted flex-shrink-0 text-xs">—</span>
       )}
     </div>
   );

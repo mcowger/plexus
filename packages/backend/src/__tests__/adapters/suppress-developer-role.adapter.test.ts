@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { suppressDeveloperRoleAdapter } from '../../transformers/adapters/suppress-developer-role.adapter';
 
 describe('suppressDeveloperRoleAdapter', () => {

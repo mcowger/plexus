@@ -1,6 +1,7 @@
-import React from 'react';
-import { Input } from '../ui/Input';
 import { ExternalLink } from 'lucide-react';
+import React from 'react';
+
+import { Input } from '../ui/Input';
 
 export interface OpenRouterQuotaConfigProps {
   options: Record<string, unknown>;
@@ -18,7 +19,7 @@ export const OpenRouterQuotaConfig: React.FC<OpenRouterQuotaConfigProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Management API Key <span className="text-danger">*</span>
         </label>
         <Input
@@ -27,13 +28,13 @@ export const OpenRouterQuotaConfig: React.FC<OpenRouterQuotaConfigProps> = ({
           onChange={(e) => handleChange('apiKey', e.target.value)}
           placeholder="Enter your OpenRouter management key"
         />
-        <span className="text-[10px] text-text-muted">
+        <span className="text-text-muted text-[10px]">
           Required. Use a management key from{' '}
           <a
             href="https://openrouter.ai/settings/management-keys"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary hover:underline inline-flex items-center gap-1"
+            className="text-primary inline-flex items-center gap-1 hover:underline"
           >
             OpenRouter Dashboard <ExternalLink size={10} />
           </a>
@@ -41,7 +42,7 @@ export const OpenRouterQuotaConfig: React.FC<OpenRouterQuotaConfigProps> = ({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[13px] font-medium text-text-secondary">
+        <label className="font-body text-text-secondary text-[13px] font-medium">
           Endpoint (optional)
         </label>
         <Input

@@ -82,11 +82,11 @@ OAuth providers are configured in the Admin UI. See [Configuration: OAuth provid
 
 The dashboard is the operating view: configure providers and aliases, investigate every request, and watch usage and quota health.
 
-| Dashboard | Providers |
-| --- | --- |
-| ![Dashboard showing request volume, tokens, cost, and recent activity](docs/images/dashhome.png) | ![Providers view showing provider status, quota indicators, and controls](docs/images/providers.png) |
-| Request logs | Model aliases |
-| ![Request logs with model, provider, tokens, cost, latency, and live throughput](docs/images/logs.png) | ![Model aliases with targets, selectors, and routing priorities](docs/images/models.png) |
+| Dashboard                                                                                              | Providers                                                                                            |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| ![Dashboard showing request volume, tokens, cost, and recent activity](docs/images/dashhome.png)       | ![Providers view showing provider status, quota indicators, and controls](docs/images/providers.png) |
+| Request logs                                                                                           | Model aliases                                                                                        |
+| ![Request logs with model, provider, tokens, cost, latency, and live throughput](docs/images/logs.png) | ![Model aliases with targets, selectors, and routing priorities](docs/images/models.png)             |
 
 ## Built for the edges of provider APIs
 

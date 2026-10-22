@@ -1,5 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { decryptJson, encrypt } from '../../utils/encryption';
+import { toDbBoolean } from '../../utils/normalize';
 import {
   closeDatabase,
   getCurrentDialect,
@@ -7,10 +10,8 @@ import {
   getSchema,
   initializeDatabase,
 } from '../client';
-import { runMigrations } from '../migrate';
 import { runMcpKeyMigration } from '../mcp-key-migration';
-import { decryptJson, encrypt } from '../../utils/encryption';
-import { toDbBoolean } from '../../utils/normalize';
+import { runMigrations } from '../migrate';
 
 describe('MCP key migration', () => {
   let db: ReturnType<typeof getDatabase>;

@@ -39,7 +39,7 @@ const response = await ctx.fetch(
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-  },
+  }
 );
 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 const data = await response.json();
@@ -76,14 +76,14 @@ Request settings are configured on the provider assignment, not globally on
 the checker definition. This allows one checker to be reused with different
 providers or credentials.
 
-| Setting | Purpose |
-| --- | --- |
-| Request endpoint | Available to code as `options.endpoint`; the checker chooses whether to use it. |
-| Authentication header | Header receiving the provider API key, default `Authorization`. |
-| Authentication prefix | Prefix before the key, default `Bearer`; leave blank for a raw key. |
-| Send the provider API key in this header | Enables automatic API-key injection; enabled by default. |
-| Additional request headers | JSON object merged into requests, for example `{"X-Client": "plexus"}`. |
-| Other options | JSON values for provider-specific settings used with `ctx.getOption()`. |
+| Setting                                  | Purpose                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------- |
+| Request endpoint                         | Available to code as `options.endpoint`; the checker chooses whether to use it. |
+| Authentication header                    | Header receiving the provider API key, default `Authorization`.                 |
+| Authentication prefix                    | Prefix before the key, default `Bearer`; leave blank for a raw key.             |
+| Send the provider API key in this header | Enables automatic API-key injection; enabled by default.                        |
+| Additional request headers               | JSON object merged into requests, for example `{"X-Client": "plexus"}`.         |
+| Other options                            | JSON values for provider-specific settings used with `ctx.getOption()`.         |
 
 Use `ctx.fetch()` for requests that should receive these settings. Headers
 passed in the request's `init` object override configured headers.
@@ -108,17 +108,17 @@ const response = await fetch('https://example.com/quota', {
 
 The checker body receives one `ctx` object:
 
-| API | Description |
-| --- | --- |
-| `ctx.checkerId` | Configured checker instance ID. |
-| `ctx.provider` | Provider slug being checked. |
-| `ctx.options` | Provider-specific options object. |
-| `ctx.getOption(key, defaultValue)` | Reads an option and uses the default when absent. |
-| `ctx.requireOption(key)` | Reads an option or throws a helpful error when absent. |
-| `ctx.fetch(input, init?)` | Fetches a URL with configured headers and authentication. |
-| `ctx.requestHeaders()` | Returns configured headers, including the provider API key when enabled. |
-| `ctx.balance(params)` | Creates a balance meter. |
-| `ctx.allowance(params)` | Creates a rate or usage allowance meter. |
+| API                                | Description                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| `ctx.checkerId`                    | Configured checker instance ID.                                          |
+| `ctx.provider`                     | Provider slug being checked.                                             |
+| `ctx.options`                      | Provider-specific options object.                                        |
+| `ctx.getOption(key, defaultValue)` | Reads an option and uses the default when absent.                        |
+| `ctx.requireOption(key)`           | Reads an option or throws a helpful error when absent.                   |
+| `ctx.fetch(input, init?)`          | Fetches a URL with configured headers and authentication.                |
+| `ctx.requestHeaders()`             | Returns configured headers, including the provider API key when enabled. |
+| `ctx.balance(params)`              | Creates a balance meter.                                                 |
+| `ctx.allowance(params)`            | Creates a rate or usage allowance meter.                                 |
 
 The body may be asynchronous and must return an array containing only meters
 created by `ctx.balance()` or `ctx.allowance()`.
@@ -250,15 +250,15 @@ Return:
 
 All custom checker endpoints require the `x-admin-key` header:
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `GET` | `/v0/management/custom-checkers` | List custom checkers. |
-| `GET` | `/v0/management/custom-checkers/{id}` | Get one checker. |
-| `PUT` | `/v0/management/custom-checkers/{id}` | Create or replace a checker. |
-| `PATCH` | `/v0/management/custom-checkers/{id}` | Update a checker. |
-| `DELETE` | `/v0/management/custom-checkers/{id}` | Delete a checker. |
-| `POST` | `/v0/management/custom-checkers/{id}/test` | Test code without persisting a snapshot. |
-| `POST` | `/v0/management/custom-checkers/{id}/check` | Run the saved checker immediately. |
+| Method   | Endpoint                                    | Purpose                                  |
+| -------- | ------------------------------------------- | ---------------------------------------- |
+| `GET`    | `/v0/management/custom-checkers`            | List custom checkers.                    |
+| `GET`    | `/v0/management/custom-checkers/{id}`       | Get one checker.                         |
+| `PUT`    | `/v0/management/custom-checkers/{id}`       | Create or replace a checker.             |
+| `PATCH`  | `/v0/management/custom-checkers/{id}`       | Update a checker.                        |
+| `DELETE` | `/v0/management/custom-checkers/{id}`       | Delete a checker.                        |
+| `POST`   | `/v0/management/custom-checkers/{id}/test`  | Test code without persisting a snapshot. |
+| `POST`   | `/v0/management/custom-checkers/{id}/check` | Run the saved checker immediately.       |
 
 Example create request:
 

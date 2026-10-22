@@ -1,5 +1,5 @@
 name: Cora AI Code Review (fallback, manual only)
-run-name: "Cora Review (fallback): PR #${{ inputs.pr_number }}"
+run-name: 'Cora Review (fallback): PR #${{ inputs.pr_number }}'
 
 # Dormant fallback for the OpenCodeReview cutover (see ocr-review.yml).
 # Trigger manually from the Actions tab with a PR number if OCR must be bypassed.

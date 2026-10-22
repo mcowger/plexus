@@ -2,7 +2,7 @@ name: Dependabot Auto-Merge
 
 on:
   workflow_run:
-    workflows: ["PR Tests"]
+    workflows: ['PR Tests']
     types: [completed]
 
 permissions:

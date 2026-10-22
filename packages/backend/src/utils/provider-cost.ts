@@ -1,5 +1,5 @@
-import { logger } from './logger';
 import { UsageRecord } from '../types/usage';
+import { logger } from './logger';
 import type { ProviderCostDetails } from './usage-normalizer';
 
 /**

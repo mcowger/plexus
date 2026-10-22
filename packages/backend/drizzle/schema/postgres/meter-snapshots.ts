@@ -1,4 +1,4 @@
-import { pgTable, serial, text, real, integer, bigint, boolean, index } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, pgTable, real, serial, text } from 'drizzle-orm/pg-core';
 
 export const meterSnapshots = pgTable(
   'meter_snapshots',

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LatencySelector } from '../latency';
-import { UsageStorageService } from '../../../observability/usage-storage';
+
 import { ModelTarget, PlexusConfig, setConfigForTesting } from '../../../../config';
+import { UsageStorageService } from '../../../observability/usage-storage';
+import { LatencySelector } from '../latency';
 
 const makeConfig = (
   overrides: Partial<
@@ -24,8 +25,8 @@ const makeConfig = (
 describe('LatencySelector', () => {
   // Mock usage storage
   // Explicitly type the mock return to allow any array of objects
-  const mockGetProviderPerformance = vi.fn(
-    (provider?: string, model?: string): Promise<any[]> => Promise.resolve([])
+  const mockGetProviderPerformance = vi.fn((provider?: string, model?: string): Promise<any[]> =>
+    Promise.resolve([])
   );
   const mockStorage = {
     getProviderPerformance: mockGetProviderPerformance,

@@ -1,4 +1,5 @@
 import { Save } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
 import type { FieldValidation } from './types';
@@ -74,7 +75,7 @@ export function StallDetectionSettings({
           <div className="flex flex-col gap-1">
             <label
               htmlFor="stallTtfbSeconds"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               TTFB Timeout (s){' '}
               <span className="text-text-muted font-normal">— 5–120, empty = off</span>
@@ -88,14 +89,14 @@ export function StallDetectionSettings({
               placeholder="Disabled"
               value={ttfbInput}
               onChange={(event) => onTtfbChange(event.target.value)}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
             {!ttfbValidation.valid && ttfbInput !== '' && (
-              <span className="text-[11px] text-warning">{ttfbValidation.error}</span>
+              <span className="text-warning text-[11px]">{ttfbValidation.error}</span>
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="stallTtfbBytes" className="font-body text-[12px] font-medium text-text">
+            <label htmlFor="stallTtfbBytes" className="font-body text-text text-[12px] font-medium">
               TTFB Byte Threshold <span className="text-text-muted font-normal">— 50–10,000</span>
             </label>
             <input
@@ -106,14 +107,14 @@ export function StallDetectionSettings({
               step={1}
               value={ttfbBytesInput}
               onChange={(event) => onTtfbBytesChange(event.target.value)}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
             {!ttfbBytesValidation.valid && ttfbBytesInput !== '' && (
-              <span className="text-[11px] text-warning">{ttfbBytesValidation.error}</span>
+              <span className="text-warning text-[11px]">{ttfbBytesValidation.error}</span>
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="stallMinBps" className="font-body text-[12px] font-medium text-text">
+            <label htmlFor="stallMinBps" className="font-body text-text text-[12px] font-medium">
               Min Bytes/sec{' '}
               <span className="text-text-muted font-normal">— 50–5,000, empty = off</span>
             </label>
@@ -126,16 +127,16 @@ export function StallDetectionSettings({
               placeholder="Disabled"
               value={minBpsInput}
               onChange={(event) => onMinBpsChange(event.target.value)}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
             {!minBpsValidation.valid && minBpsInput !== '' && (
-              <span className="text-[11px] text-warning">{minBpsValidation.error}</span>
+              <span className="text-warning text-[11px]">{minBpsValidation.error}</span>
             )}
           </div>
           <div className="flex flex-col gap-1">
             <label
               htmlFor="stallWindowSeconds"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Sliding Window (s) <span className="text-text-muted font-normal">— 3–30</span>
             </label>
@@ -147,16 +148,16 @@ export function StallDetectionSettings({
               step={1}
               value={windowInput}
               onChange={(event) => onWindowChange(event.target.value)}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
             {!windowValidation.valid && windowInput !== '' && (
-              <span className="text-[11px] text-warning">{windowValidation.error}</span>
+              <span className="text-warning text-[11px]">{windowValidation.error}</span>
             )}
           </div>
           <div className="flex flex-col gap-1">
             <label
               htmlFor="stallGraceSeconds"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Grace Period (s){' '}
               <span className="text-text-muted font-normal">— 0–120, post-TTFB pause</span>
@@ -169,10 +170,10 @@ export function StallDetectionSettings({
               step={1}
               value={graceInput}
               onChange={(event) => onGraceChange(event.target.value)}
-              className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+              className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
             />
             {!graceValidation.valid && graceInput !== '' && (
-              <span className="text-[11px] text-warning">{graceValidation.error}</span>
+              <span className="text-warning text-[11px]">{graceValidation.error}</span>
             )}
           </div>
         </div>

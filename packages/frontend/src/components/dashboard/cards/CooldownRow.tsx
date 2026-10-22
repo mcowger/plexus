@@ -4,9 +4,9 @@
  * Renders a single provider/model cooldown alert row with popover detail dialog.
  */
 
+import { AlertTriangle, Info, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Info, X } from 'lucide-react';
 
 export interface CooldownRowProps {
   provider: string;
@@ -77,15 +77,15 @@ export const CooldownRow: React.FC<CooldownRowProps> = ({
 
   return (
     <div
-      className="px-3 py-2 flex items-center gap-2 bg-warning/5"
+      className="bg-warning/5 flex items-center gap-2 px-3 py-2"
       onClick={(e) => e.stopPropagation()}
     >
       <AlertTriangle size={12} className="text-warning shrink-0" />
-      <span className="text-xs font-medium text-text">{provider}</span>
-      <span className="text-xs text-text-muted truncate">
+      <span className="text-text text-xs font-medium">{provider}</span>
+      <span className="text-text-muted truncate text-xs">
         {modelDisplay} — {timeDisplay}
       </span>
-      <div className="relative ml-auto shrink-0 flex items-center gap-2" ref={ref}>
+      <div className="relative ml-auto flex shrink-0 items-center gap-2" ref={ref}>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -112,21 +112,21 @@ export const CooldownRow: React.FC<CooldownRowProps> = ({
               <div
                 ref={popoverRef}
                 onClick={(e) => e.stopPropagation()}
-                className="fixed z-[500] w-72 rounded-md border border-border shadow-lg p-3 text-xs space-y-2"
+                className="border-border fixed z-[500] w-72 space-y-2 rounded-md border p-3 text-xs shadow-lg"
                 style={{
                   backgroundColor: 'rgb(15, 23, 42)',
                   top: popoverStyle.top,
                   right: popoverStyle.right,
                 }}
               >
-                <div className="flex items-center gap-1.5 font-semibold text-warning">
+                <div className="text-warning flex items-center gap-1.5 font-semibold">
                   <AlertTriangle size={12} />
                   Cooldown Details
                 </div>
                 {lastError && (
                   <div>
                     <span className="text-text-muted font-medium">Error:</span>
-                    <p className="mt-0.5 text-text wrap-break-word whitespace-pre-wrap font-mono text-[11px] bg-bg-hover rounded p-1.5 max-h-32 overflow-y-auto">
+                    <p className="text-text bg-bg-hover mt-0.5 max-h-32 overflow-y-auto rounded p-1.5 font-mono text-[11px] wrap-break-word whitespace-pre-wrap">
                       {lastError}
                     </p>
                   </div>
@@ -134,12 +134,12 @@ export const CooldownRow: React.FC<CooldownRowProps> = ({
                 {consecutiveFailures !== undefined && (
                   <div className="flex justify-between gap-3">
                     <span className="text-text-muted">Consecutive failures</span>
-                    <span className="font-semibold text-danger">{consecutiveFailures}</span>
+                    <span className="text-danger font-semibold">{consecutiveFailures}</span>
                   </div>
                 )}
                 <div className="flex justify-between gap-3">
                   <span className="text-text-muted">Expires at</span>
-                  <span className="font-semibold text-text text-right">{expiryStr}</span>
+                  <span className="text-text text-right font-semibold">{expiryStr}</span>
                 </div>
               </div>,
               document.body

@@ -1,23 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { api, InferenceError } from '../lib/api';
 import Editor from '@monaco-editor/react';
+import { clsx } from 'clsx';
 import {
-  RefreshCw,
-  Clock,
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
+  Clock,
   Copy,
-  Check,
+  RefreshCw,
   Trash2,
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { isClipboardAvailable, copyToClipboard } from '../lib/clipboard';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+
+import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
-import { PageHeader } from '../components/layout/PageHeader';
-import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api, InferenceError } from '../lib/api';
+import { copyToClipboard, isClipboardAvailable } from '../lib/clipboard';
 
 export const Errors: React.FC = () => {
   const location = useLocation();
@@ -140,7 +141,7 @@ export const Errors: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-3rem)]">
+    <div className="flex min-h-[calc(100vh-3rem)] flex-col">
       <div className="shrink-0">
         <PageHeader
           title={
@@ -180,51 +181,51 @@ export const Errors: React.FC = () => {
         />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border-glass md:flex-row">
+      <div className="border-border-glass flex min-h-0 flex-1 flex-col overflow-hidden border-t md:flex-row">
         {/* Left Pane: Error List */}
-        <div className="flex max-h-[34vh] w-full shrink-0 flex-col border-b border-border-glass bg-bg-surface md:max-h-none md:w-[320px] md:border-b-0 md:border-r">
-          <div className="border-b border-border-glass p-3 sm:p-4">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+        <div className="border-border-glass bg-bg-surface flex max-h-[34vh] w-full shrink-0 flex-col border-b md:max-h-none md:w-[320px] md:border-r md:border-b-0">
+          <div className="border-border-glass border-b p-3 sm:p-4">
+            <span className="text-text-muted text-xs font-bold tracking-wider uppercase">
               Recent Errors
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+          <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
             {errors.map((err) => (
               <div
                 key={err.id}
                 onClick={() => setSelectedId(err.requestId)}
                 className={clsx(
-                  'p-3 rounded-md cursor-pointer transition-all duration-200 border border-transparent hover:bg-bg-hover group',
+                  'hover:bg-bg-hover group cursor-pointer rounded-md border border-transparent p-3 transition-all duration-200',
                   selectedId === err.requestId && 'bg-bg-glass border-border-glass shadow-sm'
                 )}
               >
                 <div className="w-full">
-                  <div className="flex items-center gap-2 mb-1 justify-between">
+                  <div className="mb-1 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Clock size={14} className="text-[var(--color-text-muted)]" />
-                      <span className="text-xs font-mono text-text-muted">
+                      <span className="text-text-muted font-mono text-xs">
                         {new Date(err.date).toLocaleTimeString()}
                       </span>
                     </div>
                     <button
                       onClick={(e) => handleDelete(e, err.requestId)}
-                      className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-red-600/10 hover:text-danger opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                      className="text-text-muted hover:text-danger flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 opacity-100 transition-all duration-200 hover:bg-red-600/10 md:opacity-0 md:group-hover:opacity-100"
                       title="Delete error log"
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
-                  <div className="text-[13px] font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis mt-1 font-mono text-xs text-[var(--color-text-muted)]">
+                  <div className="text-primary mt-1 overflow-hidden font-mono text-xs text-[13px] text-ellipsis whitespace-nowrap text-[var(--color-text-muted)]">
                     {err.requestId?.substring(0, 8) ?? '-'}...
                   </div>
-                  <div className="mt-1 text-sm text-red-400 truncate" title={err.errorMessage}>
+                  <div className="mt-1 truncate text-sm text-red-400" title={err.errorMessage}>
                     {err.errorMessage}
                   </div>
                 </div>
               </div>
             ))}
             {errors.length === 0 && (
-              <div className="text-center p-8 text-[var(--color-text-muted)] italic text-sm">
+              <div className="p-8 text-center text-sm text-[var(--color-text-muted)] italic">
                 No errors found.
               </div>
             )}
@@ -232,7 +233,7 @@ export const Errors: React.FC = () => {
         </div>
 
         {/* Right Pane: Details */}
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg-deep">
+        <div className="bg-bg-deep relative flex min-h-0 flex-1 flex-col overflow-y-auto">
           {selectedId && selectedError ? (
             <div className="flex flex-col">
               <div className="mb-3 border-b border-[var(--color-border)] p-3 sm:mb-4 sm:p-4">
@@ -242,7 +243,7 @@ export const Errors: React.FC = () => {
                 <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 sm:gap-4 sm:text-sm">
                   <div className="min-w-0">
                     <span className="text-[var(--color-text-muted)]">Request ID:</span>
-                    <span className="ml-2 break-all font-mono">{selectedError.requestId}</span>
+                    <span className="ml-2 font-mono break-all">{selectedError.requestId}</span>
                   </div>
                   <div className="min-w-0">
                     <span className="text-[var(--color-text-muted)]">Time:</span>
@@ -253,15 +254,15 @@ export const Errors: React.FC = () => {
                   const details = parseDetails(selectedError.details);
                   if (details && (details.provider || details.targetModel || details.url)) {
                     return (
-                      <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
-                        <h4 className="text-sm font-semibold text-yellow-500 mb-2">
+                      <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                        <h4 className="mb-2 text-sm font-semibold text-yellow-500">
                           Routing Information
                         </h4>
                         <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 sm:gap-4 sm:text-sm">
                           {details.provider && (
                             <div className="min-w-0">
                               <span className="text-[var(--color-text-muted)]">Provider:</span>
-                              <span className="ml-2 break-all font-mono text-blue-400">
+                              <span className="ml-2 font-mono break-all text-blue-400">
                                 {details.provider}
                               </span>
                             </div>
@@ -269,7 +270,7 @@ export const Errors: React.FC = () => {
                           {details.targetModel && (
                             <div className="min-w-0">
                               <span className="text-[var(--color-text-muted)]">Target Model:</span>
-                              <span className="ml-2 break-all font-mono text-blue-400">
+                              <span className="ml-2 font-mono break-all text-blue-400">
                                 {details.targetModel}
                               </span>
                             </div>
@@ -277,7 +278,7 @@ export const Errors: React.FC = () => {
                           {details.targetApiType && (
                             <div className="min-w-0">
                               <span className="text-[var(--color-text-muted)]">Target API:</span>
-                              <span className="ml-2 break-all font-mono text-blue-400">
+                              <span className="ml-2 font-mono break-all text-blue-400">
                                 {details.targetApiType}
                               </span>
                             </div>
@@ -293,7 +294,7 @@ export const Errors: React.FC = () => {
                           {details.url && (
                             <div className="sm:col-span-2">
                               <span className="text-[var(--color-text-muted)]">Request URL:</span>
-                              <div className="ml-2 font-mono text-xs text-blue-400 break-all mt-1">
+                              <div className="mt-1 ml-2 font-mono text-xs break-all text-blue-400">
                                 {details.url}
                               </div>
                             </div>
@@ -379,7 +380,7 @@ export const Errors: React.FC = () => {
                 })()}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-text-muted gap-4">
+            <div className="text-text-muted flex h-full flex-col items-center justify-center gap-4">
               <AlertTriangle size={48} opacity={0.2} />
               <p>Select an error to inspect details</p>
             </div>
@@ -461,19 +462,19 @@ const AccordionPanel: React.FC<{
   };
 
   return (
-    <div className="border-b border-border-glass bg-bg-surface">
+    <div className="border-border-glass bg-bg-surface border-b">
       <div
-        className="flex cursor-pointer select-none items-center justify-between bg-bg-hover px-3 py-2.5 transition-colors duration-200 hover:bg-bg-glass sm:px-4 sm:py-3"
+        className="bg-bg-hover hover:bg-bg-glass flex cursor-pointer items-center justify-between px-3 py-2.5 transition-colors duration-200 select-none sm:px-4 sm:py-3"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex items-center gap-2">
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <span className={clsx('text-[11px] font-bold uppercase tracking-wider', color)}>
+          <span className={clsx('text-[11px] font-bold tracking-wider uppercase', color)}>
             {title}
           </span>
         </div>
         <button
-          className="bg-transparent border-0 text-text-muted p-1 rounded cursor-pointer transition-all duration-200 flex items-center justify-center hover:bg-white/10 hover:text-text"
+          className="text-text-muted hover:text-text flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 transition-all duration-200 hover:bg-white/10"
           onClick={handleCopy}
           title="Copy to clipboard"
         >

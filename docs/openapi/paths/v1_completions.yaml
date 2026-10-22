@@ -4,7 +4,7 @@ post:
   summary: TODO - Add summary for POST /v1/completions
   description: |
     TODO - Add detailed description.
-    
+
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []

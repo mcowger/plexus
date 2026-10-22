@@ -1,9 +1,10 @@
-import { describe, expect, test, beforeEach, vi } from 'vitest';
-import { Dispatcher } from '../dispatch/dispatcher';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
-import { CooldownManager } from '../runtime/cooldown-manager';
+import { Dispatcher } from '../dispatch/dispatcher';
 import { EMPTY_COMPLETION_REASON } from '../dispatch/empty-completion';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 // T5 — dispatch-level empty-completion failover.
 //

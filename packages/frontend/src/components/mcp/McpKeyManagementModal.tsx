@@ -1,9 +1,10 @@
 import { clsx } from 'clsx';
+
+import type { McpServerKey } from '../../lib/api';
+import { formatResetsIn } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
-import type { McpServerKey } from '../../lib/api';
-import { formatResetsIn } from '../../lib/format';
 
 interface McpKeyManagementModalProps {
   serverName: string | null;
@@ -44,12 +45,12 @@ export function McpKeyManagementModal({
       }
     >
       <div className="space-y-4">
-        <div className="rounded-md bg-bg-surface p-3 text-sm text-text-secondary border border-border-subtle">
+        <div className="bg-bg-surface text-text-secondary border-border-subtle rounded-md border p-3 text-sm">
           <p>
             These keys will be load-balanced (Round Robin) and automatically rotated if a rate limit
             or quota is exceeded. They will be injected using the server&apos;s configured{' '}
             <strong>Auth Scheme</strong>:{' '}
-            <span className="font-mono text-text bg-bg-subtle px-1 py-0.5 rounded">
+            <span className="text-text bg-bg-subtle rounded px-1 py-0.5 font-mono">
               {serverName && authScheme ? authScheme : 'None (keys will not be sent)'}
             </span>
           </p>
@@ -72,9 +73,9 @@ export function McpKeyManagementModal({
         </div>
 
         {isLoadingKeys ? (
-          <p className="text-sm text-text-secondary">Loading keys...</p>
+          <p className="text-text-secondary text-sm">Loading keys...</p>
         ) : serverKeys.length === 0 ? (
-          <p className="text-sm text-text-secondary">No keys configured.</p>
+          <p className="text-text-secondary text-sm">No keys configured.</p>
         ) : (
           <div className="space-y-2">
             {serverKeys.map((key) => {
@@ -83,10 +84,10 @@ export function McpKeyManagementModal({
               return (
                 <div
                   key={key.id}
-                  className="flex flex-col gap-3 rounded-md border border-border-glass bg-bg-subtle p-3 sm:flex-row sm:items-center"
+                  className="border-border-glass bg-bg-subtle flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-mono text-sm text-text" title={key.key}>
+                    <div className="text-text truncate font-mono text-sm" title={key.key}>
                       {key.key}
                     </div>
                     <div

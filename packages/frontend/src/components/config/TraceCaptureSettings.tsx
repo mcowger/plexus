@@ -1,4 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
+
 import { Disclosure } from '../ui/Disclosure';
 import { Switch } from '../ui/Switch';
 
@@ -21,8 +22,8 @@ export function TraceCaptureSettings({
         <div className="flex items-center gap-2">
           <AlertTriangle size={16} className="text-primary" />
           <div>
-            <p className="font-body text-[12px] font-medium text-text">Capture Trace on Error</p>
-            <p className="font-body text-[11px] text-text-muted">
+            <p className="font-body text-text text-[12px] font-medium">Capture Trace on Error</p>
+            <p className="font-body text-text-muted text-[11px]">
               When enabled, debug traces are stored for requests that write to the inference error
               log or trigger a cooldown, even while global debug tracing is off.
             </p>

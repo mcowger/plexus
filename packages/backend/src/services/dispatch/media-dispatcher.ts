@@ -1,3 +1,12 @@
+import { getConfig, getProviderTypes } from '../../config';
+import {
+  OPENROUTER_DECISIONS_API_TYPE,
+  parseDecisionsUpstreamResponse,
+  SYSTEMONE_API_TYPE,
+  SYSTEMONE_ENDPOINT,
+  TYPESAFE_DECISIONS_API_TYPE,
+} from '../../types/decisions';
+import type { ImageGenerationTransformer } from '../../types/image-transformer';
 import {
   UnifiedDecisionsRequest,
   UnifiedDecisionsResponse,
@@ -8,38 +17,29 @@ import {
   UnifiedTranscriptionRequest,
   UnifiedTranscriptionResponse,
 } from '../../types/unified';
-import { getConfig, getProviderTypes } from '../../config';
+import { getApiBaseType } from '../../utils/api-format';
+import { fetchWithSession } from '../../utils/fetch-sessions';
 import { logger } from '../../utils/logger';
-import { applyKeyAccessPolicy } from '../routing/key-access-policy';
-import { Router, type RouteResult } from '../routing/router';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
+import { isOAuthRoute } from '../oauth/oauth-dispatcher';
+import { prepareCodexImagesDispatch } from '../oauth/oauth-native-request';
 import { DebugManager } from '../observability/debug-manager';
-import { EmbeddingsTransformerFactory } from './embeddings-transformer-factory';
-import { ImageGenerationTransformerFactory } from './image-transformer-factory';
 import {
   resolveImageProviderBaseUrl,
   selectTargetApiType,
 } from '../providers/provider-api-selection';
-import { isOAuthRoute } from '../oauth/oauth-dispatcher';
-import { prepareCodexImagesDispatch } from '../oauth/oauth-native-request';
-import { getApiBaseType } from '../../utils/api-format';
-import { fetchWithSession } from '../../utils/fetch-sessions';
-import type { ImageGenerationTransformer } from '../../types/image-transformer';
+import { applyKeyAccessPolicy } from '../routing/key-access-policy';
+import { Router, type RouteResult } from '../routing/router';
+import { ConcurrencyTracker } from '../runtime/concurrency-tracker';
+import { CooldownManager } from '../runtime/cooldown-manager';
+import { admitProvider } from '../runtime/provider-admission';
 import type { RetryAttemptRecord } from './dispatcher-types';
+import { EmbeddingsTransformerFactory } from './embeddings-transformer-factory';
+import { ImageGenerationTransformerFactory } from './image-transformer-factory';
 import {
-  createAttemptTimeout,
   type AttemptTimeout,
+  createAttemptTimeout,
   type ResolveTimeoutMs,
 } from './upstream-execution';
-import { admitProvider } from '../runtime/provider-admission';
-import {
-  OPENROUTER_DECISIONS_API_TYPE,
-  SYSTEMONE_API_TYPE,
-  SYSTEMONE_ENDPOINT,
-  TYPESAFE_DECISIONS_API_TYPE,
-  parseDecisionsUpstreamResponse,
-} from '../../types/decisions';
 
 function imageRoutingError(message: string): Error {
   const error = new Error(message) as any;

@@ -1,4 +1,4 @@
-import { pgTable, text, bigint, integer, real, index } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgTable, real, text } from 'drizzle-orm/pg-core';
 
 export const responses = pgTable(
   'responses',

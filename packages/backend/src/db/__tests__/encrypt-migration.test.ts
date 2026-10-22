@@ -1,5 +1,8 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { decrypt, hashSecret, isEncrypted, resetEncryptionKeyCache } from '../../utils/encryption';
+import { toDbBoolean } from '../../utils/normalize';
 import {
   closeDatabase,
   getCurrentDialect,
@@ -7,10 +10,8 @@ import {
   getSchema,
   initializeDatabase,
 } from '../client';
-import { runMigrations } from '../migrate';
 import { runEncryptionMigration } from '../encrypt-migration';
-import { decrypt, hashSecret, isEncrypted, resetEncryptionKeyCache } from '../../utils/encryption';
-import { toDbBoolean } from '../../utils/normalize';
+import { runMigrations } from '../migrate';
 
 const TEST_KEY = 'b'.repeat(64);
 

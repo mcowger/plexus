@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { closeDatabase } from '../../src/db/client';
 import { ConfigRepository } from '../../src/db/config-repository';
 import { ConfigService } from '../../src/services/configuration/config-service';

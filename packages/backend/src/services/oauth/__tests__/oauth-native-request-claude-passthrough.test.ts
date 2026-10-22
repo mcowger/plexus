@@ -8,10 +8,11 @@
  * identity headers preserved, masking skipped).
  */
 
-import { describe, expect, test, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
+
+import type { UnifiedChatRequest } from '../../../types/unified';
 import { ClaudeCodeVersionService } from '../claude-code-version-service';
 import { isGenuineClaudeCodeRequest, prepareOAuthNativeRequest } from '../oauth-native-request';
-import type { UnifiedChatRequest } from '../../../types/unified';
 
 const CLIENT_UA = 'claude-cli/2.1.278 (external, cli)';
 const SESSION_ID = 'f30933dc-c43f-4e8f-82d2-8d87c3ef60e6';

@@ -5,8 +5,9 @@
  * using EntityRow components.
  */
 
-import React from 'react';
 import { Cpu, Server } from 'lucide-react';
+import React from 'react';
+
 import { SortableCard } from '../../ui/SortableCard';
 import type { EntityStats } from '../liveTypes';
 import { EntityRow } from './EntityRow';
@@ -37,7 +38,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
         id: 'stats',
         title: 'Provider & Model Stats',
         extra: (
-          <span className="text-xs text-text-secondary">
+          <span className="text-text-secondary text-xs">
             {activeProviderCount} providers, {activeModelCount} models
           </span>
         ),
@@ -45,18 +46,18 @@ export const StatsCard: React.FC<StatsCardProps> = ({
         style: { cursor: 'pointer' },
         className: 'hover:shadow-lg hover:border-primary/30 transition-all',
         content: (
-          <div className="h-48 sm:h-56 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto">
+          <div className="grid h-48 grid-cols-1 gap-4 overflow-y-auto sm:h-56 lg:grid-cols-2">
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-text flex items-center gap-2">
+              <h4 className="text-text flex items-center gap-2 text-sm font-semibold">
                 <Server size={16} className="text-primary" />
                 Top Providers
               </h4>
               {providerStats.length === 0 ? (
-                <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+                <div className="text-text-secondary flex h-32 items-center justify-center text-sm">
                   No provider activity in window
                 </div>
               ) : (
-                <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
+                <div className="max-h-70 space-y-2 overflow-y-auto pr-1">
                   {providerStats.map((provider) => (
                     <EntityRow key={provider.name} entity={provider} />
                   ))}
@@ -64,16 +65,16 @@ export const StatsCard: React.FC<StatsCardProps> = ({
               )}
             </div>
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-text flex items-center gap-2">
+              <h4 className="text-text flex items-center gap-2 text-sm font-semibold">
                 <Cpu size={16} className="text-secondary" />
                 Top Models
               </h4>
               {modelStats.length === 0 ? (
-                <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+                <div className="text-text-secondary flex h-32 items-center justify-center text-sm">
                   No model activity in window
                 </div>
               ) : (
-                <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
+                <div className="max-h-70 space-y-2 overflow-y-auto pr-1">
                   {modelStats.map((model) => (
                     <EntityRow key={model.name} entity={model} isModel />
                   ))}

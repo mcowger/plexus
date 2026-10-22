@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, bigint, jsonb, unique } from 'drizzle-orm/pg-core';
+import { bigint, integer, jsonb, pgTable, serial, text, unique } from 'drizzle-orm/pg-core';
+
 import { modelAliases } from './model-aliases';
 
 export const aliasMetadataOverrides = pgTable(
@@ -16,16 +17,15 @@ export const aliasMetadataOverrides = pgTable(
     pricingCompletion: text('pricing_completion'),
     pricingInputCacheRead: text('pricing_input_cache_read'),
     pricingInputCacheWrite: text('pricing_input_cache_write'),
-    pricingTiers:
-      jsonb('pricing_tiers').$type<
-        Array<{
-          input_tokens_above: number;
-          prompt?: string;
-          completion?: string;
-          input_cache_read?: string;
-          input_cache_write?: string;
-        }>
-      >(),
+    pricingTiers: jsonb('pricing_tiers').$type<
+      Array<{
+        input_tokens_above: number;
+        prompt?: string;
+        completion?: string;
+        input_cache_read?: string;
+        input_cache_write?: string;
+      }>
+    >(),
     architectureInputModalities: jsonb('architecture_input_modalities').$type<string[]>(),
     architectureOutputModalities: jsonb('architecture_output_modalities').$type<string[]>(),
     architectureTokenizer: text('architecture_tokenizer'),

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowRight, AlertCircle, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/ui/Button';
+import { AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import { PlexusMark } from '../components/layout/PlexusMark';
+import { Button } from '../components/ui/Button';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Login: React.FC = () => {
   const [key, setKey] = useState('');
@@ -80,10 +81,10 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-deep p-4 sm:p-6">
+    <div className="bg-bg-deep flex min-h-screen items-center justify-center p-4 sm:p-6">
       {/* Background mesh */}
-      <div className="fixed inset-0 pointer-events-none opacity-50" aria-hidden="true">
-        <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" className="w-full h-full">
+      <div className="pointer-events-none fixed inset-0 opacity-50" aria-hidden="true">
+        <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
           <g stroke="rgba(245,158,11,0.10)" strokeWidth="0.5" fill="none">
             <path d="M0 200 C 200 100, 600 300, 800 180" />
             <path d="M0 320 C 220 220, 580 420, 800 300" />
@@ -104,10 +105,10 @@ export const Login: React.FC = () => {
             <PlexusMark size={44} />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold amber-grad-text font-heading tracking-tight">
+            <span className="amber-grad-text font-heading text-3xl font-bold tracking-tight">
               Plexus
             </span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-text-muted font-mono">
+            <span className="text-text-muted font-mono text-[10px] tracking-[0.18em] uppercase">
               {appVersion}
             </span>
           </div>
@@ -116,8 +117,8 @@ export const Login: React.FC = () => {
         {/* Card */}
         <div className="glass-bg rounded-xl p-5 shadow-2xl sm:rounded-2xl sm:p-8">
           <div className="mb-6">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight mb-1.5">Sign in</h1>
-            <p className="text-sm text-text-secondary leading-relaxed">
+            <h1 className="font-heading mb-1.5 text-2xl font-semibold tracking-tight">Sign in</h1>
+            <p className="text-text-secondary text-sm leading-relaxed">
               Enter your admin key for full access, or an API key secret for a scoped view of your
               key's activity.
             </p>
@@ -136,14 +137,14 @@ export const Login: React.FC = () => {
             <div>
               <label
                 htmlFor="adminKey"
-                className="block text-xs font-medium text-text-secondary mb-1.5 uppercase tracking-wider"
+                className="text-text-secondary mb-1.5 block text-xs font-medium tracking-wider uppercase"
               >
                 Admin key or API key secret
               </label>
               <div className="relative">
                 <KeyRound
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+                  className="text-text-muted pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
                 />
                 <input
                   id="adminKey"
@@ -156,19 +157,19 @@ export const Login: React.FC = () => {
                   }}
                   placeholder="sk-admin-•••• or sk-•••••••••••••"
                   autoFocus
-                  className="w-full bg-slate-900/60 border border-border rounded-md py-3 pl-10 pr-10 text-text font-mono text-sm placeholder:text-text-muted hover:border-border-2 focus:border-primary focus:shadow-[0_0_0_3px_rgba(245,158,11,0.18)] focus:outline-none transition-all duration-fast"
+                  className="border-border text-text placeholder:text-text-muted hover:border-border-2 focus:border-primary duration-fast w-full rounded-md border bg-slate-900/60 py-3 pr-10 pl-10 font-mono text-sm transition-all focus:shadow-[0_0_0_3px_rgba(245,158,11,0.18)] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowKey((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md hover:bg-slate-700/50 text-text-secondary"
+                  className="text-text-secondary absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1.5 hover:bg-slate-700/50"
                   aria-label={showKey ? 'Hide key' : 'Show key'}
                 >
                   {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
               {error && (
-                <div className="mt-2 flex items-start gap-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg p-2.5">
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
                   <AlertCircle size={14} className="mt-0.5 flex-none" />
                   <span>{error}</span>
                 </div>
@@ -181,7 +182,7 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          <div className="mt-6 flex flex-col gap-2 border-t border-white/5 pt-5 text-[11px] text-text-muted sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-text-muted mt-6 flex flex-col gap-2 border-t border-white/5 pt-5 text-[11px] sm:flex-row sm:items-center sm:justify-between">
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck size={14} />
               End-to-end encrypted
@@ -189,7 +190,7 @@ export const Login: React.FC = () => {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-text-muted">
+        <p className="text-text-muted mt-6 text-center text-xs">
           © 2026 Plexus · Unified LLM Gateway
         </p>
       </main>

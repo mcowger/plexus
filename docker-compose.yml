@@ -5,7 +5,7 @@ services:
     container_name: plexus
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - '4000:4000'
     volumes:
       - ./data:/app/data
     environment:

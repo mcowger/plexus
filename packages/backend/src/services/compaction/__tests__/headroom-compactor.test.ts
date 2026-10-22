@@ -1,3 +1,10 @@
+import type {
+  AssistantMessage,
+  Context,
+  ToolResultMessage,
+  UserMessage,
+} from '@earendil-works/pi-ai';
+import type { CompressResult } from 'headroom-ai';
 /**
  * headroom-compactor.test.ts
  *
@@ -5,14 +12,8 @@
  * so no real headroom-ai server is ever contacted.
  */
 import { describe, expect, test, vi } from 'vitest';
-import type {
-  Context,
-  AssistantMessage,
-  ToolResultMessage,
-  UserMessage,
-} from '@earendil-works/pi-ai';
-import type { CompressResult } from 'headroom-ai';
-import { HeadroomCompactor, toOpenAI, fromOpenAI } from '../headroom-compactor';
+
+import { fromOpenAI, HeadroomCompactor, toOpenAI } from '../headroom-compactor';
 import { COMPACTION_DEFAULTS } from '../types';
 import type { CompactionStrategyContext } from '../types';
 

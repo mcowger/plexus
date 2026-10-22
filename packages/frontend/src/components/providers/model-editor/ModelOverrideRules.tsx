@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
+
 import { Button } from '../../ui/Button';
 import { DebouncedInput } from '../../ui/DebouncedInput';
 import { getAdapterName, normalizeAdapterEntries } from './adapter-utils';
@@ -34,10 +35,10 @@ export function ModelOverrideRules({ modelId, modelConfig, updateModelConfig }: 
         paddingTop: '6px',
       }}
     >
-      <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
+      <div className="font-body text-text-secondary mb-1 text-[11px] font-medium">
         Model Override Rules
       </div>
-      <div className="font-body text-[10px] text-text-muted mb-2" style={{ lineHeight: 1.3 }}>
+      <div className="font-body text-text-muted mb-2 text-[10px]" style={{ lineHeight: 1.3 }}>
         When ANY condition matches, rewrite the model name. Use dotted paths like reasoning.enabled.
       </div>
       {rules.map((rule: any, rIdx: number) => (
@@ -51,10 +52,10 @@ export function ModelOverrideRules({ modelId, modelConfig, updateModelConfig }: 
             background: 'var(--color-bg-subtle)',
           }}
         >
-          <div className="font-body text-[10px] font-medium text-text-muted mb-1">Rewrite</div>
+          <div className="font-body text-text-muted mb-1 text-[10px] font-medium">Rewrite</div>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <div
-              className="font-body text-[12px] text-text-muted"
+              className="font-body text-text-muted text-[12px]"
               style={{
                 flex: 2,
                 padding: '5px 8px',
@@ -69,7 +70,7 @@ export function ModelOverrideRules({ modelId, modelConfig, updateModelConfig }: 
             >
               {modelId}
             </div>
-            <span className="font-body text-[11px] text-text-muted">→</span>
+            <span className="font-body text-text-muted text-[11px]">→</span>
             <div style={{ flex: 1 }}>
               <DebouncedInput
                 placeholder="Rewrite to (e.g. deepseek-r1-fast)"
@@ -93,18 +94,18 @@ export function ModelOverrideRules({ modelId, modelConfig, updateModelConfig }: 
           <div
             style={{ borderTop: '1px solid var(--color-border-glass)', margin: '6px 0 4px 0' }}
           />
-          <div className="font-body text-[10px] font-medium text-text-muted mb-1">
+          <div className="font-body text-text-muted mb-1 text-[10px] font-medium">
             Conditions (any match triggers rewrite)
           </div>
           <div style={{ display: 'flex', gap: '4px', marginBottom: '2px', marginLeft: '8px' }}>
             <span
-              className="font-body text-[9px] font-medium text-text-muted"
+              className="font-body text-text-muted text-[9px] font-medium"
               style={{ flex: 1, paddingLeft: '8px' }}
             >
               Field path (dotted)
             </span>
             <span
-              className="font-body text-[9px] font-medium text-text-muted"
+              className="font-body text-text-muted text-[9px] font-medium"
               style={{ flex: 1, paddingLeft: '8px' }}
             >
               Value (blank = presence check)

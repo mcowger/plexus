@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+
 import { formatNumber } from '../../../lib/format';
 
 export interface ModelPulseModalProps {
@@ -15,7 +16,7 @@ export const ModelPulseModal: React.FC<ModelPulseModalProps> = ({ modelPulseRows
   return (
     <div className="h-[60vh]">
       {modelPulseRows.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-text-secondary">
+        <div className="text-text-secondary flex h-full items-center justify-center">
           No model traffic in the selected live window.
         </div>
       ) : (
@@ -23,15 +24,15 @@ export const ModelPulseModal: React.FC<ModelPulseModalProps> = ({ modelPulseRows
           {modelPulseRows.map((row) => (
             <div
               key={row.label}
-              className="rounded-md border border-border-glass bg-bg-glass px-4 py-3"
+              className="border-border-glass bg-bg-glass rounded-md border px-4 py-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-base text-text font-medium">{row.label}</span>
-                <span className="text-sm text-text-secondary">
+                <span className="text-text text-base font-medium">{row.label}</span>
+                <span className="text-text-secondary text-sm">
                   {formatNumber(row.requests, 0)} requests
                 </span>
               </div>
-              <div className="mt-1 text-sm text-text-secondary">
+              <div className="text-text-secondary mt-1 text-sm">
                 Success: {row.successRate.toFixed(1)}%
               </div>
             </div>

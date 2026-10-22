@@ -1,14 +1,15 @@
-import { describe, expect, test, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { describe, expect, test, vi } from 'vitest';
+
+import type { QuotaCheckSnapshot, QuotaContext, QuotaEnforcer } from '../quota-enforcer';
 import {
+  attachQuotaContext,
   buildQuotaExceededBody,
   buildQuotaExceededError,
   buildQuotaHeaders,
-  attachQuotaContext,
   checkQuotaMiddleware,
   recordQuotaUsage,
 } from '../quota-middleware';
-import type { QuotaContext, QuotaCheckSnapshot, QuotaEnforcer } from '../quota-enforcer';
 
 function makeSnapshot(overrides: Partial<QuotaCheckSnapshot> = {}): QuotaCheckSnapshot {
   return {

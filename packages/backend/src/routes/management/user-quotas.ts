@@ -1,7 +1,8 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../../utils/logger';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+
 import { QuotaDefinition, QuotaDefinitionSchema } from '../../config';
 import { ConfigService } from '../../services/configuration/config-service';
+import { logger } from '../../utils/logger';
 
 /**
  * Register API endpoints for user quota management.

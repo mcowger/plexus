@@ -1,11 +1,12 @@
-import type { Dispatch, SetStateAction } from 'react';
 import { RefreshCw } from 'lucide-react';
-import type { KeyConfig } from '../../lib/api';
-import { Input } from '../../components/ui/Input';
-import { TagSelect } from '../../components/ui/TagSelect';
+import type { Dispatch, SetStateAction } from 'react';
+
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { Switch } from '../../components/ui/Switch';
+import { TagSelect } from '../../components/ui/TagSelect';
+import type { KeyConfig } from '../../lib/api';
 import { formatExpiry } from './helpers';
 import type { ExpiryUnit } from './types';
 
@@ -87,7 +88,7 @@ export const KeyEditorModal = ({
           placeholder="e.g. production-app-1"
           disabled={!!originalKeyName}
         />
-        <p className="text-xs text-text-muted">
+        <p className="text-text-muted text-xs">
           {originalKeyName
             ? 'Key ID cannot be changed once created.'
             : 'A unique identifier for this key.'}
@@ -95,7 +96,7 @@ export const KeyEditorModal = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="font-body text-[13px] font-medium text-text-secondary">Secret Key</label>
+        <label className="font-body text-text-secondary text-[13px] font-medium">Secret Key</label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="min-w-0 flex-1">
             <Input
@@ -114,7 +115,7 @@ export const KeyEditorModal = ({
             <RefreshCw size={16} />
           </Button>
         </div>
-        <p className="text-xs text-text-muted mt-1">
+        <p className="text-text-muted mt-1 text-xs">
           The secret used to authenticate. Click refresh to generate a secure random key.
         </p>
       </div>
@@ -128,14 +129,14 @@ export const KeyEditorModal = ({
 
       {originalKeyName ? (
         editingKey.expiresAt && (
-          <div className="rounded-md border border-border-glass bg-bg-subtle p-3 text-sm text-text-secondary">
+          <div className="border-border-glass bg-bg-subtle text-text-secondary rounded-md border p-3 text-sm">
             <div>Expires: {formatExpiry(editingKey.expiresAt)}</div>
-            <p className="mt-1 text-xs text-text-muted">Expiry cannot be changed after creation.</p>
+            <p className="text-text-muted mt-1 text-xs">Expiry cannot be changed after creation.</p>
           </div>
         )
       ) : (
         <div className="flex flex-col gap-2">
-          <label className="font-body text-[13px] font-medium text-text-secondary">
+          <label className="font-body text-text-secondary text-[13px] font-medium">
             Expiry (optional)
           </label>
           <div className="flex gap-2">
@@ -148,7 +149,7 @@ export const KeyEditorModal = ({
               placeholder="Never expires"
             />
             <select
-              className="rounded-md border border-border-glass bg-bg-subtle px-3 text-sm text-text"
+              className="border-border-glass bg-bg-subtle text-text rounded-md border px-3 text-sm"
               value={expiryUnit}
               onChange={(event) => setExpiryUnit(event.target.value as ExpiryUnit)}
             >
@@ -157,7 +158,7 @@ export const KeyEditorModal = ({
               <option value="days">Days</option>
             </select>
           </div>
-          <p className="text-xs text-text-muted">
+          <p className="text-text-muted text-xs">
             Once set, a time-bound key cannot be extended or re-enabled.
           </p>
         </div>
@@ -175,7 +176,7 @@ export const KeyEditorModal = ({
           })
         }
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Optional denylist. If set, this key cannot use these model aliases.
       </p>
 
@@ -191,7 +192,7 @@ export const KeyEditorModal = ({
           })
         }
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Optional allowlist. If set, this key can only use these configured model aliases.
       </p>
 
@@ -207,7 +208,7 @@ export const KeyEditorModal = ({
           })
         }
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Optional denylist. If set, routing will not use these provider IDs.
       </p>
 
@@ -223,18 +224,18 @@ export const KeyEditorModal = ({
           })
         }
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Optional allowlist. If set, routing is limited to these provider IDs.
       </p>
 
-      <label className="flex items-start gap-2 py-1 cursor-pointer">
+      <label className="flex cursor-pointer items-start gap-2 py-1">
         <Switch
           checked={editingKey.allowRawPassthrough === true}
           onChange={(allowRawPassthrough) => setEditingKey({ ...editingKey, allowRawPassthrough })}
         />
         <div>
-          <div className="font-body text-[13px] text-text">Allow Raw Provider Access</div>
-          <div className="text-xs text-text-muted" style={{ lineHeight: 1.35 }}>
+          <div className="font-body text-text text-[13px]">Allow Raw Provider Access</div>
+          <div className="text-text-muted text-xs" style={{ lineHeight: 1.35 }}>
             Privileged capability. This key may call any endpoint on raw-enabled providers permitted
             by its provider allow/deny lists. Model restrictions do not apply.
           </div>
@@ -255,7 +256,7 @@ export const KeyEditorModal = ({
           })
         }
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Optional allowlist. Type entries separated by spaces. Empty means allow all;{' '}
         <code>0.0.0.0/0</code> is all IPv4 and <code>::/0</code> all IPv6. Accepts IPv4/IPv6, CIDR
         (e.g. <code>10.0.0.0/8</code>), and ranges (e.g. <code>10.1.0.10-20</code>).
@@ -270,7 +271,7 @@ export const KeyEditorModal = ({
           setEditingKey({ ...editingKey, quotas: names.length > 0 ? names : undefined })
         }
       />
-      <p className="text-xs text-text-muted -mt-1">
+      <p className="text-text-muted -mt-1 text-xs">
         Optional: assign one or more quotas to this key (usage against each is tracked
         independently). When left empty, this key falls back to the system's default quotas, if any
         are configured.
@@ -279,13 +280,13 @@ export const KeyEditorModal = ({
       <div className="flex flex-col gap-2">
         <label
           htmlFor="key-default-service-tier"
-          className="font-body text-[13px] font-medium text-text-secondary"
+          className="font-body text-text-secondary text-[13px] font-medium"
         >
           Default service tier
         </label>
         <select
           id="key-default-service-tier"
-          className="rounded-md border border-border-glass bg-bg-subtle px-3 py-2 text-sm text-text"
+          className="border-border-glass bg-bg-subtle text-text rounded-md border px-3 py-2 text-sm"
           value={editingKey.defaultServiceTier ?? ''}
           onChange={(event) =>
             setEditingKey({
@@ -303,7 +304,7 @@ export const KeyEditorModal = ({
             </option>
           ))}
         </select>
-        <p className="text-xs text-text-muted -mt-1">
+        <p className="text-text-muted -mt-1 text-xs">
           Applied only when the client does not request a service tier itself. A client-supplied{' '}
           <code>service_tier</code> or <code>@tier</code> model suffix overrides this value.
         </p>

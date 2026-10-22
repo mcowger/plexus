@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { ProviderConfigSchema } from '../../../config';
 import { isNativeOAuthRoute } from '../../dispatch/request-payload-builder';
 import type { RouteResult } from '../../routing/router';

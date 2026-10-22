@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   reasoningRewriteAdapter,
-  setDottedPath,
   removeDottedPath,
+  setDottedPath,
 } from '../reasoning-rewrite.adapter';
 
 // ── setDottedPath ──────────────────────────────────────────────────────

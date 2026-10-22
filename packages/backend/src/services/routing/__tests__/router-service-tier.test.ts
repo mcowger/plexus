@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+
 import { setConfigForTesting } from '../../../config';
 import { Router } from '../router';
 

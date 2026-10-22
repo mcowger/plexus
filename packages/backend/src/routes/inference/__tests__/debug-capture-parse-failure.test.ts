@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
-import { registerInferenceRoutes } from '../index';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
-import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { DebugManager } from '../../../services/observability/debug-manager';
+import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { SelectorFactory } from '../../../services/routing/selectors/factory';
 import {
   AnthropicTransformer,
@@ -13,7 +14,7 @@ import {
   OpenAITransformer,
   ResponsesTransformer,
 } from '../../../transformers';
-import { registerSpy } from '../../../../test/test-utils';
+import { registerInferenceRoutes } from '../index';
 
 // Parse failures used to happen before DebugManager.startLog, so enabling
 // debug capture never recorded the payload that actually broke parsing.

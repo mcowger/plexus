@@ -1,4 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyReply, FastifyRequest } from 'fastify';
+
 import { logger } from '../utils/logger';
 
 export const requestLogger = async (request: FastifyRequest, reply: FastifyReply) => {

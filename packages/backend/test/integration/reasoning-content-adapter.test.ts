@@ -14,11 +14,12 @@
  *      back to `reasoning` before transformResponse() consumes it.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { registerSpy } from '../test-utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import * as configModule from '../../src/config';
 import { Dispatcher } from '../../src/services/dispatch/dispatcher';
 import { Router } from '../../src/services/routing/router';
-import * as configModule from '../../src/config';
+import { registerSpy } from '../test-utils';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 

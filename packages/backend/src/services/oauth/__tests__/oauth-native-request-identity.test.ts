@@ -12,7 +12,8 @@
  * startup/offline fallback.
  */
 
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { CC_VERSION } from '../../../transformers/oauth/masking/cc-constants';
 import { ClaudeCodeVersionService } from '../claude-code-version-service';
 import { prepareOAuthNativeRequest } from '../oauth-native-request';

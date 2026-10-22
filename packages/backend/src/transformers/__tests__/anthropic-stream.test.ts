@@ -1,9 +1,10 @@
-import { test, expect, describe } from 'vitest';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import { describe, expect, test } from 'vitest';
+
+import { UnifiedChatStreamChunk } from '../../types/unified';
 import { AnthropicTransformer } from '../anthropic';
 import { transformAnthropicStream } from '../anthropic/stream-transformer';
 import { OpenAITransformer } from '../openai';
-import { UnifiedChatStreamChunk } from '../../types/unified';
 
 describe('AnthropicTransformer Stream Formatting', () => {
   test('should include usage when it arrives after finish_reason', async () => {

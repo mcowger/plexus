@@ -1,4 +1,4 @@
-import { pgTable, serial, text, bigint, index } from 'drizzle-orm/pg-core';
+import { bigint, index, pgTable, serial, text } from 'drizzle-orm/pg-core';
 
 export const inferenceErrors = pgTable(
   'inference_errors',

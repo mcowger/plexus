@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { suppressUnsupportedGpt5OptionsAdapter } from '../suppress-unsupported-gpt5-options.adapter';
 
 describe('suppressUnsupportedGpt5OptionsAdapter', () => {

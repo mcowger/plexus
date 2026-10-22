@@ -1,5 +1,6 @@
-import { getEncoding, type Tiktoken } from 'js-tiktoken';
 import type { Context } from '@earendil-works/pi-ai';
+import { getEncoding, type Tiktoken } from 'js-tiktoken';
+
 import { logger } from './logger';
 
 // ---------------------------------------------------------------------------

@@ -1,10 +1,12 @@
 import { Database } from 'bun:sqlite';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+
 import { logger } from '../utils/logger';
-import path from 'node:path';
-import fs from 'node:fs';
 
 type SupportedDialect = 'sqlite' | 'postgres';
 type PostgresDriver = 'postgres-js' | 'pglite';

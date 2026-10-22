@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Gauge, TimerReset, Trash2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from 'recharts';
+
+import { useToast } from '../../../contexts/ToastContext';
 import { api, type ProviderPerformanceData } from '../../../lib/api';
 import { formatMs, formatNumber } from '../../../lib/format';
-import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
-import { useToast } from '../../../contexts/ToastContext';
+import { Card } from '../../ui/Card';
 
 const BAR_COLORS = [
   '#c26134',
@@ -60,7 +61,7 @@ const PerformanceBarChart = ({
   return (
     <div ref={containerRef} className="h-full w-full min-w-0">
       {chartData.length === 0 ? (
-        <div className="h-full w-full min-w-0 flex items-center justify-center text-sm text-text-secondary">
+        <div className="text-text-secondary flex h-full w-full min-w-0 items-center justify-center text-sm">
           No performance data for this model yet.
         </div>
       ) : size.width > 10 && size.height > 10 ? (
@@ -195,8 +196,8 @@ export const PerformanceTab = () => {
   return (
     <div className="p-6 transition-all duration-300">
       <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-text m-0 mb-2">Performance</h1>
-        <p className="text-[15px] text-text-secondary m-0">
+        <h1 className="font-heading text-text m-0 mb-2 text-3xl font-bold">Performance</h1>
+        <p className="text-text-secondary m-0 text-[15px]">
           Compare provider speed for a given model by throughput and time-to-first-token.
         </p>
       </div>
@@ -206,7 +207,7 @@ export const PerformanceTab = () => {
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="bg-bg-glass text-text border border-border-glass rounded-md px-3 py-2 text-sm min-w-60"
+            className="bg-bg-glass text-text border-border-glass min-w-60 rounded-md border px-3 py-2 text-sm"
           >
             {models.length === 0 ? (
               <option value="">No models available</option>
@@ -234,16 +235,16 @@ export const PerformanceTab = () => {
             Clear
           </Button>
 
-          <div className="text-sm text-text-secondary">
+          <div className="text-text-secondary text-sm">
             Providers: <span className="text-text font-medium">{selectedRows.length}</span>
           </div>
-          <div className="text-sm text-text-secondary">
+          <div className="text-text-secondary text-sm">
             Samples: <span className="text-text font-medium">{formatNumber(totalSamples, 0)}</span>
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card
           className="min-w-0"
           title="Fastest Providers (tok/s)"
@@ -301,7 +302,7 @@ export const PerformanceTab = () => {
             <div className="text-text-secondary">Model</div>
             <div className="text-text font-medium break-all">{selectedModel || '—'}</div>
 
-            <div className="pt-2 border-t border-border-glass text-text-secondary">
+            <div className="border-border-glass text-text-secondary border-t pt-2">
               Top throughput provider
             </div>
             <div className="text-text font-medium">
@@ -310,7 +311,7 @@ export const PerformanceTab = () => {
                 : '—'}
             </div>
 
-            <div className="pt-2 border-t border-border-glass text-text-secondary">
+            <div className="border-border-glass text-text-secondary border-t pt-2">
               Lowest TTFT provider
             </div>
             <div className="text-text font-medium">

@@ -1,11 +1,12 @@
 import { FastifyInstance } from 'fastify';
-import { QuotaScheduler } from '../../services/quota/quota-scheduler';
+
 import { getConfig } from '../../config';
-import { logger } from '../../utils/logger';
 import {
   getCheckerDefinitions,
   isCustomCheckerRegistered,
 } from '../../services/quota/checker-registry';
+import { QuotaScheduler } from '../../services/quota/quota-scheduler';
+import { logger } from '../../utils/logger';
 
 function getOAuthMetadata(checkerId: string) {
   const quotaConfig = getConfig().quotas?.find((q) => q.id === checkerId);

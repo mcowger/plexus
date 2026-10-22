@@ -1,7 +1,8 @@
-import React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Modal } from '../ui/Modal';
+import React from 'react';
+
 import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
 interface Props {
   isOpen: boolean;

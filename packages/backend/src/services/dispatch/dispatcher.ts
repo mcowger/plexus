@@ -1,56 +1,29 @@
 import { createParser } from 'eventsource-parser';
+
+import { getConfig } from '../../config';
+import { editRequestToGenerationRequest } from '../../transformers/image';
+import type { ResolvedAdapter } from '../../types/provider-adapter';
 import {
   UnifiedChatRequest,
   UnifiedChatResponse,
   UnifiedDecisionsRequest,
   UnifiedDecisionsResponse,
-  UnifiedTranscriptionRequest,
-  UnifiedTranscriptionResponse,
-  UnifiedSpeechRequest,
-  UnifiedSpeechResponse,
-  UnifiedImageGenerationRequest,
-  UnifiedImageGenerationResponse,
   UnifiedImageEditRequest,
   UnifiedImageEditResponse,
+  UnifiedImageGenerationRequest,
+  UnifiedImageGenerationResponse,
+  UnifiedSpeechRequest,
+  UnifiedSpeechResponse,
+  UnifiedTranscriptionRequest,
+  UnifiedTranscriptionResponse,
 } from '../../types/unified';
-import { QuotaEnforcer } from '../quota/quota-enforcer';
-import { buildQuotaExceededError } from '../quota/quota-middleware';
+import { DEADLINE_EXPIRED_PATTERNS, QUOTA_ERROR_PATTERNS } from '../../utils/constants';
 import { logger } from '../../utils/logger';
-import { QUOTA_ERROR_PATTERNS, DEADLINE_EXPIRED_PATTERNS } from '../../utils/constants';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { StickySessionManager } from '../routing/sticky-session-manager';
-import { RouteResult } from '../routing/router';
+import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import type { StallConfig } from '../inspectors/stall-inspector';
+import { isPiAiRoute } from '../oauth/oauth-dispatcher';
 import { DebugManager } from '../observability/debug-manager';
 import { UsageStorageService } from '../observability/usage-storage';
-import { getConfig } from '../../config';
-import type { ResolvedAdapter } from '../../types/provider-adapter';
-import type { StallConfig } from '../inspectors/stall-inspector';
-import { sanitizeHeaders } from '../../utils/sanitize-headers';
-import type { RetryAttemptRecord } from './dispatcher-types';
-import { MediaDispatcher } from './media-dispatcher';
-import { editRequestToGenerationRequest } from '../../transformers/image';
-import { RequestManager, type RequestManagerHost } from './request-manager';
-import {
-  appendFailureAttempt,
-  appendSkippedAttempt,
-  appendSuccessAttempt,
-  attachAttemptMetadata,
-  buildAllTargetsFailedError,
-} from './attempt-history';
-import { isRetryableNetworkError, isRetryableStatus } from './failover-policy';
-import { buildRequestPayload, NATIVE_OAUTH_STASH } from './request-payload-builder';
-import {
-  extractActualServiceTier,
-  extractActualServiceTierFromHeaders,
-} from './service-tier-metadata';
-import {
-  createAttemptTimeout,
-  executeUpstreamRequest,
-  probeStreamingStart,
-} from './upstream-execution';
-import { isPiAiRoute } from '../oauth/oauth-dispatcher';
-import { setupProviderHeaders } from '../providers/provider-request-headers';
-import { applyHeaderCacheKeyInjection } from './cache-key-injection';
 import {
   applyGeminiThinkingConfig,
   getApiMetadata,
@@ -61,6 +34,34 @@ import {
   parseCooldownDurationForProvider,
   resolveCooldownProviderType,
 } from '../providers/provider-cooldown';
+import { setupProviderHeaders } from '../providers/provider-request-headers';
+import { QuotaEnforcer } from '../quota/quota-enforcer';
+import { buildQuotaExceededError } from '../quota/quota-middleware';
+import { RouteResult } from '../routing/router';
+import { StickySessionManager } from '../routing/sticky-session-manager';
+import { CooldownManager } from '../runtime/cooldown-manager';
+import {
+  appendFailureAttempt,
+  appendSkippedAttempt,
+  appendSuccessAttempt,
+  attachAttemptMetadata,
+  buildAllTargetsFailedError,
+} from './attempt-history';
+import { applyHeaderCacheKeyInjection } from './cache-key-injection';
+import type { RetryAttemptRecord } from './dispatcher-types';
+import { isRetryableNetworkError, isRetryableStatus } from './failover-policy';
+import { MediaDispatcher } from './media-dispatcher';
+import { RequestManager, type RequestManagerHost } from './request-manager';
+import { buildRequestPayload, NATIVE_OAUTH_STASH } from './request-payload-builder';
+import {
+  extractActualServiceTier,
+  extractActualServiceTierFromHeaders,
+} from './service-tier-metadata';
+import {
+  createAttemptTimeout,
+  executeUpstreamRequest,
+  probeStreamingStart,
+} from './upstream-execution';
 
 interface ParseFailureContext {
   rawResponseText: string;

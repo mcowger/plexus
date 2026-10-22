@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
+
+import type { RouteResult } from '../../routing/router';
 import {
   appendFailureAttempt,
   appendSkippedAttempt,
   appendSuccessAttempt,
   attachAttemptMetadata,
   buildAllTargetsFailedError,
-  resolveUpstreamPricing,
   type ErrorSummaryFormatter,
   type FailureReasonFormatter,
+  resolveUpstreamPricing,
 } from '../attempt-history';
-import { EMPTY_COMPLETION_REASON } from '../empty-completion';
-import type { RouteResult } from '../../routing/router';
 import type { RetryAttemptRecord } from '../dispatcher-types';
+import { EMPTY_COMPLETION_REASON } from '../empty-completion';
 
 // Minimal RouteResult factory — attempt-history only reads `provider`/`model`,
 // so `config` is stubbed out (mirrors adapter-resolver.test.ts's makeRoute).

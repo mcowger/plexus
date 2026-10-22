@@ -1,5 +1,5 @@
-import { UsageRecord } from '../types/usage';
 import { PricingManager } from '../services/observability/pricing-manager';
+import { UsageRecord } from '../types/usage';
 
 export interface CostAttribution {
   upstreamModel?: string;

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+
 import { closeDatabase, initializeDatabase } from '../client';
-import { runMigrations } from '../migrate';
 import { ConfigRepository } from '../config-repository';
+import { runMigrations } from '../migrate';
 
 describe('raw passthrough configuration persistence', () => {
   let repository: ConfigRepository;

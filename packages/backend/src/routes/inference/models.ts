@@ -1,11 +1,17 @@
-import { FastifyInstance } from 'fastify';
-import type { FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'crypto';
+
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai';
 import type { Api, Model as PiAiModel } from '@earendil-works/pi-ai';
+import { FastifyInstance } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+
 import { getConfig } from '../../config';
 import type { ModelConfig, ProviderConfig } from '../../config';
-import { PricingManager } from '../../services/observability/pricing-manager';
+import {
+  applyQuirkOverlay,
+  resolveInlineQuirks,
+} from '../../services/dispatch/dispatcher-auto-compat';
+import { resolveAliasServiceTiers } from '../../services/models/alias-service-tiers';
 import {
   ModelMetadataManager,
   resolveAutomaticModelIdentity,
@@ -13,12 +19,8 @@ import {
   resolvePreferredApi,
 } from '../../services/models/model-metadata-manager';
 import { deriveShortName } from '../../services/models/short-name';
+import { PricingManager } from '../../services/observability/pricing-manager';
 import { getCatalogModel } from '../../services/pi-ai/catalog';
-import { resolveAliasServiceTiers } from '../../services/models/alias-service-tiers';
-import {
-  applyQuirkOverlay,
-  resolveInlineQuirks,
-} from '../../services/dispatch/dispatcher-auto-compat';
 import { renderModelsUiPage } from './models-ui';
 
 let v1ModelsLastHash: string | null = null;

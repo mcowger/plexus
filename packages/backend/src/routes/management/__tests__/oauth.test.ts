@@ -1,13 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import type { OAuthProviderDescriptor } from '../../../services/oauth/oauth-providers';
-import { registerOAuthRoutes } from '../oauth';
-import { OAuthLoginSessionManager } from '../../../services/oauth/oauth-login-session';
-import { OAuthAuthManager } from '../../../services/oauth/oauth-auth-manager';
-import { CodexVersionService } from '../../../services/oauth/codex-version-service';
-import { ConfigService } from '../../../services/configuration/config-service';
-import { CODEX_IMAGE_MODELS } from '../../../services/providers/provider-model-discovery';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { registerSpy } from '../../../../test/test-utils';
+import { ConfigService } from '../../../services/configuration/config-service';
+import { CodexVersionService } from '../../../services/oauth/codex-version-service';
+import { OAuthAuthManager } from '../../../services/oauth/oauth-auth-manager';
+import { OAuthLoginSessionManager } from '../../../services/oauth/oauth-login-session';
+import type { OAuthProviderDescriptor } from '../../../services/oauth/oauth-providers';
+import { CODEX_IMAGE_MODELS } from '../../../services/providers/provider-model-discovery';
+import { registerOAuthRoutes } from '../oauth';
 
 // @earendil-works/pi-ai is mocked globally in vitest.setup.ts — do not add a
 // per-file vi.mock() call here.  With isolate: false all files share one

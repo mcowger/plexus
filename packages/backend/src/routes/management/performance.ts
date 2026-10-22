@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { logger } from '../../utils/logger';
 

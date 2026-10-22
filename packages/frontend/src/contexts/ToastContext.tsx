@@ -1,7 +1,8 @@
+import { clsx } from 'clsx';
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
-import { clsx } from 'clsx';
+
 import { Button } from '../components/ui/Button';
 
 type ToastVariant = 'success' | 'error' | 'warning' | 'info';
@@ -97,21 +98,21 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={value}>
       {children}
       {createPortal(
-        <div className="fixed top-4 right-4 z-[600] flex flex-col gap-2 max-w-[90vw] sm:max-w-sm pointer-events-none">
+        <div className="pointer-events-none fixed top-4 right-4 z-[600] flex max-w-[90vw] flex-col gap-2 sm:max-w-sm">
           {toasts.map((toast) => (
             <div
               key={toast.id}
               className={clsx(
-                'pointer-events-auto flex items-start gap-3 bg-bg-surface border rounded-md p-3 shadow-modal backdrop-blur-md animate-[slideUp_0.2s_ease]',
+                'bg-bg-surface shadow-modal pointer-events-auto flex animate-[slideUp_0.2s_ease] items-start gap-3 rounded-md border p-3 backdrop-blur-md',
                 variantStyles[toast.variant].classes
               )}
             >
               <div className="mt-0.5 flex-shrink-0">{variantStyles[toast.variant].icon}</div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 {toast.title && (
-                  <div className="font-heading text-sm font-semibold text-text">{toast.title}</div>
+                  <div className="font-heading text-text text-sm font-semibold">{toast.title}</div>
                 )}
-                <div className="font-body text-xs text-text-secondary break-words">
+                <div className="font-body text-text-secondary text-xs break-words">
                   {toast.message}
                 </div>
               </div>
@@ -119,7 +120,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Dismiss"
-                className="flex-shrink-0 text-text-muted hover:text-text transition-colors duration-fast"
+                className="text-text-muted hover:text-text duration-fast flex-shrink-0 transition-colors"
               >
                 <X size={14} />
               </button>
@@ -131,24 +132,24 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {confirmState &&
         createPortal(
           <div
-            className="fixed inset-0 z-[410] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 z-[410] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
             onClick={() => resolveConfirm(false)}
             role="dialog"
             aria-modal="true"
           >
             <div
-              className="bg-bg-surface border border-border-glass rounded-xl w-full max-w-[420px] shadow-modal animate-[slideUp_0.2s_ease]"
+              className="bg-bg-surface border-border-glass shadow-modal w-full max-w-[420px] animate-[slideUp_0.2s_ease] rounded-xl border"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-5 sm:p-6 border-b border-border-glass">
-                <h2 className="font-heading text-h2 font-semibold text-text m-0">
+              <div className="border-border-glass border-b p-5 sm:p-6">
+                <h2 className="font-heading text-h2 text-text m-0 font-semibold">
                   {confirmState.title}
                 </h2>
               </div>
-              <div className="p-5 sm:p-6 font-body text-sm text-text-secondary">
+              <div className="font-body text-text-secondary p-5 text-sm sm:p-6">
                 {confirmState.message}
               </div>
-              <div className="flex items-center justify-end gap-3 px-5 py-4 sm:px-6 border-t border-border-glass">
+              <div className="border-border-glass flex items-center justify-end gap-3 border-t px-5 py-4 sm:px-6">
                 <Button variant="secondary" onClick={() => resolveConfirm(false)}>
                   {confirmState.cancelLabel ?? 'Cancel'}
                 </Button>

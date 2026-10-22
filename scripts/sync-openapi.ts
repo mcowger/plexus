@@ -11,8 +11,9 @@
  *   bun run scripts/sync-openapi.ts --diff   # Show detailed diff
  */
 
-import { readdir, readFile, writeFile, stat } from 'fs/promises';
-import { join, relative, basename } from 'path';
+import { readdir, readFile, stat, writeFile } from 'fs/promises';
+import { basename, join, relative } from 'path';
+
 import { parse } from 'yaml';
 
 // ─── Configuration ───────────────────────────────────────────────────

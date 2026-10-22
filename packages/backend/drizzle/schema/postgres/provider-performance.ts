@@ -1,4 +1,4 @@
-import { pgTable, serial, text, real, bigint, integer, index } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgTable, real, serial, text } from 'drizzle-orm/pg-core';
 
 export const providerPerformance = pgTable(
   'provider_performance',

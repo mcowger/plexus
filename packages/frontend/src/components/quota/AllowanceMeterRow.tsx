@@ -1,10 +1,11 @@
-import React from 'react';
 import { clsx } from 'clsx';
-import type { Meter, MeterStatus } from '../../types/quota';
-import { formatMeterValue } from './MeterValue';
+import React from 'react';
+
+import { useNow } from '../../hooks/useNow';
 import { useCurrency } from '../../lib/CurrencyContext';
 import { countdownTickMs, formatResetCountdown } from '../../lib/format';
-import { useNow } from '../../hooks/useNow';
+import type { Meter, MeterStatus } from '../../types/quota';
+import { formatMeterValue } from './MeterValue';
 
 interface AllowanceMeterRowProps {
   meter: Meter;
@@ -62,11 +63,11 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
   if (compact) {
     return (
       <div className="flex flex-col gap-0.5">
-        <div className="flex items-center justify-between gap-1 min-w-0">
-          <span className="text-[11px] text-text-secondary truncate flex-1">{meter.label}</span>
+        <div className="flex min-w-0 items-center justify-between gap-1">
+          <span className="text-text-secondary flex-1 truncate text-[11px]">{meter.label}</span>
           {(pct !== null || reset) && (
             <span
-              className="text-[10px] tabular-nums text-text-muted flex-shrink-0"
+              className="text-text-muted flex-shrink-0 text-[10px] tabular-nums"
               title={reset ? `Resets at ${reset.absolute}` : undefined}
             >
               {pct !== null && `${Math.round(pct)}%`}
@@ -76,7 +77,7 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
           )}
         </div>
         {pct !== null && (
-          <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden border border-border/30">
+          <div className="bg-bg-subtle border-border/30 h-1.5 overflow-hidden rounded-full border">
             <div
               className={clsx(
                 'h-full rounded-full transition-all duration-500',
@@ -94,21 +95,21 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
     <div
       className={clsx(
         'flex flex-col gap-1 py-0.5',
-        onClick && 'cursor-pointer hover:bg-bg-hover rounded px-1 -mx-1 transition-colors'
+        onClick && 'hover:bg-bg-hover -mx-1 cursor-pointer rounded px-1 transition-colors'
       )}
       onClick={onClick}
       title={onClick ? 'Click to view history' : undefined}
     >
-      <div className="flex items-center justify-between gap-1 min-w-0">
-        <span className="text-xs text-text-secondary truncate min-w-0 flex-1">{meter.label}</span>
+      <div className="flex min-w-0 items-center justify-between gap-1">
+        <span className="text-text-secondary min-w-0 flex-1 truncate text-xs">{meter.label}</span>
         {meter.scope && (
-          <span className="text-[10px] text-text-muted px-1 bg-bg-subtle border border-border-glass/40 rounded uppercase tracking-wider font-mono shrink-0">
+          <span className="text-text-muted bg-bg-subtle border-border-glass/40 shrink-0 rounded border px-1 font-mono text-[10px] tracking-wider uppercase">
             {meter.scope}
           </span>
         )}
       </div>
       {pct !== null && (
-        <div className="h-1.5 rounded-full bg-bg-subtle overflow-hidden border border-border/30">
+        <div className="bg-bg-subtle border-border/30 h-1.5 overflow-hidden rounded-full border">
           <div
             className={clsx(
               'h-full rounded-full transition-all duration-500',
@@ -120,9 +121,9 @@ export const AllowanceMeterRow: React.FC<AllowanceMeterRowProps> = ({
       )}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         {remaining !== undefined && (
-          <span className="text-xs tabular-nums text-text">{remaining} left</span>
+          <span className="text-text text-xs tabular-nums">{remaining} left</span>
         )}
-        {period && <span className="text-[10px] text-text-muted">{period}</span>}
+        {period && <span className="text-text-muted text-[10px]">{period}</span>}
         {pct !== null && (
           <span
             className={clsx(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { reasoningContentAdapter } from '../../transformers/adapters/reasoning-content.adapter';
 
 describe('reasoningContentAdapter', () => {

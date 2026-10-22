@@ -1,4 +1,5 @@
-import { beforeEach, describe, test, expect } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
+
 import { OpenAICompletionTransformer } from '../completions';
 
 describe('OpenAICompletionTransformer', () => {

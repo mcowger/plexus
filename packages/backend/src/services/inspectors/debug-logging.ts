@@ -1,8 +1,10 @@
 import { PassThrough } from 'stream';
+
 import { createParser } from 'eventsource-parser';
+
 import { logger } from '../../utils/logger';
-import { BaseInspector } from './base';
 import { DebugManager } from '../observability/debug-manager';
+import { BaseInspector } from './base';
 
 const MAX_DEBUG_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
 const RESPONSES_TERMINAL_EVENT_TYPES = new Set([

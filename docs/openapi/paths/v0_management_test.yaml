@@ -107,13 +107,13 @@ post:
                 success: true
                 durationMs: 1234
                 apiType: chat
-                response: "Hello! How can I help you?"
+                response: 'Hello! How can I help you?'
             failure:
               value:
                 success: false
                 durationMs: 567
                 apiType: chat
-                error: "401 Unauthorized - invalid API key"
+                error: '401 Unauthorized - invalid API key'
     '400':
       description: Validation error — missing required fields, unknown
         `apiType`, or unsupported `transcriptions` apiType.

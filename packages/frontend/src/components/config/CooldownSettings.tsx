@@ -1,5 +1,6 @@
-import { Save } from 'lucide-react';
 import { formatMinutesToMinSec } from '@plexus/shared';
+import { Save } from 'lucide-react';
+
 import { Button } from '../ui/Button';
 import { Disclosure } from '../ui/Disclosure';
 import type { CooldownPolicy, FieldValidation } from './types';
@@ -52,7 +53,7 @@ export function CooldownSettings({
           <div className="flex flex-col gap-1">
             <label
               htmlFor="cooldownInitialMinutes"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Initial Cooldown (min){' '}
               <span className="text-text-muted font-normal">— C₀, first failure</span>
@@ -65,9 +66,9 @@ export function CooldownSettings({
                 step={0.1}
                 value={initialInput}
                 onChange={(event) => onInitialChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
-              <span className="text-[11px] text-text-muted tabular-nums whitespace-nowrap">
+              <span className="text-text-muted text-[11px] whitespace-nowrap tabular-nums">
                 {initialValidation.valid && initialValidation.value != null
                   ? formatMinutesToMinSec(initialValidation.value)
                   : loaded
@@ -76,13 +77,13 @@ export function CooldownSettings({
               </span>
             </div>
             {!initialValidation.valid && initialInput !== '' && (
-              <span className="text-[11px] text-warning">{initialValidation.error}</span>
+              <span className="text-warning text-[11px]">{initialValidation.error}</span>
             )}
           </div>
           <div className="flex flex-col gap-1">
             <label
               htmlFor="cooldownMaxMinutes"
-              className="font-body text-[12px] font-medium text-text"
+              className="font-body text-text text-[12px] font-medium"
             >
               Maximum Cooldown (min){' '}
               <span className="text-text-muted font-normal">— C_max, upper limit</span>
@@ -95,9 +96,9 @@ export function CooldownSettings({
                 step={0.1}
                 value={maxInput}
                 onChange={(event) => onMaxChange(event.target.value)}
-                className="w-full h-[27px] py-0 px-2 font-mono text-[12px] leading-none text-text bg-bg-subtle border border-border-glass rounded-sm outline-none focus:border-primary placeholder:text-text-muted"
+                className="text-text bg-bg-subtle border-border-glass focus:border-primary placeholder:text-text-muted h-[27px] w-full rounded-sm border px-2 py-0 font-mono text-[12px] leading-none outline-none"
               />
-              <span className="text-[11px] text-text-muted tabular-nums whitespace-nowrap">
+              <span className="text-text-muted text-[11px] whitespace-nowrap tabular-nums">
                 {maxValidation.valid && maxValidation.value != null
                   ? formatMinutesToMinSec(maxValidation.value)
                   : loaded
@@ -106,7 +107,7 @@ export function CooldownSettings({
               </span>
             </div>
             {!maxValidation.valid && maxInput !== '' && (
-              <span className="text-[11px] text-warning">{maxValidation.error}</span>
+              <span className="text-warning text-[11px]">{maxValidation.error}</span>
             )}
           </div>
         </div>

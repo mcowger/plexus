@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+
 import { registerSpy } from '../../../test/test-utils';
 import { logger } from '../logger';
 

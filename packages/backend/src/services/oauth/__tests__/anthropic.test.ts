@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AuthPrompt, OAuthAuth, ProviderAuthInteraction } from '@earendil-works/pi-ai';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { parseAuthorizationInput, withCopyCodeLogin } from '../anthropic';
 
 const neverAbortedSignal = new AbortController().signal;

@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import {
   creds,
   oauthProvider,
   resetOAuthDatabase,
 } from '../../../test/oauth-credential-test-utils';
+import type { ProviderConfig } from '../../config';
 import { closeDatabase } from '../client';
 import { ConfigRepository } from '../config-repository';
-import type { ProviderConfig } from '../../config';
 
 describe('provider OAuth slug linking', () => {
   let repo: ConfigRepository;

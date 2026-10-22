@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
+
+import { ResponsesTransformer } from '../../transformers/responses';
 import { Dispatcher } from '../dispatch/dispatcher';
 import { TransformerFactory } from '../dispatch/transformer-factory';
-import { ResponsesTransformer } from '../../transformers/responses';
 
 function makeRoute(
   accessVia: any[],

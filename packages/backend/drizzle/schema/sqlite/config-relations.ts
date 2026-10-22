@@ -1,10 +1,11 @@
 import { relations } from 'drizzle-orm';
-import { providers } from './providers';
-import { providerModels } from './provider-models';
-import { modelAliases } from './model-aliases';
-import { modelAliasTargets } from './model-alias-targets';
+
 import { aliasMetadataOverrides } from './alias-metadata-overrides';
+import { modelAliasTargets } from './model-alias-targets';
+import { modelAliases } from './model-aliases';
 import { oauthCredentials } from './oauth-credentials';
+import { providerModels } from './provider-models';
+import { providers } from './providers';
 
 export const providersRelations = relations(providers, ({ many, one }) => ({
   models: many(providerModels),

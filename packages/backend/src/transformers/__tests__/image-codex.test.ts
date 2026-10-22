@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { CodexImageTransformer } from '../images/codex';
-import { ImageRequestValidationError } from '../image';
+
 import { registerSpy } from '../../../test/test-utils';
 import type { UnifiedImageGenerationRequest } from '../../types/unified';
+import { ImageRequestValidationError } from '../image';
+import { CodexImageTransformer } from '../images/codex';
 
 const BASE_REQUEST: UnifiedImageGenerationRequest = {
   model: 'gpt-image-1',

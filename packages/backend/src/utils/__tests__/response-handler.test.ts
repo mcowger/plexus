@@ -1,15 +1,16 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { handleResponse } from '../../services/responses/response-handler';
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { UsageStorageService } from '../../services/observability/usage-storage';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+import { registerSpy } from '../../../test/test-utils';
 import { TransformerFactory } from '../../services/dispatch/transformer-factory';
+import { DebugManager } from '../../services/observability/debug-manager';
+import { UsageStorageService } from '../../services/observability/usage-storage';
+import { handleResponse } from '../../services/responses/response-handler';
+import { SYNTHETIC_SAFEGUARD_EXPLANATION } from '../../transformers/anthropic/synthetic-safeguards';
 import { Transformer } from '../../types/transformer';
 import { UnifiedChatResponse } from '../../types/unified';
 import { UsageRecord } from '../../types/usage';
-import { registerSpy } from '../../../test/test-utils';
 import { logger } from '../../utils/logger';
-import { DebugManager } from '../../services/observability/debug-manager';
-import { SYNTHETIC_SAFEGUARD_EXPLANATION } from '../../transformers/anthropic/synthetic-safeguards';
 
 // Force the alias toggle on for the synthetic-safeguard regression test
 // without depending on global config state; every other test in this file

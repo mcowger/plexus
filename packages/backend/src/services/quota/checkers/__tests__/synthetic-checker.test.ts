@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { createMeterContext, isCheckerRegistered } from '../../checker-registry';
 import checkerDef from '../synthetic-checker';
 

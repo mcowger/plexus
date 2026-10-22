@@ -1,14 +1,16 @@
+import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { logger } from '../../utils/logger';
+
+import { getConfig, ModelConfigSchema } from '../../config';
 import {
   ModelMetadataManager,
   resolveAutomaticModelIdentity,
   resolveModelMetadata,
   resolvePreferredApi,
 } from '../../services/models/model-metadata-manager';
-import { getConfig, ModelConfigSchema } from '../../config';
-import { getBuiltinProviders } from '@earendil-works/pi-ai/providers/all';
+import { ClaudeCodeVersionService } from '../../services/oauth/claude-code-version-service';
+import { CodexVersionService } from '../../services/oauth/codex-version-service';
 import {
   getCatalogAllModels,
   getCatalogModel,
@@ -16,9 +18,8 @@ import {
   getModelCatalog,
   REMOTE_CATALOG_REFRESH_INTERVAL_MS,
 } from '../../services/pi-ai/catalog';
-import { CodexVersionService } from '../../services/oauth/codex-version-service';
-import { ClaudeCodeVersionService } from '../../services/oauth/claude-code-version-service';
 import { resolvePiAiProvider } from '../../services/pi-ai/provider-endpoint-match';
+import { logger } from '../../utils/logger';
 
 export async function registerModelRoutes(fastify: FastifyInstance) {
   fastify.post('/v0/management/models/metadata/refresh', async (_request, reply) => {
