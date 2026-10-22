@@ -540,8 +540,34 @@ const StripAdaptiveThinkingBehaviorSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
+// Fills `cache_control` breakpoints into requests that were translated to the
+// Messages API from a format that cannot express them (chat, responses).
+// Auto-enabled for aliases that dispatch to Anthropic's own API; adding the
+// behavior explicitly (or with `enabled: false`) overrides that default.
+const InjectCacheControlBehaviorSchema = z.object({
+  type: z.literal('inject_cache_control'),
+  enabled: z.boolean().default(true),
+  // Mark the last tool definition, caching the tools block.
+  tools: z.boolean().default(true),
+  // Mark the last system text block.
+  system: z.boolean().default(true),
+  // Trailing "walking" breakpoints on the conversation tail (0 disables).
+  message_breakpoints: z.number().int().min(0).max(4).default(2),
+  // Omitted leaves Anthropic's 5m default (1.25x write); '1h' costs 2x.
+  ttl: z.enum(['5m', '1h']).optional(),
+});
+
 // Union of all known behavior schemas – extend here for future behaviors
-const ModelBehaviorSchema = z.discriminatedUnion('type', [StripAdaptiveThinkingBehaviorSchema]);
+const ModelBehaviorSchema = z.discriminatedUnion('type', [
+  StripAdaptiveThinkingBehaviorSchema,
+  InjectCacheControlBehaviorSchema,
+]);
+
+// Schema defaults materialised, for aliases that get the behavior implicitly
+// (auto-enable on Anthropic-owned routes).
+export const DEFAULT_INJECT_CACHE_CONTROL_BEHAVIOR = InjectCacheControlBehaviorSchema.parse({
+  type: 'inject_cache_control',
+});
 
 // ─── Model Metadata ──────────────────────
 // Optional reference to an external model catalog entry. When configured,
@@ -720,6 +746,7 @@ export const ModelConfigSchema = z
 
 export type ModelBehavior = z.infer<typeof ModelBehaviorSchema>;
 export type StripAdaptiveThinkingBehavior = z.infer<typeof StripAdaptiveThinkingBehaviorSchema>;
+export type InjectCacheControlBehavior = z.infer<typeof InjectCacheControlBehaviorSchema>;
 export type ModelMetadata = z.infer<typeof ModelMetadataSchema>;
 export type MetadataOverrides = z.infer<typeof MetadataOverridesSchema>;
 

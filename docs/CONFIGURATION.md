@@ -722,6 +722,41 @@ For text aliases, when `preferred_api` is omitted, Plexus advertises a recommend
 An explicitly configured `preferred_api` always takes precedence.
 Non-text aliases do not receive an inferred preferred API.
 
+### Prompt Cache Breakpoints
+
+Anthropic prompt caching is prefix caching keyed on `cache_control` breakpoints. Requests that arrive on `/v1/chat/completions` or `/v1/responses` and get translated to the Messages API have no way to express them, so without help every turn pays full input price.
+
+The `inject_cache_control` behavior fills them in:
+
+| Position                      | What it caches                                                 |
+| ----------------------------- | -------------------------------------------------------------- |
+| Last tool definition          | The tools block, which renders first and is the most stable    |
+| Last system text block        | The system prompt, on top of the tools block                   |
+| Trailing messages (default 2) | The conversation tail: current turn end plus previous turn end |
+
+Breakpoints are capped at Anthropic's limit of four per request and filled in that order. The trailing marks "walk" with the conversation without any server-side state: Anthropic hashes cumulative prefixes, so a marker that always sits on the current turn advances by itself, and the second one still points at the previous turn's end for turns that emit more than 20 blocks (past the cache lookup window).
+
+It is on wherever the target is Anthropic's own API (`api.anthropic.com`, Anthropic OAuth, Claude-masking routes) and off everywhere else. Add the behavior explicitly to opt in on Anthropic-compatible upstreams, or with `enabled: false` to opt out:
+
+```yaml
+models:
+  claude-fast:
+    advanced:
+      - type: inject_cache_control
+        ttl: 1h # optional; 5m default, 1h doubles the cache-write cost
+        message_breakpoints: 2 # 0 = static prefix only, max 4
+        # tools: true
+        # system: true
+```
+
+Notes:
+
+- Only enable it where the target accepts Anthropic `cache_control`. A wrapped Claude endpoint that passes unknown fields through is fine; one that validates strictly is not.
+- Native Messages clients always keep their own breakpoints, and a translated request that already carries one is left completely untouched.
+- Prompts below the model's minimum cacheable size (512-4096 tokens depending on family) silently don't cache. Nothing breaks, you just get no reads.
+- `ttl: 1h` also extends the alias's sticky-session window to an hour, so follow-up turns keep landing on the same target.
+- Tool definitions render before the system prompt, so a client that reorders its tool list every turn defeats the cache wherever the breakpoints sit. Plexus does not reorder tools.
+
 ### Targets
 
 Each target specifies:

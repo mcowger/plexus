@@ -24,7 +24,7 @@ import type { RouteResult } from '../routing/router';
 import { isAnthropicTargetProvider } from './adapter-resolver';
 import { applyBodyCacheKeyInjection } from './cache-key-injection';
 import { applyRegistryAutoCompat, stripLiteUnsupportedTools } from './dispatcher-auto-compat';
-import { applyEagerToolInputStreaming } from './eager-tool-streaming';
+import { applyEagerToolInputStreaming, sendsToAnthropicApi } from './eager-tool-streaming';
 import {
   detectResponsesExtensions,
   hasUnsupportedResponsesExtensions,
@@ -251,12 +251,16 @@ export async function buildRequestPayload(
   if (route.canonicalModel) {
     const aliasConfig = getConfig().models?.[route.canonicalModel];
     if (aliasConfig?.extraBody) payload = { ...payload, ...aliasConfig.extraBody };
-    if (aliasConfig?.advanced) {
-      payload = applyModelBehaviors(payload, aliasConfig.advanced, {
-        incomingApiType: request.incomingApiType ?? '',
-        canonicalModel: route.canonicalModel,
-      });
-    }
+    // Invoked even when the alias has no `advanced` entries: some behaviors
+    // apply implicitly. `inject_cache_control` auto-enables for aliases that
+    // dispatch to Anthropic's own API, and an explicitly configured behavior
+    // (including `enabled: false`) always overrides that default.
+    payload = applyModelBehaviors(payload, aliasConfig?.advanced, {
+      incomingApiType: request.incomingApiType ?? '',
+      canonicalModel: route.canonicalModel,
+      targetApiType,
+      autoEnableCacheControl: sendsToAnthropicApi(route, targetApiType),
+    });
   }
 
   for (const { adapter, options } of adapters) {

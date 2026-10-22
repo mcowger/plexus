@@ -355,7 +355,35 @@ properties:
           type: string
           enum:
             - strip_adaptive_thinking
+            - inject_cache_control
           description: Behaviour modifier type.
         enabled:
           type: boolean
           default: true
+        tools:
+          type: boolean
+          default: true
+          description: >
+            `inject_cache_control` only. Mark the last tool definition so the
+            tools block is cached.
+        system:
+          type: boolean
+          default: true
+          description: >
+            `inject_cache_control` only. Mark the last system text block.
+        message_breakpoints:
+          type: integer
+          minimum: 0
+          maximum: 4
+          default: 2
+          description: >
+            `inject_cache_control` only. Number of trailing ("walking")
+            breakpoints placed on the conversation tail. 0 keeps breakpoints on
+            the static prefix only.
+        ttl:
+          type: string
+          enum: ['5m', '1h']
+          description: >
+            `inject_cache_control` only. Cache TTL; omitted leaves Anthropic's
+            5m default (1.25x write). `1h` doubles the cache-write cost and also
+            extends the sticky-session window for the alias.

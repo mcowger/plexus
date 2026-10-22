@@ -17,7 +17,21 @@ export interface StripAdaptiveThinkingBehavior {
   enabled: boolean;
 }
 
-export type AliasBehavior = StripAdaptiveThinkingBehavior; // | NextBehavior | ...
+/**
+ * Fills `cache_control` breakpoints into requests translated to the Messages
+ * API. Auto-enabled for aliases dispatching to Anthropic's own API, so an
+ * absent entry means "default"; `enabled: false` opts out.
+ */
+export interface InjectCacheControlBehavior {
+  type: 'inject_cache_control';
+  enabled: boolean;
+  tools?: boolean;
+  system?: boolean;
+  message_breakpoints?: number;
+  ttl?: '5m' | '1h';
+}
+
+export type AliasBehavior = StripAdaptiveThinkingBehavior | InjectCacheControlBehavior; // | NextBehavior | ...
 
 export type CatalogMetadataSource = 'openrouter' | 'models.dev' | 'catwalk';
 export type MetadataSource = CatalogMetadataSource | 'auto' | 'disabled' | 'custom';
