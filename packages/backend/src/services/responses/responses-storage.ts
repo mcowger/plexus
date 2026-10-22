@@ -1,12 +1,15 @@
+import { eq, inArray, lt, sql } from 'drizzle-orm';
+
 import { getDatabase, getSchema } from '../../db/client';
-import { eq, sql, lt, inArray } from 'drizzle-orm';
-import { logger } from '../../utils/logger';
 import { UnifiedResponsesResponse } from '../../types/responses';
+import { logger } from '../../utils/logger';
 
 export class ResponsesStorageService {
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: any = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  /** In-flight initial sweep, awaited by the matching stop() so it cannot outlive the caller. */
+  private initialSweep: Promise<unknown> | null = null;
 
   /**
    * Response Storage with Automatic TTL Cleanup
@@ -33,7 +36,7 @@ export class ResponsesStorageService {
     }
 
     // Run initial cleanup
-    this.cleanupOldResponses(ttlDays).catch((err) =>
+    this.initialSweep = this.cleanupOldResponses(ttlDays).catch((err) =>
       logger.error('Initial response cleanup failed:', err)
     );
 
@@ -60,12 +63,15 @@ export class ResponsesStorageService {
   /**
    * Stop the cleanup job
    */
-  stopCleanupJob(): void {
+  async stopCleanupJob(): Promise<void> {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
       logger.debug('Response cleanup job stopped');
     }
+    const sweep = this.initialSweep;
+    this.initialSweep = null;
+    await sweep;
   }
 
   private ensureDb() {

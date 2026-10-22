@@ -1,18 +1,19 @@
-import { logger } from '../../utils/logger';
-import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
+import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
+
 import type { QuotaConfig } from '../../config';
+import { getCurrentDialect, getDatabase, getSchema } from '../../db/client';
+import type { Meter, MeterCheckResult } from '../../types/meter';
+import { logger } from '../../utils/logger';
+import { toDbTimestampMs } from '../../utils/normalize';
+import { getUsageRetentionDays } from '../observability/usage-storage';
+import { CooldownManager } from '../runtime/cooldown-manager';
 import {
+  createMeterContext,
+  getCheckerDefinition,
   loadAllCheckers,
   loadCustomCheckers,
-  getCheckerDefinition,
-  createMeterContext,
 } from './checker-registry';
-import type { MeterCheckResult, Meter } from '../../types/meter';
-import { toDbTimestampMs } from '../../utils/normalize';
-import { eq, desc, gte, and, lt, sql } from 'drizzle-orm';
-import { CooldownManager } from '../runtime/cooldown-manager';
-import { getUsageRetentionDays } from '../observability/usage-storage';
-import { INDEFINITE_COOLDOWN_MS } from '@plexus/shared';
 
 const DEFAULT_EXHAUSTION_THRESHOLD = 99;
 const MAX_STALE_QUOTA_CHECK_INTERVALS = 2;
@@ -67,6 +68,8 @@ export class QuotaScheduler {
   private checkerRunTails: Map<string, Promise<void>> = new Map();
   private lastCheckerRunAt: Map<string, number> = new Map();
   private retentionInterval: ReturnType<typeof setInterval> | null = null;
+  /** In-flight initial sweep, awaited by stopRetentionJob() so it cannot outlive the caller. */
+  private retentionSweep: Promise<unknown> | null = null;
   private checkersLoaded = false;
   private db: ReturnType<typeof getDatabase> | null = null;
   private schema: ReturnType<typeof getSchema> | null = null;
@@ -615,8 +618,9 @@ export class QuotaScheduler {
       return;
     }
 
-    // Run initial cleanup
-    this.cleanupOldSnapshots(ttlDays).catch((err) =>
+    // Run initial cleanup. Tracked so stopRetentionJob() can wait for it: an
+    // in-flight sweep must not outlive a caller that closes the database.
+    this.retentionSweep = this.cleanupOldSnapshots(ttlDays).catch((err) =>
       logger.error('Initial quota retention cleanup failed:', err)
     );
 
@@ -643,16 +647,19 @@ export class QuotaScheduler {
   /**
    * Stop the retention job.
    */
-  stopRetentionJob(): void {
+  async stopRetentionJob(): Promise<void> {
     if (this.retentionInterval) {
       clearInterval(this.retentionInterval);
       this.retentionInterval = null;
       logger.debug('Quota retention job stopped');
     }
+    const sweep = this.retentionSweep;
+    this.retentionSweep = null;
+    await sweep;
   }
 
-  stop(): void {
-    this.stopRetentionJob();
+  async stop(): Promise<void> {
+    await this.stopRetentionJob();
     for (const [id, intervalId] of this.intervals) {
       clearInterval(intervalId);
       logger.info(`Stopped quota checker '${id}'`);

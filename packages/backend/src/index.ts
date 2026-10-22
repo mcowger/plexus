@@ -24,48 +24,51 @@ if (subcommand === 'backup') {
   await new Promise(() => {});
 }
 
-import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import fs from 'fs';
+import path from 'path';
+
+import { registerBunOAuthFlows } from '@earendil-works/pi-ai/bun-oauth';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { registerBunOAuthFlows } from '@earendil-works/pi-ai/bun-oauth';
-import path from 'path';
+import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
+
 import indexHtmlPath from '../../frontend/dist/index.html' with { type: 'file' };
 import mainJsPath from '../../frontend/dist/main.js' with { type: 'file' };
-// @ts-expect-error — CSS import with type:'file' resolved at build time
-import mainCssPath from '../../frontend/dist/main.css' with { type: 'file' };
-import fs from 'fs';
-import { logger } from './utils/logger';
-import { closeFetchSessions } from './utils/fetch-sessions';
 import { getConfig } from './config';
-import { ConfigService } from './services/configuration/config-service';
-import { Dispatcher } from './services/dispatch/dispatcher';
-import { UsageStorageService } from './services/observability/usage-storage';
-import { ProbeService } from './services/probes/probe-service';
-import { BackgroundExplorer } from './services/routing/background-explorer';
-import { CooldownManager } from './services/runtime/cooldown-manager';
-import { DebugManager } from './services/observability/debug-manager';
-import { ModelMetadataManager } from './services/models/model-metadata-manager';
-import { CodexVersionService } from './services/oauth/codex-version-service';
-import { ClaudeCodeVersionService } from './services/oauth/claude-code-version-service';
-import { SelectorFactory } from './services/routing/selectors/factory';
-import { QuotaScheduler } from './services/quota/quota-scheduler';
-import { ResponsesStorageService } from './services/responses/responses-storage';
-import { OAuthAuthManager } from './services/oauth/oauth-auth-manager';
-import { requestLogger } from './middleware/log';
-import { registerManagementRoutes } from './routes/management';
-import { registerInferenceRoutes } from './routes/inference';
-import { registerRawPassthroughRoutes } from './routes/raw-passthrough';
-import { registerMcpRoutes } from './routes/mcp';
-import { registerOpenApiRoute } from './routes/openapi';
-import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
-import { QuotaEnforcer } from './services/quota/quota-enforcer';
-import { initModelCatalog } from './services/pi-ai/catalog';
 import { initializeDatabase } from './db/client';
-import { runMigrations } from './db/migrate';
 import { runEncryptionMigration } from './db/encrypt-migration';
 import { runMcpKeyMigration } from './db/mcp-key-migration';
-import { isEncryptionEnabled } from './utils/encryption';
+import { runMigrations } from './db/migrate';
+import { requestLogger } from './middleware/log';
+import { registerInferenceRoutes } from './routes/inference';
+import { registerManagementRoutes } from './routes/management';
+import { registerMcpRoutes } from './routes/mcp';
+import { registerOpenApiRoute } from './routes/openapi';
+import { registerRawPassthroughRoutes } from './routes/raw-passthrough';
+import { ConfigService } from './services/configuration/config-service';
+import { Dispatcher } from './services/dispatch/dispatcher';
 import { mcpProcessManager } from './services/mcp-local/mcp-process-manager';
+import { McpUsageStorageService } from './services/mcp-proxy/mcp-usage-storage';
+import { ModelMetadataManager } from './services/models/model-metadata-manager';
+import { ClaudeCodeVersionService } from './services/oauth/claude-code-version-service';
+import { CodexVersionService } from './services/oauth/codex-version-service';
+import { OAuthAuthManager } from './services/oauth/oauth-auth-manager';
+import { DebugManager } from './services/observability/debug-manager';
+import { UsageStorageService } from './services/observability/usage-storage';
+import { initModelCatalog } from './services/pi-ai/catalog';
+import { ProbeService } from './services/probes/probe-service';
+import { QuotaEnforcer } from './services/quota/quota-enforcer';
+import { QuotaScheduler } from './services/quota/quota-scheduler';
+import { ResponsesStorageService } from './services/responses/responses-storage';
+import { BackgroundExplorer } from './services/routing/background-explorer';
+import { SelectorFactory } from './services/routing/selectors/factory';
+import { CooldownManager } from './services/runtime/cooldown-manager';
+import { isEncryptionEnabled } from './utils/encryption';
+import { closeFetchSessions } from './utils/fetch-sessions';
+import { logger } from './utils/logger';
+
+// @ts-expect-error — CSS import with type:'file' resolved at build time
+import mainCssPath from '../../frontend/dist/main.css' with { type: 'file' };
 
 registerBunOAuthFlows();
 
@@ -484,10 +487,10 @@ const start = async () => {
 
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down gracefully...`);
-      quotaScheduler.stop();
-      usageStorage.stopCleanupJob();
-      mcpUsageStorage.stopCleanupJob();
-      responsesStorage.stopCleanupJob();
+      await quotaScheduler.stop();
+      await usageStorage.stopCleanupJob();
+      await mcpUsageStorage.stopCleanupJob();
+      await responsesStorage.stopCleanupJob();
       await mcpProcessManager.stopAll();
       await fastify.close();
       // After the server has drained: in-flight streams may still be reading

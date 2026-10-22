@@ -1,5 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { registerSpy } from '../../../../test/test-utils';
+import type { QuotaConfig } from '../../../config';
 import {
   closeDatabase,
   getCurrentDialect,
@@ -8,12 +11,10 @@ import {
   initializeDatabase,
 } from '../../../db/client';
 import { runMigrations } from '../../../db/migrate';
-import { QuotaScheduler } from '../quota-scheduler';
+import type { Meter, MeterCheckResult } from '../../../types/meter';
 import { CooldownManager } from '../../runtime/cooldown-manager';
-import type { MeterCheckResult, Meter } from '../../../types/meter';
-import type { QuotaConfig } from '../../../config';
-import { registerSpy } from '../../../../test/test-utils';
 import claudeChecker from '../checkers/claude-code-checker';
+import { QuotaScheduler } from '../quota-scheduler';
 import '../checkers/opencode-go-checker';
 
 const CHECKER_ID = 'quota-persistence-checker';
@@ -118,7 +119,7 @@ describe('QuotaScheduler persistence', () => {
   });
 
   afterEach(async () => {
-    QuotaScheduler.getInstance().stop();
+    await QuotaScheduler.getInstance().stop();
     await closeDatabase();
   });
 
@@ -428,7 +429,7 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
   });
 
   afterEach(async () => {
-    QuotaScheduler.getInstance().stop();
+    await QuotaScheduler.getInstance().stop();
     const cooldownManager = CooldownManager.getInstance();
     await cooldownManager.markProviderSuccess(PROVIDER, '');
     await cooldownManager.markProviderSuccess(ROUTING_RUN_PROVIDER, '');

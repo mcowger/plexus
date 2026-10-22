@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  UsageStorageService,
-  getUsageRetentionDays,
-  DEFAULT_USAGE_RETENTION_DAYS,
-} from '../observability/usage-storage';
-import { McpUsageStorageService } from '../mcp-proxy/mcp-usage-storage';
-import { QuotaScheduler } from '../quota/quota-scheduler';
-import { toDbTimestampMs } from '../../utils/normalize';
+
+import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
+import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
 import {
   closeDatabase,
   getCurrentDialect,
@@ -15,8 +10,14 @@ import {
   initializeDatabase,
 } from '../../db/client';
 import { runMigrations } from '../../db/migrate';
-import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
-import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
+import { toDbTimestampMs } from '../../utils/normalize';
+import { McpUsageStorageService } from '../mcp-proxy/mcp-usage-storage';
+import {
+  DEFAULT_USAGE_RETENTION_DAYS,
+  getUsageRetentionDays,
+  UsageStorageService,
+} from '../observability/usage-storage';
+import { QuotaScheduler } from '../quota/quota-scheduler';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -90,7 +91,7 @@ describe('observability retention', () => {
 
   afterEach(async () => {
     delete process.env.PLEXUS_USAGE_RETENTION_DAYS;
-    QuotaScheduler.getInstance().stop();
+    await QuotaScheduler.getInstance().stop();
     await closeDatabase();
   });
 
@@ -206,7 +207,7 @@ describe('observability retention', () => {
     scheduler.startRetentionJob(24, 30);
     // Second start is a no-op with a warning, not a second timer.
     scheduler.startRetentionJob(24, 30);
-    scheduler.stopRetentionJob();
+    await scheduler.stopRetentionJob();
 
     const storage = new UsageStorageService();
     const mcpStorage = new McpUsageStorageService();
@@ -216,7 +217,7 @@ describe('observability retention', () => {
     // Second start is a no-op with a warning, not a second timer.
     storage.startCleanupJob(24, 30);
 
-    storage.stopCleanupJob();
-    mcpStorage.stopCleanupJob();
+    await storage.stopCleanupJob();
+    await mcpStorage.stopCleanupJob();
   });
 });

@@ -1,8 +1,9 @@
-import { logger } from '../../utils/logger';
-import { getDatabase, getCurrentDialect } from '../../db/client';
-import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
+import { and, desc, eq, like, lt, sql } from 'drizzle-orm';
+
 import * as pgMcp from '../../../drizzle/schema/postgres/mcp';
-import { desc, eq, sql, and, like, lt } from 'drizzle-orm';
+import * as sqliteMcp from '../../../drizzle/schema/sqlite/mcp';
+import { getCurrentDialect, getDatabase } from '../../db/client';
+import { logger } from '../../utils/logger';
 import { toDbTimestamp } from '../../utils/normalize';
 import { getUsageRetentionDays } from '../observability/usage-storage';
 
@@ -38,6 +39,8 @@ interface McpDebugLogRecord {
 export class McpUsageStorageService {
   private db: ReturnType<typeof getDatabase> | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  /** In-flight initial sweep, awaited by the matching stop() so it cannot outlive the caller. */
+  private initialSweep: Promise<unknown> | null = null;
 
   constructor() {}
 
@@ -140,7 +143,10 @@ export class McpUsageStorageService {
           .orderBy(desc(table.startTime))
           .limit(limit)
           .offset(offset),
-        db.select({ count: sql<number>`COUNT(*)` }).from(table).where(whereClause),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(table)
+          .where(whereClause),
       ]);
 
       const total = Number(countRows[0]?.count ?? 0);
@@ -269,7 +275,7 @@ export class McpUsageStorageService {
     }
 
     // Run initial cleanup
-    this.cleanupOldLogs(ttlDays).catch((err) =>
+    this.initialSweep = this.cleanupOldLogs(ttlDays).catch((err) =>
       logger.error('Initial MCP retention cleanup failed:', err)
     );
 
@@ -300,11 +306,14 @@ export class McpUsageStorageService {
   /**
    * Stop the retention cleanup job.
    */
-  stopCleanupJob(): void {
+  async stopCleanupJob(): Promise<void> {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
       logger.debug('MCP retention cleanup job stopped');
     }
+    const sweep = this.initialSweep;
+    this.initialSweep = null;
+    await sweep;
   }
 }

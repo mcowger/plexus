@@ -1,12 +1,14 @@
-import { logger } from '../../utils/logger';
-import { UsageRecord } from '../../types/usage';
+import { EventEmitter } from 'node:events';
+
+import { and, asc, desc, eq, getTableName, gte, like, lt, lte, sql } from 'drizzle-orm';
+
 import { getDatabase, getSchema } from '../../db/client';
 import { NewRequestUsage } from '../../db/types';
-import { EventEmitter } from 'node:events';
-import { eq, and, gte, lte, lt, like, desc, asc, sql, getTableName } from 'drizzle-orm';
+import { UsageRecord } from '../../types/usage';
+import { logger } from '../../utils/logger';
+import type { StallInspector } from '../inspectors/stall-inspector';
 import { DebugLogRecord, DebugManager } from './debug-manager';
 import { getCurrentKeyName } from './request-context';
-import type { StallInspector } from '../inspectors/stall-inspector';
 
 export interface ProgressUpdate {
   requestId: string;
@@ -52,12 +54,7 @@ export interface PaginationOptions {
 }
 
 export type UsageSortField =
-  | 'date'
-  | 'apiKey'
-  | 'provider'
-  | 'incomingModelAlias'
-  | 'costTotal'
-  | 'durationMs';
+  'date' | 'apiKey' | 'provider' | 'incomingModelAlias' | 'costTotal' | 'durationMs';
 
 export type UsageSortDirection = 'asc' | 'desc';
 
@@ -103,6 +100,8 @@ export class UsageStorageService extends EventEmitter {
   private schema: any = null;
   private readonly defaultPerformanceRetentionLimit = 100;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  /** In-flight initial sweep, awaited by the matching stop() so it cannot outlive the caller. */
+  private initialSweep: Promise<unknown> | null = null;
   private telemetryQueue: Promise<void> = Promise.resolve();
   private inFlightRegistry = new Map<
     string,
@@ -163,7 +162,7 @@ export class UsageStorageService extends EventEmitter {
     }
 
     // Run initial cleanup
-    this.cleanupOldRecords(ttlDays).catch((err) =>
+    this.initialSweep = this.cleanupOldRecords(ttlDays).catch((err) =>
       logger.error('Initial usage retention cleanup failed:', err)
     );
 
@@ -194,12 +193,15 @@ export class UsageStorageService extends EventEmitter {
   /**
    * Stop the retention cleanup job.
    */
-  stopCleanupJob(): void {
+  async stopCleanupJob(): Promise<void> {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
       logger.debug('Usage retention cleanup job stopped');
     }
+    const sweep = this.initialSweep;
+    this.initialSweep = null;
+    await sweep;
   }
 
   /**
@@ -215,7 +217,10 @@ export class UsageStorageService extends EventEmitter {
     const schema = this.schema!;
 
     const countOlder = async (table: any, condition: any): Promise<number> => {
-      const rows = await db.select({ count: sql<number>`COUNT(*)` }).from(table).where(condition);
+      const rows = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(table)
+        .where(condition);
       return Number(rows[0]?.count ?? 0);
     };
 
@@ -539,7 +544,10 @@ export class UsageStorageService extends EventEmitter {
         .offset(offset);
       const [data, countRows] = await Promise.all([
         where ? query.where(where) : query,
-        db.select({ count: sql<number>`COUNT(*)` }).from(this.schema.inferenceErrors).where(where),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(this.schema.inferenceErrors)
+          .where(where),
       ]);
       return { data, total: Number(countRows[0]?.count ?? 0) };
     } catch (error) {
@@ -629,7 +637,10 @@ export class UsageStorageService extends EventEmitter {
         .offset(offset);
       const [results, countRows] = await Promise.all([
         where ? query.where(where) : query,
-        db.select({ count: sql<number>`COUNT(*)` }).from(this.schema.debugLogs).where(where),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(this.schema.debugLogs)
+          .where(where),
       ]);
 
       return {
