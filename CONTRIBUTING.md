@@ -73,7 +73,7 @@ Load the `opencodereview-cli` skill before invoking OpenCodeReview. If it is una
 
 ## Code Style
 
-All code must be formatted with `bun fmt` (Bun 1.4.4+) before committing. Configuration lives in the `[fmt]` section of `bunfig.toml`; ignored paths live in `.prettierignore`.
+All code must be formatted with `bun fmt` (Bun 1.4.4+) before committing. Configuration, including `ignorePatterns` for generated and vendored paths, lives in the `[fmt]` section of `bunfig.toml`.
 
 ```bash
 bun run format          # format everything
