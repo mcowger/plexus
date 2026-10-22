@@ -5,7 +5,7 @@
     "": {
       "name": "plexus2",
       "dependencies": {
-        "@earendil-works/pi-ai": "1.2.0",
+        "@earendil-works/pi-ai": "1.4.0",
       },
       "devDependencies": {
         "@biomejs/biome": "2.5.15",
@@ -26,7 +26,7 @@
       "name": "plexus-backend",
       "version": "1.0.0",
       "dependencies": {
-        "@earendil-works/pi-ai": "1.2.0",
+        "@earendil-works/pi-ai": "1.4.0",
         "@fastify/bearer-auth": "^10.1.4",
         "@fastify/cors": "^11.3.1",
         "@fastify/formbody": "^9.0.1",
@@ -79,7 +79,7 @@
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
-        "@earendil-works/pi-ai": "1.2.0",
+        "@earendil-works/pi-ai": "1.4.0",
         "@monaco-editor/react": "4.7.0",
         "@plexus/shared": "workspace:*",
         "@types/human-format": "^1.0.3",
@@ -242,9 +242,9 @@
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
-    "@earendil-works/pi-ai": ["@earendil-works/pi-ai@1.2.0", "", { "dependencies": { "@anthropic-ai/sdk": "0.129.0", "@aws-sdk/client-bedrock-runtime": "3.1127.0", "@earendil-works/pi-telemetry": "^1.2.0", "@google/genai": "2.21.0", "@smithy/node-http-handler": "4.12.1", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "7.19.0", "partial-json": "0.1.7", "typebox": "1.3.27" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-U5/1zXqfV1on7/9sbez03tT4Ru49Lvfb4+zXSDK3DBKF5cRk6KxvAOTOY3HJ4jimlZth+rs7vbJqN6iBQAoNuQ=="],
+    "@earendil-works/pi-ai": ["@earendil-works/pi-ai@1.4.0", "", { "dependencies": { "@anthropic-ai/sdk": "0.129.0", "@aws-sdk/client-bedrock-runtime": "3.1127.0", "@earendil-works/pi-telemetry": "1.4.0", "@google/genai": "2.21.0", "@smithy/node-http-handler": "4.12.1", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "7.19.0", "partial-json": "0.1.7", "typebox": "1.3.27" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-hQM/C4+1w8rHYACzDDf+0vQMnEnpzIop1tptIERVgR3ZeT/hHSzBNG8PaWPgxWQjqSeKCyBZSyp8uTT6eKK1pQ=="],
 
-    "@earendil-works/pi-telemetry": ["@earendil-works/pi-telemetry@1.2.0", "", {}, "sha512-NZ3aJE6dr7aTgzzXDe53OW7BsAsF8ZUKHPJTtnjaQcxtlagkUT0Ew8Qas0EvYQsZqR/KpF1lB+z209XBzIC7xg=="],
+    "@earendil-works/pi-telemetry": ["@earendil-works/pi-telemetry@1.4.0", "", {}, "sha512-MLIfowwUYIY65jSjMX82paZOrX/NTvLk6D08h+3Jq42a99RzUOewzuCR0zOlPul3D6UBfddat76VT6LvsHEs1w=="],
 
     "@electric-sql/pglite": ["@electric-sql/pglite@0.5.9", "", {}, "sha512-GoQTRMZ/o4J3sMW4mLDtDFGNOm1xy5oH+iHDALWll3uERY6OF4BSnL1t7FZH2Mlw+RPceDBlFJgSaecO73c4EA=="],
 

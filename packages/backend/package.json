@@ -16,7 +16,7 @@
     "lint:migrations": "cd ../.. && bun run scripts/lint-migrations.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-ai": "1.4.0",
     "@fastify/bearer-auth": "^10.1.4",
     "@fastify/cors": "^11.3.1",
     "@fastify/formbody": "^9.0.1",
