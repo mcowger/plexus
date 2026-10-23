@@ -167,12 +167,12 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="border-border-glass bg-bg-card flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl sm:max-h-[90vh]">
+      <div className="border-border-glass bg-bg-card flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border shadow-2xl sm:max-h-[90dvh]">
         {/* Header */}
-        <div className="border-border-glass flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 sm:py-4">
+        <div className="border-border-glass flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0">
             <h2 className="font-heading text-h2 text-text truncate font-semibold">{meter.label}</h2>
             <p className="text-text-muted mt-0.5 truncate text-xs">
@@ -189,7 +189,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Time-range selector */}
-        <div className="border-border-glass flex items-center gap-1 overflow-x-auto border-b px-4 py-3 sm:px-5">
+        <div className="border-border-glass flex shrink-0 items-center gap-1 overflow-x-auto border-b px-4 py-3 sm:px-5">
           {TIME_RANGES.map((r) => (
             <button
               key={r.key}
@@ -207,7 +207,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           {/* Stats row */}
           {stats && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -307,7 +307,7 @@ export const MeterHistoryModal: React.FC<MeterHistoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-border-glass flex justify-end border-t px-4 py-3 sm:px-5">
+        <div className="border-border-glass flex shrink-0 justify-end border-t px-4 py-3 sm:px-5">
           <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>

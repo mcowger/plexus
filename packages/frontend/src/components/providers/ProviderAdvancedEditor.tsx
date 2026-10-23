@@ -1178,11 +1178,13 @@ export function ProviderAdvancedEditor({
             )}
           </div>
 
-          {/* Compact settings card — toggles left, value inputs right */}
+          {/* Compact settings card — toggles left, value inputs right. Single
+              column on phones: two fixed `1fr` tracks made the right column's
+              selects wider than the modal, clipping them horizontally. */}
           <div className="border-border-glass bg-bg-subtle rounded-md border p-2">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-2">
               {/* Left: toggles */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div className="flex min-w-0 flex-col gap-0.5">
                 <label className="flex cursor-pointer items-start gap-2 py-1">
                   <Switch
                     checked={editingProvider.estimateTokens || false}
@@ -1312,14 +1314,7 @@ export function ProviderAdvancedEditor({
                 </div>
               </div>
               {/* Right: inputs */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  justifyContent: 'center',
-                }}
-              >
+              <div className="flex min-w-0 flex-col justify-center gap-1.5">
                 {/* Discount */}
                 <div className="flex flex-col gap-0.5">
                   <label className="font-body text-text-secondary text-[11px] font-medium">

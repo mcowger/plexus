@@ -37,7 +37,7 @@ export const Disclosure: React.FC<DisclosureProps> = ({
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="duration-fast hover:bg-bg-hover focus-visible:outline-primary flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2"
+        className="duration-fast hover:bg-bg-hover focus-visible:outline-primary flex w-full flex-wrap items-center gap-3 px-4 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2"
       >
         <ChevronRight
           size={14}
@@ -46,7 +46,10 @@ export const Disclosure: React.FC<DisclosureProps> = ({
             open && 'rotate-90'
           )}
         />
-        <span className="font-heading text-text flex-1 text-sm font-medium">{title}</span>
+        {/* `flex-wrap` on the header + `min-w-0` here: actions passed via
+            `extra` (Refresh / Restart / Export, etc.) otherwise overflow a
+            phone-width card, and the card clips them out of reach. */}
+        <span className="font-heading text-text min-w-0 flex-1 text-sm font-medium">{title}</span>
         {extra && <span onClick={(e) => e.stopPropagation()}>{extra}</span>}
       </button>
       {open && (

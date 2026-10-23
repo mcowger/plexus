@@ -31,7 +31,9 @@ export function BackupRestoreCard({
 }: BackupRestoreCardProps) {
   return (
     <Card title="Backup & Restore">
-      <div className="flex items-center gap-2">
+      {/* flex-wrap: five action buttons are wider than a phone viewport, and
+          the card clips overflow, which hid the right-hand buttons entirely. */}
+      <div className="flex flex-wrap items-center gap-2">
         <div className="border-warning/30 bg-warning/10 mr-1 flex items-center gap-1.5 rounded-md border px-2 py-1">
           <AlertTriangle size={13} className="text-warning shrink-0" />
           <span className="font-body text-text-muted text-[11px]">

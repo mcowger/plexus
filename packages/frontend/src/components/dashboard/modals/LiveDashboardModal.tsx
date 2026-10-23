@@ -127,11 +127,11 @@ export const LiveDashboardModal: React.FC<LiveDashboardModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
       onClick={onClose}
     >
       <div
-        className="border-border-glass bg-bg-card relative max-h-[90vh] w-full max-w-6xl overflow-auto rounded-lg border p-6"
+        className="border-border-glass bg-bg-card relative max-h-[90dvh] w-full max-w-6xl overflow-auto overscroll-contain rounded-lg border p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
