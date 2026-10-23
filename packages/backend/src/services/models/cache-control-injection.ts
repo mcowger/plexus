@@ -31,6 +31,13 @@
  *     completely untouched,
  *   - only cacheable block types are marked (`thinking` / `redacted_thinking`
  *     are skipped), and nothing is ever mutated in place.
+ *
+ * Payload shapes are typed loosely (`any`) on purpose: this operates on the
+ * provider-specific Messages wire body, which the transformer builders and the
+ * pass-through path both produce as untyped JSON (the transformer layer types
+ * its payloads the same way). Narrowing to `unknown` here would only push the
+ * casts into the helpers without adding safety, so the runtime checks below
+ * are the actual contract.
  */
 
 import { getApiBaseType } from '../../utils/api-format';
@@ -73,12 +80,16 @@ export interface CacheControlInjectionResult {
  */
 const CACHEABLE_BLOCK_TYPES = new Set(['text', 'image', 'document', 'tool_use', 'tool_result']);
 
+function isNil(value: unknown): boolean {
+  return value === undefined || value === null;
+}
+
 function hasBreakpoint(value: unknown): boolean {
   return (
     !!value &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
-    (value as { cache_control?: unknown }).cache_control != null
+    !isNil((value as { cache_control?: unknown }).cache_control)
   );
 }
 
@@ -117,7 +128,7 @@ function buildMarker(ttl: CacheControlTtl | undefined): CacheControlMarker {
 
 function isCacheableBlock(block: any): boolean {
   if (!block || typeof block !== 'object' || Array.isArray(block)) return false;
-  if (block.cache_control != null) return false;
+  if (!isNil(block.cache_control)) return false;
   if (!CACHEABLE_BLOCK_TYPES.has(block.type)) return false;
   if (block.type === 'text' && (typeof block.text !== 'string' || block.text.trim() === '')) {
     return false;
@@ -135,7 +146,7 @@ function markSystem(system: any, marker: CacheControlMarker): any[] | undefined 
         block?.type === 'text' &&
         typeof block.text === 'string' &&
         block.text.trim() !== '' &&
-        block.cache_control == null
+        isNil(block.cache_control)
       ) {
         blocks[i] = { ...block, cache_control: marker };
         return blocks;
@@ -156,7 +167,7 @@ function markSystem(system: any, marker: CacheControlMarker): any[] | undefined 
 /** Returns the marked message, or null when the message cannot take a breakpoint. */
 function markMessage(message: any, marker: CacheControlMarker): any | null {
   if (!message || typeof message !== 'object' || Array.isArray(message)) return null;
-  if (message.cache_control != null) return null;
+  if (!isNil(message.cache_control)) return null;
 
   if (typeof message.content === 'string') {
     if (message.content.trim() === '') return null;

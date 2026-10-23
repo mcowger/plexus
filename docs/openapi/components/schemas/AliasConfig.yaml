@@ -345,7 +345,9 @@ properties:
     type: array
     description: >
       List of model behaviour modifiers applied during request/response
-      transformation.
+      transformation. `inject_cache_control` is also applied implicitly for
+      aliases that dispatch to Anthropic's own API; configuring it explicitly
+      (including `enabled: false` to opt out) overrides that default.
     items:
       type: object
       required:

@@ -38,6 +38,12 @@ export interface BehaviorContext {
    * that don't configure `inject_cache_control` get it implicitly here.
    */
   autoEnableCacheControl?: boolean;
+  /**
+   * True when the native Anthropic path rebuilds `system` after behaviors run
+   * (OAuth and Claude-masking routes). A breakpoint placed there would be
+   * discarded, so the injector skips that site.
+   */
+  systemRewrittenByMasking?: boolean;
 }
 
 /**
@@ -150,7 +156,12 @@ function applyInjectCacheControl(
     ctx.targetApiType,
     {
       tools: behavior.tools,
-      system: behavior.system,
+      // The masking transform rebuilds `system` from fixed Claude Code blocks
+      // after this runs, dropping any marker placed here — and its billing
+      // header is payload-derived, so that prefix would not cache reliably
+      // anyway. Skipping the site keeps the debug log honest; the freed slot
+      // is left unused rather than spent on an extra trailing breakpoint.
+      system: behavior.system !== false && ctx.systemRewrittenByMasking !== true,
       messageBreakpoints: behavior.message_breakpoints,
       ttl: behavior.ttl,
     }

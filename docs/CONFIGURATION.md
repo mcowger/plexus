@@ -752,6 +752,7 @@ models:
 Notes:
 
 - Only enable it where the target accepts Anthropic `cache_control`. A wrapped Claude endpoint that passes unknown fields through is fine; one that validates strictly is not.
+- Marked prefixes pay the cache-write premium (1.25x input, 2x with `ttl: 1h`) on the turn that first writes them. That is a win whenever the prefix is reused across turns and a small loss for one-shot traffic that never reads it back — which is why it only auto-enables on Anthropic's own API. `enabled: false` opts out.
 - Native Messages clients always keep their own breakpoints, and a translated request that already carries one is left completely untouched.
 - Prompts below the model's minimum cacheable size (512-4096 tokens depending on family) silently don't cache. Nothing breaks, you just get no reads.
 - `ttl: 1h` also extends the alias's sticky-session window to an hour, so follow-up turns keep landing on the same target.

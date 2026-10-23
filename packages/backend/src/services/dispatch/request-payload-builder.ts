@@ -260,6 +260,9 @@ export async function buildRequestPayload(
       canonicalModel: route.canonicalModel,
       targetApiType,
       autoEnableCacheControl: sendsToAnthropicApi(route, targetApiType),
+      // The native Anthropic path rewrites `system` (Claude Code masking) after
+      // this point, so behaviors must not count on a system breakpoint there.
+      systemRewrittenByMasking: anthropicNative,
     });
   }
 
