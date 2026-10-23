@@ -39,6 +39,9 @@ function files(dir: string, ext: string): string[] {
 const args = [
   'build',
   resolve('packages/backend/src/index.ts'),
+  // Worker entrypoints are not auto-detected from `new Worker(new URL(...))`;
+  // without this entry the worker file is absent from $bunfs at runtime.
+  resolve('packages/backend/src/services/quota/custom-checker-worker.ts'),
   ...files('packages/backend/drizzle/migrations', '.sql'),
   ...files('packages/backend/drizzle/migrations_pg', '.sql'),
   ...files('packages/frontend/dist', '.png'),
@@ -49,6 +52,9 @@ const args = [
   '--minify',
   '--sourcemap',
   '--asset-naming=[name].[ext]',
+  // Flatten entry paths so the worker lands next to the main entry inside
+  // $bunfs and `new URL('./custom-checker-worker.ts', import.meta.url)` resolves.
+  '--entry-naming=[name].[ext]',
   `--target=${target}`,
   `--outfile=${outfile}`,
 ];
