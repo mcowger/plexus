@@ -45,7 +45,62 @@ describe('synthetic checker', () => {
     expect(m.periodCycle).toBe('rolling');
   });
 
-  it('maps weeklyTokenLimit dollar strings to 7d rolling allowance meter with usd unit', async () => {
+  it('maps planWeeklyLimit percentRemaining to a 7d percentage allowance meter', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            planWeeklyLimit: {
+              nextRegenAt: '2026-10-23T05:03:47.000Z',
+              percentRemaining: 34.3,
+              nextRegenPercent: 2,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters).toHaveLength(1);
+    const m = meters[0]!;
+    expect(m.key).toBe('weekly_credits');
+    expect(m.label).toBe('Weekly credits');
+    expect(m.unit).toBe('percentage');
+    expect(m.used).toBeCloseTo(65.7);
+    expect(m.remaining).toBeCloseTo(34.3);
+    expect(m.limit).toBeUndefined();
+    expect(m.periodValue).toBe(7);
+    expect(m.periodUnit).toBe('day');
+    expect(m.periodCycle).toBe('rolling');
+    expect(m.resetsAt).toBe('2026-10-23T05:03:47.000Z');
+    expect(m.status).toBe('ok');
+  });
+
+  it('marks a spent planWeeklyLimit as exhausted', async () => {
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            planWeeklyLimit: {
+              nextRegenAt: '2026-10-23T05:03:47.000Z',
+              percentRemaining: 0,
+              nextRegenPercent: 2,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+
+    const m = meters.find((x) => x.key === 'weekly_credits')!;
+    expect(m.used).toBe(100);
+    expect(m.remaining).toBe(0);
+    expect(m.status).toBe('exhausted');
+  });
+
+  it('ignores the legacy weeklyTokenLimit block', async () => {
     setFetchMock(
       async () =>
         new Response(
@@ -62,51 +117,7 @@ describe('synthetic checker', () => {
 
     const meters = await checkerDef.check(makeCtx());
 
-    expect(meters).toHaveLength(1);
-    const m = meters[0]!;
-    expect(m.key).toBe('weekly_credits');
-    expect(m.unit).toBe('usd');
-    expect(m.limit).toBeCloseTo(50);
-    expect(m.remaining).toBeCloseTo(20);
-    expect(m.used).toBeCloseTo(30);
-    expect(m.periodValue).toBe(7);
-    expect(m.periodUnit).toBe('day');
-    expect(m.periodCycle).toBe('rolling');
-  });
-
-  it('handles weeklyTokenLimit with dollar-sign-less credit strings', async () => {
-    setFetchMock(
-      async () =>
-        new Response(
-          JSON.stringify({
-            weeklyTokenLimit: { maxCredits: '100', remainingCredits: '40' },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-    );
-
-    const meters = await checkerDef.check(makeCtx());
-
-    const m = meters.find((x) => x.key === 'weekly_credits')!;
-    expect(m.limit).toBeCloseTo(100);
-    expect(m.remaining).toBeCloseTo(40);
-    expect(m.used).toBeCloseTo(60);
-  });
-
-  it('omits weekly_credits meter when credit strings are unparseable', async () => {
-    setFetchMock(
-      async () =>
-        new Response(
-          JSON.stringify({ weeklyTokenLimit: { maxCredits: 'N/A', remainingCredits: 'N/A' } }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-    );
-
-    const meters = await checkerDef.check(makeCtx());
-
-    const m = meters.find((x) => x.key === 'weekly_credits');
-    expect(m?.limit).toBeUndefined();
-    expect(m?.used).toBeUndefined();
+    expect(meters.find((x) => x.key === 'weekly_credits')).toBeUndefined();
   });
 
   it('maps search hourly window when present', async () => {

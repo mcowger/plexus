@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 import { defineChecker } from '../checker-registry';
 
+interface SyntheticWeeklyPercentLimit {
+  nextRegenAt?: string;
+  percentRemaining?: number;
+  nextRegenPercent?: number;
+}
+
 interface SyntheticQuotaResponse {
   search?: {
     hourly?: {
@@ -11,11 +17,7 @@ interface SyntheticQuotaResponse {
       renewsAt?: string;
     };
   };
-  weeklyTokenLimit?: {
-    nextRegenAt?: string;
-    maxCredits?: string;
-    remainingCredits?: string;
-  };
+  planWeeklyLimit?: SyntheticWeeklyPercentLimit | null;
   rollingFiveHourLimit?: {
     nextTickAt?: string;
     remaining?: number;
@@ -23,10 +25,15 @@ interface SyntheticQuotaResponse {
   };
 }
 
-function parseCredits(val?: string): number | undefined {
+function parsePercent(val: unknown): number | undefined {
+  if (typeof val !== 'number' || !Number.isFinite(val)) return undefined;
+  return Math.min(100, Math.max(0, val));
+}
+
+function toIsoDate(val?: string): string | undefined {
   if (!val) return undefined;
-  const num = parseFloat(val.replace('$', ''));
-  return isNaN(num) ? undefined : num;
+  const date = new Date(val);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
 export default defineChecker({
@@ -75,7 +82,7 @@ export default defineChecker({
           periodValue: 5,
           periodUnit: 'hour',
           periodCycle: 'rolling',
-          resetsAt: nextTickAt ? new Date(nextTickAt).toISOString() : undefined,
+          resetsAt: toIsoDate(nextTickAt),
         })
       );
     }
@@ -94,31 +101,24 @@ export default defineChecker({
           periodValue: 1,
           periodUnit: 'hour',
           periodCycle: 'fixed',
-          resetsAt: renewsAt ? new Date(renewsAt).toISOString() : undefined,
+          resetsAt: toIsoDate(renewsAt),
         })
       );
     }
 
-    if (data.weeklyTokenLimit) {
-      const { maxCredits, remainingCredits, nextRegenAt } = data.weeklyTokenLimit;
-      const parsedMax = parseCredits(maxCredits);
-      const parsedRemaining = parseCredits(remainingCredits);
-      const parsedUsed =
-        parsedMax !== undefined && parsedRemaining !== undefined
-          ? parsedMax - parsedRemaining
-          : undefined;
+    const planPercent = parsePercent(data.planWeeklyLimit?.percentRemaining);
+    if (planPercent !== undefined) {
       meters.push(
         ctx.allowance({
           key: 'weekly_credits',
-          label: 'Weekly token credits',
-          unit: 'usd',
-          limit: parsedMax,
-          used: parsedUsed,
-          remaining: parsedRemaining,
+          label: 'Weekly credits',
+          unit: 'percentage',
+          used: 100 - planPercent,
+          remaining: planPercent,
           periodValue: 7,
           periodUnit: 'day',
           periodCycle: 'rolling',
-          resetsAt: nextRegenAt ? new Date(nextRegenAt).toISOString() : undefined,
+          resetsAt: toIsoDate(data.planWeeklyLimit?.nextRegenAt),
         })
       );
     }
