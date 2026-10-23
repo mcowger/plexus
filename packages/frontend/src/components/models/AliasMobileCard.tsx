@@ -127,14 +127,21 @@ export const AliasMobileCard: React.FC<Props> = ({
           </div>
         </div>
         <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
-          <div className="text-text-muted mb-2 flex items-center gap-2 text-[10px] font-semibold tracking-wider uppercase">
-            <span>Targets</span>
+          <div className="text-text-muted mb-2 flex min-w-0 items-center gap-2 text-[10px] font-semibold tracking-wider uppercase">
+            <span className="shrink-0">Targets</span>
             {firstTargetGroup && (
               <>
-                <span className="normal-case opacity-40">
+                <span
+                  className="min-w-0 flex-1 truncate normal-case opacity-40"
+                  title={`direct/${alias.id}/${firstTargetGroup.name}`}
+                >
                   direct/{alias.id}/{firstTargetGroup.name}
                 </span>
-                <CopyButton value={`direct/${alias.id}/${firstTargetGroup.name}`} size="sm" />
+                <CopyButton
+                  value={`direct/${alias.id}/${firstTargetGroup.name}`}
+                  size="sm"
+                  className="shrink-0"
+                />
               </>
             )}
           </div>
