@@ -68,6 +68,31 @@ function constantTimeHashEquals(a: string, b: string): boolean {
 }
 
 /**
+ * Accept `Authorization: Bearer <credential>` as an alias for `x-admin-key` on
+ * admin-only surfaces whose clients can only send a bearer token (the
+ * management MCP at `/mcp/plexus`).
+ *
+ * The bearer credential is copied onto `x-admin-key` so the rest of the request
+ * path (authenticate → requireAdmin → management shim forwarding) keeps a
+ * single credential source. This does not widen who may authenticate: the
+ * credential is resolved exactly like an `x-admin-key` value, and admin-only
+ * routes still reject anything that is not the server's `ADMIN_KEY` with 403.
+ * An explicit non-empty `x-admin-key` header always wins over the bearer token.
+ */
+export function acceptBearerAdminKey(request: FastifyRequest): void {
+  const headerKey = request.headers['x-admin-key'];
+  if (typeof headerKey === 'string' && headerKey.length > 0) return;
+
+  const authorization = request.headers.authorization;
+  if (typeof authorization !== 'string') return;
+
+  const match = /^\s*bearer\s+(\S+)\s*$/i.exec(authorization);
+  if (!match) return;
+
+  request.headers['x-admin-key'] = match[1];
+}
+
+/**
  * Resolve the principal for an incoming management request.
  * Returns null if no valid credential was presented.
  */

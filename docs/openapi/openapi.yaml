@@ -631,3 +631,12 @@ components:
       description: |
         Either the server's `ADMIN_KEY` (full admin access) or the plaintext
         secret of a configured API key (limited access, scoped to that key).
+    AdminBearer:
+      type: http
+      scheme: bearer
+      description: |
+        The server's `ADMIN_KEY` sent as `Authorization: Bearer <ADMIN_KEY>`. An
+        alias for the `x-admin-key` header, accepted only by the admin-only
+        Plexus Management MCP (`/mcp/plexus`). Inference API keys are rejected
+        with 403 there. A non-empty `x-admin-key` header takes precedence over
+        the bearer token.

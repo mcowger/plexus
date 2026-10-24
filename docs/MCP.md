@@ -19,11 +19,16 @@ The MCP Gateway requires an inference API key passed as a Bearer token or in the
 
 ### Plexus Management MCP (`/mcp/plexus`)
 
-The management MCP requires the admin key in the `x-admin-key` header. Inference API keys and Bearer tokens are **not** accepted.
+The management MCP requires the admin key. Send it in either location:
 
-- Missing `x-admin-key` → 401
-- Incorrect `x-admin-key` → 401
-- Inference API key or Bearer token alone → 401
+- `x-admin-key: <ADMIN_KEY>`
+- `Authorization: Bearer <ADMIN_KEY>`
+
+Only the server's `ADMIN_KEY` is accepted. An inference API key is rejected with 403, and an MCP OAuth access token carries no management access. A non-empty `x-admin-key` header takes precedence over the bearer token.
+
+- Missing credential → 401
+- Wrong credential, or an OAuth access token → 401
+- Inference API key → 403
 - Valid admin key → request processed
 
 ## MCP Gateway Commands

@@ -9965,10 +9965,13 @@
           "MCP Proxy"
         ],
         "summary": "Plexus Management MCP (JSON-RPC, admin only)",
-        "description": "The Plexus Management MCP server is an in-process Model Context Protocol\nserver exposing compact domain tools for managing Plexus.\n\n## Authentication\n\nRequires the `x-admin-key` header. Bearer inference keys are rejected.\n\n## MCP disabled\n\nWhen `mcpEnabled` is `false`, requests return HTTP 418\n(`mcp_disabled`) before authentication. Enable it via\n`PATCH /v0/management/config/mcp-enabled` or the MCP Servers UI.\n\n## Transport\n\nUses the Streamable HTTP transport with JSON responses. Each request\ncreates a stateless per-request MCP server instance.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "The Plexus Management MCP server is an in-process Model Context Protocol\nserver exposing compact domain tools for managing Plexus.\n\n## Authentication\n\nRequires the `x-admin-key` header, or the same `ADMIN_KEY` sent as\n`Authorization: Bearer <ADMIN_KEY>`. Inference API keys are rejected with\n403. A non-empty `x-admin-key` header takes precedence over the bearer\ntoken.\n\n## MCP disabled\n\nWhen `mcpEnabled` is `false`, requests return HTTP 418\n(`mcp_disabled`) before authentication. Enable it via\n`PATCH /v0/management/config/mcp-enabled` or the MCP Servers UI.\n\n## Transport\n\nUses the Streamable HTTP transport with JSON responses. Each request\ncreates a stateless per-request MCP server instance.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
+          },
+          {
+            "AdminBearer": []
           }
         ],
         "requestBody": {
@@ -10071,6 +10074,9 @@
         "security": [
           {
             "AdminKey": []
+          },
+          {
+            "AdminBearer": []
           }
         ],
         "responses": {
@@ -10110,6 +10116,9 @@
         "security": [
           {
             "AdminKey": []
+          },
+          {
+            "AdminBearer": []
           }
         ],
         "responses": {
@@ -15509,6 +15518,11 @@
         "in": "header",
         "name": "x-admin-key",
         "description": "Either the server's `ADMIN_KEY` (full admin access) or the plaintext\nsecret of a configured API key (limited access, scoped to that key).\n"
+      },
+      "AdminBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The server's `ADMIN_KEY` sent as `Authorization: Bearer <ADMIN_KEY>`. An\nalias for the `x-admin-key` header, accepted only by the admin-only\nPlexus Management MCP (`/mcp/plexus`). Inference API keys are rejected\nwith 403 there. A non-empty `x-admin-key` header takes precedence over\nthe bearer token.\n"
       }
     },
     "responses": {

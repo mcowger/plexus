@@ -4,7 +4,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { ConfigService } from '../../../services/configuration/config-service';
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
-import { authenticate, ManagementAuthError, requireAdmin } from '../../management/_principal';
+import {
+  acceptBearerAdminKey,
+  authenticate,
+  ManagementAuthError,
+  requireAdmin,
+} from '../../management/_principal';
 import { handleToolCall } from './dispatch';
 import { createPlexusMcpRequestContext, handlePlexusMcpHttpRequest } from './http';
 import { buildShimHeaders } from './management';
@@ -44,6 +49,15 @@ export async function registerPlexusMcpRoutes(
         }
         done();
       })().catch(done);
+    });
+
+    // MCP clients commonly can only configure a bearer token, so let
+    // `Authorization: Bearer <ADMIN_KEY>` stand in for `x-admin-key`. The
+    // credential is still resolved as an admin key; `requireAdmin` below is what
+    // enforces that only the server's ADMIN_KEY may use this endpoint.
+    plexusMcp.addHook('preHandler', (request, _reply, done) => {
+      acceptBearerAdminKey(request);
+      done();
     });
 
     plexusMcp.addHook('preHandler', authenticate);

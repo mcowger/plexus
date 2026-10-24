@@ -8,7 +8,10 @@ post:
 
     ## Authentication
 
-    Requires the `x-admin-key` header. Bearer inference keys are rejected.
+    Requires the `x-admin-key` header, or the same `ADMIN_KEY` sent as
+    `Authorization: Bearer <ADMIN_KEY>`. Inference API keys are rejected with
+    403. A non-empty `x-admin-key` header takes precedence over the bearer
+    token.
 
     ## MCP disabled
 
@@ -24,6 +27,7 @@ post:
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
+    - AdminBearer: []
   requestBody:
     required: true
     content:
@@ -94,6 +98,7 @@ get:
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
+    - AdminBearer: []
   responses:
     '200':
       description: SSE stream or JSON-RPC response.
@@ -122,6 +127,7 @@ delete:
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
+    - AdminBearer: []
   responses:
     '200':
       description: Session closed or no-op for stateless transport.

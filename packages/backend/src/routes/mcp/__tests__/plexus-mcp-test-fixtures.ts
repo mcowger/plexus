@@ -11,7 +11,7 @@ import { DebugManager } from '../../../services/observability/debug-manager';
 import { UsageStorageService } from '../../../services/observability/usage-storage';
 import { registerMcpRoutes } from '../index';
 
-const TEST_ADMIN_KEY = 'test-admin-key';
+export const TEST_ADMIN_KEY = 'test-admin-key';
 
 export function createBaselineConfig(): PlexusConfig {
   return {

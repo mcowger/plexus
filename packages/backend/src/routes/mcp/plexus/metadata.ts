@@ -2,7 +2,7 @@ import type { PlexusToolName } from './types';
 
 export const PLEXUS_MANAGEMENT_PROMPT = `Plexus is a unified API gateway for LLMs. It exposes OpenAI- and Anthropic-compatible endpoints, provider-native raw endpoints, routes requests to configured providers, records usage, and manages provider, model alias, key, quota, debug, and MCP gateway configuration.
 
-Use /mcp/plexus for admin-only Plexus management. All requests require x-admin-key. Do not use bearer inference keys for this endpoint.
+This server is admin-only. Authenticate with the Plexus ADMIN_KEY, sent as either an x-admin-key header or an Authorization: Bearer <ADMIN_KEY> header. Inference API keys are rejected with 403.
 
 The tools are compact domain tools. Prefer inspection before mutation: list or get the current state, explain the intended change, then call the relevant tool with operation, id, category, query, and body.
 
