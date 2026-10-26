@@ -57,6 +57,65 @@ function getPostgresDriver(): PostgresDriver {
   return process.env.PLEXUS_POSTGRES_DRIVER === 'pglite' ? 'pglite' : 'postgres-js';
 }
 
+type PostgresSslOption = false | 'allow' | 'prefer' | 'require' | 'verify-full';
+
+/**
+ * Resolve the postgres-js `ssl` option from a PostgreSQL connection string.
+ *
+ * Previously this was hardcoded to `false`, so a server that requires SSL
+ * (for example a managed database with only `hostssl` entries) rejected
+ * every connection, no matter what `sslmode` the connection string asked
+ * for — the explicit option takes precedence over the URL in postgres-js.
+ *
+ * The mapping follows libpq's `sslmode`, as understood by postgres-js:
+ * no `sslmode` (or `disable`) keeps the previous plaintext behaviour, so
+ * local databases without SSL are unaffected. `verify-ca` has no
+ * equivalent in postgres-js's `ssl` option type and its runtime would
+ * verify the hostname anyway (it always sets `servername`), so it is
+ * normalized to `verify-full` rather than silently weakened. As in
+ * postgres-js, `sslrootcert=system` upgrades to `verify-full`.
+ *
+ * An unrecognised `sslmode` throws instead of silently falling back to
+ * plaintext, so a typo cannot accidentally downgrade a connection that
+ * was meant to be encrypted.
+ */
+export function resolvePostgresSsl(connectionString: string): PostgresSslOption {
+  let sslmode: string | null = null;
+  let sslrootcert: string | null = null;
+  try {
+    const url = new URL(connectionString);
+    sslmode = url.searchParams.get('sslmode');
+    sslrootcert = url.searchParams.get('sslrootcert');
+  } catch {
+    // Leave unparseable strings to postgres-js, as before.
+    return false;
+  }
+
+  if (sslrootcert === 'system') {
+    return 'verify-full';
+  }
+
+  if (!sslmode) {
+    return false;
+  }
+
+  const mode = sslmode.toLowerCase();
+  if (mode === 'disable') {
+    return false;
+  }
+  if (mode === 'allow' || mode === 'prefer' || mode === 'require') {
+    return mode;
+  }
+  if (mode === 'verify-ca' || mode === 'verify-full') {
+    return 'verify-full';
+  }
+
+  throw new Error(
+    `Invalid sslmode in database connection string: "${sslmode}". ` +
+      'Expected one of: disable, allow, prefer, require, verify-ca, verify-full.'
+  );
+}
+
 export function initializeDatabase(connectionString?: string) {
   if (dbInstance) {
     logger.silly('Database already initialized, skipping');
@@ -204,7 +263,7 @@ export function initializeDatabase(connectionString?: string) {
       });
     } else {
       sqlClient = postgres(connStr, {
-        ssl: false,
+        ssl: resolvePostgresSsl(connStr),
         max: 10,
         idle_timeout: 20,
         connect_timeout: 10,
