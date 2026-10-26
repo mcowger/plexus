@@ -247,3 +247,130 @@ describe('Anthropic image block cache_control round-trip', () => {
     expect(imageBlock.cache_control).toEqual({ type: 'ephemeral' });
   });
 });
+
+describe('Anthropic mid-conversation system entries', () => {
+  const requestWithEntry = () => ({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1024,
+    system: 'You are a helpful assistant.',
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'low' },
+    messages: [
+      { role: 'user', content: 'first turn' },
+      { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+      {
+        role: 'system',
+        content: [{ type: 'text', text: 'Answer in one sentence.' }],
+        output_config: { effort: 'high' },
+      },
+      { role: 'user', content: 'second turn' },
+    ],
+  });
+
+  it('keeps the entries in place and leaves the request-level system alone', async () => {
+    const request = requestWithEntry();
+    const unified = await parseAnthropicRequest(request);
+    const built = await buildAnthropicRequest({
+      ...unified,
+      incomingApiType: 'messages',
+      originalBody: request,
+    });
+
+    expect(built.system).toBe('You are a helpful assistant.');
+    expect(built.messages).toHaveLength(4);
+    expect(built.messages[2]).toEqual(request.messages[2]);
+  });
+
+  it('does not hoist the entries into the top-level system prompt', async () => {
+    const request = { ...requestWithEntry(), system: undefined };
+    const unified = await parseAnthropicRequest(request);
+    const built = await buildAnthropicRequest({
+      ...unified,
+      incomingApiType: 'messages',
+      originalBody: request,
+    });
+
+    expect(built.system).toBeUndefined();
+    expect(built.messages[2]).toEqual(request.messages[2]);
+  });
+
+  it('keeps consecutive mid-conversation entries separate and in order', async () => {
+    const request = {
+      model: 'claude-opus-5.5',
+      max_tokens: 1024,
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'system', content: [], output_config: { effort: 'low' } },
+        { role: 'system', content: [{ type: 'text', text: 'Be terse.' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+      ],
+    };
+    const unified = await parseAnthropicRequest(request);
+    const built = await buildAnthropicRequest({
+      ...unified,
+      incomingApiType: 'messages',
+      originalBody: request,
+    });
+
+    expect(built.messages.slice(1, 3)).toEqual(request.messages.slice(1, 3));
+  });
+
+  it('re-emits the output_config-only shape verbatim', async () => {
+    const entry = { role: 'system', content: [], output_config: { effort: 'high' } };
+    const request = {
+      model: 'claude-opus-5.5',
+      max_tokens: 1024,
+      messages: [
+        { role: 'user', content: 'hello' },
+        entry,
+        { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+      ],
+    };
+    const unified = await parseAnthropicRequest(request);
+    const built = await buildAnthropicRequest({
+      ...unified,
+      incomingApiType: 'messages',
+      originalBody: request,
+    });
+
+    expect(built.messages[1]).toEqual(entry);
+  });
+
+  it('clamps per-entry effort without mutating the inbound body', async () => {
+    const request = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      messages: [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'system',
+          content: [
+            { type: 'text', text: 'Think hard.' },
+            { type: 'text', text: 'And long.' },
+          ],
+          output_config: { effort: 'minimal' },
+        },
+        { role: 'assistant', content: [{ type: 'text', text: 'ok' }] },
+      ],
+    };
+    const unified = await parseAnthropicRequest(request);
+    const built = await buildAnthropicRequest({
+      ...unified,
+      incomingApiType: 'messages',
+      originalBody: request,
+    });
+
+    expect(built.messages[1].output_config).toEqual({ effort: 'low' });
+    expect(request.messages[1]!.output_config).toEqual({ effort: 'minimal' });
+  });
+
+  it('falls back to the flattened content when the inbound body is gone', async () => {
+    const unified = await parseAnthropicRequest(requestWithEntry());
+    const built = await buildAnthropicRequest(unified);
+
+    expect(built.messages[2]).toEqual({
+      role: 'system',
+      content: 'Answer in one sentence.',
+    });
+  });
+});

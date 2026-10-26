@@ -161,3 +161,46 @@ describe('clampAnthropicEffortAndThinking', () => {
     });
   });
 });
+
+describe('clampAnthropicEffortAndThinking mid-conversation entries', () => {
+  const withEntry = (effort: unknown, model = 'claude-sonnet-4-6') => ({
+    model,
+    messages: [
+      { role: 'user', content: [] },
+      { role: 'system', content: [], output_config: { effort } },
+      { role: 'assistant', content: [] },
+    ],
+  });
+
+  it.each([
+    ['minimal', 'low'],
+    ['off', 'low'],
+    ['none', 'low'],
+    ['turbo', 'low'],
+    ['LOW', 'low'],
+    ['medium', 'medium'],
+    ['high', 'high'],
+    ['xhigh', 'xhigh'],
+    ['max', 'max'],
+  ])('clamps a per-entry effort of %s to %s', (effort, expected) => {
+    const result = clampAnthropicEffortAndThinking(withEntry(effort));
+    expect(result.messages[1]!.output_config).toEqual({ effort: expected });
+  });
+
+  it('clamps per-entry effort for models that cannot disable thinking', () => {
+    const result = clampAnthropicEffortAndThinking(withEntry('off', 'claude-opus-5'));
+    expect(result.messages[1]!.output_config).toEqual({ effort: 'low' });
+  });
+
+  it('leaves entries without output_config and non-system messages alone', () => {
+    const payload = {
+      model: 'claude-sonnet-4-6',
+      messages: [
+        { role: 'user', content: [], output_config: { effort: 'minimal' } },
+        { role: 'system', content: [] },
+      ],
+    };
+    const result = clampAnthropicEffortAndThinking(payload);
+    expect(result.messages).toEqual(payload.messages);
+  });
+});

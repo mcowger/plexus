@@ -44,6 +44,23 @@ export interface UnifiedMessage {
     signature?: string;
   };
   thought_signature?: string; // New field for direct mapping
+  /**
+   * Marks an Anthropic MID-CONVERSATION `role: 'system'` entry (the
+   * `mid-conversation-system-2026-04-07` and
+   * `mid-conversation-output-config-2026-07-01` betas). Such an entry lives
+   * inside `messages` and carries per-turn directives — system-level content
+   * and/or `output_config` — so it belongs at its position in the conversation,
+   * NOT in the request-level `system` prompt. The Anthropic Messages builder
+   * re-emits the client's own entry verbatim at that position; egress formats
+   * with no in-conversation system concept deliberately hoist the content into
+   * their system prompt (see request-payload-builder.ts).
+   *
+   * `content` holds the entry's text flattened to a string (used by that
+   * hoist), and is empty for the `output_config`-only shape. The per-turn
+   * effort itself is already carried on `UnifiedChatRequest.reasoning` (see
+   * getMidConversationEffort).
+   */
+  mid_conversation?: boolean;
 }
 
 // Unified Tool Types

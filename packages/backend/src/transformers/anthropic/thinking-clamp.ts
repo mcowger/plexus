@@ -46,6 +46,10 @@ export function anthropicModelSupportsDisable(modelId?: string): boolean {
  * 3. If a model can disable thinking and effort is 'off', removes `output_config.effort`
  *    and sets `thinking: { type: 'disabled' }`.
  * 4. Ensures `output_config.effort` is not sent when `thinking: { type: 'disabled' }`.
+ * 5. Clamps the `output_config.effort` carried by Anthropic mid-conversation
+ *    `role: 'system'` entries (mid-conversation-output-config beta) to the same
+ *    `['low', 'max']` window. Those per-turn directives are separate from the
+ *    request-level `output_config`, so the top-level handling never reaches them.
  */
 export function clampAnthropicEffortAndThinking<T extends Record<string, unknown>>(
   payload: T,
@@ -111,6 +115,29 @@ export function clampAnthropicEffortAndThinking<T extends Record<string, unknown
         ? clampEffortToWindow(normalizedEffort, 'low', 'max')
         : 'low';
       outputConfig.effort = clamped;
+    }
+  }
+
+  // Mid-conversation `role: 'system'` entries carry their OWN per-turn
+  // `output_config.effort`. Anthropic accepts only low..max there too, and a
+  // per-turn value cannot disable the request-level thinking mode, so an
+  // 'off'/unknown value clamps to the lowest expressible level ('low') rather
+  // than deleting the directive (which would silently fall back to the
+  // top-level placeholder effort).
+  const payloadMessages = (payload as { messages?: unknown }).messages;
+  if (Array.isArray(payloadMessages)) {
+    for (const message of payloadMessages) {
+      if (!message || typeof message !== 'object') continue;
+      if ((message as { role?: unknown }).role !== 'system') continue;
+      const entryOutputConfig = (message as { output_config?: unknown }).output_config;
+      if (!entryOutputConfig || typeof entryOutputConfig !== 'object') continue;
+      const entry = entryOutputConfig as Record<string, unknown>;
+      if (entry.effort === undefined) continue;
+      const entryEffort = normalizeEffort(entry.effort);
+      entry.effort =
+        entryEffort && entryEffort !== 'off'
+          ? clampEffortToWindow(entryEffort, 'low', 'max')
+          : 'low';
     }
   }
 

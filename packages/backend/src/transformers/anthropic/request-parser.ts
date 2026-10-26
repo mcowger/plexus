@@ -5,6 +5,26 @@ import { convertAnthropicContent } from './content-mapper';
 import { convertAnthropicToolsToUnified } from './tool-mapper';
 
 /**
+ * Flattens an Anthropic mid-conversation `role: 'system'` entry's content into
+ * the unified string form.
+ *
+ * Anthropic egress re-emits the caller's raw entry (so content and block-level
+ * `cache_control` survive there), which means the unified string only feeds
+ * cross-format egress — and the Responses/Gemini emitters stringify array
+ * content, so joining the text blocks produces a usable system prompt instead
+ * of a JSON blob. Contentless entries (the per-turn `output_config`-only
+ * shape) become the empty string.
+ */
+function flattenMidConversationSystemContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((part: any) => part && part.type === 'text' && typeof part.text === 'string')
+    .map((part: any) => part.text as string)
+    .join('\n\n');
+}
+
+/**
  * Parses an Anthropic API request and converts it to unified format.
  *
  * Key transformations:
@@ -34,6 +54,20 @@ export async function parseAnthropicRequest(input: any): Promise<UnifiedChatRequ
 
   if (input.messages) {
     for (const msg of input.messages) {
+      // Anthropic allows `role: 'system'` entries INSIDE `messages` under the
+      // mid-conversation-system / mid-conversation-output-config betas. They
+      // are per-turn directives at a position in the conversation, not part of
+      // the request-level `system` prompt, so keep them (marked) in place
+      // instead of discarding or hoisting them.
+      if (msg.role === 'system') {
+        messages.push({
+          role: 'system',
+          content: flattenMidConversationSystemContent(msg.content),
+          mid_conversation: true,
+        });
+        continue;
+      }
+
       if (msg.role === 'user' || msg.role === 'assistant') {
         if (typeof msg.content === 'string') {
           messages.push({ role: msg.role, content: msg.content });

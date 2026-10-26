@@ -49,10 +49,41 @@ function toAnthropicImageSource(url: unknown, fallbackMediaType?: string): Anthr
  */
 export async function buildAnthropicRequest(request: UnifiedChatRequest): Promise<any> {
   let system: string | { type: string; text: string; cache_control?: unknown }[] | undefined;
-  const messages: any[] = [];
+  /** Built messages; `midConversationEntry` carries the caller's raw entry. */
+  const messages: Array<{
+    role: string;
+    content: any[];
+    midConversationEntry?: Record<string, any>;
+  }> = [];
+
+  // Anthropic mid-conversation `role: 'system'` entries live inside `messages`
+  // and must be re-emitted there verbatim: they carry per-turn directives
+  // (`output_config` under the mid-conversation-output-config beta, the
+  // system-level content of mid-conversation-system) plus fields the unified
+  // shape does not model. The parser marks each one, so pairing the markers
+  // with the caller's own entries in order recovers the exact entry — content
+  // order and block-level `cache_control` included. Anything rebuilt from a
+  // unified request without `originalBody` falls back to the flattened content.
+  const nativeMidConversationEntries: unknown[] = Array.isArray(request.originalBody?.messages)
+    ? request.originalBody.messages.filter(
+        (message: any) => message && typeof message === 'object' && message.role === 'system'
+      )
+    : [];
+  let nativeMidConversationCursor = 0;
 
   for (const msg of request.messages) {
     if (msg.role === 'system') {
+      if (msg.mid_conversation) {
+        const nativeEntry = nativeMidConversationEntries[nativeMidConversationCursor++];
+        messages.push({
+          role: 'system',
+          content: [],
+          midConversationEntry: nativeEntry
+            ? structuredClone(nativeEntry as Record<string, any>)
+            : { role: 'system', content: typeof msg.content === 'string' ? msg.content : '' },
+        });
+        continue;
+      }
       if (typeof msg.content === 'string') {
         system = msg.content;
       } else if (Array.isArray(msg.content)) {
@@ -138,6 +169,12 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
   // This is required by Anthropic API: can't have consecutive user or assistant messages
   const mergedMessages: any[] = [];
   for (const msg of messages) {
+    // Mid-conversation entries are forwarded byte-for-byte: merging would
+    // concatenate content arrays and rewrite the caller's entries.
+    if (msg.midConversationEntry) {
+      mergedMessages.push(msg.midConversationEntry);
+      continue;
+    }
     if (mergedMessages.length > 0) {
       const last = mergedMessages[mergedMessages.length - 1];
       if (last.role === msg.role) {

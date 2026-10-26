@@ -79,6 +79,65 @@ export function applyAutoAnthropicBetas(
   headers[existingKey ?? 'anthropic-beta'] = betas.join(',');
 }
 
+/**
+ * Translate Anthropic mid-conversation `role: 'system'` entries for egress
+ * formats that have no in-conversation system concept.
+ *
+ * Those entries are marked by the Messages parser so a rebuilt Messages request
+ * can re-emit the caller's own entry verbatim at its position. Other wire
+ * formats cannot express a system turn mid-conversation, so this hoists the
+ * entries' content into the request's system prompt (creating one when absent),
+ * which is what the chat/Responses/Gemini builders already do with system
+ * messages. Contentless entries — the `output_config`-only shape — are dropped:
+ * their per-turn effort already travelled to the target on
+ * `request.reasoning` (see getMidConversationEffort). Hoisting is deliberate:
+ * it preserves the instructions at the cost of their original position, rather
+ * than losing them by accident.
+ */
+export function hoistMidConversationEntries(request: UnifiedChatRequest): UnifiedChatRequest {
+  if (!request.messages?.some((message) => message.mid_conversation)) return request;
+
+  const hoistedText: string[] = [];
+  const messages = request.messages.filter((message) => {
+    if (!message.mid_conversation) return true;
+    if (typeof message.content === 'string') {
+      if (message.content) hoistedText.push(message.content);
+    } else if (Array.isArray(message.content)) {
+      const text = message.content
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text)
+        .join('\n\n');
+      if (text) hoistedText.push(text);
+    }
+    return false;
+  });
+
+  if (hoistedText.length === 0) return { ...request, messages };
+
+  const systemIndex = messages.findIndex((message) => message.role === 'system');
+  const existing = systemIndex === -1 ? undefined : messages[systemIndex];
+  if (!existing) {
+    messages.unshift({ role: 'system', content: hoistedText.join('\n\n') });
+  } else if (typeof existing.content === 'string') {
+    messages[systemIndex] = {
+      ...existing,
+      content: [existing.content, ...hoistedText].filter(Boolean).join('\n\n'),
+    };
+  } else if (Array.isArray(existing.content)) {
+    messages[systemIndex] = {
+      ...existing,
+      content: [
+        ...existing.content,
+        ...hoistedText.map((text) => ({ type: 'text' as const, text })),
+      ],
+    };
+  } else {
+    messages[systemIndex] = { ...existing, content: hoistedText.join('\n\n') };
+  }
+
+  return { ...request, messages };
+}
+
 function shouldUsePassThrough(
   request: UnifiedChatRequest,
   targetApiType: string,
@@ -198,7 +257,15 @@ export async function buildRequestPayload(
           },
         }
       : request;
-    payload = await transformer.transformRequest(requestWithOAuthProvider);
+    // Same-format Messages egress keeps the mid-conversation markers so the
+    // builder can re-emit the caller's entries in place; every other target
+    // gets them hoisted into its system prompt (see
+    // hoistMidConversationEntries).
+    const requestForTransform =
+      getApiBaseType(targetApiType) === 'messages'
+        ? requestWithOAuthProvider
+        : hoistMidConversationEntries(requestWithOAuthProvider);
+    payload = await transformer.transformRequest(requestForTransform);
   }
 
   // Claude genuine-client fast-path. Masking only exists on the native
