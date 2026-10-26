@@ -78,8 +78,19 @@ type PostgresSslOption = false | 'allow' | 'prefer' | 'require' | 'verify-full';
  * An unrecognised `sslmode` throws instead of silently falling back to
  * plaintext, so a typo cannot accidentally downgrade a connection that
  * was meant to be encrypted.
+ *
+ * A string that `new URL()` cannot parse returns `undefined` instead of
+ * `false`: postgres-js accepts connection strings this parser rejects,
+ * notably multi-host strings such as
+ * `postgres://u:p@h1:5432,h2:5432/db?sslmode=require`, which it parses
+ * by rewriting the host before parsing. Returning `false` here would set
+ * an explicit `ssl` option and override the URL, silently dropping the
+ * requested `sslmode`. The call site therefore omits `ssl` entirely
+ * when the result is `undefined` — passing `{ ssl: undefined }` would
+ * not work, because postgres-js treats a present `ssl` key as an
+ * explicit option even when its value is `undefined`.
  */
-export function resolvePostgresSsl(connectionString: string): PostgresSslOption {
+export function resolvePostgresSsl(connectionString: string): PostgresSslOption | undefined {
   let sslmode: string | null = null;
   let sslrootcert: string | null = null;
   try {
@@ -87,8 +98,9 @@ export function resolvePostgresSsl(connectionString: string): PostgresSslOption 
     sslmode = url.searchParams.get('sslmode');
     sslrootcert = url.searchParams.get('sslrootcert');
   } catch {
-    // Leave unparseable strings to postgres-js, as before.
-    return false;
+    // Defer to postgres-js's own parser: do not set an explicit ssl
+    // option that would override the sslmode in the connection string.
+    return undefined;
   }
 
   if (sslrootcert === 'system') {
@@ -262,8 +274,9 @@ export function initializeDatabase(connectionString?: string) {
         schema,
       });
     } else {
+      const postgresSsl = resolvePostgresSsl(connStr);
       sqlClient = postgres(connStr, {
-        ssl: resolvePostgresSsl(connStr),
+        ...(postgresSsl !== undefined ? { ssl: postgresSsl } : {}),
         max: 10,
         idle_timeout: 20,
         connect_timeout: 10,

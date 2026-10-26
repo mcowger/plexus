@@ -44,4 +44,21 @@ describe('resolvePostgresSsl', () => {
       'Invalid sslmode in database connection string: "bogus"'
     );
   });
+
+  it('defers to postgres-js for multi-host strings that new URL cannot parse', () => {
+    // new URL() throws on the comma-separated host list, but postgres-js
+    // parses it by rewriting the host first. Returning false here would
+    // set an explicit ssl option and silently drop the requested sslmode,
+    // so the result must be undefined and the call site must omit ssl.
+    expect(
+      resolvePostgresSsl('postgres://user:pass@h1:5432,h2:5432/plexus?sslmode=require')
+    ).toBeUndefined();
+    expect(
+      resolvePostgresSsl('postgres://user:pass@h1:5432,h2:5432/plexus?sslmode=verify-full')
+    ).toBeUndefined();
+    expect(
+      resolvePostgresSsl('postgres://user:pass@h1:5432,h2:5432/plexus?sslrootcert=system')
+    ).toBeUndefined();
+    expect(resolvePostgresSsl('postgres://user:pass@h1:5432,h2:5432/plexus')).toBeUndefined();
+  });
 });
