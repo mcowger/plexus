@@ -52,13 +52,13 @@ export interface UnifiedMessage {
    * and/or `output_config` — so it belongs at its position in the conversation,
    * NOT in the request-level `system` prompt. The Anthropic Messages builder
    * re-emits the client's own entry verbatim at that position; egress formats
-   * with no in-conversation system concept deliberately hoist the content into
-   * their system prompt (see request-payload-builder.ts).
+   * with no in-conversation system concept deliberately drop the entry rather
+   * than rewrite the target's system prompt (see request-payload-builder.ts).
    *
-   * `content` holds the entry's text flattened to a string (used by that
-   * hoist), and is empty for the `output_config`-only shape. The per-turn
-   * effort itself is already carried on `UnifiedChatRequest.reasoning` (see
-   * getMidConversationEffort).
+   * `content` holds the entry's text flattened to a string (used only as the
+   * builder's fallback when `originalBody` is unavailable), and is empty for
+   * the `output_config`-only shape. The per-turn effort itself is already
+   * carried on `UnifiedChatRequest.reasoning` (see getMidConversationEffort).
    */
   mid_conversation?: boolean;
 }
