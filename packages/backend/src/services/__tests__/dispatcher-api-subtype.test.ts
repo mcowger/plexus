@@ -345,6 +345,38 @@ describe('Dispatcher API subtypes', () => {
     ]);
   });
 
+  test.each([
+    ['omitted reasoning (trace 26d1e440)', undefined],
+    ['null reasoning', null],
+    ['empty reasoning', {}],
+    ['incompatible context', { effort: 'high', summary: 'auto', context: 'last_turn' }],
+    ['valid context', { effort: 'high', context: 'all_turns' }],
+  ])('enforces the lite reasoning context with %s', async (_label, reasoning) => {
+    const dispatcher = new Dispatcher() as any;
+    const route = makeRoute([{ type: 'responses', subtype: 'lite' }]);
+    const originalBody = {
+      model: 'gpt-6.1-terra',
+      input: [
+        { type: 'additional_tools', role: 'developer', tools: [] },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+      ],
+      ...(reasoning === undefined ? {} : { reasoning }),
+    };
+    const originalSnapshot = structuredClone(originalBody);
+
+    const result = await dispatcher.transformRequestPayload(
+      { model: 'alias', messages: [], incomingApiType: 'responses:lite', originalBody },
+      route,
+      TransformerFactory.getTransformer('responses:lite'),
+      'responses:lite'
+    );
+
+    expect(result.bypassTransformation).toBe(true);
+    expect(result.payload.reasoning).toEqual({ ...reasoning, context: 'all_turns' });
+    expect(result.payload.input).toEqual(originalBody.input);
+    expect(originalBody).toEqual(originalSnapshot);
+  });
+
   test('does not normalize the lite wire contract for a base (non-lite) responses target', async () => {
     const dispatcher = new Dispatcher() as any;
     const route = makeRoute(['responses']);
@@ -367,6 +399,7 @@ describe('Dispatcher API subtypes', () => {
       'responses'
     );
 
+    expect(result.payload.reasoning).toBeUndefined();
     expect(result.payload.parallel_tool_calls).toBe(true);
     expect(result.payload.tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ type: 'web_search' })])
@@ -407,6 +440,7 @@ describe('Dispatcher API subtypes', () => {
     );
 
     expect(result.bypassTransformation).toBe(false);
+    expect(result.payload.reasoning).toEqual({ context: 'all_turns' });
     expect(result.payload.tools).toEqual([
       expect.objectContaining({ type: 'function', name: 'crm__list_open_orders' }),
     ]);

@@ -334,16 +334,12 @@ export async function buildRequestPayload(
   if (!nativeOAuth && targetApiType.toLowerCase() === 'responses:lite') {
     payload = {
       ...payload,
-      // Only default `context` when the payload already has a `reasoning`
-      // object — injecting one from nothing would send `reasoning` to a
-      // non-reasoning model routed through a lite target, and /v1/responses
-      // rejects that as an unsupported parameter. A genuinely reasoning
-      // model (the only kind Codex CLI's lite mode targets in practice)
-      // always sends `reasoning` itself, so this never needed to default
-      // the object's presence, only the missing `context` field within it.
-      ...(payload.reasoning
-        ? { reasoning: { ...payload.reasoning, context: payload.reasoning.context ?? 'all_turns' } }
-        : {}),
+      // The lite header requires this even when the client omits reasoning
+      // entirely (trace 26d1e440). Enforce the contract over client/extraBody
+      // context values, while preserving effort, summary, and other options.
+      // Models that reject reasoning must use a base Responses target rather
+      // than this header-based lite contract.
+      reasoning: { ...payload.reasoning, context: 'all_turns' },
       parallel_tool_calls: false,
     };
     const toolStripResult = stripLiteUnsupportedTools(payload);
