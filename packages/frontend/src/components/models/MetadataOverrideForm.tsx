@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import type { MetadataOverrides } from '../../lib/api';
 import { Input } from '../ui/Input';
 import { TagSelect } from '../ui/TagSelect';
@@ -39,9 +41,10 @@ interface Props {
     value: MetadataOverrides[K] | undefined
   ) => void;
   onSetPricing: (
-    key: keyof NonNullable<MetadataOverrides['pricing']>,
+    key: keyof Omit<NonNullable<MetadataOverrides['pricing']>, 'tiers'>,
     value: string | undefined
   ) => void;
+  onSetPricingCutoff: (cutoff: number | undefined) => void;
   onSetArchitecture: (
     key: keyof NonNullable<MetadataOverrides['architecture']>,
     value: string | string[] | undefined
@@ -77,12 +80,46 @@ const parseIntOrUndef = (s: string): number | undefined => {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+function PricingCutoffInput({
+  cutoff,
+  onSetCutoff,
+}: {
+  cutoff: number | undefined;
+  onSetCutoff: (cutoff: number | undefined) => void;
+}) {
+  const [draft, setDraft] = useState(cutoff?.toString() ?? '');
+  useEffect(() => setDraft(cutoff?.toString() ?? ''), [cutoff]);
+
+  return (
+    <Input
+      aria-label="First long-context cutoff (input tokens)"
+      type="number"
+      min={0}
+      step={1}
+      value={draft}
+      placeholder="e.g. 200000"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={(e) => {
+        if (draft === (cutoff?.toString() ?? '')) return;
+        if (draft === '') onSetCutoff(undefined);
+        else if (e.target.validity.valid && Number.isSafeInteger(Number(draft))) {
+          onSetCutoff(Number(draft));
+        } else setDraft(cutoff?.toString() ?? '');
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 export function MetadataOverrideForm({
   overrides,
   isCustom,
   shortNamePlaceholder,
   onSetField,
   onSetPricing,
+  onSetPricingCutoff,
   onSetArchitecture,
   onSetTopProvider,
 }: Props) {
@@ -211,6 +248,18 @@ export function MetadataOverrideForm({
               placeholder="0.00000375"
             />
           </div>
+        </div>
+        <div style={{ marginTop: '8px' }}>
+          <FieldLabel>First long-context cutoff (input tokens)</FieldLabel>
+          <PricingCutoffInput
+            cutoff={overrides.pricing?.tiers?.[0]?.input_tokens_above}
+            onSetCutoff={onSetPricingCutoff}
+          />
+          <p className="font-body text-text-muted mt-1 text-[11px]">
+            Advertised in model metadata when input tokens exceed this value. This overrides catalog
+            pricing tiers but does not change calculated costs. Clearing it removes the first tier
+            and its rates.
+          </p>
         </div>
       </div>
 

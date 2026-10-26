@@ -54,6 +54,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
     clearMetadata,
     setOverrideField,
     setPricingField,
+    setPricingCutoff,
     setArchitectureField,
     setTopProviderField,
     countOverrides,
@@ -795,6 +796,7 @@ export function ModelMetadataEditor({ editingAlias, setEditingAlias, isModalOpen
                         }
                         onSetField={setOverrideField}
                         onSetPricing={setPricingField}
+                        onSetPricingCutoff={setPricingCutoff}
                         onSetArchitecture={setArchitectureField}
                         onSetTopProvider={setTopProviderField}
                       />

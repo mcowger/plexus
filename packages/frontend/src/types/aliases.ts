@@ -36,6 +36,14 @@ export type AliasBehavior = StripAdaptiveThinkingBehavior | InjectCacheControlBe
 export type CatalogMetadataSource = 'openrouter' | 'models.dev' | 'catwalk';
 export type MetadataSource = CatalogMetadataSource | 'auto' | 'disabled' | 'custom';
 
+export interface MetadataPricingTier {
+  input_tokens_above: number;
+  prompt?: string;
+  completion?: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+}
+
 export interface MetadataOverrides {
   name?: string;
   short_name?: string;
@@ -46,6 +54,7 @@ export interface MetadataOverrides {
     completion?: string;
     input_cache_read?: string;
     input_cache_write?: string;
+    tiers?: MetadataPricingTier[];
   };
   architecture?: {
     input_modalities?: string[];
@@ -80,6 +89,7 @@ export interface NormalizedModelMetadata {
     completion?: string;
     input_cache_read?: string;
     input_cache_write?: string;
+    tiers?: MetadataPricingTier[];
   };
   supported_parameters?: string[];
   top_provider?: {

@@ -9,6 +9,7 @@ import {
   MetadataSource,
   NormalizedModelMetadata,
 } from '../lib/api';
+import { setFirstPricingCutoff } from '../lib/metadataPricing';
 import { dedupeById } from '../lib/modelOptions';
 
 /**
@@ -94,6 +95,8 @@ export function useMetadataEditor(
         p.input_cache_read = meta.pricing.input_cache_read;
       if (meta.pricing.input_cache_write !== undefined)
         p.input_cache_write = meta.pricing.input_cache_write;
+      if (meta.pricing.tiers !== undefined)
+        p.tiers = meta.pricing.tiers.map((tier) => ({ ...tier }));
       if (Object.keys(p).length > 0) out.pricing = p;
     }
     if (meta.architecture) {
@@ -142,7 +145,7 @@ export function useMetadataEditor(
       const valuesEqual = (a: unknown, b: unknown): boolean => {
         if (a === b) return true;
         if (Array.isArray(a) && Array.isArray(b)) {
-          return a.length === b.length && a.every((v, i) => v === b[i]);
+          return JSON.stringify(a) === JSON.stringify(b);
         }
         return false;
       };
@@ -324,13 +327,32 @@ export function useMetadataEditor(
   );
 
   const setPricingField = useCallback(
-    (key: keyof NonNullable<MetadataOverrides['pricing']>, value: string | undefined) => {
+    (
+      key: keyof Omit<NonNullable<MetadataOverrides['pricing']>, 'tiers'>,
+      value: string | undefined
+    ) => {
       const current = aliasRef.current.metadata;
       if (!current || current.source === 'disabled') return;
       const pricing = { ...(current.overrides?.pricing ?? {}) };
       if (value === undefined || value === '') delete pricing[key];
       else pricing[key] = value;
       const nextOverrides: MetadataOverrides = { ...(current.overrides ?? {}) };
+      if (Object.keys(pricing).length === 0) delete nextOverrides.pricing;
+      else nextOverrides.pricing = pricing;
+      setEditingAlias({ ...aliasRef.current, metadata: withOverrides(current, nextOverrides) });
+    },
+    [setEditingAlias, withOverrides]
+  );
+
+  const setPricingCutoff = useCallback(
+    (cutoff: number | undefined) => {
+      const current = aliasRef.current.metadata;
+      if (!current || current.source === 'disabled') return;
+      const pricing = { ...(current.overrides?.pricing ?? {}) };
+      const tiers = setFirstPricingCutoff(pricing.tiers, cutoff);
+      if (tiers === undefined) delete pricing.tiers;
+      else pricing.tiers = tiers;
+      const nextOverrides = { ...(current.overrides ?? {}) };
       if (Object.keys(pricing).length === 0) delete nextOverrides.pricing;
       else nextOverrides.pricing = pricing;
       setEditingAlias({ ...aliasRef.current, metadata: withOverrides(current, nextOverrides) });
@@ -401,6 +423,11 @@ export function useMetadataEditor(
         const r = ref.pricing ?? {};
         if (o.pricing.prompt !== undefined && o.pricing.prompt !== r.prompt) n++;
         if (o.pricing.completion !== undefined && o.pricing.completion !== r.completion) n++;
+        if (
+          o.pricing.tiers !== undefined &&
+          JSON.stringify(o.pricing.tiers) !== JSON.stringify(r.tiers)
+        )
+          n++;
         if (
           o.pricing.input_cache_read !== undefined &&
           o.pricing.input_cache_read !== r.input_cache_read
@@ -522,6 +549,7 @@ export function useMetadataEditor(
     clearMetadata,
     setOverrideField,
     setPricingField,
+    setPricingCutoff,
     setArchitectureField,
     setTopProviderField,
     countOverrides,
