@@ -1,4 +1,4 @@
-import { normalizeEffort } from '../../services/pi-ai/reasoning';
+import { getMidConversationEffort, normalizeEffort } from '../../services/pi-ai/reasoning';
 import { UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
 import { getThinkLevel } from '../utils';
 import { convertAnthropicContent } from './content-mapper';
@@ -131,7 +131,14 @@ export async function parseAnthropicRequest(input: any): Promise<UnifiedChatRequ
     const thinkingType = input.thinking.type;
     const thinkingBudget = input.thinking.budget_tokens;
     const thinkingEnabled = thinkingType === 'enabled' || thinkingType === 'adaptive';
-    const configuredEffort = normalizeEffort(input.output_config?.effort);
+    // With the mid-conversation output-config beta, the top-level
+    // `output_config.effort` is a cache-stable placeholder; the effort this turn
+    // actually runs at is the last `output_config.effort` carried inside
+    // `messages`. Prefer it so cross-format egress (and logging off the unified
+    // request) sees the real per-turn effort.
+    const configuredEffort = normalizeEffort(
+      getMidConversationEffort(input) ?? input.output_config?.effort
+    );
     const effort = thinkingEnabled
       ? configuredEffort === 'off'
         ? 'none'

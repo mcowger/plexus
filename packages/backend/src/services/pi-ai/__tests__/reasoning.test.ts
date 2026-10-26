@@ -127,6 +127,48 @@ describe('getReasoningLogValue', () => {
   });
 });
 
+describe('getReasoningLogValue with mid-conversation output_config', () => {
+  const body = (efforts: string[], topLevelEffort = 'low') => ({
+    thinking: { type: 'adaptive', display: 'summarized' },
+    output_config: { effort: topLevelEffort },
+    messages: [
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: 'hi' },
+      ...efforts.map((effort) => ({ role: 'system', content: [], output_config: { effort } })),
+    ],
+  });
+
+  it('reports the trailing mid-conversation effort, not the placeholder', () => {
+    expect(getReasoningLogValue(undefined, body(['low', 'high']))).toBe('high');
+  });
+
+  it('uses the last mid-conversation entry', () => {
+    expect(getReasoningLogValue(undefined, body(['high', 'medium']))).toBe('medium');
+  });
+
+  it('keeps the top-level effort when no mid-conversation entry exists', () => {
+    expect(getReasoningLogValue(undefined, body([], 'medium'))).toBe('medium');
+  });
+
+  it('applies without a thinking block', () => {
+    expect(
+      getReasoningLogValue(undefined, {
+        output_config: { effort: 'low' },
+        messages: [{ role: 'system', content: [], output_config: { effort: 'max' } }],
+      })
+    ).toBe('max');
+  });
+
+  it('still reports off when thinking is explicitly disabled', () => {
+    expect(
+      getReasoningLogValue(undefined, {
+        thinking: { type: 'disabled' },
+        messages: [{ role: 'system', content: [], output_config: { effort: 'high' } }],
+      })
+    ).toBe('off');
+  });
+});
+
 describe('intentToEffort', () => {
   it('maps budgetTokens: -1 to adaptive default effort', () => {
     expect(intentToEffort({ budgetTokens: -1, source: 'client' })).toBe('high');

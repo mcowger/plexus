@@ -178,6 +178,36 @@ function reasoningIntentToLogValue(intent: {
   return undefined;
 }
 
+/**
+ * Resolve the per-turn effort an Anthropic Messages request actually runs with.
+ *
+ * With the `mid-conversation-output-config-2026-07-01` beta, a client can pin a
+ * fixed top-level `output_config.effort` (so the prompt cache stays valid) and
+ * instead express the effort for each turn as `output_config.effort` on entries
+ * inside `messages` (typically `role: 'system'`). Those entries are history: the
+ * LAST one is the effort applied to the turn being generated, and the top-level
+ * value is a placeholder that does not describe the request.
+ *
+ * Returns the raw effort from the last in-`messages` `output_config`, or
+ * `undefined` when the request carries none (so the caller keeps using the
+ * top-level `output_config.effort`).
+ */
+export function getMidConversationEffort(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const messages = (payload as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return undefined;
+
+  let effort: string | undefined;
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue;
+    const outputConfig = (message as { output_config?: unknown }).output_config;
+    if (!outputConfig || typeof outputConfig !== 'object') continue;
+    const raw = (outputConfig as { effort?: unknown }).effort;
+    if (typeof raw === 'string' && raw.trim()) effort = raw;
+  }
+  return effort;
+}
+
 export function getReasoningLogValue(
   request:
     | {
@@ -209,13 +239,19 @@ export function getReasoningLogValue(
     return value;
   };
 
+  // A mid-conversation `output_config.effort` (see getMidConversationEffort)
+  // describes this turn; a top-level `output_config.effort` is a cache-stable
+  // placeholder in those requests, so the in-`messages` value takes precedence.
+  const midConversationEffort = getMidConversationEffort(source);
+  const outputEffort = midConversationEffort ?? source.output_config?.effort;
+
   const thinking = source.thinking;
   if (thinking && typeof thinking === 'object') {
     const thinkingType =
       typeof thinking.type === 'string' ? thinking.type.toLowerCase() : undefined;
     const value = resolve(
       reasoningIntentToLogValue({
-        effort: source.output_config?.effort,
+        effort: outputEffort,
         budgetTokens: thinking.budget_tokens,
         enabled: thinkingType === 'disabled' ? false : thinkingType ? true : undefined,
         adaptive: thinkingType === 'adaptive',
@@ -266,7 +302,7 @@ export function getReasoningLogValue(
 
   const value = resolve(
     reasoningIntentToLogValue({
-      effort: source.output_config?.effort ?? source.thinking_level,
+      effort: outputEffort ?? source.thinking_level,
       budgetTokens: source.budget_tokens ?? source.thinking_budget,
       enabled: source.enable_thinking ?? source.chat_template_kwargs?.enable_thinking,
     })

@@ -171,6 +171,44 @@ describe('Anthropic reasoning intent normalization', () => {
       enabled: true,
     });
   });
+
+  it('prefers the trailing mid-conversation output effort over the top-level placeholder', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-5.5',
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'system', content: [], output_config: { effort: 'low' } },
+        { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+        { role: 'system', content: [], output_config: { effort: 'high' } },
+      ],
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'low' },
+    });
+
+    expect(unified.reasoning).toEqual({ effort: 'high', enabled: true, adaptive: true });
+  });
+
+  it('ignores effort carried by message content', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude-opus-5.5',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-1',
+              content: JSON.stringify({ output_config: { effort: 'max' } }),
+            },
+          ],
+        },
+      ],
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'low' },
+    });
+
+    expect(unified.reasoning).toEqual({ effort: 'low', enabled: true, adaptive: true });
+  });
 });
 
 describe('Anthropic image block cache_control round-trip', () => {
