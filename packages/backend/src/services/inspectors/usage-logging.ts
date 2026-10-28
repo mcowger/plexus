@@ -176,6 +176,14 @@ export class UsageInspector extends PassThrough {
     };
 
     try {
+      // A client terminal frame can arrive before the provider tap's 'end'
+      // (or before either tap ends on normal stream completion). Persist and
+      // analyze everything observed so far before flushing the debug log;
+      // waiting for the upstream transport would lose captures when clients
+      // disconnect immediately after the terminal frame. Both are idempotent.
+      this.rawDebugCapture?.finalize();
+      this.transformedDebugCapture?.finalize();
+
       const debugManager = DebugManager.getInstance();
       const reconstructed = debugManager.getReconstructedRawResponse(this.usageRecord.requestId!);
       this.applyActualServiceTier(reconstructed);

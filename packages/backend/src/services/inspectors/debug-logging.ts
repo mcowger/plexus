@@ -167,12 +167,11 @@ export class DebugLoggingInspector extends BaseInspector {
    * 'end' event and any explicit teardown call share the same guard, so
    * whichever runs first wins and later calls are no-ops.
    *
-   * PUBLIC because stream flush is not guaranteed to run: a client
-   * disconnect/timeout cancels the web TransformStream pipeline WITHOUT
-   * running its flush, so this tap's 'end' never fires — response-handler's
-   * cancellation teardown calls finalize() explicitly BEFORE destroying the
-   * usage inspector, so UsageInspector._destroy's snapshot fallback reads a
-   * live capture instead of nothing.
+   * PUBLIC because stream flush is not guaranteed to run before the trace is
+   * persisted: a client terminal event can finalize usage while the upstream
+   * tap is still open, and a disconnect/timeout can cancel the web pipeline
+   * without running its flush at all. UsageInspector and response-handler
+   * explicitly finalize the taps before reading usage or flushing the trace.
    */
   finalize(): void {
     if (this.finalized) return;
