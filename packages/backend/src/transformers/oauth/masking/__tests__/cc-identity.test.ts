@@ -68,6 +68,34 @@ describe('injectClaudeCodeIdentity — non-mutation', () => {
       : firstUser.content;
 
     expect(content).toContain('<system-reminder>');
+    expect(content).toContain('caller system prompt');
     expect(content).toContain('hello');
+  });
+
+  it('preserves multiple instruction blocks and whitespace in array content', () => {
+    const first = '  First instruction.\n';
+    const second = '\nSecond instruction.  ';
+    const body = {
+      system: [
+        { type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." },
+        { type: 'text', text: first },
+        { type: 'text', text: second },
+      ],
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
+    };
+    const result = injectClaudeCodeIdentity(body);
+    expect(result.messages[0].content[0].text).toContain(`${first}\n\n${second}`);
+    expect(result.messages[0].content[1].text).toBe('hello');
+    expect(result.system[2].text).not.toContain(first);
+  });
+
+  it('preserves string system instructions in string message content', () => {
+    const instructions = '  Legal instructions.\nDo not omit terms.\n';
+    const result = injectClaudeCodeIdentity({
+      system: instructions,
+      messages: [{ role: 'user', content: 'Review this.' }],
+    });
+    expect(result.messages[0].content).toContain(instructions);
+    expect(result.messages[0].content).toContain('Review this.');
   });
 });

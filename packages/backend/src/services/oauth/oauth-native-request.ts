@@ -9,10 +9,8 @@
  *   - Outbound wire body: the native `AnthropicTransformer` /
  *     `ResponsesTransformer` already build the correct provider body (proven by
  *     the golden traces). We take that body as input.
- *   - Fingerprint/masking: `applyClaudeOAuthTransform` + `applyClaudeCodeMasking`
- *     (the exact two-step sequence `oauth-transformer.executeRequest` runs today
- *     in its `onPayload` hook) — these are input-agnostic and mask the native
- *     body just as well as they masked pi-ai's `buildParams()` output.
+ *   - Fingerprint/masking: canonicalize OAuth tool names and apply the Claude
+ *     Code masking pipeline to the native body.
  *   - Inbound tool-name reversal: `reverseToolRenames` (v2 pairs) +
  *     `reverseRemapOAuthToolNamesFromStreamLine` (v1) operate on raw SSE frame
  *     text — no IR needed.
@@ -34,8 +32,9 @@ import {
 } from '../../transformers/oauth/masking';
 import type { RenamePair } from '../../transformers/oauth/masking/types';
 import {
-  applyClaudeOAuthTransform,
   canonicalizeOAuthToolName,
+  isClaudeOAuthToken,
+  remapOAuthToolNames,
 } from '../../transformers/oauth/oauth-claude';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { logger } from '../../utils/logger';
@@ -337,20 +336,12 @@ function prepareAnthropicOAuthRequest(
   // out as `x-api-key`.
   const maskingToken = auth.mode === 'oauth' ? auth.token : `sk-ant-oat-mask-${auth.apiKey}`;
 
-  // Build the outbound Claude Code wire body. Two proven, shipped transforms
-  // produce the exact fingerprinted body Anthropic expects:
-  //   1. name canonicalization + system relocation (applyClaudeOAuthTransform)
-  //   2. the full CC masking pipeline: shape-renames, synthetic tools, identity
-  //      rebuild, metadata, CCH signing (applyClaudeCodeMasking)
-  // We keep these verbatim for the body (verified byte-for-byte against a
-  // canon-only variant, which drops the system relocation). We do NOT reuse
-  // their internal rename bookkeeping for the response — see reversal below.
-  const { payload: transformed } = applyClaudeOAuthTransform(preparedBody, maskingToken, {
-    version: '2.1.63',
-    entrypoint: 'cli',
-    workload: '',
-    oauthMode: true,
-  });
+  // Canonicalize tool names once, then let the masking pipeline own identity
+  // relocation and signing. Running the full v1 transform here also relocates
+  // the system prompt, causing v2 to inject a second synthetic reminder.
+  const transformed = isClaudeOAuthToken(maskingToken)
+    ? remapOAuthToolNames(preparedBody).body
+    : preparedBody;
   const payloadStr = typeof transformed === 'string' ? transformed : JSON.stringify(transformed);
   const { payload: maskedBody, toolRenamePairs } = applyClaudeCodeMasking(payloadStr);
 

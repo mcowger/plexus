@@ -150,8 +150,9 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
     expect(payload.system[2].text).not.toContain('AGENTS.md');
   });
 
-  it('relocates the caller real system content, sanitized, into the first user message', () => {
-    const { payload } = applyClaudeCodeMasking(JSON.stringify(buildPiAiOutputFixture()));
+  it('relocates the complete caller system content into the first user message', () => {
+    const input = buildPiAiOutputFixture();
+    const { payload } = applyClaudeCodeMasking(JSON.stringify(input));
 
     const firstUserMessage = payload.messages.find((m: any) => m.role === 'user');
     const content =
@@ -160,12 +161,9 @@ describe('applyClaudeCodeMasking (regression: debug trace 17404760-e986-49b3-8a2
         : firstUserMessage.content[0].text;
 
     expect(content).toContain('<system-reminder>');
-    expect(content).toContain(
-      'Use the available tools when needed to help with software engineering tasks.'
-    );
-    // The caller's actual system-prompt content (paths, AGENTS.md instructions) must NOT leak through.
-    expect(content).not.toContain('synthetic/workspace');
-    expect(content).not.toContain('Synthetic agent rules');
+    expect(content).toContain(input.system[1].text);
+    expect(content).toContain('synthetic/workspace');
+    expect(content).toContain('Synthetic agent rules');
   });
 
   it('signs the CCH — never sends the unsigned 00000 placeholder', () => {

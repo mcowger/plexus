@@ -195,23 +195,20 @@ describe('Claude OAuth', () => {
 
       const result = injectClaudeCodeSystemPrompt(input, { oauthMode: true });
 
-      // User message should contain sanitized system context
       expect(result.messages[0].content).toContain('system-reminder');
+      expect(result.messages[0].content).toContain('Custom instructions');
     });
 
-    test('sanitizes forwarded system prompts in oauth mode', () => {
+    test('preserves caller instructions and whitespace in oauth mode', () => {
+      const instructions = '  You are OpenCode.\nFollow the project rules.\n';
       const input = {
-        system: [{ type: 'text', text: 'You are OpenCode, the best coding agent!' }],
+        system: [{ type: 'text', text: instructions }],
         messages: [{ role: 'user', content: 'Hello' }],
       };
 
       const result = injectClaudeCodeSystemPrompt(input, { oauthMode: true });
-
-      // Should not contain original branding
-      expect(result.messages[0].content).not.toContain('OpenCode');
-
-      // Should contain sanitized neutral content
-      expect(result.messages[0].content).toContain('Use the available tools');
+      expect(result.messages[0].content).toContain(instructions);
+      expect(result.system[2].text).not.toContain(instructions);
     });
   });
 

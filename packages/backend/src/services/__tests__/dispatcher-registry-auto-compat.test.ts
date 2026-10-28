@@ -2,10 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, jest, type Mock, mock, tes
 
 import { registerSpy } from '../../../test/test-utils';
 import { ProviderConfigSchema } from '../../config';
+import { buildAnthropicRequest } from '../../transformers/anthropic/request-builder';
+import { parseResponsesRequest } from '../../transformers/responses/request-parser';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { logger } from '../../utils/logger';
 import { Dispatcher } from '../dispatch/dispatcher';
-import { applyQuirkOverlay, applyRegistryAutoCompat } from '../dispatch/dispatcher-auto-compat';
+import {
+  applyNativeAnthropicCompat,
+  applyQuirkOverlay,
+  applyRegistryAutoCompat,
+} from '../dispatch/dispatcher-auto-compat';
+import { prepareOAuthNativeRequest } from '../oauth/oauth-native-request';
 import * as piAiRegistry from '../pi-ai/registry';
 import type { RouteResult } from '../routing/router';
 
@@ -59,6 +66,98 @@ describe('Dispatcher registry auto-compat', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  test('translates Responses effort and budget through native Anthropic masking', async () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({
+        id: 'claude-opus-5-5',
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        maxTokens: 64000,
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const input = {
+      model: 'alias-model',
+      input: 'hello',
+      instructions: 'caller system prompt',
+      reasoning_effort: 'medium',
+      temperature: 1,
+    };
+    const unified = await parseResponsesRequest(input as any);
+    const built = await buildAnthropicRequest({ ...unified, model: 'claude-opus-5-5' });
+    const translated = applyNativeAnthropicCompat(built, unified, 'claude-opus-5-5');
+    const outbound = prepareOAuthNativeRequest(
+      'anthropic',
+      'claude-opus-5-5',
+      { mode: 'oauth', token: 'sk-ant-oat-test' },
+      translated,
+      false
+    ).body;
+    expect(outbound.thinking).toEqual({ type: 'adaptive', display: 'summarized' });
+    expect(outbound.output_config.effort).toBe('medium');
+    expect(outbound.max_tokens).toBe(64000);
+    expect(outbound.temperature).toBeUndefined();
+    expect(JSON.stringify(outbound.messages).match(/<system-reminder>/g)).toHaveLength(1);
+    expect(JSON.stringify(outbound.messages)).toContain(input.instructions);
+    expect(JSON.stringify(outbound.system)).not.toContain(input.instructions);
+  });
+
+  test('native masking route applies translation even when auto-compat is disabled', async () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({
+        id: 'claude-opus-5-5',
+        api: 'anthropic-messages',
+        maxTokens: 64000,
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const input = { model: 'alias-model', input: 'hello', reasoning_effort: 'medium' };
+    const unified = await parseResponsesRequest(input as any);
+    const dispatcher = new Dispatcher() as any;
+    const result = await dispatcher.transformRequestPayload(
+      unified,
+      route({
+        model: 'claude-opus-5-5',
+        config: {
+          api_base_url: 'https://api.anthropic.com',
+          api_key: 'test-key',
+          useClaudeMasking: true,
+        } as any,
+      }),
+      {
+        transformRequest: (req: UnifiedChatRequest) =>
+          buildAnthropicRequest({ ...req, model: 'claude-opus-5-5' }),
+      },
+      'messages',
+      []
+    );
+    expect(result.payload.thinking).toEqual({ type: 'adaptive', display: 'summarized' });
+    expect(result.payload.output_config.effort).toBe('medium');
+    expect(result.payload.max_tokens).toBe(64000);
+  });
+
+  test('native Anthropic preserves explicit limits and hidden reasoning', () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({
+        api: 'anthropic-messages',
+        maxTokens: 64000,
+        compat: { forceAdaptiveThinking: true },
+      })
+    );
+    const req = request({
+      incomingApiType: 'responses',
+      max_tokens: 12345,
+      originalBody: { reasoning: { effort: 'high', summary: 'none' }, max_output_tokens: 12345 },
+    });
+    const result = applyNativeAnthropicCompat(
+      { model: 'provider-model', max_tokens: 12345 },
+      req,
+      'provider-model'
+    );
+    expect(result.max_tokens).toBe(12345);
+    expect(result.thinking).toEqual({ type: 'adaptive', display: 'omitted' });
   });
 
   test('applies registry reasoning fields on the passthrough path', async () => {

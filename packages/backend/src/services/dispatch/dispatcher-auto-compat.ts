@@ -124,7 +124,12 @@ function extractGenerationIntent(payload: any, request: UnifiedChatRequest): Gen
   const serviceTierIntent = pickServiceTierIntent(request, source);
 
   return {
-    reasoning: extractReasoningIntent(source, request),
+    reasoning: extractReasoningIntent(
+      request.originalBody && request.incomingApiType?.toLowerCase() !== 'messages'
+        ? request.originalBody
+        : source,
+      request
+    ),
     ...(typeof maxTokens === 'number' ? { maxTokens } : {}),
     ...(typeof temperature === 'number' ? { temperature } : {}),
     ...(verbosity ? { verbosity } : {}),
@@ -628,6 +633,24 @@ function routeDeclaresTierSupport(route: RouteResult, targetApiType: string): bo
   const effective = modelMap ?? block.serviceTierMap;
   if (!effective) return false;
   return Object.values(effective).some((v) => typeof v === 'string' && v.length > 0);
+}
+
+/** Apply catalog-backed translation on cross-format native Anthropic OAuth routes. */
+export function applyNativeAnthropicCompat(
+  payload: any,
+  request: UnifiedChatRequest,
+  modelId: string
+): any {
+  const model = resolvePiAiModel('anthropic', modelId);
+  if (!model || model.api !== 'anthropic-messages') return payload;
+  const intent = extractGenerationIntent(request.originalBody ?? {}, request);
+  const options = buildGenerationOptions(model, intent);
+  // Messages requires max_tokens. When the client omitted a limit, use the
+  // catalog ceiling rather than the generic builder's conservative fallback.
+  if (request.max_tokens === undefined && intent.maxTokens === undefined && model.maxTokens > 0) {
+    options.maxTokens = model.maxTokens;
+  }
+  return projectAnthropicAutoCompat(payload, model, intent, options);
 }
 
 export function applyRegistryAutoCompat(

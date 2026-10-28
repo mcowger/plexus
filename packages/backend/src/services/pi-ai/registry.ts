@@ -206,6 +206,8 @@ function buildEnabledOptions(
       base.thinkingDisplay = 'raw';
     } else if (intent?.visibility === 'summary') {
       base.thinkingDisplay = 'summarized';
+    } else if (intent?.visibility === 'hidden') {
+      base.thinkingDisplay = 'omitted';
     }
     if ((model.compat as { forceAdaptiveThinking?: boolean })?.forceAdaptiveThinking === true) {
       if (intent?.adaptive === true && intent?.effort == null) {

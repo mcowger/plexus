@@ -24,8 +24,7 @@
  * `cc-billing.ts`), the CC identity line, and the real static CC system
  * prompt — then relocates the caller's actual system content (from pi-ai's
  * injected block[1] and/or the caller's own systemPrompt) into the first
- * user message as a sanitized `<system-reminder>` block, mirroring v1's
- * `injectClaudeCodeSystemPrompt` / `sanitizeForwardedSystemPrompt`.
+ * user message as a `<system-reminder>` block, preserving its instructions.
  */
 
 import { BILLING_HEADER_PREFIX, buildBillingHeaderText } from './cc-billing';
@@ -91,21 +90,6 @@ const STATIC_CLAUDE_CODE_PROMPT = [
 const CLAUDE_CODE_IDENTITY_TEXT = "You are Claude Code, Anthropic's official CLI for Claude.";
 
 /**
- * Sanitizes the caller's real system prompt to minimal neutral content
- * before relocating it into the first user message, so no client-specific
- * branding/instructions reach Anthropic outside the genuine CC system
- * prompt. Fixed output regardless of input — same approach v1 uses.
- */
-function sanitizeForwardedSystemPrompt(text: string): string {
-  if (!text || !text.trim()) {
-    return '';
-  }
-  return `Use the available tools when needed to help with software engineering tasks.
-Keep responses concise and focused on the user's request.
-Prefer acting on the user's task over describing product-specific workflows.`;
-}
-
-/**
  * Returns a NEW messages array with a `<system-reminder>` block prepended
  * to the first user message's content. Never mutates the input array or
  * any message object within it — builds a new message object and a new
@@ -153,7 +137,7 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
  * (billing header placeholder + CC identity + static CC system prompt) and
  * relocates whatever real system content was present (pi-ai's own
  * `context.systemPrompt` block, i.e. the caller's real system prompt) into
- * the first user message as a sanitized `<system-reminder>` block.
+ * the first user message as a `<system-reminder>` block.
  *
  * Must run BEFORE CCH signing (`sign-billing.ts`), since signing hashes
  * over the finalized body and this function is what produces the unsigned
@@ -169,7 +153,11 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
 export function injectClaudeCodeIdentity(body: any): any {
   const result = { ...body };
 
-  const existingSystem = Array.isArray(body.system) ? body.system : [];
+  const existingSystem = Array.isArray(body.system)
+    ? body.system
+    : typeof body.system === 'string'
+      ? [{ type: 'text', text: body.system }]
+      : [];
 
   // Collect all real text content (identity/billing blocks excluded) for
   // relocation — i.e. the caller's own system prompt, however pi-ai framed
@@ -177,10 +165,11 @@ export function injectClaudeCodeIdentity(body: any): any {
   const userSystemParts: string[] = [];
   for (const part of existingSystem) {
     if (part?.type !== 'text') continue;
-    const txt = typeof part.text === 'string' ? part.text.trim() : '';
-    if (!txt) continue;
-    if (txt.startsWith(BILLING_HEADER_PREFIX)) continue;
-    if (txt === CLAUDE_CODE_IDENTITY_TEXT) continue;
+    const txt = typeof part.text === 'string' ? part.text : '';
+    const trimmed = txt.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith(BILLING_HEADER_PREFIX)) continue;
+    if (trimmed === CLAUDE_CODE_IDENTITY_TEXT) continue;
     userSystemParts.push(txt);
   }
 
@@ -191,10 +180,7 @@ export function injectClaudeCodeIdentity(body: any): any {
   ];
 
   if (userSystemParts.length > 0) {
-    const sanitized = sanitizeForwardedSystemPrompt(userSystemParts.join('\n\n'));
-    if (sanitized.trim()) {
-      result.messages = prependToFirstUserMessage(body.messages, sanitized);
-    }
+    result.messages = prependToFirstUserMessage(body.messages, userSystemParts.join('\n\n'));
   }
 
   return result;

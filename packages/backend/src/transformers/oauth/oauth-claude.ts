@@ -421,20 +421,6 @@ function computeSHA256Truncated(input: string, length: number): string {
 }
 
 /**
- * Sanitizes forwarded third-party system prompts to minimal neutral content.
- * Removes all client-specific branding, URLs, and workflow descriptions.
- */
-function sanitizeForwardedSystemPrompt(text: string): string {
-  if (!text || !text.trim()) {
-    return '';
-  }
-
-  return `Use the available tools when needed to help with software engineering tasks.
-Keep responses concise and focused on the user's request.
-Prefer acting on the user's task over describing product-specific workflows.`;
-}
-
-/**
  * Prepends system context to the first user message as a system-reminder block.
  */
 function prependToFirstUserMessage(messages: any[], text: string): any[] {
@@ -500,17 +486,17 @@ export function injectClaudeCodeSystemPrompt(payload: any, config: ClaudeOAuthCo
   if (Array.isArray(result.system)) {
     for (const part of result.system) {
       if (part.type === 'text') {
-        const txt = part.text?.trim();
-        if (txt) {
-          messageText = messageText || txt;
+        const txt = typeof part.text === 'string' ? part.text : '';
+        if (txt.trim()) {
+          messageText = messageText || txt.trim();
           userSystemParts.push(txt);
         }
       }
     }
   } else if (typeof result.system === 'string') {
-    const txt = result.system.trim();
-    if (txt) {
-      messageText = txt;
+    const txt = result.system;
+    if (txt.trim()) {
+      messageText = txt.trim();
       userSystemParts.push(txt);
     }
   }
@@ -558,13 +544,7 @@ export function injectClaudeCodeSystemPrompt(payload: any, config: ClaudeOAuthCo
 
   // Move user system instructions to first user message (if not strict mode)
   if (!config.strictMode && userSystemParts.length > 0) {
-    let combined = userSystemParts.join('\n\n');
-
-    // In OAuth mode, sanitize the forwarded system prompt
-    if (config.oauthMode) {
-      combined = sanitizeForwardedSystemPrompt(combined);
-    }
-
+    const combined = userSystemParts.join('\n\n');
     if (combined.trim()) {
       result.messages = prependToFirstUserMessage(result.messages, combined);
     }

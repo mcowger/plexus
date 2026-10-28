@@ -23,7 +23,11 @@ import { applyGeminiThinkingConfig, getApiMetadata } from '../providers/provider
 import type { RouteResult } from '../routing/router';
 import { isAnthropicTargetProvider } from './adapter-resolver';
 import { applyBodyCacheKeyInjection } from './cache-key-injection';
-import { applyRegistryAutoCompat, stripLiteUnsupportedTools } from './dispatcher-auto-compat';
+import {
+  applyNativeAnthropicCompat,
+  applyRegistryAutoCompat,
+  stripLiteUnsupportedTools,
+} from './dispatcher-auto-compat';
 import { applyEagerToolInputStreaming, sendsToAnthropicApi } from './eager-tool-streaming';
 import {
   detectResponsesExtensions,
@@ -258,6 +262,9 @@ export async function buildRequestPayload(
   payload = applyServiceTierSelection(payload, request, targetApiType);
 
   payload = applyGeminiThinkingConfig(route, targetApiType, payload);
+  if (anthropicNative && !bypassTransformation) {
+    payload = applyNativeAnthropicCompat(payload, request, route.model);
+  }
   payload = applyRegistryAutoCompat(payload, request, route, targetApiType);
 
   payload = applyEagerToolInputStreaming(
