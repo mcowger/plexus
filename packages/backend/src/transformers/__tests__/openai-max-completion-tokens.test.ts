@@ -55,7 +55,7 @@ describe('parseRequest max_completion_tokens normalization', () => {
 });
 
 describe('cross-format emission (chat -> messages)', () => {
-  it('forwards the max_completion_tokens budget instead of defaulting to 4096', async () => {
+  it('forwards the max_completion_tokens budget instead of using the fallback', async () => {
     const unified = await parse({
       model: 'alias-A',
       messages: MESSAGES,
@@ -65,10 +65,10 @@ describe('cross-format emission (chat -> messages)', () => {
     expect(out.max_tokens).toBe(393216);
   });
 
-  it('still defaults to 4096 when the caller sent no budget', async () => {
+  it('defaults to 64000 when the caller sent no budget', async () => {
     const unified = await parse({ model: 'alias-A', messages: MESSAGES });
     const out = await buildAnthropicRequest({ ...unified, model: 'upstream-A' });
-    expect(out.max_tokens).toBe(4096);
+    expect(out.max_tokens).toBe(64000);
   });
 });
 

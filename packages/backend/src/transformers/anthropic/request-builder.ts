@@ -189,7 +189,7 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
     model: request.model,
     messages: mergedMessages,
     system: system,
-    max_tokens: request.max_tokens || 4096,
+    max_tokens: request.max_tokens || 64000,
     temperature: request.temperature,
     stream: request.stream,
     tools: request.tools ? convertUnifiedToolsToAnthropic(request.tools) : undefined,
