@@ -46,7 +46,13 @@ describe('oauth-providers facade', () => {
 
   it('rejects unknown/non-OAuth provider ids', () => {
     expect(isKnownOAuthProviderId('not-a-real-provider')).toBe(false);
-    expect(isKnownOAuthProviderId('openai')).toBe(false); // no auth.oauth
+  });
+
+  it('blocks pi-ai\u2019s openai (Sign in with ChatGPT); openai-codex is the ChatGPT login', () => {
+    expect(isKnownOAuthProviderId('openai')).toBe(false);
+    expect(getOAuthProviderAuth('openai')).toBeUndefined();
+    expect(listOAuthProviders().some((p) => p.id === 'openai')).toBe(false);
+    expect(listOAuthProviders().some((p) => p.id === 'openai-codex')).toBe(true);
   });
 
   it('never lists radius', () => {
