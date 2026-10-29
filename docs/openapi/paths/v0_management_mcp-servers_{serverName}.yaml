@@ -117,7 +117,8 @@ delete:
     - Management — Config
   summary: Delete an MCP server entry (admin only)
   description: |
-    Removes an MCP server configuration.
+    Removes an MCP server configuration. If it is a local HTTP server, Plexus
+    stops its process and permanently deletes its persistent data directory.
 
     ## Impact
 
@@ -136,4 +137,6 @@ delete:
             $ref: ../components/schemas/SuccessTrue.yaml
     '401':
       description: Authentication required or invalid credentials.
+    '404':
+      description: MCP server not found.
   operationId: deleteV0ManagementMcpserversByserverName

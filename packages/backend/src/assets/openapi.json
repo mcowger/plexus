@@ -5472,7 +5472,7 @@
           "Management — Config"
         ],
         "summary": "Delete an MCP server entry (admin only)",
-        "description": "Removes an MCP server configuration.\n\n## Impact\n\nThe `/mcp/{serverName}` endpoints will return 404 for this server.\nAny in-flight proxy requests will fail.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Removes an MCP server configuration. If it is a local HTTP server, Plexus\nstops its process and permanently deletes its persistent data directory.\n\n## Impact\n\nThe `/mcp/{serverName}` endpoints will return 404 for this server.\nAny in-flight proxy requests will fail.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -5491,6 +5491,9 @@
           },
           "401": {
             "description": "Authentication required or invalid credentials."
+          },
+          "404": {
+            "description": "MCP server not found."
           }
         },
         "operationId": "deleteV0ManagementMcpserversByserverName"
@@ -13914,27 +13917,95 @@
         }
       },
       "McpServerConfig": {
-        "type": "object",
-        "required": [
-          "upstream_url"
-        ],
-        "properties": {
-          "upstream_url": {
-            "type": "string",
-            "format": "uri"
-          },
-          "enabled": {
-            "type": "boolean",
-            "default": true
-          },
-          "headers": {
+        "oneOf": [
+          {
             "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Static headers forwarded upstream."
+            "required": [
+              "mode",
+              "launcher",
+              "package",
+              "port"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "local_http"
+                ]
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "launcher": {
+                "type": "string",
+                "enum": [
+                  "bunx",
+                  "uvx"
+                ]
+              },
+              "package": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Environment variables passed to the local MCP process. MCP_DATA_DIR is managed by Plexus; values for this key in any casing are ignored."
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "path": {
+                "type": "string",
+                "default": "/mcp"
+              },
+              "startup_timeout_ms": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 300000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "upstream_url"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "remote_http"
+                ]
+              },
+              "upstream_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Static headers forwarded upstream."
+              }
+            }
           }
-        }
+        ]
       },
       "UserQuotaDefinition": {
         "type": "object",

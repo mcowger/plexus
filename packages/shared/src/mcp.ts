@@ -28,7 +28,14 @@ export const LocalHttpMcpServerConfigSchema = z
     startup_timeout_ms: z.number().int().min(1_000).max(300_000).default(30_000).optional(),
     headers: z.record(z.string(), z.string()).optional(),
   })
-  .extend(McpServerSettingsSchema.shape);
+  .extend(McpServerSettingsSchema.shape)
+  .transform((config) => {
+    if (!config.env) return config;
+    const env = Object.fromEntries(
+      Object.entries(config.env).filter(([key]) => key.toUpperCase() !== 'MCP_DATA_DIR')
+    );
+    return { ...config, env };
+  });
 
 export const McpServerConfigSchema = z.union([
   LocalHttpMcpServerConfigSchema,

@@ -155,6 +155,14 @@ export function McpServerEditorModal({
               Available interpolations: {'{{PORT}}'} for the configured port and {'{{HOST}}'} for
               127.0.0.1.
             </p>
+            <div className="border-border-glass bg-bg-glass rounded-md border px-3 py-2 text-xs">
+              <span className="text-text-secondary">Persistent data directory</span>
+              <code className="text-text ml-2 font-mono">MCP_DATA_DIR</code>
+              <p className="text-text-muted mt-1">
+                Set automatically to an owner-only, server-specific directory. This variable cannot
+                be overridden here.
+              </p>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Input
                 label="Port"

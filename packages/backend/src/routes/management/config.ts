@@ -1173,7 +1173,13 @@ export async function registerConfigRoutes(
     const { serverName } = request.params as { serverName: string };
 
     try {
-      await configService.deleteMcpServer(serverName);
+      const servers = await configService.getRepository().getAllMcpServers();
+      if (!servers[serverName]) {
+        return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
+      }
+      await mcpProcessManager.deleteServer(serverName, () =>
+        configService.deleteMcpServer(serverName)
+      );
       logger.debug(`MCP server '${serverName}' deleted via API`);
       return reply.send({ success: true });
     } catch (e: any) {
@@ -1199,7 +1205,12 @@ export async function registerConfigRoutes(
     if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
     if (server.mode !== 'local_http')
       return reply.code(400).send({ error: 'MCP server is not local_http' });
-    return reply.send(await mcpProcessManager.start(serverName, server));
+    return reply.send(
+      await mcpProcessManager.start(serverName, server, async () => {
+        const currentServers = await configService.getRepository().getAllMcpServers();
+        return currentServers[serverName];
+      })
+    );
   });
 
   fastify.post('/v0/management/mcp-servers/:serverName/stop', async (request, reply) => {
@@ -1216,7 +1227,12 @@ export async function registerConfigRoutes(
     if (!server) return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
     if (server.mode !== 'local_http')
       return reply.code(400).send({ error: 'MCP server is not local_http' });
-    return reply.send(await mcpProcessManager.restart(serverName, server));
+    return reply.send(
+      await mcpProcessManager.restart(serverName, server, async () => {
+        const currentServers = await configService.getRepository().getAllMcpServers();
+        return currentServers[serverName];
+      })
+    );
   });
 
   fastify.get('/v0/management/mcp-servers/:serverName/process-logs', async (request, reply) => {

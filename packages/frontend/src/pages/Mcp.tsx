@@ -568,6 +568,10 @@ export const McpPage: React.FC = () => {
 
   const addEnv = () => {
     if (editingServer.mode !== 'local_http' || !envKey.trim()) return;
+    if (envKey.trim().toUpperCase() === 'MCP_DATA_DIR') {
+      toast.error('MCP_DATA_DIR is managed automatically and cannot be overridden');
+      return;
+    }
     setEditingServer({
       ...editingServer,
       env: {

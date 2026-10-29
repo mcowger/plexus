@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, jest, mock, test } from 'bun:test';
+import { mkdtemp, rm, stat } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 import { advanceTimersByTimeAsync, registerSpy } from '../../../../test/test-utils';
 import type { LocalHttpMcpServerConfig } from '../../../types/mcp';
@@ -40,10 +43,15 @@ function makeChild(pid: number, exitOn: string | null = 'SIGTERM') {
   return child;
 }
 let children: Array<{ finish: (code: number) => void }> = [];
+let originalMcpServersDataDir: string | undefined;
+let mcpServersDataDir: string;
 
 beforeEach(async () => {
   await mcpProcessManager.resetForTesting();
   children = [];
+  originalMcpServersDataDir = process.env.MCP_SERVERS_DATA_DIR;
+  mcpServersDataDir = await mkdtemp(path.join(os.tmpdir(), 'plexus-mcp-manager-'));
+  process.env.MCP_SERVERS_DATA_DIR = mcpServersDataDir;
   jest.useFakeTimers();
 });
 
@@ -53,6 +61,9 @@ afterEach(async () => {
     await mcpProcessManager.resetForTesting();
   } finally {
     jest.useRealTimers();
+    if (originalMcpServersDataDir === undefined) delete process.env.MCP_SERVERS_DATA_DIR;
+    else process.env.MCP_SERVERS_DATA_DIR = originalMcpServersDataDir;
+    await rm(mcpServersDataDir, { recursive: true, force: true });
   }
 });
 
@@ -71,6 +82,77 @@ describe('local MCP process supervision', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  test('passes a persistent server-specific MCP_DATA_DIR to the child', async () => {
+    const spawn = registerSpy(Bun, 'spawn').mockReturnValue(makeChild(113));
+    registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
+
+    await mcpProcessManager.start('isolated-server', {
+      ...config,
+      env: { MCP_DATA_DIR: '/tmp/should-not-be-used' },
+    });
+
+    const options = spawn.mock.calls[0]?.[1] as { env: Record<string, string> };
+    const dataDir = options.env.MCP_DATA_DIR;
+    expect(dataDir).toBeDefined();
+    if (!dataDir) throw new Error('MCP_DATA_DIR was not passed to the child');
+    expect(dataDir).toStartWith(mcpServersDataDir);
+    expect(dataDir).not.toBe('/tmp/should-not-be-used');
+    expect((await stat(dataDir)).mode & 0o777).toBe(0o700);
+  });
+
+  test('reuses the same persistent directory when a local server process restarts', async () => {
+    const spawn = registerSpy(Bun, 'spawn')
+      .mockReturnValueOnce(makeChild(114))
+      .mockReturnValueOnce(makeChild(115));
+    registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
+
+    await mcpProcessManager.start('persistent-server', config);
+    await mcpProcessManager.restart('persistent-server', config);
+
+    const firstEnv = (spawn.mock.calls[0]?.[1] as { env: Record<string, string> }).env;
+    const secondEnv = (spawn.mock.calls[1]?.[1] as { env: Record<string, string> }).env;
+    expect(firstEnv.MCP_DATA_DIR).toBe(secondEnv.MCP_DATA_DIR);
+    expect((await stat(firstEnv.MCP_DATA_DIR!)).mode & 0o777).toBe(0o700);
+  });
+
+  test('removes persistent data after stopping and deleting a local server', async () => {
+    const spawn = registerSpy(Bun, 'spawn').mockReturnValue(makeChild(116));
+    registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
+    const deleteConfig = mock(async () => {});
+
+    await mcpProcessManager.start('deleted-server', config);
+    const dataDir = (spawn.mock.calls[0]?.[1] as { env: Record<string, string> }).env.MCP_DATA_DIR;
+
+    await mcpProcessManager.deleteServer('deleted-server', deleteConfig);
+
+    expect(deleteConfig).toHaveBeenCalledOnce();
+    expect(await stat(dataDir!).catch(() => null)).toBeNull();
+  });
+
+  test('does not restart a stale server queued behind deletion', async () => {
+    const spawn = registerSpy(Bun, 'spawn').mockReturnValue(makeChild(117));
+    let currentConfig: LocalHttpMcpServerConfig | undefined = config;
+    const deleting = mcpProcessManager.deleteServer('deleting-server', async () => {
+      currentConfig = undefined;
+    });
+    const staleStart = mcpProcessManager.ensureRunning(
+      'deleting-server',
+      config,
+      async () => currentConfig
+    );
+    const startResult = staleStart.then(
+      () => null,
+      (error: Error) => error
+    );
+
+    await deleting;
+
+    expect((await startResult)?.message).toBe(
+      'Local MCP server configuration is no longer current'
+    );
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   test('aborts hanging readiness requests at the startup deadline and cleans up', async () => {
     const child = makeChild(102);
     registerSpy(Bun, 'spawn').mockReturnValue(child);
@@ -83,6 +165,7 @@ describe('local MCP process supervision', () => {
       });
     });
     const result = mcpProcessManager.start('test', config);
+    await advanceTimersByTimeAsync(0);
     await advanceTimersByTimeAsync(1200);
     expect(jest.getTimerCount()).toBe(0);
     const startError = await result.then(
@@ -117,6 +200,7 @@ describe('local MCP process supervision', () => {
     });
 
     const starting = mcpProcessManager.start('test', { ...config, startup_timeout_ms: 8000 });
+    await advanceTimersByTimeAsync(0);
     await advanceTimersByTimeAsync(1499);
     expect(readinessSignal?.aborted).toBe(false);
     await advanceTimersByTimeAsync(1);
@@ -198,6 +282,7 @@ describe('local MCP process supervision', () => {
     });
 
     const startingPromise = mcpProcessManager.start('test', config);
+    await advanceTimersByTimeAsync(0);
     await advanceTimersByTimeAsync(5200);
     const startingError = await startingPromise.then(
       () => {
