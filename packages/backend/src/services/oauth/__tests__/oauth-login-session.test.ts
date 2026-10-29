@@ -1,8 +1,6 @@
-import { describe, expect, it, mock, spyOn, test } from 'bun:test';
+import { describe, expect, it, mock, test } from 'bun:test';
 
 import { registerSpy, waitFor } from '../../../../test/test-utils';
-import { ConfigService } from '../../configuration/config-service';
-import { INSTALLATION_DEVICE_ID_SETTING } from '../installation-identity';
 import { OAuthAuthManager } from '../oauth-auth-manager';
 import { OAuthLoginSessionManager } from '../oauth-login-session';
 import type { OAuthProviderDescriptor } from '../oauth-providers';
@@ -194,44 +192,6 @@ describe('OAuthLoginSessionManager — completed login', () => {
       const session = await manager.createSession('anthropic', 'acct');
       await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('error'));
       expect(manager.getSession(session.id)?.error).toBe('database unavailable');
-    } finally {
-      manager.dispose();
-      OAuthAuthManager.resetForTesting();
-    }
-  });
-});
-
-describe('OAuthLoginSessionManager — installation device ID', () => {
-  // Sign in with ChatGPT aborts immediately unless the login is handed a UUID.
-  it('passes the persisted installation device ID to the provider login', async () => {
-    OAuthAuthManager.resetForTesting();
-    const deviceId = '9f1d3a6e-6c2b-4b6a-9c2f-2d6f0b8f9a11';
-    spyOn(ConfigService.getInstance(), 'getSetting').mockImplementation((async (key: string) =>
-      key === INSTALLATION_DEVICE_ID_SETTING ? deviceId : undefined) as never);
-    registerSpy(OAuthAuthManager.getInstance(), 'setCredentials').mockResolvedValue();
-
-    const seen: Array<(() => string) | undefined> = [];
-    const provider = {
-      id: 'openai',
-      name: 'OpenAI',
-      usesCallbackServer: false,
-      oauth: {
-        name: 'OpenAI',
-        login: async (_interaction: any, options?: { getDeviceId?: () => string }) => {
-          seen.push(options?.getDeviceId);
-          return { type: 'oauth', access: 'a', refresh: 'r', expires: Date.now() + 60_000 };
-        },
-        refresh: async (credential: any) => credential,
-        toAuth: async (credential: any) => ({ apiKey: credential.access }),
-      },
-    } as unknown as OAuthProviderDescriptor;
-
-    const manager = new OAuthLoginSessionManager(() => provider);
-    try {
-      const session = await manager.createSession('openai', 'acct');
-      await waitFor(() => expect(manager.getSession(session.id)?.status).toBe('success'));
-      expect(seen).toHaveLength(1);
-      expect(seen[0]?.()).toBe(deviceId);
     } finally {
       manager.dispose();
       OAuthAuthManager.resetForTesting();

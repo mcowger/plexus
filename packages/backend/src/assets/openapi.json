@@ -8044,7 +8044,7 @@
           "Management — OAuth"
         ],
         "summary": "List OAuth providers (admin only)",
-        "description": "Returns all OAuth-capable providers that Plexus supports.\n\n## Provider properties\n\n- `id` — Unique identifier (e.g. `openai-codex`, `anthropic-claude-code`)\n- `name` — Human-readable display name\n- `usesCallbackServer` — Whether this provider uses the callback server\n  for OAuth flow vs requiring manual code paste\n- `selectable` — Whether to offer this provider for new configurations.\n  Non-selectable providers remain listed so existing configurations can\n  display their current selection.\n\n## Callback vs manual code\n\n- **usesCallbackServer: true** — Plexus runs a callback server that\n  receives the OAuth redirect. The user visits the auth URL and is\n  automatically redirected back. No manual copy-paste needed.\n\n- **usesCallbackServer: false** — The provider returns an authorization\n  code that must be manually pasted into Plexus. Use the\n  `/sessions/{id}/manual-code` endpoint.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Returns all OAuth-capable providers that Plexus supports.\n\n## Provider properties\n\n- `id` — Unique identifier (e.g. `openai-codex`, `anthropic-claude-code`)\n- `name` — Human-readable display name\n- `usesCallbackServer` — Whether this provider uses the callback server\n  for OAuth flow vs requiring manual code paste\n\n## Callback vs manual code\n\n- **usesCallbackServer: true** — Plexus runs a callback server that\n  receives the OAuth redirect. The user visits the auth URL and is\n  automatically redirected back. No manual copy-paste needed.\n\n- **usesCallbackServer: false** — The provider returns an authorization\n  code that must be manually pasted into Plexus. Use the\n  `/sessions/{id}/manual-code` endpoint.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -8070,9 +8070,6 @@
                             "type": "string"
                           },
                           "usesCallbackServer": {
-                            "type": "boolean"
-                          },
-                          "selectable": {
                             "type": "boolean"
                           }
                         }
