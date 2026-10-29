@@ -40,6 +40,9 @@ const KNOWN_APIS = [
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
   const map: Record<string, string> = {
+    // ChatGPT subscriptions report plan usage through the ChatGPT backend, same
+    // as the Codex login they replaced.
+    openai: 'openai-codex',
     'openai-codex': 'openai-codex',
     anthropic: 'claude-code',
     'claude-code': 'claude-code',
