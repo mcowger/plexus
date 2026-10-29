@@ -1,5 +1,6 @@
 import type { OAuthCredentials, ProviderAuthInteraction } from '@earendil-works/pi-ai';
 
+import { getInstallationDeviceId } from './installation-identity';
 import { OAuthAuthManager } from './oauth-auth-manager';
 import {
   getOAuthProviderAuth,
@@ -413,7 +414,13 @@ export class OAuthLoginSessionManager {
     };
 
     try {
-      const credentials: OAuthCredentials = await provider.oauth.login(interaction);
+      // Sign in with ChatGPT needs a stable installation device ID and fails
+      // before doing anything else without one. Resolve it up front because
+      // pi-ai calls `getDeviceId()` synchronously from inside `login`.
+      const deviceId = await getInstallationDeviceId();
+      const credentials: OAuthCredentials = await provider.oauth.login(interaction, {
+        getDeviceId: () => deviceId,
+      });
       if (session.status === 'cancelled') return;
       session.savingCredentials = true;
       try {
