@@ -13,11 +13,9 @@
  * (`radiusProvider({ id, name, gateway })`) for pointing at an arbitrary
  * self-hosted gateway, not a fixed identity provider like the others, so it
  * doesn't fit the "pick a provider, log in" model this facade assumes.
- * pi-ai's `openai` (Sign in with ChatGPT) is the other: its token is bound to
- * api.openai.com and ChatGPT's own backend rejects it, so plan usage cannot be
- * read with it. `openai-codex` is the ChatGPT subscription login (the same
- * client and scopes the Codex CLI uses), and it works for both inference and
- * quota.
+ * pi-ai's `openai` (Sign in with ChatGPT) is the other: its token is rejected
+ * by ChatGPT's backend, so quota can't be read. `openai-codex` (the Codex CLI's
+ * client and scopes) is the ChatGPT subscription login instead.
  */
 
 import type { OAuthAuth } from '@earendil-works/pi-ai';
