@@ -31,9 +31,6 @@ interface CodexUsageResponse {
 // refresh whenever the token will expire within the next 10 minutes.
 export const OPENAI_CODEX_OAUTH_EXPIRY_BUFFER_MS = 10 * 60 * 1000;
 
-/** Provider whose OAuth credential can read the ChatGPT plan usage endpoint. */
-const CODEX_CREDENTIAL_PROVIDER = 'openai-codex';
-
 interface OAuthCredentialsBlob {
   access_token?: string;
 }
@@ -128,33 +125,6 @@ async function resolveApiKey(
       : await authManager.getApiKey(provider as OAuthProvider, undefined, refreshOptions);
   }
   return parseAccessToken(resolvedAuth);
-}
-
-/**
- * Resolve a ChatGPT-backend-usable token when the configured OAuth provider is
- * not the Codex flow.
- *
- * A ChatGPT-subscription (Sign in with ChatGPT) access token cannot read plan
- * usage: api.openai.com serves it no usage endpoint, and chatgpt.com rejects it
- * with `rejected_by_access_enforcement` because the token's audience is
- * api.openai.com. The same ChatGPT account signed in through the Codex flow can
- * read it, so when such a credential exists we use that instead of reporting an
- * error the user cannot act on.
- */
-async function resolveCodexFallbackKey(
-  oauthAccountId: string,
-  signal: AbortSignal
-): Promise<string | null> {
-  try {
-    const resolved = await OAuthAuthManager.getInstance().getApiKey(
-      CODEX_CREDENTIAL_PROVIDER as OAuthProvider,
-      oauthAccountId || undefined,
-      { refreshIfExpiringWithinMs: OPENAI_CODEX_OAUTH_EXPIRY_BUFFER_MS, signal }
-    );
-    return parseAccessToken(resolved);
-  } catch {
-    return null;
-  }
 }
 
 function resolveCodexAccountId(
@@ -265,48 +235,9 @@ export default defineChecker({
         }
       }
 
-      // A ChatGPT-subscription token never reaches the ChatGPT backend; a Codex
-      // credential for the same account can, so borrow it before giving up.
-      const oauthProvider =
-        ctx.getOption<string>('oauthProvider', CODEX_CREDENTIAL_PROVIDER).trim() ||
-        CODEX_CREDENTIAL_PROVIDER;
-      if (response.status === 401 && isOAuth && oauthProvider !== CODEX_CREDENTIAL_PROVIDER) {
-        const fallbackKey = await resolveCodexFallbackKey(
-          ctx.getOption<string>('oauthAccountId', '').trim(),
-          abortController.signal
-        );
-        if (fallbackKey) {
-          logger.debug(
-            `OpenAI Codex quota checker: '${oauthProvider}' cannot read usage, using the '${CODEX_CREDENTIAL_PROVIDER}' credential`
-          );
-          resolvedKey = fallbackKey;
-          accountId = resolveCodexAccountId(ctx, fallbackKey);
-          headers.Authorization = `Bearer ${fallbackKey}`;
-          if (accountId) {
-            headers['Chatgpt-Account-Id'] = accountId;
-          } else {
-            delete headers['Chatgpt-Account-Id'];
-          }
-          response = await fetch(endpoint, {
-            method: 'GET',
-            headers,
-            signal: abortController.signal,
-          });
-        }
-      }
-
       bodyText = await response.text();
-      if (!response.ok) {
-        if (response.status === 401 && oauthProvider !== CODEX_CREDENTIAL_PROVIDER) {
-          throw new Error(
-            `ChatGPT plan usage is not readable with a '${oauthProvider}' login: ` +
-              `api.openai.com exposes no usage endpoint for ChatGPT-subscription tokens ` +
-              `and the ChatGPT backend rejects them. Sign in with OpenAI Codex for this ` +
-              `account to track plan quota.`
-          );
-        }
+      if (!response.ok)
         throw new Error(`quota request failed with status ${response.status}: ${bodyText}`);
-      }
     } finally {
       clearTimeout(timeout);
     }
