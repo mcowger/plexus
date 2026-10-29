@@ -20,6 +20,8 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
   // when their argument deltas are interleaved with other output items.
   const toolCallIndexByOutputIndex = new Map<number, number>();
   const toolCallIndexByItemId = new Map<string, number>();
+  const functionCallIndexesWithStartedChunks = new Set<number>();
+  const functionCallIndexesWithHandledArguments = new Set<number>();
   let nextToolCallIndex = 0;
   let hasFunctionCall = false;
   // image_generation_call items already rendered as a content delta from
@@ -56,6 +58,41 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
 
   return new ReadableStream({
     async start(controller) {
+      const emitCompletedFunctionCallArguments = (
+        data: any,
+        argumentsString: string,
+        item?: any
+      ) => {
+        const toolCallIndex = getToolCallIndex({ ...data, item });
+        if (functionCallIndexesWithHandledArguments.has(toolCallIndex)) {
+          return;
+        }
+
+        const hasStartedChunk = functionCallIndexesWithStartedChunks.has(toolCallIndex);
+        if (!hasStartedChunk && !item) return;
+
+        controller.enqueue({
+          id: responseId,
+          model: responseModel,
+          created: Math.floor(Date.now() / 1000),
+          delta: {
+            tool_calls: [
+              {
+                index: toolCallIndex,
+                ...(!hasStartedChunk && { id: item.call_id, type: 'function' as const }),
+                function: {
+                  ...(!hasStartedChunk && { name: item.name }),
+                  arguments: argumentsString,
+                },
+              },
+            ],
+          },
+          finish_reason: null,
+        });
+        functionCallIndexesWithStartedChunks.add(toolCallIndex);
+        functionCallIndexesWithHandledArguments.add(toolCallIndex);
+      };
+
       const parser = createParser({
         onEvent: (event) => {
           if (event.data === '[DONE]') {
@@ -124,6 +161,8 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
             } else if (data.type === 'response.function_call_arguments.delta') {
               // Tool call arguments delta
               hasFunctionCall = true;
+              const toolCallIndex = getToolCallIndex(data);
+              functionCallIndexesWithHandledArguments.add(toolCallIndex);
               controller.enqueue({
                 id: responseId,
                 model: responseModel,
@@ -131,7 +170,7 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
                 delta: {
                   tool_calls: [
                     {
-                      index: getToolCallIndex(data),
+                      index: toolCallIndex,
                       function: {
                         arguments: data.delta,
                       },
@@ -146,6 +185,8 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
             ) {
               // Tool call start
               hasFunctionCall = true;
+              const toolCallIndex = getToolCallIndex(data);
+              functionCallIndexesWithStartedChunks.add(toolCallIndex);
               controller.enqueue({
                 id: responseId,
                 model: responseModel,
@@ -153,7 +194,7 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
                 delta: {
                   tool_calls: [
                     {
-                      index: getToolCallIndex(data),
+                      index: toolCallIndex,
                       id: data.item.call_id,
                       type: 'function',
                       function: {
@@ -165,6 +206,14 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
                 },
                 finish_reason: null,
               });
+            } else if (data.type === 'response.function_call_arguments.done') {
+              emitCompletedFunctionCallArguments(data, data.arguments ?? '');
+            } else if (
+              data.type === 'response.output_item.done' &&
+              data.item?.type === 'function_call'
+            ) {
+              hasFunctionCall = true;
+              emitCompletedFunctionCallArguments(data, data.item.arguments ?? '', data.item);
             } else if (
               data.type === 'response.output_item.done' &&
               data.item?.type === 'image_generation_call'
@@ -267,7 +316,15 @@ export function transformResponsesStream(stream: ReadableStream): ReadableStream
               // the intermediate output_item.done for them, or leave the
               // final snapshot's output populated where the streamed
               // events didn't carry it) — skip ones already carried above.
-              for (const item of data.response?.output ?? []) {
+              for (const [outputIndex, item] of (data.response?.output ?? []).entries()) {
+                if (item?.type === 'function_call') {
+                  emitCompletedFunctionCallArguments(
+                    { output_index: outputIndex, item_id: item.id },
+                    item.arguments ?? '',
+                    item
+                  );
+                  continue;
+                }
                 if (!isClientExecutedToolItem(item)) continue;
                 const key = clientToolCallKey(item);
                 if (key && renderedClientToolCallIds.has(key)) {
