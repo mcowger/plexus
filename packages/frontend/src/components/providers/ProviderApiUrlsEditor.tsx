@@ -31,7 +31,7 @@ interface Props {
   removeApiBaseUrlEntry: (apiType: string) => void;
   editingProvider: Provider;
   setEditingProvider: React.Dispatch<React.SetStateAction<Provider>>;
-  OAUTH_PROVIDERS: Array<{ value: string; label: string }>;
+  OAUTH_PROVIDERS: Array<{ value: string; label: string; selectable?: boolean }>;
   /** Load state of the OAuth provider list, so loading/error/empty render differently. */
   oauthProvidersStatus: OAuthProvidersStatus;
   /** Refetch the OAuth provider list after a load failure. */
@@ -64,6 +64,9 @@ export function ProviderApiUrlsEditor({
   // provider Modal unmounts when it closes. Closing and reopening the modal
   // therefore starts a fresh set of drafts — no stale cross-provider state.
   const connectionDrafts = useRef<ConnectionDraftMap>({});
+  const visibleOAuthProviders = OAUTH_PROVIDERS.filter(
+    (provider) => provider.selectable !== false || provider.value === editingProvider.oauthProvider
+  );
 
   return (
     <div className="border-border-glass bg-bg-subtle flex flex-col gap-1 rounded-md border p-3">
@@ -124,12 +127,12 @@ export function ProviderApiUrlsEditor({
             <select
               className="font-body text-text bg-bg-glass border-border-glass focus:border-primary h-[27px] w-full rounded-sm border px-2 py-0 text-[12px] leading-none outline-none"
               value={(editingProvider.oauthProvider || OAUTH_PROVIDERS[0]?.value) ?? ''}
-              disabled={OAUTH_PROVIDERS.length === 0}
+              disabled={visibleOAuthProviders.length === 0}
               onChange={(e) =>
                 setEditingProvider({ ...editingProvider, oauthProvider: e.target.value })
               }
             >
-              {OAUTH_PROVIDERS.map((p) => (
+              {visibleOAuthProviders.map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}
                 </option>

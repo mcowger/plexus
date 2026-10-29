@@ -6,13 +6,12 @@
  * This module is the single place Plexus resolves OAuth providers, plus the
  * provider metadata the management UI needs.
  *
- * Every pi-ai built-in provider with `auth.oauth` is exposed automatically —
- * Plexus does not maintain a per-provider allowlist, so new OAuth flows pi-ai
- * ships (e.g. xAI, Kimi Code, OpenRouter) become available with no code
- * changes here. `radius` is the one deliberate exception: it's a factory
- * (`radiusProvider({ id, name, gateway })`) for pointing at an arbitrary
- * self-hosted gateway, not a fixed identity provider like the others, so it
- * doesn't fit the "pick a provider, log in" model this facade assumes.
+ * Every pi-ai built-in provider with `auth.oauth` is available automatically,
+ * so new OAuth flows pi-ai ships become usable with no code changes here.
+ * The management UI list marks legacy `openai-codex` as non-selectable for
+ * new configurations while keeping it available for existing ones. `radius`
+ * is excluded because it is a configurable gateway factory rather
+ * than a fixed identity provider.
  */
 
 import type { OAuthAuth } from '@earendil-works/pi-ai';
@@ -37,6 +36,8 @@ export interface OAuthProviderDescriptor {
   name: string;
   /** Whether login runs a local callback server with manual code fallback. */
   usesCallbackServer: boolean;
+  /** Whether this provider is offered for new provider configurations. */
+  selectable?: boolean;
   /** pi-ai's OAuth flow implementation (login/refresh/toAuth). */
   oauth: OAuthAuth;
 }
@@ -82,6 +83,9 @@ const CALLBACK_SERVER_PROVIDERS = new Set(
  */
 const BLOCKED_PROVIDERS = new Set(['radius']);
 
+/** OAuth implementations retained for existing configs but not offered for new ones. */
+const NON_SELECTABLE_PROVIDERS = new Set(['openai-codex']);
+
 function toDescriptor(providerId: string): OAuthProviderDescriptor | undefined {
   if (BLOCKED_PROVIDERS.has(providerId)) return undefined;
   const custom = CUSTOM_OAUTH_PROVIDERS[providerId];
@@ -90,6 +94,7 @@ function toDescriptor(providerId: string): OAuthProviderDescriptor | undefined {
       id: providerId,
       name: custom.name,
       usesCallbackServer: CALLBACK_SERVER_PROVIDERS.has(providerId),
+      selectable: !NON_SELECTABLE_PROVIDERS.has(providerId),
       oauth: custom.oauth,
     };
   }
@@ -100,6 +105,7 @@ function toDescriptor(providerId: string): OAuthProviderDescriptor | undefined {
     id: provider.id,
     name: oauth.name,
     usesCallbackServer: CALLBACK_SERVER_PROVIDERS.has(provider.id),
+    selectable: !NON_SELECTABLE_PROVIDERS.has(provider.id),
     oauth,
   };
 }
@@ -109,7 +115,7 @@ export function getOAuthProviderAuth(providerId: string): OAuthProviderDescripto
   return toDescriptor(providerId);
 }
 
-/** List all built-in providers that support OAuth login (excluding blocked ones). */
+/** List OAuth providers and mark deprecated choices as non-selectable. */
 export function listOAuthProviders(): OAuthProviderDescriptor[] {
   const customIds = new Set(Object.keys(CUSTOM_OAUTH_PROVIDERS));
   const custom = Object.keys(CUSTOM_OAUTH_PROVIDERS)

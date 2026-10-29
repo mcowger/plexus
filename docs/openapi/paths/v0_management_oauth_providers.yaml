@@ -11,6 +11,9 @@ get:
     - `name` — Human-readable display name
     - `usesCallbackServer` — Whether this provider uses the callback server
       for OAuth flow vs requiring manual code paste
+    - `selectable` — Whether to offer this provider for new configurations.
+      Non-selectable providers remain listed so existing configurations can
+      display their current selection.
 
     ## Callback vs manual code
 
@@ -43,6 +46,8 @@ get:
                     name:
                       type: string
                     usesCallbackServer:
+                      type: boolean
+                    selectable:
                       type: boolean
               total:
                 type: integer
