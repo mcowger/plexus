@@ -134,11 +134,7 @@ export function useProviderForm() {
   // up here automatically with no frontend change.
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
   const [oauthProvidersStatus, setOauthProvidersStatus] = useState<OAuthProvidersStatus>('loading');
-  const OAUTH_PROVIDERS = oauthProviders.map((p) => ({
-    value: p.id,
-    label: p.name,
-    selectable: p.selectable,
-  }));
+  const OAUTH_PROVIDERS = oauthProviders.map((p) => ({ value: p.id, label: p.name }));
   const [customCheckerIds, setCustomCheckerIds] = useState<string[]>([]);
   const [quotas, setQuotas] = useState<QuotaCheckerInfo[]>([]);
   const [quotasLoading, setQuotasLoading] = useState(true);
