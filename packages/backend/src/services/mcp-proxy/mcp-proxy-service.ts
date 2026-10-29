@@ -252,9 +252,11 @@ export function requestsToolsList(body: unknown): boolean {
 
 // Some upstreams (GitHub's MCP server) advertise a non-positive `ttlMs` on
 // tools/list results, which TTL-honoring clients treat as permanently
-// invalid and loop on. Strip the field so clients fall back to their default
-// caching behavior; positive TTLs and everything else pass through untouched.
-export function stripZeroTtlFromToolsListResult(payload: unknown): boolean {
+// invalid and loop on. Clamp it to a one-minute TTL so strict clients retain
+// the required field while avoiding the upstream's invalid cache directive.
+const MIN_TOOLS_LIST_TTL_MS = 60_000;
+
+export function clampNonPositiveToolsListTtl(payload: unknown): boolean {
   const messages = Array.isArray(payload) ? payload : [payload];
   let changed = false;
   for (const message of messages) {
@@ -264,7 +266,7 @@ export function stripZeroTtlFromToolsListResult(payload: unknown): boolean {
     const resultRecord = result as Record<string, unknown>;
     if (!Array.isArray(resultRecord.tools)) continue;
     if (typeof resultRecord.ttlMs === 'number' && resultRecord.ttlMs <= 0) {
-      delete resultRecord.ttlMs;
+      resultRecord.ttlMs = MIN_TOOLS_LIST_TTL_MS;
       changed = true;
     }
   }
@@ -288,8 +290,8 @@ export function sanitizeToolsListTtlStream(
     if (data === null) return line;
     try {
       const parsed: unknown = JSON.parse(data);
-      if (stripZeroTtlFromToolsListResult(parsed)) {
-        logger.silly('[mcp-proxy] stripped non-positive ttlMs from tools/list result');
+      if (clampNonPositiveToolsListTtl(parsed)) {
+        logger.silly('[mcp-proxy] clamped non-positive ttlMs on tools/list result to 60000');
         return `data: ${JSON.stringify(parsed)}`;
       }
     } catch {
@@ -508,17 +510,17 @@ export async function proxyMcpRequest(
     // MCP JSON-RPC payloads are opaque to the gateway. Preserve tool
     // inputSchema objects and their protocol extensions exactly as received,
     // with the sole exception of a non-positive ttlMs on tools/list results
-    // (see stripZeroTtlFromToolsListResult).
+    // (see clampNonPositiveToolsListTtl).
     let parsedBody: unknown;
     try {
       parsedBody = JSON.parse(responseText);
-      if (toolsListRequested && stripZeroTtlFromToolsListResult(parsedBody)) {
+      if (toolsListRequested && clampNonPositiveToolsListTtl(parsedBody)) {
         // The serialized body no longer matches upstream's content-length.
         for (const key of Object.keys(responseHeaders)) {
           if (key.toLowerCase() === 'content-length') delete responseHeaders[key];
         }
         logger.silly(
-          '[mcp-proxy:' + serverName + '] stripped non-positive ttlMs from tools/list result'
+          '[mcp-proxy:' + serverName + '] clamped non-positive ttlMs on tools/list result to 60000'
         );
       }
       logger.silly(`Response body (parsed): ${JSON.stringify(parsedBody).substring(0, 500)}`);
