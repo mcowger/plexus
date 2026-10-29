@@ -169,9 +169,9 @@ export function ProviderQuotaEditor({
         }}
       >
         {isOAuthMode && oauthCheckerType
-          ? `Only the '${oauthCheckerType}' checker is available for this OAuth provider.`
+          ? `Recommended for this OAuth provider: '${oauthCheckerType}'. Other types may not accept its credentials.`
           : isOAuthMode
-            ? 'No quota checker is available for this OAuth provider type.'
+            ? 'No checker is matched to this OAuth provider automatically. Pick one only if its usage API accepts these credentials.'
             : selectedQuotaCheckerType
               ? 'Quota checker is active for this provider.'
               : 'Select <none> to disable provider quota checks.'}
