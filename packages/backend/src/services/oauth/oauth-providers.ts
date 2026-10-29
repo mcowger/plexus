@@ -73,8 +73,9 @@ const CUSTOM_OAUTH_PROVIDERS: Readonly<Record<string, { name: string; oauth: OAu
 /** Providers whose login flow runs a local callback server. */
 // Anthropic only falls back to pi-ai's loopback login when the copy-code
 // override is unavailable, so keep its callback-server handling for that case.
+// `openai` and `openai-codex` both bind port 1455 during login.
 const CALLBACK_SERVER_PROVIDERS = new Set(
-  upstreamAnthropicOAuth ? ['openai-codex'] : ['anthropic', 'openai-codex']
+  upstreamAnthropicOAuth ? ['openai', 'openai-codex'] : ['anthropic', 'openai', 'openai-codex']
 );
 
 /**
