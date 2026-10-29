@@ -681,6 +681,22 @@
       "notes": "Get a key at https://platform.opper.ai. Model ids are pool names such as claude-sonnet-4-6 or gpt-5.4-mini, which Opper routes across the providers serving that model; a provider/model id such as anthropic/claude-sonnet-4-6 pins one route. Fetch Models reads GET /v3/compat/models on the chat base. Anthropic messages live under /v3/compat/v1, so that base carries the /v1 segment. Reasoning effort is sent as low, medium or high, so minimal is sent as low."
     },
     {
+      "id": "cheaperinference",
+      "name": "Cheaper Inference",
+      "description": "Cheaper Inference LLM gateway, OpenAI chat, completions, responses and embeddings plus Anthropic messages on one base.",
+      "docsUrl": "https://cheaperinference.com/docs",
+      "suggestedProviderId": "cheaperinference",
+      "suggestedName": "Cheaper Inference",
+      "apiBaseUrl": {
+        "chat": "https://api.cheaperinference.com/v1",
+        "completions": "https://api.cheaperinference.com/v1",
+        "messages": "https://api.cheaperinference.com/v1",
+        "responses": "https://api.cheaperinference.com/v1",
+        "embeddings": "https://api.cheaperinference.com/v1"
+      },
+      "notes": "Get a key at https://cheaperinference.com. Keys start with ci_live_ and go in the Bearer header. Model ids are bare names such as gpt-5.4-mini, claude-sonnet-5 or deepseek-v4-flash. Fetch Models reads GET /v1/models on the same base and needs the key. Embeddings use text-embedding-3-small. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "runcrate",
       "name": "Runcrate",
       "description": "Runcrate inference API for open-weight models, OpenAI chat and responses plus Anthropic messages on one base.",
