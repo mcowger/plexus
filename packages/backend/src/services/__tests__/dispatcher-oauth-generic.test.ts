@@ -4,7 +4,11 @@ import { registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
-import { genericOAuthApiType, prepareGenericOAuthDispatch } from '../oauth/oauth-native-request';
+import {
+  applyChatGPTSignInBodyRules,
+  genericOAuthApiType,
+  prepareGenericOAuthDispatch,
+} from '../oauth/oauth-native-request';
 import * as catalog from '../pi-ai/catalog';
 
 // Generic OAuth dispatch — every pi-ai OAuth provider that ISN'T one of the
@@ -222,5 +226,65 @@ describe('Generic OAuth dispatch (non-native providers, e.g. xai)', () => {
     getCatalogModel.mockReturnValue({ id: 'grok-test', api: 'gemini' } as any);
     setConfigForTesting(genericOAuthConfig());
     await expect(new Dispatcher().dispatch(chatRequest())).rejects.toThrow(/wire API/i);
+  });
+});
+
+describe('Sign in with ChatGPT (the `openai` OAuth provider) body rules', () => {
+  test('forces the subscription request shape and drops API-key-only fields', () => {
+    const wire = applyChatGPTSignInBodyRules({
+      model: 'gpt-6-luna',
+      store: true,
+      stream: false,
+      prompt_cache_retention: '24h',
+      prompt_cache_options: { mode: 'explicit' },
+      temperature: 0.4,
+      max_output_tokens: 512,
+      instructions: 'be brief',
+    });
+
+    expect(wire.store).toBe(false);
+    expect(wire.stream).toBe(true); // ChatGPT-subscription tokens are stream-only
+    expect(wire).not.toHaveProperty('prompt_cache_retention');
+    expect(wire).not.toHaveProperty('prompt_cache_options');
+    expect(wire).not.toHaveProperty('temperature');
+    expect(wire).not.toHaveProperty('max_output_tokens');
+    // Everything else the caller sent survives.
+    expect(wire.instructions).toBe('be brief');
+    expect(wire.model).toBe('gpt-6-luna');
+  });
+
+  test('applies the rules to an openai responses request but not to other OAuth providers', async () => {
+    OAuthAuthManager.resetForTesting();
+    registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(GENERIC_TOKEN);
+    getCatalogModel.mockReturnValue({
+      id: 'gpt-6-luna',
+      api: 'openai-responses',
+      baseUrl: 'https://api.openai.com/v1',
+    } as any);
+
+    const prepared = await prepareGenericOAuthDispatch({
+      provider: 'openai',
+      modelId: 'gpt-6-luna',
+      body: { model: 'gpt-6-luna', store: true, stream: false },
+      streaming: false,
+      apiType: 'responses',
+      oauthAccountId: 'cgpt',
+    });
+
+    expect(prepared.url).toBe('https://api.openai.com/v1/responses');
+    expect(prepared.body.store).toBe(false);
+    expect(prepared.body.stream).toBe(true);
+
+    // A non-ChatGPT generic provider keeps its body byte-identical.
+    const other = await prepareGenericOAuthDispatch({
+      provider: 'xai',
+      modelId: 'grok-test',
+      body: { model: 'grok-test', store: true, stream: false },
+      streaming: false,
+      apiType: 'responses',
+      oauthAccountId: 'test-account',
+    });
+    expect(other.body.store).toBe(true);
+    expect(other.body.stream).toBe(false);
   });
 });

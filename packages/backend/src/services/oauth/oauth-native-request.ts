@@ -978,9 +978,10 @@ function resolveGenericOAuthBaseUrl(provider: string, modelId: string): string {
 
 /**
  * Prepare a request for any OAuth provider pi-ai supports that isn't one of
- * the native providers above. No masking, no tool-name games, no body
- * adornment — `body` is already the correct standard-path wire body; this
- * only resolves the real Bearer token and upstream URL.
+ * the native providers above. No masking, no tool-name games — `body` is
+ * already the correct standard-path wire body; this resolves the real Bearer
+ * token and upstream URL, and applies the ChatGPT-subscription request rules
+ * when the provider is `openai`.
  */
 export async function prepareGenericOAuthDispatch(params: {
   provider: string;
@@ -1030,9 +1031,46 @@ export async function prepareGenericOAuthDispatch(params: {
   return {
     url,
     headers,
-    body,
+    body: isChatGPTSignInRoute(provider, apiType) ? applyChatGPTSignInBodyRules(body) : body,
     reverseResponseFrame: (frame: string) => frame,
   };
+}
+
+// ─── Sign in with ChatGPT (the `openai` OAuth provider) ────────────────────
+//
+// A ChatGPT-subscription token is not an API key. api.openai.com serves it only
+// through the Responses API, and enforces the subscription request shape:
+// responses cannot be stored ("Store must be set to false"), the prompt-cache
+// retention knobs are rejected, the call must stream, and the per-model
+// sampling/token-cap options GPT-5 models refuse must be gone. pi-ai applies
+// the same rules to its own ChatGPT requests (see api/openai-responses.ts).
+
+const CHATGPT_SIGNIN_PROVIDER = 'openai';
+
+/** Fields only an API-key caller may send; ChatGPT sign-in rejects them. */
+const CHATGPT_SIGNIN_UNSUPPORTED_FIELDS = [
+  'prompt_cache_retention',
+  'prompt_cache_options',
+] as const;
+
+function isChatGPTSignInRoute(provider: string, apiType: string): boolean {
+  return provider === CHATGPT_SIGNIN_PROVIDER && apiType === 'responses';
+}
+
+/**
+ * Force the ChatGPT-subscription request shape onto a normalized Responses
+ * body: `store:false`, `stream:true`, no prompt-cache retention knobs, and no
+ * GPT-5-unsupported sampling/token-cap fields (removed by the shared adapter).
+ */
+export function applyChatGPTSignInBodyRules(body: any): any {
+  if (!body || typeof body !== 'object') return body;
+  const next: any = stripUnsupportedGpt5Options({ ...body });
+  next.store = false;
+  next.stream = true; // ChatGPT-subscription tokens are stream-only
+  for (const field of CHATGPT_SIGNIN_UNSUPPORTED_FIELDS) {
+    delete next[field];
+  }
+  return next;
 }
 
 /**
