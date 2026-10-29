@@ -4,6 +4,7 @@ import { registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import { mcpProcessManager } from '../../mcp-local/mcp-process-manager';
 import {
+  clampNonPositiveToolsListTtl,
   extractJsonRpcMethod,
   extractJsonRpcMethods,
   filterClientAuthHeaders,
@@ -17,7 +18,6 @@ import {
   requestsToolsList,
   sanitizeToolsListTtlStream,
   selectMcpKeyRoundRobin,
-  stripZeroTtlFromToolsListResult,
   validateServerName,
 } from '../mcp-proxy-service';
 
@@ -455,7 +455,7 @@ describe('MCP Proxy Service', () => {
       expect(result.body).toEqual(body);
     });
 
-    test('strips a non-positive ttlMs from buffered tools/list JSON responses', async () => {
+    test('clamps a non-positive ttlMs in buffered tools/list JSON responses', async () => {
       const body = {
         jsonrpc: '2.0',
         id: 1,
@@ -479,10 +479,10 @@ describe('MCP Proxy Service', () => {
       expect(result.body).toEqual({
         jsonrpc: '2.0',
         id: 1,
-        result: { cacheScope: 'public', tools: [{ name: 'example_tool' }] },
+        result: { ttlMs: 60000, cacheScope: 'public', tools: [{ name: 'example_tool' }] },
       });
-      // The rewritten body is shorter than the upstream payload, so the
-      // forwarded content-length must be dropped or the response hangs.
+      // The rewritten body no longer matches upstream's content-length, so
+      // the forwarded header must be dropped or the response may hang.
       expect(result.headers['content-length']).toBeUndefined();
     });
 
@@ -509,7 +509,7 @@ describe('MCP Proxy Service', () => {
       expect(result.body).toEqual(body);
     });
 
-    test('strips a non-positive ttlMs from tools/list results on SSE streams', async () => {
+    test('clamps a non-positive ttlMs from tools/list results on SSE streams', async () => {
       const sse =
         'event: message\n' +
         'data: {"jsonrpc":"2.0","id":1,"result":{"ttlMs":0,"cacheScope":"public","tools":[{"name":"example_tool"}]}}\n\n';
@@ -531,7 +531,7 @@ describe('MCP Proxy Service', () => {
       const text = await new Response(result.stream).text();
       const dataLine = text.split('\n').find((line: string) => line.startsWith('data: '));
       const data = JSON.parse(dataLine!.slice(6));
-      expect(data.result.ttlMs).toBeUndefined();
+      expect(data.result.ttlMs).toBe(60000);
       expect(data.result.cacheScope).toBe('public');
       expect(data.result.tools).toEqual([{ name: 'example_tool' }]);
     });
@@ -579,39 +579,39 @@ describe('MCP Proxy Service', () => {
       expect(requestsToolsList('not json')).toBe(false);
     });
 
-    test('removes a zero ttlMs from tools/list results', () => {
+    test('clamps a zero ttlMs to one minute on tools/list results', () => {
       const payload = {
         jsonrpc: '2.0',
         id: 1,
         result: { ttlMs: 0, cacheScope: 'public', tools: [] },
       };
 
-      expect(stripZeroTtlFromToolsListResult(payload)).toBe(true);
-      expect(payload.result).toEqual<unknown>({ cacheScope: 'public', tools: [] });
+      expect(clampNonPositiveToolsListTtl(payload)).toBe(true);
+      expect(payload.result).toEqual({ ttlMs: 60000, cacheScope: 'public', tools: [] });
     });
 
-    test('removes a negative ttlMs from tools/list results', () => {
+    test('clamps a negative ttlMs to one minute on tools/list results', () => {
       const payload = { jsonrpc: '2.0', id: 1, result: { ttlMs: -1, tools: [] } };
 
-      expect(stripZeroTtlFromToolsListResult(payload)).toBe(true);
-      expect(payload.result).toEqual<unknown>({ tools: [] });
+      expect(clampNonPositiveToolsListTtl(payload)).toBe(true);
+      expect(payload.result).toEqual({ ttlMs: 60000, tools: [] });
     });
 
     test('keeps a positive ttlMs on tools/list results', () => {
       const payload = { jsonrpc: '2.0', id: 1, result: { ttlMs: 60000, tools: [] } };
 
-      expect(stripZeroTtlFromToolsListResult(payload)).toBe(false);
+      expect(clampNonPositiveToolsListTtl(payload)).toBe(false);
       expect(payload.result).toEqual({ ttlMs: 60000, tools: [] });
     });
 
     test('ignores non-tools/list results and malformed payloads', () => {
       const callResult = { jsonrpc: '2.0', id: 1, result: { ttlMs: 0, content: [] } };
 
-      expect(stripZeroTtlFromToolsListResult(callResult)).toBe(false);
+      expect(clampNonPositiveToolsListTtl(callResult)).toBe(false);
       expect(callResult.result).toEqual({ ttlMs: 0, content: [] });
-      expect(stripZeroTtlFromToolsListResult('not an object')).toBe(false);
-      expect(stripZeroTtlFromToolsListResult(null)).toBe(false);
-      expect(stripZeroTtlFromToolsListResult(undefined)).toBe(false);
+      expect(clampNonPositiveToolsListTtl('not an object')).toBe(false);
+      expect(clampNonPositiveToolsListTtl(null)).toBe(false);
+      expect(clampNonPositiveToolsListTtl(undefined)).toBe(false);
     });
 
     test('handles JSON-RPC batches', () => {
@@ -620,9 +620,9 @@ describe('MCP Proxy Service', () => {
         { jsonrpc: '2.0', id: 2, result: { ttlMs: 0, tools: [] } },
       ];
 
-      expect(stripZeroTtlFromToolsListResult(payload)).toBe(true);
+      expect(clampNonPositiveToolsListTtl(payload)).toBe(true);
       expect(payload[0]!.result).toEqual({ ttlMs: 60000, tools: [] });
-      expect(payload[1]!.result).toEqual<unknown>({ tools: [] });
+      expect(payload[1]!.result).toEqual({ ttlMs: 60000, tools: [] });
     });
 
     test('sanitizeToolsListTtlStream passes non-JSON events through unchanged', async () => {
@@ -653,7 +653,7 @@ describe('MCP Proxy Service', () => {
 
       const text = await new Response(sanitizeToolsListTtlStream(stream)).text();
       const dataLine = text.split('\n').find((line: string) => line.startsWith('data: '));
-      expect(JSON.parse(dataLine!.slice(6)).result).toEqual({ tools: [] });
+      expect(JSON.parse(dataLine!.slice(6)).result).toEqual({ ttlMs: 60000, tools: [] });
     });
   });
 });
