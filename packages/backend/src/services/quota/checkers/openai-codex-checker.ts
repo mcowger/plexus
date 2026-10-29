@@ -236,8 +236,18 @@ export default defineChecker({
       }
 
       bodyText = await response.text();
-      if (!response.ok)
+      if (!response.ok) {
+        // Sign in with ChatGPT tokens are audience-bound to api.openai.com, so the
+        // ChatGPT backend answers 401 rejected_by_access_enforcement. Say so rather
+        // than showing the raw gateway error.
+        if (response.status === 401 && bodyText.includes('rejected_by_access_enforcement')) {
+          throw new Error(
+            'ChatGPT rejected this login for plan usage (rejected_by_access_enforcement): ' +
+              'its token is scoped to api.openai.com, not the ChatGPT usage endpoint'
+          );
+        }
         throw new Error(`quota request failed with status ${response.status}: ${bodyText}`);
+      }
     } finally {
       clearTimeout(timeout);
     }

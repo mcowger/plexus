@@ -288,4 +288,18 @@ describe('openai-codex checker', () => {
       })
     );
   });
+  it('explains an access-enforcement 401 instead of showing the raw gateway error', async () => {
+    const token = makeToken({});
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: { message: 'Unauthorized', type: 'rejected_by_access_enforcement' },
+          }),
+          { status: 401 }
+        )
+    );
+
+    await expect(checkerDef.check(makeCtx(token))).rejects.toThrow(/scoped to api\.openai\.com/);
+  });
 });
