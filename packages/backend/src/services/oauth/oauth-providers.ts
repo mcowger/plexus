@@ -6,13 +6,12 @@
  * This module is the single place Plexus resolves OAuth providers, plus the
  * provider metadata the management UI needs.
  *
- * Every pi-ai built-in provider with `auth.oauth` is exposed automatically —
- * Plexus does not maintain a per-provider allowlist, so new OAuth flows pi-ai
- * ships (e.g. xAI, Kimi Code, OpenRouter) become available with no code
- * changes here. `radius` is the one deliberate exception: it's a factory
- * (`radiusProvider({ id, name, gateway })`) for pointing at an arbitrary
- * self-hosted gateway, not a fixed identity provider like the others, so it
- * doesn't fit the "pick a provider, log in" model this facade assumes.
+ * Every pi-ai built-in provider with `auth.oauth` is available automatically,
+ * so new OAuth flows pi-ai ships become usable with no code changes here.
+ * The management UI list is curated separately: `openai-codex` remains
+ * supported for existing configurations but is not offered for new ones, and
+ * `radius` is excluded because it is a configurable gateway factory rather
+ * than a fixed identity provider.
  */
 
 import type { OAuthAuth } from '@earendil-works/pi-ai';
@@ -82,6 +81,9 @@ const CALLBACK_SERVER_PROVIDERS = new Set(
  */
 const BLOCKED_PROVIDERS = new Set(['radius']);
 
+/** OAuth implementations retained for existing configs but hidden from new UI choices. */
+const HIDDEN_FROM_PROVIDER_LIST = new Set(['openai-codex']);
+
 function toDescriptor(providerId: string): OAuthProviderDescriptor | undefined {
   if (BLOCKED_PROVIDERS.has(providerId)) return undefined;
   const custom = CUSTOM_OAUTH_PROVIDERS[providerId];
@@ -117,7 +119,9 @@ export function listOAuthProviders(): OAuthProviderDescriptor[] {
     .filter((descriptor): descriptor is OAuthProviderDescriptor => descriptor !== undefined);
   const builtin = models
     .getProviders()
-    .filter((provider) => !customIds.has(provider.id))
+    .filter(
+      (provider) => !customIds.has(provider.id) && !HIDDEN_FROM_PROVIDER_LIST.has(provider.id)
+    )
     .map((provider) => toDescriptor(provider.id))
     .filter((descriptor): descriptor is OAuthProviderDescriptor => descriptor !== undefined);
   return [...custom, ...builtin];

@@ -6,9 +6,8 @@ import {
   listOAuthProviders,
 } from '../oauth-providers';
 
-// Plexus exposes every OAuth-capable provider pi-ai ships except 'radius',
-// which is a configurable gateway factory rather than a fixed identity
-// provider (see oauth-providers.ts doc comment).
+// Plexus keeps every OAuth-capable pi-ai provider available, but hides
+// retired choices from the management UI list (see oauth-providers.ts).
 describe('oauth-providers facade', () => {
   it('recognizes every OAuth-capable pi-ai provider except radius', () => {
     for (const id of [
@@ -49,8 +48,15 @@ describe('oauth-providers facade', () => {
     expect(isKnownOAuthProviderId('openai')).toBe(false); // no auth.oauth
   });
 
-  it('never lists radius', () => {
-    expect(listOAuthProviders().some((p) => p.id === 'radius')).toBe(false);
+  it('does not list radius or legacy OpenAI Codex for new provider choices', () => {
+    const listedIds = listOAuthProviders().map((p) => p.id);
+    expect(listedIds).not.toContain('radius');
+    expect(listedIds).not.toContain('openai-codex');
+  });
+
+  it('retains legacy OpenAI Codex OAuth support for existing configurations', () => {
+    expect(isKnownOAuthProviderId('openai-codex')).toBe(true);
+    expect(getOAuthProviderAuth('openai-codex')).toBeDefined();
   });
 
   it('lists each provider id once even when overridden', () => {
