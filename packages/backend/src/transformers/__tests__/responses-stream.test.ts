@@ -154,6 +154,215 @@ describe('ResponsesTransformer stream transformation', () => {
     ]);
   });
 
+  test('forwards completed arguments when no argument deltas were streamed', async () => {
+    const chunks = await transformEvents([
+      {
+        type: 'response.output_item.added',
+        sequence_number: 1,
+        output_index: 0,
+        item: {
+          id: 'fc_example',
+          type: 'function_call',
+          status: 'in_progress',
+          call_id: 'call_example',
+          name: 'example_lookup',
+          arguments: '',
+        },
+      },
+      {
+        type: 'response.function_call_arguments.done',
+        sequence_number: 2,
+        item_id: 'fc_example',
+        output_index: 0,
+        arguments: '{"limit":100,"offset":50}',
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 3,
+        output_index: 0,
+        item: {
+          id: 'fc_example',
+          type: 'function_call',
+          status: 'completed',
+          call_id: 'call_example',
+          name: 'example_lookup',
+          arguments: '{"limit":100,"offset":50}',
+        },
+      },
+      {
+        type: 'response.completed',
+        sequence_number: 4,
+        response: {
+          id: 'resp_example',
+          object: 'response',
+          created_at: 0,
+          model: 'example-model',
+          status: 'completed',
+          output: [
+            {
+              id: 'fc_example',
+              type: 'function_call',
+              status: 'completed',
+              call_id: 'call_example',
+              name: 'example_lookup',
+              arguments: '{"limit":100,"offset":50}',
+            },
+          ],
+          usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+        },
+      },
+    ]);
+
+    expect(
+      chunks
+        .flatMap((chunk) => chunk.delta?.tool_calls ?? [])
+        .map((toolCall) => ({
+          index: toolCall.index,
+          arguments: toolCall.function?.arguments,
+        }))
+    ).toEqual([
+      { index: 0, arguments: '' },
+      { index: 0, arguments: '{"limit":100,"offset":50}' },
+    ]);
+    expect(chunks.findLast((chunk) => chunk.finish_reason)?.finish_reason).toBe('tool_calls');
+  });
+
+  test('does not repeat completed arguments after forwarding argument deltas', async () => {
+    const chunks = await transformEvents([
+      {
+        type: 'response.created',
+        response: { id: 'resp_1', model: 'gpt-4o', created_at: 1234567890 },
+      },
+      {
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: {
+          id: 'fc_1',
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'example_lookup',
+          arguments: '',
+        },
+      },
+      {
+        type: 'response.function_call_arguments.delta',
+        output_index: 0,
+        item_id: 'fc_1',
+        delta: '{"limit":100,"offset":50}',
+      },
+      {
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: {
+          id: 'fc_1',
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'example_lookup',
+          arguments: '{"limit":100,"offset":50}',
+        },
+      },
+      {
+        type: 'response.completed',
+        response: {
+          output: [
+            {
+              id: 'fc_1',
+              type: 'function_call',
+              call_id: 'call_1',
+              name: 'example_lookup',
+              arguments: '{"limit":100,"offset":50}',
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(
+      chunks
+        .flatMap((chunk) => chunk.delta?.tool_calls ?? [])
+        .map((toolCall) => ({
+          index: toolCall.index,
+          arguments: toolCall.function?.arguments,
+        }))
+    ).toEqual([
+      { index: 0, arguments: '' },
+      { index: 0, arguments: '{"limit":100,"offset":50}' },
+    ]);
+  });
+
+  test('keeps completion-only fallback arguments separate from parallel call deltas', async () => {
+    const chunks = await transformEvents([
+      {
+        type: 'response.created',
+        response: { id: 'resp_1', model: 'gpt-4o', created_at: 1234567890 },
+      },
+      {
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: {
+          id: 'fc_1',
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'first_tool',
+          arguments: '',
+        },
+      },
+      {
+        type: 'response.output_item.added',
+        output_index: 1,
+        item: {
+          id: 'fc_2',
+          type: 'function_call',
+          call_id: 'call_2',
+          name: 'second_tool',
+          arguments: '',
+        },
+      },
+      {
+        type: 'response.function_call_arguments.delta',
+        output_index: 1,
+        item_id: 'fc_2',
+        delta: '{"which":"second"}',
+      },
+      {
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: {
+          id: 'fc_1',
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'first_tool',
+          arguments: '{"which":"first"}',
+        },
+      },
+      {
+        type: 'response.output_item.done',
+        output_index: 1,
+        item: {
+          id: 'fc_2',
+          type: 'function_call',
+          call_id: 'call_2',
+          name: 'second_tool',
+          arguments: '{"which":"second"}',
+        },
+      },
+    ]);
+
+    expect(
+      chunks
+        .flatMap((chunk) => chunk.delta?.tool_calls ?? [])
+        .map((toolCall) => ({
+          index: toolCall.index,
+          arguments: toolCall.function?.arguments,
+        }))
+    ).toEqual([
+      { index: 0, arguments: '' },
+      { index: 1, arguments: '' },
+      { index: 1, arguments: '{"which":"second"}' },
+      { index: 0, arguments: '{"which":"first"}' },
+    ]);
+  });
+
   test('finishes with tool_calls after streaming a function call', async () => {
     const chunks = await transformEvents(FUNCTION_CALL_COMPLETION_EVENTS);
 
