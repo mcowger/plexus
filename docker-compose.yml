@@ -7,6 +7,7 @@ services:
     ports:
       - '4000:4000'
     volumes:
+      # Includes Plexus state and durable per-server local MCP data directories.
       - ./data:/app/data
     environment:
       - ADMIN_KEY=${ADMIN_KEY:?ADMIN_KEY is required}
@@ -14,3 +15,4 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - LOG_LEVEL=info
       - DATA_DIR=/app/data
+      - MCP_SERVERS_DATA_DIR=/app/data/mcp-servers

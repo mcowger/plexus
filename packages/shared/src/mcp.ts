@@ -28,7 +28,16 @@ export const LocalHttpMcpServerConfigSchema = z
     startup_timeout_ms: z.number().int().min(1_000).max(300_000).default(30_000).optional(),
     headers: z.record(z.string(), z.string()).optional(),
   })
-  .extend(McpServerSettingsSchema.shape);
+  .extend(McpServerSettingsSchema.shape)
+  .superRefine((config, context) => {
+    if (config.env && Object.keys(config.env).some((key) => key.toUpperCase() === 'MCP_DATA_DIR')) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['env', 'MCP_DATA_DIR'],
+        message: 'MCP_DATA_DIR is managed by Plexus and cannot be configured directly',
+      });
+    }
+  });
 
 export const McpServerConfigSchema = z.union([
   LocalHttpMcpServerConfigSchema,

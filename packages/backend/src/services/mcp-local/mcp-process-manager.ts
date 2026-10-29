@@ -1,5 +1,6 @@
 import { McpServerConfig } from '../../types/mcp';
 import { logger } from '../../utils/logger';
+import { ensureMcpServerDataDir } from './mcp-data-dir';
 
 export type LocalMcpStatus = 'stopped' | 'starting' | 'running' | 'failed';
 
@@ -227,7 +228,7 @@ class McpProcessManager {
         stdout: 'pipe',
         stderr: 'pipe',
         stdin: 'pipe',
-        env: this.buildChildEnv(config),
+        env: this.buildChildEnv(serverName, config),
       });
     } catch (error) {
       state.status = 'failed';
@@ -341,14 +342,19 @@ class McpProcessManager {
     throw new Error('Local MCP server did not become ready: ' + lastError);
   }
 
-  private buildChildEnv(config: McpServerConfig): Record<string, string> {
+  private buildChildEnv(serverName: string, config: McpServerConfig): Record<string, string> {
     const env: Record<string, string> = Object.create(null);
     for (const key of SAFE_INHERITED_ENV_KEYS) {
       const value = process.env[key];
       if (value !== undefined) env[key] = value;
     }
     if (config.mode === 'local_http' && config.env) Object.assign(env, config.env);
-    if (config.mode === 'local_http') env.PORT = String(config.port);
+    if (config.mode === 'local_http') {
+      // Always override user-supplied MCP_DATA_DIR. The directory is managed by
+      // Plexus and unique to this server, not a configurable arbitrary path.
+      env.MCP_DATA_DIR = ensureMcpServerDataDir(serverName);
+      env.PORT = String(config.port);
+    }
     env.HOST = '127.0.0.1';
     return env;
   }
