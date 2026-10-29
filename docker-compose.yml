@@ -15,4 +15,3 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - LOG_LEVEL=info
       - DATA_DIR=/app/data
-      - MCP_SERVERS_DATA_DIR=/app/data/mcp-servers

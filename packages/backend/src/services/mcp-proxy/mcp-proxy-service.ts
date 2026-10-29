@@ -6,6 +6,7 @@ import { McpServerConfig } from '../../types/mcp';
 import { decryptField } from '../../utils/encryption';
 import { getClientIp } from '../../utils/ip';
 import { logger } from '../../utils/logger';
+import { ConfigService } from '../configuration/config-service';
 import { mcpProcessManager } from '../mcp-local/mcp-process-manager';
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -376,7 +377,10 @@ export async function proxyMcpRequest(
 
   if (serverConfig.mode === 'local_http') {
     try {
-      await mcpProcessManager.ensureRunning(serverName, serverConfig);
+      await mcpProcessManager.ensureRunning(serverName, serverConfig, async () => {
+        const currentServers = await ConfigService.getInstance().getRepository().getAllMcpServers();
+        return currentServers[serverName];
+      });
     } catch (error) {
       logger.error(`[mcp-proxy:${serverName}] local MCP server failed to start`, error);
       return {

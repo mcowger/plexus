@@ -15,20 +15,19 @@ describe('LocalHttpMcpServerConfigSchema', () => {
     expect(LocalHttpMcpServerConfigSchema.safeParse(localServer).success).toBe(true);
   });
 
-  test('rejects a configured MCP_DATA_DIR override', () => {
+  test('strips MCP_DATA_DIR overrides in any casing, including legacy configs', () => {
     const result = LocalHttpMcpServerConfigSchema.safeParse({
       ...localServer,
-      env: { MCP_DATA_DIR: '/tmp/not-private' },
+      env: {
+        MCP_DATA_DIR: '/tmp/not-private',
+        mcp_data_dir: '/tmp/also-not-private',
+        CUSTOM_SETTING: 'kept',
+      },
     });
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues).toContainEqual(
-        expect.objectContaining({
-          path: ['env', 'MCP_DATA_DIR'],
-          message: 'MCP_DATA_DIR is managed by Plexus and cannot be configured directly',
-        })
-      );
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.env).toEqual({ CUSTOM_SETTING: 'kept' });
     }
   });
 });

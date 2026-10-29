@@ -1,6 +1,6 @@
 import { McpServerConfig } from '../../types/mcp';
 import { logger } from '../../utils/logger';
-import { ensureMcpServerDataDir } from './mcp-data-dir';
+import { ensureMcpServerDataDir, removeMcpServerDataDir } from './mcp-data-dir';
 
 export type LocalMcpStatus = 'stopped' | 'starting' | 'running' | 'failed';
 
@@ -49,18 +49,33 @@ class McpProcessManager {
     return 'http://127.0.0.1:' + config.port + (config.path || '/mcp');
   }
 
-  async ensureRunning(serverName: string, config: McpServerConfig): Promise<void> {
+  async ensureRunning(
+    serverName: string,
+    config: McpServerConfig,
+    getCurrentConfig: () => Promise<McpServerConfig | undefined> = async () => config
+  ): Promise<void> {
     if (config.mode !== 'local_http') return;
     const version = this.getState(serverName).lifecycleVersion;
-    return this.enqueue(serverName, () => this.ensureRunningInternal(serverName, config, version));
+    return this.enqueue(serverName, () =>
+      this.ensureRunningInternal(serverName, config, version, getCurrentConfig)
+    );
   }
 
   private async ensureRunningInternal(
     serverName: string,
     config: McpServerConfig,
-    version: number
+    version: number,
+    getCurrentConfig: () => Promise<McpServerConfig | undefined> = async () => config
   ): Promise<void> {
     const state = this.getState(serverName);
+    if (state.lifecycleVersion !== version) throw new Error('Local MCP startup cancelled');
+    const currentConfig = await getCurrentConfig();
+    if (
+      !currentConfig ||
+      this.getConfigFingerprint(currentConfig) !== this.getConfigFingerprint(config)
+    ) {
+      throw new Error('Local MCP server configuration is no longer current');
+    }
     if (state.lifecycleVersion !== version) throw new Error('Local MCP startup cancelled');
     const fingerprint = this.getConfigFingerprint(config);
     if (state.process) {
@@ -77,11 +92,15 @@ class McpProcessManager {
     }
   }
 
-  async start(serverName: string, config: McpServerConfig): Promise<LocalMcpRuntimeStatus> {
+  async start(
+    serverName: string,
+    config: McpServerConfig,
+    getCurrentConfig: () => Promise<McpServerConfig | undefined> = async () => config
+  ): Promise<LocalMcpRuntimeStatus> {
     if (config.mode !== 'local_http') throw new Error('MCP server is not local_http');
     const version = this.getState(serverName).lifecycleVersion;
     return this.enqueue(serverName, async () => {
-      await this.ensureRunningInternal(serverName, config, version);
+      await this.ensureRunningInternal(serverName, config, version, getCurrentConfig);
       return this.getStatus(serverName, config);
     });
   }
@@ -91,6 +110,17 @@ class McpProcessManager {
     state.lifecycleVersion++;
     state.startupController?.abort(new Error('Local MCP startup cancelled'));
     return this.enqueue(serverName, () => this.stopInternal(serverName));
+  }
+
+  async deleteServer(serverName: string, deleteConfig: () => Promise<void>): Promise<void> {
+    const state = this.getState(serverName);
+    state.lifecycleVersion++;
+    state.startupController?.abort(new Error('Local MCP startup cancelled'));
+    await this.enqueue(serverName, async () => {
+      await this.stopInternal(serverName);
+      await deleteConfig();
+      removeMcpServerDataDir(serverName);
+    });
   }
 
   private async stopInternal(serverName: string): Promise<LocalMcpRuntimeStatus> {
@@ -121,14 +151,18 @@ class McpProcessManager {
     return this.getStatus(serverName);
   }
 
-  async restart(serverName: string, config: McpServerConfig): Promise<LocalMcpRuntimeStatus> {
+  async restart(
+    serverName: string,
+    config: McpServerConfig,
+    getCurrentConfig: () => Promise<McpServerConfig | undefined> = async () => config
+  ): Promise<LocalMcpRuntimeStatus> {
     if (config.mode !== 'local_http') throw new Error('MCP server is not local_http');
     const state = this.getState(serverName);
     const version = ++state.lifecycleVersion;
     state.startupController?.abort(new Error('Local MCP startup cancelled'));
     return this.enqueue(serverName, async () => {
       await this.stopInternal(serverName);
-      await this.ensureRunningInternal(serverName, config, version);
+      await this.ensureRunningInternal(serverName, config, version, getCurrentConfig);
       return this.getStatus(serverName, config);
     });
   }

@@ -5472,7 +5472,7 @@
           "Management — Config"
         ],
         "summary": "Delete an MCP server entry (admin only)",
-        "description": "Removes an MCP server configuration.\n\n## Impact\n\nThe `/mcp/{serverName}` endpoints will return 404 for this server.\nAny in-flight proxy requests will fail.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Removes an MCP server configuration. If it is a local HTTP server, Plexus\nstops its process and permanently deletes its persistent data directory.\n\n## Impact\n\nThe `/mcp/{serverName}` endpoints will return 404 for this server.\nAny in-flight proxy requests will fail.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -5491,6 +5491,9 @@
           },
           "401": {
             "description": "Authentication required or invalid credentials."
+          },
+          "404": {
+            "description": "MCP server not found."
           }
         },
         "operationId": "deleteV0ManagementMcpserversByserverName"
@@ -13955,19 +13958,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "Environment variables passed to the local MCP process. MCP_DATA_DIR is managed by Plexus and cannot be set here."
-              },
-              "not": {
-                "properties": {
-                  "env": {
-                    "required": [
-                      "MCP_DATA_DIR"
-                    ]
-                  }
-                },
-                "required": [
-                  "env"
-                ]
+                "description": "Environment variables passed to the local MCP process. MCP_DATA_DIR is managed by Plexus; values for this key in any casing are ignored."
               },
               "port": {
                 "type": "integer",

@@ -115,6 +115,44 @@ describe('local MCP process supervision', () => {
     expect((await stat(firstEnv.MCP_DATA_DIR!)).mode & 0o777).toBe(0o700);
   });
 
+  test('removes persistent data after stopping and deleting a local server', async () => {
+    const spawn = registerSpy(Bun, 'spawn').mockReturnValue(makeChild(116));
+    registerSpy(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 405 }));
+    const deleteConfig = mock(async () => {});
+
+    await mcpProcessManager.start('deleted-server', config);
+    const dataDir = (spawn.mock.calls[0]?.[1] as { env: Record<string, string> }).env.MCP_DATA_DIR;
+
+    await mcpProcessManager.deleteServer('deleted-server', deleteConfig);
+
+    expect(deleteConfig).toHaveBeenCalledOnce();
+    expect(await stat(dataDir!).catch(() => null)).toBeNull();
+  });
+
+  test('does not restart a stale server queued behind deletion', async () => {
+    const spawn = registerSpy(Bun, 'spawn').mockReturnValue(makeChild(117));
+    let currentConfig: LocalHttpMcpServerConfig | undefined = config;
+    const deleting = mcpProcessManager.deleteServer('deleting-server', async () => {
+      currentConfig = undefined;
+    });
+    const staleStart = mcpProcessManager.ensureRunning(
+      'deleting-server',
+      config,
+      async () => currentConfig
+    );
+    const startResult = staleStart.then(
+      () => null,
+      (error: Error) => error
+    );
+
+    await deleting;
+
+    expect((await startResult)?.message).toBe(
+      'Local MCP server configuration is no longer current'
+    );
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   test('aborts hanging readiness requests at the startup deadline and cleans up', async () => {
     const child = makeChild(102);
     registerSpy(Bun, 'spawn').mockReturnValue(child);

@@ -69,7 +69,6 @@ EXPOSE 4000
 ENV PORT=4000
 ENV LOG_LEVEL=info
 ENV DATA_DIR=/app/data
-ENV MCP_SERVERS_DATA_DIR=/app/data/mcp-servers
 ENV DATABASE_URL=sqlite:///app/data/plexus.db
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}

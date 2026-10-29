@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { chmod, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { ensureMcpServerDataDir, getMcpServerDataDir } from '../mcp-data-dir';
+import {
+  ensureMcpServerDataDir,
+  getMcpServerDataDir,
+  removeMcpServerDataDir,
+} from '../mcp-data-dir';
 
 let temporaryRoots: string[] = [];
 
@@ -47,8 +51,8 @@ describe('local MCP data directories', () => {
   test('refuses a server directory symlink instead of following it', async () => {
     const root = await createRoot();
     const outside = path.join(root, 'outside');
-    await import('node:fs/promises').then(({ mkdir }) => mkdir(outside));
-    await import('node:fs/promises').then(({ mkdir }) => mkdir(path.join(root, 'mcp-servers')));
+    await mkdir(outside);
+    await mkdir(path.join(root, 'mcp-servers'));
     const serverPath = getMcpServerDataDir('linked', path.join(root, 'mcp-servers'));
     await symlink(outside, serverPath);
 
@@ -57,15 +61,46 @@ describe('local MCP data directories', () => {
     );
   });
 
-  test('enforces owner-only permissions on the data root and server directory', async () => {
+  test('does not change permissions on an existing root and secures the server directory', async () => {
     const root = await createRoot();
+    await chmod(root, 0o750);
     const directory = await ensureMcpServerDataDir('private', root);
-    await chmod(root, 0o777);
     await chmod(directory, 0o777);
 
     await ensureMcpServerDataDir('private', root);
 
-    expect((await stat(root)).mode & 0o777).toBe(0o700);
+    expect((await stat(root)).mode & 0o777).toBe(0o750);
     expect((await stat(directory)).mode & 0o777).toBe(0o700);
+  });
+
+  test('ignores an empty MCP_SERVERS_DATA_DIR and falls back to DATA_DIR', () => {
+    const previousMcpRoot = process.env.MCP_SERVERS_DATA_DIR;
+    const previousDataDir = process.env.DATA_DIR;
+    process.env.MCP_SERVERS_DATA_DIR = '';
+    process.env.DATA_DIR = '/tmp/plexus-data-root';
+    try {
+      expect(getMcpServerDataDir('fallback')).toBe(
+        path.join(
+          '/tmp/plexus-data-root',
+          'mcp-servers',
+          createHash('sha256').update('fallback').digest('hex')
+        )
+      );
+    } finally {
+      if (previousMcpRoot === undefined) delete process.env.MCP_SERVERS_DATA_DIR;
+      else process.env.MCP_SERVERS_DATA_DIR = previousMcpRoot;
+      if (previousDataDir === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = previousDataDir;
+    }
+  });
+
+  test('removes a server data directory when the server is deleted', async () => {
+    const root = await createRoot();
+    const directory = await ensureMcpServerDataDir('removed', root);
+    await writeFile(path.join(directory, 'state.json'), '{}');
+
+    removeMcpServerDataDir('removed', root);
+
+    expect(await stat(directory).catch(() => null)).toBeNull();
   });
 });

@@ -58,8 +58,11 @@ root defaults to `$DATA_DIR/mcp-servers` (or `/app/data/mcp-servers` if
 `DATA_DIR` is unset). The environment variable is managed by Plexus and cannot
 be overridden in the server's configured environment. The directory contents
 survive process and Plexus restarts as long as the root is on durable storage.
-For Docker Compose, the default `./data:/app/data` bind mount persists the
-server directories along with Plexus data.
+The root can be overridden with `MCP_SERVERS_DATA_DIR`; an unset or empty value
+uses the `$DATA_DIR/mcp-servers` default. For Docker Compose, the default
+`./data:/app/data` bind mount persists the server directories along with Plexus
+data. Deleting a local MCP server also deletes its data directory; recreating a
+server with the same name starts with a fresh directory.
 
 This provides path separation and private permissions for each server's data
 directory; it is not an operating-system sandbox for local MCP packages.

@@ -29,14 +29,12 @@ export const LocalHttpMcpServerConfigSchema = z
     headers: z.record(z.string(), z.string()).optional(),
   })
   .extend(McpServerSettingsSchema.shape)
-  .superRefine((config, context) => {
-    if (config.env && Object.keys(config.env).some((key) => key.toUpperCase() === 'MCP_DATA_DIR')) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['env', 'MCP_DATA_DIR'],
-        message: 'MCP_DATA_DIR is managed by Plexus and cannot be configured directly',
-      });
-    }
+  .transform((config) => {
+    if (!config.env) return config;
+    const env = Object.fromEntries(
+      Object.entries(config.env).filter(([key]) => key.toUpperCase() !== 'MCP_DATA_DIR')
+    );
+    return { ...config, env };
   });
 
 export const McpServerConfigSchema = z.union([
