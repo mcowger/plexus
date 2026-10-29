@@ -40,9 +40,6 @@ const KNOWN_APIS = [
 const getOAuthCheckerType = (oauthProvider?: string): string | null => {
   if (!oauthProvider) return null;
   const map: Record<string, string> = {
-    // ChatGPT subscription (Sign in with ChatGPT) and Codex both report plan
-    // usage through the ChatGPT backend's usage endpoint.
-    openai: 'openai-codex',
     'openai-codex': 'openai-codex',
     anthropic: 'claude-code',
     'claude-code': 'claude-code',
@@ -251,12 +248,10 @@ export function useProviderForm() {
     typeof editingProvider.apiBaseUrl === 'string' &&
     isOAuthPlaceholderUrl(editingProvider.apiBaseUrl);
   const oauthCheckerType = isOAuthMode ? getOAuthCheckerType(editingProvider.oauthProvider) : null;
-  // OAuth providers still get the full checker list: the matched type is only a
-  // recommendation, and blocking the rest hid checkers for providers whose
-  // usage API differs from the one we assume (e.g. ChatGPT subscription).
-  const selectableQuotaCheckerTypes =
-    isOAuthMode && oauthCheckerType
-      ? [oauthCheckerType, ...quotaCheckerTypes.filter((type) => type !== oauthCheckerType)]
+  const selectableQuotaCheckerTypes = oauthCheckerType
+    ? [oauthCheckerType]
+    : isOAuthMode
+      ? []
       : quotaCheckerTypes;
   const selectedQuotaCheckerType =
     editingProvider.quotaChecker?.type &&
