@@ -858,11 +858,11 @@ packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:213 [function] filt
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:228 [function] extractJsonRpcMethods
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:237 [function] extractJsonRpcMethod
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:241 [function] requestsToolsList
-packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:257 [function] stripZeroTtlFromToolsListResult
-packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:274 [function] sanitizeToolsListTtlStream
+packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:259 [function] clampNonPositiveToolsListTtl
+packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:276 [function] sanitizeToolsListTtlStream
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:31 [interface] McpKey
-packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:335 [function] extractToolName
-packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:355 [function] proxyMcpRequest
+packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:337 [function] extractToolName
+packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:357 [function] proxyMcpRequest
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:36 [interface] McpServerKeyConfig
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:43 [function] selectMcpKeyRoundRobin
 packages/backend/src/services/mcp-proxy/mcp-proxy-service.ts:53 [function] injectMcpKeyAuth
