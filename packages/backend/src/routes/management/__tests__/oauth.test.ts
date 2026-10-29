@@ -86,6 +86,20 @@ describe('OAuth management routes', () => {
     OAuthAuthManager.resetForTesting();
   });
 
+  it('marks legacy OAuth providers as non-selectable in the provider list', async () => {
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/v0/management/oauth/providers',
+    });
+    const json = response.json() as {
+      data: Array<{ id: string; selectable: boolean }>;
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(json.data.find((provider) => provider.id === 'openai-codex')?.selectable).toBe(false);
+    expect(json.data.find((provider) => provider.id === 'anthropic')?.selectable).toBe(true);
+  });
+
   it('stores credentials after prompt flow', async () => {
     const configService = ConfigService.getInstance();
     const saveCredentials = registerSpy(configService, 'setOAuthCredentials').mockResolvedValue();

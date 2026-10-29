@@ -6,8 +6,8 @@ import {
   listOAuthProviders,
 } from '../oauth-providers';
 
-// Plexus keeps every OAuth-capable pi-ai provider available, but hides
-// retired choices from the management UI list (see oauth-providers.ts).
+// Plexus keeps every OAuth-capable pi-ai provider available, while marking
+// retired choices as non-selectable in the management UI (see oauth-providers.ts).
 describe('oauth-providers facade', () => {
   it('recognizes every OAuth-capable pi-ai provider except radius', () => {
     for (const id of [
@@ -48,10 +48,10 @@ describe('oauth-providers facade', () => {
     expect(isKnownOAuthProviderId('openai')).toBe(false); // no auth.oauth
   });
 
-  it('does not list radius or legacy OpenAI Codex for new provider choices', () => {
-    const listedIds = listOAuthProviders().map((p) => p.id);
-    expect(listedIds).not.toContain('radius');
-    expect(listedIds).not.toContain('openai-codex');
+  it('marks legacy OpenAI Codex as unavailable for new provider choices', () => {
+    const codex = listOAuthProviders().find((p) => p.id === 'openai-codex');
+    expect(codex?.selectable).toBe(false);
+    expect(listOAuthProviders().some((p) => p.id === 'radius')).toBe(false);
   });
 
   it('retains legacy OpenAI Codex OAuth support for existing configurations', () => {

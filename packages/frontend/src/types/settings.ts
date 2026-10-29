@@ -159,6 +159,7 @@ export interface OAuthProviderInfo {
   id: string;
   name: string;
   usesCallbackServer: boolean;
+  selectable?: boolean;
 }
 
 export interface OAuthAuthInfo {

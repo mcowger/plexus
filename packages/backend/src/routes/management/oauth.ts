@@ -41,10 +41,12 @@ const toProviderResponse = (provider: {
   id: string;
   name: string;
   usesCallbackServer?: boolean;
+  selectable?: boolean;
 }) => ({
   id: provider.id,
   name: provider.name,
   usesCallbackServer: !!provider.usesCallbackServer,
+  selectable: provider.selectable !== false,
 });
 
 export async function registerOAuthRoutes(
