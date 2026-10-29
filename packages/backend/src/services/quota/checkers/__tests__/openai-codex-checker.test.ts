@@ -289,3 +289,72 @@ describe('openai-codex checker', () => {
     );
   });
 });
+
+describe('openai-codex checker — ChatGPT-subscription (Sign in with ChatGPT) providers', () => {
+  const chatgptSubscriptionCtx = () =>
+    createMeterContext('cgpt', 'openai', { oauthProvider: 'openai', oauthAccountId: 'cgpt' });
+
+  const setFetchMock = (impl: () => Promise<Response>): void => {
+    spyOn(globalThis, 'fetch').mockImplementation(mock(impl) as unknown as typeof fetch);
+  };
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    OAuthAuthManager.resetForTesting();
+  });
+
+  const unauthorized = () =>
+    new Response(
+      JSON.stringify({
+        error: { message: 'Unauthorized', type: 'rejected_by_access_enforcement' },
+        status: 401,
+      }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+
+  it('falls back to the Codex credential for the same account when the subscription token is rejected', async () => {
+    const subscriptionToken = makeToken({});
+    const codexToken = makeToken({
+      'https://api.openai.com/auth': { chatgpt_account_id: 'acct_123' },
+    });
+    const authManager = OAuthAuthManager.getInstance();
+    registerSpy(authManager, 'getApiKey').mockImplementation((async (provider: string) =>
+      provider === 'openai-codex' ? codexToken : subscriptionToken) as never);
+
+    const seen: Array<Record<string, string>> = [];
+    setFetchMock(async (...args: any[]) => {
+      const init = args[1] as RequestInit;
+      seen.push(init.headers as Record<string, string>);
+      // The reactive refresh and the Codex fallback each retry once, so the
+      // subscription token is rejected twice before the Codex credential wins.
+      if (seen.length < 3) return unauthorized();
+      return new Response(
+        JSON.stringify({
+          plan_type: 'plus',
+          rate_limit: { allowed: true, primary_window: { used_percent: 42 } },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const meters = await checkerDef.check(chatgptSubscriptionCtx());
+
+    expect(seen).toHaveLength(3);
+    expect(seen[2]?.Authorization).toBe(`Bearer ${codexToken}`);
+    expect(seen[2]?.['Chatgpt-Account-Id']).toBe('acct_123');
+    expect(meters[0]?.used).toBe(42);
+  });
+
+  it('explains that the subscription login cannot read plan usage when no Codex credential exists', async () => {
+    const authManager = OAuthAuthManager.getInstance();
+    registerSpy(authManager, 'getApiKey').mockImplementation((async (provider: string) => {
+      if (provider === 'openai-codex') throw new Error('not authenticated');
+      return makeToken({});
+    }) as never);
+    setFetchMock(async () => unauthorized());
+
+    await expect(checkerDef.check(chatgptSubscriptionCtx())).rejects.toThrow(
+      /Sign in with OpenAI Codex/
+    );
+  });
+});
