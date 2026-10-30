@@ -12064,14 +12064,34 @@
         "type": "object",
         "description": "Request body for image editing (multipart/form-data).",
         "required": [
-          "image",
           "prompt"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "image"
+            ]
+          },
+          {
+            "required": [
+              "image[]"
+            ]
+          }
         ],
         "properties": {
           "image": {
             "type": "string",
             "format": "binary",
-            "description": "Source image file. Must be PNG format, less than 4 MB."
+            "description": "Source image file, for a single-reference edit. Must be PNG format, less than 4 MB. Send either this field or `image[]`, not both."
+          },
+          "image[]": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Source image files, repeated once per image, for a multi-image edit. Must be PNG format, less than 4 MB each. Up to 16 references. Send either this field or `image`, not both."
           },
           "prompt": {
             "type": "string",
