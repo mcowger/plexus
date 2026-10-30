@@ -1335,7 +1335,6 @@ packages/backend/src/services/quota/checkers/nanogpt-checker.ts:27 [function] no
 packages/backend/src/services/quota/checkers/nanogpt-checker.ts:6 [interface] NanoGPTUsageWindow
 packages/backend/src/services/quota/checkers/neuralwatt-checker.ts:7 [interface] NeuralwattQuotaResponse
 packages/backend/src/services/quota/checkers/novita-checker.ts:6 [interface] NovitaBalanceResponse
-packages/backend/src/services/quota/checkers/ollama-checker.ts:6 [function] extractUsage
 packages/backend/src/services/quota/checkers/openai-codex-checker.ts:103 [function] resolveApiKey
 packages/backend/src/services/quota/checkers/openai-codex-checker.ts:11 [interface] CodexUsageWindow
 packages/backend/src/services/quota/checkers/openai-codex-checker.ts:137 [function] resolveCodexAccountId
