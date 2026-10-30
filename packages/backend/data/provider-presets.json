@@ -756,6 +756,19 @@
       "notes": "Get a key at https://www.runcrate.ai/dashboard/api-keys (keys start with rc_live_). Model ids keep the vendor prefix, such as deepseek-ai/DeepSeek-V4.1-Flash or zai-org/GLM-5.3. Fetch Models reads GET /v1/models on the same base. Reasoning effort is sent as low, medium or high, so minimal is sent as low."
     },
     {
+      "id": "cloudgpu",
+      "name": "CloudGPU",
+      "description": "CloudGPU model API, OpenAI-compatible chat completions plus a messages endpoint on one base.",
+      "docsUrl": "https://cloudgpu.app/api/docs",
+      "suggestedProviderId": "cloudgpu",
+      "suggestedName": "CloudGPU",
+      "apiBaseUrl": {
+        "chat": "https://cloudgpu.app/v1",
+        "messages": "https://cloudgpu.app/v1"
+      },
+      "notes": "Get a key in the CloudGPU dashboard at https://cloudgpu.app (keys start with cgw-sk-) and send it as a Bearer token. Model ids are bare names such as deepseek-v4-flash, kimi-k3 or glm-5.2. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "meta",
       "name": "Meta",
       "description": "Meta Model API — chat, responses, and Anthropic-compatible messages.",
