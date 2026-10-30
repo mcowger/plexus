@@ -12066,6 +12066,18 @@
         "required": [
           "prompt"
         ],
+        "oneOf": [
+          {
+            "required": [
+              "image"
+            ]
+          },
+          {
+            "required": [
+              "image[]"
+            ]
+          }
+        ],
         "properties": {
           "image": {
             "type": "string",

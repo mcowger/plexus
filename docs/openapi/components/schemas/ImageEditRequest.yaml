@@ -2,6 +2,14 @@ type: object
 description: Request body for image editing (multipart/form-data).
 required:
   - prompt
+# Exactly one of the two reference fields must be sent; mixing them is rejected
+# because `@fastify/multipart` groups repeated keys by spelling rather than by
+# wire order, so a mixed request would silently reorder the images.
+oneOf:
+  - required:
+      - image
+  - required:
+      - 'image[]'
 properties:
   image:
     type: string
