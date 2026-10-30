@@ -53,9 +53,55 @@ describe('Ollama quota checker', () => {
     );
 
     const meters = await checker.check(ctx());
-    expect(meters).toHaveLength(2);
+    expect(meters).toHaveLength(3);
     expect(meters[0]).toMatchObject({ key: 'session', used: 25, remaining: 75 });
     expect(meters[1]).toMatchObject({ key: 'weekly', used: 60, remaining: 40 });
+    expect(meters[2]).toMatchObject({ key: 'purchased', remaining: 0, status: 'exhausted' });
+  });
+
+  it('returns a zero-balance meter for accounts with exhausted purchased credits', async () => {
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => Response.json({ purchased: { balance_usd: 0 } }))
+    );
+
+    const meters = await checker.check(ctx());
+    expect(meters).toHaveLength(1);
+    expect(meters[0]).toMatchObject({
+      key: 'purchased',
+      kind: 'balance',
+      unit: 'USD',
+      remaining: 0,
+      status: 'exhausted',
+    });
+  });
+
+  it('rejects malformed balance responses instead of returning invalid meters', async () => {
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () =>
+        Response.json({
+          included: {
+            session: { resets_at: '2026-10-01T07:00:00Z' },
+            weekly: { remaining_percent: 40, resets_at: '2026-10-05T00:00:00Z' },
+          },
+          purchased: { balance_usd: 0 },
+        })
+      )
+    );
+
+    await expect(checker.check(ctx())).rejects.toThrow('Unexpected Ollama balance response');
+  });
+
+  it('rejects monthly responses without period reset data', async () => {
+    spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () =>
+        Response.json({
+          included: { balance_usd: 25, allowance_usd: 50 },
+          purchased: { balance_usd: 0 },
+        })
+      )
+    );
+
+    await expect(checker.check(ctx())).rejects.toThrow('Unexpected Ollama balance response');
   });
 
   it('throws for unsuccessful responses and does not request HTML', async () => {

@@ -3,19 +3,40 @@ import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 import { defineChecker } from '../checker-registry';
 
-interface OllamaBalanceResponse {
-  included?:
-    | {
-        balance_usd: number;
-        allowance_usd: number;
-        period: { from: string; until: string };
-      }
-    | {
-        session?: { remaining_percent: number; resets_at: string };
-        weekly?: { remaining_percent: number; resets_at: string };
-      };
-  purchased?: { balance_usd: number };
-}
+const OllamaBalanceSchema = z
+  .object({
+    included: z
+      .union([
+        z
+          .object({
+            balance_usd: z.number().finite(),
+            allowance_usd: z.number().finite(),
+            period: z.object({ from: z.string(), until: z.string() }).strict(),
+          })
+          .strict(),
+        z
+          .object({
+            session: z
+              .object({
+                remaining_percent: z.number().finite().min(0).max(100),
+                resets_at: z.string(),
+              })
+              .strict()
+              .optional(),
+            weekly: z
+              .object({
+                remaining_percent: z.number().finite().min(0).max(100),
+                resets_at: z.string(),
+              })
+              .strict()
+              .optional(),
+          })
+          .strict(),
+      ])
+      .optional(),
+    purchased: z.object({ balance_usd: z.number().finite() }).strict().optional(),
+  })
+  .strict();
 
 export default defineChecker({
   type: 'ollama',
@@ -36,7 +57,12 @@ export default defineChecker({
 
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-    const data: OllamaBalanceResponse = await response.json();
+    const raw: unknown = await response.json();
+    const parsed = OllamaBalanceSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new Error(`Unexpected Ollama balance response: ${parsed.error.message}`);
+    }
+    const data = parsed.data;
     const meters = [];
     const included = data.included;
 
@@ -93,11 +119,7 @@ export default defineChecker({
     }
 
     const purchasedBalance = data.purchased?.balance_usd;
-    if (
-      typeof purchasedBalance === 'number' &&
-      Number.isFinite(purchasedBalance) &&
-      purchasedBalance > 0
-    ) {
+    if (typeof purchasedBalance === 'number' && Number.isFinite(purchasedBalance)) {
       meters.push(
         ctx.balance({
           key: 'purchased',
