@@ -3,6 +3,14 @@ import type { FastifyRequest } from 'fastify';
 import { toMcpToolError } from './responses';
 import { type ManagementShimContext, McpToolError } from './types';
 
+/**
+ * `update` operations are additive: tool callers send only the fields they are
+ * changing, and the management PATCH routes merge nested objects instead of
+ * replacing them (a `null` value removes a key). Without this, a caller that
+ * did not first read the whole map would silently drop concurrent changes.
+ */
+export const PATCH_MERGE_QUERY: Record<string, unknown> = { merge: 'deep' };
+
 export function buildShimHeaders(request: FastifyRequest): Record<string, string> {
   const headers: Record<string, string> = {};
   const adminKey = request.headers['x-admin-key'];
