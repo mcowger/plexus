@@ -25,6 +25,7 @@ import { VisionDescriptorService } from '../../services/vision/vision-descriptor
 import { decryptField } from '../../utils/encryption';
 import { isValidIpRule } from '../../utils/ip-match';
 import { logger } from '../../utils/logger';
+import { mergePatch, wantsDeepMerge } from './patch-merge';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -196,6 +197,7 @@ export async function registerConfigRoutes(
   });
 
   // PATCH — partial update; merges into existing config then validates the result
+  // `?merge=deep` merges nested objects (e.g. models) instead of replacing them.
   // Using wildcard to support slugs containing '/' (e.g. "provider/model")
   fastify.patch('/v0/management/providers/*', async (request, reply) => {
     const slug = (request.params as { '*': string })['*'];
@@ -208,11 +210,17 @@ export async function registerConfigRoutes(
       if (!existing) {
         return reply.code(404).send({ error: `Provider '${slug}' not found` });
       }
-      const merged = { ...existing, ...body };
-      // Explicit null clears a saved setting on PATCH; omission preserves it.
-      if (body.pi_ai_provider === null) delete merged.pi_ai_provider;
-      if (body.pi_ai_quirks === null) delete merged.pi_ai_quirks;
-      if (body.responses_extensions === null) delete merged.responses_extensions;
+      const deepMerge = wantsDeepMerge(request.query);
+      const merged = deepMerge
+        ? mergePatch(existing as Record<string, unknown>, body)
+        : ({ ...existing, ...body } as Record<string, unknown>);
+      if (!deepMerge) {
+        // Explicit null clears a saved setting on PATCH; omission preserves it.
+        // (mergePatch already treats every null as a removal.)
+        if (body.pi_ai_provider === null) delete merged.pi_ai_provider;
+        if (body.pi_ai_quirks === null) delete merged.pi_ai_quirks;
+        if (body.responses_extensions === null) delete merged.responses_extensions;
+      }
       const result = ProviderConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
@@ -308,6 +316,7 @@ export async function registerConfigRoutes(
   });
 
   // PATCH — partial update; merges into existing alias then validates
+  // `?merge=deep` merges nested objects instead of replacing them.
   // Using wildcard to support slugs containing '/' (e.g. "provider/model")
   fastify.patch('/v0/management/aliases/*', async (request, reply) => {
     const slug = (request.params as { '*': string })['*'];
@@ -320,7 +329,9 @@ export async function registerConfigRoutes(
       if (!existing) {
         return reply.code(404).send({ error: `Alias '${slug}' not found` });
       }
-      const merged = { ...existing, ...body };
+      const merged = wantsDeepMerge(request.query)
+        ? mergePatch(existing as Record<string, unknown>, body)
+        : ({ ...existing, ...body } as Record<string, unknown>);
       const result = ModelConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
@@ -443,7 +454,10 @@ export async function registerConfigRoutes(
       // Normalize a legacy `quota` field on the incoming body BEFORE merging,
       // so a legacy-format PATCH replaces the key's `quotas` instead of being
       // shadowed by the existing config's `quotas`.
-      const merged = { ...existing, ...normalizeKeyConfig(body) };
+      const normalized = normalizeKeyConfig(body);
+      const merged = wantsDeepMerge(request.query)
+        ? mergePatch(existing as Record<string, unknown>, normalized)
+        : ({ ...existing, ...normalized } as Record<string, unknown>);
       const result = KeyConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });
@@ -1155,7 +1169,9 @@ export async function registerConfigRoutes(
       if (!existing) {
         return reply.code(404).send({ error: `MCP server '${serverName}' not found` });
       }
-      const merged = { ...existing, ...body };
+      const merged = wantsDeepMerge(request.query)
+        ? mergePatch(existing as Record<string, unknown>, body)
+        : ({ ...existing, ...body } as Record<string, unknown>);
       const result = McpServerConfigSchema.safeParse(merged);
       if (!result.success) {
         return reply.code(400).send({ error: 'Validation failed', details: result.error.issues });

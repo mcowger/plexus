@@ -1,4 +1,4 @@
-import { callManagementRoute, encodePathPreservingSlashes } from './management';
+import { callManagementRoute, encodePathPreservingSlashes, PATCH_MERGE_QUERY } from './management';
 import {
   asObject,
   mapRecordResponse,
@@ -76,7 +76,8 @@ export async function handleProviderTool(
           shimContext,
           'PATCH',
           `/v0/management/providers/${encodePathPreservingSlashes(requireId(input, 'provider'))}`,
-          input.body ?? {}
+          input.body ?? {},
+          PATCH_MERGE_QUERY
         )
       );
     case 'delete':
@@ -263,7 +264,8 @@ export async function handleModelAliasTool(
           shimContext,
           'PATCH',
           `/v0/management/aliases/${encodePathPreservingSlashes(requireId(input, 'model_alias'))}`,
-          input.body ?? {}
+          input.body ?? {},
+          PATCH_MERGE_QUERY
         )
       );
     case 'delete':
@@ -329,7 +331,8 @@ export async function handleKeyTool(
           shimContext,
           'PATCH',
           `/v0/management/keys/${encodeURIComponent(requireId(input, 'key'))}`,
-          input.body ?? {}
+          input.body ?? {},
+          PATCH_MERGE_QUERY
         )
       );
     case 'delete':
@@ -399,7 +402,8 @@ export async function handleQuotaTool(
           shimContext,
           'PATCH',
           `/v0/management/user-quotas/${encodeURIComponent(requireId(input, 'quota'))}`,
-          input.body ?? {}
+          input.body ?? {},
+          PATCH_MERGE_QUERY
         )
       );
     case 'delete':

@@ -226,6 +226,20 @@ export function createPlexusMcpTestFixture(): PlexusMcpTestFixture {
         const provider = setConfigSnapshot().providers?.[id];
         return provider ? json(provider) : json({ error: `Provider '${id}' not found` }, 404);
       }
+      if (method === 'PATCH' && path.startsWith('/v0/management/providers/')) {
+        const id = decodeURIComponent(path.replace('/v0/management/providers/', ''));
+        const current = setConfigSnapshot();
+        const existing = current.providers?.[id];
+        if (!existing) return json({ error: `Provider '${id}' not found` }, 404);
+        setConfigForTesting({
+          ...current,
+          providers: {
+            ...current.providers,
+            [id]: { ...existing, ...(request.payload as Record<string, unknown>) },
+          },
+        } as PlexusConfig);
+        return json({ success: true, slug: id });
+      }
       if (method === 'GET' && path === '/v0/management/aliases') {
         return json(setConfigSnapshot().models ?? {});
       }
