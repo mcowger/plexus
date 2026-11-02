@@ -1,19 +1,1057 @@
 {
   "$schema": "https://raw.githubusercontent.com/mcowger/plexus/main/packages/backend/data/provider-presets.schema.json",
-  "$comment": "Pre-configured provider presets for common API services.",
+  "$comment": "Pre-configured provider presets served by GET /v0/management/provider-presets, which defaults to this file's raw GitHub URL and falls back to this built-in copy when the remote is unreachable. Everything is validated against ProviderPresetSchema from @plexus/shared. URL convention: values are the base stored in apiBaseUrl[type] — Plexus appends the per-type suffix (/chat/completions, /messages, /responses, ...), so Anthropic-compatible bases include the /v1 segment.",
   "presets": [
     {
       "id": "openai",
       "name": "OpenAI",
-      "description": "Official OpenAI API — chat, responses, and legacy completions.",
-      "docsUrl": "https://platform.openai.com/docs/api-reference",
+      "description": "OpenAI platform API — chat, responses, and media endpoints.",
+      "docsUrl": "https://developers.openai.com/api/reference/overview",
       "suggestedProviderId": "openai",
       "suggestedName": "OpenAI",
       "apiBaseUrl": {
         "chat": "https://api.openai.com/v1",
+        "completions": "https://api.openai.com/v1",
         "responses": "https://api.openai.com/v1",
-        "completions": "https://api.openai.com/v1"
+        "embeddings": "https://api.openai.com/v1",
+        "transcriptions": "https://api.openai.com/v1",
+        "speech": "https://api.openai.com/v1"
       },
       "piAiProvider": "openai",
-      "autoCompat": false
+      "autoCompat": true,
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": "auto",
+            "standard": "default",
+            "flex": null,
+            "priority": null,
+            "ultrafast": null
+          },
+          "models": {
+            "gpt-4.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-2024-05-13": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.2": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-terra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-astra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6.1-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o3": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            }
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": "auto",
+            "standard": "default",
+            "flex": null,
+            "priority": null,
+            "ultrafast": null
+          },
+          "models": {
+            "gpt-4.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4.1-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-2024-05-13": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-4o-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.1": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.2": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-nano": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.3-codex": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.4-pro": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.5": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.5-pro": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex"
+              }
+            },
+            "gpt-5.6": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-5.6-terra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-astra": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority",
+                "ultrafast": "ultrafast"
+              }
+            },
+            "gpt-6-luna": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "gpt-6.1-sol": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o3": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            },
+            "o4-mini": {
+              "serviceTierMap": {
+                "auto": "auto",
+                "standard": "default",
+                "flex": "flex",
+                "priority": "priority"
+              }
+            }
+          }
+        }
+      },
+      "notes": "Service tiers follow OpenAI's documented per-model support (pricing page). Chat Completions omits gpt-5.5-pro/gpt-5.4-pro (Responses-API only) and ultrafast (Responses-only); flex models are limited to their listed context windows. Account eligibility and rate limits still apply."
     },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "description": "Anthropic Messages API.",
+      "docsUrl": "https://docs.anthropic.com/en/api",
+      "suggestedProviderId": "anthropic",
+      "suggestedName": "Anthropic",
+      "apiBaseUrl": {
+        "messages": "https://api.anthropic.com/v1"
+      },
+      "piAiProvider": "anthropic",
+      "autoCompat": true,
+      "piAiQuirks": {
+        "messages": {
+          "api": "anthropic-messages",
+          "compat": {
+            "serviceTierFormat": "anthropic-speed"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": null,
+            "flex": null,
+            "priority": null,
+            "ultrafast": null
+          },
+          "models": {
+            "claude-opus-5-5": {
+              "serviceTierMap": {
+                "priority": "fast"
+              }
+            },
+            "claude-opus-5": {
+              "serviceTierMap": {
+                "priority": "fast"
+              }
+            },
+            "claude-opus-4-8": {
+              "serviceTierMap": {
+                "priority": "fast"
+              }
+            }
+          }
+        }
+      },
+      "notes": "Fast mode (priority) is a research preview on Claude Opus 5.5, Claude Opus 5, and Claude Opus 4.8 and requires account-manager access; other models reject speed:\"fast\". Standard speed uses the native default."
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "description": "OpenRouter unified gateway — all protocols plus System One.",
+      "docsUrl": "https://openrouter.ai/docs/api-reference/overview",
+      "suggestedProviderId": "openrouter",
+      "suggestedName": "OpenRouter",
+      "apiBaseUrl": {
+        "chat": "https://openrouter.ai/api/v1",
+        "completions": "https://openrouter.ai/api/v1",
+        "messages": "https://openrouter.ai/api/v1",
+        "responses": "https://openrouter.ai/api/v1",
+        "systemone": "https://openrouter.ai/api/v1"
+      },
+      "piAiProvider": "openrouter",
+      "autoCompat": true,
+      "notes": "Service tiers pass through as service_tier on chat, responses, and messages; OpenRouter picks eligible tier endpoints and falls back per provider, so support is a gateway policy, not a per-model assertion. Optional attribution headers (HTTP-Referer, X-Title) can be added under headers.",
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": "default",
+            "flex": "flex",
+            "priority": "priority",
+            "ultrafast": "ultrafast"
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": "default",
+            "flex": "flex",
+            "priority": "priority",
+            "ultrafast": "ultrafast"
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "compat": {
+            "serviceTierFormat": "service-tier"
+          },
+          "serviceTierMap": {
+            "auto": null,
+            "standard": "default",
+            "flex": "flex",
+            "priority": "priority",
+            "ultrafast": "ultrafast"
+          }
+        }
+      }
+    },
+    {
+      "id": "requesty",
+      "name": "Requesty",
+      "description": "Requesty LLM gateway, OpenAI chat and responses plus Anthropic messages on one base.",
+      "docsUrl": "https://docs.requesty.ai",
+      "suggestedProviderId": "requesty",
+      "suggestedName": "Requesty",
+      "apiBaseUrl": {
+        "chat": "https://router.requesty.ai/v1",
+        "messages": "https://router.requesty.ai/v1",
+        "responses": "https://router.requesty.ai/v1"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "disabled",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Get a key at https://app.requesty.ai/api-keys. Model ids look like openai/gpt-4o-mini. Fetch Models reads GET /v1/models on the same base. Reasoning effort above high is model dependent upstream, so it clamps to high. For EU routing use https://router.eu.requesty.ai/v1."
+    },
+    {
+      "id": "opper",
+      "name": "Opper",
+      "description": "Opper AI gateway, OpenAI chat and responses plus Anthropic messages under one compat base.",
+      "docsUrl": "https://docs.opper.ai",
+      "suggestedProviderId": "opper",
+      "suggestedName": "Opper",
+      "apiBaseUrl": {
+        "chat": "https://api.opper.ai/v3/compat",
+        "messages": "https://api.opper.ai/v3/compat/v1",
+        "responses": "https://api.opper.ai/v3/compat"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "disabled",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Get a key at https://platform.opper.ai. Model ids are pool names such as claude-sonnet-4-6 or gpt-5.4-mini, which Opper routes across the providers serving that model; a provider/model id such as anthropic/claude-sonnet-4-6 pins one route. Fetch Models reads GET /v3/compat/models on the chat base. Anthropic messages live under /v3/compat/v1, so that base carries the /v1 segment. Reasoning effort is sent as low, medium or high, so minimal is sent as low."
+    },
+    {
+      "id": "llmbuzz",
+      "name": "llm.buzz",
+      "description": "llm.buzz model gateway, OpenAI chat and responses plus Anthropic messages on one base.",
+      "docsUrl": "https://llm.buzz/docs",
+      "suggestedProviderId": "llmbuzz",
+      "suggestedName": "llm.buzz",
+      "apiBaseUrl": {
+        "chat": "https://api.llm.buzz/api/v1",
+        "messages": "https://api.llm.buzz/api/v1",
+        "responses": "https://api.llm.buzz/api/v1"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "compat": {
+            "supportsTemperature": true
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "reasoning": "adaptive",
+          "compat": {
+            "supportsTemperature": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Get a key at https://app.llm.buzz. Model ids carry a vendor prefix, such as openai/gpt-4.1-mini, anthropic/claude-sonnet-5 or deepseek/deepseek-v4.1-flash. Fetch Models reads GET /api/v1/models on the same base. Reasoning effort passes through as-is; llm.buzz maps each level to the nearest the model supports. Messages uses adaptive thinking because Claude on llm.buzz refuses budget_tokens."
+    },
+    {
+      "id": "cheaperinference",
+      "name": "Cheaper Inference",
+      "description": "Cheaper Inference LLM gateway, OpenAI chat, completions, responses and embeddings plus Anthropic messages on one base.",
+      "docsUrl": "https://cheaperinference.com/docs",
+      "suggestedProviderId": "cheaperinference",
+      "suggestedName": "Cheaper Inference",
+      "apiBaseUrl": {
+        "chat": "https://api.cheaperinference.com/v1",
+        "completions": "https://api.cheaperinference.com/v1",
+        "messages": "https://api.cheaperinference.com/v1",
+        "responses": "https://api.cheaperinference.com/v1",
+        "embeddings": "https://api.cheaperinference.com/v1"
+      },
+      "notes": "Get a key at https://cheaperinference.com. Keys start with ci_live_ and go in the Bearer header. Model ids are bare names such as gpt-5.4-mini, claude-sonnet-5 or deepseek-v4-flash. Fetch Models reads GET /v1/models on the same base and needs the key. Embeddings use text-embedding-3-small. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
+      "id": "runcrate",
+      "name": "Runcrate",
+      "description": "Runcrate inference API for open-weight models, OpenAI chat and responses plus Anthropic messages on one base.",
+      "docsUrl": "https://www.runcrate.ai/inference/pricing",
+      "suggestedProviderId": "runcrate",
+      "suggestedName": "Runcrate",
+      "apiBaseUrl": {
+        "chat": "https://api.runcrate.ai/v1",
+        "messages": "https://api.runcrate.ai/v1",
+        "responses": "https://api.runcrate.ai/v1"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "messages": {
+          "api": "anthropic-messages",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "disabled",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Get a key at https://www.runcrate.ai/dashboard/api-keys (keys start with rc_live_). Model ids keep the vendor prefix, such as deepseek-ai/DeepSeek-V4.1-Flash or zai-org/GLM-5.3. Fetch Models reads GET /v1/models on the same base. Reasoning effort is sent as low, medium or high, so minimal is sent as low."
+    },
+    {
+      "id": "cloudgpu",
+      "name": "CloudGPU",
+      "description": "CloudGPU model API, OpenAI-compatible chat completions plus a messages endpoint on one base.",
+      "docsUrl": "https://cloudgpu.app/api/docs",
+      "suggestedProviderId": "cloudgpu",
+      "suggestedName": "CloudGPU",
+      "apiBaseUrl": {
+        "chat": "https://cloudgpu.app/v1",
+        "messages": "https://cloudgpu.app/v1"
+      },
+      "notes": "Get a key in the CloudGPU dashboard at https://cloudgpu.app (keys start with cgw-sk-) and send it as a Bearer token. Model ids are bare names such as deepseek-v4-flash, kimi-k3 or glm-5.2. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
+      "id": "meta",
+      "name": "Meta",
+      "description": "Meta Model API — chat, responses, and Anthropic-compatible messages.",
+      "docsUrl": "https://ai.developer.meta.com/docs",
+      "suggestedProviderId": "meta",
+      "suggestedName": "Meta",
+      "apiBaseUrl": {
+        "chat": "https://api.meta.ai/v1",
+        "messages": "https://api.meta.ai/v1",
+        "responses": "https://api.meta.ai/v1"
+      },
+      "piAiProvider": "meta",
+      "autoCompat": true,
+      "cacheKeyInjection": "prompt_cache_key"
+    },
+    {
+      "id": "moonshot",
+      "name": "Moonshot AI (Global)",
+      "description": "Kimi API on api.moonshot.ai — OpenAI protocols plus Anthropic messages.",
+      "docsUrl": "https://platform.kimi.ai/docs/api/overview",
+      "suggestedProviderId": "moonshot",
+      "suggestedName": "Moonshot",
+      "apiBaseUrl": {
+        "chat": "https://api.moonshot.ai/v1",
+        "responses": "https://api.moonshot.ai/v1",
+        "messages": "https://api.moonshot.ai/anthropic/v1"
+      },
+      "piAiProvider": "moonshotai",
+      "autoCompat": true
+    },
+    {
+      "id": "moonshot-cn",
+      "name": "Moonshot AI (China)",
+      "description": "Kimi API on api.moonshot.cn for mainland billing.",
+      "docsUrl": "https://platform.moonshot.cn/docs",
+      "suggestedProviderId": "moonshot-cn",
+      "suggestedName": "Moonshot CN",
+      "apiBaseUrl": {
+        "chat": "https://api.moonshot.cn/v1"
+      },
+      "piAiProvider": "moonshotai-cn",
+      "autoCompat": true,
+      "notes": "Anthropic-messages and responses parity on the .cn host is unverified."
+    },
+    {
+      "id": "kilocode",
+      "name": "Kilocode",
+      "description": "Kilo AI gateway — multi-protocol model gateway.",
+      "docsUrl": "https://kilo.ai/docs/gateway",
+      "suggestedProviderId": "kilocode",
+      "suggestedName": "Kilocode",
+      "apiBaseUrl": {
+        "chat": "https://api.kilo.ai/api/gateway",
+        "completions": "https://api.kilo.ai/api/gateway",
+        "messages": "https://api.kilo.ai/api/gateway",
+        "responses": "https://api.kilo.ai/api/gateway"
+      },
+      "piAiProvider": "openrouter",
+      "autoCompat": true,
+      "notes": "Only /chat/completions is documented upstream; the other protocols proxy through the same base in production use."
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare AI Gateway",
+      "description": "Cloudflare AI Gateway REST API — needs your Cloudflare account ID.",
+      "docsUrl": "https://developers.cloudflare.com/ai-gateway/usage/rest-api/",
+      "suggestedProviderId": "cloudflare",
+      "suggestedName": "Cloudflare",
+      "apiBaseUrl": {
+        "chat": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+        "messages": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+        "responses": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1"
+      },
+      "templateVars": [
+        { "key": "account_id", "label": "Account ID", "placeholder": "e.g. 0f6..." }
+      ],
+      "piAiProvider": "cloudflare-ai-gateway",
+      "autoCompat": true,
+      "notes": "Authenticate with a Cloudflare API token (Account > Workers AI > Read). Requests log to the `default` gateway unless a cf-aig-gateway-id header selects another."
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "description": "DeepSeek API — chat plus an Anthropic-compatible base.",
+      "docsUrl": "https://api-docs.deepseek.com/",
+      "suggestedProviderId": "deepseek",
+      "suggestedName": "DeepSeek",
+      "apiBaseUrl": {
+        "chat": "https://api.deepseek.com",
+        "messages": "https://api.deepseek.com/anthropic/v1",
+        "responses": "https://api.deepseek.com"
+      },
+      "piAiProvider": "deepseek",
+      "autoCompat": true,
+      "notes": "DeepSeek Responses is stateless: previous_response_id and store are unsupported; send full history in input."
+    },
+    {
+      "id": "fireworks",
+      "name": "Fireworks AI",
+      "description": "Fireworks inference API — OpenAI protocols plus Anthropic messages.",
+      "docsUrl": "https://docs.fireworks.ai/getting-started/quickstart",
+      "suggestedProviderId": "fireworks",
+      "suggestedName": "Fireworks",
+      "apiBaseUrl": {
+        "chat": "https://api.fireworks.ai/inference/v1",
+        "completions": "https://api.fireworks.ai/inference/v1",
+        "messages": "https://api.fireworks.ai/inference/v1"
+      },
+      "piAiProvider": "fireworks",
+      "autoCompat": true
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "description": "Groq Cloud — OpenAI-compatible chat plus responses (beta).",
+      "docsUrl": "https://console.groq.com/docs/api-reference",
+      "suggestedProviderId": "groq",
+      "suggestedName": "Groq",
+      "apiBaseUrl": {
+        "chat": "https://api.groq.com/openai/v1",
+        "responses": "https://api.groq.com/openai/v1"
+      },
+      "piAiProvider": "groq",
+      "autoCompat": true,
+      "notes": "The responses endpoint is beta upstream."
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax (Global)",
+      "description": "MiniMax international platform on api.minimax.io.",
+      "docsUrl": "https://platform.minimax.io/docs",
+      "suggestedProviderId": "minimax",
+      "suggestedName": "MiniMax",
+      "apiBaseUrl": {
+        "chat": "https://api.minimax.io/v1",
+        "messages": "https://api.minimax.io/anthropic/v1"
+      },
+      "piAiProvider": "minimax",
+      "autoCompat": true
+    },
+    {
+      "id": "minimax-cn",
+      "name": "MiniMax (China)",
+      "description": "MiniMax China platform on api.minimaxi.com.",
+      "docsUrl": "https://platform.minimaxi.com",
+      "suggestedProviderId": "minimax-cn",
+      "suggestedName": "MiniMax CN",
+      "apiBaseUrl": {
+        "chat": "https://api.minimaxi.com/v1",
+        "messages": "https://api.minimaxi.com/anthropic/v1"
+      },
+      "piAiProvider": "minimax-cn",
+      "autoCompat": true
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "description": "Mistral La Plateforme — OpenAI-compatible chat completions.",
+      "docsUrl": "https://docs.mistral.ai/api/",
+      "suggestedProviderId": "mistral",
+      "suggestedName": "Mistral",
+      "apiBaseUrl": {
+        "chat": "https://api.mistral.ai/v1"
+      },
+      "piAiProvider": "mistral",
+      "autoCompat": true
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel AI Gateway",
+      "description": "Vercel AI Gateway — OpenAI protocols plus Anthropic messages.",
+      "docsUrl": "https://vercel.com/docs/ai-gateway",
+      "suggestedProviderId": "vercel",
+      "suggestedName": "Vercel",
+      "apiBaseUrl": {
+        "chat": "https://ai-gateway.vercel.sh/v1",
+        "messages": "https://ai-gateway.vercel.sh/v1",
+        "responses": "https://ai-gateway.vercel.sh/v1"
+      },
+      "piAiProvider": "vercel-ai-gateway",
+      "autoCompat": true
+    },
+    {
+      "id": "zai",
+      "name": "Z.ai",
+      "description": "Z.ai (Zhipu GLM) — OpenAI-compatible chat completions.",
+      "docsUrl": "https://docs.z.ai/guides/overview/quick-start",
+      "suggestedProviderId": "zai",
+      "suggestedName": "Z.ai",
+      "apiBaseUrl": {
+        "chat": "https://api.z.ai/api/paas/v4"
+      },
+      "piAiProvider": "zai",
+      "autoCompat": true
+    },
+    {
+      "id": "neuralwatt",
+      "name": "Neuralwatt",
+      "description": "Neuralwatt Cloud — OpenAI-compatible chat, Anthropic messages, and responses with energy metering.",
+      "docsUrl": "https://docs.neuralwatt.com/quickstart",
+      "suggestedProviderId": "neuralwatt",
+      "suggestedName": "Neuralwatt",
+      "apiBaseUrl": {
+        "chat": "https://api.neuralwatt.com/v1",
+        "messages": "https://api.neuralwatt.com/v1",
+        "responses": "https://api.neuralwatt.com/v1"
+      },
+      "piAiQuirks": {
+        "chat": {
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsTemperature": true,
+            "maxTokensField": "max_tokens",
+            "supportsReasoningEffort": true
+          }
+        },
+        "responses": {
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "max"
+          },
+          "compat": {
+            "supportsTemperature": true
+          }
+        }
+      },
+      "autoCompat": true,
+      "notes": "Authenticate with a Neuralwatt sk- Bearer key. Effort levels collapse server-side per model; glm-5.3 and kimi-k2.7-code reason mandatorily and -fast aliases never reason. Discover models via GET /v1/models."
+    }
+  ]
+}
