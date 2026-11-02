@@ -702,7 +702,7 @@
         },
         "messages": {
           "api": "anthropic-messages",
-          "reasoning": "adaptive",
+          "reasoning": true,
           "compat": {
             "supportsTemperature": true
           }
