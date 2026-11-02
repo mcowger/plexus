@@ -22,9 +22,16 @@ interface CodexRateLimitInfo {
   secondary_window?: CodexUsageWindow;
 }
 
+interface CodexSpendLimit {
+  used_percent?: number;
+  remaining_percent?: number;
+  reset_at?: number;
+}
+
 interface CodexUsageResponse {
   plan_type?: string;
-  rate_limit?: CodexRateLimitInfo;
+  rate_limit?: CodexRateLimitInfo | null;
+  spend_control?: { individual_limit?: CodexSpendLimit | null } | null;
 }
 
 // OpenAI Codex access tokens typically have a 1-hour lifetime. Proactively
@@ -247,6 +254,37 @@ export default defineChecker({
       data = JSON.parse(bodyText) as CodexUsageResponse;
     } catch {
       throw new Error(`failed to parse codex usage response`);
+    }
+
+    // Enterprise/business plans report no rate_limit; usage is capped by a
+    // USD spend control instead.
+    const spend = data.spend_control?.individual_limit;
+    if (!data.rate_limit && spend) {
+      const { used_percent, remaining_percent } = spend;
+      if (typeof used_percent !== 'number' || !Number.isFinite(used_percent)) {
+        throw new Error(`codex usage response has invalid spend_control`);
+      }
+      const used = Math.min(Math.max(used_percent, 0), 100);
+      const remaining =
+        typeof remaining_percent === 'number' && Number.isFinite(remaining_percent)
+          ? Math.min(Math.max(remaining_percent, 0), 100)
+          : 100 - used;
+      return [
+        ctx.allowance({
+          key: 'spend',
+          label: 'Monthly',
+          unit: 'percentage',
+          used,
+          remaining,
+          periodValue: 1,
+          periodUnit: 'month',
+          periodCycle: 'fixed',
+          resetsAt:
+            typeof spend.reset_at === 'number' && spend.reset_at > 0
+              ? new Date(spend.reset_at * 1000).toISOString()
+              : undefined,
+        }),
+      ];
     }
 
     if (!data.rate_limit) throw new Error(`codex usage response missing rate_limit`);

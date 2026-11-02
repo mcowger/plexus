@@ -241,8 +241,12 @@ describe('Native Meta OAuth dispatch', () => {
 
     expect(response.bypassTransformation).toBe(false);
     const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
+    // A subscription route always carries the builtin declaration: Meta's
+    // entitlement check needs it even when nothing else in the body is
+    // namespaced.
     expect(sent.tools).toEqual([
       expect.objectContaining({ type: 'function', name: 'apply_patch' }),
+      expect.objectContaining({ type: 'namespace', name: 'muse' }),
     ]);
   });
 
@@ -256,6 +260,8 @@ describe('Native Meta OAuth dispatch', () => {
 
     expect(response.bypassTransformation).toBe(false);
     const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
-    expect(sent.tools.map((t: any) => t.name)).toEqual(['muse__read_file', 'muse__bash']);
+    // Flattening alone would leave only `muse__*` function tools, which the
+    // entitlement check rejects; the declaration is re-injected after it.
+    expect(sent.tools.map((t: any) => t.name)).toEqual(['muse__read_file', 'muse__bash', 'muse']);
   });
 });

@@ -13,6 +13,9 @@
  * (`radiusProvider({ id, name, gateway })`) for pointing at an arbitrary
  * self-hosted gateway, not a fixed identity provider like the others, so it
  * doesn't fit the "pick a provider, log in" model this facade assumes.
+ * pi-ai's `openai` (Sign in with ChatGPT) is the other: its token is rejected
+ * by ChatGPT's backend, so quota can't be read. `openai-codex` (the Codex CLI's
+ * client and scopes) is the ChatGPT subscription login instead.
  */
 
 import type { OAuthAuth } from '@earendil-works/pi-ai';
@@ -78,9 +81,9 @@ const CALLBACK_SERVER_PROVIDERS = new Set(
 
 /**
  * Providers excluded from Plexus's OAuth surface despite having
- * `auth.oauth` in pi-ai. See module doc comment for why `radius` is excluded.
+ * `auth.oauth` in pi-ai. See module doc comment for why each is excluded.
  */
-const BLOCKED_PROVIDERS = new Set(['radius']);
+const BLOCKED_PROVIDERS = new Set(['radius', 'openai']);
 
 function toDescriptor(providerId: string): OAuthProviderDescriptor | undefined {
   if (BLOCKED_PROVIDERS.has(providerId)) return undefined;

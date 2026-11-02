@@ -50,6 +50,25 @@ HTTP port, then proxies `/mcp/:name` to `http://127.0.0.1:<port><path>`.
 Admins select the launcher (`bunx` or `uvx`), provide a package name, package
 arguments, environment variables, port, and path. Arbitrary commands are not supported.
 
+Each local server receives a stable, server-specific directory through the
+`MCP_DATA_DIR` environment variable. Plexus creates the directory before
+starting the process with owner-only (`0700`) permissions. Its location is
+`$MCP_SERVERS_DATA_DIR/<opaque-server-id>`; when that variable is unset, the
+root defaults to `$DATA_DIR/mcp-servers` (or `/app/data/mcp-servers` if
+`DATA_DIR` is unset). The environment variable is managed by Plexus and cannot
+be overridden in the server's configured environment. The directory contents
+survive process and Plexus restarts as long as the root is on durable storage.
+The root can be overridden with `MCP_SERVERS_DATA_DIR`; an unset or empty value
+uses the `$DATA_DIR/mcp-servers` default. For Docker Compose, the default
+`./data:/app/data` bind mount persists the server directories along with Plexus
+data. Deleting a local MCP server also deletes its data directory; recreating a
+server with the same name starts with a fresh directory.
+
+This provides path separation and private permissions for each server's data
+directory; it is not an operating-system sandbox for local MCP packages.
+Processes launched by Plexus run with Plexus's OS identity and may access other
+files that identity can read. Only run trusted local MCP packages.
+
 Server names must match `[a-z0-9][a-z0-9-_]{1,62}`. The name `plexus` is reserved for the management MCP server and cannot be used as a gateway server name.
 
 ## Plexus Management MCP Tools

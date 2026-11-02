@@ -115,9 +115,27 @@ patch:
     PATCH performs a shallow merge; fields omitted from the request keep their
     existing values.
 
+    ## Deep merge (`?merge=deep`)
+
+    Nested objects merge key by key and a `null` value removes a field. The
+    list fields (`quotas`, `allowedModels`, `allowedProviders`, …) are arrays
+    and always replace. The Plexus management MCP tools always request this mode
+    for `update`.
+
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
+  parameters:
+    - in: query
+      name: merge
+      schema:
+        type: string
+        enum:
+          - deep
+          - 'true'
+      description: >
+        `deep` merges nested objects key by key instead of replacing them, and
+        treats `null` as a removal. Omit for the default shallow merge.
   requestBody:
     required: true
     content:

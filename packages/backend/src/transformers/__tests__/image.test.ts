@@ -356,6 +356,58 @@ describe('ImageTransformer', () => {
 
       expect(result.get('response_format')).toBe('url');
     });
+
+    it('appends a single image field named image for one reference (N=1 shape unchanged)', async () => {
+      const result = (await transformer.transformGenerationRequest({
+        model: 'gpt-image-1',
+        prompt: 'Add sunglasses',
+        input_references: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,iVBO' } }],
+      })) as FormData;
+
+      const image = result.get('image');
+      expect(image).toBeInstanceOf(Blob);
+      expect(result.getAll('image[]')).toEqual([]);
+    });
+
+    it('appends one image[] field per reference for multiple references (N=2 shape)', async () => {
+      const first = {
+        type: 'image_url',
+        image_url: { url: 'data:image/png;base64,iVBO' },
+      } as const;
+      const second = {
+        type: 'image_url',
+        image_url: { url: 'data:image/png;base64,/w==' },
+      } as const;
+      const result = (await transformer.transformGenerationRequest({
+        model: 'gpt-image-1',
+        prompt: 'Add sunglasses',
+        input_references: [first, second],
+      })) as FormData;
+
+      const parts = result.getAll('image[]');
+      expect(parts).toHaveLength(2);
+      expect(parts[0]).toBeInstanceOf(Blob);
+      expect(parts[1]).toBeInstanceOf(Blob);
+      const bytes = new Uint8Array(await (parts[1] as Blob).arrayBuffer());
+      expect(Array.from(bytes)).toEqual([0xff]);
+      expect(result.get('image')).toBeNull();
+    });
+
+    it('rejects more than the reference cap', async () => {
+      const reference = {
+        type: 'image_url',
+        image_url: { url: 'data:image/png;base64,iVBO' },
+      } as const;
+
+      const pending = transformer.transformGenerationRequest({
+        model: 'gpt-image-1',
+        prompt: 'Add sunglasses',
+        input_references: Array.from({ length: 17 }, () => reference),
+      });
+
+      const error = await pending.catch((e: unknown) => e);
+      expect((error as Error).message).toContain('at most 16 input references');
+    });
   });
 
   describe('editRequestToGenerationRequest', () => {

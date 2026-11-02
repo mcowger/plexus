@@ -242,10 +242,12 @@ const MOCK_BUILTIN_PROVIDER_IDS = new Set(['anthropic', 'openai-codex', 'openai'
 // sync with services/oauth/oauth-providers.ts's expectations so config
 // validation and OAuth provider listing behave the same under test as in
 // production. 'radius' is deliberately omitted (see that module's doc
-// comment); it must resolve as OAuth-less here too. 'meta' is pi-ai 0.86's
-// native Muse subscription provider.
+// comment); it must resolve as OAuth-less here too. 'openai' (Sign in with
+// ChatGPT) is present because pi-ai ships it; Plexus blocks it itself. 'meta'
+// is pi-ai 0.86's native Muse subscription provider.
 const MOCK_OAUTH_PROVIDER_IDS = new Set([
   'anthropic',
+  'openai',
   'openai-codex',
   'github-copilot',
   'xai',

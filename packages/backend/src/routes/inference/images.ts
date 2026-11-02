@@ -4,7 +4,11 @@ import { Dispatcher } from '../../services/dispatch/dispatcher';
 import { DebugManager } from '../../services/observability/debug-manager';
 import { UsageStorageService } from '../../services/observability/usage-storage';
 import { ImageTransformer } from '../../transformers';
-import { formatOpenRouterImageResponse, imageReferenceFromBuffer } from '../../transformers/image';
+import {
+  formatOpenRouterImageResponse,
+  imageReferenceFromBuffer,
+  MAX_IMAGE_REFERENCES,
+} from '../../transformers/image';
 import { UnifiedImageGenerationRequest } from '../../types/unified';
 import { UsageRecord } from '../../types/usage';
 import { attachKeyAccessPolicy } from '../../utils/auth';
@@ -21,9 +25,8 @@ import { wireEarlyDisconnectDetection, wireUpstreamTimeout } from '../../utils/t
  * iterator).
  */
 type MultipartEditUpload = {
-  imageBuffer?: Buffer;
-  imageFilename?: string;
-  imageMimeType?: string;
+  images: { buffer: Buffer; filename?: string; mimeType?: string }[];
+  imageFieldNames: Set<string>;
   maskBuffer?: Buffer;
   maskFilename?: string;
   maskMimeType?: string;
@@ -81,13 +84,12 @@ async function readMultipartFileBuffer(entry: any): Promise<Buffer | undefined> 
  * against a raw `request.parts()` stream.
  */
 async function extractImageEditUpload(request: any): Promise<MultipartEditUpload> {
-  const upload: MultipartEditUpload = { formFields: {} };
+  const upload: MultipartEditUpload = { formFields: {}, images: [], imageFieldNames: new Set() };
 
   const assignFile = (fieldname: string, entry: any, buffer: Buffer) => {
-    if (fieldname === 'image') {
-      upload.imageBuffer = buffer;
-      upload.imageFilename = entry.filename;
-      upload.imageMimeType = entry.mimetype;
+    if (fieldname === 'image' || fieldname === 'image[]') {
+      upload.imageFieldNames.add(fieldname);
+      upload.images.push({ buffer, filename: entry.filename, mimeType: entry.mimetype });
     } else if (fieldname === 'mask') {
       upload.maskBuffer = buffer;
       upload.maskFilename = entry.filename;
@@ -97,12 +99,15 @@ async function extractImageEditUpload(request: any): Promise<MultipartEditUpload
 
   if (hasAttachedMultipartFields(request?.body)) {
     for (const [name, raw] of Object.entries(request.body as Record<string, any>)) {
-      const entry = firstMultipartEntry(raw);
-      if (isMultipartFileEntry(entry)) {
-        const buffer = await readMultipartFileBuffer(entry);
-        if (buffer) assignFile(entry.fieldname ?? name, entry, buffer);
-      } else if (isMultipartValueEntry(entry)) {
-        upload.formFields[entry.fieldname ?? name] = entry.value;
+      const isImageKey = name === 'image' || name === 'image[]';
+      const entries = Array.isArray(raw) ? (isImageKey ? raw : [raw[0]]) : [raw];
+      for (const entry of entries) {
+        if (isMultipartFileEntry(entry)) {
+          const buffer = await readMultipartFileBuffer(entry);
+          if (buffer) assignFile(entry.fieldname ?? name, entry, buffer);
+        } else if (isMultipartValueEntry(entry)) {
+          upload.formFields[entry.fieldname ?? name] = entry.value;
+        }
       }
     }
     return upload;
@@ -320,14 +325,34 @@ export async function registerImagesRoute(
 
     try {
       // Parse multipart/form-data from whichever shape the plugin produced.
-      const { imageBuffer, imageFilename, imageMimeType, maskBuffer, maskMimeType, formFields } =
+      const { images, imageFieldNames, maskBuffer, maskMimeType, formFields } =
         await extractImageEditUpload(request);
 
-      if (!imageBuffer) {
+      if (images.length === 0) {
         return reply.code(400).send({
           error: { message: 'Missing required field: image', type: 'validation_error' },
         });
       }
+
+      if (images.length > MAX_IMAGE_REFERENCES) {
+        return reply.code(400).send({
+          error: {
+            message: `Too many image references (max ${MAX_IMAGE_REFERENCES})`,
+            type: 'validation_error',
+          },
+        });
+      }
+
+      if (imageFieldNames.size > 1) {
+        return reply.code(400).send({
+          error: {
+            message: 'Send every image as either image or image[], not both',
+            type: 'validation_error',
+          },
+        });
+      }
+
+      const refs = images.map((f) => imageReferenceFromBuffer(f.buffer, f.mimeType));
 
       if (!formFields.prompt) {
         return reply.code(400).send({
@@ -349,16 +374,17 @@ export async function registerImagesRoute(
       logger.silly('Incoming Image Edit Request', {
         model: formFields.model,
         prompt: formFields.prompt?.substring(0, 100),
-        filename: imageFilename,
+        referenceCount: images.length,
+        filename: images[0]?.filename,
         hasMask: !!maskBuffer,
       });
 
-      // Edits share the generation IR: the upload is the single input
-      // reference and the optional mask rides alongside it.
+      // Edits share the generation IR: every upload becomes an input
+      // reference; the optional mask rides alongside it.
       let unifiedRequest: UnifiedImageGenerationRequest = {
         model: formFields.model,
         prompt: formFields.prompt,
-        input_references: [imageReferenceFromBuffer(imageBuffer, imageMimeType)],
+        input_references: refs,
         ...(maskBuffer ? { mask: imageReferenceFromBuffer(maskBuffer, maskMimeType) } : {}),
         n: formFields.n ? parseInt(formFields.n) : undefined,
         size: formFields.size,
@@ -376,7 +402,8 @@ export async function registerImagesRoute(
         {
           model: formFields.model,
           prompt: formFields.prompt?.substring(0, 100),
-          filename: imageFilename,
+          referenceCount: images.length,
+          filename: images[0]?.filename,
           hasMask: !!maskBuffer,
           n: formFields.n,
           size: formFields.size,

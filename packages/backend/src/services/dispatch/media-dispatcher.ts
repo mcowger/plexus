@@ -314,6 +314,7 @@ const RESERVED_IMAGE_PROVIDER_OPTION_KEYS = new Set([
   'seed',
   'input_references',
   'image',
+  'image[]',
   'mask',
   'response_format',
   'stream',

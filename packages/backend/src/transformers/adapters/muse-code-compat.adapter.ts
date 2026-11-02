@@ -1,6 +1,8 @@
+import { isOAuthPlaceholderUrl } from '../../config';
 import type { RouteResult } from '../../services/routing/router';
 import type { ProviderAdapter } from '../../types/provider-adapter';
 import { logger } from '../../utils/logger';
+import { injectMuseBuiltinTool } from './muse-builtin-tool';
 
 /**
  * muse_code_compat adapter
@@ -20,16 +22,24 @@ import { logger } from '../../utils/logger';
  *   loss is visible in logs. If everything is dropped, the empty array is
  *   still emitted so the body shape is preserved.
  *
+ * - Muse Code's builtin tool declaration is appended when the dispatch opts
+ *   in with `{ inject_builtin_tool: true }` (see `muse-builtin-tool.ts` for
+ *   the entitlement check this satisfies). The implicit resolver sets that
+ *   option only for Muse *subscription* routes: pay-as-you-go Meta API keys
+ *   are not gated, so they keep their exact tool surface.
+ *
  * Outbound (preDispatch) only — the response shape is unaffected.
  * Auto-injected by `adapter-resolver.ts` for Muse subscription routes and
  * any provider pointed at Meta's API host; a
  * `{ name: 'muse_code_compat', enabled: false }` entry opts out, and an
- * explicit enabled entry force-enables it elsewhere.
+ * explicit enabled entry force-enables it elsewhere. An explicit entry can
+ * also set `{ inject_builtin_tool: true }` to request the declaration on a
+ * route the implicit gate skipped.
  */
 export const museCodeCompatAdapter: ProviderAdapter = {
   name: 'muse_code_compat',
 
-  preDispatch(payload: Record<string, any>): Record<string, any> {
+  preDispatch(payload: Record<string, any>, options?: Record<string, any>): Record<string, any> {
     let next = payload;
 
     if (Object.hasOwn(next, 'tool_choice')) {
@@ -51,6 +61,10 @@ export const museCodeCompatAdapter: ProviderAdapter = {
       }
     }
 
+    if (options?.inject_builtin_tool === true) {
+      next = injectMuseBuiltinTool(next);
+    }
+
     return next;
   },
 
@@ -67,6 +81,22 @@ export const museCodeCompatAdapter: ProviderAdapter = {
 export function isCustomTool(tool: any): boolean {
   if (!tool || typeof tool !== 'object') return false;
   return typeof tool.type === 'string' && tool.type.toLowerCase() === 'custom';
+}
+
+/**
+ * Whether a dispatch carries a Muse Code *subscription* credential, which is
+ * the only case Meta's builtin-tool check applies to. A direct `api.meta.ai`
+ * provider with a pay-as-you-go key speaks the same wire contract but is not
+ * gated, so it must not receive the declaration.
+ */
+export function isMuseSubscriptionTarget(route: RouteResult): boolean {
+  if (route.config.oauth_provider === 'meta') return true;
+  if ((route.config.oauth_provider || route.provider) !== 'meta') return false;
+  const urls =
+    typeof route.config.api_base_url === 'string'
+      ? [route.config.api_base_url]
+      : Object.values(route.config.api_base_url ?? {});
+  return urls.some((url) => typeof url === 'string' && isOAuthPlaceholderUrl(url));
 }
 
 /**

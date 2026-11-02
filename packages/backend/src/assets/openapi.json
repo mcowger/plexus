@@ -3846,10 +3846,24 @@
           "Management — Config"
         ],
         "summary": "Merge updates into an existing provider (admin only)",
-        "description": "Merges the request body into the existing provider configuration,\nthen validates the result.\n\n## Merge behavior\n\nUnlike PUT (which replaces), PATCH performs a shallow merge:\n- New fields are added\n- Existing fields are overwritten\n- Fields not in the request are preserved\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Merges the request body into the existing provider configuration,\nthen validates the result.\n\n## Merge behavior\n\nUnlike PUT (which replaces), PATCH performs a shallow merge:\n- New fields are added\n- Existing fields are overwritten\n- Fields not in the request are preserved\n\n## Deep merge (`?merge=deep`)\n\nA shallow merge replaces nested objects wholesale, so a `models` map has to\nbe resent in full and any entry a caller did not read first is dropped. With\n`merge=deep` nested objects merge key by key instead:\n\n```\nPATCH /v0/management/providers/openrouter?merge=deep\n{ \"models\": { \"new-model\": { \"pricing\": { \"source\": \"simple\", \"input\": 1, \"output\": 2 } } } }\n```\n\n- Only the map entries you send are added or changed\n- A `null` value removes a field, or a single entry when nested in a map\n  (`{ \"models\": { \"old-model\": null } }`)\n- Arrays and scalars still replace\n\nThe Plexus management MCP tools always request this mode for `update`.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "merge",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deep",
+                "true"
+              ]
+            },
+            "description": "`deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge.\n"
           }
         ],
         "requestBody": {
@@ -4558,10 +4572,24 @@
           "Management — Config"
         ],
         "summary": "Merge updates into a model alias (admin only)",
-        "description": "Merges the request body into the existing alias configuration,\nthen validates the result.\n\n## Merge behavior\n\nPATCH performs a shallow merge — new fields are added, existing fields\nare overwritten, fields not in the request are preserved.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Merges the request body into the existing alias configuration,\nthen validates the result.\n\n## Merge behavior\n\nPATCH performs a shallow merge — new fields are added, existing fields\nare overwritten, fields not in the request are preserved.\n\n## Deep merge (`?merge=deep`)\n\nNested objects merge key by key and a `null` value removes a field. Targets,\ntarget groups, and the other list fields are arrays and always replace, so\nsend the complete list when changing one. The Plexus management MCP tools\nalways request this mode for `update`.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "merge",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deep",
+                "true"
+              ]
+            },
+            "description": "`deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge.\n"
           }
         ],
         "requestBody": {
@@ -5151,10 +5179,24 @@
           "Management — Config"
         ],
         "summary": "Merge updates into an API key (admin only)",
-        "description": "Merges the request body into the existing API key configuration, then\nvalidates the result against `KeyConfig`.\n\nPATCH performs a shallow merge; fields omitted from the request keep their\nexisting values.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Merges the request body into the existing API key configuration, then\nvalidates the result against `KeyConfig`.\n\nPATCH performs a shallow merge; fields omitted from the request keep their\nexisting values.\n\n## Deep merge (`?merge=deep`)\n\nNested objects merge key by key and a `null` value removes a field. The\nlist fields (`quotas`, `allowedModels`, `allowedProviders`, …) are arrays\nand always replace. The Plexus management MCP tools always request this mode\nfor `update`.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "merge",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deep",
+                "true"
+              ]
+            },
+            "description": "`deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge.\n"
           }
         ],
         "requestBody": {
@@ -5421,10 +5463,24 @@
           "Management — Config"
         ],
         "summary": "Merge updates into an MCP server entry (admin only)",
-        "description": "Merges the request body into the existing MCP server configuration, then\nvalidates the result against `McpServerConfig`.\n\nPATCH performs a shallow merge; omitted fields keep their current values.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Merges the request body into the existing MCP server configuration, then\nvalidates the result against `McpServerConfig`.\n\nPATCH performs a shallow merge; omitted fields keep their current values.\n\n## Deep merge (`?merge=deep`)\n\nNested objects such as `headers` merge key by key and a `null` value removes\na field. Arrays such as `args` always replace. The Plexus management MCP\ntools always request this mode for `update`.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "merge",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deep",
+                "true"
+              ]
+            },
+            "description": "`deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge.\n"
           }
         ],
         "requestBody": {
@@ -5472,7 +5528,7 @@
           "Management — Config"
         ],
         "summary": "Delete an MCP server entry (admin only)",
-        "description": "Removes an MCP server configuration.\n\n## Impact\n\nThe `/mcp/{serverName}` endpoints will return 404 for this server.\nAny in-flight proxy requests will fail.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Removes an MCP server configuration. If it is a local HTTP server, Plexus\nstops its process and permanently deletes its persistent data directory.\n\n## Impact\n\nThe `/mcp/{serverName}` endpoints will return 404 for this server.\nAny in-flight proxy requests will fail.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -5491,6 +5547,9 @@
           },
           "401": {
             "description": "Authentication required or invalid credentials."
+          },
+          "404": {
+            "description": "MCP server not found."
           }
         },
         "operationId": "deleteV0ManagementMcpserversByserverName"
@@ -8984,10 +9043,24 @@
           "Management — Quotas (User)"
         ],
         "summary": "Partial update (admin only)",
-        "description": "Partially updates a quota definition.\n\n## PUT vs PATCH\n\n- **PUT** — Complete replacement. All required fields must be provided.\n- **PATCH** — Partial update. Only provided fields are updated. Only\n  fields present in the request body are changed; missing fields retain\n  their current values.\n\n## Use cases\n\n- Change just the limit: `{\"limit\": 50000}`\n- Change just the duration: `{\"duration\": \"2h\"}`\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Partially updates a quota definition.\n\n## PUT vs PATCH\n\n- **PUT** — Complete replacement. All required fields must be provided.\n- **PATCH** — Partial update. Only provided fields are updated. Only\n  fields present in the request body are changed; missing fields retain\n  their current values.\n\n## Use cases\n\n- Change just the limit: `{\"limit\": 50000}`\n- Change just the duration: `{\"duration\": \"2h\"}`\n\n## Deep merge (`?merge=deep`)\n\nNested objects merge key by key and a `null` value removes a field. The\nscope fields (`allowedProviders`, `excludedModels`, …) are arrays and always\nreplace. The Plexus management MCP tools always request this mode for\n`update`.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "merge",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deep",
+                "true"
+              ]
+            },
+            "description": "`deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge.\n"
           }
         ],
         "requestBody": {
@@ -12061,14 +12134,34 @@
         "type": "object",
         "description": "Request body for image editing (multipart/form-data).",
         "required": [
-          "image",
           "prompt"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "image"
+            ]
+          },
+          {
+            "required": [
+              "image[]"
+            ]
+          }
         ],
         "properties": {
           "image": {
             "type": "string",
             "format": "binary",
-            "description": "Source image file. Must be PNG format, less than 4 MB."
+            "description": "Source image file, for a single-reference edit. Must be PNG format, less than 4 MB. Send either this field or `image[]`, not both."
+          },
+          "image[]": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Source image files, repeated once per image, for a multi-image edit. Must be PNG format, less than 4 MB each. Up to 16 references. Send either this field or `image`, not both."
           },
           "prompt": {
             "type": "string",
@@ -13914,27 +14007,95 @@
         }
       },
       "McpServerConfig": {
-        "type": "object",
-        "required": [
-          "upstream_url"
-        ],
-        "properties": {
-          "upstream_url": {
-            "type": "string",
-            "format": "uri"
-          },
-          "enabled": {
-            "type": "boolean",
-            "default": true
-          },
-          "headers": {
+        "oneOf": [
+          {
             "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Static headers forwarded upstream."
+            "required": [
+              "mode",
+              "launcher",
+              "package",
+              "port"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "local_http"
+                ]
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "launcher": {
+                "type": "string",
+                "enum": [
+                  "bunx",
+                  "uvx"
+                ]
+              },
+              "package": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Environment variables passed to the local MCP process. MCP_DATA_DIR is managed by Plexus; values for this key in any casing are ignored."
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "path": {
+                "type": "string",
+                "default": "/mcp"
+              },
+              "startup_timeout_ms": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 300000
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "upstream_url"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "remote_http"
+                ]
+              },
+              "upstream_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Static headers forwarded upstream."
+              }
+            }
           }
-        }
+        ]
       },
       "UserQuotaDefinition": {
         "type": "object",

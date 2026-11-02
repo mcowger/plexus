@@ -19,7 +19,17 @@ import { describe, expect, it, test } from 'bun:test';
 
 import { resolveAdapters } from '../../../services/dispatch/adapter-resolver';
 import type { RouteResult } from '../../../services/routing/router';
-import { isCustomTool, isMuseTarget, museCodeCompatAdapter } from '../muse-code-compat.adapter';
+import {
+  hasMuseBuiltinNamespace,
+  injectMuseBuiltinTool,
+  MUSE_BUILTIN_NAMESPACE_DECLARATION,
+} from '../muse-builtin-tool';
+import {
+  isCustomTool,
+  isMuseSubscriptionTarget,
+  isMuseTarget,
+  museCodeCompatAdapter,
+} from '../muse-code-compat.adapter';
 
 function makeRoute(configOverrides: Record<string, any> = {}): RouteResult {
   return {
@@ -97,6 +107,77 @@ describe('museCodeCompatAdapter.preDispatch', () => {
       tools: [{ type: 'custom', name: 'apply_patch' }],
     });
     expect(result.tools).toEqual([]);
+  });
+});
+
+describe('Muse builtin tool declaration', () => {
+  it('appends the namespace to a body that declares tools', () => {
+    const read = { type: 'function', name: 'read', function: { name: 'read' } };
+    const result = injectMuseBuiltinTool({ tools: [read] });
+    expect(result.tools).toHaveLength(2);
+    expect(result.tools[0]).toBe(read);
+    expect(result.tools[1]).toEqual(MUSE_BUILTIN_NAMESPACE_DECLARATION);
+  });
+
+  it('leaves bodies without tools untouched', () => {
+    const noTools = { model: 'muse-spark-1.3' };
+    expect(injectMuseBuiltinTool(noTools)).toBe(noTools);
+
+    const empty = { tools: [] };
+    expect(injectMuseBuiltinTool(empty)).toBe(empty);
+  });
+
+  it('is idempotent, including for a genuine Muse Code body', () => {
+    const genuine = { tools: [structuredClone(MUSE_BUILTIN_NAMESPACE_DECLARATION)] };
+    expect(hasMuseBuiltinNamespace(genuine.tools)).toBe(true);
+    expect(injectMuseBuiltinTool(genuine)).toBe(genuine);
+
+    const once = injectMuseBuiltinTool({ tools: [{ type: 'function', name: 'read' }] });
+    expect(injectMuseBuiltinTool(once)).toBe(once);
+  });
+
+  it('clones the declaration so callers cannot corrupt the constant', () => {
+    const first = injectMuseBuiltinTool({ tools: [{ type: 'function', name: 'read' }] });
+    (first.tools[1] as any).tools[0].name = 'mutated';
+    const second = injectMuseBuiltinTool({ tools: [{ type: 'function', name: 'read' }] });
+    expect((second.tools[1] as any).tools[0].name).toBe('cron_list');
+    expect(MUSE_BUILTIN_NAMESPACE_DECLARATION.tools[0].name).toBe('cron_list');
+  });
+
+  it('injects only when the adapter is asked to', () => {
+    const payload = { tools: [{ type: 'function', name: 'read' }] };
+    expect(museCodeCompatAdapter.preDispatch(payload)).toBe(payload);
+    expect(museCodeCompatAdapter.preDispatch(payload, { inject_builtin_tool: false })).toBe(
+      payload
+    );
+    const injected = museCodeCompatAdapter.preDispatch(payload, { inject_builtin_tool: true });
+    expect(hasMuseBuiltinNamespace(injected.tools)).toBe(true);
+  });
+});
+
+describe('isMuseSubscriptionTarget', () => {
+  it('matches meta OAuth routes', () => {
+    expect(
+      isMuseSubscriptionTarget(
+        makeRoute({ api_base_url: 'oauth://plexus', oauth_provider: 'meta' })
+      )
+    ).toBe(true);
+  });
+
+  it('skips pay-as-you-go keys on the same host', () => {
+    expect(isMuseSubscriptionTarget(makeRoute({ api_base_url: 'https://api.meta.ai/v1' }))).toBe(
+      false
+    );
+  });
+
+  it('requests the declaration only for subscription routes', () => {
+    const subscription = resolveAdapters(
+      makeRoute({ api_base_url: 'oauth://plexus', oauth_provider: 'meta' })
+    );
+    expect(subscription[0]?.options).toEqual({ inject_builtin_tool: true });
+
+    const payg = resolveAdapters(makeRoute({ api_base_url: 'https://api.meta.ai/v1' }));
+    expect(payg[0]?.options).toEqual({});
   });
 });
 

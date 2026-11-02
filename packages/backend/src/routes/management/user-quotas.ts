@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { QuotaDefinition, QuotaDefinitionSchema } from '../../config';
 import { ConfigService } from '../../services/configuration/config-service';
 import { logger } from '../../utils/logger';
+import { mergePatch, wantsDeepMerge } from './patch-merge';
 
 /**
  * Register API endpoints for user quota management.
@@ -107,13 +108,14 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
   /**
    * PATCH /v0/management/user-quotas/:name
    * Partially update a quota definition — merges into existing then validates.
+   * `?merge=deep` merges nested objects instead of replacing them.
    */
   fastify.patch(
     '/v0/management/user-quotas/:name',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { name } = request.params as { name: string };
-        const updates = request.body as Partial<QuotaDefinition>;
+        const updates = request.body as Partial<QuotaDefinition> & Record<string, unknown>;
 
         const quotas = await configService.getRepository().getAllUserQuotas();
         const existing = quotas[name];
@@ -124,7 +126,9 @@ export async function registerUserQuotaRoutes(fastify: FastifyInstance) {
           });
         }
 
-        const merged = { ...existing, ...updates };
+        const merged = wantsDeepMerge(request.query)
+          ? mergePatch(existing as Record<string, unknown>, updates)
+          : ({ ...existing, ...updates } as Record<string, unknown>);
         const result = QuotaDefinitionSchema.safeParse(merged);
         if (!result.success) {
           return reply.code(400).send({

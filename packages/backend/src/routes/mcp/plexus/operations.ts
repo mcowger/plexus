@@ -1,4 +1,4 @@
-import { callManagementRoute, encodePathPreservingSlashes } from './management';
+import { callManagementRoute, encodePathPreservingSlashes, PATCH_MERGE_QUERY } from './management';
 import {
   asOptionalString,
   mapRecordResponse,
@@ -299,7 +299,8 @@ export async function handleMcpGatewayTool(
           shimContext,
           'PATCH',
           `/v0/management/mcp-servers/${encodeURIComponent(requireId(input, 'mcp_gateway'))}`,
-          input.body ?? {}
+          input.body ?? {},
+          PATCH_MERGE_QUERY
         )
       );
     case 'delete':

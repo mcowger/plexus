@@ -206,6 +206,42 @@ describe('openai-codex checker', () => {
     );
   });
 
+  it('builds a percentage spend meter for enterprise plans with null rate_limit', async () => {
+    const token = makeToken({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct_123' } });
+
+    setFetchMock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            plan_type: 'ent26',
+            rate_limit: null,
+            spend_control: {
+              individual_limit: {
+                unit: 'usd',
+                limit: '1500',
+                used: '300.0',
+                remaining: '1200.0',
+                used_percent: 20,
+                remaining_percent: 80,
+                reset_at: 1793491200,
+              },
+            },
+          }),
+          { status: 200 }
+        )
+    );
+
+    const meters = await checkerDef.check(makeCtx(token));
+
+    expect(meters).toHaveLength(1);
+    expect(meters[0]).toMatchObject({
+      key: 'spend',
+      unit: 'percentage',
+      used: 20,
+      remaining: 80,
+    });
+  });
+
   it('falls back to OAuthAuthManager when apiKey is not provided', async () => {
     const token = makeToken({
       'https://api.openai.com/auth': { chatgpt_account_id: 'acct_from_auth_manager' },

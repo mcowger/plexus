@@ -97,6 +97,35 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
     expect(JSON.stringify(body.result)).not.toContain('sk-valid-key');
   });
 
+  test('sends update PATCHes in merge mode so callers can send only the delta', async () => {
+    const response = await fixture.postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 1,
+        params: {
+          name: 'plexus_provider',
+          arguments: {
+            operation: 'update',
+            id: 'openrouter',
+            body: { models: { 'new-model': {} } },
+          },
+        },
+      },
+      fixture.adminHeaders()
+    );
+    expect(fixture.parseJsonRpcResponse(response).result.structuredContent.ok).toBe(true);
+
+    // `?merge=deep` keeps the stored models map intact instead of replacing it,
+    // so the caller never has to read and resend the existing models.
+    expect(fixture.fastify.inject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'PATCH',
+        url: '/v0/management/providers/openrouter?merge=deep',
+        payload: { models: { 'new-model': {} } },
+      })
+    );
+  });
+
   test('implements plexus_key update through the management shim', async () => {
     const updateResponse = await fixture.postPlexusMcp(
       {

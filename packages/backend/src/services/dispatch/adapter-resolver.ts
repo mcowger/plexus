@@ -1,6 +1,7 @@
 import { type AdapterEntry, isOAuthPlaceholderUrl } from '../../config';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
 import {
+  isMuseSubscriptionTarget,
   isMuseTarget,
   museCodeCompatAdapter,
 } from '../../transformers/adapters/muse-code-compat.adapter';
@@ -126,7 +127,14 @@ function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string):
     adapters.push({ name: stripUnsupportedToolSearchAdapter.name, options: {}, enabled: true });
   }
   if (isMuseTarget(route)) {
-    adapters.push({ name: museCodeCompatAdapter.name, options: {}, enabled: true });
+    adapters.push({
+      name: museCodeCompatAdapter.name,
+      // Subscription keys carry Meta's builtin-tool entitlement check; a
+      // pay-as-you-go key on the same host does not, so only OAuth routes
+      // get the declaration appended.
+      options: isMuseSubscriptionTarget(route) ? { inject_builtin_tool: true } : {},
+      enabled: true,
+    });
   }
   if (
     effectiveApiType &&
