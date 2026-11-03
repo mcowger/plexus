@@ -282,6 +282,7 @@ function projectOpenAiCompletionsAutoCompat(
       delete next.max_tokens;
       next.max_completion_tokens = options.maxTokens;
     } else {
+      delete next.max_completion_tokens;
       next.max_tokens = options.maxTokens;
     }
   }
