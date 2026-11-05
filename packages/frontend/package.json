@@ -9,7 +9,7 @@
     "dev": "bun run build.ts --watch"
   },
   "dependencies": {
-    "@assistant-ui/react": "0.15.31",
+    "@assistant-ui/react": "0.15.32",
     "@assistant-ui/react-markdown": "^0.14.24",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -21,10 +21,10 @@
     "clsx": "^2.1.1",
     "fuse.js": "^7.5.0",
     "human-format": "^1.4.0",
-    "lucide-react": "^1.61.0",
+    "lucide-react": "^1.66.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router-dom": "^7.18.4",
+    "react-router-dom": "^7.18.5",
     "recharts": "^3.10.1",
     "yaml": "^2.9.1"
   },
@@ -34,7 +34,7 @@
     "@types/bun": "latest",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "postcss": "^8.5.31",
+    "postcss": "^8.5.32",
     "tailwindcss": "^4.3.0"
   }
 }
