@@ -34,7 +34,7 @@
     "js-tiktoken": "^1.0.21",
     "parse-duration": "^2.1.11",
     "pkce-challenge": "^6.0.0",
-    "postgres": "^3.4.9",
+    "postgres": "^4.0.0",
     "vanilla-jsoneditor": "3.13.0",
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
