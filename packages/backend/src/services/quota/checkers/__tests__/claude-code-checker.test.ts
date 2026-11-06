@@ -78,6 +78,55 @@ describe('claude-code checker', () => {
     });
   });
 
+  it('reports monthly enterprise spend alongside consumer windows', async () => {
+    setFetchMock(
+      jsonResponse({
+        five_hour: { utilization: 15, resets_at: null },
+        extra_usage: {
+          is_enabled: true,
+          monthly_limit: 150000,
+          used_credits: 433,
+          currency: 'USD',
+          decimal_places: 2,
+        },
+        spend: { percent: 0 },
+      })
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'five_hour', used: 15 }),
+        expect.objectContaining({
+          key: 'spend',
+          unit: 'usd',
+          used: 4.33,
+          limit: 1500,
+          periodValue: 1,
+          periodUnit: 'month',
+          periodCycle: 'fixed',
+          utilizationPercent: (433 / 150000) * 100,
+        }),
+      ])
+    );
+  });
+
+  it('does not report disabled extra usage as a spend limit', async () => {
+    setFetchMock(
+      jsonResponse({
+        extra_usage: {
+          is_enabled: false,
+          monthly_limit: 150000,
+          used_credits: 433,
+          currency: 'USD',
+          decimal_places: 2,
+        },
+      })
+    );
+    expect(await checkerDef.check(makeCtx())).toEqual([]);
+  });
+
   it('renders a scoped weekly limit from limits[] as its own meter', async () => {
     setFetchMock(
       jsonResponse({

@@ -591,6 +591,8 @@ Quota checkers monitor upstream provider rate limits and prevent routing to exha
 | `novita`       | Novita balance            |
 | `minimax`      | Minimax balance           | Requires `groupid`, `hertzSession`    |
 
+The `claude-code` checker reports available rolling usage windows and enabled monthly USD extra-usage limits. Monthly spend is reported alongside rolling windows when both are present.
+
 **Settings:**
 
 - `enabled`: Enable/disable polling
