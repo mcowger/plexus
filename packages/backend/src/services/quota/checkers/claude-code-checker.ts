@@ -315,6 +315,8 @@ export default defineChecker({
           periodValue: 1,
           periodUnit: 'month',
           periodCycle: 'fixed',
+          // Extra usage is overflow billing when subscription windows exist.
+          exhaustionThreshold: meters.length > 0 ? 101 : undefined,
         })
       );
     }
