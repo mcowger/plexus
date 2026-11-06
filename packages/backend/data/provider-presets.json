@@ -850,6 +850,20 @@
       "notes": "Get a key at https://console.cheapaimodel.ai/keys and send it as a Bearer token. Model ids are bare names such as deepseek-v4-1-flash, glm-5.3, glm-5.3-flash, grok-4.7 or kimi-k3; the catalog is at https://cheapaimodel.ai/models. Fetch Models reads GET /v1/models on the same base and needs the key. A responses endpoint is not listed because the GLM models return 400 on /v1/responses. kimi-k3 only accepts temperature 1 or 0.6 and top_p 0.95; Plexus drops supplied temperature for this model under auto-compat. GLM-5.3 models cannot disable reasoning; requests asking for reasoning off are mapped to low effort."
     },
     {
+      "id": "atlascloud",
+      "name": "Atlas Cloud",
+      "description": "Atlas Cloud model gateway, OpenAI-compatible chat completions plus responses and messages endpoints on one base.",
+      "docsUrl": "https://www.atlascloud.ai/docs",
+      "suggestedProviderId": "atlascloud",
+      "suggestedName": "Atlas Cloud",
+      "apiBaseUrl": {
+        "chat": "https://api.atlascloud.ai/v1",
+        "responses": "https://api.atlascloud.ai/v1",
+        "messages": "https://api.atlascloud.ai/v1"
+      },
+      "notes": "Get a key at https://console.atlascloud.ai/api-keys and send it as a Bearer token. Model ids keep the vendor prefix, such as deepseek-ai/deepseek-v4-flash, moonshotai/kimi-k3 or zai-org/glm-5.2. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. The logprobs parameter is rejected with 400 even when false. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "meta",
       "name": "Meta",
       "description": "Meta Model API — chat, responses, and Anthropic-compatible messages.",
