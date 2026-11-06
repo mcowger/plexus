@@ -256,8 +256,10 @@ export class QuotaScheduler {
 
     for (const meter of result.meters) {
       const util = meter.utilizationPercent;
-      const utilExhausted = typeof util === 'number' && util >= exhaustionThreshold;
-      const statusExhausted = meter.status === 'exhausted';
+      const meterThreshold = meter.exhaustionThreshold ?? exhaustionThreshold;
+      const utilExhausted = typeof util === 'number' && util >= meterThreshold;
+      const statusExhausted =
+        meter.status === 'exhausted' && meter.exhaustionThreshold === undefined;
 
       if (utilExhausted || statusExhausted) {
         isExhausted = true;

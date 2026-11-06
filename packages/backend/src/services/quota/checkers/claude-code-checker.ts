@@ -21,12 +21,21 @@ const ClaudeLimitSchema = z.object({
   scope: z.object({ model: ClaudeScopeLabelSchema, surface: ClaudeScopeLabelSchema }).nullish(),
 });
 
+const ClaudeExtraUsageSchema = z.object({
+  is_enabled: z.literal(true),
+  monthly_limit: z.number().finite().positive(),
+  used_credits: z.number().finite().nonnegative(),
+  currency: z.literal('USD'),
+  decimal_places: z.number().int().min(0).max(10),
+});
+
 const ClaudeUsageResponseSchema = z.object({
   five_hour: ClaudeUsageWindowSchema.nullish(),
   seven_day: ClaudeUsageWindowSchema.nullish(),
   seven_day_opus: ClaudeUsageWindowSchema.nullish(),
   seven_day_omelette: ClaudeUsageWindowSchema.nullish(),
   limits: z.array(z.unknown()).nullish(),
+  extra_usage: z.unknown().optional(),
 });
 
 type ClaudeLimit = z.infer<typeof ClaudeLimitSchema>;
@@ -288,6 +297,26 @@ export default defineChecker({
           periodCycle: 'rolling',
           resetsAt: parseIsoDate(limit.resetsAt),
           scope: limit.dimension,
+        })
+      );
+    }
+
+    const extraUsage = ClaudeExtraUsageSchema.safeParse(usage.extra_usage);
+    if (extraUsage.success) {
+      const { monthly_limit, used_credits, decimal_places } = extraUsage.data;
+      const scale = 10 ** decimal_places;
+      meters.push(
+        ctx.allowance({
+          key: 'spend',
+          label: 'Spend limit',
+          unit: 'usd',
+          used: used_credits / scale,
+          limit: monthly_limit / scale,
+          periodValue: 1,
+          periodUnit: 'month',
+          periodCycle: 'fixed',
+          // Extra usage is overflow billing when subscription windows exist.
+          exhaustionThreshold: meters.length > 0 ? 101 : undefined,
         })
       );
     }

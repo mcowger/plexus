@@ -14,6 +14,7 @@ import {
 import { runMigrations } from '../../../db/migrate';
 import type { Meter, MeterCheckResult } from '../../../types/meter';
 import { CooldownManager } from '../../runtime/cooldown-manager';
+import { createMeterContext } from '../checker-registry';
 import claudeChecker from '../checkers/claude-code-checker';
 import { QuotaScheduler } from '../quota-scheduler';
 import '../checkers/opencode-go-checker';
@@ -440,6 +441,46 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
     await cooldownManager.markProviderSuccess(PROVIDER, '');
     await cooldownManager.markProviderSuccess(ROUTING_RUN_PROVIDER, '');
     await closeDatabase();
+  });
+
+  it('only blocks on exhausted Claude extra usage when no subscription window is present', async () => {
+    // The scheduler's cooldown application is private; exercise it through its runtime shape.
+    const scheduler = QuotaScheduler.getInstance() as unknown as {
+      configs: Map<string, QuotaConfig>;
+      applyCooldownsFromResult(result: MeterCheckResult, config: QuotaConfig): Promise<void>;
+    };
+    const config = makeConfig({ provider: PROVIDER });
+    scheduler.configs.set('threshold-checker', config);
+    const body = {
+      extra_usage: {
+        is_enabled: true,
+        monthly_limit: 10000,
+        used_credits: 10000,
+        currency: 'USD',
+        decimal_places: 2,
+      },
+    };
+    const fetchSpy = registerSpy(globalThis, 'fetch').mockImplementation(async () =>
+      Response.json({ ...body, five_hour: { utilization: 5, resets_at: null } })
+    );
+    const context = createMeterContext('threshold-checker', PROVIDER, { apiKey: 'test' });
+    const result = makeMeterResult(0, 'threshold-checker', PROVIDER);
+    result.meters = await claudeChecker.check(context);
+    await scheduler.applyCooldownsFromResult(result, config);
+    expect(await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '')).toBe(true);
+
+    fetchSpy.mockImplementation(async () =>
+      Response.json({ ...body, five_hour: { utilization: 100, resets_at: null } })
+    );
+    result.meters = await claudeChecker.check(context);
+    await scheduler.applyCooldownsFromResult(result, config);
+    expect(await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '')).toBe(false);
+
+    await CooldownManager.getInstance().markProviderSuccess(PROVIDER, '');
+    fetchSpy.mockImplementation(async () => Response.json(body));
+    result.meters = await claudeChecker.check(context);
+    await scheduler.applyCooldownsFromResult(result, config);
+    expect(await CooldownManager.getInstance().isProviderHealthy(PROVIDER, '')).toBe(false);
   });
 
   it('defaults to 99% threshold — stays healthy at 98%', async () => {
