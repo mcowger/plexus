@@ -66,32 +66,38 @@ export async function registerPlexusMcpRoutes(
       })().catch(done);
     });
 
-    // MCP clients commonly can only configure a bearer token, so let
-    // `Authorization: Bearer <ADMIN_KEY>` stand in for `x-admin-key`. The
-    // credential is still resolved as an admin key; `requireAdmin` below is what
-    // enforces that only the server's ADMIN_KEY may use this endpoint.
-    plexusMcp.addHook('preHandler', (request, _reply, done) => {
-      acceptBearerAdminKey(request);
-      done();
-    });
+    plexusMcp.get<{ Params: { id: string }; Querystring: { token?: unknown } }>(
+      '/mcp/plexus/results/:id',
+      (request, reply) => {
+        const token = request.query?.token;
+        const body =
+          typeof token === 'string' ? resultStore.get(request.params.id, token) : undefined;
+        reply.header('Cache-Control', 'no-store');
+        reply.header('Referrer-Policy', 'no-referrer');
+        if (body === undefined)
+          return reply.code(404).send({ error: 'Result not found or expired' });
+        return reply.type('application/json; charset=utf-8').send(body);
+      }
+    );
 
-    plexusMcp.addHook('preHandler', authenticate);
-    plexusMcp.addHook('preHandler', requireAdmin);
+    plexusMcp.register(async (management) => {
+      // MCP clients may use a bearer token in place of x-admin-key.
+      management.addHook('preHandler', (request, _reply, done) => {
+        acceptBearerAdminKey(request);
+        done();
+      });
+      management.addHook('preHandler', authenticate);
+      management.addHook('preHandler', requireAdmin);
 
-    plexusMcp.post('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
-    );
-    plexusMcp.get('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
-    );
-    plexusMcp.delete('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
-    );
-    plexusMcp.get<{ Params: { id: string } }>('/mcp/plexus/results/:id', (request, reply) => {
-      const body = resultStore.get(request.params.id);
-      reply.header('Cache-Control', 'no-store');
-      if (body === undefined) return reply.code(404).send({ error: 'Result not found or expired' });
-      return reply.type('application/json; charset=utf-8').send(body);
+      management.post('/mcp/plexus', (request, reply) =>
+        handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
+      );
+      management.get('/mcp/plexus', (request, reply) =>
+        handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
+      );
+      management.delete('/mcp/plexus', (request, reply) =>
+        handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
+      );
     });
   });
 }

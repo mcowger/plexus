@@ -19,9 +19,15 @@ describe('management MCP result storage', () => {
     const item = result.content[0];
     if (!item || item.type !== 'text') throw new Error('Expected text result');
     const metadata = JSON.parse(item.text);
-    const id = new URL(metadata.download.url).pathname.split('/').pop();
-    if (!id) throw new Error('Expected result ID');
-    expect(store.get(id)).toBe(JSON.stringify(response));
+    const url = new URL(metadata.download.url);
+    const id = url.pathname.split('/').pop();
+    const token = url.searchParams.get('token');
+    if (!id || !token) throw new Error('Expected result ID and token');
+    expect(store.get(id, token)).toBe(JSON.stringify(response));
+    expect(store.get(id, 'invalid')).toBeUndefined();
+    const other = store.put('other', 5);
+    if (!other) throw new Error('Expected another stored result');
+    expect(store.get(other.id, token)).toBeUndefined();
   });
 
   test('expires stored results at the stated time', () => {
@@ -30,7 +36,7 @@ describe('management MCP result storage', () => {
     if (!saved) throw new Error('Expected stored result');
     const clock = spyOn(Date, 'now').mockReturnValue(saved.expiresAt);
     try {
-      expect(store.get(saved.id)).toBeUndefined();
+      expect(store.get(saved.id, saved.token)).toBeUndefined();
     } finally {
       clock.mockRestore();
     }

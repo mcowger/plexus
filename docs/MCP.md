@@ -90,15 +90,17 @@ The management MCP server at `/mcp/plexus` provides domain-oriented tools for in
 
 ### Tool results and downloads
 
-Tool results contain one text item with compact JSON (`ok`, `operation`, and `data` or `error`); they do not include `structuredContent`. If the serialized MCP result exceeds 128 KiB, the text instead contains `download` with `url`, the original JSON size in `bytes`, `expiresAt`, and `contentType`. The original result's `isError` is preserved.
+Tool results contain one text item with compact JSON (`ok`, `operation`, and `data` or `error`); they do not include `structuredContent`. If the serialized MCP result exceeds 128 KiB, the text instead contains `reason`, `instructions`, and `download` with `url`, the original JSON size in `bytes`, `expiresAt`, and `contentType`. The original result's `isError` is preserved.
 
-Download the full JSON with the admin key, for example:
+The URL contains a credential for that result, so no admin key is needed to download it:
 
 ```sh
-curl -fsS -H "Authorization: Bearer $PLEXUS_ADMIN_KEY" "$DOWNLOAD_URL" -o result.json
+curl -fsS "$DOWNLOAD_URL" -o result.json
 ```
 
-Downloads expire after 15 minutes, are held in process memory, and are lost on restart. Storage is capped at 256 MiB; older results may be evicted sooner. A single result larger than 256 MiB returns a `result_too_large` error instead. Download URLs require admin authentication and return 404 after expiration or eviction. This limit applies only to the Plexus management MCP, not gateway servers.
+Downloads expire after 15 minutes, are held in process memory, and are lost on restart. Storage is capped at 256 MiB; older results may be evicted sooner. A single result larger than 256 MiB returns a `result_too_large` error instead. Anyone with the URL can download the result until it expires or is evicted, so treat the URL as a secret and avoid logging or sharing it. Downloads return 404 for missing, invalid, expired, or evicted credentials. This limit applies only to the Plexus management MCP, not gateway servers.
+
+Plexus omits query strings from its request log. Reverse proxies and other intermediaries may still log the full URL; configure them to suppress or redact query strings on `/mcp/plexus/results/`.
 
 The MCP resource `plexus://management/log-formats` documents debug traces and inference errors, including fields that contain nested JSON strings and sensitive content.
 
