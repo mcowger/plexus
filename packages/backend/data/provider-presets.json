@@ -850,6 +850,19 @@
       "notes": "Get a key at https://console.cheapaimodel.ai/keys and send it as a Bearer token. Model ids are bare names such as deepseek-v4-1-flash, glm-5.3, glm-5.3-flash, grok-4.7 or kimi-k3; the catalog is at https://cheapaimodel.ai/models. Fetch Models reads GET /v1/models on the same base and needs the key. A responses endpoint is not listed because the GLM models return 400 on /v1/responses. kimi-k3 only accepts temperature 1 or 0.6 and top_p 0.95; Plexus drops supplied temperature for this model under auto-compat. GLM-5.3 models cannot disable reasoning; requests asking for reasoning off are mapped to low effort."
     },
     {
+      "id": "standardcompute",
+      "name": "Standard Compute",
+      "description": "Standard Compute model gateway, OpenAI-compatible chat completions plus an Anthropic-compatible messages endpoint on one base.",
+      "docsUrl": "https://docs.standardcompute.com",
+      "suggestedProviderId": "standardcompute",
+      "suggestedName": "Standard Compute",
+      "apiBaseUrl": {
+        "chat": "https://api.stdcmpt.com/v1",
+        "messages": "https://api.stdcmpt.com/v1"
+      },
+      "notes": "Get a key at https://standardcompute.com (commonly stored as STANDARDCOMPUTE_API_KEY) and send it as a Bearer token. The model id StandardCompute is routed: each request goes to the cheapest enabled model that can handle it, with automatic fallback. Pinned ids keep the vendor prefix, such as deepseek/deepseek-v4-flash, z-ai/glm-5.3 or moonshotai/kimi-k3, with context windows up to about 1M tokens. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "atlascloud",
       "name": "Atlas Cloud",
       "description": "Atlas Cloud model gateway, OpenAI-compatible chat completions plus responses and messages endpoints on one base.",
