@@ -1,3 +1,5 @@
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+
 import type { ToolResponse } from './types';
 
 export const MCP_RESULT_LIMIT_BYTES = 128 * 1024;
@@ -5,7 +7,10 @@ const MAX_STORED_BYTES = 256 * 1024 * 1024;
 const RESULT_TTL_MS = 15 * 60 * 1000;
 
 export class McpResultStore {
-  private readonly results = new Map<string, { body: string; bytes: number; expiresAt: number }>();
+  private readonly results = new Map<
+    string,
+    { body: string; bytes: number; expiresAt: number; tokenHash: Buffer }
+  >();
   private storedBytes = 0;
 
   private remove(id: string) {
@@ -32,15 +37,20 @@ export class McpResultStore {
       this.remove(oldest);
     }
     const id = crypto.randomUUID();
+    const token = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(token).digest();
     const expiresAt = Date.now() + RESULT_TTL_MS;
-    this.results.set(id, { body, bytes, expiresAt });
+    this.results.set(id, { body, bytes, expiresAt, tokenHash });
     this.storedBytes += bytes;
-    return { id, expiresAt };
+    return { id, token, expiresAt };
   }
 
-  get(id: string) {
+  get(id: string, token: string) {
     this.expire();
-    return this.results.get(id)?.body;
+    const result = this.results.get(id);
+    if (!result) return undefined;
+    const tokenHash = createHash('sha256').update(token).digest();
+    return timingSafeEqual(result.tokenHash, tokenHash) ? result.body : undefined;
   }
 
   clear() {

@@ -194,15 +194,22 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
     const result = fixture.parseJsonRpcResponse(response).result;
     expect(result.structuredContent).toBeUndefined();
     expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(128 * 1024);
-    const { download } = JSON.parse(result.content[0].text);
+    const { download, reason, instructions } = JSON.parse(result.content[0].text);
+    expect(reason).toContain('128 KiB');
+    expect(instructions).toContain('curl');
+    expect(instructions).toContain('plexus://management/log-formats');
     expect(download.bytes).toBeGreaterThan(128 * 1024);
-    const path = new URL(download.url).pathname;
-    const unauthorized = await fixture.fastify.inject({ method: 'GET', url: path });
-    expect(unauthorized.statusCode).toBe(401);
+    const url = new URL(download.url);
+    const missing = await fixture.fastify.inject({ method: 'GET', url: url.pathname });
+    expect(missing.statusCode).toBe(404);
+    const invalid = await fixture.fastify.inject({
+      method: 'GET',
+      url: `${url.pathname}?token=invalid`,
+    });
+    expect(invalid.statusCode).toBe(404);
     const fetched = await fixture.fastify.inject({
       method: 'GET',
-      url: path,
-      headers: fixture.adminHeaders(),
+      url: `${url.pathname}${url.search}`,
     });
     expect(fetched.statusCode).toBe(200);
     expect(fetched.headers['cache-control']).toBe('no-store');

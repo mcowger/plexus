@@ -105,8 +105,11 @@ export function toToolResult(
         text: JSON.stringify({
           ok: response.ok,
           operation,
+          reason: 'The tool result exceeds the 128 KiB response limit.',
+          instructions:
+            'Make an HTTP GET request to download.url and save the JSON to a file, for example with curl or fetch. The URL grants access only to this result and expires after 15 minutes; no admin key is needed. For debug traces and inference errors, read the MCP resource plexus://management/log-formats.',
           download: {
-            url: `${baseUrl}/mcp/plexus/results/${stored.id}`,
+            url: `${baseUrl}/mcp/plexus/results/${stored.id}?token=${stored.token}`,
             bytes,
             expiresAt: new Date(stored.expiresAt).toISOString(),
             contentType: 'application/json',
