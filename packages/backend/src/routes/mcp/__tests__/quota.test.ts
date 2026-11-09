@@ -35,12 +35,12 @@ describe('Plexus management MCP routes - quota', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data.key).toBe('test-key');
-    expect(body.result.structuredContent.data.quotas).toEqual([
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.key).toBe('test-key');
+    expect(JSON.parse(body.result.content[0].text).data.quotas).toEqual([
       expect.objectContaining({ name: 'daily', source: 'assigned', shared: false }),
     ]);
-    expect(body.result.structuredContent.data.quota_name).toBe('daily');
+    expect(JSON.parse(body.result.content[0].text).data.quota_name).toBe('daily');
   });
 
   test('plexus_quota status surfaces 404 for an unknown key', async () => {
@@ -58,8 +58,8 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.code).toBe(404);
-    expect(body.result.structuredContent.error.type).toBe('not_found_error');
+    expect(JSON.parse(body.result.content[0].text).error.code).toBe(404);
+    expect(JSON.parse(body.result.content[0].text).error.type).toBe('not_found_error');
   });
 
   test('plexus_quota clear requires acknowledgement', async () => {
@@ -77,7 +77,7 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.type).toBe('confirmation_required');
+    expect(JSON.parse(body.result.content[0].text).error.type).toBe('confirmation_required');
   });
 
   test('implements plexus_quota clear for every quota attached to a key', async () => {
@@ -98,8 +98,8 @@ describe('Plexus management MCP routes - quota', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data).toEqual(
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data).toEqual(
       expect.objectContaining({ success: true, key: 'test-key', quota: null })
     );
   });
@@ -122,8 +122,8 @@ describe('Plexus management MCP routes - quota', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data).toEqual(
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data).toEqual(
       expect.objectContaining({ success: true, key: 'test-key', quota: 'daily' })
     );
   });
@@ -147,7 +147,7 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.code).toBe(400);
+    expect(JSON.parse(body.result.content[0].text).error.code).toBe(400);
   });
 
   test('plexus_quota clear surfaces 404 for an unknown key', async () => {
@@ -169,7 +169,7 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.code).toBe(404);
+    expect(JSON.parse(body.result.content[0].text).error.code).toBe(404);
   });
 
   test('implements plexus_quota recompute for a named quota', async () => {
@@ -186,11 +186,11 @@ describe('Plexus management MCP routes - quota', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data).toEqual(
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data).toEqual(
       expect.objectContaining({ success: true, key: 'test-key', quota: 'daily', usage: 42 })
     );
-    expect(body.result.structuredContent.data.windowStartMs).toBe(1700000000000);
+    expect(JSON.parse(body.result.content[0].text).data.windowStartMs).toBe(1700000000000);
   });
 
   test('plexus_quota recompute passes through the 400 reason for unsupported quota types', async () => {
@@ -208,8 +208,10 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.code).toBe(400);
-    expect(body.result.structuredContent.error.message).toContain('unsupported_quota_type');
+    expect(JSON.parse(body.result.content[0].text).error.code).toBe(400);
+    expect(JSON.parse(body.result.content[0].text).error.message).toContain(
+      'unsupported_quota_type'
+    );
   });
 
   test('plexus_quota recompute surfaces 404 for an unknown key', async () => {
@@ -227,7 +229,7 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.code).toBe(404);
+    expect(JSON.parse(body.result.content[0].text).error.code).toBe(404);
   });
 
   test('plexus_quota recompute surfaces 400 for a quota not attached to the key', async () => {
@@ -245,6 +247,6 @@ describe('Plexus management MCP routes - quota', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.code).toBe(400);
+    expect(JSON.parse(body.result.content[0].text).error.code).toBe(400);
   });
 });

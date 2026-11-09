@@ -84,7 +84,7 @@ describe('Plexus management MCP routes - authentication', () => {
     );
 
     const body = fixture.parseJsonRpcResponse(response);
-    expect(body.result.structuredContent.ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
   });
 
   test('rejects limited key sent as x-admin-key', async () => {

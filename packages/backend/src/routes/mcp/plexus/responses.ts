@@ -1,5 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+import { MCP_RESULT_LIMIT_BYTES, McpResultStore, serializeToolResponse } from './result-store';
 import { McpToolError, type ToolInput, type ToolResponse } from './types';
 
 export function requireId(input: ToolInput, resourceType: string): string {
@@ -56,13 +57,61 @@ export function toMcpToolError(response: { statusCode: number; body: string }): 
   return new McpToolError(message, type, code);
 }
 
-export function toToolResult(response: ToolResponse): CallToolResult {
+export function toToolResult(
+  response: ToolResponse,
+  store: McpResultStore,
+  baseUrl: string
+): CallToolResult {
+  const body = serializeToolResponse(response);
+  const result: CallToolResult = {
+    content: [{ type: 'text', text: body }],
+    isError: !response.ok,
+  };
+  const bytes = Buffer.byteLength(body, 'utf8');
+  if (
+    bytes <= MCP_RESULT_LIMIT_BYTES &&
+    Buffer.byteLength(JSON.stringify(result), 'utf8') <= MCP_RESULT_LIMIT_BYTES
+  )
+    return result;
+  // The operation is caller-controlled and may itself be too large for the cap.
+  const operation =
+    Buffer.byteLength(response.operation, 'utf8') <= 256 ? response.operation : '[omitted]';
+
+  const stored = store.put(body, bytes);
+  if (!stored) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            operation,
+            error: {
+              message: 'Result exceeds the temporary download storage limit.',
+              type: 'result_too_large',
+              code: 413,
+            },
+            bytes,
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
   return {
-    structuredContent: response,
     content: [
       {
         type: 'text',
-        text: JSON.stringify(response, null, 2),
+        text: JSON.stringify({
+          ok: response.ok,
+          operation,
+          download: {
+            url: `${baseUrl}/mcp/plexus/results/${stored.id}`,
+            bytes,
+            expiresAt: new Date(stored.expiresAt).toISOString(),
+            contentType: 'application/json',
+          },
+        }),
       },
     ],
     isError: !response.ok,

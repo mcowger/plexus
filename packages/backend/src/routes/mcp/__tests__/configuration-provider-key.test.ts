@@ -40,15 +40,15 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
     );
 
     expect(
-      fixture.parseJsonRpcResponse(configResponse).result.structuredContent.data
+      JSON.parse(fixture.parseJsonRpcResponse(configResponse).result.content[0].text).data
     ).toMatchObject({
       providerCount: 1,
     });
-    expect(fixture.parseJsonRpcResponse(quotaResponse).result.structuredContent.data).toMatchObject(
-      {
-        checkerId: 'checker',
-      }
-    );
+    expect(
+      JSON.parse(fixture.parseJsonRpcResponse(quotaResponse).result.content[0].text).data
+    ).toMatchObject({
+      checkerId: 'checker',
+    });
     expect(fixture.fastify.inject).toHaveBeenCalledWith(
       expect.objectContaining({ url: '/v0/management/config/status' })
     );
@@ -71,9 +71,9 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data.api_key).toBe('[REDACTED]');
-    expect(body.result.structuredContent.data.headers.Authorization).toBe('[REDACTED]');
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.api_key).toBe('[REDACTED]');
+    expect(JSON.parse(body.result.content[0].text).data.headers.Authorization).toBe('[REDACTED]');
     expect(JSON.stringify(body.result)).not.toContain('provider-secret');
     expect(JSON.stringify(body.result)).not.toContain('upstream-secret');
   });
@@ -92,8 +92,8 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data.secret).toBe('[REDACTED]');
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.secret).toBe('[REDACTED]');
     expect(JSON.stringify(body.result)).not.toContain('sk-valid-key');
   });
 
@@ -113,7 +113,7 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
       },
       fixture.adminHeaders()
     );
-    expect(fixture.parseJsonRpcResponse(response).result.structuredContent.ok).toBe(true);
+    expect(JSON.parse(fixture.parseJsonRpcResponse(response).result.content[0].text).ok).toBe(true);
 
     // `?merge=deep` keeps the stored models map intact instead of replacing it,
     // so the caller never has to read and resend the existing models.
@@ -143,7 +143,7 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
       fixture.adminHeaders()
     );
     const updateBody = fixture.parseJsonRpcResponse(updateResponse);
-    expect(updateBody.result.structuredContent.ok).toBe(true);
+    expect(JSON.parse(updateBody.result.content[0].text).ok).toBe(true);
 
     const getResponse = await fixture.postPlexusMcp(
       {
@@ -157,6 +157,6 @@ describe('Plexus management MCP routes - configuration, provider, and key', () =
       fixture.adminHeaders()
     );
     const getBody = fixture.parseJsonRpcResponse(getResponse);
-    expect(getBody.result.structuredContent.data.beta).toBe(true);
+    expect(JSON.parse(getBody.result.content[0].text).data.beta).toBe(true);
   });
 });
