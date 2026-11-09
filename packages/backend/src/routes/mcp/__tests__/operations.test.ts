@@ -37,7 +37,7 @@ describe('Plexus management MCP routes - operations', () => {
       fixture.adminHeaders()
     );
     const listBody = fixture.parseJsonRpcResponse(listResponse);
-    expect(listBody.result.structuredContent.ok).toBe(true);
+    expect(JSON.parse(listBody.result.content[0].text).ok).toBe(true);
 
     const clearResponse = await fixture.postPlexusMcp(
       {
@@ -55,7 +55,7 @@ describe('Plexus management MCP routes - operations', () => {
       fixture.adminHeaders()
     );
     const clearBody = fixture.parseJsonRpcResponse(clearResponse);
-    expect(clearBody.result.structuredContent.data.success).toBe(true);
+    expect(JSON.parse(clearBody.result.content[0].text).data.success).toBe(true);
   });
 
   test('implements plexus_operations backup and restart response', async () => {
@@ -87,8 +87,8 @@ describe('Plexus management MCP routes - operations', () => {
       fixture.adminHeaders()
     );
     const backupBody = fixture.parseJsonRpcResponse(backupResponse);
-    expect(backupBody.result.structuredContent.ok).toBe(true);
-    expect(backupBody.result.structuredContent.data.full).toBe(false);
+    expect(JSON.parse(backupBody.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(backupBody.result.content[0].text).data.full).toBe(false);
 
     const restartResponse = await fixture.postPlexusMcp(
       {
@@ -102,9 +102,9 @@ describe('Plexus management MCP routes - operations', () => {
       fixture.adminHeaders()
     );
     const restartBody = fixture.parseJsonRpcResponse(restartResponse);
-    expect(restartBody.result.structuredContent.ok).toBe(true);
-    expect(restartBody.result.structuredContent.data.success).toBe(true);
-    expect(restartBody.result.structuredContent.data.message).toContain('restarting');
+    expect(JSON.parse(restartBody.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(restartBody.result.content[0].text).data.success).toBe(true);
+    expect(JSON.parse(restartBody.result.content[0].text).data.message).toContain('restarting');
   });
 
   test('implements plexus_operations refresh_metadata response', async () => {
@@ -136,8 +136,8 @@ describe('Plexus management MCP routes - operations', () => {
     );
 
     const body = fixture.parseJsonRpcResponse(response);
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data.message).toContain('refresh completed');
-    expect(body.result.structuredContent.data.sources.modelsDev.count).toBe(20);
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.message).toContain('refresh completed');
+    expect(JSON.parse(body.result.content[0].text).data.sources.modelsDev.count).toBe(20);
   });
 });

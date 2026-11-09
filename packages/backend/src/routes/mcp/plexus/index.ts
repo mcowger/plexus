@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { ConfigService } from '../../../services/configuration/config-service';
+import { getRequestBaseUrl } from '../../../services/mcp-oauth/url';
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
 import {
   acceptBearerAdminKey,
@@ -13,8 +14,14 @@ import {
 import { handleToolCall } from './dispatch';
 import { createPlexusMcpRequestContext, handlePlexusMcpHttpRequest } from './http';
 import { buildShimHeaders } from './management';
-import { getToolDescription, PLEXUS_MANAGEMENT_PROMPT, TOOL_NAMES } from './metadata';
+import {
+  getToolDescription,
+  PLEXUS_LOG_FORMATS,
+  PLEXUS_MANAGEMENT_PROMPT,
+  TOOL_NAMES,
+} from './metadata';
 import { toToolResult } from './responses';
+import { McpResultStore } from './result-store';
 import { type ManagementShimContext, type ToolInput, ToolInputSchema } from './types';
 
 export async function registerPlexusMcpRoutes(
@@ -22,6 +29,14 @@ export async function registerPlexusMcpRoutes(
   mcpUsageStorage: McpUsageStorageService
 ) {
   fastify.register(async (plexusMcp) => {
+    const resultStore = new McpResultStore();
+    const expiryTimer = setInterval(() => resultStore.expire(), 60_000);
+    expiryTimer.unref();
+    plexusMcp.addHook('onClose', async () => {
+      clearInterval(expiryTimer);
+      resultStore.clear();
+    });
+
     plexusMcp.setErrorHandler(async (error, _request, reply) => {
       if (error instanceof ManagementAuthError) {
         return reply.code(error.statusCode).send(error.authBody);
@@ -64,21 +79,28 @@ export async function registerPlexusMcpRoutes(
     plexusMcp.addHook('preHandler', requireAdmin);
 
     plexusMcp.post('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage)
+      handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
     );
     plexusMcp.get('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage)
+      handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
     );
     plexusMcp.delete('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage)
+      handlePlexusMcpRequest(request, reply, mcpUsageStorage, resultStore)
     );
+    plexusMcp.get<{ Params: { id: string } }>('/mcp/plexus/results/:id', (request, reply) => {
+      const body = resultStore.get(request.params.id);
+      reply.header('Cache-Control', 'no-store');
+      if (body === undefined) return reply.code(404).send({ error: 'Result not found or expired' });
+      return reply.type('application/json; charset=utf-8').send(body);
+    });
   });
 }
 
 async function handlePlexusMcpRequest(
   request: FastifyRequest,
   reply: FastifyReply,
-  mcpUsageStorage: McpUsageStorageService
+  mcpUsageStorage: McpUsageStorageService,
+  resultStore: McpResultStore
 ) {
   const requestContext = createPlexusMcpRequestContext(request);
   const shimContext: ManagementShimContext = {
@@ -88,7 +110,7 @@ async function handlePlexusMcpRequest(
 
   // The SDK server owns one active transport at a time. A singleton would need
   // close/reconnect queueing, so stateless per-request servers are simpler and safer.
-  const server = createPlexusMcpServer(shimContext);
+  const server = createPlexusMcpServer(shimContext, resultStore, getRequestBaseUrl(request));
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
     sessionIdGenerator: undefined,
@@ -109,7 +131,11 @@ async function handlePlexusMcpRequest(
   }
 }
 
-function createPlexusMcpServer(shimContext: ManagementShimContext) {
+function createPlexusMcpServer(
+  shimContext: ManagementShimContext,
+  resultStore: McpResultStore,
+  baseUrl: string
+) {
   const server = new McpServer(
     {
       name: 'plexus-management',
@@ -137,6 +163,19 @@ function createPlexusMcpServer(shimContext: ManagementShimContext) {
           text: PLEXUS_MANAGEMENT_PROMPT,
         },
       ],
+    })
+  );
+
+  server.registerResource(
+    'plexus_log_formats',
+    'plexus://management/log-formats',
+    {
+      title: 'Plexus Log Formats',
+      description: 'Fields and interpretation of debug traces and inference error logs.',
+      mimeType: 'text/markdown',
+    },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: 'text/markdown', text: PLEXUS_LOG_FORMATS }],
     })
   );
 
@@ -169,7 +208,12 @@ function createPlexusMcpServer(shimContext: ManagementShimContext) {
         description: getToolDescription(toolName),
         inputSchema: ToolInputSchema,
       },
-      async (input) => toToolResult(await handleToolCall(toolName, input as ToolInput, shimContext))
+      async (input) =>
+        toToolResult(
+          await handleToolCall(toolName, input as ToolInput, shimContext),
+          resultStore,
+          baseUrl
+        )
     );
   }
 

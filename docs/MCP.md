@@ -88,6 +88,20 @@ The management MCP server at `/mcp/plexus` provides domain-oriented tools for in
 }
 ```
 
+### Tool results and downloads
+
+Tool results contain one text item with compact JSON (`ok`, `operation`, and `data` or `error`); they do not include `structuredContent`. If the serialized MCP result exceeds 128 KiB, the text instead contains `download` with `url`, the original JSON size in `bytes`, `expiresAt`, and `contentType`. The original result's `isError` is preserved.
+
+Download the full JSON with the admin key, for example:
+
+```sh
+curl -fsS -H "Authorization: Bearer $PLEXUS_ADMIN_KEY" "$DOWNLOAD_URL" -o result.json
+```
+
+Downloads expire after 15 minutes, are held in process memory, and are lost on restart. Storage is capped at 256 MiB; older results may be evicted sooner. A single result larger than 256 MiB returns a `result_too_large` error instead. Download URLs require admin authentication and return 404 after expiration or eviction. This limit applies only to the Plexus management MCP, not gateway servers.
+
+The MCP resource `plexus://management/log-formats` documents debug traces and inference errors, including fields that contain nested JSON strings and sensitive content.
+
 ### Destructive Operations
 
 Destructive or high-impact operations (delete, restore, restart, rotate, etc.) require `"destructive": "acknowledged"`. If omitted, the tool call is rejected with a `confirmation_required` error.

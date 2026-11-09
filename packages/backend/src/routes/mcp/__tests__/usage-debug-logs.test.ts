@@ -1,4 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, jest, test } from 'bun:test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  jest,
+  spyOn,
+  test,
+} from 'bun:test';
 
 import { createPlexusMcpTestFixture } from './plexus-mcp-test-fixtures';
 
@@ -61,7 +71,7 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(true);
-    expect(body.result.structuredContent.error.type).toBe('confirmation_required');
+    expect(JSON.parse(body.result.content[0].text).error.type).toBe('confirmation_required');
   });
 
   test('allows acknowledged destructive operations to reach handler', async () => {
@@ -79,7 +89,7 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
     const body = fixture.parseJsonRpcResponse(response);
 
     expect(body.result.isError).toBe(false);
-    expect(body.result.structuredContent.data.success).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.success).toBe(true);
   });
 
   test('implements plexus_usage list', async () => {
@@ -96,8 +106,8 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data.total).toBe(1);
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.total).toBe(1);
     expect(fixture.mockUsageStorage.getUsage).toHaveBeenCalled();
   });
 
@@ -117,9 +127,9 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const updateBody = fixture.parseJsonRpcResponse(updateResponse);
-    expect(updateBody.result.structuredContent.ok).toBe(true);
-    expect(updateBody.result.structuredContent.data.enabledGlobal).toBe(true);
-    expect(updateBody.result.structuredContent.data.providers).toEqual(['openrouter']);
+    expect(JSON.parse(updateBody.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(updateBody.result.content[0].text).data.enabledGlobal).toBe(true);
+    expect(JSON.parse(updateBody.result.content[0].text).data.providers).toEqual(['openrouter']);
 
     const stateResponse = await fixture.postPlexusMcp(
       {
@@ -133,8 +143,8 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const stateBody = fixture.parseJsonRpcResponse(stateResponse);
-    expect(stateBody.result.structuredContent.ok).toBe(true);
-    expect(stateBody.result.structuredContent.data.enabledGlobal).toBe(true);
+    expect(JSON.parse(stateBody.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(stateBody.result.content[0].text).data.enabledGlobal).toBe(true);
   });
 
   test('implements plexus_debug log operations', async () => {
@@ -150,7 +160,7 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const logsBody = fixture.parseJsonRpcResponse(logsResponse);
-    expect(logsBody.result.structuredContent.data[0].requestId).toBe('req-debug');
+    expect(JSON.parse(logsBody.result.content[0].text).data[0].requestId).toBe('req-debug');
 
     const getResponse = await fixture.postPlexusMcp(
       {
@@ -164,7 +174,55 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const getBody = fixture.parseJsonRpcResponse(getResponse);
-    expect(getBody.result.structuredContent.data.requestId).toBe('req-debug');
+    expect(JSON.parse(getBody.result.content[0].text).data.requestId).toBe('req-debug');
+  });
+
+  test('returns a bounded download reference for a large debug trace', async () => {
+    const payload = '日志'.repeat(40_000);
+    spyOn(fixture.mockUsageStorage, 'getDebugLog').mockResolvedValueOnce({
+      requestId: 'large',
+      rawResponse: payload,
+    });
+    const response = await fixture.postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 8,
+        params: { name: 'plexus_debug', arguments: { operation: 'get_log', id: 'large' } },
+      },
+      fixture.adminHeaders()
+    );
+    const result = fixture.parseJsonRpcResponse(response).result;
+    expect(result.structuredContent).toBeUndefined();
+    expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(128 * 1024);
+    const { download } = JSON.parse(result.content[0].text);
+    expect(download.bytes).toBeGreaterThan(128 * 1024);
+    const path = new URL(download.url).pathname;
+    const unauthorized = await fixture.fastify.inject({ method: 'GET', url: path });
+    expect(unauthorized.statusCode).toBe(401);
+    const fetched = await fixture.fastify.inject({
+      method: 'GET',
+      url: path,
+      headers: fixture.adminHeaders(),
+    });
+    expect(fetched.statusCode).toBe(200);
+    expect(fetched.headers['cache-control']).toBe('no-store');
+    expect(Buffer.byteLength(fetched.body)).toBe(download.bytes);
+    expect(JSON.parse(fetched.body).data.rawResponse).toBe(payload);
+  });
+
+  test('exposes debug and error log format resource', async () => {
+    const response = await fixture.postPlexusMcp(
+      {
+        method: 'resources/read',
+        id: 9,
+        params: { uri: 'plexus://management/log-formats' },
+      },
+      fixture.adminHeaders()
+    );
+    const resource = fixture.parseJsonRpcResponse(response).result.contents[0];
+    expect(resource.text).toContain('rawResponseSnapshot');
+    expect(resource.text).toContain('errorMessage');
+    expect(resource.text).toContain('requestId');
   });
 
   test('implements plexus_system_logs recent', async () => {
@@ -180,9 +238,9 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const body = fixture.parseJsonRpcResponse(response);
-    expect(body.result.structuredContent.ok).toBe(true);
-    expect(body.result.structuredContent.data.total).toBe(1);
-    expect(body.result.structuredContent.data.data[0].message).toBe('system-log');
+    expect(JSON.parse(body.result.content[0].text).ok).toBe(true);
+    expect(JSON.parse(body.result.content[0].text).data.total).toBe(1);
+    expect(JSON.parse(body.result.content[0].text).data.data[0].message).toBe('system-log');
   });
 
   test('implements plexus_system_logs level operations', async () => {
@@ -198,7 +256,7 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const levelBody = fixture.parseJsonRpcResponse(levelResponse);
-    expect(levelBody.result.structuredContent.data.level).toBe('info');
+    expect(JSON.parse(levelBody.result.content[0].text).data.level).toBe('info');
 
     const setLevelResponse = await fixture.postPlexusMcp(
       {
@@ -212,7 +270,7 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const setLevelBody = fixture.parseJsonRpcResponse(setLevelResponse);
-    expect(setLevelBody.result.structuredContent.data.level).toBe('debug');
+    expect(JSON.parse(setLevelBody.result.content[0].text).data.level).toBe('debug');
 
     const resetLevelResponse = await fixture.postPlexusMcp(
       {
@@ -226,6 +284,6 @@ describe('Plexus management MCP routes - usage, debug, and logs', () => {
       fixture.adminHeaders()
     );
     const resetLevelBody = fixture.parseJsonRpcResponse(resetLevelResponse);
-    expect(resetLevelBody.result.structuredContent.data.level).toBe('info');
+    expect(JSON.parse(resetLevelBody.result.content[0].text).data.level).toBe('info');
   });
 });

@@ -35,7 +35,7 @@ describe('Plexus management MCP routes - pi-ai catalog', () => {
       fixture.adminHeaders()
     );
     const providers = fixture.parseJsonRpcResponse(providersResponse);
-    expect(providers.result.structuredContent.data.data).toEqual(['anthropic', 'openai']);
+    expect(JSON.parse(providers.result.content[0].text).data.data).toEqual(['anthropic', 'openai']);
 
     const modelsResponse = await fixture.postPlexusMcp(
       {
@@ -49,7 +49,7 @@ describe('Plexus management MCP routes - pi-ai catalog', () => {
       fixture.adminHeaders()
     );
     const models = fixture.parseJsonRpcResponse(modelsResponse);
-    expect(models.result.structuredContent.data.data).toEqual([
+    expect(JSON.parse(models.result.content[0].text).data.data).toEqual([
       { id: 'gpt-4.1', name: 'GPT-4.1', api: 'openai-responses', custom: false },
     ]);
     expect(fixture.fastify.inject).toHaveBeenCalledWith(
@@ -73,7 +73,7 @@ describe('Plexus management MCP routes - pi-ai catalog', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent).toMatchObject({
+    expect(JSON.parse(body.result.content[0].text)).toMatchObject({
       ok: false,
       error: {
         message: 'Missing id for pi-ai provider operation.',
@@ -122,7 +122,7 @@ describe('Plexus management MCP routes - pi-ai catalog', () => {
     );
     const body = fixture.parseJsonRpcResponse(response);
 
-    expect(body.result.structuredContent.data).toMatchObject({
+    expect(JSON.parse(body.result.content[0].text).data).toMatchObject({
       valid: false,
       checkedProviders: 3,
       checkedModels: 4,
