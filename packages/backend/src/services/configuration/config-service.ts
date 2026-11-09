@@ -20,6 +20,7 @@ import { ConfigRepository, OAuthCredentialsData } from '../../db/config-reposito
 import { logger } from '../../utils/logger';
 import { ModelAutosyncScheduler } from '../models/model-autosync-scheduler';
 import { QuotaScheduler } from '../quota/quota-scheduler';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 /**
  * OAuth provider ids that were removed from Plexus (Gemini CLI / Antigravity).
@@ -566,6 +567,8 @@ export class ConfigService {
       mcp_servers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       user_quotas: Object.keys(userQuotas).length > 0 ? userQuotas : undefined,
     };
+
+    await CooldownManager.getInstance().pruneDisabledProviders();
 
     // Reload the quota scheduler with the updated quota configs so that
     // changes saved via the UI take effect without a restart.

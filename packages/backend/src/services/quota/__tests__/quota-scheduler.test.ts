@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 
 import { advanceTimersByTimeAsync, registerSpy } from '../../../../test/test-utils';
 import type { QuotaConfig } from '../../../config';
+import { getConfig, setConfigForTesting } from '../../../config';
 import {
   closeDatabase,
   getCurrentDialect,
@@ -13,6 +14,8 @@ import {
 } from '../../../db/client';
 import { runMigrations } from '../../../db/migrate';
 import type { Meter, MeterCheckResult } from '../../../types/meter';
+import { logger } from '../../../utils/logger';
+import { Router } from '../../routing/router';
 import { CooldownManager } from '../../runtime/cooldown-manager';
 import { createMeterContext } from '../checker-registry';
 import claudeChecker from '../checkers/claude-code-checker';
@@ -441,6 +444,72 @@ describe('QuotaScheduler maxUtilizationPercent', () => {
     await cooldownManager.markProviderSuccess(PROVIDER, '');
     await cooldownManager.markProviderSuccess(ROUTING_RUN_PROVIDER, '');
     await closeDatabase();
+  });
+  it('does not rearm disabled cooldowns and clears existing rows on configuration change', async () => {
+    const originalConfig = getConfig();
+    // The routing fixture only needs these provider and alias fields.
+    const configure = (disabled: boolean) =>
+      setConfigForTesting({
+        ...originalConfig,
+        providers: {
+          [PROVIDER]: {
+            api_base_url: 'https://example.com/v1',
+            api_key: 'test',
+            disable_cooldown: disabled,
+          },
+        },
+        models: {
+          alias: { selector: 'random', targets: [{ provider: PROVIDER, model: 'model' }] },
+        },
+      } as unknown as typeof originalConfig);
+    // The scheduler applies results internally after collecting them.
+    const scheduler = QuotaScheduler.getInstance() as unknown as {
+      applyCooldownsFromResult(result: MeterCheckResult, config: QuotaConfig): Promise<void>;
+    };
+    const config = makeConfig({ provider: PROVIDER });
+    const result = makeMeterResult(100, 'threshold-checker', PROVIDER);
+    const manager = CooldownManager.getInstance();
+    const info = registerSpy(logger, 'info');
+    const db = getDatabase();
+    const schema = getSchema();
+    const rows = () =>
+      db
+        .select()
+        .from(schema.providerCooldowns)
+        .where(eq(schema.providerCooldowns.provider, PROVIDER));
+    try {
+      configure(false);
+      await scheduler.applyCooldownsFromResult(result, config);
+      expect((await rows())[0]?.consecutiveFailures).toBe(1);
+      expect(await Router.resolveCandidates('alias')).toHaveLength(0);
+      expect(
+        info.mock.calls.some((args: unknown[]) =>
+          String(args[0]).includes('Injecting provider-wide')
+        )
+      ).toBe(true);
+
+      configure(true);
+      expect(await Router.resolveCandidates('alias')).toHaveLength(1);
+      await manager.pruneDisabledProviders();
+      info.mockClear();
+      await scheduler.applyCooldownsFromResult(result, config);
+      await scheduler.applyCooldownsFromResult(result, config);
+      expect(await rows()).toHaveLength(0);
+      expect(
+        info.mock.calls.some((args: unknown[]) =>
+          String(args[0]).includes('Injecting provider-wide')
+        )
+      ).toBe(false);
+
+      configure(false);
+      expect(await Router.resolveCandidates('alias')).toHaveLength(1);
+      await scheduler.applyCooldownsFromResult(result, config);
+      expect((await rows())[0]?.consecutiveFailures).toBe(1);
+      expect(await Router.resolveCandidates('alias')).toHaveLength(0);
+    } finally {
+      await manager.clearCooldown(PROVIDER);
+      setConfigForTesting(originalConfig);
+    }
   });
 
   it('only blocks on exhausted Claude extra usage when no subscription window is present', async () => {
