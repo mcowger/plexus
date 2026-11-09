@@ -13,6 +13,10 @@ describe('request logging', () => {
     try {
       await app.inject({ method: 'GET', url: '/mcp/plexus/results/id?token=secret' });
       expect(mockLogger.debug).toHaveBeenCalledWith('GET /mcp/plexus/results/id');
+      await app.inject({ method: 'GET', url: '/mcp/plexus/r%65sults/id?token=encoded-secret' });
+      expect(mockLogger.debug).toHaveBeenCalledWith('GET /mcp/plexus/r%65sults/id');
+      await app.inject({ method: 'GET', url: '/other?token=other-secret' });
+      expect(mockLogger.debug).toHaveBeenCalledWith('GET /other');
       expect(
         mockLogger.debug.mock.calls.some((args) => JSON.stringify(args).includes('secret'))
       ).toBe(false);

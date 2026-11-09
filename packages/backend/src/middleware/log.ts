@@ -4,8 +4,8 @@ import { logger } from '../utils/logger';
 
 export const requestLogger = async (request: FastifyRequest, reply: FastifyReply) => {
   const { method, url } = request;
-  // Download URLs carry bearer credentials; never write their query strings to logs.
-  const path = url.startsWith('/mcp/plexus/results/') ? url.split('?')[0] : url;
+  // Query strings can contain bearer credentials, regardless of route or encoding.
+  const path = url.split('?')[0];
 
   if (method === 'GET' || method === 'POST') {
     logger.debug(`${method} ${path}`);

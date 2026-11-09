@@ -100,7 +100,7 @@ curl -fsS "$DOWNLOAD_URL" -o result.json
 
 Downloads expire after 15 minutes, are held in process memory, and are lost on restart. Storage is capped at 256 MiB; older results may be evicted sooner. A single result larger than 256 MiB returns a `result_too_large` error instead. Anyone with the URL can download the result until it expires or is evicted, so treat the URL as a secret and avoid logging or sharing it. Downloads return 404 for missing, invalid, expired, or evicted credentials. This limit applies only to the Plexus management MCP, not gateway servers.
 
-Plexus omits the query string from its request log for these downloads. Reverse proxies and other intermediaries may still log the full URL; configure them to suppress or redact query strings on `/mcp/plexus/results/`.
+Plexus omits query strings from its request log. Reverse proxies and other intermediaries may still log the full URL; configure them to suppress or redact query strings on `/mcp/plexus/results/`.
 
 The MCP resource `plexus://management/log-formats` documents debug traces and inference errors, including fields that contain nested JSON strings and sensitive content.
 
