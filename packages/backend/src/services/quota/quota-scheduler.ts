@@ -280,19 +280,21 @@ export class QuotaScheduler {
       const durationMs =
         latestResetMs !== null ? Math.max(0, latestResetMs - Date.now()) : INDEFINITE_COOLDOWN_MS;
 
-      logger.info(
-        `Provider '${provider}' quota exhausted` +
-          ` (meter: ${exhaustedMeterLabel}, threshold: ${exhaustionThreshold}%, checker: ${result.checkerId}).` +
-          (latestResetMs !== null
-            ? ` Injecting provider-wide cooldown for ${Math.round(durationMs / 1000)}s.`
-            : ` Injecting provider-wide indefinite cooldown until reset/balance recovery.`)
-      );
-      await cooldownManager.markProviderFailure(
+      const applied = await cooldownManager.markProviderFailure(
         provider,
         '',
         durationMs,
         `quota exhausted (threshold: ${exhaustionThreshold}%) — ${exhaustedMeterLabel}`
       );
+      if (applied) {
+        logger.info(
+          `Provider '${provider}' quota exhausted` +
+            ` (meter: ${exhaustedMeterLabel}, threshold: ${exhaustionThreshold}%, checker: ${result.checkerId}).` +
+            (latestResetMs !== null
+              ? ` Injecting provider-wide cooldown for ${Math.round(durationMs / 1000)}s.`
+              : ` Injecting provider-wide indefinite cooldown until reset/balance recovery.`)
+        );
+      }
     } else {
       const strictestThreshold = this.getStrictestThresholdForProvider(provider);
       if (exhaustionThreshold <= strictestThreshold) {

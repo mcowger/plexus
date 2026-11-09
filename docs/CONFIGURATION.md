@@ -1002,6 +1002,8 @@ Set `disable_cooldown: true` on a provider to exclude it from the cooldown syste
 
 **Do not** disable for cloud providers with unreliable endpoints.
 
+Disabling cooldowns removes the provider's existing cooldowns. Quota checks continue to report usage but do not create cooldowns until cooldowns are enabled again.
+
 ### Management API
 
 - `GET /v0/management/cooldowns` — list active cooldowns

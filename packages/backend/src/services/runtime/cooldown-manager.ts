@@ -113,33 +113,29 @@ export class CooldownManager {
     await this.markProviderFailure(provider, model, undefined, lastError);
   }
 
-  private async pruneDisabledProviders(): Promise<void> {
-    const keysToDelete: string[] = [];
+  public async pruneDisabledProviders(): Promise<void> {
+    let providers: string[];
+    try {
+      providers = Object.entries(getConfig().providers ?? {})
+        .filter(([, config]) => config.disable_cooldown === true)
+        .map(([provider]) => provider);
+    } catch {
+      return;
+    }
 
     for (const key of this.cooldowns.keys()) {
-      const provider = key.split(':')[0];
-      if (provider && this.isCooldownDisabledForProvider(provider)) {
-        keysToDelete.push(key);
-      }
+      if (providers.includes(key.split(':')[0]!)) this.cooldowns.delete(key);
     }
 
-    for (const key of keysToDelete) {
-      this.cooldowns.delete(key);
-    }
-
-    if (keysToDelete.length > 0) {
-      const providers = [...new Set(keysToDelete.map((k) => k.split(':')[0]))];
-      try {
-        const db = this.ensureDb();
-        for (const provider of providers) {
-          await db
-            .delete(this.schema.providerCooldowns)
-            .where(eq(this.schema.providerCooldowns.provider, provider));
-        }
-        logger.debug(`Pruned cooldowns for disable_cooldown providers: ${providers.join(', ')}`);
-      } catch (e) {
-        logger.error('Failed to prune disabled provider cooldowns from DB', e);
+    try {
+      const db = this.ensureDb();
+      for (const provider of providers) {
+        await db
+          .delete(this.schema.providerCooldowns)
+          .where(eq(this.schema.providerCooldowns.provider, provider));
       }
+    } catch (e) {
+      logger.error('Failed to prune disabled provider cooldowns from DB', e);
     }
   }
 
@@ -186,12 +182,12 @@ export class CooldownManager {
     model: string,
     durationMs?: number,
     lastError?: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (this.isCooldownDisabledForProvider(provider)) {
       logger.debug(
         `Skipping cooldown for provider '${provider}' model '${model}' (disable_cooldown=true)`
       );
-      return;
+      return false;
     }
 
     if (
@@ -201,7 +197,7 @@ export class CooldownManager {
       logger.debug(
         `Skipping cooldown for provider '${provider}' model '${model}' (deadline expired error)`
       );
-      return;
+      return false;
     }
 
     const key = CooldownManager.makeCooldownKey(provider, model);
@@ -247,6 +243,12 @@ export class CooldownManager {
     } catch (e) {
       logger.error(`Failed to persist cooldown for ${provider}:${model}`, e);
     }
+    // Configuration can change while the persistence operation is in flight.
+    if (this.isCooldownDisabledForProvider(provider)) {
+      await this.pruneDisabledProviders();
+      return false;
+    }
+    return true;
   }
 
   public async markProviderSuccess(provider: string, model: string): Promise<void> {
