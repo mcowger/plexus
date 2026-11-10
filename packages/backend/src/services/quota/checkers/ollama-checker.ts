@@ -44,6 +44,7 @@ export default defineChecker({
   optionsSchema: z.object({
     apiKey: z.string().min(1, 'Ollama API key is required'),
     endpoint: z.string().url().optional(),
+    usePurchasedCredits: z.boolean().optional(),
   }),
   async check(ctx) {
     const apiKey = ctx.requireOption<string>('apiKey');
@@ -65,7 +66,14 @@ export default defineChecker({
     const data = parsed.data;
     const meters = [];
     const included = data.included;
-
+    const usePurchasedCredits = ctx.getOption<boolean>('usePurchasedCredits', false);
+    const purchasedBalance = data.purchased?.balance_usd;
+    const hasPurchasedBalance =
+      typeof purchasedBalance === 'number' && Number.isFinite(purchasedBalance);
+    const creditsAvailable = hasPurchasedBalance && purchasedBalance > 0;
+    // Ollama bills credits once the plan allowance runs out. When the user opts in and credits
+    // remain, an exhausted allowance must not block routing (101 is never reached).
+    const allowanceThreshold = usePurchasedCredits && creditsAvailable ? 101 : undefined;
     if (included && 'allowance_usd' in included) {
       const allowance = included.allowance_usd;
       const balance = included.balance_usd;
@@ -82,6 +90,7 @@ export default defineChecker({
             periodUnit: 'month',
             periodCycle: 'fixed',
             resetsAt: included.period.until,
+            exhaustionThreshold: allowanceThreshold,
           })
         );
       }
@@ -98,6 +107,7 @@ export default defineChecker({
             periodUnit: 'hour',
             periodCycle: 'rolling',
             resetsAt: included.session.resets_at,
+            exhaustionThreshold: allowanceThreshold,
           })
         );
       }
@@ -113,20 +123,24 @@ export default defineChecker({
             periodUnit: 'day',
             periodCycle: 'rolling',
             resetsAt: included.weekly.resets_at,
+            exhaustionThreshold: allowanceThreshold,
           })
         );
       }
     }
 
-    const purchasedBalance = data.purchased?.balance_usd;
-    if (typeof purchasedBalance === 'number' && Number.isFinite(purchasedBalance)) {
+    if (hasPurchasedBalance) {
+      const purchased = ctx.balance({
+        key: 'purchased',
+        label: 'Purchased credits',
+        unit: 'USD',
+        remaining: Math.max(0, purchasedBalance),
+      });
+      // A zero balance next to plan allowances is the normal subscription state, not exhaustion.
       meters.push(
-        ctx.balance({
-          key: 'purchased',
-          label: 'Purchased credits',
-          unit: 'USD',
-          remaining: Math.max(0, purchasedBalance),
-        })
+        meters.length > 0 && !creditsAvailable
+          ? { ...purchased, utilizationPercent: 'not_applicable' as const, status: 'ok' as const }
+          : purchased
       );
     }
 
