@@ -205,6 +205,25 @@ function thinkingSignatureErrorResponse() {
   );
 }
 
+/**
+ * The MISSING-signature variant a strict gateway returns for an unsigned
+ * `thinking` block — Anthropic's own wording for a replayed `reasoning_content`
+ * with no signature attached.
+ */
+function missingSignatureErrorResponse() {
+  return new Response(
+    JSON.stringify({
+      type: 'error',
+      error: {
+        type: 'invalid_request_error',
+        message: 'messages.1.content.0.thinking.signature: Field required',
+      },
+      request_id: 'req_test456',
+    }),
+    { status: 400, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
 function successMessagesResponse(model: string) {
   return new Response(
     JSON.stringify({
@@ -227,6 +246,21 @@ function messagesWithStaleThinking() {
       role: 'assistant',
       content: [
         { type: 'thinking', thinking: 'stale reasoning', signature: 'sig-from-model-a' },
+        { type: 'text', text: 'answer' },
+      ],
+    },
+    { role: 'user', content: [{ type: 'text', text: 'follow up' }] },
+  ];
+}
+
+/** An unsigned `thinking` block, i.e. a replayed `reasoning_content`. */
+function messagesWithUnsignedThinking() {
+  return [
+    { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+    {
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: 'deepseek reasoning' },
         { type: 'text', text: 'answer' },
       ],
     },
@@ -824,6 +858,43 @@ describe('Dispatcher Failover', () => {
     expect(signatureStripWarn).toBeDefined();
     expect(signatureStripWarn).toContain('p1/model-1');
     expect(signatureStripWarn).toContain('stripped 1 thinking block(s)');
+  });
+
+  test('same-target retry: repairs a gateway that 400s on the MISSING signature too', async () => {
+    // Third leg of the repair. `makeAnthropicMessagesConfig` is a plain
+    // Messages-speaking proxy (p1.example.com), so the proactive
+    // `drop_unsigned_thinking` adapter is NOT injected and the client body is
+    // forwarded verbatim, unsigned block and all. The upstream still enforces
+    // Anthropic's rule, so the reactive matcher has to recognize the
+    // missing-signature wording as well as the stale one.
+    setConfigForTesting(makeAnthropicMessagesConfig({ targetCount: 1 }));
+    fetchMock
+      .mockImplementationOnce(async () => missingSignatureErrorResponse())
+      .mockImplementationOnce(async () => successMessagesResponse('model-1'));
+
+    const dispatcher = new Dispatcher();
+    const response = await dispatcher.dispatch(makeMessagesRequest(messagesWithUnsignedThinking()));
+    const meta = (response as any).plexus;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(meta?.finalAttemptProvider).toBe('p1');
+
+    // The verbatim first attempt carried the unsigned block (proof the adapter
+    // was not injected on this non-Anthropic host)...
+    const firstBody = JSON.parse((fetchMock.mock.calls[0] as any[])[1].body as string);
+    expect(firstBody.messages[1].content[0]).toEqual({
+      type: 'thinking',
+      thinking: 'deepseek reasoning',
+    });
+
+    // ...and the bounded retry stripped it instead of failing over.
+    const retriedBody = JSON.parse((fetchMock.mock.calls[1] as any[])[1].body as string);
+    expect(retriedBody.messages[1].content).toEqual([{ type: 'text', text: 'answer' }]);
+
+    const stripWarn = mockLogger.warn.mock.calls
+      .map((call) => String(call[0]))
+      .find((message) => message.includes('stale thinking-block'));
+    expect(stripWarn).toContain('stripped 1 thinking block(s)');
   });
 
   test('same-target retry: gives up after the one-shot thinking-signature retry bound and fails normally when the signature error persists', async () => {

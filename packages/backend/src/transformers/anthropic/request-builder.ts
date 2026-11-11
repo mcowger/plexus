@@ -110,10 +110,23 @@ export async function buildAnthropicRequest(request: UnifiedChatRequest): Promis
       const content: any[] = [];
 
       if (msg.thinking) {
+        // Always emit the block, but only carry `signature` when there is one.
+        // Anthropic rejects an unsigned `thinking` block
+        // (`messages.N.content.0.thinking.signature: Field required`), yet not
+        // every Messages-format upstream shares that rule — Kimi/Moonshot
+        // requires unsigned thinking to stay present on historical assistant
+        // turns — and this builder cannot know which one it is building for.
+        // So the shape stays target-neutral here: the block is preserved and no
+        // `signature` key is emitted for an absent/empty one (it would be
+        // dropped at serialization anyway). Anthropic's requirement is enforced
+        // target-side by the `drop_unsigned_thinking` adapter, with the bounded
+        // signature strip-and-retry as the fallback for unknown strict gateways.
         content.push({
           type: 'thinking',
           thinking: msg.thinking.content,
-          signature: msg.thinking.signature,
+          ...(typeof msg.thinking.signature === 'string' && msg.thinking.signature.length > 0
+            ? { signature: msg.thinking.signature }
+            : {}),
         });
       }
 

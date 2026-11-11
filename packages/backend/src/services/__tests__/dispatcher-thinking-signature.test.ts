@@ -55,6 +55,20 @@ describe('matchThinkingSignatureError', () => {
     expect(matchThinkingSignatureError('INVALID SIGNATURE IN THINKING BLOCK')).toBe(true);
   });
 
+  test('matches the missing-signature wording a strict gateway returns for an unsigned block', () => {
+    // The third leg of the repair: a gateway that is not recognized as
+    // Anthropic (so `drop_unsigned_thinking` is not injected) still 400s on an
+    // unsigned `thinking` block, and the bounded strip-and-retry must fire.
+    expect(
+      matchThinkingSignatureError(
+        '{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0.thinking.signature: Field required"}}'
+      )
+    ).toBe(true);
+    expect(
+      matchThinkingSignatureError('messages.7.content.2.thinking.signature: field required')
+    ).toBe(true);
+  });
+
   test('returns false for an unrelated 400 body', () => {
     expect(
       matchThinkingSignatureError('{"error":{"message":"Invalid request: missing model"}}')

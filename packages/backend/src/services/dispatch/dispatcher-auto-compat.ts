@@ -1087,11 +1087,14 @@ export function planUnsupportedParamStrip(
 
 /**
  * Matches Anthropic's stale/invalid thinking-block-signature 400, e.g.
- * `messages.3.content.0: Invalid \`signature\` in \`thinking\` block`.
+ * `messages.3.content.0: Invalid \`signature\` in \`thinking\` block`, AND the
+ * missing-signature variant a strict gateway returns for an unsigned block,
+ * e.g. `messages.1.content.0.thinking.signature: Field required`.
  * Backtick-quoting of "signature"/"thinking" is optional since not every
  * upstream quotes them identically.
  */
-const THINKING_SIGNATURE_ERROR_PATTERN = /invalid\s+`?signature`?\s+in\s+`?thinking`?\s+block/i;
+const THINKING_SIGNATURE_ERROR_PATTERN =
+  /invalid\s+`?signature`?\s+in\s+`?thinking`?\s+block|thinking\.signature\s*:?\s*(?:field\s+)?required/i;
 
 /**
  * True when an upstream error response body names an invalid/stale

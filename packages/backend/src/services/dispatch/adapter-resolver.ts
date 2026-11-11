@@ -1,4 +1,5 @@
 import { type AdapterEntry, isOAuthPlaceholderUrl } from '../../config';
+import { dropUnsignedThinkingAdapter } from '../../transformers/adapters/drop-unsigned-thinking.adapter';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
 import {
   isMuseSubscriptionTarget,
@@ -21,11 +22,12 @@ import type { RouteResult } from '../routing/router';
  *      provider (currently: tool-search stripping for `pi_ai_provider ===
  *      'openrouter'`, Muse wire compat for `meta` OAuth routes and
  *      `api.meta.ai` targets), its model (GPT-5 option suppression) and its
- *      provider+wire-format pair (Anthropic tool-id normalization, gated on
- *      BOTH the outbound wire format being Anthropic Messages AND the target
- *      looking like an Anthropic provider — an `anthropic.com` base URL,
- *      Anthropic OAuth, or Claude masking). These run first so
- *      user-configured adapters see the cleaned-up payload if they inspect it.
+ *      provider+wire-format pair (Anthropic tool-id normalization and the
+ *      unsigned-thinking drop, both gated on BOTH the outbound wire format being
+ *      Anthropic Messages AND the target looking like an Anthropic provider — an
+ *      `anthropic.com` base URL, Anthropic OAuth, or Claude masking). These run
+ *      first so user-configured adapters see the cleaned-up payload if they
+ *      inspect it.
  *   2. Provider-level `adapter` (applies to all models under the provider)
  *   3. Model-level `adapter`   (appended after provider-level adapters)
  *
@@ -114,6 +116,13 @@ export function resolveAdapters(route: RouteResult, effectiveApiType?: string): 
  * detected-Anthropic route out. `effectiveApiType` (not `targetApiType`) is the
  * only value that reflects the real protocol for native-OAuth routes.
  *
+ * `drop_unsigned_thinking` rides the SAME gate, for the same reason: Anthropic
+ * also hard-400s on a `thinking` block with no `signature`
+ * (`messages.N.content.0.thinking.signature: Field required`), while
+ * Messages-speaking upstreams such as Kimi/Moonshot accept — and expect — the
+ * unsigned block. So both repairs are target-scoped, and a non-Anthropic
+ * Messages proxy keeps the client's blocks untouched.
+ *
  * Implicit adapters go through the same registry path as user-configured
  * adapters, so an unresolved name here would fail loudly rather than
  * silently no-op.
@@ -142,6 +151,7 @@ function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string):
     isAnthropicTargetProvider(route, effectiveApiType)
   ) {
     adapters.push({ name: normalizeAnthropicToolIdsAdapter.name, options: {}, enabled: true });
+    adapters.push({ name: dropUnsignedThinkingAdapter.name, options: {}, enabled: true });
   }
   return adapters;
 }
