@@ -55,6 +55,13 @@ import { logger } from '../../utils/logger';
  * show up in every replayed history. The merge cannot orphan a `tool_result`
  * either — a turn that still carried a `tool_use` block is never emptied.
  *
+ * The merge only looks at the turn immediately before the dropped one, so a
+ * non-alternating role in between — a `system` entry inserted mid-conversation
+ * — stops it and the emptied turn's neighbours stay separate turns;
+ * `stripThinkingSignatureBlocks` has the same limit, and whether Anthropic
+ * ignores `system` entries when checking alternation is unverified, so this
+ * adapter does not walk past them.
+ *
  * Inbound (postDispatch) and stream hooks: no-op (request-side repair only).
  */
 

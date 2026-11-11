@@ -148,6 +148,27 @@ describe('dropUnsignedThinkingBlocks', () => {
       ]);
     });
 
+    it('does not merge across a mid-conversation system entry — the merge is single-step', () => {
+      // The mid-conversation-system beta lets a client insert a `system` entry
+      // mid-history. The merge only compares to the turn right before the
+      // emptied one, so the system entry stops it and the neighbours stay
+      // separate turns. Bounded on purpose (adapter docblock): this test freezes
+      // the current shape so the case is weighed rather than forgotten.
+      const payload = makePayload([
+        { role: 'user', content: [{ type: 'text', text: 'one' }] },
+        { role: 'assistant', content: [{ type: 'thinking', thinking: 'only' }] },
+        { role: 'system', content: [{ type: 'text', text: 'be terse' }] },
+        { role: 'user', content: [{ type: 'text', text: 'two' }] },
+      ]);
+
+      const { payload: out, droppedTurnCount } = dropUnsignedThinkingBlocks(payload);
+
+      expect(droppedTurnCount).toBe(1);
+      expect(out.messages.map((m: any) => m.role)).toEqual(['user', 'system', 'user']);
+      expect(out.messages[0].content).toEqual([{ type: 'text', text: 'one' }]);
+      expect(out.messages[2].content).toEqual([{ type: 'text', text: 'two' }]);
+    });
+
     it('merges two string-content turns into text blocks', () => {
       const payload = makePayload([
         { role: 'user', content: 'one' },
