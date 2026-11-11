@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Dependencies
+
+- Update all workspace dependencies to their latest stable releases, including Google GenAI 3, and refresh the lockfile.
+- Replace Playground's removed pi-ai schema-builder import with equivalent JSON Schema tool definitions.
+
 ### Bug fixes
 
 - Preserve provider-targeted debug traces for failed upstream requests by assigning the provider before dispatch, including transport failures.
