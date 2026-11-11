@@ -46,6 +46,15 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
         );
         const allowanceMeters = getAllowanceMeters(quota.meters);
         const isLast = idx === allowanceQuotas.length - 1;
+        const providerName = quota.provider || quota.checkerId;
+        const heading = (
+          <div className="min-w-0 flex-1 text-[11px]">
+            <div className="text-text-muted truncate">{displayName}</div>
+            <div className="text-text-secondary break-words" title={providerName}>
+              {providerName}
+            </div>
+          </div>
+        );
 
         if (!quota.success) {
           return (
@@ -56,7 +65,7 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
                 !isLast && 'border-border border-b pb-1.5'
               )}
             >
-              <span className="text-text-secondary flex-1 truncate text-[11px]">{displayName}</span>
+              {heading}
               <AlertTriangle className="text-danger h-3 w-3 flex-shrink-0" />
             </div>
           );
@@ -71,22 +80,20 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
                 !isLast && 'border-border border-b pb-1.5'
               )}
             >
-              <span className="text-text-secondary flex-1 truncate text-[11px]">{displayName}</span>
+              {heading}
               <span className="text-text-muted text-[11px]">—</span>
             </div>
           );
         }
 
-        // Show the service name once, then stack all allowance meters below it
+        // Show the service and provider once, then stack their allowance meters below.
         return (
           <div
             key={quota.checkerId}
             className={clsx('min-w-0 py-1', !isLast && 'border-border border-b pb-1.5')}
           >
             <div className="mb-0.5 flex min-w-0 items-center gap-1">
-              <span className="text-text-muted min-w-0 flex-1 truncate pl-0 text-[11px]">
-                {displayName}
-              </span>
+              {heading}
               {quota.stale && (
                 <span
                   className="flex-shrink-0"

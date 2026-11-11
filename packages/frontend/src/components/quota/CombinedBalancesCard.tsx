@@ -2,7 +2,6 @@ import { clsx } from 'clsx';
 import { AlertTriangle, RefreshCw, Wallet } from 'lucide-react';
 import React, { useState } from 'react';
 
-import { toTitleCase } from '../../lib/format';
 import type { Meter, QuotaCheckerInfo } from '../../types/quota';
 import { Button } from '../ui/Button';
 import { BalanceMeterRow } from './BalanceMeterRow';
@@ -48,7 +47,9 @@ export const CombinedBalancesCard: React.FC<CombinedBalancesCardProps> = ({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Wallet size={14} className="text-info flex-shrink-0" />
-            <span className="text-text text-sm font-semibold">{toTitleCase(quota.checkerId)}</span>
+            <span className="text-text min-w-0 text-sm font-semibold break-words">
+              {quota.provider || quota.checkerId}
+            </span>
           </div>
           <div className="text-text-muted truncate pl-5 text-xs">
             {displayName}
