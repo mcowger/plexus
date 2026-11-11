@@ -2068,11 +2068,11 @@ packages/backend/src/utils/stall.ts:28 [function] resolveStallConfig
 packages/backend/src/utils/stall.ts:81 [function] getGlobalStallConfig
 packages/backend/src/utils/timeout.ts:27 [function] wireUpstreamTimeout
 packages/backend/src/utils/timeout.ts:52 [function] wireEarlyDisconnectDetection
-packages/backend/src/utils/usage-normalizer.ts:137 [function] normalizeOpenAIChatUsage
-packages/backend/src/utils/usage-normalizer.ts:162 [function] normalizeOpenAIResponsesUsage
-packages/backend/src/utils/usage-normalizer.ts:197 [function] normalizeGeminiUsage
-packages/backend/src/utils/usage-normalizer.ts:220 [function] normalizeAnthropicUsage
-packages/backend/src/utils/usage-normalizer.ts:236 [function] normalizeOAuthUsage
+packages/backend/src/utils/usage-normalizer.ts:138 [function] normalizeOpenAIChatUsage
+packages/backend/src/utils/usage-normalizer.ts:163 [function] normalizeOpenAIResponsesUsage
+packages/backend/src/utils/usage-normalizer.ts:198 [function] normalizeGeminiUsage
+packages/backend/src/utils/usage-normalizer.ts:221 [function] normalizeAnthropicUsage
+packages/backend/src/utils/usage-normalizer.ts:237 [function] normalizeOAuthUsage
 packages/backend/src/utils/usage-normalizer.ts:36 [interface] ProviderCostDetails
 packages/backend/src/utils/usage-normalizer.ts:53 [interface] UsageWithCostDetails
 packages/backend/src/utils/usage-normalizer.ts:62 [function] extractUsageCostDetails
