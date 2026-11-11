@@ -65,8 +65,9 @@ export function extractUsageCostDetails(usage: any): ProviderCostDetails | null 
   if (!details || typeof details !== 'object') {
     // No cost_details block — check top-level cost fields from providers that omit cost_details:
     // - usage.cost: OpenRouter-routed providers (e.g. Kimi/Avian) that don't surface cost_details
+    // - usage.cost_usd: UberLLM actual request cost in dollars
     // - usage.cost_in_usd_ticks: xAI grok models; 1 USD = 10^10 ticks per xAI API docs.
-    const topLevelCost = safeCost(usage?.cost ?? usage?.estimated_cost);
+    const topLevelCost = safeCost(usage?.cost ?? usage?.cost_usd ?? usage?.estimated_cost);
     const xaiTicks =
       typeof usage?.cost_in_usd_ticks === 'number'
         ? safeCost(usage.cost_in_usd_ticks / 10_000_000_000)
@@ -94,11 +95,11 @@ export function extractUsageCostDetails(usage: any): ProviderCostDetails | null 
 
   // Determine total cost:
   // 1. cost_details.total_cost
-  // 2. usage.cost or usage.estimated_cost (standard path)
+  // 2. usage.cost, usage.cost_usd, or usage.estimated_cost (standard path)
   // 3. cost_details.upstream_inference_cost (OpenRouter quirk)
   let totalCost = safeCost(details.total_cost);
 
-  const costFromUsage = safeCost(usage?.cost ?? usage?.estimated_cost);
+  const costFromUsage = safeCost(usage?.cost ?? usage?.cost_usd ?? usage?.estimated_cost);
   const upstreamInferenceCost = safeCost(details.upstream_inference_cost);
 
   if (totalCost === null) {
