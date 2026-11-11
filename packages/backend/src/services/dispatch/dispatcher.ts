@@ -302,13 +302,14 @@ export class Dispatcher {
   }
 
   /**
-   * Emit an early routing update so the frontend shows provider/model immediately.
-   * The route handler emits a second update after dispatch, but for non-streaming
-   * requests that can be seconds later — this one fires as soon as routing is done.
+   * Attribute the debug trace before dispatch so failed attempts retain their provider.
+   * Emit an early routing update so the frontend shows provider/model immediately,
+   * without waiting for the route handler's post-dispatch update.
    */
   private emitRoutingUpdate(requestId: string | undefined, route: RouteResult): void {
-    if (!requestId || !this.usageStorage) return;
-    this.usageStorage.emitUpdatedAsync({
+    if (!requestId) return;
+    DebugManager.getInstance().setProviderForRequest(requestId, route.provider);
+    this.usageStorage?.emitUpdatedAsync({
       requestId,
       provider: route.provider,
       selectedModelName: route.model,

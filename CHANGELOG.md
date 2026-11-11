@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- Preserve provider-targeted debug traces for failed upstream requests by assigning the provider before dispatch, including transport failures.
+
 ## 2026.04.14.1 - 2026-04-14
 
 ### Add Support for Neuralwatt cost data, support for the new Synthetic quota system, Added provider access allowlists and improved log filtering
