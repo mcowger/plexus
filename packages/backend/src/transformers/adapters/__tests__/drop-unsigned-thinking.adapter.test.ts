@@ -432,6 +432,75 @@ describe('request thinking config vs the final assistant turn', () => {
     expect(out.payload.output_config).toEqual({ effort: 'high' });
     expect(out.payload.messages[1].content[0]).toBe(signed);
   });
+  it('keeps the config when the stripped turn is a completed text turn followed by a fresh user turn', () => {
+    // Outside an open tool-use cycle, prior thinking may be omitted and the
+    // thinking mode toggled between turns: stripping the block must not
+    // silently disable thinking for the next turn.
+    const payload = makeManualThinkingPayload([
+      { role: 'user', content: [{ type: 'text', text: 'q' }] },
+      {
+        role: 'assistant',
+        content: [unsignedThinking, { type: 'text', text: 'the answer' }],
+      },
+      { role: 'user', content: [{ type: 'text', text: 'follow up' }] },
+    ]);
+
+    const {
+      payload: out,
+      droppedBlockCount,
+      droppedThinkingConfig,
+    } = dropUnsignedThinkingBlocks(payload);
+
+    expect(droppedBlockCount).toBe(1);
+    expect(droppedThinkingConfig).toBe(false);
+    expect(out.thinking).toEqual({ type: 'enabled', budget_tokens: 4096 });
+    expect(out.output_config).toEqual({ effort: 'high' });
+    expect(out.messages[1].content).toEqual([{ type: 'text', text: 'the answer' }]);
+  });
+
+  it('drops the config on a later tool-loop step whose open-cycle assistant never carried a thinking block', () => {
+    // The previous step was generated while thinking was degraded, so its
+    // assistant turn is `tool_use`-only. The unsigned block that triggers
+    // the config drop sits in an earlier turn of the same cycle, not in
+    // the final assistant turn itself.
+    const toolUse2 = { type: 'tool_use', id: 'toolu_2', name: 'search', input: { q: 'y' } };
+    const payload = makeManualThinkingPayload([
+      { role: 'user', content: [{ type: 'text', text: 'run a search' }] },
+      { role: 'assistant', content: [unsignedThinking, toolUse] },
+      { role: 'user', content: [toolResult] },
+      { role: 'assistant', content: [toolUse2] },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_2', content: 'ok' }],
+      },
+    ]);
+
+    const { payload: out, droppedThinkingConfig } = dropUnsignedThinkingBlocks(payload);
+
+    expect(droppedThinkingConfig).toBe(true);
+    expect('thinking' in out).toBe(false);
+    expect(out.output_config).toBeUndefined();
+  });
+
+  it('drops the config when an emptied trailing reasoning turn exposes a tool_use-only assistant turn', () => {
+    const payload = makeManualThinkingPayload([
+      { role: 'user', content: [{ type: 'text', text: 'run a search' }] },
+      { role: 'assistant', content: [toolUse] },
+      { role: 'user', content: [toolResult] },
+      { role: 'assistant', content: [unsignedThinking] },
+    ]);
+
+    const {
+      payload: out,
+      droppedTurnCount,
+      droppedThinkingConfig,
+    } = dropUnsignedThinkingBlocks(payload);
+
+    expect(droppedTurnCount).toBe(1);
+    expect(droppedThinkingConfig).toBe(true);
+    expect(out.messages.map((m: any) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect('thinking' in out).toBe(false);
+  });
 
   it('leaves the config alone when an EARLIER assistant turn lost its thinking block (scope = final turn)', () => {
     // The API validates the final assistant turn only, so a tool-use cycle that

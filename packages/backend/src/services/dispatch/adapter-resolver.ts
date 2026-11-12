@@ -179,10 +179,11 @@ function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string):
  *     route, which is Anthropic by construction (and so is URL-independent).
  *
  * The `includes('anthropic.com')` substring test is as loose as
- * `getProviderTypes()`'s — accepted for parity. A false positive only injects an
- * idempotent, deterministic id rewrite that a
- * `{ name: 'normalize_anthropic_tool_ids', enabled: false }` adapter entry
- * disables.
+ * `getProviderTypes()`'s — accepted for parity. A false positive injects both
+ * Anthropic adapters on a non-Anthropic endpoint (a deterministic tool-id
+ * rewrite and the unsigned-thinking drop, which can also remove a manual
+ * thinking config in an open tool-use cycle); each is removable with a
+ * `{ name: '<adapter>', enabled: false }` adapter entry.
  *
  * @param effectiveApiType The FINAL outbound wire type. For the RECORD form of
  *   `api_base_url` this scopes the URL check to the entry the dispatcher would

@@ -358,6 +358,21 @@ properties:
         to force it on for an Anthropic-compatible gateway hosted elsewhere, or
         `{ name: 'normalize_anthropic_tool_ids', enabled: false }` to opt out.
 
+      - `drop_unsigned_thinking` — Removes `thinking` blocks that carry no
+        usable `signature` from outbound Anthropic Messages bodies, which
+        Anthropic rejects with a hard HTTP 400 (`thinking.signature: Field
+        required`). A turn left with no content is dropped and same-role
+        neighbours merged so roles keep alternating; when the strip leaves a
+        manual extended-thinking request (`thinking: {type: "enabled"}`) in an
+        open tool-use cycle whose assistant turn no longer opens with a
+        thinking block, the request-level `thinking` config and its dependent
+        `output_config.effort` are removed as well. Injected automatically
+        under the same gate as `normalize_anthropic_tool_ids`. Override per
+        provider or model with
+        `{ name: 'drop_unsigned_thinking', options: {}, enabled: true }`
+        to force it on for an Anthropic-compatible gateway hosted elsewhere,
+        or `{ name: 'drop_unsigned_thinking', enabled: false }` to opt out.
+
       Adapters run on the outbound body whether or not the pass-through
       optimisation is active — a same-format request skips the transformer, but
       its body is still cloned, given the target model and the provider/model

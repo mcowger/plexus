@@ -1134,6 +1134,93 @@ function contentHasBlockType(content: any, type: string): boolean {
   );
 }
 
+/** Anthropic's manual extended-thinking mode: the only one demanding a leading thinking block. */
+function hasManualThinkingEnabled(payload: Record<string, any>): boolean {
+  const thinking = payload.thinking;
+  return !!thinking && typeof thinking === 'object' && thinking.type === 'enabled';
+}
+
+/** True when a turn opens on a thinking block. */
+function startsWithThinkingBlock(message: any): boolean {
+  const first = Array.isArray(message?.content) ? message.content[0] : undefined;
+  return (
+    !!first &&
+    typeof first === 'object' &&
+    (first.type === 'thinking' || first.type === 'redacted_thinking')
+  );
+}
+
+/**
+ * The assistant turn of the still-open tool-use cycle, if the history ends
+ * in one: trailing `tool_result` user turns walked back to the assistant
+ * turn carrying the `tool_use` they answer (a trailing `tool_use` assistant
+ * turn awaiting its result counts too). Any other ending — a completed
+ * assistant turn, a fresh user turn — is a closed turn, where Anthropic
+ * imposes no leading-thinking-block requirement.
+ */
+function openToolUseCycleAssistant(messages: any[]): any {
+  let index = messages.length - 1;
+  while (
+    index >= 0 &&
+    messages[index]?.role === 'user' &&
+    contentHasBlockType(messages[index]?.content, 'tool_result')
+  ) {
+    index--;
+  }
+  const assistant = messages[index];
+  if (!assistant || assistant.role !== 'assistant') return undefined;
+  return contentHasBlockType(assistant.content, 'tool_use') ? assistant : undefined;
+}
+
+/**
+ * Removes the request-level thinking configuration, copy-on-write:
+ * `thinking` goes, `output_config.effort` goes with it (no effort without a
+ * thinking mode) and an emitted-empty `output_config` disappears. Other
+ * `output_config` keys are carried over; per-message directives live on the
+ * messages and are not reachable from here.
+ */
+function withoutRequestThinkingConfig(payload: Record<string, any>): Record<string, any> {
+  const rewritten: Record<string, any> = { ...payload };
+  delete rewritten.thinking;
+  const outputConfig = rewritten.output_config;
+  if (outputConfig && typeof outputConfig === 'object' && 'effort' in outputConfig) {
+    const { effort: _effort, ...rest } = outputConfig as Record<string, unknown>;
+    if (Object.keys(rest).length > 0) rewritten.output_config = rest;
+    else delete rewritten.output_config;
+  }
+  return rewritten;
+}
+
+export interface ThinkingConfigDropResult {
+  /** The rewritten payload, or the input reference when nothing was dropped. */
+  payload: Record<string, any>;
+  /** True when the request-level thinking config was removed. */
+  droppedThinkingConfig: boolean;
+}
+
+/**
+ * Degrades a manual extended-thinking request to non-thinking when its
+ * history ends in an open tool-use cycle whose assistant turn does not open
+ * on a `thinking`/`redacted_thinking` block — the shape Anthropic rejects
+ * with "a final `assistant` message must start with a thinking block".
+ * Callers invoke this only on a payload a thinking-block strip (proactive
+ * adapter or reactive signature strip) has just rewritten; a payload whose
+ * cycle assistant still opens on a signed thinking block, a closed turn,
+ * and non-manual thinking modes are all returned untouched.
+ */
+export function dropManualThinkingConfigForOpenToolCycle(
+  payload: Record<string, any>
+): ThinkingConfigDropResult {
+  if (!hasManualThinkingEnabled(payload) || !Array.isArray(payload.messages)) {
+    return { payload, droppedThinkingConfig: false };
+  }
+  const cycleAssistant = openToolUseCycleAssistant(payload.messages);
+  if (!cycleAssistant || startsWithThinkingBlock(cycleAssistant)) {
+    return { payload, droppedThinkingConfig: false };
+  }
+  return { payload: withoutRequestThinkingConfig(payload), droppedThinkingConfig: true };
+}
+
 // A fresh array/object is allocated per call (not a shared module-level
 // constant) so multiple placeholder messages in the same payload never end
 // up aliasing the same mutable content array.
@@ -1164,6 +1251,15 @@ export interface ThinkingSignatureStripResult {
    * blocks, so a 0-strip retry would resend a byte-identical request.
    */
   strippedCount: number;
+  /**
+   * True when the strip also removed the request-level thinking config
+   * (`thinking` plus dependent `output_config.effort`) because it left a
+   * manual extended-thinking request in an open tool-use cycle whose
+   * assistant turn no longer opens on a thinking block — without this, the
+   * same-target retry would be rejected again for the thinking *mode*
+   * rather than the signature. See `dropManualThinkingConfigForOpenToolCycle`.
+   */
+  droppedThinkingConfig: boolean;
 }
 
 /**
@@ -1183,12 +1279,20 @@ export interface ThinkingSignatureStripResult {
  * `[{"type":"text","text":"[reasoning elided]"}]` placeholder instead of
  * dropping the message, so the conversation shape stays valid.
  *
+ * When the strip leaves a manual extended-thinking request in an open
+ * tool-use cycle whose assistant turn no longer opens on a thinking block,
+ * the request-level thinking config is removed as well
+ * (`dropManualThinkingConfigForOpenToolCycle`): otherwise the retried
+ * request would be rejected again, this time for the thinking mode.
+ * Closed turns keep their config.
+ *
  * Non-array `content` (e.g. plain-string messages) is left untouched.
  */
 export function stripThinkingSignatureBlocks(
   payload: Record<string, any>
 ): ThinkingSignatureStripResult {
-  if (!isAnthropicMessagesPayload(payload)) return { payload, strippedCount: 0 };
+  if (!isAnthropicMessagesPayload(payload))
+    return { payload, strippedCount: 0, droppedThinkingConfig: false };
 
   let strippedCount = 0;
   const perMessage: Array<{
@@ -1215,7 +1319,7 @@ export function stripThinkingSignatureBlocks(
     };
   });
 
-  if (strippedCount === 0) return { payload, strippedCount: 0 };
+  if (strippedCount === 0) return { payload, strippedCount: 0, droppedThinkingConfig: false };
 
   const result: any[] = [];
   for (let i = 0; i < perMessage.length; i++) {
@@ -1244,7 +1348,9 @@ export function stripThinkingSignatureBlocks(
     // else: drop — push nothing for this message.
   }
 
-  return { payload: { ...payload, messages: result }, strippedCount };
+  const { payload: repairedPayload, droppedThinkingConfig } =
+    dropManualThinkingConfigForOpenToolCycle({ ...payload, messages: result });
+  return { payload: repairedPayload, strippedCount, droppedThinkingConfig };
 }
 
 /** Per-target, per-request bound: at most one signature-strip-and-retry cycle. */
