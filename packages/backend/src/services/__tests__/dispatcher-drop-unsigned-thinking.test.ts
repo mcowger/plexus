@@ -131,7 +131,11 @@ function makeDeepseekChatConfig() {
 }
 
 /** A same-format (messages -> messages) body: the pass-through path. */
-function makeMessagesRequest(alias: string, messages: any[]): UnifiedChatRequest {
+function makeMessagesRequest(
+  alias: string,
+  messages: any[],
+  extra: Record<string, any> = {}
+): UnifiedChatRequest {
   return {
     model: alias,
     // Unified `messages` is required by the type but unused on the pass-through
@@ -139,7 +143,7 @@ function makeMessagesRequest(alias: string, messages: any[]): UnifiedChatRequest
     messages: [{ role: 'user', content: 'placeholder' }],
     incomingApiType: 'messages',
     stream: false,
-    originalBody: { model: alias, max_tokens: 1024, messages },
+    originalBody: { model: alias, max_tokens: 1024, messages, ...extra },
   } as any;
 }
 
@@ -343,6 +347,132 @@ describe('Dispatcher unsigned-thinking drop', () => {
     expect(outboundBody(0).messages).toEqual(messages);
     // Not merely a no-op rewrite: the adapter was never in the chain.
     expect(dropWarns()).toHaveLength(0);
+  });
+
+  test('messages -> messages: the open tool-use cycle loses its thinking block and the request thinking config with it', async () => {
+    setConfigForTesting(makeAnthropicMessagesConfig());
+    fetchMock.mockImplementation(async () => messagesSuccessResponse('model-1'));
+
+    // Manual extended thinking additionally requires the final assistant turn
+    // to start with a thinking block. Stripping the only one this turn had would
+    // be rejected with `Expected thinking or redacted_thinking, but found
+    // tool_use`, so the request is degraded to non-thinking instead.
+    const dispatcher = new Dispatcher();
+    await dispatcher.dispatch(
+      makeMessagesRequest(
+        'msgs-alias',
+        [
+          { role: 'user', content: [{ type: 'text', text: 'run a search' }] },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking: 'deepseek reasoning' },
+              { type: 'tool_use', id: 'toolu_1', name: 'search', input: { q: 'x' } },
+            ],
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'tool_result', tool_use_id: 'toolu_1', content: 'ok' },
+              { type: 'text', text: 'now summarize' },
+            ],
+          },
+        ],
+        { thinking: { type: 'enabled', budget_tokens: 4096 }, output_config: { effort: 'high' } }
+      )
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = outboundBody(0);
+    expect(body.thinking).toBeUndefined();
+    expect(body.output_config).toBeUndefined();
+    // The tool call and its result stay paired: only the reasoning is gone.
+    expect(body.messages[1].content[0]).toMatchObject({ type: 'tool_use', id: 'toolu_1' });
+    expect(body.messages[2].content[0]).toMatchObject({
+      type: 'tool_result',
+      tool_use_id: 'toolu_1',
+    });
+    expect(blockTypes(body)).toEqual(['text', 'tool_use', 'tool_result', 'text']);
+    expect(dropWarns()).toHaveLength(1);
+    expect(dropWarns()[0]).toContain('removed the request thinking config');
+  });
+
+  test('messages -> messages: a final assistant turn that still opens on a signed thinking block keeps the config', async () => {
+    setConfigForTesting(makeAnthropicMessagesConfig());
+    fetchMock.mockImplementation(async () => messagesSuccessResponse('model-1'));
+
+    const dispatcher = new Dispatcher();
+    await dispatcher.dispatch(
+      makeMessagesRequest(
+        'msgs-alias',
+        [
+          { role: 'user', content: [{ type: 'text', text: 'run a search' }] },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking: 'claude reasoning', signature: 'EqQB...sig' },
+              { type: 'thinking', thinking: 'deepseek reasoning' },
+              { type: 'tool_use', id: 'toolu_1', name: 'search', input: { q: 'x' } },
+            ],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'ok' }],
+          },
+        ],
+        { thinking: { type: 'enabled', budget_tokens: 4096 }, output_config: { effort: 'high' } }
+      )
+    );
+
+    const body = outboundBody(0);
+    // The unsigned block is gone, the signed one leads, so reasoning is valid.
+    expect(blockTypes(body)).toEqual(['text', 'thinking', 'tool_use', 'tool_result']);
+    expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 4096 });
+    expect(body.output_config).toEqual({ effort: 'high' });
+    expect(dropWarns()[0]).toContain('dropped 1 unsigned thinking block(s)');
+    expect(dropWarns()[0]).not.toContain('removed the request thinking config');
+  });
+
+  test('messages -> messages: an emptied trailing assistant turn is removed and the tool loop still drops the config', async () => {
+    setConfigForTesting(makeAnthropicMessagesConfig());
+    fetchMock.mockImplementation(async () => messagesSuccessResponse('model-1'));
+
+    const dispatcher = new Dispatcher();
+    await dispatcher.dispatch(
+      makeMessagesRequest(
+        'msgs-alias',
+        [
+          { role: 'user', content: [{ type: 'text', text: 'run a search' }] },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'thinking', thinking: 'deepseek reasoning' },
+              { type: 'tool_use', id: 'toolu_1', name: 'search', input: { q: 'x' } },
+            ],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'ok' }],
+          },
+          { role: 'assistant', content: [{ type: 'thinking', thinking: 'more reasoning' }] },
+        ],
+        { thinking: { type: 'enabled', budget_tokens: 4096 }, output_config: { effort: 'high' } }
+      )
+    );
+
+    const body = outboundBody(0);
+    // The reasoning-only turn disappears, and the tool-use turn it leaves as the
+    // final assistant turn no longer opens on a thinking block.
+    expect(body.messages.map((message: any) => message.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+    ]);
+    expect(blockTypes(body)).toEqual(['text', 'tool_use', 'tool_result']);
+    expect(body.thinking).toBeUndefined();
+    expect(body.output_config).toBeUndefined();
+    expect(dropWarns()[0]).toContain('and 1 emptied turn(s)');
+    expect(dropWarns()[0]).toContain('removed the request thinking config');
   });
 
   test('100% deepseek history on the reasoning target: reasoning_content is untouched', async () => {

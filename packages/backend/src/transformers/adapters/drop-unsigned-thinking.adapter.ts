@@ -62,6 +62,48 @@ import { logger } from '../../utils/logger';
  * ignores `system` entries when checking alternation is unverified, so this
  * adapter does not walk past them.
  *
+ * Manual extended thinking (`thinking: { type: 'enabled' }`) adds a second
+ * requirement the drop can violate: the FINAL assistant turn must start with a
+ * `thinking` or `redacted_thinking` block, otherwise Anthropic rejects the
+ * request with
+ *
+ *   Expected `thinking` or `redacted_thinking`, but found `tool_use`. When
+ *   `thinking` is enabled, a final `assistant` message must start with a
+ *   thinking block (preceeding the lastmost set of `tool_use` and `tool_result`
+ *   blocks).
+ *
+ * The open tool-use cycle is exactly that shape: `assistant[thinking,
+ * tool_use]` -> `user[tool_result]`. Dropping the unsigned thinking block there
+ * leaves the turn starting on `tool_use`, so every turn of the loop fails. The
+ * reactive strip-and-retry cannot repair it either — it targets a stale
+ * `signature`, not a thinking-mode requirement — so this adapter removes the
+ * request-level `thinking` config (and its dependent `output_config.effort`)
+ * instead: the request is degraded to non-thinking rather than refused.
+ *
+ * Bounds of that degradation:
+ *
+ *   - Manual mode only. Adaptive thinking (`type: 'adaptive'`) carries no
+ *     leading-thinking-block requirement ("adaptive mode relaxes this", Thinking
+ *     docs), so its config is never touched; absent, `disabled` and unknown
+ *     types are no-ops by design.
+ *   - The LAST assistant turn of the rewritten history only, which is the turn
+ *     the API validates. An earlier turn that now opens on `tool_use` is left
+ *     alone.
+ *   - Only when this adapter's own drop emptied the leading thinking block of
+ *     that turn. A payload whose final assistant turn never carried a thinking
+ *     block is not rewritten here.
+ *   - Deleting the field always leaves manual mode behind, which is what the
+ *     rejected request needs: on every model that accepts `type: 'enabled'`
+ *     (4.5/4.6 era) the field's absence means thinking off, and on Claude
+ *     Mythos Preview it means adaptive — and adaptive carries no
+ *     leading-thinking-block requirement. Models that cannot disable thinking
+ *     (Opus 5 / Fable 5 / Sonnet 5.5 and later, `thinkingLevelMap.off === null`)
+ *     reject `type: 'enabled'` outright, so such a payload is already invalid
+ *     for another reason; deleting the field there lands on their adaptive
+ *     default, equally requirement-free. A per-entry `output_config.effort` on
+ *     mid-conversation `role: 'system'` entries is a per-turn directive and
+ *     stays untouched.
+ *
  * Inbound (postDispatch) and stream hooks: no-op (request-side repair only).
  */
 
@@ -87,6 +129,54 @@ function toContentBlocks(content: any): any[] {
   return [];
 }
 
+/** Anthropic's manual extended-thinking mode: the only one demanding a leading thinking block. */
+function hasManualThinkingEnabled(payload: Record<string, any>): boolean {
+  const thinking = payload.thinking;
+  return !!thinking && typeof thinking === 'object' && thinking.type === 'enabled';
+}
+
+/** True when a turn opens on a thinking block (signed by construction after the drop). */
+function startsWithThinkingBlock(message: any): boolean {
+  const first = Array.isArray(message?.content) ? message.content[0] : undefined;
+  return (
+    !!first &&
+    typeof first === 'object' &&
+    (first.type === 'thinking' || first.type === 'redacted_thinking')
+  );
+}
+
+/**
+ * True when the FINAL assistant turn of the rewritten history (the only one the
+ * API validates) lost one of its own unsigned blocks and no longer opens on a
+ * thinking block — the open tool-use cycle after the drop.
+ */
+function finalAssistantTurnLostThinkingBlocks(messages: any[], droppedPerTurn: number[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]?.role !== 'assistant') continue;
+    return droppedPerTurn[index]! > 0 && !startsWithThinkingBlock(messages[index]);
+  }
+  return false;
+}
+
+/**
+ * Removes the request-level thinking configuration, copy-on-write: `thinking`
+ * goes, `output_config.effort` goes with it (no effort without a thinking
+ * mode) and an emitted-empty `output_config` disappears. Other `output_config`
+ * keys are carried over; so are per-message directives, which live on the
+ * messages and are not reachable from here.
+ */
+function withoutRequestThinkingConfig(payload: Record<string, any>): Record<string, any> {
+  const rewritten: Record<string, any> = { ...payload };
+  delete rewritten.thinking;
+  const outputConfig = rewritten.output_config;
+  if (outputConfig && typeof outputConfig === 'object' && 'effort' in outputConfig) {
+    const { effort: _effort, ...rest } = outputConfig as Record<string, unknown>;
+    if (Object.keys(rest).length > 0) rewritten.output_config = rest;
+    else delete rewritten.output_config;
+  }
+  return rewritten;
+}
+
 export interface UnsignedThinkingStripResult {
   /** The rewritten payload, or the input reference when nothing was dropped. */
   payload: Record<string, any>;
@@ -94,6 +184,8 @@ export interface UnsignedThinkingStripResult {
   droppedBlockCount: number;
   /** Number of turns dropped because nothing but unsigned thinking remained. */
   droppedTurnCount: number;
+  /** True when the request-level thinking config was removed to keep the payload valid. */
+  droppedThinkingConfig: boolean;
 }
 
 /**
@@ -105,17 +197,30 @@ export interface UnsignedThinkingStripResult {
 export function dropUnsignedThinkingBlocks(
   payload: Record<string, any>
 ): UnsignedThinkingStripResult {
-  const unchanged = { payload, droppedBlockCount: 0, droppedTurnCount: 0 };
+  const unchanged = {
+    payload,
+    droppedBlockCount: 0,
+    droppedTurnCount: 0,
+    droppedThinkingConfig: false,
+  };
   if (!isAnthropicMessagesPayload(payload)) return unchanged;
 
   let droppedBlockCount = 0;
   const perMessage = payload.messages.map((message: any) => {
     if (!message || !Array.isArray(message.content)) {
-      return { message, content: message?.content, isArrayContent: false, changed: false };
+      return {
+        message,
+        content: message?.content,
+        isArrayContent: false,
+        changed: false,
+        dropped: 0,
+      };
     }
+    let dropped = 0;
     const kept = message.content.filter((block: any) => {
       if (!isUnsignedThinkingBlock(block)) return true;
       droppedBlockCount++;
+      dropped++;
       return false;
     });
     return {
@@ -123,6 +228,7 @@ export function dropUnsignedThinkingBlocks(
       content: kept,
       isArrayContent: true,
       changed: kept.length !== message.content.length,
+      dropped,
     };
   });
 
@@ -133,8 +239,11 @@ export function dropUnsignedThinkingBlocks(
   // merged with the turn before it rather than pushed as a neighbour.
   let mergeWithPrevious = false;
   const messages: any[] = [];
+  // Blocks dropped per kept turn, aligned with `messages`: the request-level
+  // thinking config is only removable for a turn this adapter itself stripped.
+  const droppedPerTurn: number[] = [];
 
-  for (const { message, content, isArrayContent, changed } of perMessage) {
+  for (const { message, content, isArrayContent, changed, dropped } of perMessage) {
     if (isArrayContent && changed && content.length === 0) {
       // Nothing but unsigned thinking in this turn: drop it, the next kept turn
       // merges into its predecessor to keep the roles alternating.
@@ -158,17 +267,27 @@ export function dropUnsignedThinkingBlocks(
         ...previous,
         content: [...toContentBlocks(previous.content), ...toContentBlocks(content)],
       };
+      droppedPerTurn[messages.length - 1]! += dropped;
     } else {
       // Untouched messages (including non-array content) are shared, not cloned.
       messages.push(changed ? { ...message, content } : message);
+      droppedPerTurn.push(dropped);
     }
     mergeWithPrevious = false;
   }
 
+  const rewritten = { ...payload, messages };
+  // A manual-thinking request whose final assistant turn now opens on
+  // `tool_use` (or text) is rejected on every turn; degrade to non-thinking.
+  const droppedThinkingConfig =
+    hasManualThinkingEnabled(rewritten) &&
+    finalAssistantTurnLostThinkingBlocks(messages, droppedPerTurn);
+
   return {
-    payload: { ...payload, messages },
+    payload: droppedThinkingConfig ? withoutRequestThinkingConfig(rewritten) : rewritten,
     droppedBlockCount,
     droppedTurnCount,
+    droppedThinkingConfig,
   };
 }
 
@@ -180,11 +299,15 @@ export const dropUnsignedThinkingAdapter: ProviderAdapter = {
       payload: rewritten,
       droppedBlockCount,
       droppedTurnCount,
+      droppedThinkingConfig,
     } = dropUnsignedThinkingBlocks(payload);
     if (droppedBlockCount > 0) {
       logger.warn(
         `drop_unsigned_thinking: dropped ${droppedBlockCount} unsigned thinking block(s) ` +
-          `and ${droppedTurnCount} emptied turn(s) (model=${payload?.model ?? 'unknown'})`
+          `and ${droppedTurnCount} emptied turn(s) (model=${payload?.model ?? 'unknown'})` +
+          (droppedThinkingConfig
+            ? '; removed the request thinking config (final assistant turn no longer starts with a thinking block)'
+            : '')
       );
     }
     return rewritten;
