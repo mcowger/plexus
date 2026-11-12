@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test';
 
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -76,6 +76,7 @@ describe('ProviderAdvancedEditor — automatically injected Anthropic adapters',
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    jest.restoreAllMocks();
   });
 
   async function mount(initial: Provider) {
