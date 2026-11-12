@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Dependencies
+
+- Update all workspace dependencies to their latest stable releases, including Google GenAI 3, and refresh the lockfile.
+- Replace Playground's removed pi-ai schema-builder import with equivalent JSON Schema tool definitions.
+
+### Bug fixes
+
+- Preserve provider-targeted debug traces for failed upstream requests by assigning the provider before dispatch, including transport failures.
+- Show configured provider names on dashboard quota summaries and quota cards so multiple accounts using the same service can be distinguished.
+
 ## 2026.04.14.1 - 2026-04-14
 
 ### Add Support for Neuralwatt cost data, support for the new Synthetic quota system, Added provider access allowlists and improved log filtering

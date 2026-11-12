@@ -73,20 +73,20 @@
     "deploy:staging": "bun run scripts/deploy-staging.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.4.0"
+    "@earendil-works/pi-ai": "1.5.2"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.72.1",
-    "agent-browser": "^0.41.1",
+    "@redocly/cli": "^2.77.0",
+    "agent-browser": "^0.42.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "bun-types": "1.4.4",
-    "lefthook": "^2.2.1",
+    "lefthook": "^2.2.2",
     "octokit": "^5.0.5",
     "yaml": "^2.9.1",
-    "zod": "^4.6.6"
+    "zod": "^4.6.7"
   },
   "overrides": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   }
 }

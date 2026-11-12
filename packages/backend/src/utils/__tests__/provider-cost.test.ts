@@ -194,6 +194,53 @@ describe('extractUsageCostDetails', () => {
     expect(result!.total_cost).toBe(0.003);
   });
 
+  test('uses UberLLM cost_usd to override calculated request cost', () => {
+    const usage = {
+      input_tokens: 157223,
+      input_tokens_details: { cached_tokens: 153588 },
+      output_tokens: 69,
+      total_tokens: 157292,
+      cost_usd: 0.001002,
+    };
+    const details = extractUsageCostDetails(usage)!;
+    const record = createUsageRecord();
+    applyUsageCostDetails(record, details);
+
+    expect(record.costTotal).toBe(0.001002);
+    expect(record.providerReportedCost).toBe(0.001002);
+    expect(record.costSource).toBe('provider_reported');
+  });
+
+  test('prefers cost_usd over estimated_cost while retaining cost breakdowns', () => {
+    const details = extractUsageCostDetails({
+      cost_usd: 0.001002,
+      estimated_cost: 0.003,
+      cost_details: { input_cost: 0.0009, output_cost: 0.000102 },
+    });
+
+    expect(details!.total_cost).toBe(0.001002);
+    expect(details!.input_cost).toBe(0.0009);
+    expect(details!.output_cost).toBe(0.000102);
+  });
+
+  test('preserves cost and cost_details.total_cost precedence over cost_usd', () => {
+    expect(extractUsageCostDetails({ cost: 0.002, cost_usd: 0.001002 })!.total_cost).toBe(0.002);
+    expect(
+      extractUsageCostDetails({
+        cost: 0.002,
+        cost_usd: 0.001002,
+        cost_details: { total_cost: 0.004 },
+      })!.total_cost
+    ).toBe(0.004);
+  });
+
+  test('rejects negative and non-finite cost_usd values', () => {
+    for (const cost_usd of [-1, NaN, Infinity, 'invalid']) {
+      expect(extractUsageCostDetails({ cost_usd })).toBeNull();
+      expect(extractUsageCostDetails({ cost_usd, cost_details: {} })).toBeNull();
+    }
+  });
+
   test('returns null when usage has no cost_details', () => {
     const usage = {
       prompt_tokens: 23,

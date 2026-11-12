@@ -863,6 +863,20 @@
       "notes": "Get a key at https://standardcompute.com (commonly stored as STANDARDCOMPUTE_API_KEY) and send it as a Bearer token. The model id StandardCompute is routed: each request goes to the cheapest enabled model that can handle it, with automatic fallback. Pinned ids keep the vendor prefix, such as deepseek/deepseek-v4-flash, z-ai/glm-5.3 or moonshotai/kimi-k3, with context windows up to about 1M tokens. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
     },
     {
+      "id": "uberllm",
+      "name": "UberLLM",
+      "description": "UberLLM model gateway, OpenAI-compatible chat completions plus responses and Anthropic-compatible messages endpoints on one base.",
+      "docsUrl": "https://uberllm.dev/docs/quickstart",
+      "suggestedProviderId": "uberllm",
+      "suggestedName": "UberLLM",
+      "apiBaseUrl": {
+        "chat": "https://api.uberllm.dev/v1",
+        "responses": "https://api.uberllm.dev/v1",
+        "messages": "https://api.uberllm.dev/v1"
+      },
+      "notes": "Get a key at https://uberllm.dev/signup (prepaid, no monthly fee) and send it as a Bearer token. Model ids keep the vendor prefix, such as deepseek/deepseek-v4-flash, openai/gpt-5.4-mini, anthropic/claude-haiku-4.5 or z-ai/glm-5; per-model prices are at https://uberllm.dev/models. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. Failed requests are not billed. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "atlascloud",
       "name": "Atlas Cloud",
       "description": "Atlas Cloud model gateway, OpenAI-compatible chat completions plus responses and messages endpoints on one base.",

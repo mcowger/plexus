@@ -29,7 +29,6 @@ import {
   type Tool,
   type ToolCall,
   type ToolResultMessage,
-  Type,
 } from '@earendil-works/pi-ai';
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy';
 import { googleGenerativeAIApi } from '@earendil-works/pi-ai/api/google-generative-ai.lazy';
@@ -82,32 +81,39 @@ const playgroundTools: Tool[] = [
     name: 'get_date',
     description:
       'Get the current date and time in a specified timezone. Use UTC when none is specified.',
-    parameters: Type.Object(
-      {
-        timezone: Type.String({
+    parameters: {
+      type: 'object',
+      properties: {
+        timezone: {
+          type: 'string',
           description: 'IANA timezone, such as America/Los_Angeles.',
-        }),
+        },
       },
-      { additionalProperties: false }
-    ),
+      required: ['timezone'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'add_tasks',
     description:
       'Add one or more tasks to this browser-only test task list. Use one call with every task in titles.',
-    parameters: Type.Object(
-      {
-        titles: Type.Array(Type.String(), {
+    parameters: {
+      type: 'object',
+      properties: {
+        titles: {
+          type: 'array',
+          items: { type: 'string' },
           description: 'One or more tasks to add together',
-        }),
+        },
       },
-      { additionalProperties: false }
-    ),
+      required: ['titles'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'list_tasks',
     description: 'List tasks added during this current Playground chat session.',
-    parameters: Type.Object({}, { additionalProperties: false }),
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
 ];
 

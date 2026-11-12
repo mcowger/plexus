@@ -138,6 +138,12 @@ export const Quotas = () => {
         key={quota.checkerId}
         className="border-border-glass bg-bg-card/60 relative rounded-lg border p-4"
       >
+        <div
+          className="text-text-secondary mb-3 pr-8 text-sm font-medium break-words"
+          title={quota.provider || quota.checkerId}
+        >
+          {quota.provider || quota.checkerId}
+        </div>
         <button
           type="button"
           onClick={() => handleRefresh(quota.checkerId)}

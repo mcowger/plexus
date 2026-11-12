@@ -2068,11 +2068,11 @@ packages/backend/src/utils/stall.ts:28 [function] resolveStallConfig
 packages/backend/src/utils/stall.ts:81 [function] getGlobalStallConfig
 packages/backend/src/utils/timeout.ts:27 [function] wireUpstreamTimeout
 packages/backend/src/utils/timeout.ts:52 [function] wireEarlyDisconnectDetection
-packages/backend/src/utils/usage-normalizer.ts:137 [function] normalizeOpenAIChatUsage
-packages/backend/src/utils/usage-normalizer.ts:162 [function] normalizeOpenAIResponsesUsage
-packages/backend/src/utils/usage-normalizer.ts:197 [function] normalizeGeminiUsage
-packages/backend/src/utils/usage-normalizer.ts:220 [function] normalizeAnthropicUsage
-packages/backend/src/utils/usage-normalizer.ts:236 [function] normalizeOAuthUsage
+packages/backend/src/utils/usage-normalizer.ts:138 [function] normalizeOpenAIChatUsage
+packages/backend/src/utils/usage-normalizer.ts:163 [function] normalizeOpenAIResponsesUsage
+packages/backend/src/utils/usage-normalizer.ts:198 [function] normalizeGeminiUsage
+packages/backend/src/utils/usage-normalizer.ts:221 [function] normalizeAnthropicUsage
+packages/backend/src/utils/usage-normalizer.ts:237 [function] normalizeOAuthUsage
 packages/backend/src/utils/usage-normalizer.ts:36 [interface] ProviderCostDetails
 packages/backend/src/utils/usage-normalizer.ts:53 [interface] UsageWithCostDetails
 packages/backend/src/utils/usage-normalizer.ts:62 [function] extractUsageCostDetails
@@ -2129,7 +2129,8 @@ packages/frontend/src/components/providers/model-editor/constants.ts:37 [functio
 packages/frontend/src/components/providers/model-editor/types.ts:3 [interface] ModelTestState
 packages/frontend/src/components/providers/model-editor/usePiAiModels.ts:14 [function] usePiAiModels
 packages/frontend/src/components/providers/model-editor/usePiAiModels.ts:7 [interface] PiAiModel
-packages/frontend/src/components/quota/checker-presentation.ts:1 [function] getCheckerDisplayName
+packages/frontend/src/components/quota/checker-presentation.ts:18 [function] sortQuotaCheckersByDisplayName
+packages/frontend/src/components/quota/checker-presentation.ts:3 [function] getCheckerDisplayName
 packages/frontend/src/hooks/useBodyScrollLock.ts:10 [function] useBodyScrollLock
 packages/frontend/src/hooks/useCardPositions.ts:57 [interface] UseCardPositionsReturn
 packages/frontend/src/hooks/useCardPositions.ts:83 [function] useCardPositions
