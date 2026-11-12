@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import type { Meter, QuotaCheckerInfo } from '../../types/quota';
 import { AllowanceMeterRow } from './AllowanceMeterRow';
-import { getCheckerDisplayName } from './checker-presentation';
+import { getCheckerDisplayName, sortQuotaCheckersByDisplayName } from './checker-presentation';
 import { getStaleReadingMessage } from './StaleReadingNotice';
 
 interface CompactQuotasCardProps {
@@ -25,6 +25,8 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
 
   if (allowanceQuotas.length === 0) return null;
 
+  const sortedQuotas = sortQuotaCheckersByDisplayName(allowanceQuotas, displayNameMap);
+
   return (
     <div
       className="hover:bg-bg-hover cursor-pointer space-y-1 px-2 py-1 transition-colors"
@@ -38,14 +40,14 @@ export const CompactQuotasCard: React.FC<CompactQuotasCardProps> = ({
         }
       }}
     >
-      {allowanceQuotas.map((quota, idx) => {
+      {sortedQuotas.map((quota, idx) => {
         const displayName = getCheckerDisplayName(
           quota.checkerType,
           quota.checkerId,
           displayNameMap
         );
         const allowanceMeters = getAllowanceMeters(quota.meters);
-        const isLast = idx === allowanceQuotas.length - 1;
+        const isLast = idx === sortedQuotas.length - 1;
         const providerName = quota.provider || quota.checkerId;
         const heading = (
           <div className="min-w-0 flex-1 text-[11px]">
