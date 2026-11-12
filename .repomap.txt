@@ -2129,7 +2129,8 @@ packages/frontend/src/components/providers/model-editor/constants.ts:37 [functio
 packages/frontend/src/components/providers/model-editor/types.ts:3 [interface] ModelTestState
 packages/frontend/src/components/providers/model-editor/usePiAiModels.ts:14 [function] usePiAiModels
 packages/frontend/src/components/providers/model-editor/usePiAiModels.ts:7 [interface] PiAiModel
-packages/frontend/src/components/quota/checker-presentation.ts:1 [function] getCheckerDisplayName
+packages/frontend/src/components/quota/checker-presentation.ts:18 [function] sortQuotaCheckersByDisplayName
+packages/frontend/src/components/quota/checker-presentation.ts:3 [function] getCheckerDisplayName
 packages/frontend/src/hooks/useBodyScrollLock.ts:10 [function] useBodyScrollLock
 packages/frontend/src/hooks/useCardPositions.ts:57 [interface] UseCardPositionsReturn
 packages/frontend/src/hooks/useCardPositions.ts:83 [function] useCardPositions
