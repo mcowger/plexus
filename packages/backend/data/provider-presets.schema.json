@@ -174,6 +174,9 @@
                       "supportsReasoningEffort": {
                         "type": "boolean"
                       },
+                      "requiresReasoningContentOnAssistantMessages": {
+                        "type": "boolean"
+                      },
                       "serviceTierFormat": {
                         "type": "string",
                         "enum": ["service-tier", "anthropic-speed"]
@@ -277,6 +280,9 @@
                               "type": "boolean"
                             },
                             "supportsReasoningEffort": {
+                              "type": "boolean"
+                            },
+                            "requiresReasoningContentOnAssistantMessages": {
                               "type": "boolean"
                             },
                             "serviceTierFormat": {
@@ -418,6 +424,9 @@
                       "supportsReasoningEffort": {
                         "type": "boolean"
                       },
+                      "requiresReasoningContentOnAssistantMessages": {
+                        "type": "boolean"
+                      },
                       "serviceTierFormat": {
                         "type": "string",
                         "enum": ["service-tier", "anthropic-speed"]
@@ -521,6 +530,9 @@
                               "type": "boolean"
                             },
                             "supportsReasoningEffort": {
+                              "type": "boolean"
+                            },
+                            "requiresReasoningContentOnAssistantMessages": {
                               "type": "boolean"
                             },
                             "serviceTierFormat": {
@@ -662,6 +674,9 @@
                       "supportsReasoningEffort": {
                         "type": "boolean"
                       },
+                      "requiresReasoningContentOnAssistantMessages": {
+                        "type": "boolean"
+                      },
                       "serviceTierFormat": {
                         "type": "string",
                         "enum": ["service-tier", "anthropic-speed"]
@@ -765,6 +780,9 @@
                               "type": "boolean"
                             },
                             "supportsReasoningEffort": {
+                              "type": "boolean"
+                            },
+                            "requiresReasoningContentOnAssistantMessages": {
                               "type": "boolean"
                             },
                             "serviceTierFormat": {
@@ -906,6 +924,9 @@
                       "supportsReasoningEffort": {
                         "type": "boolean"
                       },
+                      "requiresReasoningContentOnAssistantMessages": {
+                        "type": "boolean"
+                      },
                       "serviceTierFormat": {
                         "type": "string",
                         "enum": ["service-tier", "anthropic-speed"]
@@ -1009,6 +1030,9 @@
                               "type": "boolean"
                             },
                             "supportsReasoningEffort": {
+                              "type": "boolean"
+                            },
+                            "requiresReasoningContentOnAssistantMessages": {
                               "type": "boolean"
                             },
                             "serviceTierFormat": {
@@ -1150,6 +1174,9 @@
                       "supportsReasoningEffort": {
                         "type": "boolean"
                       },
+                      "requiresReasoningContentOnAssistantMessages": {
+                        "type": "boolean"
+                      },
                       "serviceTierFormat": {
                         "type": "string",
                         "enum": ["service-tier", "anthropic-speed"]
@@ -1253,6 +1280,9 @@
                               "type": "boolean"
                             },
                             "supportsReasoningEffort": {
+                              "type": "boolean"
+                            },
+                            "requiresReasoningContentOnAssistantMessages": {
                               "type": "boolean"
                             },
                             "serviceTierFormat": {
