@@ -118,6 +118,7 @@ type LevelsDraft = Record<keyof ThinkingLevelMap, LevelDraftEntry>;
 interface CompatDraft {
   supportsTemperature: TriState;
   supportsReasoningEffort: TriState;
+  requiresReasoningContentOnAssistantMessages: TriState;
   forceAdaptiveThinking: TriState;
   thinkingFormat: '' | ThinkingFormatValue;
   maxTokensField: '' | MaxTokensFieldValue;
@@ -197,6 +198,7 @@ function blankCompat(): CompatDraft {
   return {
     supportsTemperature: 'unset',
     supportsReasoningEffort: 'unset',
+    requiresReasoningContentOnAssistantMessages: 'unset',
     forceAdaptiveThinking: 'unset',
     thinkingFormat: '',
     maxTokensField: '',
@@ -246,6 +248,9 @@ function compatToDraft(compat: QuirksCompat | undefined): CompatDraft {
   return {
     supportsTemperature: toTri(compat?.supportsTemperature),
     supportsReasoningEffort: toTri(compat?.supportsReasoningEffort),
+    requiresReasoningContentOnAssistantMessages: toTri(
+      compat?.requiresReasoningContentOnAssistantMessages
+    ),
     forceAdaptiveThinking: toTri(compat?.forceAdaptiveThinking),
     thinkingFormat: compat?.thinkingFormat ?? '',
     maxTokensField: compat?.maxTokensField ?? '',
@@ -336,6 +341,12 @@ function draftToCompat(compat: CompatDraft): QuirksCompat | undefined {
   const reasoningEffort = triToBool(compat.supportsReasoningEffort);
   if (reasoningEffort !== undefined) {
     out.supportsReasoningEffort = reasoningEffort;
+    any = true;
+  }
+
+  const reasoningContent = triToBool(compat.requiresReasoningContentOnAssistantMessages);
+  if (reasoningContent !== undefined) {
+    out.requiresReasoningContentOnAssistantMessages = reasoningContent;
     any = true;
   }
 
@@ -612,6 +623,15 @@ function CompatEditor({
             <TriSelect
               value={compat.supportsReasoningEffort}
               onChange={(value) => set({ supportsReasoningEffort: value })}
+            />
+          </label>
+        )}
+        {isCompletions && (
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLASS}>Requires reasoning_content on assistant messages</span>
+            <TriSelect
+              value={compat.requiresReasoningContentOnAssistantMessages}
+              onChange={(value) => set({ requiresReasoningContentOnAssistantMessages: value })}
             />
           </label>
         )}

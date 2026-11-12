@@ -257,8 +257,8 @@ and does not re-enable the removed `inference-v2` path.
 
 With a builtin link, set `pi_ai_provider` on the provider and `pi_ai_model_id` on
 each configured provider model. Enable `auto_compat: true` on the provider or
-model. If the pair is missing or unresolved, the registry rewrite does nothing;
-unresolved configured pairs produce a startup warning.
+model. If the pair is missing or unresolved, the registry rewrite does nothing
+(one exception below); unresolved configured pairs produce a startup warning.
 
 For providers without pi-ai definitions, use `pi_ai_quirks` instead of
 `pi_ai_provider`. Keys are configured target APIs (`chat`, `completions`,
@@ -268,6 +268,19 @@ bounded `compat` object. Optional `models` entries use exact upstream model IDs
 and override the common traits. Model-specific maps replace the common
 thinking-level map; individual `compat` flags merge. No `pi_ai_model_id` is
 needed. Unknown traits remain unknown and are not advertised or rewritten.
+
+Some thinking endpoints (DeepSeek, Kimi K3, MiMo) reject a replayed history
+when any assistant message lacks `reasoning_content`. When the resolved pi-ai
+model declares `requiresReasoningContentOnAssistantMessages` — as the builtin
+DeepSeek models do — auto-compat fills `reasoning_content: ""` on assistant
+turns that recorded no reasoning. Recorded reasoning is preserved verbatim;
+no adapter option is needed. Uncatalogued chat models can declare the same
+trait inline (`compat.requiresReasoningContentOnAssistantMessages: true`, with
+`reasoning: true`). As a fallback for DeepSeek routes whose model ID is not
+in the catalog (for example `deepseek-v4-flash`), a `deepseek.com` base URL,
+the `deepseek` pi-ai provider link, or the `deepseek` provider slug enables
+the same fill whenever thinking is engaged. The built-in DeepSeek preset
+already enables auto-compat, so preset-created providers get this by default.
 
 With neither source, requests use ordinary routing. Existing provider configs
 with `auto_compat: true` but no source remain valid and inert; new presets

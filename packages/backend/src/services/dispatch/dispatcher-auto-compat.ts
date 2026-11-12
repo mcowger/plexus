@@ -23,6 +23,49 @@ function hasOwn(value: Record<string, any>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
+/**
+ * Some thinking endpoints (DeepSeek, Kimi K3, MiMo, …) reject a replayed
+ * history when any assistant message lacks `reasoning_content`: the field
+ * must be passed back even for turns that recorded no reasoning. Mirrors
+ * pi-ai's openai-completions handling — fill `""` only where the field is
+ * absent, preserving any recorded reasoning verbatim. Copy-on-write: the
+ * input payload and untouched messages keep their identity.
+ */
+function ensureReasoningContentOnAssistantMessages(payload: any): any {
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.messages)) return payload;
+  let changed = false;
+  const messages = payload.messages.map((msg: any) => {
+    if (!msg || msg.role !== 'assistant' || msg.reasoning_content !== undefined) return msg;
+    changed = true;
+    return { ...msg, reasoning_content: '' };
+  });
+  return changed ? { ...payload, messages } : payload;
+}
+
+/**
+ * pi-ai's detectCompat parity for routes whose model does not resolve in the
+ * catalog (e.g. a DeepSeek route using the upstream id `deepseek-v4-flash`):
+ * the provider link, provider slug, or a `deepseek.com` base URL identifies a
+ * DeepSeek chat target, which requires reasoning_content passback whenever
+ * thinking is engaged.
+ */
+function isDetectedDeepSeekChatTarget(
+  route: RouteResult,
+  piAiProvider: string | undefined,
+  targetApiType: string
+): boolean {
+  if (getApiBaseType(targetApiType) !== 'chat') return false;
+  if (piAiProvider === 'deepseek' || route.provider === 'deepseek') return true;
+  const apiBaseUrl: unknown = route.config.api_base_url;
+  const urls =
+    typeof apiBaseUrl === 'string'
+      ? [apiBaseUrl]
+      : apiBaseUrl && typeof apiBaseUrl === 'object'
+        ? Object.values(apiBaseUrl)
+        : [];
+  return urls.some((url) => typeof url === 'string' && url.toLowerCase().includes('deepseek.com'));
+}
+
 function normalizeReasoningFromUnified(
   reasoning: UnifiedChatRequest['reasoning']
 ): ReasoningIntent {
@@ -726,6 +769,17 @@ export function applyRegistryAutoCompat(
   } else if (base) {
     piAiModel = applyQuirkOverlay(base, quirks, targetApiType, route.model);
   } else {
+    // No catalog model and no inline quirks. A positively-identified DeepSeek
+    // chat target still gets the reasoning_content passback fill when thinking
+    // is engaged (pi-ai detectCompat parity); every other unresolved route is
+    // left byte-identical.
+    const intent = extractGenerationIntent(tierPayload, request);
+    if (
+      (intent.reasoning.enabled === true || intent.reasoning.effort !== undefined) &&
+      isDetectedDeepSeekChatTarget(route, piAiProvider, targetApiType)
+    ) {
+      return ensureReasoningContentOnAssistantMessages(tierPayload);
+    }
     logger.debug(
       `Registry auto-compat skipped: ${route.provider}/${route.model} has no resolvable ` +
         `pi-ai base${
@@ -735,13 +789,36 @@ export function applyRegistryAutoCompat(
     return tierPayload;
   }
 
+  // Models whose compat declares `requiresReasoningContentOnAssistantMessages`
+  // (DeepSeek, Kimi K3, MiMo, … in the pi-ai catalog, or an inline-quirk
+  // declaration) reject histories with a missing field on any assistant turn.
+  // Inline quirks must declare `reasoning: true` themselves; catalog models
+  // carry the capability on the resolved model. Deliberately NOT gated on
+  // this request's thinking intent: these models can default thinking on,
+  // and pi-ai fills unconditionally for reasoning models.
+  const requiresReasoningContent =
+    piAiModel.compat?.requiresReasoningContentOnAssistantMessages === true &&
+    (inline ? inline.reasoning === true : piAiModel.reasoning === true);
+
+  const api = (piAiModel.api as string | undefined) ?? targetApiType;
+  const isCompletionsApi = ![
+    'openai-responses',
+    'openai-codex-responses',
+    'azure-openai-responses',
+    'anthropic-messages',
+    'google-generative-ai',
+    'google-generative-ai-vertex',
+  ].includes(api);
+
   const intent = extractGenerationIntent(tierPayload, request);
   const selectedIntent = inline ? selectInlineGenerationIntent(inline, intent) : intent;
   const options = buildGenerationOptions(piAiModel, selectedIntent);
   // An inline API declaration alone carries no model capabilities. Leave the
   // payload untouched unless a declared trait actually requests a projection.
   if (inline && Object.keys(options).length === 0 && inline.compat?.supportsTemperature !== false) {
-    return tierPayload;
+    return requiresReasoningContent && isCompletionsApi
+      ? ensureReasoningContentOnAssistantMessages(tierPayload)
+      : tierPayload;
   }
 
   // Anthropic fast mode's beta flag is resolved at fetch time in
@@ -749,7 +826,6 @@ export function applyRegistryAutoCompat(
   // override to `standard` (or a strip-and-retry that removes `speed`) never
   // leaves a stale fast-mode beta behind.
 
-  const api = (piAiModel.api as string | undefined) ?? targetApiType;
   let nextPayload: any;
   if (
     api === 'openai-responses' ||
@@ -775,6 +851,9 @@ export function applyRegistryAutoCompat(
       selectedIntent,
       options
     );
+    if (requiresReasoningContent) {
+      nextPayload = ensureReasoningContentOnAssistantMessages(nextPayload);
+    }
   }
 
   logger.debug(`Registry auto-compat applied for ${route.provider}/${route.model}`, {

@@ -81,6 +81,14 @@ const PiAiCompatSchema = z
     forceAdaptiveThinking: z.boolean().optional(),
     supportsReasoningEffort: z.boolean().optional(),
     /**
+     * The endpoint rejects a replayed history when any assistant message
+     * lacks `reasoning_content` (DeepSeek thinking mode, Kimi K3, MiMo).
+     * Auto-compat then fills `reasoning_content: ""` on assistant turns that
+     * recorded no reasoning. Catalog (pi-ai) models declare this themselves;
+     * inline quirks only need it for uncatalogued models.
+     */
+    requiresReasoningContentOnAssistantMessages: z.boolean().optional(),
+    /**
      * Wire shape used to project a canonical service tier onto this API:
      * `service-tier` writes the provider's `service_tier` body field (OpenAI,
      * OpenRouter); `anthropic-speed` writes `speed` plus the

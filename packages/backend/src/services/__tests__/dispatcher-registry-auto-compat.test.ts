@@ -787,6 +787,171 @@ describe('Dispatcher registry auto-compat', () => {
     expect(result.payload.reasoning).toBeUndefined();
   });
 
+  test('fills missing reasoning_content on assistant messages when the model requires passback', () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({
+        compat: {
+          supportsReasoningEffort: true,
+          thinkingFormat: 'deepseek',
+          requiresReasoningContentOnAssistantMessages: true,
+        },
+      })
+    );
+    const bareAssistant = {
+      role: 'assistant',
+      content: '',
+      tool_calls: [{ id: 'c1', type: 'function', function: { name: 'f', arguments: '{}' } }],
+    };
+    const payload = {
+      model: 'provider-model',
+      messages: [
+        { role: 'user', content: 'go' },
+        bareAssistant,
+        { role: 'tool', tool_call_id: 'c1', content: 'ok' },
+        { role: 'assistant', content: 'done', reasoning_content: 'real thought' },
+        { role: 'assistant', content: 'also done', reasoning_content: '' },
+      ],
+    };
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ originalBody: payload }),
+      route(),
+      'chat'
+    );
+
+    expect(outbound.messages[1].reasoning_content).toBe('');
+    expect(outbound.messages[3].reasoning_content).toBe('real thought');
+    expect(outbound.messages[4].reasoning_content).toBe('');
+    expect(outbound.messages[0]).not.toHaveProperty('reasoning_content');
+    expect(outbound.messages[2]).not.toHaveProperty('reasoning_content');
+    // Copy-on-write: the caller's payload is not mutated.
+    expect(bareAssistant).not.toHaveProperty('reasoning_content');
+  });
+
+  test('does not fill reasoning_content when the model does not declare the requirement', () => {
+    const payload = {
+      model: 'provider-model',
+      messages: [{ role: 'assistant', content: '', tool_calls: [{ id: 'c1' }] }],
+    };
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ originalBody: payload }),
+      route(),
+      'chat'
+    );
+
+    expect(outbound.messages[0]).not.toHaveProperty('reasoning_content');
+  });
+
+  test('does not fill reasoning_content for a non-reasoning model even when the flag is set', () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({ reasoning: false, compat: { requiresReasoningContentOnAssistantMessages: true } })
+    );
+    const payload = {
+      model: 'provider-model',
+      messages: [{ role: 'assistant', content: 'hi' }],
+    };
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ originalBody: payload }),
+      route(),
+      'chat'
+    );
+
+    expect(outbound.messages[0]).not.toHaveProperty('reasoning_content');
+  });
+
+  test('inline quirks can declare the reasoning_content passback requirement', () => {
+    const payload = {
+      model: 'upstream/model',
+      messages: [{ role: 'assistant', content: '', tool_calls: [{ id: 'c1' }] }],
+    };
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ originalBody: payload }),
+      route({
+        model: 'upstream/model',
+        modelConfig: undefined,
+        config: {
+          api_base_url: 'https://example.test/v1',
+          api_key: 'test-key',
+          auto_compat: true,
+          pi_ai_quirks: {
+            chat: {
+              api: 'openai-completions',
+              reasoning: true,
+              compat: { requiresReasoningContentOnAssistantMessages: true },
+            },
+          },
+        } as any,
+      }),
+      'chat'
+    );
+
+    expect(outbound.messages[0].reasoning_content).toBe('');
+  });
+
+  test('fills reasoning_content for an uncatalogued DeepSeek model when thinking is engaged', () => {
+    resolvePiAiModel.mockReturnValue(null);
+    const payload = {
+      model: 'deepseek-v4-flash',
+      reasoning_effort: 'high',
+      messages: [
+        { role: 'assistant', content: '', tool_calls: [{ id: 'c1' }] },
+        { role: 'assistant', content: 'done', reasoning_content: 'real thought' },
+      ],
+    };
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ originalBody: payload }),
+      route({
+        provider: 'custom-deepseek',
+        model: 'deepseek-v4-flash',
+        modelConfig: undefined,
+        config: {
+          api_base_url: 'https://api.deepseek.com',
+          api_key: 'test-key',
+          auto_compat: true,
+        } as any,
+      }),
+      'chat'
+    );
+
+    expect(outbound.messages[0].reasoning_content).toBe('');
+    expect(outbound.messages[1].reasoning_content).toBe('real thought');
+  });
+
+  test('leaves an uncatalogued DeepSeek history untouched when thinking is not engaged', () => {
+    resolvePiAiModel.mockReturnValue(null);
+    const payload = {
+      model: 'deepseek-v4-flash',
+      messages: [{ role: 'assistant', content: 'hi' }],
+    };
+
+    const outbound = applyRegistryAutoCompat(
+      payload,
+      request({ originalBody: payload }),
+      route({
+        provider: 'custom-deepseek',
+        model: 'deepseek-v4-flash',
+        modelConfig: undefined,
+        config: {
+          api_base_url: 'https://api.deepseek.com',
+          api_key: 'test-key',
+          auto_compat: true,
+        } as any,
+      }),
+      'chat'
+    );
+
+    expect(outbound.messages[0]).not.toHaveProperty('reasoning_content');
+  });
+
   test('ant-ling drops the unified reasoning notation when the intent is a disable it cannot express', async () => {
     resolvePiAiModel.mockReturnValue(
       piModel({ compat: { supportsReasoningEffort: true, thinkingFormat: 'ant-ling' } })
