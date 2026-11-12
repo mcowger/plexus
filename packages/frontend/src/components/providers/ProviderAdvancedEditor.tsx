@@ -30,6 +30,27 @@ import { ReasoningRewriteRulesEditor } from './ReasoningRewriteRulesEditor';
 export { KNOWN_ADAPTERS } from './model-editor/adapter-utils';
 
 const ANTHROPIC_TOOL_ID_ADAPTER = 'normalize_anthropic_tool_ids';
+const DROP_UNSIGNED_THINKING_ADAPTER = 'drop_unsigned_thinking';
+
+/**
+ * Adapters the backend injects automatically under one gate (adapter-resolver.ts).
+ * Each renders as Auto | Enabled | Disabled, so an operator can force one on or
+ * opt out from the UI instead of only through the API.
+ */
+const AUTO_ANTHROPIC_ADAPTERS: { name: string; label: string; description: string }[] = [
+  {
+    name: ANTHROPIC_TOOL_ID_ADAPTER,
+    label: 'Anthropic Tool-ID Normalization',
+    description:
+      "Rewrites tool ids that violate Anthropic's ^[a-zA-Z0-9_-]+$ charset before dispatch. Anthropic rejects such ids with HTTP 400.",
+  },
+  {
+    name: DROP_UNSIGNED_THINKING_ADAPTER,
+    label: 'Drop Unsigned Thinking',
+    description:
+      'Removes thinking blocks that carry no signature before dispatch. Anthropic rejects unsigned thinking with HTTP 400.',
+  },
+];
 
 const WEB_SEARCH_TARGETS = [
   { value: 'anthropic', label: 'Anthropic (web_search_20250305)' },
@@ -416,41 +437,8 @@ export function ProviderAdvancedEditor({
                   );
                 })()}
 
-                {/* Anthropic Tool-ID Normalization — Auto | Enabled | Disabled */}
+                {/* Automatically injected Anthropic adapters — Auto | Enabled | Disabled */}
                 {(() => {
-                  const entries = normalizeAdapterEntries(editingProvider.adapter);
-                  // The backend replays adapter entries in order, so a LATER
-                  // entry overrides an earlier one — read the last match, not
-                  // the first (resolveAdapters, adapter-resolver.ts).
-                  let entry: any;
-                  for (const candidate of entries) {
-                    const name = getAdapterName(candidate);
-                    if (name === ANTHROPIC_TOOL_ID_ADAPTER) entry = candidate;
-                  }
-                  const mode: 'auto' | 'on' | 'off' = !entry
-                    ? 'auto'
-                    : typeof entry === 'string' || entry.enabled !== false
-                      ? 'on'
-                      : 'off';
-
-                  const setMode = (value: 'auto' | 'on' | 'off') => {
-                    const withoutEntry = entries.filter(
-                      (e: any) => getAdapterName(e) !== ANTHROPIC_TOOL_ID_ADAPTER
-                    );
-                    const next =
-                      value === 'auto'
-                        ? withoutEntry
-                        : [
-                            ...withoutEntry,
-                            {
-                              name: ANTHROPIC_TOOL_ID_ADAPTER,
-                              options: {},
-                              enabled: value === 'on',
-                            },
-                          ];
-                    setEditingProvider({ ...editingProvider, adapter: next });
-                  };
-
                   // Advisory mirror of the backend gate (adapter-resolver.ts):
                   // it only fires on the Messages wire format, so a record base
                   // URL counts only where the Messages dispatch would go — a
@@ -480,64 +468,104 @@ export function ProviderAdvancedEditor({
                         }));
 
                   return (
-                    <div
-                      style={{
-                        gridColumn: '1 / -1',
-                        padding: '4px 8px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--color-border-glass)',
-                        background:
-                          mode === 'auto' ? 'var(--color-bg-glass)' : 'var(--color-bg-hover)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                      }}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="font-body text-text text-[12px] font-medium">
-                            Anthropic Tool-ID Normalization
-                          </div>
-                          <Tooltip
-                            position="top"
-                            content={
-                              <div className="font-body w-64 leading-relaxed whitespace-normal">
-                                Auto enables this only for Anthropic-like targets on this provider's
-                                Messages endpoint: base URL containing anthropic.com, Anthropic
-                                OAuth, or Claude masking. Choose Enabled to force it for
-                                Anthropic-compatible gateways on other hosts.
-                              </div>
-                            }
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {AUTO_ANTHROPIC_ADAPTERS.map((adapter) => {
+                        const entries = normalizeAdapterEntries(editingProvider.adapter);
+                        // The backend replays adapter entries in order, so a LATER
+                        // entry overrides an earlier one — read the last match, not
+                        // the first (resolveAdapters, adapter-resolver.ts).
+                        let entry: any;
+                        for (const candidate of entries) {
+                          if (getAdapterName(candidate) === adapter.name) entry = candidate;
+                        }
+                        const mode: 'auto' | 'on' | 'off' = !entry
+                          ? 'auto'
+                          : typeof entry === 'string' || entry.enabled !== false
+                            ? 'on'
+                            : 'off';
+
+                        const setMode = (value: 'auto' | 'on' | 'off') => {
+                          const withoutEntry = entries.filter(
+                            (e: any) => getAdapterName(e) !== adapter.name
+                          );
+                          const next =
+                            value === 'auto'
+                              ? withoutEntry
+                              : [
+                                  ...withoutEntry,
+                                  {
+                                    name: adapter.name,
+                                    options: {},
+                                    enabled: value === 'on',
+                                  },
+                                ];
+                          setEditingProvider({ ...editingProvider, adapter: next });
+                        };
+
+                        return (
+                          <div
+                            key={adapter.name}
+                            style={{
+                              gridColumn: '1 / -1',
+                              padding: '4px 8px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--color-border-glass)',
+                              background:
+                                mode === 'auto' ? 'var(--color-bg-glass)' : 'var(--color-bg-hover)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                            }}
                           >
-                            <button
-                              type="button"
-                              aria-label="About Anthropic Tool-ID Normalization"
-                              className="text-text-muted hover:bg-bg-hover hover:text-text-secondary focus-visible:ring-primary flex h-4 w-4 items-center justify-center rounded-full transition-colors focus-visible:ring-1 focus-visible:outline-none"
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <div className="font-body text-text text-[12px] font-medium">
+                                  {adapter.label}
+                                </div>
+                                <Tooltip
+                                  position="top"
+                                  content={
+                                    <div className="font-body w-64 leading-relaxed whitespace-normal">
+                                      Auto enables this only for Anthropic-like targets on this
+                                      provider's Messages endpoint: base URL containing
+                                      anthropic.com, Anthropic OAuth, or Claude masking. Choose
+                                      Enabled to force it for Anthropic-compatible gateways on other
+                                      hosts.
+                                    </div>
+                                  }
+                                >
+                                  <button
+                                    type="button"
+                                    aria-label={`About ${adapter.label}`}
+                                    className="text-text-muted hover:bg-bg-hover hover:text-text-secondary focus-visible:ring-primary flex h-4 w-4 items-center justify-center rounded-full transition-colors focus-visible:ring-1 focus-visible:outline-none"
+                                  >
+                                    <Info size={12} />
+                                  </button>
+                                </Tooltip>
+                              </div>
+                              <div
+                                className="font-body text-text-secondary text-[11px]"
+                                style={{ lineHeight: 1.35 }}
+                              >
+                                {adapter.description}
+                              </div>
+                            </div>
+                            <select
+                              aria-label={adapter.label}
+                              className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border py-1 pr-2 pl-2 text-[12px] outline-none"
+                              value={mode === 'auto' ? '' : mode}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setMode(raw === 'on' ? 'on' : raw === 'off' ? 'off' : 'auto');
+                              }}
                             >
-                              <Info size={12} />
-                            </button>
-                          </Tooltip>
-                        </div>
-                        <div
-                          className="font-body text-text-secondary text-[11px]"
-                          style={{ lineHeight: 1.35 }}
-                        >
-                          Rewrites tool ids that violate Anthropic's ^[a-zA-Z0-9_-]+$ charset before
-                          dispatch. Anthropic rejects such ids with HTTP 400.
-                        </div>
-                      </div>
-                      <select
-                        className="font-body text-text bg-bg-glass border-border-glass focus:border-primary w-full rounded-sm border py-1 pr-2 pl-2 text-[12px] outline-none"
-                        value={mode === 'auto' ? '' : mode}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setMode(raw === 'on' ? 'on' : raw === 'off' ? 'off' : 'auto');
-                        }}
-                      >
-                        <option value="">{`Auto (currently: ${autoDetected ? 'enabled' : 'disabled'})`}</option>
-                        <option value="on">Enabled</option>
-                        <option value="off">Disabled</option>
-                      </select>
+                              <option value="">{`Auto (currently: ${autoDetected ? 'enabled' : 'disabled'})`}</option>
+                              <option value="on">Enabled</option>
+                              <option value="off">Disabled</option>
+                            </select>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}

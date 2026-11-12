@@ -55,6 +55,20 @@ describe('matchThinkingSignatureError', () => {
     expect(matchThinkingSignatureError('INVALID SIGNATURE IN THINKING BLOCK')).toBe(true);
   });
 
+  test('matches the missing-signature wording a strict gateway returns for an unsigned block', () => {
+    // The third leg of the repair: a gateway that is not recognized as
+    // Anthropic (so `drop_unsigned_thinking` is not injected) still 400s on an
+    // unsigned `thinking` block, and the bounded strip-and-retry must fire.
+    expect(
+      matchThinkingSignatureError(
+        '{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0.thinking.signature: Field required"}}'
+      )
+    ).toBe(true);
+    expect(
+      matchThinkingSignatureError('messages.7.content.2.thinking.signature: field required')
+    ).toBe(true);
+  });
+
   test('returns false for an unrelated 400 body', () => {
     expect(
       matchThinkingSignatureError('{"error":{"message":"Invalid request: missing model"}}')
@@ -121,6 +135,70 @@ describe('stripThinkingSignatureBlocks', () => {
       role: 'user',
       content: [{ type: 'text', text: 'do the thing' }],
     });
+  });
+  test('drops the request thinking config when the strip leaves an open tool-use cycle without a leading thinking block', () => {
+    // Manual extended thinking requires the open cycle's assistant turn to
+    // open on a thinking block; with every thinking block stripped, the
+    // retry would be rejected again for the thinking mode, not the
+    // signature. The request is degraded to non-thinking instead.
+    const payload: Record<string, any> = {
+      model: 'claude-x',
+      thinking: { type: 'enabled', budget_tokens: 1024 },
+      output_config: { effort: 'high' },
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'do the thing' }] },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'reasoning', signature: 'sig-1' },
+            { type: 'tool_use', id: 'tool-1', name: 'search', input: { q: 'x' } },
+          ],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: 'ok' }],
+        },
+      ],
+    };
+
+    const result = stripThinkingSignatureBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    expect(result.droppedThinkingConfig).toBe(true);
+    expect('thinking' in result.payload).toBe(false);
+    expect(result.payload.output_config).toBeUndefined();
+    expect(result.payload.messages[1].content).toEqual([
+      { type: 'tool_use', id: 'tool-1', name: 'search', input: { q: 'x' } },
+    ]);
+    // Copy-on-write: the input keeps its thinking config.
+    expect(payload.thinking).toEqual({ type: 'enabled', budget_tokens: 1024 });
+    expect(payload.output_config).toEqual({ effort: 'high' });
+  });
+
+  test('keeps the request thinking config when the stripped turn is a completed text turn', () => {
+    const payload: Record<string, any> = {
+      model: 'claude-x',
+      thinking: { type: 'enabled', budget_tokens: 1024 },
+      output_config: { effort: 'high' },
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'reasoning', signature: 'sig-1' },
+            { type: 'text', text: 'the answer' },
+          ],
+        },
+        { role: 'user', content: [{ type: 'text', text: 'follow up' }] },
+      ],
+    };
+
+    const result = stripThinkingSignatureBlocks(payload);
+
+    expect(result.strippedCount).toBe(1);
+    expect(result.droppedThinkingConfig).toBe(false);
+    expect(result.payload.thinking).toEqual({ type: 'enabled', budget_tokens: 1024 });
+    expect(result.payload.output_config).toEqual({ effort: 'high' });
   });
 
   test('removes a redacted_thinking block, preserving sibling content', () => {

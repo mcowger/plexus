@@ -419,8 +419,11 @@ async function runStandardAttempt(
             providerPayload = stripResult.payload;
             logger.warn(
               `Auto-compat: ${route.provider}/${route.model} rejected a stale thinking-block ` +
-                `signature — stripped ${stripResult.strippedCount} thinking block(s) and retrying the ` +
-                `same target (attempt ${thinkingStripState.attempts}/${MAX_THINKING_SIGNATURE_STRIP_RETRIES})`
+                `signature — stripped ${stripResult.strippedCount} thinking block(s)` +
+                (stripResult.droppedThinkingConfig
+                  ? ` and removed the request thinking config (open tool-use cycle no longer starts with a thinking block)`
+                  : '') +
+                ` and retrying the same target (attempt ${thinkingStripState.attempts}/${MAX_THINKING_SIGNATURE_STRIP_RETRIES})`
             );
             continue;
           }

@@ -239,26 +239,36 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
   // tool-id charset, and rewriting ids there would corrupt ids the client
   // matches against on its next turn.
   const NORMALIZER = 'normalize_anthropic_tool_ids';
+  // Injected by the same gate: Anthropic rejects an unsigned `thinking` block
+  // just as it rejects a foreign tool id, so the two repairs travel together.
+  const UNSIGNED_THINKING = 'drop_unsigned_thinking';
+  const ANTHROPIC_IMPLICIT = [NORMALIZER, UNSIGNED_THINKING];
 
   it('auto-injects for a string anthropic.com base URL on the messages wire format', () => {
     const route = makeRoute(undefined, undefined, {
       api_base_url: 'https://api.anthropic.com',
     });
-    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('auto-injects for a record base URL whose messages value is anthropic.com', () => {
     const route = makeRoute(undefined, undefined, {
       api_base_url: { messages: 'https://gw.anthropic.com/v1' },
     });
-    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('matches the anthropic.com host case-insensitively', () => {
     const route = makeRoute(undefined, undefined, {
       api_base_url: 'https://API.ANTHROPIC.COM',
     });
-    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('auto-injects for an Anthropic OAuth route (string oauth:// URL)', () => {
@@ -268,7 +278,9 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       api_base_url: 'oauth://anthropic',
       oauth_provider: 'anthropic',
     });
-    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('auto-injects for an Anthropic OAuth route (record oauth:// URL)', () => {
@@ -276,7 +288,9 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       api_base_url: { messages: 'oauth://anthropic' },
       oauth_provider: 'anthropic',
     });
-    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('auto-injects for a Claude-masking route regardless of its base URL', () => {
@@ -284,7 +298,9 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       api_base_url: 'https://example.com',
       useClaudeMasking: true,
     });
-    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('auto-injects for a messages subtype on an Anthropic target', () => {
@@ -298,7 +314,9 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
     const route = makeRoute(undefined, undefined, {
       api_base_url: 'https://api.anthropic.com',
     });
-    expect(resolveAdapters(route, subtypeApiType).map((r) => r.adapter.name)).toEqual([NORMALIZER]);
+    expect(resolveAdapters(route, subtypeApiType).map((r) => r.adapter.name)).toEqual(
+      ANTHROPIC_IMPLICIT
+    );
   });
 
   it('does NOT auto-inject for a non-Anthropic messages proxy', () => {
@@ -364,7 +382,11 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
     const route = makeRoute([{ name: NORMALIZER, enabled: false }], undefined, {
       api_base_url: 'https://api.anthropic.com',
     });
-    expect(resolveAdapters(route, 'messages')).toHaveLength(0);
+    // Only the normalizer is tombstoned; the implicit drop stays and is the
+    // sole remaining adapter.
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([
+      UNSIGNED_THINKING,
+    ]);
   });
 
   it('allows a model adapter entry to disable the tool-id normalizer', () => {
@@ -372,7 +394,9 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
     const route = makeRoute(undefined, [{ name: NORMALIZER, enabled: false }], {
       api_base_url: 'https://api.anthropic.com',
     });
-    expect(resolveAdapters(route, 'messages')).toHaveLength(0);
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([
+      UNSIGNED_THINKING,
+    ]);
   });
 
   it('allows a provider adapter entry to force-enable the normalizer on a non-Anthropic proxy', () => {
@@ -381,6 +405,8 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
     const route = makeRoute([{ name: NORMALIZER, options: {}, enabled: true }], undefined, {
       api_base_url: 'https://p1.example.com/v1',
     });
+    // The unsigned-thinking drop stays off: this proxy is not Anthropic, and
+    // force-enabling one repair must not drag the other in.
     expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
   });
 
@@ -390,6 +416,21 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       [{ name: NORMALIZER, enabled: true }],
       { api_base_url: 'https://api.anthropic.com' }
     );
+    // The tombstone removes the implicit normalizer only; the implicit drop
+    // stays ahead of the explicitly re-enabled normalizer.
+    expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([
+      UNSIGNED_THINKING,
+      NORMALIZER,
+    ]);
+  });
+
+  it('allows a provider adapter entry to disable the unsigned-thinking drop alone', () => {
+    // The operator opt-out is per adapter: an operator who knows their
+    // Anthropic-compatible gateway accepts unsigned thinking keeps it while
+    // still normalizing tool ids.
+    const route = makeRoute([{ name: UNSIGNED_THINKING, enabled: false }], undefined, {
+      api_base_url: 'https://api.anthropic.com',
+    });
     expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([NORMALIZER]);
   });
 
@@ -404,6 +445,7 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
     });
     expect(resolveAdapters(route, 'messages').map((r) => r.adapter.name)).toEqual([
       NORMALIZER,
+      UNSIGNED_THINKING,
       NORMALIZER,
     ]);
   });
@@ -418,6 +460,7 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       'suppress_unsupported_gpt5_options',
       'strip_unsupported_tool_search',
       'normalize_anthropic_tool_ids',
+      'drop_unsigned_thinking',
       'reasoning_content',
     ]);
   });
