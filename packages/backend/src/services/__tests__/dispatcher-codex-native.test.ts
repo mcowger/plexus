@@ -9,10 +9,8 @@ import { isCodexCliShapedBody } from '../oauth/oauth-native-request';
 // Native Codex OAuth pass-through.
 //
 // Codex is NOT Anthropic: no masking. The ChatGPT backend wants a specific
-// Responses body. Two paths:
-//   1. CLI-shaped body  → sent VERBATIM (auth only), extensions preserved.
-//   2. Not CLI-shaped   → normalized via ResponsesTransformer + adorned.
-// Responses clients stream RAW backend SSE; cross-format clients get translated.
+// Responses bodies are preserved when supported; non-CLI bodies are adorned.
+// Cross-format requests and unsupported extensions are transformed.
 
 const { Dispatcher } = await import('../dispatch/dispatcher');
 const { ResponsesTransformer } = await import('../../transformers/responses');
@@ -116,46 +114,6 @@ function codexCliRequest(): UnifiedChatRequest {
   return {
     model: 'codex-alias',
     messages: [{ role: 'user', content: 'hi' }],
-    stream: true,
-    incomingApiType: 'responses',
-    originalBody: body,
-  } as any;
-}
-
-// A plain (non-CLI) OpenAI Responses request: plain function tools, no
-// client_metadata, no instructions/text.
-function plainResponsesRequest(): UnifiedChatRequest {
-  const body = {
-    model: 'codex-alias',
-    stream: true,
-    top_p: 0.5,
-    truncation: 'auto',
-    frequency_penalty: 1,
-    max_output_tokens: 256,
-    input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
-    tools: [
-      {
-        type: 'function',
-        name: 'get_weather',
-        description: 'weather',
-        parameters: { type: 'object', properties: {} },
-      },
-    ],
-  };
-  return {
-    model: 'codex-alias',
-    messages: [{ role: 'user', content: 'hi' }],
-    max_tokens: 256,
-    tools: [
-      {
-        type: 'function',
-        function: {
-          name: 'get_weather',
-          description: 'weather',
-          parameters: { type: 'object', properties: {} },
-        },
-      },
-    ],
     stream: true,
     incomingApiType: 'responses',
     originalBody: body,
@@ -290,9 +248,28 @@ describe('Native Codex OAuth pass-through', () => {
     expect(init.headers['session-id']).toBe('sess-cli-1');
   });
 
-  test('PATH 2 (non-CLI): normalizes + adorns the body for the backend', async () => {
+  test('preserves a named tool choice and Responses fields while adorning a non-CLI body', async () => {
     setConfigForTesting(codexOAuthConfig());
-    const response = await new Dispatcher().dispatch(plainResponsesRequest());
+    const body = {
+      model: 'codex-alias',
+      stream: true,
+      top_p: 0.5,
+      truncation: 'auto',
+      frequency_penalty: 1,
+      max_output_tokens: 256,
+      input: 'Call get_weather.',
+      tools: [
+        { type: 'function', name: 'get_weather', parameters: { type: 'object', properties: {} } },
+      ],
+      tool_choice: { type: 'function', name: 'get_weather' },
+      metadata: { purpose: 'weather' },
+    };
+    const parsed = await new ResponsesTransformer().parseRequest(body);
+    const response = await new Dispatcher().dispatch({
+      ...parsed,
+      incomingApiType: 'responses',
+      originalBody: body,
+    });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(response.bypassTransformation).toBe(true);
@@ -306,6 +283,9 @@ describe('Native Codex OAuth pass-through', () => {
     expect(typeof sent.instructions).toBe('string');
     expect(sent.text.verbosity).toBe('low');
     expect(sent.model).toBe('gpt-5-codex');
+    expect(sent.input).toEqual(body.input);
+    expect(sent.tool_choice).toEqual(body.tool_choice);
+    expect(sent.metadata).toEqual(body.metadata);
     // Plain function tool preserved as a function (not turned into custom).
     expect(sent.tools.find((t: any) => t.name === 'get_weather').type).toBe('function');
     // Unsupported sampling params the Codex backend rejects must NOT be
@@ -321,6 +301,23 @@ describe('Native Codex OAuth pass-through', () => {
     expect(sent).not.toHaveProperty('max_completion_tokens');
   });
 
+  test.each([
+    { effort: 'off', context: 'all_turns' },
+    { effort: 'high', enabled: false, context: 'all_turns' },
+  ])('normalizes disabled reasoning while preserving Responses fields', async (reasoning) => {
+    setConfigForTesting(codexOAuthConfig());
+    const body = { model: 'codex-alias', input: 'hi', stream: true, reasoning };
+    const parsed = await new ResponsesTransformer().parseRequest(body);
+    await new Dispatcher().dispatch({
+      ...parsed,
+      incomingApiType: 'responses',
+      originalBody: body,
+    });
+
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as [unknown, RequestInit])[1].body as string);
+    expect(sent.reasoning).toEqual({ effort: 'none', context: 'all_turns' });
+  });
+
   test('flattens Muse dotted history the backend rejects, and translates the response back', async () => {
     setConfigForTesting(codexOAuthConfig());
     const body = {
@@ -333,6 +330,7 @@ describe('Native Codex OAuth pass-through', () => {
           tools: [{ type: 'function', name: 'bash', parameters: { type: 'object' } }],
         },
       ],
+      tool_choice: { type: 'function', name: 'muse__bash' },
       input: [
         { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
         { type: 'function_call', call_id: 'c1', name: 'muse.bash', arguments: '{}' },
@@ -350,6 +348,7 @@ describe('Native Codex OAuth pass-through', () => {
     expect(response.bypassTransformation).toBe(false);
     const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
     expect(sent.tools.map((t: any) => t.name)).toEqual(['muse__bash']);
+    expect(sent.tool_choice).toEqual({ type: 'function', name: 'muse__bash' });
     expect(sent.input.find((i: any) => i.type === 'function_call').name).toBe('muse__bash');
   });
 
@@ -371,12 +370,21 @@ describe('Native Codex OAuth pass-through', () => {
 
   test('marks backend Responses SSE for translation to a Chat Completions client', async () => {
     setConfigForTesting(codexOAuthConfig());
-    const response = await new Dispatcher().dispatch(chatRequest());
+    const request = chatRequest();
+    request.tool_choice = { type: 'function', function: { name: 'lookup' } };
+    request.tools = [
+      {
+        type: 'function',
+        function: { name: 'lookup', parameters: { type: 'object', properties: {} } },
+      },
+    ];
+    const response = await new Dispatcher().dispatch(request);
 
     expect(response.bypassTransformation).toBe(false);
     const sent = JSON.parse((fetchSpy.mock.calls[0] as any[])[1].body);
     expect(sent.input).toBeDefined();
     expect(sent.messages).toBeUndefined();
+    expect(sent.tool_choice).toEqual({ type: 'function', name: 'lookup' });
   });
 
   test('aggregates backend Responses SSE for a non-streaming Chat Completions client', async () => {

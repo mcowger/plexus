@@ -114,7 +114,10 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
     payload.tools = tools;
   }
   if (request.tool_choice) {
-    payload.tool_choice = request.tool_choice;
+    payload.tool_choice =
+      typeof request.tool_choice === 'string'
+        ? request.tool_choice
+        : { type: 'function', name: request.tool_choice.function.name };
   }
   if (request.reasoning) {
     const reasoning = projectReasoningForResponses(request.reasoning);
