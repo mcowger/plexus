@@ -248,6 +248,44 @@ describe('Native Codex OAuth pass-through', () => {
     expect(init.headers['session-id']).toBe('sess-cli-1');
   });
 
+  test('normalizes string input for a CLI-shaped request', async () => {
+    setConfigForTesting(codexOAuthConfig());
+    const body = {
+      model: 'codex-alias',
+      input: 'hi',
+      stream: true,
+      client_metadata: { turn_id: 'turn' },
+    };
+    const parsed = await new ResponsesTransformer().parseRequest(body);
+    await new Dispatcher().dispatch({
+      ...parsed,
+      incomingApiType: 'responses',
+      originalBody: body,
+    });
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as [unknown, RequestInit])[1].body as string);
+    expect(sent.input).toEqual([
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+    ]);
+  });
+
+  test('converts system input messages to developer messages for Codex', async () => {
+    setConfigForTesting(codexOAuthConfig());
+    const input = [
+      { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'Be concise.' }] },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi.' }] },
+    ];
+    const body = { model: 'codex-alias', input, stream: true };
+    const parsed = await new ResponsesTransformer().parseRequest(body);
+    await new Dispatcher().dispatch({
+      ...parsed,
+      incomingApiType: 'responses',
+      originalBody: body,
+    });
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as [unknown, RequestInit])[1].body as string);
+    expect(sent.input).toEqual([{ ...input[0], role: 'developer' }, input[1]]);
+    expect(input[0]?.role).toBe('system');
+  });
+
   test('preserves a named tool choice and Responses fields while adorning a non-CLI body', async () => {
     setConfigForTesting(codexOAuthConfig());
     const body = {
@@ -283,7 +321,9 @@ describe('Native Codex OAuth pass-through', () => {
     expect(typeof sent.instructions).toBe('string');
     expect(sent.text.verbosity).toBe('low');
     expect(sent.model).toBe('gpt-5-codex');
-    expect(sent.input).toEqual(body.input);
+    expect(sent.input).toEqual([
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: body.input }] },
+    ]);
     expect(sent.tool_choice).toEqual(body.tool_choice);
     expect(sent.metadata).toEqual(body.metadata);
     // Plain function tool preserved as a function (not turned into custom).
@@ -302,8 +342,8 @@ describe('Native Codex OAuth pass-through', () => {
   });
 
   test.each([
-    { effort: 'off', context: 'all_turns' },
-    { effort: 'high', enabled: false, context: 'all_turns' },
+    { effort: 'off', context: 'all_turns', max_tokens: 100, adaptive: true },
+    { effort: 'high', enabled: false, context: 'all_turns', max_tokens: 100, adaptive: false },
   ])('normalizes disabled reasoning while preserving Responses fields', async (reasoning) => {
     setConfigForTesting(codexOAuthConfig());
     const body = { model: 'codex-alias', input: 'hi', stream: true, reasoning };

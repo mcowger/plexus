@@ -504,8 +504,8 @@ export function buildCodexOAuthHeaders(token: string): Record<string, string> {
 }
 
 /**
- * Prepare a native Codex OAuth request. `passthrough` sends the body verbatim
- * (CLI-shaped); otherwise the body is adorned for the backend.
+ * Prepare a native Codex OAuth request. CLI-shaped bodies skip adornment;
+ * both paths normalize string input and strip unsupported options.
  */
 function prepareCodexOAuthRequest(
   modelId: string,
@@ -520,6 +520,17 @@ function prepareCodexOAuthRequest(
   const body = stripUnsupportedGpt5Options(
     passthrough ? nativeBody : adornCodexResponsesBody(nativeBody)
   );
+  if (typeof body.input === 'string') {
+    body.input = [
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: body.input }] },
+    ];
+  } else if (Array.isArray(body.input)) {
+    body.input = body.input.map((item: unknown) =>
+      item && typeof item === 'object' && 'role' in item && item.role === 'system'
+        ? { ...item, role: 'developer' }
+        : item
+    );
+  }
   // The Codex backend rejects `service_tier: 'flex'` (`priority` is
   // supported), so strip flex here as the final gate covering passthrough,
   // adorned, extraBody, and auto-compat paths.

@@ -361,7 +361,7 @@ Agent clients such as Codex CLI and Muse Code send OpenAI Responses API extensio
 
 Plexus forwards a Responses request verbatim only when the target accepts every extension the request carries. Otherwise it flattens them: namespace tools become `namespace__name` function tools, custom tools become functions with a single string `input`, and tool calls are split back into the client's original shape on the response. Any client can use any Responses or Chat target this way.
 
-For Codex OAuth, supported same-format Responses requests retain their original body. Plexus still applies provider compatibility settings and the fields required by the Codex backend; unsupported extensions and cross-format requests use transformation.
+For Codex OAuth, supported same-format Responses requests retain their original fields. Plexus wraps string input in a message, converts system input messages to developer messages, applies provider compatibility settings and adds fields required by the Codex backend. Unsupported extensions and cross-format requests use transformation.
 
 The accepted set depends on the target:
 

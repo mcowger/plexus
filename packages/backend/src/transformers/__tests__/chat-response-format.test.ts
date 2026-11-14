@@ -111,6 +111,24 @@ describe('cross-format structured-output emission', () => {
     });
   });
 
+  it.each([
+    [
+      { type: 'custom', custom: { name: 'patch' } },
+      { type: 'custom', name: 'patch' },
+    ],
+    [
+      {
+        type: 'allowed_tools',
+        allowed_tools: { tools: [{ type: 'function', name: 'lookup' }], mode: 'auto' },
+      },
+      { type: 'allowed_tools', tools: [{ type: 'function', name: 'lookup' }], mode: 'auto' },
+    ],
+  ])('keeps alternate tool choices usable in Responses requests', async (choice, expected) => {
+    const unified = await parseChat({ ...CHAT_BODY, tool_choice: choice });
+    const out = await buildResponsesRequest(unified);
+    expect(out.tool_choice).toEqual(expected);
+  });
+
   it('chat -> responses emits text.format with name/strict/schema', async () => {
     const unified = await parseChat(CHAT_BODY);
     const out = await buildResponsesRequest(unified);

@@ -198,6 +198,8 @@ export async function buildRequestPayload(
         reasoning.effort = 'none';
       }
       delete reasoning.enabled;
+      delete reasoning.max_tokens;
+      delete reasoning.adaptive;
     }
 
     // Native Gemini pass-through forwards `contents` verbatim, so a client
@@ -421,7 +423,7 @@ export async function buildRequestPayload(
     // A transformed Codex request that carried extensions was flattened, so
     // its response must be translated for the names to split back.
     const nativeBypass = codexNative
-      ? codexCliPassthrough ||
+      ? codexSameFormat ||
         (incomingIsResponses && detectResponsesExtensions(request.originalBody).size === 0)
       : copilotNative || museNative
         ? bypassTransformation
