@@ -152,33 +152,29 @@ export async function buildRequestPayload(
     !isClaudeMaskingApiKeyRoute(route, targetApiType) &&
     isPiAiRoute(route, targetApiType);
 
-  // Codex two-path decision. A genuine Codex CLI body is sent to the ChatGPT
-  // backend VERBATIM (pass-through) when the backend accepts every extension
-  // it carries. Any other request is forced through the transformer + adorned
-  // for the backend, even though incoming == target == responses — so Codex
-  // doesn't use the same-format `shouldUsePassThrough` rule.
+  // Preserve same-format Responses bodies when their extensions are supported.
+  // CLI-shaped requests additionally skip Codex adornment, as before.
   const oauthProviderForNative = isClaudeMaskingApiKeyRoute(route, targetApiType)
     ? 'anthropic'
     : route.config.oauth_provider || route.provider;
   const codexNative = nativeOAuth && oauthProviderForNative === 'openai-codex';
   const copilotNative = nativeOAuth && oauthProviderForNative === 'github-copilot';
   const museNative = nativeOAuth && oauthProviderForNative === 'meta';
-  const codexCliPassthrough =
-    codexNative &&
-    isCodexCliShapedBody(request.originalBody) &&
-    !hasUnsupportedResponsesExtensions(request.originalBody, route, targetApiType);
-  const anthropicNative = nativeOAuth && oauthProviderForNative === 'anthropic';
   const incomingBaseType = getApiBaseType(request.incomingApiType?.toLowerCase() ?? '');
   const incomingIsResponses = incomingBaseType === 'responses';
+  const codexSameFormat =
+    codexNative &&
+    incomingIsResponses &&
+    getApiBaseType(targetApiType.toLowerCase()) === 'responses' &&
+    !!request.originalBody &&
+    !('_hasVisionFallthrough' in request && request._hasVisionFallthrough) &&
+    !hasUnsupportedResponsesExtensions(request.originalBody, route, targetApiType);
+  const codexCliPassthrough = codexSameFormat && isCodexCliShapedBody(request.originalBody);
+  const anthropicNative = nativeOAuth && oauthProviderForNative === 'anthropic';
 
-  // Everything except Codex: standard same-format pass-through detection,
-  // which flattens any Responses extension the target doesn't accept (Meta
-  // accepts its own namespace tools — see getDefaultResponsesExtensions).
-  // For Copilot this is authoritative (multi-API: a client may send a format
-  // the target model's wire API doesn't match, requiring response
-  // translation); Anthropic clients are always same-format in practice.
+  // Unsupported extensions and vision fallthrough still require transformation.
   const bypassTransformation = codexNative
-    ? codexCliPassthrough
+    ? codexSameFormat
     : shouldUsePassThrough(request, targetApiType, route);
   let payload: any;
 
@@ -189,6 +185,22 @@ export async function buildRequestPayload(
     );
     payload = JSON.parse(JSON.stringify(request.originalBody));
     payload.model = route.model;
+
+    // Normalize Plexus-only reasoning controls without discarding Responses fields.
+    if (
+      codexSameFormat &&
+      !codexCliPassthrough &&
+      typeof payload.reasoning === 'object' &&
+      payload.reasoning !== null
+    ) {
+      const reasoning = payload.reasoning;
+      if (reasoning.enabled === false || reasoning.effort === 'off') {
+        reasoning.effort = 'none';
+      }
+      delete reasoning.enabled;
+      delete reasoning.max_tokens;
+      delete reasoning.adaptive;
+    }
 
     // Native Gemini pass-through forwards `contents` verbatim, so a client
     // history ending on a text-only model turn would 400 upstream
@@ -411,7 +423,7 @@ export async function buildRequestPayload(
     // A transformed Codex request that carried extensions was flattened, so
     // its response must be translated for the names to split back.
     const nativeBypass = codexNative
-      ? codexCliPassthrough ||
+      ? codexSameFormat ||
         (incomingIsResponses && detectResponsesExtensions(request.originalBody).size === 0)
       : copilotNative || museNative
         ? bypassTransformation

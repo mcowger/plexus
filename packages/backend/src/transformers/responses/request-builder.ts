@@ -114,7 +114,59 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
     payload.tools = tools;
   }
   if (request.tool_choice) {
-    payload.tool_choice = request.tool_choice;
+    const choice: unknown = request.tool_choice;
+    if (typeof choice === 'object' && choice !== null && 'type' in choice) {
+      if (
+        choice.type === 'function' &&
+        'function' in choice &&
+        typeof choice.function === 'object' &&
+        choice.function !== null &&
+        'name' in choice.function
+      ) {
+        payload.tool_choice = { type: 'function', name: choice.function.name };
+      } else if (
+        choice.type === 'custom' &&
+        'custom' in choice &&
+        typeof choice.custom === 'object' &&
+        choice.custom !== null &&
+        'name' in choice.custom
+      ) {
+        payload.tool_choice = { type: 'custom', name: choice.custom.name };
+      } else if (
+        choice.type === 'allowed_tools' &&
+        'allowed_tools' in choice &&
+        typeof choice.allowed_tools === 'object' &&
+        choice.allowed_tools !== null &&
+        'mode' in choice.allowed_tools &&
+        'tools' in choice.allowed_tools
+      ) {
+        payload.tool_choice = {
+          type: 'allowed_tools',
+          mode: choice.allowed_tools.mode,
+          tools: Array.isArray(choice.allowed_tools.tools)
+            ? choice.allowed_tools.tools.map((tool: unknown) => {
+                if (
+                  typeof tool === 'object' &&
+                  tool !== null &&
+                  'type' in tool &&
+                  tool.type === 'function' &&
+                  'function' in tool &&
+                  typeof tool.function === 'object' &&
+                  tool.function !== null &&
+                  'name' in tool.function
+                ) {
+                  return { type: 'function', name: tool.function.name };
+                }
+                return tool;
+              })
+            : choice.allowed_tools.tools,
+        };
+      } else {
+        payload.tool_choice = choice;
+      }
+    } else {
+      payload.tool_choice = choice;
+    }
   }
   if (request.reasoning) {
     const reasoning = projectReasoningForResponses(request.reasoning);
