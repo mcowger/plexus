@@ -119,7 +119,10 @@ describe('cross-format structured-output emission', () => {
     [
       {
         type: 'allowed_tools',
-        allowed_tools: { tools: [{ type: 'function', name: 'lookup' }], mode: 'auto' },
+        allowed_tools: {
+          tools: [{ type: 'function', function: { name: 'lookup' } }],
+          mode: 'auto',
+        },
       },
       { type: 'allowed_tools', tools: [{ type: 'function', name: 'lookup' }], mode: 'auto' },
     ],

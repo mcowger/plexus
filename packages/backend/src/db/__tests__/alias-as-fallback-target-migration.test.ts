@@ -143,6 +143,8 @@ afterEach(async () => {
 /** Build the pre-feature (0060) schema by applying prior migrations, then seed data. */
 function buildPreFeatureDb(path_: string): void {
   const sqlite = new Database(path_);
+  // This disposable fixture does not need crash-safe fsyncs for every migration statement.
+  sqlite.run('PRAGMA synchronous = OFF');
   const journal = JSON.parse(
     fs.readFileSync(path.join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8')
   ) as Journal;

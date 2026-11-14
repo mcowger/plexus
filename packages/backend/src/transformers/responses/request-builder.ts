@@ -143,7 +143,23 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
         payload.tool_choice = {
           type: 'allowed_tools',
           mode: choice.allowed_tools.mode,
-          tools: choice.allowed_tools.tools,
+          tools: Array.isArray(choice.allowed_tools.tools)
+            ? choice.allowed_tools.tools.map((tool: unknown) => {
+                if (
+                  typeof tool === 'object' &&
+                  tool !== null &&
+                  'type' in tool &&
+                  tool.type === 'function' &&
+                  'function' in tool &&
+                  typeof tool.function === 'object' &&
+                  tool.function !== null &&
+                  'name' in tool.function
+                ) {
+                  return { type: 'function', name: tool.function.name };
+                }
+                return tool;
+              })
+            : choice.allowed_tools.tools,
         };
       } else {
         payload.tool_choice = choice;
