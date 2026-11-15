@@ -419,7 +419,7 @@
           "Inference — Responses"
         ],
         "summary": "Create a Responses API response",
-        "description": "OpenAI Responses API compatible. Plexus supports multi-turn continuation\nvia `previous_response_id` or `conversation` — it loads the prior output\nitems server-side so the client only needs to send the new input.\n",
+        "description": "OpenAI Responses API compatible, except storage defaults to false.\nOnly explicit `store: true` retains a response in Plexus, for both JSON and\nstreaming requests. The exact returned ID can then be retrieved or supplied\nas `previous_response_id`. Plexus replays the complete stored input and output\nhistory and sends upstream `store: false`, without an upstream response ID.\nAn unstored response cannot be used as a predecessor, but a `store: false`\nrequest can reference a stored parent without retaining its own response.\nDesired top-level `instructions` must be supplied again on each turn.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -432,7 +432,8 @@
                   "summary": "Fresh response with simple string input",
                   "value": {
                     "model": "smart-model",
-                    "input": "Explain quantum tunneling in one sentence."
+                    "input": "Explain quantum tunneling in one sentence.",
+                    "store": true
                   }
                 },
                 "continued_by_id": {
@@ -11514,7 +11515,8 @@
           },
           "store": {
             "type": "boolean",
-            "default": true
+            "default": false,
+            "description": "Retain this response in Plexus for retrieval and continuation. Only explicit true stores it; upstream requests always use store:false."
           },
           "stream": {
             "type": "boolean"

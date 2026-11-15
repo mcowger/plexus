@@ -324,6 +324,13 @@ export async function buildRequestPayload(
     );
   }
 
+  // HTTP Responses state is resolved by Plexus before routing. Configuration
+  // and adapters must not turn it back into an upstream-owned chain.
+  if (incomingIsResponses && getApiBaseType(targetApiType) === 'responses') {
+    payload.store = false;
+    delete payload.previous_response_id;
+  }
+
   if (
     isAnthropicTargetProvider(route, targetApiType) ||
     getApiBaseType(targetApiType) === 'messages'

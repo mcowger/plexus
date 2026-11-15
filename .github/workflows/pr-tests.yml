@@ -81,7 +81,7 @@ jobs:
         run: bun test
 
       - name: Run DB tests against Postgres (pglite)
-        run: PLEXUS_TEST_DIALECT=postgres bun test --parallel packages/backend/src/db packages/backend/test/integration/config-service-oauth-credential-cache.test.ts packages/backend/src/routes/management/__tests__/usage-summary.test.ts packages/backend/src/services/__tests__/usage-storage-performance.test.ts packages/backend/src/services/__tests__/usage-retention.test.ts packages/backend/src/services/oauth/__tests__/dropped-oauth-providers.test.ts packages/backend/src/services/quota/__tests__/quota-enforcer.test.ts packages/backend/src/services/quota/__tests__/quota-scheduler.test.ts
+        run: PLEXUS_TEST_DIALECT=postgres bun test --parallel packages/backend/src/db packages/backend/test/integration/config-service-oauth-credential-cache.test.ts packages/backend/test/integration/responses-state.test.ts packages/backend/src/routes/management/__tests__/usage-summary.test.ts packages/backend/src/services/__tests__/usage-storage-performance.test.ts packages/backend/src/services/__tests__/usage-retention.test.ts packages/backend/src/services/oauth/__tests__/dropped-oauth-providers.test.ts packages/backend/src/services/quota/__tests__/quota-enforcer.test.ts packages/backend/src/services/quota/__tests__/quota-scheduler.test.ts packages/backend/src/services/responses/__tests__/responses-storage.test.ts
 
   record-dispatch-check:
     name: Record workflow_dispatch check

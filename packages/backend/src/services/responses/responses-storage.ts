@@ -101,6 +101,7 @@ export class ResponsesStorageService {
         completedAt: response.completed_at || null,
         status: response.status,
         model: response.model,
+        inputItems: Array.isArray(request.input) ? JSON.stringify(request.input) : null,
         outputItems: JSON.stringify(response.output),
         instructions: request.instructions || null,
         temperature: request.temperature ?? null,
@@ -122,7 +123,7 @@ export class ResponsesStorageService {
           typeof request.conversation === 'string'
             ? request.conversation
             : request.conversation?.id || null,
-        store: request.store !== false ? 1 : 0,
+        store: request.store === true ? 1 : 0,
         background: request.background ? 1 : 0,
         truncation: request.truncation || 'disabled',
         incompleteDetails: response.incomplete_details
@@ -148,7 +149,8 @@ export class ResponsesStorageService {
           const item = response.output[i];
           if (item) {
             await db.insert(this.schema.responseItems).values({
-              id: item.id || `item_${response.id}_${i}`,
+              // Native item IDs may recur across responses; keep them untouched in itemData.
+              id: JSON.stringify([response.id, i]),
               responseId: response.id,
               itemIndex: i,
               itemType: item.type,

@@ -9,6 +9,7 @@ export const responses = pgTable(
     completedAt: bigint('completed_at', { mode: 'number' }),
     status: text('status').notNull(),
     model: text('model').notNull(),
+    inputItems: text('input_items'), // JSON array of replayable input items
     outputItems: text('output_items').notNull(), // JSON array of output items
     instructions: text('instructions'),
     temperature: real('temperature'),
@@ -27,7 +28,7 @@ export const responses = pgTable(
     usageTotalTokens: integer('usage_total_tokens'),
     previousResponseId: text('previous_response_id'),
     conversationId: text('conversation_id'),
-    store: integer('store').notNull().default(1),
+    store: integer('store').notNull().default(0),
     background: integer('background').notNull().default(0),
     truncation: text('truncation'),
     incompleteDetails: text('incomplete_details'),

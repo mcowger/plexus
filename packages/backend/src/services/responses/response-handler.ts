@@ -34,6 +34,7 @@ import { UsageStorageService } from '../observability/usage-storage';
 import { QuotaEnforcer } from '../quota/quota-enforcer';
 import { buildQuotaHeaders, recordQuotaUsage } from '../quota/quota-middleware';
 import { CooldownManager } from '../runtime/cooldown-manager';
+import { interceptResponseEvents } from './response-event-callback';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];
@@ -114,7 +115,8 @@ export async function handleResponse(
       stallWindowMs?: number | null;
       stallGracePeriodMs?: number | null;
     }) => void;
-  } | null
+  } | null,
+  onResponse?: (response: unknown, event?: string) => Promise<void>
 ) {
   // Populate usage record with metadata from the dispatcher's selection
   usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
@@ -466,6 +468,10 @@ export async function handleResponse(
         : safeguardStream;
     }
 
+    if (apiType === 'responses' && onResponse) {
+      finalClientStream = finalClientStream.pipeThrough(interceptResponseEvents(onResponse));
+    }
+
     // TAP THE TRANSFORMED STREAM for debugging
     // This captures what is actually sent to the client. The terminal
     // callback fires lazily (when the client stream emits its terminal
@@ -537,6 +543,10 @@ export async function handleResponse(
     const pipeline = stallInspector
       ? nodeStream.pipe(stallInspector).pipe(usageInspector)
       : nodeStream.pipe(usageInspector);
+
+    // Node's pipe does not forward source errors to downstream streams.
+    nodeStream.on('error', (error) => pipeline.destroy(error));
+    if (stallInspector) stallInspector.on('error', (error) => pipeline.destroy(error));
 
     // =============================================================================
     // CLIENT DISCONNECT DETECTION & UPSTREAM CANCELLATION
@@ -839,6 +849,8 @@ export async function handleResponse(
     if (playgroundRouting && responseBody && typeof responseBody === 'object') {
       responseBody.plexus = playgroundRouting;
     }
+
+    if (onResponse) await onResponse(responseBody);
 
     // Capture transformed response for debugging
     DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);

@@ -22,7 +22,8 @@ properties:
           - id
   store:
     type: boolean
-    default: true
+    default: false
+    description: Retain this response in Plexus for retrieval and continuation. Only explicit true stores it; upstream requests always use store:false.
   stream:
     type: boolean
   tools:
