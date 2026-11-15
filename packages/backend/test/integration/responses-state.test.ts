@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
+import { eq } from 'drizzle-orm';
 import { createParser } from 'eventsource-parser';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { ProviderConfigSchema } from '../../src/config';
+import { getDatabase, getSchema } from '../../src/db/client';
 import { registerResponsesRoute } from '../../src/routes/inference/responses';
 import type { Dispatcher } from '../../src/services/dispatch/dispatcher';
 import { buildRequestPayload } from '../../src/services/dispatch/request-payload-builder';
@@ -40,6 +42,7 @@ const sse = (body: object) => `data: ${JSON.stringify(body)}\n\n`;
 let app: FastifyInstance;
 let storage: ResponsesStorageService;
 let ids: string[];
+let conversationIds: string[];
 let requests: UnifiedChatRequest[];
 let native: boolean;
 let nextOutput: ResponsesOutputItem[];
@@ -74,6 +77,7 @@ async function post(body: Record<string, unknown>, expectedStatus = 200) {
 beforeEach(async () => {
   storage = new ResponsesStorageService();
   ids = [];
+  conversationIds = [];
   requests = [];
   native = true;
   nextOutput = output('answer');
@@ -146,6 +150,10 @@ beforeEach(async () => {
 afterEach(async () => {
   await app.close();
   for (const id of ids) await storage.deleteResponse(id);
+  for (const id of conversationIds) {
+    const conversations = getSchema().conversations;
+    await getDatabase().delete(conversations).where(eq(conversations.id, id));
+  }
 });
 
 describe('Plexus-owned HTTP Responses state', () => {
@@ -187,6 +195,61 @@ describe('Plexus-owned HTTP Responses state', () => {
         expect(requests).toHaveLength(1);
       });
     }
+
+  for (const stream of [false, true]) {
+    test(`rejects mixed history references before lookup or dispatch (stream:${stream})`, async () => {
+      const getResponse = spyOn(ResponsesStorageService.prototype, 'getResponse');
+      const getConversation = spyOn(ResponsesStorageService.prototype, 'getConversation');
+      try {
+        await post(
+          {
+            previous_response_id: 'resp_missing',
+            conversation: { id: 'conv_missing' },
+            input: 'next',
+            stream,
+          },
+          400
+        );
+        expect(getResponse).not.toHaveBeenCalled();
+        expect(getConversation).not.toHaveBeenCalled();
+        expect(requests).toHaveLength(0);
+      } finally {
+        getResponse.mockRestore();
+        getConversation.mockRestore();
+      }
+    });
+
+    for (const store of [undefined, false, true]) {
+      test(`conversation is read-only unless stored (store:${store}, stream:${stream})`, async () => {
+        const id = `conv_${crypto.randomUUID()}`;
+        conversationIds.push(id);
+        const priorInput = message('prior input');
+        const priorOutput = output('prior output');
+        await storage.updateConversation(id, priorOutput, [priorInput]);
+        const currentOutput = structuredClone(nextOutput);
+        const response = await post({
+          conversation: id,
+          input: 'current input',
+          stream,
+          ...(store === undefined ? {} : { store }),
+        });
+        if (!response) throw new Error('Missing response');
+        const expectedInput = [priorInput, ...priorOutput, message('current input')];
+        expect(requests[0]?.originalBody.input).toEqual(expectedInput);
+        const conversation = await storage.getConversation(id);
+        expect(JSON.parse(conversation.items)).toEqual(
+          store === true ? [...expectedInput, ...currentOutput] : [priorInput, ...priorOutput]
+        );
+        expect(response.store).toBe(store === true);
+        const row = await storage.getResponse(response.id);
+        if (store === true) {
+          expect(JSON.parse(row.inputItems)).toEqual(expectedInput);
+        } else {
+          expect(row).toBeNull();
+        }
+      });
+    }
+  }
 
   for (const stream of [false, true]) {
     test(`replays three turns including original users, reasoning and tools exactly once (stream:${stream})`, async () => {

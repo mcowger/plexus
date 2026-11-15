@@ -139,6 +139,14 @@ export async function registerResponsesRoute(
       const body = parsedBody.data;
       const shouldStore = body.store === true;
       const previousResponseId = body.previous_response_id;
+      if (previousResponseId != null && body.conversation != null) {
+        return reply.code(400).send({
+          error: {
+            message: 'conversation and previous_response_id cannot be used together',
+            type: 'invalid_request_error',
+          },
+        });
+      }
       usageRecord.incomingModelAlias = body.model;
       usageRecord.apiKey = (request as any).keyName;
       usageRecord.attribution = (request as any).attribution || null;

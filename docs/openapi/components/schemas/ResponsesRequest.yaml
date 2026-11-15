@@ -11,7 +11,9 @@ properties:
     type: string
   previous_response_id:
     type: string
+    description: Continue a stored response. Cannot be combined with conversation; legacy responses without stored input cannot be continued.
   conversation:
+    description: Read an existing conversation. Cannot be combined with previous_response_id. Only store:true appends the current input and output.
     oneOf:
       - type: string
       - type: object
@@ -23,7 +25,7 @@ properties:
   store:
     type: boolean
     default: false
-    description: Retain this response in Plexus for retrieval and continuation. Only explicit true stores it; upstream requests always use store:false.
+    description: Retain this response in Plexus and append to any referenced conversation. Only explicit true stores it; upstream requests always use store:false. Stored responses contain full replay snapshots, so cumulative storage grows with chain history.
   stream:
     type: boolean
   tools:

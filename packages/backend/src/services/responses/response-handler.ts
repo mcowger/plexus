@@ -544,8 +544,20 @@ export async function handleResponse(
       ? nodeStream.pipe(stallInspector).pipe(usageInspector)
       : nodeStream.pipe(usageInspector);
 
-    // Node's pipe does not forward source errors to downstream streams.
-    nodeStream.on('error', (error) => pipeline.destroy(error));
+    // Node's pipe does not forward source errors to downstream streams. Capture
+    // consumed usage before destroying the inspector, which otherwise treats a
+    // source failure as a client cancellation.
+    nodeStream.on('error', (error) => {
+      if (
+        usageRecord.responseStatus !== 'cancelled' &&
+        usageRecord.responseStatus !== 'timeout' &&
+        usageRecord.responseStatus !== 'stall'
+      ) {
+        usageRecord.responseStatus = 'error';
+      }
+      usageInspector.finalize();
+      pipeline.destroy(error);
+    });
     if (stallInspector) stallInspector.on('error', (error) => pipeline.destroy(error));
 
     // =============================================================================
@@ -850,7 +862,30 @@ export async function handleResponse(
       responseBody.plexus = playgroundRouting;
     }
 
-    if (onResponse) await onResponse(responseBody);
+    try {
+      if (onResponse) await onResponse(responseBody);
+    } catch (error) {
+      // The route owns the error record; populate it with the consumed provider
+      // usage without saving it here a second time.
+      try {
+        await finalizeUsage(
+          usageRecord,
+          unifiedResponse,
+          usageStorage,
+          startTime,
+          pricing,
+          providerDiscount,
+          quotaEnforcer,
+          keyName,
+          { responseStatus: 'error', updatePerformanceMetrics: false, saveRequest: false },
+          costAttribution
+        );
+      } finally {
+        debugManager.flush(usageRecord.requestId!);
+        if (shouldEstimateTokens && !wasDebugEnabled) debugManager.setEnabled(false);
+      }
+      throw error;
+    }
 
     // Capture transformed response for debugging
     DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
@@ -899,7 +934,11 @@ async function finalizeUsage(
   providerDiscount: any,
   quotaEnforcer?: QuotaEnforcer,
   keyName?: string,
-  options: { responseStatus?: 'success' | 'error'; updatePerformanceMetrics?: boolean } = {},
+  options: {
+    responseStatus?: 'success' | 'error';
+    updatePerformanceMetrics?: boolean;
+    saveRequest?: boolean;
+  } = {},
   costAttribution?: CostAttribution
 ) {
   // Capture token usage if available in the response
@@ -964,7 +1003,7 @@ async function finalizeUsage(
   }
 
   // Persist usage record to database
-  await usageStorage.saveRequest(usageRecord as UsageRecord);
+  if (options.saveRequest !== false) await usageStorage.saveRequest(usageRecord as UsageRecord);
 
   // Update the performance sliding window for future routing decisions
   if (

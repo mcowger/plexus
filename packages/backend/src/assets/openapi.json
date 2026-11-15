@@ -419,7 +419,7 @@
           "Inference — Responses"
         ],
         "summary": "Create a Responses API response",
-        "description": "OpenAI Responses API compatible, except storage defaults to false.\nOnly explicit `store: true` retains a response in Plexus, for both JSON and\nstreaming requests. The exact returned ID can then be retrieved or supplied\nas `previous_response_id`. Plexus replays the complete stored input and output\nhistory and sends upstream `store: false`, without an upstream response ID.\nAn unstored response cannot be used as a predecessor, but a `store: false`\nrequest can reference a stored parent without retaining its own response.\nDesired top-level `instructions` must be supplied again on each turn.\n",
+        "description": "OpenAI Responses API compatible, except storage defaults to false.\nOnly explicit `store: true` retains a response in Plexus, for both JSON and\nstreaming requests. The exact returned ID can then be retrieved or supplied\nas `previous_response_id`. Plexus replays the complete stored input and output\nhistory and sends upstream `store: false`, without an upstream response ID.\nAn unstored response cannot be used as a predecessor, but a `store: false`\nrequest can reference a stored parent without retaining its own response.\nDesired top-level `instructions` must be supplied again on each turn.\n`conversation` and `previous_response_id` are mutually exclusive. Existing\nconversations can be read with omitted or false `store`, but only `store: true`\nappends the current input and output. Each stored response contains a full\nreplay snapshot, so cumulative storage grows with chain history. Legacy\nresponses without stored input cannot be continued.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -473,6 +473,16 @@
                 "schema": {
                   "type": "string",
                   "description": "Responses API SSE stream."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, including mutually exclusive history references.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIError"
                 }
               }
             }
@@ -11493,9 +11503,11 @@
             "type": "string"
           },
           "previous_response_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Continue a stored response. Cannot be combined with conversation; legacy responses without stored input cannot be continued."
           },
           "conversation": {
+            "description": "Read an existing conversation. Cannot be combined with previous_response_id. Only store:true appends the current input and output.",
             "oneOf": [
               {
                 "type": "string"
@@ -11516,7 +11528,7 @@
           "store": {
             "type": "boolean",
             "default": false,
-            "description": "Retain this response in Plexus for retrieval and continuation. Only explicit true stores it; upstream requests always use store:false."
+            "description": "Retain this response in Plexus and append to any referenced conversation. Only explicit true stores it; upstream requests always use store:false. Stored responses contain full replay snapshots, so cumulative storage grows with chain history."
           },
           "stream": {
             "type": "boolean"
