@@ -9,6 +9,7 @@ export const responses = sqliteTable(
     completedAt: integer('completed_at'), // Unix timestamp when completed
     status: text('status').notNull(), // 'completed', 'failed', 'in_progress', etc.
     model: text('model').notNull(),
+    inputItems: text('input_items'), // JSON array of replayable input items
     outputItems: text('output_items').notNull(), // JSON array of output items
     instructions: text('instructions'),
     temperature: real('temperature'),
@@ -27,7 +28,7 @@ export const responses = sqliteTable(
     usageTotalTokens: integer('usage_total_tokens'),
     previousResponseId: text('previous_response_id'),
     conversationId: text('conversation_id'),
-    store: integer('store').notNull().default(1), // Boolean as integer
+    store: integer('store').notNull().default(0), // Boolean as integer
     background: integer('background').notNull().default(0),
     truncation: text('truncation'),
     incompleteDetails: text('incomplete_details'), // JSON object

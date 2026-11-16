@@ -3,9 +3,19 @@ post:
     - Inference — Responses
   summary: Create a Responses API response
   description: |
-    OpenAI Responses API compatible. Plexus supports multi-turn continuation
-    via `previous_response_id` or `conversation` — it loads the prior output
-    items server-side so the client only needs to send the new input.
+    OpenAI Responses API compatible, except storage defaults to false.
+    Only explicit `store: true` retains a response in Plexus, for both JSON and
+    streaming requests. The exact returned ID can then be retrieved or supplied
+    as `previous_response_id`. Plexus replays the complete stored input and output
+    history and sends upstream `store: false`, without an upstream response ID.
+    An unstored response cannot be used as a predecessor, but a `store: false`
+    request can reference a stored parent without retaining its own response.
+    Desired top-level `instructions` must be supplied again on each turn.
+    `conversation` and `previous_response_id` are mutually exclusive. Existing
+    conversations can be read with omitted or false `store`, but only `store: true`
+    appends the current input and output. Each stored response contains a full
+    replay snapshot, so cumulative storage grows with chain history. Legacy
+    responses without stored input cannot be continued.
   requestBody:
     required: true
     content:
@@ -18,6 +28,7 @@ post:
             value:
               model: smart-model
               input: Explain quantum tunneling in one sentence.
+              store: true
           continued_by_id:
             summary: Continue a prior response
             value:
@@ -44,6 +55,12 @@ post:
           schema:
             type: string
             description: Responses API SSE stream.
+    '400':
+      description: Invalid request, including mutually exclusive history references.
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/OpenAIError.yaml
     '401':
       $ref: ../components/responses/AuthError.yaml
     '404':

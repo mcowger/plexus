@@ -34,6 +34,7 @@ import { UsageStorageService } from '../observability/usage-storage';
 import { QuotaEnforcer } from '../quota/quota-enforcer';
 import { buildQuotaHeaders, recordQuotaUsage } from '../quota/quota-middleware';
 import { CooldownManager } from '../runtime/cooldown-manager';
+import { interceptResponseEvents } from './response-event-callback';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];
@@ -114,7 +115,8 @@ export async function handleResponse(
       stallWindowMs?: number | null;
       stallGracePeriodMs?: number | null;
     }) => void;
-  } | null
+  } | null,
+  onResponse?: (response: unknown, event?: string) => Promise<void>
 ) {
   // Populate usage record with metadata from the dispatcher's selection
   usageRecord.selectedModelName = unifiedResponse.plexus?.model || unifiedResponse.model; // Fallback to unifiedResponse.model if plexus.model is missing
@@ -466,6 +468,10 @@ export async function handleResponse(
         : safeguardStream;
     }
 
+    if (apiType === 'responses' && onResponse) {
+      finalClientStream = finalClientStream.pipeThrough(interceptResponseEvents(onResponse));
+    }
+
     // TAP THE TRANSFORMED STREAM for debugging
     // This captures what is actually sent to the client. The terminal
     // callback fires lazily (when the client stream emits its terminal
@@ -537,6 +543,22 @@ export async function handleResponse(
     const pipeline = stallInspector
       ? nodeStream.pipe(stallInspector).pipe(usageInspector)
       : nodeStream.pipe(usageInspector);
+
+    // Node's pipe does not forward source errors to downstream streams. Capture
+    // consumed usage before destroying the inspector, which otherwise treats a
+    // source failure as a client cancellation.
+    nodeStream.on('error', (error) => {
+      if (
+        usageRecord.responseStatus !== 'cancelled' &&
+        usageRecord.responseStatus !== 'timeout' &&
+        usageRecord.responseStatus !== 'stall'
+      ) {
+        usageRecord.responseStatus = 'error';
+      }
+      usageInspector.finalize();
+      pipeline.destroy(error);
+    });
+    if (stallInspector) stallInspector.on('error', (error) => pipeline.destroy(error));
 
     // =============================================================================
     // CLIENT DISCONNECT DETECTION & UPSTREAM CANCELLATION
@@ -840,6 +862,31 @@ export async function handleResponse(
       responseBody.plexus = playgroundRouting;
     }
 
+    try {
+      if (onResponse) await onResponse(responseBody);
+    } catch (error) {
+      // The route owns the error record; populate it with the consumed provider
+      // usage without saving it here a second time.
+      try {
+        await finalizeUsage(
+          usageRecord,
+          unifiedResponse,
+          usageStorage,
+          startTime,
+          pricing,
+          providerDiscount,
+          quotaEnforcer,
+          keyName,
+          { responseStatus: 'error', updatePerformanceMetrics: false, saveRequest: false },
+          costAttribution
+        );
+      } finally {
+        debugManager.flush(usageRecord.requestId!);
+        if (shouldEstimateTokens && !wasDebugEnabled) debugManager.setEnabled(false);
+      }
+      throw error;
+    }
+
     // Capture transformed response for debugging
     DebugManager.getInstance().addTransformedResponse(usageRecord.requestId!, responseBody);
     DebugManager.getInstance().flush(usageRecord.requestId!);
@@ -887,7 +934,11 @@ async function finalizeUsage(
   providerDiscount: any,
   quotaEnforcer?: QuotaEnforcer,
   keyName?: string,
-  options: { responseStatus?: 'success' | 'error'; updatePerformanceMetrics?: boolean } = {},
+  options: {
+    responseStatus?: 'success' | 'error';
+    updatePerformanceMetrics?: boolean;
+    saveRequest?: boolean;
+  } = {},
   costAttribution?: CostAttribution
 ) {
   // Capture token usage if available in the response
@@ -952,7 +1003,7 @@ async function finalizeUsage(
   }
 
   // Persist usage record to database
-  await usageStorage.saveRequest(usageRecord as UsageRecord);
+  if (options.saveRequest !== false) await usageStorage.saveRequest(usageRecord as UsageRecord);
 
   // Update the performance sliding window for future routing decisions
   if (

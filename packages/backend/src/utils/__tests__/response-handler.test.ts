@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
+import { Readable } from 'node:stream';
 
 import { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -392,6 +393,133 @@ describe('handleResponse', () => {
     // Global debug mode must be restored to its prior (disabled) state once
     // the unary response has been handled — otherwise it stays stuck on for
     // every subsequent request until the process restarts.
+    expect(debugManager.isEnabled()).toBe(false);
+  });
+
+  test('unary persistence failure preserves usage for the route error record and restores debug', async () => {
+    const debugManager = DebugManager.getInstance();
+    debugManager.resetForTesting();
+    debugManager.setEnabled(false);
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-storage-unary' };
+    const error = new Error('response storage failed');
+    const response: UnifiedChatResponse = {
+      id: 'resp-storage-unary',
+      model: 'model-1',
+      content: 'Hello',
+      usage: {
+        input_tokens: 12,
+        output_tokens: 7,
+        total_tokens: 19,
+        reasoning_tokens: 0,
+        cached_tokens: 0,
+        cache_creation_tokens: 0,
+      },
+      plexus: { provider: 'provider-1', model: 'model-1', apiType: 'chat' },
+    };
+
+    await expect(
+      handleResponse(
+        mockRequest,
+        mockReply,
+        response,
+        mockTransformer,
+        usageRecord,
+        mockStorage,
+        Date.now(),
+        'responses',
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async () => {
+          throw error;
+        }
+      )
+    ).rejects.toBe(error);
+
+    expect(usageRecord.tokensInput).toBe(12);
+    expect(usageRecord.tokensOutput).toBe(7);
+    expect(usageRecord.responseStatus).toBe('error');
+    expect(mockStorage.saveRequest).not.toHaveBeenCalled();
+    expect(mockReply.send).not.toHaveBeenCalled();
+    expect(debugManager.isEnabled()).toBe(false);
+  });
+
+  test('stream persistence failure records provider usage once without delivering the terminal event', async () => {
+    const debugManager = DebugManager.getInstance();
+    debugManager.resetForTesting();
+    debugManager.setEnabled(false);
+    const usageRecord: Partial<UsageRecord> = { requestId: 'req-storage-stream' };
+    const error = new Error('response storage failed');
+    const terminal = {
+      type: 'response.completed',
+      response: {
+        id: 'resp-storage-stream',
+        status: 'completed',
+        output: [],
+        usage: { input_tokens: 12, output_tokens: 7, total_tokens: 19 },
+      },
+    };
+    const bytes = new TextEncoder().encode(
+      `event: response.completed\ndata: ${JSON.stringify(terminal)}\n\n`
+    );
+    const response: UnifiedChatResponse = {
+      id: 'resp-storage-stream',
+      model: 'model-1',
+      content: null,
+      bypassTransformation: true,
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      }),
+      plexus: { provider: 'provider-1', model: 'model-1', apiType: 'responses' },
+    };
+    const storage = {
+      saveRequest: mock(async () => {}),
+      saveError: mock(),
+      updatePerformanceMetrics: mock(async () => {}),
+    } as unknown as UsageStorageService;
+    const send = mock((stream: Readable) => stream);
+    const reply = { ...mockReply, send } as unknown as FastifyReply;
+
+    await handleResponse(
+      mockRequest,
+      reply,
+      response,
+      mockTransformer,
+      usageRecord,
+      storage,
+      Date.now(),
+      'responses',
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => {
+        throw error;
+      }
+    );
+    const sent = send.mock.calls[0];
+    if (!sent) throw new Error('Missing response stream');
+    const stream = sent[0];
+    const chunks: string[] = [];
+    const { promise, resolve, reject } = Promise.withResolvers<Error>();
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk.toString()));
+    stream.once('end', () => reject(new Error('stream unexpectedly completed')));
+    stream.once('error', resolve);
+    const streamError = await promise;
+    expect(streamError).toBe(error);
+    expect(chunks.join('')).not.toContain('response.completed');
+    expect(usageRecord.tokensInput).toBe(12);
+    expect(usageRecord.tokensOutput).toBe(7);
+    expect(usageRecord.responseStatus).toBe('error');
+    expect(storage.saveRequest).toHaveBeenCalledTimes(1);
     expect(debugManager.isEnabled()).toBe(false);
   });
 

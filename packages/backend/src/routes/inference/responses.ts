@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 
 import { Dispatcher } from '../../services/dispatch/dispatcher';
 import { applyRequestedServiceTierFromError } from '../../services/dispatch/service-tier-metadata';
@@ -16,6 +17,7 @@ import {
   normalizeResponsesReasoningContent,
   ResponsesTransformer,
 } from '../../transformers/responses';
+import type { UnifiedResponsesResponse } from '../../types/responses';
 import { UsageRecord } from '../../types/usage';
 import { attachKeyAccessPolicy } from '../../utils/auth';
 import { getCacheRoutingHeaders } from '../../utils/cache-routing-headers';
@@ -26,6 +28,37 @@ import { sanitizeHeaders } from '../../utils/sanitize-headers';
 import { getGlobalStallConfig, wireStallDetection } from '../../utils/stall';
 import { wireEarlyDisconnectDetection, wireUpstreamTimeout } from '../../utils/timeout';
 import { saveQuotaBlockedUsage, saveQuotaExceededUsage } from './_quota-error';
+
+const responsesStateRequestSchema = z.looseObject({
+  model: z.string(),
+  input: z.union([z.string(), z.array(z.unknown())]).nullish(),
+  store: z.boolean().optional(),
+  previous_response_id: z.string().nullish(),
+  conversation: z.union([z.string(), z.looseObject({ id: z.string() })]).nullish(),
+  include: z.array(z.string()).optional(),
+  tools: z.array(z.unknown()).optional(),
+  parallel_tool_calls: z.boolean().optional(),
+  prompt_cache_key: z.string().optional(),
+});
+
+function isResponsesResponse(value: unknown): value is UnifiedResponsesResponse {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'object' in value &&
+    value.object === 'response' &&
+    'created_at' in value &&
+    typeof value.created_at === 'number' &&
+    'model' in value &&
+    typeof value.model === 'string' &&
+    'status' in value &&
+    typeof value.status === 'string' &&
+    'output' in value &&
+    Array.isArray(value.output)
+  );
+}
 
 export function detectResponsesApiType(
   headers: Record<string, unknown>,
@@ -66,11 +99,8 @@ export async function registerResponsesRoute(
    * OpenAI Responses API Compatible Endpoint
    * Creates a new response with support for multi-turn conversations, tool use, and reasoning
    *
-   * previous_response_id Handling:
-   * Unlike most LLM tools which lack multi-turn state management, this endpoint correctly
-   * loads and merges the previous response's output items into the current request context.
-   * This enables true stateless multi-turn conversations where the client only sends the
-   * new input and the previous_response_id, without needing to re-send all history.
+   * previous_response_id resolves Plexus-owned history. Only explicit store:true
+   * retains responses; upstream requests are stateless full-history replays.
    */
   // Handler for Responses API requests (shared between /v1/responses and /v1/codex/responses)
   const responsesHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -100,7 +130,23 @@ export async function registerResponsesRoute(
 
     let earlyDisconnect: ReturnType<typeof wireEarlyDisconnectDetection> | undefined;
     try {
-      const body = request.body as any;
+      const parsedBody = responsesStateRequestSchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.code(400).send({
+          error: { message: parsedBody.error.message, type: 'invalid_request_error' },
+        });
+      }
+      const body = parsedBody.data;
+      const shouldStore = body.store === true;
+      const previousResponseId = body.previous_response_id;
+      if (previousResponseId != null && body.conversation != null) {
+        return reply.code(400).send({
+          error: {
+            message: 'conversation and previous_response_id cannot be used together',
+            type: 'invalid_request_error',
+          },
+        });
+      }
       usageRecord.incomingModelAlias = body.model;
       usageRecord.apiKey = (request as any).keyName;
       usageRecord.attribution = (request as any).attribution || null;
@@ -118,13 +164,10 @@ export async function registerResponsesRoute(
       const transformer = new ResponsesTransformer();
 
       // Helper to normalize input into the standardized array format
-      function normalizeInput(input: unknown): Array<{
-        type: string;
-        role: string;
-        content: Array<{ type: string; text: string }>;
-      }> {
+      function normalizeInput(input: unknown): unknown[] {
+        if (input == null) return [];
         return Array.isArray(input)
-          ? (input as any[])
+          ? input
           : [
               {
                 type: 'message',
@@ -134,13 +177,16 @@ export async function registerResponsesRoute(
             ];
       }
 
+      const currentInput = normalizeInput(body.input);
+      body.input = currentInput;
+
       // Check for previous_response_id and load context
-      if (body.previous_response_id) {
-        const previousResponse = await responsesStorage.getResponse(body.previous_response_id);
-        if (!previousResponse) {
+      if (previousResponseId) {
+        const previousResponse = await responsesStorage.getResponse(previousResponseId);
+        if (!previousResponse?.inputItems) {
           return reply.code(404).send({
             error: {
-              message: `Previous response not found: ${body.previous_response_id}`,
+              message: `Previous response history not found: ${previousResponseId}`,
               type: 'invalid_request_error',
               code: 'response_not_found',
               param: 'previous_response_id',
@@ -148,10 +194,11 @@ export async function registerResponsesRoute(
           });
         }
 
-        // Prepend previous output items to input
-        const previousItems = JSON.parse(previousResponse.outputItems);
-        const currentInput = normalizeInput(body.input);
-        body.input = [...previousItems, ...currentInput];
+        body.input = [
+          ...JSON.parse(previousResponse.inputItems),
+          ...JSON.parse(previousResponse.outputItems),
+          ...currentInput,
+        ];
       }
 
       // Check for conversation and load context
@@ -177,10 +224,19 @@ export async function registerResponsesRoute(
         body.input = [...conversationItems, ...currentInput];
       }
 
+      // State belongs to Plexus, never to the selected upstream account.
+      delete body.previous_response_id;
+      body.store = false;
+      if (shouldStore) {
+        body.include = Array.from(
+          new Set([...(body.include ?? []), 'reasoning.encrypted_content'])
+        );
+      }
+
       // Keep debug capture faithful to the client payload, then repair the
       // dispatch body so strict Responses providers don't reject composite
       // tool call IDs observed in replayed Codex CLI conversations.
-      const rawBodyForDebug = JSON.parse(JSON.stringify(body));
+      const rawBodyForDebug = structuredClone(request.body);
       // Start debug capture before parsing so malformed payloads are still traced.
       DebugManager.getInstance().startLog(
         requestId,
@@ -217,8 +273,8 @@ export async function registerResponsesRoute(
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
       usageRecord.reasoningEffort = getReasoningLogValue(unifiedRequest, body) ?? null;
-      if (body.previous_response_id) {
-        unifiedRequest.previousResponseId = body.previous_response_id;
+      if (previousResponseId) {
+        unifiedRequest.previousResponseId = previousResponseId;
       }
 
       unifiedRequest.cacheRoutingHeaders = getCacheRoutingHeaders(
@@ -289,7 +345,36 @@ export async function registerResponsesRoute(
       usageRecord.messageCount = unifiedRequest.messages?.length ?? 0;
       usageRecord.parallelToolCallsEnabled = body.parallel_tool_calls ?? null;
 
-      const inputItems = Array.isArray(body.input) ? body.input : [];
+      const storageRequest = {
+        ...body,
+        store: shouldStore,
+        previous_response_id: previousResponseId,
+      };
+      const responseMetadata = unifiedResponse.plexus;
+      let stored = false;
+      const onResponse = async (value: unknown, event?: string) => {
+        if (!isResponsesResponse(value)) return;
+        const response = value;
+        response.store = shouldStore;
+        response.previous_response_id = previousResponseId ?? undefined;
+        if (
+          !shouldStore ||
+          stored ||
+          (event && event !== 'response.completed' && event !== 'response.incomplete') ||
+          (response.status !== 'completed' && response.status !== 'incomplete')
+        )
+          return;
+        await responsesStorage.storeResponse(
+          { ...response, plexus: responseMetadata },
+          storageRequest
+        );
+        stored = true;
+        if (body.conversation) {
+          const conversationId =
+            typeof body.conversation === 'string' ? body.conversation : body.conversation.id;
+          await responsesStorage.updateConversation(conversationId, response.output, currentInput);
+        }
+      };
       const result = await handleResponse(
         request,
         reply,
@@ -300,30 +385,13 @@ export async function registerResponsesRoute(
         startTime,
         'responses',
         shouldEstimateTokens,
-        body,
+        storageRequest,
         quotaEnforcer,
         (request as any).keyName,
         abortController,
-        stallDetectionResult
+        stallDetectionResult,
+        onResponse
       );
-
-      // Store response if requested and not streaming
-      if (body.store !== false && !body.stream) {
-        const formattedResponse = await transformer.formatResponse(unifiedResponse);
-        await responsesStorage.storeResponse(formattedResponse, body);
-
-        // Update conversation if specified
-        if (body.conversation) {
-          const conversationId =
-            typeof body.conversation === 'string' ? body.conversation : body.conversation.id;
-
-          await responsesStorage.updateConversation(
-            conversationId,
-            formattedResponse.output,
-            inputItems
-          );
-        }
-      }
 
       earlyDisconnect?.cleanup();
       return result;
