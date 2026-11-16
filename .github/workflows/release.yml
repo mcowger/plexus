@@ -537,7 +537,7 @@ jobs:
   # ── Create Release ─────────────────────────────────────────────────────
   release:
     name: Create Release
-    needs: [setup, build-binaries, build-docker-manifest, generate-release-notes, publish-cli]
+    needs: [setup, build-binaries, build-docker-manifest, generate-release-notes]
     runs-on: ubuntu-latest
     steps:
       - name: Download binaries
