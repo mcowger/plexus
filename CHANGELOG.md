@@ -2,17 +2,9 @@
 
 ## Unreleased
 
-### Dependencies
+### Fixed
 
-- Update all workspace dependencies to their latest stable releases, including Google GenAI 3, and refresh the lockfile.
-- Replace Playground's removed pi-ai schema-builder import with equivalent JSON Schema tool definitions.
-
-### Bug fixes
-
-- Make Responses storage opt-in (`store: true`), preserve returned IDs for JSON and SSE responses, and reconstruct complete history locally without upstream response chaining. Conversations are read-only unless `store: true`; requests cannot combine a conversation with `previous_response_id`.
-- Stop reporting progress for cancelled or disconnected requests after their response streams close.
-- Preserve provider-targeted debug traces for failed upstream requests by assigning the provider before dispatch, including transport failures.
-- Show configured provider names on dashboard quota summaries and quota cards so multiple accounts using the same service can be distinguished.
+- Cancel upstream streams and stop reporting progress when response streams close early
 
 ## 2026.04.14.1 - 2026-04-14
 

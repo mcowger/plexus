@@ -474,7 +474,8 @@ describe('handleResponse chat terminal finalization (client closes after [DONE])
       storage.saveRequest = mock(async () => {});
       storage.updatePerformanceMetrics = mock(async () => {});
       const sendCalls: PassThrough[] = [];
-      const providerStream = new ReadableStream<Uint8Array>({ start() {} });
+      const cancel = mock(() => {});
+      const providerStream = new ReadableStream<Uint8Array>({ cancel });
 
       await handleResponse(
         makeRequest() as unknown as Parameters<typeof handleResponse>[0],
@@ -500,11 +501,17 @@ describe('handleResponse chat terminal finalization (client closes after [DONE])
       ]);
       const { promise: closed, resolve } = Promise.withResolvers<void>();
       pipeline.once('close', resolve);
-      if (termination === 'abort') abortController.abort();
-      else pipeline.destroy();
-      await closed;
-      expect(storage.getProgressUpdates()).toEqual([]);
-      abortController.abort();
+      try {
+        if (termination === 'abort') abortController.abort();
+        else pipeline.destroy();
+        await closed;
+        await wait(50);
+        expect(storage.getProgressUpdates()).toEqual([]);
+        expect(cancel).toHaveBeenCalledTimes(1);
+        expect(abortController.signal.aborted).toBe(true);
+      } finally {
+        abortController.abort();
+      }
     });
   }
 

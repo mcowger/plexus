@@ -760,7 +760,10 @@ export async function handleResponse(
     };
 
     pipeline.once('end', cleanupDisconnectWiring);
-    pipeline.once('close', cleanupDisconnectWiring);
+    pipeline.once('close', () => {
+      if (!pipeline.readableEnded) onDisconnect('pipeline.close');
+      cleanupDisconnectWiring();
+    });
 
     pipeline.on('error', (err: any) => {
       // Belt-and-suspenders: catch any write errors that do surface (e.g. if Bun
