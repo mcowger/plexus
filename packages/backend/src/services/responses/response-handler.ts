@@ -746,7 +746,10 @@ export async function handleResponse(
       }, 250);
     }
 
+    let disconnectWiringCleanedUp = false;
     const cleanupDisconnectWiring = () => {
+      if (disconnectWiringCleanedUp) return;
+      disconnectWiringCleanedUp = true;
       if (disconnectPoll) {
         clearInterval(disconnectPoll);
         disconnectPoll = null;
@@ -757,6 +760,7 @@ export async function handleResponse(
     };
 
     pipeline.once('end', cleanupDisconnectWiring);
+    pipeline.once('close', cleanupDisconnectWiring);
 
     pipeline.on('error', (err: any) => {
       // Belt-and-suspenders: catch any write errors that do surface (e.g. if Bun

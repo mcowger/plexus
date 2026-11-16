@@ -22,7 +22,9 @@ import { PassThrough, Readable } from 'node:stream';
 import { OpenAITransformer } from '../../transformers/openai';
 import type { UnifiedChatResponse } from '../../types/unified';
 import type { UsageRecord } from '../../types/usage';
+import { StallInspector } from '../inspectors/stall-inspector';
 import { DebugManager } from '../observability/debug-manager';
+import { UsageStorageService } from '../observability/usage-storage';
 import { handleResponse } from '../responses/response-handler';
 
 // ---------------------------------------------------------------------------
@@ -459,6 +461,52 @@ describe('handleResponse chat terminal finalization (client closes after [DONE])
     choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
     usage: { prompt_tokens: 50, completion_tokens: 9, total_tokens: 59 },
   })}\n\n`;
+
+  for (const termination of ['abort', 'transport close'] as const) {
+    it(`removes progress after ${termination}`, async () => {
+      const abortController = new AbortController();
+      const stallInspector = new StallInspector(
+        'req-progress',
+        { ttfbMs: null, ttfbBytes: 100, minBytesPerSecond: null, windowMs: 1000, gracePeriodMs: 0 },
+        abortController
+      );
+      const storage = new UsageStorageService();
+      storage.saveRequest = mock(async () => {});
+      storage.updatePerformanceMetrics = mock(async () => {});
+      const sendCalls: PassThrough[] = [];
+      const providerStream = new ReadableStream<Uint8Array>({ start() {} });
+
+      await handleResponse(
+        makeRequest() as unknown as Parameters<typeof handleResponse>[0],
+        makeReply(sendCalls) as unknown as Parameters<typeof handleResponse>[1],
+        makeUnifiedResponse(providerStream),
+        new OpenAITransformer(),
+        { requestId: 'req-progress' },
+        storage,
+        Date.now(),
+        'chat',
+        false,
+        undefined,
+        undefined,
+        undefined,
+        abortController,
+        { stallInspector, addStallConfig: () => {} }
+      );
+
+      const pipeline = sendCalls.at(-1)!;
+      pipeline.on('data', () => {});
+      expect(storage.getProgressUpdates().map((update) => update.requestId)).toEqual([
+        'req-progress',
+      ]);
+      const { promise: closed, resolve } = Promise.withResolvers<void>();
+      pipeline.once('close', resolve);
+      if (termination === 'abort') abortController.abort();
+      else pipeline.destroy();
+      await closed;
+      expect(storage.getProgressUpdates()).toEqual([]);
+      abortController.abort();
+    });
+  }
 
   it('records success WITH usage when the transport is destroyed after [DONE]', async () => {
     const encoder = new TextEncoder();
