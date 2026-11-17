@@ -891,6 +891,20 @@
       "notes": "Get a key at https://console.atlascloud.ai/api-keys and send it as a Bearer token. Model ids keep the vendor prefix, such as deepseek-ai/deepseek-v4-flash, moonshotai/kimi-k3 or zai-org/glm-5.2. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. The logprobs parameter is rejected with 400 even when false. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
     },
     {
+      "id": "synap",
+      "name": "Synap",
+      "description": "Synap402 OpenAI-compatible chat and responses plus Anthropic messages on one base.",
+      "docsUrl": "https://synap402.com/docs",
+      "suggestedProviderId": "synap",
+      "suggestedName": "Synap",
+      "apiBaseUrl": {
+        "chat": "https://synap402.com/v1",
+        "responses": "https://synap402.com/v1",
+        "messages": "https://synap402.com/v1"
+      },
+      "notes": "Get a key at https://synap402.com/account.html#keys (keys start with sk-pool-) and send it as a Bearer token. Model ids are bare names such as qwen3-coder-30b, gpt-oss-20b or synap-v1 (an auto-router that picks the cheapest model that can do the job). Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages; Claude Code points ANTHROPIC_BASE_URL at the bare https://synap402.com host instead. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "meta",
       "name": "Meta",
       "description": "Meta Model API — chat, responses, and Anthropic-compatible messages.",
