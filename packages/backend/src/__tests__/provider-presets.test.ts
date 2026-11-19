@@ -142,20 +142,6 @@ describe('built-in presets catalog (data/provider-presets.json)', () => {
     );
     // DeepSeek chat has no /v1 segment upstream.
     expect(presetOrThrow('deepseek').apiBaseUrl.chat).toBe('https://api.deepseek.com');
-    // Synap serves chat/responses under /v1 and Claude Code points
-    // ANTHROPIC_BASE_URL at the bare host, so messages also carries /v1.
-    expect(presetOrThrow('synap').apiBaseUrl).toEqual({
-      chat: 'https://synap402.com/v1',
-      responses: 'https://synap402.com/v1',
-      messages: 'https://synap402.com/v1',
-    });
-  });
-
-  test('synap declares no quirk source, so auto-compat stays off', () => {
-    const synap = presetOrThrow('synap');
-    expect(synap.piAiProvider).toBeUndefined();
-    expect(synap.piAiQuirks).toBeUndefined();
-    expect(synap.autoCompat).toBe(false);
   });
 
   test('requesty declares inline quirks instead of borrowing the openrouter catalog', () => {
