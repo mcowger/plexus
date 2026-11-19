@@ -76,8 +76,8 @@
     "@earendil-works/pi-ai": "1.5.2"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.77.0",
-    "agent-browser": "^0.42.0",
+    "@redocly/cli": "^2.79.0",
+    "agent-browser": "^0.43.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "bun-types": "1.4.4",
