@@ -128,6 +128,10 @@ is what `response-handler.ts` now does, so that future timeout wiring at the rou
 level (e.g. `AbortSignal.any([signal, AbortSignal.timeout(ms)])`) requires no
 further changes to the streaming handler. ✅
 
+### Buffered media on Bun 1.4.4
+
+The Bun 1.3.14 `Readable.fromWeb()` result above does not apply to the buffered media paths tested for [#1080](https://github.com/mcowger/plexus/issues/1080). A loopback HTTP server sent headers and part of the body through a real `Bun.FetchSession`, then stalled. With a 200 ms provider deadline and failover off, embeddings, transcription, and speech (audio and SSE) each reported `504 upstream_timeout` and closed the upstream connection at the deadline. This check did not use the Node stream adapter.
+
 ## Relevant Bun Issues
 
 - https://github.com/oven-sh/bun/issues/14697 — ServerResponse doesn't emit close event
