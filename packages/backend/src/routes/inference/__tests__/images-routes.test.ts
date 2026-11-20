@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, jest, mock, test } from 'bun:test';
+import { beforeEach, describe, expect, it, jest, mock, spyOn, test } from 'bun:test';
 
 import { FastifyInstance } from 'fastify';
 
@@ -53,12 +53,10 @@ type EditsHandler = (request: FakeRequest, reply: FakeReply) => Promise<unknown>
 
 describe('Images route telemetry', () => {
   beforeEach(() => setConfigForTesting({ providers: {}, models: {}, keys: {} } as any));
-  afterEach(() => jest.useRealTimers());
 
   it.each(['/v1/images/generations', '/v1/images/edits'])(
     'cancels pending dispatch and cleans disconnect polling for %s',
     async (path) => {
-      jest.useFakeTimers();
       let handler!: (request: any, reply: any) => Promise<unknown>;
       const fastify = {
         post: (registeredPath: string, callback: typeof handler) => {
@@ -116,23 +114,34 @@ describe('Images route telemetry', () => {
         code: mock(() => reply),
         send: mock(),
       };
-      const result = handler(
-        {
-          headers: {},
-          ip: '127.0.0.1',
-          body,
-          raw: { socket: { [Symbol('handle')]: handle } },
-          isMultipart: () => true,
-        },
-        reply
-      );
-      await ready;
-      handle.closed = true;
-      await advanceTimersByTimeAsync(250);
-      await result;
-      expect(dispatchImageGenerations.mock.calls[0]![1].aborted).toBe(true);
-      expect(reply.code).toHaveBeenCalledWith(499);
-      expect(jest.getTimerCount()).toBe(0);
+      jest.useFakeTimers();
+      const startPolling = spyOn(globalThis, 'setInterval');
+      const stopPolling = spyOn(globalThis, 'clearInterval');
+      try {
+        const result = handler(
+          {
+            headers: {},
+            ip: '127.0.0.1',
+            body,
+            raw: { socket: { [Symbol('handle')]: handle } },
+            isMultipart: () => true,
+          },
+          reply
+        );
+        await ready;
+        expect(startPolling).toHaveBeenCalledTimes(1);
+        const poll = startPolling.mock.results[0]!.value;
+        handle.closed = true;
+        await advanceTimersByTimeAsync(250);
+        await result;
+        expect(dispatchImageGenerations.mock.calls[0]![1].aborted).toBe(true);
+        expect(reply.code).toHaveBeenCalledWith(499);
+        expect(stopPolling).toHaveBeenCalledWith(poll);
+      } finally {
+        stopPolling.mockRestore();
+        startPolling.mockRestore();
+        jest.useRealTimers();
+      }
     }
   );
   it('returns promptly even when saveRequest is unresolved for /v1/images/edits', async () => {
