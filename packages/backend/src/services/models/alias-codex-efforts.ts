@@ -12,6 +12,7 @@ import { resolvePiAiModel } from '../pi-ai/registry';
 import { selectTargetApiType } from '../providers/provider-api-selection';
 import {
   type CodexReasoningCapabilities,
+  getBundledCodexReasoning,
   listCodexOAuthModels,
 } from '../providers/provider-model-discovery';
 import type { RouteResult } from '../routing/router';
@@ -128,7 +129,7 @@ export function createAliasCodexEffortResolver(
     return found;
   }
 
-  async function codexEfforts({ route }: Target): Promise<Efforts> {
+  async function codexEfforts({ route }: Target): Promise<Efforts | undefined> {
     const account = route.config.oauth_account || undefined;
     let lookup = accounts.get(account);
     if (!lookup) {
@@ -143,18 +144,25 @@ export function createAliasCodexEffortResolver(
       });
       accounts.set(account, lookup);
     }
-    const capabilities = (await lookup).get(route.model);
+    const live = (await lookup).get(route.model);
+    const capabilities = live ?? getBundledCodexReasoning(route.model);
+    if (!capabilities) return undefined;
     return {
-      values: capabilities?.supportedEfforts.map(normalizeEffort) ?? [],
-      supportsConfigurationUpdate: capabilities?.supportsEffortUpdates === true,
+      values: capabilities.supportedEfforts.map(normalizeEffort),
+      supportsConfigurationUpdate: live?.supportsEffortUpdates === true,
     };
   }
 
-  return async (aliasId: string): Promise<Efforts | undefined> => {
+  return async (
+    aliasId: string
+  ): Promise<{ values?: string[]; supportsConfigurationUpdate: boolean } | undefined> => {
     const candidates = [...collectTargets(aliasId)];
     const codex = candidates.filter((target) => target.codex);
     if (codex.length === 0) return undefined;
     const [first, ...native] = await Promise.all(codex.map(codexEfforts));
+    if (!first || !native.every((target) => target !== undefined)) {
+      return { supportsConfigurationUpdate: false };
+    }
     const direct = candidates
       .filter((target) => !target.codex)
       .map((target) => {
@@ -165,18 +173,17 @@ export function createAliasCodexEffortResolver(
         }
         return values;
       });
-    const values = [...new Set(first?.values)].filter(
+    const values = [...new Set(first.values)].filter(
       (value) =>
         native.every((target) => target.values.includes(value)) &&
         direct.every((levels) => levels.includes(value))
     );
     return {
       values,
-      // Configuration updates are verified by the Codex account catalog, not
-      // by a Direct effort map. Mixed routes must not inherit catalog defaults.
+      // Only live account metadata can confirm support for configuration updates.
       supportsConfigurationUpdate:
         direct.length === 0 &&
-        first?.supportsConfigurationUpdate === true &&
+        first.supportsConfigurationUpdate &&
         native.every((target) => target.supportsConfigurationUpdate),
     };
   };

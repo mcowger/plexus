@@ -271,6 +271,11 @@ describe('GET /v1/models – account-scoped Codex efforts', () => {
               supported_reasoning_levels: [{ effort: 'high' }],
               supports_reasoning_effort_updates: false,
             },
+            {
+              slug: 'gpt-6.2-astra',
+              supported_reasoning_levels: [],
+              supports_reasoning_effort_updates: false,
+            },
           ],
         });
       })
@@ -343,9 +348,19 @@ describe('GET /v1/models – account-scoped Codex efforts', () => {
           },
           disjoint: groups(codex, { ...direct, model: 'disjoint' }),
           downlevel: groups(codex, { ...codex, model: 'downlevel-model' }),
-          unknown: groups(codex, { ...codex, model: 'missing-codex-model' }),
+          unknown: {
+            pi_model: { provider: 'openai', model_id: 'gpt-5.6-luna' },
+            ...groups(codex, { ...codex, model: 'missing-codex-model' }),
+          },
           'unknown-direct': groups(codex, { provider: 'unmapped', model: 'unknown' }),
-          unverified: groups(codex, { ...codex, provider: 'offline', model: 'gpt-6.2-sol' }),
+          unverified: groups(codex, { provider: 'offline', model: 'gpt-6.2-sol' }),
+          'bundled-offline': groups({ provider: 'offline', model: 'gpt-6.2-sol' }),
+          'bundled-not-listed': groups({ provider: 'work', model: 'gpt-6.2-sol' }),
+          'live-empty': {
+            pi_model: { provider: 'openai', model_id: 'gpt-5.6-luna' },
+            ...groups({ provider: 'work', model: 'gpt-6.2-astra' }),
+          },
+          'unknown-offline': groups({ provider: 'offline', model: 'missing-codex-model' }),
         },
       } as unknown as PlexusConfig);
       await registerModelsRoute(fastify);
@@ -369,12 +384,31 @@ describe('GET /v1/models – account-scoped Codex efforts', () => {
         pi_options: { supportsConfigurationUpdate: false },
       });
       expect(listed.has('nested-copy')).toBe(false);
-      for (const alias of ['disjoint', 'unknown', 'unknown-direct', 'unverified']) {
+      for (const alias of ['disjoint', 'unknown-direct', 'live-empty']) {
         expect(listed.get(alias)).toMatchObject({
           reasoning_options: [{ type: 'effort', values: [] }],
           pi_options: { supportsConfigurationUpdate: false },
         });
       }
+      expect(listed.get('unverified')).toMatchObject({
+        reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
+      for (const alias of ['bundled-offline', 'bundled-not-listed']) {
+        expect(listed.get(alias)).toMatchObject({
+          reasoning_options: [
+            { type: 'effort', values: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+          ],
+          pi_options: { supportsConfigurationUpdate: false },
+        });
+      }
+      expect(listed.get('unknown')).toMatchObject({
+        reasoning_options: [
+          { type: 'effort', values: ['off', 'low', 'medium', 'high', 'xhigh', 'max'] },
+        ],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
+      expect(listed.get('unknown-offline')).not.toHaveProperty('reasoning_options');
       expect(credentials).toHaveBeenCalledTimes(2);
       expect(fetchModels).toHaveBeenCalledTimes(2);
     } finally {

@@ -248,8 +248,9 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       }
       const codex = codexEfforts[index];
       if (codex) {
-        // Distinguish an empty intersection from missing capability metadata.
-        reasoningOptions = [{ type: 'effort', values: codex.values }];
+        if (codex.values !== undefined) {
+          reasoningOptions = [{ type: 'effort', values: codex.values }];
+        }
         piOptions = {
           ...piOptions,
           supportsConfigurationUpdate: codex.supportsConfigurationUpdate,

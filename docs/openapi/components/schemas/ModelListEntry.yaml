@@ -98,9 +98,11 @@ properties:
     description: >
       Reasoning effort choices. For aliases that can route to Codex Responses,
       these are the native choices common to every enabled failover target.
-      Codex choices come from the configured OAuth account; the bundled catalog
-      does not verify support. An empty values array means no shared choices are
-      verified. The native value `none` is reported as `off`.
+      Codex choices use the configured OAuth account's catalog when available,
+      or the bundled catalog when live metadata is missing. If neither source
+      has metadata for a Codex target, the alias retains its default reasoning
+      options, if any. An empty values array means no shared choices. The
+      native value `none` is reported as `off`.
     items:
       type: object
       required: [type, values]
