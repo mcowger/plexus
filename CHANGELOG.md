@@ -5,6 +5,10 @@
 ### Fixed
 
 - Cancel upstream streams and stop reporting progress when response streams close early
+- Use the signed-in Codex account's reasoning options. Clamp unsupported efforts and strip saved reasoning updates on models that can't replay them.
+- Skip the Codex 401 retry if refreshing the OAuth token changes the ChatGPT account.
+- Use the signed-in Codex account's reasoning options, clamp unsupported efforts, and strip saved reasoning updates on models that cannot replay them
+- Skip the Codex 401 retry if refreshing the OAuth token changes the ChatGPT account
 
 ## 2026.04.14.1 - 2026-04-14
 

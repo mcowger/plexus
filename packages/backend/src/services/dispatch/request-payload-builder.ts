@@ -20,9 +20,14 @@ import {
   resolveCopilotBaseUrl,
 } from '../oauth/oauth-native-request';
 import { applyGeminiThinkingConfig, getApiMetadata } from '../providers/provider-api-selection';
+import {
+  getBundledCodexReasoning,
+  listCodexOAuthModels,
+} from '../providers/provider-model-discovery';
 import type { RouteResult } from '../routing/router';
 import { isAnthropicTargetProvider } from './adapter-resolver';
 import { applyBodyCacheKeyInjection } from './cache-key-injection';
+import { needsCodexReasoningCapabilities, projectCodexReasoning } from './codex-reasoning';
 import {
   applyNativeAnthropicCompat,
   applyRegistryAutoCompat,
@@ -186,22 +191,6 @@ export async function buildRequestPayload(
     payload = JSON.parse(JSON.stringify(request.originalBody));
     payload.model = route.model;
 
-    // Normalize Plexus-only reasoning controls without discarding Responses fields.
-    if (
-      codexSameFormat &&
-      !codexCliPassthrough &&
-      typeof payload.reasoning === 'object' &&
-      payload.reasoning !== null
-    ) {
-      const reasoning = payload.reasoning;
-      if (reasoning.enabled === false || reasoning.effort === 'off') {
-        reasoning.effort = 'none';
-      }
-      delete reasoning.enabled;
-      delete reasoning.max_tokens;
-      delete reasoning.adaptive;
-    }
-
     // Native Gemini pass-through forwards `contents` verbatim, so a client
     // history ending on a text-only model turn would 400 upstream
     // ("Requests ending with a model turn are not supported", LiteLLM
@@ -277,7 +266,7 @@ export async function buildRequestPayload(
   if (anthropicNative && !bypassTransformation) {
     payload = applyNativeAnthropicCompat(payload, request, route.model);
   }
-  payload = applyRegistryAutoCompat(payload, request, route, targetApiType);
+  payload = applyRegistryAutoCompat(payload, request, route, targetApiType, codexNative);
 
   payload = applyEagerToolInputStreaming(
     payload,
@@ -390,12 +379,26 @@ export async function buildRequestPayload(
     const provider = (
       maskingApiKeyRoute ? 'anthropic' : route.config.oauth_provider || route.provider
     ) as string;
+    const oauthAccountId = route.config.oauth_account?.trim();
+    // Use the same credential for model discovery and inference, even when the
+    // route implicitly selects the only OAuth account or its token was refreshed.
+    let oauthToken: string | undefined;
+    if (codexNative) {
+      oauthToken = await OAuthAuthManager.getInstance().getApiKey('openai-codex', oauthAccountId);
+      const modelId = typeof payload.model === 'string' ? payload.model : route.model;
+      const catalog = needsCodexReasoningCapabilities(payload)
+        ? await listCodexOAuthModels(oauthAccountId, { token: oauthToken })
+        : undefined;
+      const capabilities = catalog?.models.find((model) => model.id === modelId)?.codexReasoning;
+      payload = projectCodexReasoning(payload, capabilities ?? getBundledCodexReasoning(modelId));
+    }
     const prepared: PreparedOAuthRequest = await prepareNativeOAuthDispatch({
       provider: provider as any,
       modelId: route.model,
       nativeBody: payload,
       streaming: !!request.stream,
-      oauthAccountId: route.config.oauth_account?.trim(),
+      oauthAccountId,
+      oauthToken,
       maskingApiKey: maskingApiKeyRoute ? (route.config.api_key ?? '') : null,
       codexPassthrough: codexCliPassthrough,
       // `targetApiType` here is the resolved wire type (effectiveApiType) that
@@ -468,8 +471,8 @@ export async function buildRequestPayload(
 /**
  * Reactively refreshes OAuth credentials and updates stashed wire request
  * parameters (url + headers) after an upstream 401. Returns the updated url and
- * headers for a retry attempt against the same target, or null if the route
- * is not a refreshable OAuth route or has no active stash.
+ * headers for a retry against the same target, or null when the attempt cannot
+ * be retried with refreshed credentials.
  */
 export async function refreshOAuthRoute(
   route: RouteResult,
@@ -513,20 +516,21 @@ export async function refreshOAuthRoute(
     signal,
   });
 
+  // The request was mapped for the original account's model catalog.
+  if (
+    provider === 'openai-codex' &&
+    extractChatgptAccountId(token) !== stashed.headers['chatgpt-account-id']
+  ) {
+    return null;
+  }
+
   // Update Authorization header with the fresh token
   stashed.headers = {
     ...stashed.headers,
     Authorization: `Bearer ${token}`,
   };
 
-  if (provider === 'openai-codex') {
-    const accountId = extractChatgptAccountId(token);
-    if (accountId) {
-      stashed.headers['chatgpt-account-id'] = accountId;
-    } else {
-      delete stashed.headers['chatgpt-account-id'];
-    }
-  } else if (provider === 'github-copilot') {
+  if (provider === 'github-copilot') {
     const resolvedBaseUrl = await OAuthAuthManager.getInstance().getBaseUrl(
       provider,
       oauthAccountId

@@ -9,7 +9,12 @@ import { logger } from '../../utils/logger';
 import type { GenerationIntent } from '../pi-ai/generation';
 import { normalizeVerbosity } from '../pi-ai/generation';
 import type { ReasoningIntent, ReasoningVisibility } from '../pi-ai/reasoning';
-import { clampEffortToWindow, normalizeEffort, normalizeVisibility } from '../pi-ai/reasoning';
+import {
+  clampEffortToWindow,
+  intentToEffort,
+  normalizeEffort,
+  normalizeVisibility,
+} from '../pi-ai/reasoning';
 import { buildGenerationOptions, resolvePiAiModel } from '../pi-ai/registry';
 import type { RouteResult } from '../routing/router';
 import { LITE_ALLOWED_TOOL_TYPES } from './responses-extensions';
@@ -478,7 +483,8 @@ function projectResponsesAutoCompat(
   payload: Record<string, any>,
   model: any,
   intent: GenerationIntent,
-  options: Record<string, any>
+  options: Record<string, any>,
+  nativeCodex: boolean
 ): Record<string, any> {
   const next = { ...payload };
   if (options.maxTokens != null) next.max_output_tokens = options.maxTokens;
@@ -488,6 +494,7 @@ function projectResponsesAutoCompat(
   if (options.textVerbosity !== undefined) {
     next.text = { ...(next.text ?? {}), verbosity: options.textVerbosity };
   }
+  if (nativeCodex) return next;
   const existingReasoning = projectReasoningForResponses(next.reasoning);
   if (options.reasoningEffort || options.reasoningSummary) {
     next.reasoning = {
@@ -756,8 +763,23 @@ export function applyRegistryAutoCompat(
   providerPayload: any,
   request: UnifiedChatRequest,
   route: RouteResult,
-  targetApiType: string
+  targetApiType: string,
+  nativeCodex = false
 ): any {
+  if (nativeCodex && providerPayload?.reasoning?.effort === undefined) {
+    const original = request.originalBody;
+    const rawEffort = original?.reasoning?.effort ?? original?.reasoning_effort;
+    const effort =
+      typeof rawEffort === 'string'
+        ? rawEffort
+        : intentToEffort(extractReasoningIntent(original ?? providerPayload, request));
+    if (effort !== undefined) {
+      providerPayload = {
+        ...providerPayload,
+        reasoning: { ...providerPayload?.reasoning, effort },
+      };
+    }
+  }
   const autoCompat = route.config.auto_compat === true || route.modelConfig?.auto_compat === true;
 
   // Key defaults are best-effort: when the route declares no tier support,
@@ -877,7 +899,7 @@ export function applyRegistryAutoCompat(
   // except for embedded `configuration_update` efforts, which a declared
   // thinking map must still clamp even when the request has no top-level effort.
   if (inline && Object.keys(options).length === 0 && inline.compat?.supportsTemperature !== false) {
-    if (isResponsesApi && Array.isArray(tierPayload?.input)) {
+    if (!nativeCodex && isResponsesApi && Array.isArray(tierPayload?.input)) {
       const input = clampResponsesConfigurationUpdateEfforts(tierPayload.input, piAiModel);
       return input === tierPayload.input ? tierPayload : { ...tierPayload, input };
     }
@@ -892,8 +914,14 @@ export function applyRegistryAutoCompat(
   // leaves a stale fast-mode beta behind.
 
   let nextPayload: any;
-  if (isResponsesApi) {
-    nextPayload = projectResponsesAutoCompat(tierPayload, piAiModel, selectedIntent, options);
+  if (isResponsesApi || nativeCodex) {
+    nextPayload = projectResponsesAutoCompat(
+      tierPayload,
+      piAiModel,
+      selectedIntent,
+      options,
+      nativeCodex
+    );
   } else if (api === 'anthropic-messages') {
     nextPayload = projectAnthropicAutoCompat(
       tierPayload,

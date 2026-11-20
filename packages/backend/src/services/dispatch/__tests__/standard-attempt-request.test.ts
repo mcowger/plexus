@@ -479,7 +479,11 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     };
 
     const authManager = OAuthAuthManager.getInstance();
-    const getApiKeySpy = registerSpy(authManager, 'getApiKey').mockResolvedValue('new-token');
+    const accountClaims = Buffer.from(
+      JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-old' } })
+    ).toString('base64url');
+    const newToken = `header.${accountClaims}.signature`;
+    const getApiKeySpy = registerSpy(authManager, 'getApiKey').mockResolvedValue(newToken);
 
     const executeProviderRequest = mock()
       .mockImplementationOnce(
@@ -509,7 +513,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     // First call sent old token
     expect(executeProviderRequest.mock.calls[0]![1].Authorization).toBe('Bearer old-token');
     // Second call sent new token
-    expect(executeProviderRequest.mock.calls[1]![1].Authorization).toBe('Bearer new-token');
+    expect(executeProviderRequest.mock.calls[1]![1].Authorization).toBe(`Bearer ${newToken}`);
     // Error handler was not called (no cooldown)
     expect(handleProviderError).not.toHaveBeenCalled();
   });
