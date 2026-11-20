@@ -11,6 +11,7 @@ import {
   applyQuirkOverlay,
   resolveInlineQuirks,
 } from '../../services/dispatch/dispatcher-auto-compat';
+import { createAliasCodexEffortResolver } from '../../services/models/alias-codex-efforts';
 import { resolveAliasServiceTiers } from '../../services/models/alias-service-tiers';
 import {
   ModelMetadataManager,
@@ -139,7 +140,12 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
     const created = MODEL_CREATED_AT;
     const hasVisionFallthrough = !!config.vision_fallthrough;
 
-    const models = Object.entries(config.models).map(([aliasId, modelConfig]) => {
+    const resolveCodexEfforts = createAliasCodexEffortResolver(
+      config.models,
+      config.providers ?? {}
+    );
+    const codexEfforts = await Promise.all(Object.keys(config.models).map(resolveCodexEfforts));
+    const models = Object.entries(config.models).map(([aliasId, modelConfig], index) => {
       const automaticIdentity = resolveAutomaticModelIdentity(
         aliasId,
         modelConfig,
@@ -239,6 +245,16 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
         ];
       } else if (inlineLevels.length > 0) {
         reasoningOptions = [{ type: 'effort', values: inlineLevels }];
+      }
+      const codex = codexEfforts[index];
+      if (codex) {
+        if (codex.values !== undefined) {
+          reasoningOptions = [{ type: 'effort', values: codex.values }];
+        }
+        piOptions = {
+          ...piOptions,
+          supportsConfigurationUpdate: codex.supportsConfigurationUpdate,
+        };
       }
 
       const serviceTiers = resolveAliasServiceTiers(aliasId, config.models, config.providers ?? {});

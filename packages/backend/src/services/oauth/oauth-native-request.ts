@@ -1059,6 +1059,8 @@ export async function prepareNativeOAuthDispatch(
     nativeBody: any;
     streaming: boolean;
     oauthAccountId?: string | null;
+    /** Token already resolved for the Codex model catalog lookup. */
+    oauthToken?: string;
     /** When set, use the Claude-masking API-key mode instead of OAuth. */
     maskingApiKey?: string | null;
     /** Codex only: send the body verbatim (CLI-shaped request). */
@@ -1082,7 +1084,9 @@ export async function prepareNativeOAuthDispatch(
     }
     auth = { mode: 'apiKey', apiKey: key };
   } else {
-    const token = await OAuthAuthManager.getInstance().getApiKey(provider, oauthAccountId);
+    const token =
+      params.oauthToken ??
+      (await OAuthAuthManager.getInstance().getApiKey(provider, oauthAccountId));
     auth = { mode: 'oauth', token };
   }
 

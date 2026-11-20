@@ -1,0 +1,341 @@
+{
+  "source": "https://raw.githubusercontent.com/openai/codex/1c0c806028d5d585c574f85e5c8e979dbb2205be/codex-rs/models-manager/models.json",
+  "models": [
+    {
+      "slug": "gpt-6.2-sol",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low",
+      "supports_reasoning_effort_updates": true,
+      "multi_agent_reasoning_effort": "xhigh"
+    },
+    {
+      "slug": "gpt-6.2-astra",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low",
+      "supports_reasoning_effort_updates": true,
+      "multi_agent_reasoning_effort": "xhigh"
+    },
+    {
+      "slug": "gpt-6-astra",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low",
+      "supports_reasoning_effort_updates": true,
+      "multi_agent_reasoning_effort": "xhigh"
+    },
+    {
+      "slug": "gpt-6.1-sol",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low",
+      "supports_reasoning_effort_updates": true,
+      "multi_agent_reasoning_effort": "xhigh"
+    },
+    {
+      "slug": "gpt-6.1-terra",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low",
+      "supports_reasoning_effort_updates": true,
+      "multi_agent_reasoning_effort": "xhigh"
+    },
+    {
+      "slug": "gpt-6-sol",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "medium"
+    },
+    {
+      "slug": "gpt-6-luna",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        }
+      ],
+      "default_reasoning_level": "medium"
+    },
+    {
+      "slug": "gpt-5.6-sol",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low",
+      "supports_reasoning_effort_updates": false
+    },
+    {
+      "slug": "gpt-5.6-terra",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "medium",
+      "supports_reasoning_effort_updates": false
+    },
+    {
+      "slug": "gpt-5.6-luna",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        }
+      ],
+      "default_reasoning_level": "medium",
+      "supports_reasoning_effort_updates": false
+    },
+    {
+      "slug": "gpt-daybreak-blue-latest",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "low"
+    },
+    {
+      "slug": "gpt-daybreak-red-latest",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        },
+        {
+          "effort": "ultra"
+        }
+      ],
+      "default_reasoning_level": "medium"
+    },
+    {
+      "slug": "gpt-5.5",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        }
+      ],
+      "default_reasoning_level": "medium",
+      "supports_reasoning_effort_updates": false
+    },
+    {
+      "slug": "codex-auto-review",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low"
+        },
+        {
+          "effort": "medium"
+        },
+        {
+          "effort": "high"
+        },
+        {
+          "effort": "xhigh"
+        },
+        {
+          "effort": "max"
+        }
+      ],
+      "default_reasoning_level": "medium",
+      "supports_reasoning_effort_updates": false
+    }
+  ]
+}

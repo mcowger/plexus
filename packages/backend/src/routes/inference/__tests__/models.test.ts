@@ -1,10 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn, test } from 'bun:test';
 import path from 'path';
 
 import Fastify from 'fastify';
 
+import { asFetch } from '../../../../test/test-utils';
 import { PlexusConfig, setConfigForTesting } from '../../../config';
 import { ModelMetadataManager } from '../../../services/models/model-metadata-manager';
+import { OAuthAuthManager } from '../../../services/oauth/oauth-auth-manager';
+import { resetCodexModelDiscoveryForTesting } from '../../../services/providers/provider-model-discovery';
 import { registerModelsRoute } from '../models';
 
 const FIXTURES = path.join(__dirname, '../../../utils/__tests__/fixtures');
@@ -237,6 +240,185 @@ describe('GET /v1/models – service_tiers', () => {
 });
 
 // ─── Reasoning options from the pi-ai catalog ──────────────
+
+describe('GET /v1/models – account-scoped Codex efforts', () => {
+  it('intersects native target choices, follows nested aliases, and shares account discovery', async () => {
+    const fastify = Fastify();
+    const credentials = spyOn(OAuthAuthManager.getInstance(), 'getApiKey');
+    const fetchModels = spyOn(globalThis, 'fetch');
+    const token = (account: string) =>
+      `header.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: account } })).toString('base64url')}.signature`;
+    const workToken = token('work');
+    credentials.mockImplementation(async (_provider, account) =>
+      account === 'work' ? workToken : token('offline')
+    );
+    fetchModels.mockImplementation(
+      asFetch(async (_url, init) => {
+        if (new Headers(init?.headers).get('chatgpt-account-id') !== 'work') {
+          return new Response(null, { status: 503 });
+        }
+        return Response.json({
+          models: [
+            {
+              slug: 'codex-model',
+              supported_reasoning_levels: ['none', 'minimal', 'low', 'high', 'special'].map(
+                (effort) => ({ effort })
+              ),
+              supports_reasoning_effort_updates: true,
+            },
+            {
+              slug: 'downlevel-model',
+              supported_reasoning_levels: [{ effort: 'high' }],
+              supports_reasoning_effort_updates: false,
+            },
+            {
+              slug: 'gpt-6.2-astra',
+              supported_reasoning_levels: [],
+              supports_reasoning_effort_updates: false,
+            },
+          ],
+        });
+      })
+    );
+
+    const codex = { provider: 'work', model: 'codex-model' };
+    const direct = { provider: 'direct', model: 'actual' };
+    const groups = (
+      ...targets: { provider?: string; model?: string; alias?: string; enabled?: boolean }[]
+    ) => ({
+      target_groups: [{ name: 'primary', selector: 'in_order', targets }],
+    });
+
+    try {
+      resetCodexModelDiscoveryForTesting();
+      setConfigForTesting({
+        providers: {
+          work: {
+            api_base_url: 'oauth://openai-codex',
+            oauth_provider: 'openai-codex',
+            oauth_account: 'work',
+          },
+          offline: {
+            api_base_url: 'oauth://openai-codex',
+            oauth_provider: 'openai-codex',
+            oauth_account: 'offline',
+          },
+          disabled: {
+            api_base_url: 'oauth://openai-codex',
+            oauth_provider: 'openai-codex',
+            enabled: false,
+          },
+          direct: {
+            api_base_url: { responses: 'https://example.test/v1' },
+            auto_compat: true,
+            pi_ai_provider: 'openai',
+            models: {
+              actual: { pi_ai_model_id: 'gpt-5.6-luna' },
+              ineligible: { type: 'decisions' },
+            },
+            pi_ai_quirks: {
+              responses: {
+                api: 'openai-responses',
+                reasoning: true,
+                models: {
+                  actual: { thinkingLevelMap: { off: 'none', minimal: 'low', high: 'high' } },
+                  disjoint: { thinkingLevelMap: { medium: 'medium' } },
+                },
+              },
+            },
+          },
+          unmapped: { api_base_url: { responses: 'https://unmapped.example/v1' } },
+        },
+        models: {
+          nested: {
+            ...groups(
+              codex,
+              { ...direct, model: 'ineligible' },
+              { ...codex, provider: 'disabled' }
+            ),
+            additional_aliases: ['nested-copy'],
+          },
+          mixed: {
+            pi_model: { provider: 'anthropic', model_id: 'claude-test' },
+            ...groups({ alias: 'nested-copy' }, direct, {
+              ...direct,
+              model: 'unknown',
+              enabled: false,
+            }),
+          },
+          disjoint: groups(codex, { ...direct, model: 'disjoint' }),
+          downlevel: groups(codex, { ...codex, model: 'downlevel-model' }),
+          unknown: {
+            pi_model: { provider: 'openai', model_id: 'gpt-5.6-luna' },
+            ...groups(codex, { ...codex, model: 'missing-codex-model' }),
+          },
+          'unknown-direct': groups(codex, { provider: 'unmapped', model: 'unknown' }),
+          unverified: groups(codex, { provider: 'offline', model: 'gpt-6.2-sol' }),
+          'bundled-offline': groups({ provider: 'offline', model: 'gpt-6.2-sol' }),
+          'bundled-not-listed': groups({ provider: 'work', model: 'gpt-6.2-sol' }),
+          'live-empty': {
+            pi_model: { provider: 'openai', model_id: 'gpt-5.6-luna' },
+            ...groups({ provider: 'work', model: 'gpt-6.2-astra' }),
+          },
+          'unknown-offline': groups({ provider: 'offline', model: 'missing-codex-model' }),
+        },
+      } as unknown as PlexusConfig);
+      await registerModelsRoute(fastify);
+      const response = await fastify.inject({ method: 'GET', url: '/v1/models' });
+      expect(response.statusCode).toBe(200);
+      const listed = new Map(
+        response.json().data.map((model: { id: string }) => [model.id, model])
+      );
+      expect(listed.get('mixed')).toMatchObject({
+        reasoning_options: [{ type: 'effort', values: ['off', 'low', 'high'] }],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
+      expect(listed.get('nested')).toMatchObject({
+        reasoning_options: [
+          { type: 'effort', values: ['off', 'minimal', 'low', 'high', 'special'] },
+        ],
+        pi_options: { supportsConfigurationUpdate: true },
+      });
+      expect(listed.get('downlevel')).toMatchObject({
+        reasoning_options: [{ type: 'effort', values: ['high'] }],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
+      expect(listed.has('nested-copy')).toBe(false);
+      for (const alias of ['disjoint', 'unknown-direct', 'live-empty']) {
+        expect(listed.get(alias)).toMatchObject({
+          reasoning_options: [{ type: 'effort', values: [] }],
+          pi_options: { supportsConfigurationUpdate: false },
+        });
+      }
+      expect(listed.get('unverified')).toMatchObject({
+        reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
+      for (const alias of ['bundled-offline', 'bundled-not-listed']) {
+        expect(listed.get(alias)).toMatchObject({
+          reasoning_options: [
+            { type: 'effort', values: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+          ],
+          pi_options: { supportsConfigurationUpdate: false },
+        });
+      }
+      expect(listed.get('unknown')).toMatchObject({
+        reasoning_options: [
+          { type: 'effort', values: ['off', 'low', 'medium', 'high', 'xhigh', 'max'] },
+        ],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
+      expect(listed.get('unknown-offline')).not.toHaveProperty('reasoning_options');
+      expect(credentials).toHaveBeenCalledTimes(2);
+      expect(fetchModels).toHaveBeenCalledTimes(2);
+    } finally {
+      credentials.mockRestore();
+      fetchModels.mockRestore();
+      resetCodexModelDiscoveryForTesting();
+      await fastify.close();
+    }
+  });
+});
 
 describe('GET /v1/models – reasoning_options', () => {
   it('exposes canonical effort levels for auto-identified reasoning models', async () => {

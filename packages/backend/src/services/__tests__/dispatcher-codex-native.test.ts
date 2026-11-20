@@ -5,6 +5,7 @@ import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { isCodexCliShapedBody } from '../oauth/oauth-native-request';
+import * as discovery from '../providers/provider-model-discovery';
 
 // Native Codex OAuth pass-through.
 //
@@ -209,6 +210,18 @@ describe('Native Codex OAuth pass-through', () => {
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(CODEX_TOKEN);
+    spyOn(discovery, 'listCodexOAuthModels').mockResolvedValue({
+      source: 'codex-backend',
+      models: [
+        {
+          id: 'gpt-5-codex',
+          codexReasoning: {
+            supportedEfforts: ['none', 'low', 'medium', 'high'],
+            supportsEffortUpdates: false,
+          },
+        },
+      ],
+    });
     fetchSpy = registerSpy(global, 'fetch').mockResolvedValue(
       new Response(UPSTREAM_SSE, {
         status: 200,
@@ -456,14 +469,17 @@ describe('Native Codex OAuth pass-through', () => {
     expect(sent.messages).toBeUndefined();
   });
 
-  test('reactively force-refreshes token and retries when codex backend returns 401', async () => {
+  test.each([
+    ['unchanged', ACCOUNT_ID],
+    ['changed', 'acc_refreshed_99999'],
+  ])('retries a Codex 401 only for the original account (%s)', async (_scenario, accountId) => {
     setConfigForTesting(codexOAuthConfig());
-    const REFRESHED_ACCOUNT_ID = 'acc_refreshed_99999';
     const REFRESHED_CODEX_TOKEN = (() => {
       const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
       const payload = Buffer.from(
         JSON.stringify({
-          'https://api.openai.com/auth': { chatgpt_account_id: REFRESHED_ACCOUNT_ID },
+          'https://api.openai.com/auth': { chatgpt_account_id: accountId },
+          iat: 2,
         })
       ).toString('base64url');
       return `${header}.${payload}.sig`;
@@ -491,7 +507,14 @@ describe('Native Codex OAuth pass-through', () => {
         })
       );
 
-    const response = await new Dispatcher().dispatch(codexCliRequest());
+    const attempt = new Dispatcher().dispatch(codexCliRequest());
+    if (accountId !== ACCOUNT_ID) {
+      await expect(attempt).rejects.toThrow('Provided authentication token is expired.');
+      expect(getApiKeySpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      return;
+    }
+    const response = await attempt;
     expect(response.stream).toBeDefined();
 
     const clientBytes = await drain(response.stream!);
@@ -503,9 +526,9 @@ describe('Native Codex OAuth pass-through', () => {
     expect(firstCallInit[1].headers['Authorization']).toBe(`Bearer ${CODEX_TOKEN}`);
     expect(firstCallInit[1].headers['chatgpt-account-id']).toBe(ACCOUNT_ID);
 
-    // Second attempt used refreshed token and updated account id
+    // Same account, fresh bearer.
     const secondCallInit = fetchSpy.mock.calls[1] as any[];
     expect(secondCallInit[1].headers['Authorization']).toBe(`Bearer ${REFRESHED_CODEX_TOKEN}`);
-    expect(secondCallInit[1].headers['chatgpt-account-id']).toBe(REFRESHED_ACCOUNT_ID);
+    expect(secondCallInit[1].headers['chatgpt-account-id']).toBe(ACCOUNT_ID);
   });
 });

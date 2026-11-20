@@ -1,8 +1,18 @@
+import { createHash } from 'node:crypto';
+
 import { getProviderTypes, type ProviderConfig } from '../../config';
 import { logger } from '../../utils/logger';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { buildCodexModelsUrl, buildCodexOAuthHeaders } from '../oauth/oauth-native-request';
 import { getCatalogModels } from '../pi-ai/catalog';
+import bundledCodexModelEfforts from './codex-model-efforts.json';
+
+export interface CodexReasoningCapabilities {
+  supportedEfforts: readonly string[];
+  defaultEffort?: string;
+  supportsEffortUpdates: boolean;
+  multiAgentEffort?: string;
+}
 
 export interface DiscoveredModel {
   id: string;
@@ -22,6 +32,7 @@ export interface DiscoveredModel {
    * in the Codex CLI picker. Entries the upstream marks `none` are dropped.
    */
   visibility?: 'list' | 'hide';
+  codexReasoning?: CodexReasoningCapabilities;
 }
 
 const ANTHROPIC_API_HOST = 'api.anthropic.com';
@@ -253,7 +264,10 @@ export const CODEX_IMAGE_MODELS: readonly DiscoveredModel[] = [
   access_via: ['codex-images'],
 }));
 
-const CODEX_MODELS_TIMEOUT_MS = 15_000;
+const CODEX_MODELS_TIMEOUT_MS = 2_000;
+const CODEX_MODELS_TTL_MS = 5 * 60_000;
+const CODEX_MODELS_FAILURE_TTL_MS = 15_000;
+const CODEX_MODELS_CACHE_LIMIT = 128;
 
 /** One record of `GET /codex/models` (only the fields we consume). */
 interface CodexModelRecord {
@@ -263,6 +277,31 @@ interface CodexModelRecord {
   visibility?: unknown;
   priority?: unknown;
   context_window?: unknown;
+  supported_reasoning_levels?: unknown;
+  default_reasoning_level?: unknown;
+  supports_reasoning_effort_updates?: unknown;
+  multi_agent_reasoning_effort?: unknown;
+}
+
+function isEffort(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parseCodexReasoning(record: CodexModelRecord): CodexReasoningCapabilities | undefined {
+  if (!Array.isArray(record.supported_reasoning_levels)) return undefined;
+  const supportedEfforts: string[] = [];
+  for (const level of record.supported_reasoning_levels) {
+    if (!isEffort(level?.effort)) return undefined;
+    supportedEfforts.push(level.effort);
+  }
+  const { default_reasoning_level: defaultEffort, multi_agent_reasoning_effort: multiAgentEffort } =
+    record;
+  return {
+    supportedEfforts,
+    ...(isEffort(defaultEffort) ? { defaultEffort } : {}),
+    supportsEffortUpdates: record.supports_reasoning_effort_updates === true,
+    ...(isEffort(multiAgentEffort) ? { multiAgentEffort } : {}),
+  };
 }
 
 function mapCodexModelRecords(records: CodexModelRecord[]): DiscoveredModel[] {
@@ -276,17 +315,21 @@ function mapCodexModelRecords(records: CodexModelRecord[]): DiscoveredModel[] {
         typeof record.priority === 'number' ? record.priority : 0;
       return priority(b) - priority(a) || a.slug.localeCompare(b.slug);
     })
-    .map((record) => ({
-      id: record.slug,
-      ...(typeof record.display_name === 'string' ? { name: record.display_name } : {}),
-      ...(typeof record.description === 'string' ? { description: record.description } : {}),
-      ...(typeof record.context_window === 'number'
-        ? { context_length: record.context_window }
-        : {}),
-      ...(record.visibility === 'list' || record.visibility === 'hide'
-        ? { visibility: record.visibility }
-        : {}),
-    }));
+    .map((record) => {
+      const codexReasoning = parseCodexReasoning(record);
+      return {
+        id: record.slug,
+        ...(typeof record.display_name === 'string' ? { name: record.display_name } : {}),
+        ...(typeof record.description === 'string' ? { description: record.description } : {}),
+        ...(typeof record.context_window === 'number'
+          ? { context_length: record.context_window }
+          : {}),
+        ...(record.visibility === 'list' || record.visibility === 'hide'
+          ? { visibility: record.visibility }
+          : {}),
+        ...(codexReasoning ? { codexReasoning } : {}),
+      };
+    });
 }
 
 /** Append the curated image models, never shadowing an id the list already has. */
@@ -295,63 +338,167 @@ function withCodexImageModels(models: DiscoveredModel[]): DiscoveredModel[] {
   return [...models, ...CODEX_IMAGE_MODELS.filter((model) => !seen.has(model.id))];
 }
 
-/**
- * List the Codex models the signed-in ChatGPT account may actually use.
- *
- * The pi-ai catalog is a static, account-blind snapshot; the ChatGPT backend
- * knows the real entitlement (plan tier, staged rollouts, `client_version`
- * gating), so ask it with the same OAuth identity `/codex/responses` uses. The
- * backend never lists the image models, so the curated `CODEX_IMAGE_MODELS`
- * are appended.
- *
- * Discovery is best-effort: every failure (missing credentials, non-2xx,
- * network/timeout, malformed body) degrades to the static catalog plus the
- * image models, reporting `source: 'catalog'` and a warning the UI can show —
- * a Fetch Models click should never come back empty because the account is
- * logged out.
- */
-export async function listCodexOAuthModels(oauthAccountId?: string | null): Promise<{
+interface CodexModelDiscovery {
   models: DiscoveredModel[];
   source: 'codex-backend' | 'catalog';
   warning?: string;
-}> {
-  try {
-    const token = await OAuthAuthManager.getInstance().getApiKey('openai-codex', oauthAccountId);
-    const url = buildCodexModelsUrl();
+}
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...buildCodexOAuthHeaders(token),
-      },
-      signal: AbortSignal.timeout(CODEX_MODELS_TIMEOUT_MS),
-    });
+interface CodexCatalogCacheEntry {
+  models?: DiscoveredModel[];
+  freshUntil?: number;
+  retryAfter?: number;
+}
 
-    if (!response.ok) {
-      throw new Error(`Codex model list returned ${response.status} ${response.statusText}`);
-    }
+const codexCatalogCache = new Map<string, CodexCatalogCacheEntry>();
+const codexCatalogInFlight = new Map<string, Promise<CodexCatalogCacheEntry>>();
+const bundledCodexModels = mapCodexModelRecords(bundledCodexModelEfforts.models);
+const bundledCodexReasoning = new Map(
+  bundledCodexModels.map((model) => [model.id, model.codexReasoning])
+);
 
-    const body = (await response.json()) as { models?: unknown };
-    if (!Array.isArray(body?.models)) {
-      throw new Error('Codex model list response had no models array');
-    }
+/** Mapping fallback only; this does not attest that the model is available. */
+export function getBundledCodexReasoning(modelId: string): CodexReasoningCapabilities | undefined {
+  return bundledCodexReasoning.get(modelId);
+}
 
-    return {
-      models: withCodexImageModels(mapCodexModelRecords(body.models as CodexModelRecord[])),
-      source: 'codex-backend',
-    };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    logger.warn(`Codex model discovery failed (${reason}); falling back to the static catalog.`);
-    return {
-      models: withCodexImageModels(getOAuthProviderModels('openai-codex')),
-      source: 'catalog',
-      warning:
-        `Could not reach the Codex model list (${reason}); showing the static catalog. ` +
-        "Log in with OAuth to see your account's models.",
-    };
+export function resetCodexModelDiscoveryForTesting(): void {
+  codexCatalogCache.clear();
+  codexCatalogInFlight.clear();
+}
+
+function rememberCodexCatalog(key: string, entry: CodexCatalogCacheEntry): void {
+  codexCatalogCache.delete(key);
+  codexCatalogCache.set(key, entry);
+  if (codexCatalogCache.size > CODEX_MODELS_CACHE_LIMIT) {
+    const oldest = codexCatalogCache.keys().next();
+    if (!oldest.done) codexCatalogCache.delete(oldest.value);
   }
+}
+
+async function fetchCodexCatalog(url: string, headers: Record<string, string>) {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json', ...headers },
+    signal: AbortSignal.timeout(CODEX_MODELS_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error('Codex model list request failed');
+  const body = (await response.json()) as { models?: unknown } | null;
+  if (
+    !Array.isArray(body?.models) ||
+    (body.models.length > 0 &&
+      !body.models.some((record) => typeof record?.slug === 'string' && record.slug.length > 0))
+  ) {
+    throw new Error('Invalid Codex model list response');
+  }
+  return withCodexImageModels(mapCodexModelRecords(body.models));
+}
+
+function codexFallback(includeBundledModels: boolean): CodexModelDiscovery {
+  const models = getOAuthProviderModels('openai-codex').map((model) => {
+    const codexReasoning = getBundledCodexReasoning(model.id);
+    return codexReasoning ? { ...model, codexReasoning } : model;
+  });
+  if (includeBundledModels) {
+    const seen = new Set(models.map((model) => model.id));
+    models.push(...bundledCodexModels.filter((model) => !seen.has(model.id)));
+  }
+  return {
+    models: withCodexImageModels(models),
+    source: 'catalog',
+    warning:
+      'Could not reach the Codex model list; showing the static catalog. ' +
+      "Log in with OAuth to see your account's models.",
+  };
+}
+
+function codexCatalogCacheKey(token: string, workspace: string | undefined, url: string): string {
+  // These are server-managed OAuth credentials, not caller-supplied JWTs. Read
+  // the claims for cache partitioning only; the backend authenticates requests.
+  if (workspace) {
+    const parts = token.split('.');
+    if (parts.length === 3 && parts[1]) {
+      try {
+        const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as {
+          sub?: unknown;
+          iss?: unknown;
+        } | null;
+        if (typeof claims?.sub === 'string' && claims.sub.trim()) {
+          const issuer = typeof claims.iss === 'string' ? claims.iss : null;
+          return JSON.stringify(['principal', issuer, claims.sub, workspace, url]);
+        }
+      } catch {
+        // Malformed claims cannot establish a stable identity.
+      }
+    }
+  }
+  return JSON.stringify([
+    'bearer',
+    createHash('sha256').update(token).digest('hex'),
+    workspace,
+    url,
+  ]);
+}
+
+/** Live listings are scoped to the OAuth principal, workspace and client version. */
+export async function listCodexOAuthModels(
+  oauthAccountId?: string | null,
+  options?: { token?: string; forceRefresh?: boolean }
+): Promise<CodexModelDiscovery> {
+  const fallback = () => codexFallback(options?.token !== undefined);
+  let token: string;
+  try {
+    token =
+      options?.token ??
+      (await OAuthAuthManager.getInstance().getApiKey('openai-codex', oauthAccountId));
+    if (!token) return fallback();
+  } catch {
+    // No credential means no safe way to associate an older listing with this request.
+    return fallback();
+  }
+
+  const url = buildCodexModelsUrl();
+  const headers = buildCodexOAuthHeaders(token);
+  const key = codexCatalogCacheKey(token, headers['chatgpt-account-id'], url);
+  let entry = codexCatalogCache.get(key);
+  const now = Date.now();
+  let pending = codexCatalogInFlight.get(key);
+  // Force refresh bypasses freshness, not the outage throttle or an active request.
+  if (
+    !pending &&
+    !(entry?.retryAfter && now < entry.retryAfter) &&
+    (options?.forceRefresh || !entry?.freshUntil || now >= entry.freshUntil)
+  ) {
+    const lastGood = entry?.models;
+    const refresh = fetchCodexCatalog(url, headers).then(
+      (models): CodexCatalogCacheEntry => ({
+        models,
+        freshUntil: Date.now() + CODEX_MODELS_TTL_MS,
+      }),
+      (): CodexCatalogCacheEntry => {
+        logger.warn('Could not refresh the Codex model list.');
+        return { models: lastGood, retryAfter: Date.now() + CODEX_MODELS_FAILURE_TTL_MS };
+      }
+    );
+    pending = refresh.then((result) => {
+      if (codexCatalogInFlight.get(key) === pending) {
+        codexCatalogInFlight.delete(key);
+        rememberCodexCatalog(key, result);
+      }
+      return result;
+    });
+    codexCatalogInFlight.set(key, pending);
+  }
+
+  if (pending) entry = await pending;
+  if (!entry?.models) return fallback();
+  return {
+    models: entry.models,
+    source: 'codex-backend',
+    ...(entry.retryAfter
+      ? { warning: 'Could not refresh the Codex model list; showing the last successful list.' }
+      : {}),
+  };
 }
 
 export function deriveModelsUrl(provider: ProviderConfig): string | null {

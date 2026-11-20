@@ -29,17 +29,19 @@ import {
   CODEX_IMAGE_MODELS,
   discoverProviderModelIds,
   discoverProviderModels,
+  getBundledCodexReasoning,
   listCodexOAuthModels,
+  resetCodexModelDiscoveryForTesting,
 } from '../provider-model-discovery';
 
 const ACCOUNT_ID = 'acc_models_4242';
 
 /** A fake Codex OAuth JWT whose payload carries the given auth claims. */
-function codexToken(auth: Record<string, unknown>): string {
+function codexToken(auth: Record<string, unknown>, sub?: string): string {
   const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': auth })).toString(
-    'base64url'
-  );
+  const payload = Buffer.from(
+    JSON.stringify({ sub, 'https://api.openai.com/auth': auth })
+  ).toString('base64url');
   return `${header}.${payload}.sig`;
 }
 
@@ -102,6 +104,7 @@ describe('listCodexOAuthModels', () => {
   let fetchSpy: ReturnType<typeof registerSpy>;
 
   beforeEach(() => {
+    resetCodexModelDiscoveryForTesting();
     CodexVersionService.resetForTesting();
     OAuthAuthManager.resetForTesting();
     getApiKey = registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
@@ -111,6 +114,7 @@ describe('listCodexOAuthModels', () => {
   });
 
   afterEach(() => {
+    resetCodexModelDiscoveryForTesting();
     jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
     CodexVersionService.resetForTesting();
@@ -152,6 +156,171 @@ describe('listCodexOAuthModels', () => {
       context_length: 272000,
       visibility: 'list',
     });
+  });
+
+  it('preserves raw reasoning efforts and distinguishes empty lists from unusable data', async () => {
+    fetchSpy.mockResolvedValue(
+      jsonResponse({
+        models: [
+          {
+            slug: 'custom',
+            supported_reasoning_levels: [
+              { effort: 'none' },
+              { effort: 'minimal' },
+              { effort: 'max' },
+              { effort: 'ultra' },
+              { effort: 'future.Custom', description: 'Not a capability field' },
+            ],
+            default_reasoning_level: 'future.Custom',
+            multi_agent_reasoning_effort: 'ultra',
+            supports_reasoning_effort_updates: true,
+          },
+          { slug: 'empty', supported_reasoning_levels: [] },
+          { slug: 'missing' },
+          { slug: 'malformed', supported_reasoning_levels: [{ effort: 'high' }, null] },
+          {
+            slug: 'bad-optionals',
+            supported_reasoning_levels: [{ effort: 'low' }],
+            default_reasoning_level: [],
+            multi_agent_reasoning_effort: 3,
+            supports_reasoning_effort_updates: 'true',
+          },
+        ],
+      })
+    );
+
+    const { models } = await listCodexOAuthModels();
+    const byId = new Map(models.map((model) => [model.id, model.codexReasoning]));
+    expect(byId.get('custom')).toEqual({
+      supportedEfforts: ['none', 'minimal', 'max', 'ultra', 'future.Custom'],
+      defaultEffort: 'future.Custom',
+      multiAgentEffort: 'ultra',
+      supportsEffortUpdates: true,
+    });
+    expect(byId.get('empty')).toEqual({ supportedEfforts: [], supportsEffortUpdates: false });
+    expect(byId.get('missing')).toBeUndefined();
+    expect(byId.get('malformed')).toBeUndefined();
+    expect(byId.get('bad-optionals')).toEqual({
+      supportedEfforts: ['low'],
+      supportsEffortUpdates: false,
+    });
+  });
+
+  it('deduplicates concurrent requests and refreshes once the catalog expires', async () => {
+    const clock = registerSpy(Date, 'now').mockReturnValue(1_000);
+    const first = listCodexOAuthModels();
+    const second = listCodexOAuthModels(null, { token: CODEX_TOKEN, forceRefresh: true });
+    expect(await first).toEqual(await second);
+    expect(await listCodexOAuthModels()).toEqual(await first);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    clock.mockReturnValue(601_000);
+    fetchSpy.mockResolvedValue(jsonResponse({ models: [{ slug: 'replacement' }] }));
+    expect((await listCodexOAuthModels()).models[0]?.id).toBe('replacement');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the last success during an outage and throttles repeated failures', async () => {
+    const clock = registerSpy(Date, 'now').mockReturnValue(1_000);
+    const good = await listCodexOAuthModels();
+    fetchSpy.mockRejectedValue(new Error(`Transport error with ${CODEX_TOKEN}`));
+    const stale = await listCodexOAuthModels(null, { forceRefresh: true });
+    expect(stale.source).toBe('codex-backend');
+    expect(stale.models).toEqual(good.models);
+    expect(stale.warning).toContain('last successful list');
+    expect(stale.warning).not.toContain(CODEX_TOKEN);
+    expect(await listCodexOAuthModels()).toEqual(stale);
+    expect(await listCodexOAuthModels(null, { forceRefresh: true })).toEqual(stale);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    clock.mockReturnValue(31_000);
+    fetchSpy.mockResolvedValue(jsonResponse({ models: [] }));
+    expect(await listCodexOAuthModels()).toEqual({
+      source: 'codex-backend',
+      models: [...CODEX_IMAGE_MODELS],
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('reuses fresh and last-good data after a bearer renewal for the same principal', async () => {
+    const original = codexToken({ chatgpt_account_id: ACCOUNT_ID }, 'principal');
+    const renewed = codexToken({ chatgpt_account_id: ACCOUNT_ID, rotation: 2 }, 'principal');
+    const good = await listCodexOAuthModels(null, { token: original });
+    expect(await listCodexOAuthModels(null, { token: renewed })).toEqual(good);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockRejectedValue(new Error('offline'));
+    const stale = await listCodexOAuthModels(null, { token: renewed, forceRefresh: true });
+    expect(stale.source).toBe('codex-backend');
+    expect(stale.models).toEqual(good.models);
+    expect(stale.warning).toContain('last successful list');
+    expect(fetchSpy.mock.calls[1]?.[1]?.headers).toMatchObject({
+      Authorization: `Bearer ${renewed}`,
+    });
+  });
+
+  it('scopes last good to the supplied principal, workspace and actual client version', async () => {
+    const version = registerSpy(CodexVersionService.getInstance(), 'getVersion').mockReturnValue(
+      '1.2.3'
+    );
+    const original = codexToken({ chatgpt_account_id: ACCOUNT_ID }, 'principal');
+    expect((await listCodexOAuthModels(null, { token: original })).source).toBe('codex-backend');
+    fetchSpy.mockRejectedValue(new Error('offline'));
+
+    const otherPrincipal = codexToken({ chatgpt_account_id: ACCOUNT_ID }, 'other-principal');
+    const otherWorkspace = codexToken({ chatgpt_account_id: 'another-workspace' }, 'principal');
+    for (const token of [otherPrincipal, otherWorkspace]) {
+      expect((await listCodexOAuthModels('ignored', { token })).source).toBe('catalog');
+    }
+    expect((await listCodexOAuthModels(null, { token: original })).source).toBe('codex-backend');
+    version.mockReturnValue('1.2.4');
+    expect((await listCodexOAuthModels(null, { token: original })).source).toBe('catalog');
+
+    expect(getApiKey).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    expect(fetchSpy.mock.calls[2]?.[1]?.headers).toMatchObject({
+      Authorization: `Bearer ${otherWorkspace}`,
+      'chatgpt-account-id': 'another-workspace',
+    });
+    expect(fetchSpy.mock.calls[3]?.[0]).toContain('client_version=1.2.4');
+  });
+
+  it('isolates bearer credentials when the workspace has no stable subject claim', async () => {
+    expect((await listCodexOAuthModels(null, { token: CODEX_TOKEN })).source).toBe('codex-backend');
+    const unknownPrincipal = codexToken({ chatgpt_account_id: ACCOUNT_ID, rotation: 2 });
+    fetchSpy.mockRejectedValue(new Error('offline'));
+    expect((await listCodexOAuthModels(null, { token: unknownPrincipal })).source).toBe('catalog');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reuse a cached catalog after the account is logged out', async () => {
+    expect((await listCodexOAuthModels(ACCOUNT_ID)).source).toBe('codex-backend');
+    getApiKey.mockRejectedValue(new Error('Not authenticated'));
+
+    expect((await listCodexOAuthModels(ACCOUNT_ID)).source).toBe('catalog');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses pinned Luna capabilities for cold mapping fallback, not live entitlement', async () => {
+    const luna = getBundledCodexReasoning('gpt-6-luna');
+    expect(luna).toEqual({
+      supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      defaultEffort: 'medium',
+      supportsEffortUpdates: false,
+    });
+    fetchSpy.mockRejectedValue(new Error('offline'));
+    const fallback = await listCodexOAuthModels(null, { token: CODEX_TOKEN });
+    expect(fallback.source).toBe('catalog');
+    expect(fallback.models.find(({ id }) => id === 'gpt-6-luna')?.codexReasoning).toEqual(luna);
+    expect((await listCodexOAuthModels(null, { token: CODEX_TOKEN })).source).toBe('catalog');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockResolvedValue(jsonResponse({ models: [{ slug: 'workspace-model' }] }));
+    const live = await listCodexOAuthModels(null, {
+      token: codexToken({ chatgpt_account_id: 'another-workspace' }),
+    });
+    expect(live.source).toBe('codex-backend');
+    expect(live.models.some(({ id }) => id === 'gpt-6-luna')).toBe(false);
   });
 
   it('drops hidden-from-everyone models and keeps hide-flagged ones', async () => {
@@ -262,6 +431,7 @@ describe('discoverProviderModels for OAuth providers', () => {
   let fetchSpy: ReturnType<typeof registerSpy>;
 
   beforeEach(() => {
+    resetCodexModelDiscoveryForTesting();
     CodexVersionService.resetForTesting();
     OAuthAuthManager.resetForTesting();
     getApiKey = registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(
@@ -271,6 +441,7 @@ describe('discoverProviderModels for OAuth providers', () => {
   });
 
   afterEach(() => {
+    resetCodexModelDiscoveryForTesting();
     jest.restoreAllMocks();
     OAuthAuthManager.resetForTesting();
     CodexVersionService.resetForTesting();
