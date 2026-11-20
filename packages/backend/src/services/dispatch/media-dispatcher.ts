@@ -53,6 +53,17 @@ function decisionsRoutingError(message: string): Error {
   return error;
 }
 
+function hasUpstreamStatus(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('routingContext' in error)) return false;
+  const context = error.routingContext;
+  return (
+    !!context &&
+    typeof context === 'object' &&
+    'statusCode' in context &&
+    context.statusCode !== undefined
+  );
+}
+
 /** Upstream path for a decisions target; anything else is misconfiguration. */
 function decisionsEndpointForTarget(targetApiType: string | undefined): string {
   switch (getApiBaseType(targetApiType ?? '')) {
@@ -443,17 +454,10 @@ export class MediaDispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
-      let released = false;
-      const doRelease = () => {
-        if (!released) {
-          released = true;
-          ConcurrencyTracker.getInstance().release(route.provider, route.model);
-        }
-      };
-
-      host.emitRoutingUpdate(request.requestId, route);
-
+      let attemptTimeout: AttemptTimeout | undefined;
       try {
+        attemptTimeout = createAttemptTimeout(undefined, route.config.timeoutMs);
+        host.emitRoutingUpdate(request.requestId, route);
         const providerTypes = getProviderTypes(route.config);
         const transformer = EmbeddingsTransformerFactory.resolveTransformer(providerTypes);
         const requestWithModel = { ...request, model: route.model };
@@ -502,7 +506,13 @@ export class MediaDispatcher {
           DebugManager.getInstance().addTransformedRequest(request.requestId, payload);
         }
 
-        const response = await host.executeProviderRequest(url, headers, payload);
+        attemptTimeout.signal.throwIfAborted();
+        const response = await host.executeProviderRequest(
+          url,
+          headers,
+          payload,
+          attemptTimeout.signal
+        );
 
         // Capture response metadata for debug logging
         if (request.requestId) {
@@ -515,6 +525,7 @@ export class MediaDispatcher {
 
         if (!response.ok) {
           const errorText = await response.text();
+          attemptTimeout.signal.throwIfAborted();
           logger.error(`Embeddings request failed: ${url}`, {
             status: response.status,
             error: errorText,
@@ -564,6 +575,7 @@ export class MediaDispatcher {
           route,
           'embeddings'
         );
+        attemptTimeout.signal.throwIfAborted();
         logger.silly('Embeddings Response Payload', rawResponseBody);
 
         if (request.requestId) {
@@ -597,13 +609,14 @@ export class MediaDispatcher {
           route,
           'embeddings'
         );
-        doRelease();
         return enrichedResponse;
-      } catch (error: any) {
+      } catch (caught) {
+        const timedOut = attemptTimeout?.isTimedOut();
+        const error = timedOut ? host.buildTimeoutError() : caught;
         lastError = error;
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
-        if (error?.routingContext?.statusCode === undefined) {
+        if (timedOut || !hasUpstreamStatus(error)) {
           CooldownManager.getInstance().markProviderFailure(
             route.provider,
             route.model,
@@ -616,21 +629,22 @@ export class MediaDispatcher {
         const canRetryNetwork =
           failoverEnabled &&
           i < targets.length - 1 &&
-          host.isRetryableNetworkError(error, failover?.retryableErrors || []);
+          (timedOut || host.isRetryableNetworkError(error, failover?.retryableErrors || []));
 
         host.appendFailureAttempt(retryHistory, route, error, 'embeddings', canRetryNetwork);
 
         if (canRetryNetwork) {
           host.saveIntermediateError(request.requestId, 'embeddings', error);
           logger.warn(
-            `Failover: retrying embeddings after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+            `Failover: retrying embeddings after network/transport error from ${route.provider}/${route.model}: ${error instanceof Error ? error.message : String(error)}`
           );
-          doRelease();
           continue;
         }
 
-        doRelease();
         throw host.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+      } finally {
+        attemptTimeout?.cleanup();
+        ConcurrencyTracker.getInstance().release(route.provider, route.model);
       }
     }
 
@@ -705,17 +719,10 @@ export class MediaDispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
-      let released = false;
-      const doRelease = () => {
-        if (!released) {
-          released = true;
-          ConcurrencyTracker.getInstance().release(route.provider, route.model);
-        }
-      };
-
-      host.emitRoutingUpdate(request.requestId, route);
-
+      let attemptTimeout: AttemptTimeout | undefined;
       try {
+        attemptTimeout = createAttemptTimeout(undefined, route.config.timeoutMs);
+        host.emitRoutingUpdate(request.requestId, route);
         const baseUrl = host.resolveBaseUrl(route, 'transcriptions');
         const url = `${baseUrl}/audio/transcriptions`;
 
@@ -751,8 +758,10 @@ export class MediaDispatcher {
           });
         }
 
+        attemptTimeout.signal.throwIfAborted();
         const response = await fetchWithSession(url, {
           method: 'POST',
+          signal: attemptTimeout.signal,
           headers,
           body: formData,
         });
@@ -768,6 +777,7 @@ export class MediaDispatcher {
 
         if (!response.ok) {
           const errorText = await response.text();
+          attemptTimeout.signal.throwIfAborted();
           const canRetry =
             failoverEnabled &&
             i < targets.length - 1 &&
@@ -815,6 +825,7 @@ export class MediaDispatcher {
         } else {
           responseBody = await response.json();
         }
+        attemptTimeout.signal.throwIfAborted();
 
         logger.silly('Transcription Response', responseBody);
 
@@ -843,14 +854,14 @@ export class MediaDispatcher {
           route,
           'transcriptions'
         );
-        doRelease();
         return unifiedResponse;
-      } catch (error: any) {
+      } catch (caught) {
+        const timedOut = attemptTimeout?.isTimedOut();
+        const error = timedOut ? host.buildTimeoutError() : caught;
         lastError = error;
-        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
-        if (error?.routingContext?.statusCode === undefined) {
+        if (timedOut || !hasUpstreamStatus(error)) {
           CooldownManager.getInstance().markProviderFailure(
             route.provider,
             route.model,
@@ -863,19 +874,22 @@ export class MediaDispatcher {
         const canRetryNetwork =
           failoverEnabled &&
           i < targets.length - 1 &&
-          host.isRetryableNetworkError(error, failover?.retryableErrors || []);
+          (timedOut || host.isRetryableNetworkError(error, failover?.retryableErrors || []));
 
         host.appendFailureAttempt(retryHistory, route, error, 'transcriptions', canRetryNetwork);
 
         if (canRetryNetwork) {
           host.saveIntermediateError(request.requestId, 'transcriptions', error);
           logger.warn(
-            `Failover: retrying transcription after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+            `Failover: retrying transcription after network/transport error from ${route.provider}/${route.model}: ${error instanceof Error ? error.message : String(error)}`
           );
           continue;
         }
 
         throw host.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+      } finally {
+        attemptTimeout?.cleanup();
+        ConcurrencyTracker.getInstance().release(route.provider, route.model);
       }
     }
 
@@ -949,17 +963,10 @@ export class MediaDispatcher {
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
 
-      let released = false;
-      const doRelease = () => {
-        if (!released) {
-          released = true;
-          ConcurrencyTracker.getInstance().release(route.provider, route.model);
-        }
-      };
-
-      host.emitRoutingUpdate(request.requestId, route);
-
+      let attemptTimeout: AttemptTimeout | undefined;
       try {
+        attemptTimeout = createAttemptTimeout(undefined, route.config.timeoutMs);
+        host.emitRoutingUpdate(request.requestId, route);
         const baseUrl = host.resolveBaseUrl(route, 'speech');
         const url = `${baseUrl}/audio/speech`;
 
@@ -1008,8 +1015,10 @@ export class MediaDispatcher {
         const acceptHeader = isStreamed ? 'text/event-stream' : 'audio/*';
         headers['Accept'] = acceptHeader;
 
+        attemptTimeout.signal.throwIfAborted();
         const response = await fetchWithSession(url, {
           method: 'POST',
+          signal: attemptTimeout.signal,
           headers,
           body: JSON.stringify(payload),
         });
@@ -1025,6 +1034,7 @@ export class MediaDispatcher {
 
         if (!response.ok) {
           const errorText = await response.text();
+          attemptTimeout.signal.throwIfAborted();
           const canRetry =
             failoverEnabled &&
             i < targets.length - 1 &&
@@ -1067,6 +1077,7 @@ export class MediaDispatcher {
         let responseForProcessing = response;
         if (isStreamed) {
           const streamProbe = await host.probeStreamingStart(response, null);
+          attemptTimeout.signal.throwIfAborted();
 
           if (!streamProbe.ok) {
             const error = streamProbe.error;
@@ -1112,6 +1123,7 @@ export class MediaDispatcher {
         }
 
         const responseBuffer = Buffer.from(await responseForProcessing.arrayBuffer());
+        attemptTimeout.signal.throwIfAborted();
         logger.silly('Speech Response', { size: responseBuffer.length, isStreamed });
 
         if (request.requestId) {
@@ -1145,14 +1157,14 @@ export class MediaDispatcher {
           route,
           'speech'
         );
-        doRelease();
         return unifiedResponse;
-      } catch (error: any) {
+      } catch (caught) {
+        const timedOut = attemptTimeout?.isTimedOut();
+        const error = timedOut ? host.buildTimeoutError() : caught;
         lastError = error;
-        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
-        if (error?.routingContext?.statusCode === undefined) {
+        if (timedOut || !hasUpstreamStatus(error)) {
           CooldownManager.getInstance().markProviderFailure(
             route.provider,
             route.model,
@@ -1165,19 +1177,22 @@ export class MediaDispatcher {
         const canRetryNetwork =
           failoverEnabled &&
           i < targets.length - 1 &&
-          host.isRetryableNetworkError(error, failover?.retryableErrors || []);
+          (timedOut || host.isRetryableNetworkError(error, failover?.retryableErrors || []));
 
         host.appendFailureAttempt(retryHistory, route, error, 'speech', canRetryNetwork);
 
         if (canRetryNetwork) {
           host.saveIntermediateError(request.requestId, 'speech', error);
           logger.warn(
-            `Failover: retrying speech after network/transport error from ${route.provider}/${route.model}: ${error.message}`
+            `Failover: retrying speech after network/transport error from ${route.provider}/${route.model}: ${error instanceof Error ? error.message : String(error)}`
           );
           continue;
         }
 
         throw host.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
+      } finally {
+        attemptTimeout?.cleanup();
+        ConcurrencyTracker.getInstance().release(route.provider, route.model);
       }
     }
 
