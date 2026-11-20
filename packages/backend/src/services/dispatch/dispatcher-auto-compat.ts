@@ -1,3 +1,4 @@
+import { clampThinkingLevel, type Model, type ModelThinkingLevel } from '@earendil-works/pi-ai';
 import type { PiAiQuirks } from '@plexus/shared';
 
 import { clampAnthropicEffortAndThinking } from '../../transformers/anthropic/thinking-clamp';
@@ -500,7 +501,61 @@ function projectResponsesAutoCompat(
   } else if (options.reasoning === 'off') {
     next.reasoning = { ...(existingReasoning ?? {}), effort: mappedOffValue(model) ?? 'none' };
   }
+  if (Array.isArray(next.input)) {
+    next.input = clampResponsesConfigurationUpdateEfforts(next.input, model);
+  }
   return next;
+}
+
+/**
+ * Clamp `reasoning.effort` on mid-conversation `configuration_update` input
+ * items to levels the target Responses model actually supports.
+ *
+ * Clients such as OMP emit `{ type: 'configuration_update', reasoning: { effort } }`
+ * inside `input[]` (e.g. `'minimal'` from `minimizeEffort`). Unlike top-level
+ * `payload.reasoning`, those embedded items bypass top-level reasoning projection
+ * on pass-through and would otherwise 400 against models that reject `'minimal'`
+ * (like `openai/gpt-6.2-sol`) or `'off'`. Copy-on-write so `originalBody` is
+ * never mutated.
+ */
+function clampResponsesConfigurationUpdateEfforts(
+  input: unknown[],
+  model: Pick<Model<never>, 'api' | 'reasoning' | 'thinkingLevelMap' | 'compat'> | undefined
+): unknown[] {
+  if (!model || !model.reasoning) return input;
+  let cloned: unknown[] | undefined;
+
+  for (let i = 0; i < input.length; i++) {
+    const item = input[i];
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    if (record.type !== 'configuration_update') continue;
+    const reasoning = record.reasoning;
+    if (!reasoning || typeof reasoning !== 'object') continue;
+    const rawEffort = (reasoning as Record<string, unknown>).effort;
+    const normalized = normalizeEffort(rawEffort);
+    if (!normalized) continue;
+    const clamped = clampThinkingLevel(
+      model as unknown as Model<never>,
+      normalized as ModelThinkingLevel
+    );
+    const mapped =
+      clamped === 'off'
+        ? (mappedOffValue(model) ?? 'none')
+        : (mappedThinkingValue(model, clamped) ?? clamped);
+
+    if (mapped === rawEffort) continue;
+    if (!cloned) cloned = [...input];
+    cloned[i] = {
+      ...record,
+      reasoning: {
+        ...(reasoning as Record<string, unknown>),
+        effort: mapped,
+      },
+    };
+  }
+
+  return cloned ?? input;
 }
 
 function projectAnthropicAutoCompat(
@@ -813,9 +868,19 @@ export function applyRegistryAutoCompat(
   const intent = extractGenerationIntent(tierPayload, request);
   const selectedIntent = inline ? selectInlineGenerationIntent(inline, intent) : intent;
   const options = buildGenerationOptions(piAiModel, selectedIntent);
+  const isResponsesApi =
+    api === 'openai-responses' ||
+    api === 'openai-codex-responses' ||
+    api === 'azure-openai-responses';
   // An inline API declaration alone carries no model capabilities. Leave the
-  // payload untouched unless a declared trait actually requests a projection.
+  // payload untouched unless a declared trait actually requests a projection,
+  // except for embedded `configuration_update` efforts, which a declared
+  // thinking map must still clamp even when the request has no top-level effort.
   if (inline && Object.keys(options).length === 0 && inline.compat?.supportsTemperature !== false) {
+    if (isResponsesApi && Array.isArray(tierPayload?.input)) {
+      const input = clampResponsesConfigurationUpdateEfforts(tierPayload.input, piAiModel);
+      return input === tierPayload.input ? tierPayload : { ...tierPayload, input };
+    }
     return requiresReasoningContent && isCompletionsApi
       ? ensureReasoningContentOnAssistantMessages(tierPayload)
       : tierPayload;
@@ -827,11 +892,7 @@ export function applyRegistryAutoCompat(
   // leaves a stale fast-mode beta behind.
 
   let nextPayload: any;
-  if (
-    api === 'openai-responses' ||
-    api === 'openai-codex-responses' ||
-    api === 'azure-openai-responses'
-  ) {
+  if (isResponsesApi) {
     nextPayload = projectResponsesAutoCompat(tierPayload, piAiModel, selectedIntent, options);
   } else if (api === 'anthropic-messages') {
     nextPayload = projectAnthropicAutoCompat(

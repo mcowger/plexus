@@ -288,7 +288,8 @@ mock.module('@earendil-works/pi-ai', () => {
     complete: mockModels.complete,
     stream: mockModels.stream,
     calculateCost: mock(() => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 })),
-    clampThinkingLevel: (_m: any, l: string) => l,
+    // Pure capability clamp: keep pi-ai's real behaviour so clamping is testable.
+    clampThinkingLevel: actualPiAi.clampThinkingLevel,
     getSupportedThinkingLevels: mockGetSupportedThinkingLevels,
     createProvider: actualPiAi.createProvider,
     isModelType: actualPiAi.isModelType,

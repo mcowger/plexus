@@ -1922,3 +1922,141 @@ describe('Registry overlay quirks + service tiers', () => {
     expect(outbound.speed).toBe('fast');
   });
 });
+
+describe('Responses configuration_update effort clamping', () => {
+  beforeEach(() => {
+    resolvePiAiModel = registerSpy(piAiRegistry, 'resolvePiAiModel');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('clamps unsupported minimal effort in configuration_update items to low without mutating input', async () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({
+        id: 'gpt-6.2-sol',
+        api: 'openai-responses',
+        provider: 'openai',
+        thinkingLevelMap: {
+          off: null,
+          minimal: null,
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+          xhigh: 'xhigh',
+          max: 'max',
+        },
+      })
+    );
+
+    const originalInput = [
+      { type: 'configuration_update', reasoning: { effort: 'minimal' } },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hello' }] },
+      { type: 'configuration_update', reasoning: { effort: 'high' } },
+    ];
+    const outbound = applyRegistryAutoCompat(
+      {
+        model: 'gpt-6.2-sol',
+        input: originalInput,
+        reasoning: { effort: 'high', summary: 'auto' },
+      },
+      request({
+        incomingApiType: 'responses',
+        reasoning: { effort: 'high', enabled: true },
+      }),
+      route({ provider: 'openai', model: 'gpt-6.2-sol' }),
+      'responses'
+    );
+
+    expect(outbound.input[0]).toEqual({
+      type: 'configuration_update',
+      reasoning: { effort: 'low' },
+    });
+    expect(outbound.input[1]).toEqual(originalInput[1]);
+    expect(outbound.input[2]).toEqual({
+      type: 'configuration_update',
+      reasoning: { effort: 'high' },
+    });
+    expect(originalInput[0]).toEqual({
+      type: 'configuration_update',
+      reasoning: { effort: 'minimal' },
+    });
+  });
+
+  test('maps configuration_update effort through target thinkingLevelMap when defined', async () => {
+    resolvePiAiModel.mockReturnValue(
+      piModel({
+        id: 'gpt-6.2-sol',
+        api: 'openai-codex-responses',
+        provider: 'openai-codex',
+        thinkingLevelMap: {
+          off: null,
+          minimal: 'low',
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+          xhigh: 'xhigh',
+          max: 'max',
+        },
+      })
+    );
+
+    const outbound = applyRegistryAutoCompat(
+      {
+        model: 'gpt-6.2-sol',
+        input: [{ type: 'configuration_update', reasoning: { effort: 'minimal' } }],
+        reasoning: { effort: 'high', summary: 'auto' },
+      },
+      request({
+        incomingApiType: 'responses',
+        reasoning: { effort: 'high', enabled: true },
+      }),
+      route({ provider: 'openai-codex', model: 'gpt-6.2-sol' }),
+      'responses'
+    );
+
+    expect(outbound.input[0]).toEqual({
+      type: 'configuration_update',
+      reasoning: { effort: 'low' },
+    });
+  });
+
+  test('clamps embedded-only configuration_update on an inline-quirks route with no top-level effort', () => {
+    const config = ProviderConfigSchema.parse({
+      api_base_url: { responses: 'https://example.test/v1' },
+      api_key: 'test-key',
+      auto_compat: true,
+      pi_ai_quirks: {
+        responses: {
+          api: 'openai-responses',
+          reasoning: true,
+          thinkingLevelMap: {
+            off: null,
+            minimal: null,
+            low: 'low',
+            medium: 'medium',
+            high: 'high',
+          },
+        },
+      },
+    });
+
+    const outbound = applyRegistryAutoCompat(
+      {
+        model: 'provider-model',
+        input: [{ type: 'configuration_update', reasoning: { effort: 'minimal' } }],
+      },
+      request({ incomingApiType: 'responses' }),
+      route({ config, modelConfig: undefined }),
+      'responses'
+    );
+
+    expect(resolvePiAiModel).not.toHaveBeenCalled();
+    expect(outbound.reasoning).toBeUndefined();
+    expect(outbound.input[0]).toEqual({
+      type: 'configuration_update',
+      reasoning: { effort: 'low' },
+    });
+  });
+});
