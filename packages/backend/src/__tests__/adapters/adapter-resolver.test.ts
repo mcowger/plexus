@@ -171,6 +171,55 @@ describe('resolveAdapters', () => {
     ).toEqual([]);
   });
 
+  it('relocates model instructions before provider-level developer suppression', () => {
+    const route = makeRoute(
+      [
+        { name: 'reasoning_content', options: {} },
+        { name: 'suppress_developer_role', options: {} },
+        { name: 'reasoning_content', options: {} },
+      ],
+      [{ name: 'cache_responses_instructions', options: {}, enabled: true }]
+    );
+    const resolved = resolveAdapters(route, 'responses');
+    expect(resolved.map((entry) => entry.adapter.name)).toEqual([
+      'reasoning_content',
+      'cache_responses_instructions',
+      'suppress_developer_role',
+      'reasoning_content',
+    ]);
+    const result = resolved.reduce(
+      (payload, { adapter, options }) => adapter.preDispatch(payload, options),
+      { instructions: 'Project rules', input: 'Hi' } as Record<string, unknown>
+    );
+    expect(result).not.toHaveProperty('instructions');
+    expect(result.input).toEqual([
+      {
+        type: 'message',
+        role: 'system',
+        content: [{ type: 'input_text', text: 'Project rules' }],
+      },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] },
+    ]);
+  });
+
+  it('keeps implicit relocation before provider suppression and honors model opt-out', () => {
+    const provider = [{ name: 'suppress_developer_role', options: {} }];
+    const route = makeRoute(provider, undefined, { api_base_url: 'https://api.openai.com/v1' });
+    route.model = 'gpt-6.2-sol';
+    expect(
+      resolveAdapters(route, 'responses', 'responses').map((entry) => entry.adapter.name)
+    ).toEqual(['cache_responses_instructions', 'suppress_developer_role']);
+    const optedOut = makeRoute(
+      provider,
+      [{ name: 'cache_responses_instructions', options: {}, enabled: false }],
+      { api_base_url: 'https://api.openai.com/v1' }
+    );
+    optedOut.model = 'gpt-6.2-sol';
+    expect(
+      resolveAdapters(optedOut, 'responses', 'responses').map((entry) => entry.adapter.name)
+    ).toEqual(['suppress_developer_role']);
+  });
+
   test.each([
     ['gpt-6.2-sol', 'https://api.openai.com/v1', undefined, 'responses', true],
     ['gpt-6.5-sol', 'https://api.openai.com/v1', undefined, 'responses:lite', true],

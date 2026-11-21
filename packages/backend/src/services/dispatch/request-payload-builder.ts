@@ -25,7 +25,11 @@ import {
   listCodexOAuthModels,
 } from '../providers/provider-model-discovery';
 import type { RouteResult } from '../routing/router';
-import { isAnthropicTargetProvider, isCacheableInstructionsTarget } from './adapter-resolver';
+import {
+  isAdapterDisabled,
+  isAnthropicTargetProvider,
+  isCacheableInstructionsTarget,
+} from './adapter-resolver';
 import { applyBodyCacheKeyInjection } from './cache-key-injection';
 import { needsCodexReasoningCapabilities, projectCodexReasoning } from './codex-reasoning';
 import {
@@ -235,6 +239,7 @@ export async function buildRequestPayload(
     const translatedInstructionsAsDeveloper =
       (incomingBaseType === 'chat' || incomingBaseType === 'messages') &&
       isCacheableInstructionsTarget(route, targetApiType) &&
+      !isAdapterDisabled(route, 'cache_responses_instructions') &&
       ![route.config.extraBody, route.modelConfig?.extraBody, aliasConfig?.extraBody].some(
         (body) =>
           body != null && (Object.hasOwn(body, 'instructions') || Object.hasOwn(body, 'input'))

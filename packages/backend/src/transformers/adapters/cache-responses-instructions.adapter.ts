@@ -17,8 +17,14 @@ export const cacheResponsesInstructionsAdapter: ProviderAdapter = {
       return payload;
     }
 
-    const items =
-      input == null ? [] : typeof input === 'string' ? normalizeInput(input) : [...input];
+    let items;
+    if (typeof input === 'string') {
+      items = normalizeInput(input);
+    } else if (Array.isArray(input)) {
+      items = [...input];
+    } else {
+      items = [];
+    }
     let index = 0;
     while (index < items.length && items[index]?.type === 'additional_tools') index++;
     items.splice(index, 0, {

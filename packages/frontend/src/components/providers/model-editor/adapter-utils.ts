@@ -52,6 +52,28 @@ export function getAdapterName(entry: unknown): string | undefined {
       : undefined;
 }
 
+export type AdapterMode = 'auto' | 'on' | 'off';
+
+export function getAdapterMode(entries: AdapterEntry[], name: string): AdapterMode {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    if (getAdapterName(entry) !== name) continue;
+    if (typeof entry !== 'string' && entry.enabled === false) return 'off';
+    return 'on';
+  }
+  return 'auto';
+}
+
+export function setAdapterMode(
+  entries: AdapterEntry[],
+  name: string,
+  mode: AdapterMode
+): AdapterEntry[] {
+  const withoutEntry = entries.filter((entry) => getAdapterName(entry) !== name);
+  if (mode === 'auto') return withoutEntry;
+  return [{ name, options: {}, enabled: mode === 'on' }, ...withoutEntry];
+}
+
 export function renameRecordKey<T>(record: Record<string, T>, oldKey: string, newKey: string) {
   if (oldKey === newKey) return record;
   const next = { ...record };

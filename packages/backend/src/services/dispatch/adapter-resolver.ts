@@ -16,6 +16,21 @@ import { logger } from '../../utils/logger';
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
 import type { RouteResult } from '../routing/router';
 
+/** Whether the last configured entry for an adapter explicitly disables it. */
+export function isAdapterDisabled(route: RouteResult, name: string): boolean {
+  let disabled = false;
+  for (const entries of [route.config.adapter, route.modelConfig?.adapter]) {
+    for (const entry of entries ?? []) {
+      if (typeof entry === 'string') {
+        if (entry === name) disabled = false;
+      } else if (entry.name === name) {
+        disabled = entry.enabled === false;
+      }
+    }
+  }
+  return disabled;
+}
+
 /**
  * Resolves the ordered list of ProviderAdapters for a given route.
  *
@@ -88,6 +103,19 @@ export function resolveAdapters(
       continue;
     }
     resolved.push({ adapter, options: entry.options });
+  }
+
+  // Relocation can insert a developer item, so role suppression must run after it.
+  let firstSuppression = resolved.findIndex(
+    (entry) => entry.adapter.name === 'suppress_developer_role'
+  );
+  if (firstSuppression !== -1) {
+    for (let i = firstSuppression + 1; i < resolved.length; i++) {
+      if (resolved[i]!.adapter.name === 'cache_responses_instructions') {
+        const [relocation] = resolved.splice(i, 1);
+        resolved.splice(firstSuppression++, 0, relocation!);
+      }
+    }
   }
 
   return resolved;

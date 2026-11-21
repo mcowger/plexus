@@ -141,8 +141,8 @@ describe('ProviderAdvancedEditor — automatically injected Anthropic adapters',
     await choose(selectFor(DROP_THINKING_LABEL), 'off');
 
     expect(latest.adapter).toEqual([
-      { name: 'normalize_anthropic_tool_ids', options: {}, enabled: false },
       { name: 'drop_unsigned_thinking', options: {}, enabled: false },
+      { name: 'normalize_anthropic_tool_ids', options: {}, enabled: false },
     ]);
   });
 
@@ -177,7 +177,7 @@ describe('ProviderAdvancedEditor — automatically injected Anthropic adapters',
   });
 
   it('offers Auto, Enabled, and Disabled for Responses instruction caching', async () => {
-    await mount(makeProvider([{ name: 'reasoning_content' }]));
+    await mount(makeProvider([{ name: 'suppress_developer_role' }]));
     await openAdapters();
 
     const select = selectFor(CACHE_LABEL);
@@ -188,22 +188,48 @@ describe('ProviderAdvancedEditor — automatically injected Anthropic adapters',
     ]);
     await choose(select, 'off');
     expect(latest.adapter).toEqual([
-      { name: 'reasoning_content' },
       { name: 'cache_responses_instructions', options: {}, enabled: false },
+      { name: 'suppress_developer_role' },
     ]);
     await choose(select, 'on');
     expect(latest.adapter).toEqual([
-      { name: 'reasoning_content' },
       { name: 'cache_responses_instructions', options: {}, enabled: true },
+      { name: 'suppress_developer_role' },
     ]);
     await choose(select, '');
-    expect(latest.adapter).toEqual([{ name: 'reasoning_content' }]);
+    expect(latest.adapter).toEqual([{ name: 'suppress_developer_role' }]);
   });
 
-  it('supports a model-level instruction cache opt-out and reset', async () => {
+  it('uses the last matching adapter entry for each automatic control', async () => {
+    await mount(
+      makeProvider([
+        'normalize_anthropic_tool_ids',
+        'cache_responses_instructions',
+        { name: 'normalize_anthropic_tool_ids', enabled: false },
+        { name: 'cache_responses_instructions', enabled: false },
+      ])
+    );
+    await openAdapters();
+
+    expect(selectFor(TOOL_ID_LABEL).value).toBe('off');
+    expect(selectFor(CACHE_LABEL).value).toBe('off');
+    await choose(selectFor(CACHE_LABEL), 'on');
+    expect(latest.adapter).toEqual([
+      { name: 'cache_responses_instructions', options: {}, enabled: true },
+      'normalize_anthropic_tool_ids',
+      { name: 'normalize_anthropic_tool_ids', enabled: false },
+    ]);
+    await choose(selectFor(TOOL_ID_LABEL), '');
+    expect(latest.adapter).toEqual([
+      { name: 'cache_responses_instructions', options: {}, enabled: true },
+    ]);
+  });
+
+  it('supports model-level instruction cache ordering and reset', async () => {
+    const suppress = { name: 'suppress_developer_role' };
     let adapter: AdapterEntry[] | undefined;
     function ModelHarness() {
-      const [entries, setEntries] = useState<AdapterEntry[] | undefined>(undefined);
+      const [entries, setEntries] = useState<AdapterEntry[] | undefined>([suppress]);
       return (
         <ModelAdapters
           modelId="gpt-6.2-sol"
@@ -222,10 +248,14 @@ describe('ProviderAdvancedEditor — automatically injected Anthropic adapters',
     await choose(select, 'off');
     expect(adapter).toEqual([
       { name: 'cache_responses_instructions', options: {}, enabled: false },
+      suppress,
     ]);
     await choose(select, 'on');
-    expect(adapter).toEqual([{ name: 'cache_responses_instructions', options: {}, enabled: true }]);
+    expect(adapter).toEqual([
+      { name: 'cache_responses_instructions', options: {}, enabled: true },
+      suppress,
+    ]);
     await choose(select, '');
-    expect(adapter).toBeUndefined();
+    expect(adapter).toEqual([suppress]);
   });
 });

@@ -546,6 +546,53 @@ describe('Responses instruction cache routing', () => {
     expect(payload.input).toEqual([message('user', 'Hi')]);
   });
 
+  test.each([
+    {
+      providerAdapters: [],
+      modelAdapters: [{ name: 'cache_responses_instructions', options: {}, enabled: false }],
+      disabled: true,
+    },
+    {
+      providerAdapters: [{ name: 'cache_responses_instructions', options: {}, enabled: false }],
+      modelAdapters: [{ name: 'cache_responses_instructions', options: {}, enabled: true }],
+      disabled: false,
+    },
+    {
+      providerAdapters: [{ name: 'cache_responses_instructions', options: {}, enabled: false }],
+      modelAdapters: ['cache_responses_instructions'],
+      disabled: false,
+    },
+    {
+      providerAdapters: [],
+      modelAdapters: [
+        { name: 'cache_responses_instructions', options: {}, enabled: true },
+        { name: 'cache_responses_instructions', options: {}, enabled: false },
+      ],
+      disabled: true,
+    },
+  ])('respects the last configured cache adapter setting', async (setting) => {
+    const route = makeRoute(['responses'], 'https://api.openai.com/v1');
+    route.model = 'gpt-6.2-sol';
+    route.config.adapter = setting.providerAdapters;
+    route.modelConfig.adapter = setting.modelAdapters;
+    const request = await new OpenAITransformer().parseRequest(chatBody);
+    request.incomingApiType = 'chat';
+    request.originalBody = chatBody;
+    const { payload } = await buildRequestPayload(
+      request,
+      route,
+      new ResponsesTransformer(),
+      'responses'
+    );
+    if (setting.disabled) {
+      expect(payload.instructions).toBe('A\n\nB\n\nC\n\nD');
+      expect(payload.input).toEqual([message('user', 'Hi')]);
+    } else {
+      expect(payload).not.toHaveProperty('instructions');
+      expect(payload.input).toEqual(translatedInput);
+    }
+  });
+
   test('respects instruction and input model overlays', async () => {
     const instructions = await buildChat('gpt-6.2-sol', 'https://api.openai.com/v1', {
       instructions: 'Override',

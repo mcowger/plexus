@@ -459,16 +459,17 @@ export function extractChatgptAccountId(token: string): string | undefined {
  * Adorn a normalized (non-CLI) Responses body with the fields the ChatGPT Codex
  * backend requires, reproducing pi-ai's `buildRequestBody` forcings: `store:false`,
  * `stream:true`, encrypted-content `include`, a `text.verbosity` fallback, and
- * `tool_choice`/`parallel_tool_calls` defaults. `instructions` is left as the
- * caller sent it: the backend accepts requests without it, and a synthetic value
- * would sit after `input` on GPT-6.2+ as uncached tokens every turn.
- * Client-provided values are preserved where present; the always-unsupported
- * unsupported options are removed separately by `stripUnsupportedGpt5Options`.
+ * `tool_choice`/`parallel_tool_calls` defaults. An empty `instructions` string
+ * satisfies the backend's required field without adding uncached tokens after
+ * `input` on GPT-6.2+; CLIProxyAPI and AxonHub use the same value. Supplied
+ * strings are preserved. Unsupported options are removed separately by
+ * `stripUnsupportedGpt5Options`.
  */
 function adornCodexResponsesBody(body: any): any {
   const next: any = { ...(body ?? {}) };
   next.store = false;
   next.stream = true; // the Codex backend is stream-only
+  if (next.instructions == null) next.instructions = '';
   const include = Array.isArray(next.include) ? next.include : [];
   next.include = Array.from(new Set([...include, 'reasoning.encrypted_content']));
   next.text = { ...(next.text ?? {}), verbosity: next.text?.verbosity ?? 'low' };

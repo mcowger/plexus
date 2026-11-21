@@ -1,5 +1,15 @@
 import type { ProviderAdapter } from '../../types/provider-adapter';
 
+function isDeveloperInputMessage(item: unknown): item is Record<string, unknown> {
+  return (
+    item != null &&
+    typeof item === 'object' &&
+    (!('type' in item) || item.type === undefined || item.type === 'message') &&
+    'role' in item &&
+    item.role === 'developer'
+  );
+}
+
 /**
  * suppress_developer_role adapter
  *
@@ -23,15 +33,7 @@ export const suppressDeveloperRoleAdapter: ProviderAdapter = {
   preDispatch(payload: Record<string, any>, _options?: Record<string, any>): Record<string, any> {
     const hasMessages = Array.isArray(payload.messages);
     const hasDeveloperInput =
-      Array.isArray(payload.input) &&
-      payload.input.some(
-        (item: unknown) =>
-          item != null &&
-          typeof item === 'object' &&
-          (!('type' in item) || item.type === undefined || item.type === 'message') &&
-          'role' in item &&
-          item.role === 'developer'
-      );
+      Array.isArray(payload.input) && payload.input.some(isDeveloperInputMessage);
     if (!hasMessages && !hasDeveloperInput) return payload;
 
     const result = { ...payload };
@@ -43,14 +45,7 @@ export const suppressDeveloperRoleAdapter: ProviderAdapter = {
     }
     if (hasDeveloperInput) {
       result.input = payload.input.map((item: unknown) => {
-        if (
-          item == null ||
-          typeof item !== 'object' ||
-          ('type' in item && item.type !== undefined && item.type !== 'message') ||
-          !('role' in item) ||
-          item.role !== 'developer'
-        )
-          return item;
+        if (!isDeveloperInputMessage(item)) return item;
         return { ...item, role: 'system' };
       });
     }

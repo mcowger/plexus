@@ -331,7 +331,7 @@ describe('Native Codex OAuth pass-through', () => {
     // Adorned with the backend-required fields.
     expect(sent.store).toBe(false);
     expect(sent.include).toContain('reasoning.encrypted_content');
-    expect(sent).not.toHaveProperty('instructions');
+    expect(sent.instructions).toBe('');
     expect(sent.text.verbosity).toBe('low');
     expect(sent.model).toBe('gpt-5-codex');
     expect(sent.input).toEqual([
@@ -360,6 +360,10 @@ describe('Native Codex OAuth pass-through', () => {
       input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
     },
     {
+      instructions: null,
+      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
+    },
+    {
       instructions: 'Only this turn',
       input: [
         {
@@ -383,7 +387,7 @@ describe('Native Codex OAuth pass-through', () => {
       });
       const sent = JSON.parse((fetchSpy.mock.calls[0] as [unknown, RequestInit])[1].body as string);
       expect(response.bypassTransformation).toBe(true);
-      expect(sent.instructions).toBe(instructions);
+      expect(sent.instructions).toBe(instructions ?? '');
       expect(sent.input).toEqual(input);
     }
   );
@@ -417,7 +421,7 @@ describe('Native Codex OAuth pass-through', () => {
         expect(sent.instructions).toBe('Project rules');
         expect(sent.input).toEqual(input);
       } else {
-        expect(sent).not.toHaveProperty('instructions');
+        expect(sent.instructions).toBe('');
         expect(sent.input).toEqual([
           {
             type: 'message',
@@ -611,7 +615,7 @@ describe('Native Codex OAuth pass-through', () => {
       role: 'developer',
       content: [{ type: 'input_text', text: 'Alpha' }],
     });
-    expect(sent).not.toHaveProperty('instructions');
+    expect(sent.instructions).toBe('');
   });
 
   test('aggregates backend Responses SSE for a non-streaming Chat Completions client', async () => {
