@@ -22,8 +22,19 @@ export interface ImageContent {
 
 export type MessageContent = TextContent | ImageContent;
 
+/**
+ * Marks a unified system/developer message that came from a Responses request:
+ * its top-level `instructions` or an input message with that role. The
+ * Responses builder uses it to rebuild the request's own layout; other formats
+ * ignore it. A symbol, so in-memory spreads keep it and JSON never emits it.
+ */
+export const RESPONSES_INSTRUCTION_ORIGIN = Symbol('responsesInstructionOrigin');
+
+export type ResponsesInstructionOrigin = 'top_level' | 'input_system' | 'input_developer';
+
 export interface UnifiedMessage {
-  role: 'user' | 'assistant' | 'system' | 'tool';
+  role: 'user' | 'assistant' | 'system' | 'developer' | 'tool';
+  [RESPONSES_INSTRUCTION_ORIGIN]?: ResponsesInstructionOrigin;
   content: string | null | MessageContent[];
   tool_calls?: Array<{
     id: string;

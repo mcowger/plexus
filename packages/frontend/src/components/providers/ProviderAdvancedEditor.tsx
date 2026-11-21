@@ -20,10 +20,12 @@ import { DebouncedInput } from '../ui/DebouncedInput';
 import { Switch } from '../ui/Switch';
 import { Tooltip } from '../ui/Tooltip';
 import {
+  CACHE_RESPONSES_INSTRUCTIONS_ADAPTER,
   getAdapterName,
   KNOWN_ADAPTERS,
   normalizeAdapterEntries,
 } from './model-editor/adapter-utils';
+import { CacheResponsesInstructionsControl } from './model-editor/CacheResponsesInstructionsControl';
 import { ProviderQuirksModal } from './ProviderQuirksModal';
 import { ReasoningRewriteRulesEditor } from './ReasoningRewriteRulesEditor';
 
@@ -228,7 +230,10 @@ export function ProviderAdvancedEditor({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                   {KNOWN_ADAPTERS.filter(
-                    (a) => a.value !== 'model_override' && a.value !== 'web_search_coercion'
+                    (a) =>
+                      a.value !== 'model_override' &&
+                      a.value !== 'web_search_coercion' &&
+                      a.value !== CACHE_RESPONSES_INSTRUCTIONS_ADAPTER
                   ).map((a) => {
                     const adapterEntries = normalizeAdapterEntries(editingProvider.adapter);
                     const active = adapterEntries.some((e: any) => getAdapterName(e) === a.value);
@@ -273,6 +278,10 @@ export function ProviderAdvancedEditor({
                     );
                   })}
                 </div>
+                <CacheResponsesInstructionsControl
+                  entries={normalizeAdapterEntries(editingProvider.adapter)}
+                  onChange={(adapter) => setEditingProvider({ ...editingProvider, adapter })}
+                />
 
                 {/* Reasoning Rewrite rules editor (shared with per-model UI) */}
                 <ReasoningRewriteRulesEditor

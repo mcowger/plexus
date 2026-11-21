@@ -21,14 +21,40 @@ export const suppressDeveloperRoleAdapter: ProviderAdapter = {
   name: 'suppress_developer_role',
 
   preDispatch(payload: Record<string, any>, _options?: Record<string, any>): Record<string, any> {
-    if (!Array.isArray(payload.messages)) return payload;
+    const hasMessages = Array.isArray(payload.messages);
+    const hasDeveloperInput =
+      Array.isArray(payload.input) &&
+      payload.input.some(
+        (item: unknown) =>
+          item != null &&
+          typeof item === 'object' &&
+          (!('type' in item) || item.type === undefined || item.type === 'message') &&
+          'role' in item &&
+          item.role === 'developer'
+      );
+    if (!hasMessages && !hasDeveloperInput) return payload;
 
-    const messages = payload.messages.map((msg: any) => {
-      if (msg.role !== 'developer') return msg;
-      return { ...msg, role: 'system' };
-    });
-
-    return { ...payload, messages };
+    const result = { ...payload };
+    if (hasMessages) {
+      result.messages = payload.messages.map((msg: { role: string }) => {
+        if (msg.role !== 'developer') return msg;
+        return { ...msg, role: 'system' };
+      });
+    }
+    if (hasDeveloperInput) {
+      result.input = payload.input.map((item: unknown) => {
+        if (
+          item == null ||
+          typeof item !== 'object' ||
+          ('type' in item && item.type !== undefined && item.type !== 'message') ||
+          !('role' in item) ||
+          item.role !== 'developer'
+        )
+          return item;
+        return { ...item, role: 'system' };
+      });
+    }
+    return result;
   },
 
   postDispatch(response: Record<string, any>, _options?: Record<string, any>): Record<string, any> {

@@ -390,6 +390,170 @@ describe('Responses responses -> responses round-trip preserves native fields', 
   });
 });
 
+describe('Responses instruction layout', () => {
+  it('preserves native instruction origins in Responses and Chat rebuilds', async () => {
+    const transformer = new ResponsesTransformer();
+    const body = {
+      model: 'gpt-4o',
+      instructions: 'Just this turn',
+      input: [
+        { type: 'message', role: 'developer', content: 'Repo rules' },
+        { type: 'message', role: 'user', content: 'Hi' },
+        { role: 'system', content: 'New rules' },
+      ],
+    };
+    const unified = await transformer.parseRequest(body);
+    const { originalBody, incomingApiType, ...withoutOriginal } = unified;
+    const built = await transformer.transformRequest(withoutOriginal);
+
+    expect(built.instructions).toBe('Just this turn');
+    expect(built.input).toEqual([
+      { type: 'message', role: 'developer', content: [{ type: 'input_text', text: 'Repo rules' }] },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] },
+      { type: 'message', role: 'system', content: [{ type: 'input_text', text: 'New rules' }] },
+    ]);
+    const cacheable = await transformer.transformRequest(withoutOriginal, {
+      translatedInstructionsAsDeveloper: true,
+    });
+    expect(cacheable.instructions).toBe(built.instructions);
+    expect(cacheable.input).toEqual(built.input);
+
+    const withTranslatedGuidance = await transformer.transformRequest({
+      ...withoutOriginal,
+      messages: [...withoutOriginal.messages, { role: 'system', content: 'Fallback guidance' }],
+    });
+    expect(withTranslatedGuidance.instructions).toBe('Just this turn');
+
+    const chat = await new OpenAITransformer().transformRequest(unified);
+    expect(chat.messages.map((message: { content: string }) => message.content)).toEqual([
+      'Just this turn',
+      'Repo rules',
+      'Hi',
+      'New rules',
+    ]);
+    expect(JSON.stringify(chat)).not.toContain('responsesInstructionOrigin');
+  });
+
+  for (const instructions of ['', null]) {
+    it(`preserves native instructions ${JSON.stringify(instructions)} on rebuild`, async () => {
+      const transformer = new ResponsesTransformer();
+      const body = { model: 'gpt-4o', instructions, input: 'Hi' };
+      const unified = await transformer.parseRequest(body);
+      const built = await transformer.transformRequest({
+        ...unified,
+        incomingApiType: 'responses',
+        originalBody: body,
+      });
+      expect(built).toHaveProperty('instructions', instructions);
+    });
+  }
+
+  it('preserves native supported content and skips empty native input messages', async () => {
+    const transformer = new ResponsesTransformer();
+    const unified = await transformer.parseRequest({
+      model: 'gpt-4o',
+      input: [
+        {
+          role: 'developer',
+          content: [
+            { type: 'input_text', text: 'Rules' },
+            { type: 'input_image', image_url: 'https://example.com/image.png' },
+          ],
+        },
+        { type: 'message', role: 'system', content: [{ type: 'unsupported' }] },
+      ],
+    });
+    const built = await transformer.transformRequest(unified);
+    expect(built.input).toEqual([
+      {
+        type: 'message',
+        role: 'developer',
+        content: [
+          { type: 'input_text', text: 'Rules' },
+          { type: 'input_image', image_url: 'https://example.com/image.png', detail: 'auto' },
+        ],
+      },
+    ]);
+  });
+
+  it('joins translated guidance by default or emits it in place as developer messages', async () => {
+    const unified = await new OpenAITransformer().parseRequest({
+      model: 'gpt-6.2-sol',
+      messages: [
+        { role: 'system', content: 'A' },
+        { role: 'system', content: 'B' },
+        { role: 'developer', content: 'C' },
+        { role: 'user', content: 'Hi' },
+        { role: 'developer', content: 'D' },
+        { role: 'system', content: '   ' },
+      ],
+    });
+    const transformer = new ResponsesTransformer();
+    const user = { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] };
+    const developer = (text: string) => ({
+      type: 'message',
+      role: 'developer',
+      content: [{ type: 'input_text', text }],
+    });
+    const compatible = await transformer.transformRequest(unified);
+    expect(compatible.instructions).toBe('A\n\nB\n\nC\n\nD');
+    expect(compatible.input).toEqual([user]);
+
+    const cacheable = await transformer.transformRequest(unified, {
+      translatedInstructionsAsDeveloper: true,
+    });
+    expect(cacheable).not.toHaveProperty('instructions');
+    expect(cacheable.input).toEqual([
+      developer('A'),
+      developer('B'),
+      developer('C'),
+      user,
+      developer('D'),
+    ]);
+  });
+
+  it('skips blank translated text without trimming nonblank guidance', async () => {
+    const unified = await new OpenAITransformer().parseRequest({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: '  A  ' },
+        { role: 'developer', content: '\n  ' },
+        { role: 'user', content: 'Hi' },
+      ],
+    });
+    const transformer = new ResponsesTransformer();
+    expect((await transformer.transformRequest(unified)).instructions).toBe('  A  ');
+    const built = await transformer.transformRequest(unified, {
+      translatedInstructionsAsDeveloper: true,
+    });
+    expect(built.input[0].content[0].text).toBe('  A  ');
+    expect(built.input).toHaveLength(2);
+  });
+
+  it('flattens Anthropic system text blocks into one developer item', async () => {
+    const unified = await parseAnthropicRequest({
+      model: 'claude',
+      system: [
+        { type: 'text', text: 'Alpha' },
+        { type: 'text', text: 'Beta' },
+      ],
+      messages: [{ role: 'user', content: 'Hi' }],
+    });
+    const built = await new ResponsesTransformer().transformRequest(unified, {
+      translatedInstructionsAsDeveloper: true,
+    });
+    expect(built).not.toHaveProperty('instructions');
+    expect(built.input).toEqual([
+      {
+        type: 'message',
+        role: 'developer',
+        content: [{ type: 'input_text', text: 'Alpha\n\nBeta' }],
+      },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] },
+    ]);
+  });
+});
+
 describe('Anthropic -> Responses reasoning projection', () => {
   it('omits unified-only reasoning fields from the Responses payload', async () => {
     const unified = await parseAnthropicRequest({

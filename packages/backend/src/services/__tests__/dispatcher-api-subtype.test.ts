@@ -1,7 +1,11 @@
 import { describe, expect, it, test } from 'bun:test';
 
+import { parseAnthropicRequest } from '../../transformers/anthropic/request-parser';
+import { OpenAITransformer } from '../../transformers/openai';
 import { ResponsesTransformer } from '../../transformers/responses';
+import { resolveAdapters } from '../dispatch/adapter-resolver';
 import { Dispatcher } from '../dispatch/dispatcher';
+import { buildRequestPayload } from '../dispatch/request-payload-builder';
 import { TransformerFactory } from '../dispatch/transformer-factory';
 
 function makeRoute(
@@ -184,7 +188,15 @@ describe('Dispatcher API subtypes', () => {
     const route = makeRoute(['responses']);
     const originalBody = {
       model: 'alias',
-      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+      instructions: 'Just this turn',
+      input: [
+        {
+          type: 'message',
+          role: 'developer',
+          content: [{ type: 'input_text', text: 'Repo rules' }],
+        },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+      ],
       tools: [
         {
           type: 'namespace',
@@ -210,6 +222,8 @@ describe('Dispatcher API subtypes', () => {
     );
 
     expect(result.bypassTransformation).toBe(false);
+    expect(result.payload.instructions).toBe('Just this turn');
+    expect(result.payload.input).toEqual(originalBody.input);
     expect(result.payload.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'function', name: 'crm__list_open_orders' }),
@@ -469,5 +483,151 @@ describe('Dispatcher API subtypes', () => {
 
     expect(result.bypassTransformation).toBe(true);
     expect(result.payload.tools).toEqual(originalBody.tools);
+  });
+});
+
+describe('Responses instruction cache routing', () => {
+  const chatBody = {
+    model: 'alias',
+    messages: [
+      { role: 'system', content: 'A' },
+      { role: 'system', content: 'B' },
+      { role: 'developer', content: 'C' },
+      { role: 'user', content: 'Hi' },
+      { role: 'developer', content: 'D' },
+    ],
+  };
+  const message = (role: string, text: string) => ({
+    type: 'message',
+    role,
+    content: [{ type: 'input_text', text }],
+  });
+  const translatedInput = [
+    message('developer', 'A'),
+    message('developer', 'B'),
+    message('developer', 'C'),
+    message('user', 'Hi'),
+    message('developer', 'D'),
+  ];
+
+  async function buildChat(
+    model: string,
+    url: string | Record<string, string>,
+    extraBody?: Record<string, unknown>,
+    targetApiType = 'responses'
+  ) {
+    const route = makeRoute(['responses'], url);
+    route.model = model;
+    if (extraBody) route.modelConfig.extraBody = extraBody;
+    const request = await new OpenAITransformer().parseRequest(chatBody);
+    request.incomingApiType = 'chat';
+    request.originalBody = chatBody;
+    return buildRequestPayload(request, route, new ResponsesTransformer(), targetApiType);
+  }
+
+  test.each(['gpt-6.2-sol', 'gpt-6.3-sol', 'gpt-6.4-sol', 'gpt-6.5-sol'])(
+    'translates instructions in place for official %s',
+    async (model) => {
+      const { payload, bypassTransformation } = await buildChat(model, 'https://api.openai.com/v1');
+      expect(bypassTransformation).toBe(false);
+      expect(payload).not.toHaveProperty('instructions');
+      expect(payload.input).toEqual(translatedInput);
+    }
+  );
+
+  test.each([
+    ['gpt-6.2-sol', 'https://api.openai.com.example.test/v1'],
+    ['gpt-6.1-sol', 'https://api.openai.com/v1'],
+    ['gpt-6.6-sol', 'https://api.openai.com/v1'],
+    ['gpt-6.20-sol', 'https://api.openai.com/v1'],
+  ])('uses compatibility instructions for %s at %s', async (model, url) => {
+    const { payload } = await buildChat(model, url);
+    expect(payload.instructions).toBe('A\n\nB\n\nC\n\nD');
+    expect(payload.input).toEqual([message('user', 'Hi')]);
+  });
+
+  test('respects instruction and input model overlays', async () => {
+    const instructions = await buildChat('gpt-6.2-sol', 'https://api.openai.com/v1', {
+      instructions: 'Override',
+    });
+    expect(instructions.payload.instructions).toBe('Override');
+    expect(instructions.payload.input).toEqual([message('user', 'Hi')]);
+
+    const replacement = [message('user', 'Replacement')];
+    const input = await buildChat('gpt-6.2-sol', 'https://api.openai.com/v1', {
+      input: replacement,
+    });
+    expect(input.payload.instructions).toBe('A\n\nB\n\nC\n\nD');
+    expect(input.payload.input).toEqual(replacement);
+  });
+
+  test('preserves a Chat instructions overlay with resolved adapters', async () => {
+    const route = makeRoute(['responses'], 'https://api.openai.com/v1');
+    route.model = 'gpt-6.2-sol';
+    route.modelConfig.extraBody = { instructions: 'Override' };
+    const request = await new OpenAITransformer().parseRequest(chatBody);
+    request.incomingApiType = 'chat';
+    request.originalBody = chatBody;
+    const adapters = resolveAdapters(route, 'responses', 'chat');
+    const { payload } = await buildRequestPayload(
+      request,
+      route,
+      new ResponsesTransformer(),
+      'responses',
+      adapters
+    );
+    expect(payload.instructions).toBe('Override');
+    expect(payload.input).toEqual([message('user', 'Hi')]);
+  });
+
+  test('translates Anthropic system text blocks, not their JSON', async () => {
+    const body = {
+      model: 'alias',
+      max_tokens: 100,
+      system: [
+        { type: 'text', text: 'Alpha' },
+        { type: 'text', text: 'Beta' },
+      ],
+      messages: [{ role: 'user', content: 'Hi' }],
+    };
+    const request = await parseAnthropicRequest(body);
+    request.incomingApiType = 'messages';
+    request.originalBody = body;
+    const route = makeRoute(['responses'], 'https://api.openai.com/v1');
+    route.model = 'gpt-6.2-sol';
+    const { payload } = await buildRequestPayload(
+      request,
+      route,
+      new ResponsesTransformer(),
+      'responses'
+    );
+    expect(payload).not.toHaveProperty('instructions');
+    expect(payload.input).toEqual([message('developer', 'Alpha\n\nBeta'), message('user', 'Hi')]);
+  });
+
+  test('selects only the effective Responses URL from a URL map', async () => {
+    const official = await buildChat('gpt-6.2-sol', {
+      responses: 'https://api.openai.com/v1',
+      chat: 'https://proxy.test/v1',
+    });
+    expect(official.payload.input).toEqual(translatedInput);
+    const lite = await buildChat(
+      'gpt-6.2-sol',
+      { responses: 'https://api.openai.com/v1', 'responses:lite': 'https://proxy.test/v1' },
+      undefined,
+      'responses:lite'
+    );
+    expect(lite.payload.instructions).toBe('A\n\nB\n\nC\n\nD');
+    const liteBase = await buildChat(
+      'gpt-6.2-sol',
+      { responses: 'https://api.openai.com/v1' },
+      undefined,
+      'responses:lite'
+    );
+    expect(liteBase.payload.input).toEqual(translatedInput);
+    const missing = await buildChat('gpt-6.2-sol', { chat: 'https://api.openai.com/v1' });
+    expect(missing.payload.instructions).toBe('A\n\nB\n\nC\n\nD');
+    const invalid = await buildChat('gpt-6.2-sol', 'not-a-url');
+    expect(invalid.payload.instructions).toBe('A\n\nB\n\nC\n\nD');
   });
 });

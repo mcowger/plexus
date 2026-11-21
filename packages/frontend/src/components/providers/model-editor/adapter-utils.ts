@@ -1,4 +1,5 @@
 export type AdapterEntry = string | Record<string, any>;
+export const CACHE_RESPONSES_INSTRUCTIONS_ADAPTER = 'cache_responses_instructions';
 
 export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
   {
@@ -11,6 +12,12 @@ export const KNOWN_ADAPTERS: { value: string; label: string; description: string
     value: 'suppress_developer_role',
     label: 'Suppress Developer Role',
     description: 'Rewrites the "developer" role to "system" for providers that do not support it.',
+  },
+  {
+    value: CACHE_RESPONSES_INSTRUCTIONS_ADAPTER,
+    label: 'Cache Responses Instructions',
+    description:
+      'Moves top-level Responses instructions into a leading developer message for prompt caching. Auto-enabled for known GPT-6.2–6.5 OpenAI, Codex, and Copilot targets.',
   },
   {
     value: 'model_override',

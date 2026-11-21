@@ -331,7 +331,7 @@ describe('Native Codex OAuth pass-through', () => {
     // Adorned with the backend-required fields.
     expect(sent.store).toBe(false);
     expect(sent.include).toContain('reasoning.encrypted_content');
-    expect(typeof sent.instructions).toBe('string');
+    expect(sent).not.toHaveProperty('instructions');
     expect(sent.text.verbosity).toBe('low');
     expect(sent.model).toBe('gpt-5-codex');
     expect(sent.input).toEqual([
@@ -352,6 +352,154 @@ describe('Native Codex OAuth pass-through', () => {
     // The Codex backend accepts NO max-tokens field (rejects both names).
     expect(sent).not.toHaveProperty('max_output_tokens');
     expect(sent).not.toHaveProperty('max_completion_tokens');
+  });
+
+  test.each([
+    {
+      instructions: '',
+      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
+    },
+    {
+      instructions: 'Only this turn',
+      input: [
+        {
+          type: 'message',
+          role: 'developer',
+          content: [{ type: 'input_text', text: 'Repo rules' }],
+        },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] },
+      ],
+    },
+  ])(
+    'preserves supplied native instructions without inserting developer input',
+    async ({ instructions, input }) => {
+      setConfigForTesting(codexOAuthConfig());
+      const body = { model: 'codex-alias', stream: true, instructions, input };
+      const parsed = await new ResponsesTransformer().parseRequest(body);
+      const response = await new Dispatcher().dispatch({
+        ...parsed,
+        incomingApiType: 'responses',
+        originalBody: body,
+      });
+      const sent = JSON.parse((fetchSpy.mock.calls[0] as [unknown, RequestInit])[1].body as string);
+      expect(response.bypassTransformation).toBe(true);
+      expect(sent.instructions).toBe(instructions);
+      expect(sent.input).toEqual(input);
+    }
+  );
+
+  test.each([false, true])(
+    'relocates known-target native instructions unless the model opts out (opt-out: %s)',
+    async (optOut) => {
+      const config = codexOAuthConfig();
+      config.providers.Codex.models['gpt-6.2-sol'] = {
+        pricing: { source: 'simple', input: 0, output: 0 },
+        access_via: [],
+        ...(optOut ? { adapter: [{ name: 'cache_responses_instructions', enabled: false }] } : {}),
+      };
+      config.models['codex-alias'].targets[0].model = 'gpt-6.2-sol';
+      setConfigForTesting(config);
+      const input = [
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hi' }] },
+      ];
+      const body = { model: 'codex-alias', stream: true, instructions: 'Project rules', input };
+      const parsed = await new ResponsesTransformer().parseRequest(body);
+      const response = await new Dispatcher().dispatch({
+        ...parsed,
+        incomingApiType: 'responses',
+        originalBody: body,
+      });
+      const [url, init] = fetchSpy.mock.calls[0] as [unknown, RequestInit];
+      const sent = JSON.parse(init.body as string);
+      expect(url).toBe('https://chatgpt.com/backend-api/codex/responses');
+      expect(response.bypassTransformation).toBe(true);
+      if (optOut) {
+        expect(sent.instructions).toBe('Project rules');
+        expect(sent.input).toEqual(input);
+      } else {
+        expect(sent).not.toHaveProperty('instructions');
+        expect(sent.input).toEqual([
+          {
+            type: 'message',
+            role: 'developer',
+            content: [{ type: 'input_text', text: 'Project rules' }],
+          },
+          ...input,
+        ]);
+      }
+      expect(body.instructions).toBe('Project rules');
+      expect(body.input).toEqual(input);
+    }
+  );
+
+  test('relocates opt-in instructions after CLI tool extensions on full replays', async () => {
+    const config = codexOAuthConfig();
+    config.providers.Codex.adapter = [
+      { name: 'cache_responses_instructions', options: {}, enabled: true },
+    ];
+    setConfigForTesting(config);
+    fetchSpy
+      .mockResolvedValueOnce(
+        new Response(UPSTREAM_SSE, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(UPSTREAM_SSE, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      );
+
+    const first = codexCliRequest();
+    const additionalTools = { type: 'additional_tools', role: 'developer', tools: [] };
+    const existingDeveloper = {
+      type: 'message',
+      role: 'developer',
+      content: [{ type: 'input_text', text: 'Repo rules' }],
+    };
+    const user = { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] };
+    const appended = {
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text: 'again' }],
+    };
+    first.originalBody.instructions = 'Project rules';
+    first.originalBody.input = [additionalTools, existingDeveloper, user];
+    const second = codexCliRequest();
+    second.originalBody = { ...first.originalBody, input: [...first.originalBody.input, appended] };
+    const originalFirst = structuredClone(first.originalBody);
+    const originalSecond = structuredClone(second.originalBody);
+
+    const dispatcher = new Dispatcher();
+    const firstResponse = await dispatcher.dispatch(first);
+    const secondResponse = await dispatcher.dispatch(second);
+    expect(firstResponse.bypassTransformation).toBe(true);
+    expect(secondResponse.bypassTransformation).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const calls = fetchSpy.mock.calls as [unknown, RequestInit][];
+    expect(calls[0]![0]).toBe('https://chatgpt.com/backend-api/codex/responses');
+    expect(calls[1]![0]).toBe('https://chatgpt.com/backend-api/codex/responses');
+    const firstSent = JSON.parse(calls[0]![1].body as string);
+    const secondSent = JSON.parse(calls[1]![1].body as string);
+    const prefix = [
+      additionalTools,
+      {
+        type: 'message',
+        role: 'developer',
+        content: [{ type: 'input_text', text: 'Project rules' }],
+      },
+      existingDeveloper,
+      user,
+    ];
+    expect(firstSent.input).toEqual(prefix);
+    expect(secondSent.input).toEqual([...prefix, appended]);
+    expect(secondSent.input.slice(0, prefix.length)).toEqual(firstSent.input);
+    expect(firstSent).not.toHaveProperty('instructions');
+    expect(secondSent).not.toHaveProperty('instructions');
+    expect(first.originalBody).toEqual(originalFirst);
+    expect(second.originalBody).toEqual(originalSecond);
   });
 
   test.each([
@@ -438,6 +586,32 @@ describe('Native Codex OAuth pass-through', () => {
     expect(sent.input).toBeDefined();
     expect(sent.messages).toBeUndefined();
     expect(sent.tool_choice).toEqual({ type: 'function', name: 'lookup' });
+  });
+
+  test('puts translated Chat guidance first for GPT-6.2 Codex', async () => {
+    const config = codexOAuthConfig();
+    config.providers.Codex.models['gpt-6.2-sol'] = {
+      pricing: { source: 'simple', input: 0, output: 0 },
+      access_via: [],
+    };
+    config.models['codex-62'] = { targets: [{ provider: 'Codex', model: 'gpt-6.2-sol' }] };
+    setConfigForTesting(config);
+    const request = chatRequest();
+    request.model = 'codex-62';
+    request.messages = [
+      { role: 'system', content: 'Alpha' },
+      { role: 'user', content: 'hi' },
+    ];
+    request.originalBody = { model: request.model, stream: true, messages: request.messages };
+    const response = await new Dispatcher().dispatch(request);
+    const sent = JSON.parse((fetchSpy.mock.calls[0] as [unknown, RequestInit])[1].body as string);
+    expect(response.bypassTransformation).toBe(false);
+    expect(sent.input[0]).toEqual({
+      type: 'message',
+      role: 'developer',
+      content: [{ type: 'input_text', text: 'Alpha' }],
+    });
+    expect(sent).not.toHaveProperty('instructions');
   });
 
   test('aggregates backend Responses SSE for a non-streaming Chat Completions client', async () => {

@@ -58,6 +58,26 @@ describe('suppressDeveloperRoleAdapter', () => {
       const payload = { model: 'foo' };
       expect(suppressDeveloperRoleAdapter.preDispatch(payload)).toEqual({ model: 'foo' });
     });
+
+    it('rewrites only Responses developer message items', () => {
+      const input = [
+        { type: 'message', role: 'developer', content: 'typed' },
+        { role: 'developer', content: 'shorthand' },
+        { type: 'additional_tools', role: 'developer', tools: [] },
+        { type: 'message', role: 'user', content: 'hi' },
+        null,
+        'scalar',
+      ];
+      const payload = { input };
+      expect(suppressDeveloperRoleAdapter.preDispatch(payload).input).toEqual([
+        { type: 'message', role: 'system', content: 'typed' },
+        { role: 'system', content: 'shorthand' },
+        ...input.slice(2),
+      ]);
+      expect(payload.input).toEqual(input);
+      const untouched = { input: input.slice(2) };
+      expect(suppressDeveloperRoleAdapter.preDispatch(untouched)).toBe(untouched);
+    });
   });
 
   // ── postDispatch ─────────────────────────────────────────────────────────

@@ -156,6 +156,89 @@ describe('resolveAdapters', () => {
     expect(resolved[0]!.options).toEqual({});
   });
 
+  it('resolves instruction relocation only for Responses routes and honors model opt-out', () => {
+    const entry = { name: 'cache_responses_instructions', options: {}, enabled: true };
+    const route = makeRoute([entry]);
+    for (const apiType of ['responses', 'responses:lite']) {
+      expect(resolveAdapters(route, apiType).map((item) => item.adapter.name)).toEqual([
+        entry.name,
+      ]);
+    }
+    expect(resolveAdapters(route, 'chat')).toEqual([]);
+    expect(resolveAdapters(route)).toEqual([]);
+    expect(
+      resolveAdapters(makeRoute([entry], [{ name: entry.name, enabled: false }]), 'responses')
+    ).toEqual([]);
+  });
+
+  test.each([
+    ['gpt-6.2-sol', 'https://api.openai.com/v1', undefined, 'responses', true],
+    ['gpt-6.5-sol', 'https://api.openai.com/v1', undefined, 'responses:lite', true],
+    ['openai/gpt-6.2-sol', 'oauth://openai-codex', 'openai-codex', 'responses', true],
+    ['gpt-6.2-sol', 'oauth://github-copilot', 'github-copilot', 'responses', true],
+    ['gpt-6.1-sol', 'https://api.openai.com/v1', undefined, 'responses', false],
+    ['gpt-6.6-sol', 'https://api.openai.com/v1', undefined, 'responses', false],
+    ['gpt-6.20-sol', 'https://api.openai.com/v1', undefined, 'responses', false],
+    ['gpt-6.2-sol', 'https://api.openai.com.example.test/v1', undefined, 'responses', false],
+    ['gpt-6.2-sol', 'https://api.openai.com/v1', undefined, 'chat', false],
+    ['gpt-6.2-sol', 'oauth://anthropic', 'anthropic', 'responses', false],
+    ['gpt-6.2-sol', 'not-a-url', undefined, 'responses', false],
+  ])(
+    'gates automatic instruction relocation for %s at %s (%s, %s)',
+    (model, url, oauth, type, expected) => {
+      const route = makeRoute(undefined, undefined, { api_base_url: url, oauth_provider: oauth });
+      route.model = model;
+      expect(
+        resolveAdapters(route, type, 'responses').some(
+          (item) => item.adapter.name === 'cache_responses_instructions'
+        )
+      ).toBe(expected);
+    }
+  );
+
+  it('selects only the effective Responses URL for automatic instruction relocation', () => {
+    const route = makeRoute(undefined, undefined, {
+      api_base_url: { chat: 'https://api.openai.com/v1', responses: 'https://example.com' },
+    });
+    route.model = 'gpt-6.2-sol';
+    expect(resolveAdapters(route, 'responses', 'responses')).toEqual([]);
+    route.config.api_base_url = {
+      responses: 'https://api.openai.com/v1',
+      'responses:lite': 'https://example.com',
+    };
+    expect(resolveAdapters(route, 'responses:lite', 'responses')).toEqual([]);
+    expect(
+      resolveAdapters(route, 'responses', 'responses').map((item) => item.adapter.name)
+    ).toContain('cache_responses_instructions');
+  });
+
+  test.each(['provider', 'model'])(
+    'allows a %s tombstone to disable automatic instruction relocation',
+    (level) => {
+      const tombstone = [{ name: 'cache_responses_instructions', enabled: false }];
+      const route = makeRoute(
+        level === 'provider' ? tombstone : undefined,
+        level === 'model' ? tombstone : undefined,
+        {
+          api_base_url: 'https://api.openai.com/v1',
+        }
+      );
+      route.model = 'gpt-6.2-sol';
+      expect(resolveAdapters(route, 'responses', 'responses')).toEqual([]);
+    }
+  );
+
+  it('injects automatic relocation only for native Responses clients', () => {
+    const route = makeRoute(undefined, undefined, { api_base_url: 'https://api.openai.com/v1' });
+    route.model = 'gpt-6.2-sol';
+    for (const incoming of ['chat', 'messages']) {
+      expect(resolveAdapters(route, 'responses', incoming)).toEqual([]);
+    }
+    expect(
+      resolveAdapters(route, 'responses', 'responses').map((item) => item.adapter.name)
+    ).toEqual(['cache_responses_instructions']);
+  });
+
   it('resolves a model-level adapter entry', () => {
     const route = makeRoute(undefined, [{ name: 'suppress_developer_role', options: {} }]);
     const resolved = resolveAdapters(route);

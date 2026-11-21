@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest, spyOn, test } from 'bun:test';
 
-import { registerSpy } from '../../../test/test-utils';
+import { asFetch, registerSpy } from '../../../test/test-utils';
 import { setConfigForTesting } from '../../config';
 import type { UnifiedChatRequest } from '../../types/unified';
 import { NATIVE_OAUTH_STASH, refreshOAuthRoute } from '../dispatch/request-payload-builder';
 import { OAuthAuthManager } from '../oauth/oauth-auth-manager';
 import { copilotWireApiType, isNativeOAuthProvider } from '../oauth/oauth-native-request';
+import * as catalog from '../pi-ai/catalog';
 
 // Native GitHub Copilot OAuth.
 //
@@ -28,6 +29,19 @@ const CHAT_SSE = [
   'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4.1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}',
   '',
   'data: [DONE]',
+  '',
+  '',
+].join('\n');
+
+const RESPONSES_SSE = [
+  'event: response.created',
+  'data: {"type":"response.created","response":{"id":"resp_abc","object":"response","status":"in_progress","model":"gpt-6.2-sol","output":[]}}',
+  '',
+  'event: response.output_text.delta',
+  'data: {"type":"response.output_text.delta","delta":"NATIVE"}',
+  '',
+  'event: response.completed',
+  'data: {"type":"response.completed","response":{"id":"resp_abc","object":"response","status":"completed","model":"gpt-6.2-sol","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"NATIVE"}]}],"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}',
   '',
   '',
 ].join('\n');
@@ -116,6 +130,16 @@ describe('Native GitHub Copilot OAuth', () => {
 
   beforeEach(() => {
     OAuthAuthManager.resetForTesting();
+    const originalGetCatalogModel = catalog.getCatalogModel;
+    registerSpy(catalog, 'getCatalogModel').mockImplementation(
+      (provider: string, modelId: string) => {
+        if (provider === 'github-copilot' && modelId === 'gpt-6.2-sol') {
+          const model = originalGetCatalogModel('github-copilot', 'gpt-5.4');
+          return model ? { ...model, id: 'gpt-6.2-sol' } : null;
+        }
+        return originalGetCatalogModel(provider, modelId);
+      }
+    );
     registerSpy(OAuthAuthManager.getInstance(), 'getApiKey').mockResolvedValue(COPILOT_TOKEN);
     fetchSpy = spyOn(global, 'fetch').mockResolvedValue(
       new Response(CHAT_SSE, {
@@ -208,6 +232,40 @@ describe('Native GitHub Copilot OAuth', () => {
     expect(url).toBe('https://api.individual.githubcopilot.com/responses');
     expect(init.headers['Copilot-Integration-Id']).toBe('vscode-chat');
     expect(init.headers['Authorization']).toBe(`Bearer ${COPILOT_TOKEN}`);
+  });
+
+  test('Responses GPT-6.2 translates chat system guidance into a leading developer item', async () => {
+    const config = copilotConfig();
+    config.providers.Copilot.models['gpt-6.2-sol'] = {
+      pricing: { source: 'simple', input: 0, output: 0 },
+      access_via: [],
+    };
+    config.models['cop-responses'].targets[0].model = 'gpt-6.2-sol';
+    setConfigForTesting(config);
+    fetchSpy.mockImplementation(
+      asFetch(
+        async () =>
+          new Response(RESPONSES_SSE, {
+            status: 200,
+            headers: { 'content-type': 'text/event-stream' },
+          })
+      )
+    );
+    const request = chatRequest('cop-responses');
+    request.messages.unshift({ role: 'system', content: 'Alpha' });
+    request.originalBody = { model: 'cop-responses', stream: true, messages: request.messages };
+    const response = await new Dispatcher().dispatch(request);
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.individual.githubcopilot.com/responses');
+    const sent = JSON.parse(String(init.body));
+    expect(sent.input[0]).toEqual({
+      type: 'message',
+      role: 'developer',
+      content: [{ type: 'input_text', text: 'Alpha' }],
+    });
+    expect(sent).not.toHaveProperty('instructions');
+    expect(response.bypassTransformation).toBe(false);
   });
 
   test('Business account token preserves the account-specific endpoint', async () => {

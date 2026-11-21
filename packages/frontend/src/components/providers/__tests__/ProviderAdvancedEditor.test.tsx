@@ -5,6 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { useHappyDom } from '../../../../test/happydom';
 import { api, type Provider } from '../../../lib/api';
+import type { AdapterEntry } from '../model-editor/adapter-utils';
+import { ModelAdapters } from '../model-editor/ModelAdapters';
 import { ProviderAdvancedEditor } from '../ProviderAdvancedEditor';
 
 useHappyDom();
@@ -20,6 +22,7 @@ afterAll(() => {
 
 const TOOL_ID_LABEL = 'Anthropic Tool-ID Normalization';
 const DROP_THINKING_LABEL = 'Drop Unsigned Thinking';
+const CACHE_LABEL = 'Cache Responses Instructions';
 
 /** An Anthropic-compatible gateway on a non-Anthropic host: nothing auto-fires. */
 function makeProvider(adapter: any[] = []): Provider {
@@ -171,5 +174,58 @@ describe('ProviderAdvancedEditor — automatically injected Anthropic adapters',
     await choose(selectFor(DROP_THINKING_LABEL), '');
 
     expect(latest.adapter).toEqual([{ name: 'reasoning_content' }]);
+  });
+
+  it('offers Auto, Enabled, and Disabled for Responses instruction caching', async () => {
+    await mount(makeProvider([{ name: 'reasoning_content' }]));
+    await openAdapters();
+
+    const select = selectFor(CACHE_LABEL);
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      'Auto',
+      'Enabled',
+      'Disabled',
+    ]);
+    await choose(select, 'off');
+    expect(latest.adapter).toEqual([
+      { name: 'reasoning_content' },
+      { name: 'cache_responses_instructions', options: {}, enabled: false },
+    ]);
+    await choose(select, 'on');
+    expect(latest.adapter).toEqual([
+      { name: 'reasoning_content' },
+      { name: 'cache_responses_instructions', options: {}, enabled: true },
+    ]);
+    await choose(select, '');
+    expect(latest.adapter).toEqual([{ name: 'reasoning_content' }]);
+  });
+
+  it('supports a model-level instruction cache opt-out and reset', async () => {
+    let adapter: AdapterEntry[] | undefined;
+    function ModelHarness() {
+      const [entries, setEntries] = useState<AdapterEntry[] | undefined>(undefined);
+      return (
+        <ModelAdapters
+          modelId="gpt-6.2-sol"
+          modelConfig={{ adapter: entries }}
+          isOpen
+          setIsOpen={() => {}}
+          updateModelConfig={(_id, updates) => {
+            adapter = updates.adapter;
+            setEntries(adapter);
+          }}
+        />
+      );
+    }
+    await act(async () => root.render(<ModelHarness />));
+    const select = selectFor(CACHE_LABEL);
+    await choose(select, 'off');
+    expect(adapter).toEqual([
+      { name: 'cache_responses_instructions', options: {}, enabled: false },
+    ]);
+    await choose(select, 'on');
+    expect(adapter).toEqual([{ name: 'cache_responses_instructions', options: {}, enabled: true }]);
+    await choose(select, '');
+    expect(adapter).toBeUndefined();
   });
 });

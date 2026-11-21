@@ -1,28 +1,8 @@
 import { getMidConversationEffort, normalizeEffort } from '../../services/pi-ai/reasoning';
 import { UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
-import { getThinkLevel } from '../utils';
+import { flattenInstructionText, getThinkLevel } from '../utils';
 import { convertAnthropicContent } from './content-mapper';
 import { convertAnthropicToolsToUnified } from './tool-mapper';
-
-/**
- * Flattens an Anthropic mid-conversation `role: 'system'` entry's content into
- * the unified string form.
- *
- * Anthropic egress re-emits the caller's raw entry (so content and block-level
- * `cache_control` survive there), which means the unified string only feeds
- * cross-format egress — and the Responses/Gemini emitters stringify array
- * content, so joining the text blocks produces a usable system prompt instead
- * of a JSON blob. Contentless entries (the per-turn `output_config`-only
- * shape) become the empty string.
- */
-function flattenMidConversationSystemContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .filter((part: any) => part && part.type === 'text' && typeof part.text === 'string')
-    .map((part: any) => part.text as string)
-    .join('\n\n');
-}
 
 /**
  * Parses an Anthropic API request and converts it to unified format.
@@ -62,7 +42,7 @@ export async function parseAnthropicRequest(input: any): Promise<UnifiedChatRequ
       if (msg.role === 'system') {
         messages.push({
           role: 'system',
-          content: flattenMidConversationSystemContent(msg.content),
+          content: flattenInstructionText(msg.content),
           mid_conversation: true,
         });
         continue;

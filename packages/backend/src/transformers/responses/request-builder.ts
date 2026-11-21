@@ -1,31 +1,69 @@
-import { UnifiedChatRequest } from '../../types/unified';
-import { projectReasoningForResponses } from '../utils';
+import { RESPONSES_INSTRUCTION_ORIGIN, UnifiedChatRequest } from '../../types/unified';
+import { flattenInstructionText, projectReasoningForResponses } from '../utils';
+
+export interface ResponsesRequestOptions {
+  translatedInstructionsAsDeveloper?: boolean;
+}
 
 /**
  * Transforms Chat Completions request to Responses API format (not typically needed)
  */
-export async function buildResponsesRequest(request: UnifiedChatRequest): Promise<any> {
-  // Convert UnifiedChatRequest to Responses API format
-  const inputItems: any[] = [];
+export async function buildResponsesRequest(
+  request: UnifiedChatRequest,
+  options?: ResponsesRequestOptions
+): Promise<any> {
+  const inputItems: Record<string, unknown>[] = [];
+  const translatedInstructions: string[] = [];
+  let nativeInstructions: string | undefined;
 
   // Convert messages to input items
   for (const msg of request.messages) {
-    if (msg.role === 'system') {
-      // System messages become instructions (not input items)
-      continue; // Will be handled below
-    } else if (msg.role === 'user' || msg.role === 'assistant') {
-      const content: any[] = [];
+    const origin = msg[RESPONSES_INSTRUCTION_ORIGIN];
+    if (origin === 'top_level') {
+      if (typeof msg.content === 'string') nativeInstructions = msg.content;
+      continue;
+    }
+
+    if (!origin && (msg.role === 'system' || msg.role === 'developer')) {
+      const text = flattenInstructionText(msg.content);
+      if (text.trim()) {
+        if (options?.translatedInstructionsAsDeveloper) {
+          inputItems.push({
+            type: 'message',
+            role: 'developer',
+            content: [{ type: 'input_text', text }],
+          });
+        } else {
+          translatedInstructions.push(text);
+        }
+      }
+      continue;
+    }
+
+    if (
+      origin === 'input_system' ||
+      origin === 'input_developer' ||
+      msg.role === 'user' ||
+      msg.role === 'assistant'
+    ) {
+      const role =
+        origin === 'input_system'
+          ? 'system'
+          : origin === 'input_developer'
+            ? 'developer'
+            : msg.role;
+      const content: Record<string, unknown>[] = [];
 
       if (typeof msg.content === 'string') {
         content.push({
-          type: msg.role === 'user' ? 'input_text' : 'output_text',
+          type: role === 'assistant' ? 'output_text' : 'input_text',
           text: msg.content,
         });
       } else if (Array.isArray(msg.content)) {
         for (const part of msg.content) {
           if (part.type === 'text') {
             content.push({
-              type: msg.role === 'user' ? 'input_text' : 'output_text',
+              type: role === 'assistant' ? 'output_text' : 'input_text',
               text: part.text,
             });
           } else if (part.type === 'image_url') {
@@ -38,11 +76,13 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
         }
       }
 
-      inputItems.push({
-        type: 'message',
-        role: msg.role,
-        content,
-      });
+      if (!origin || content.length > 0) {
+        inputItems.push({
+          type: 'message',
+          role,
+          content,
+        });
+      }
     } else if (msg.role === 'tool') {
       // Tool result becomes function_call_output item
       inputItems.push({
@@ -64,14 +104,6 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
       }
     }
   }
-
-  // Extract system message for instructions
-  const systemMessage = request.messages.find((m) => m.role === 'system');
-  const instructions = systemMessage
-    ? typeof systemMessage.content === 'string'
-      ? systemMessage.content
-      : JSON.stringify(systemMessage.content)
-    : undefined;
 
   // Convert tools to Responses API format.
   // Non-function tools (e.g. server-side web search types like "web_search",
@@ -101,8 +133,10 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
     ...(request.stream !== undefined ? { stream: request.stream } : {}),
   };
 
-  if (instructions) {
-    payload.instructions = instructions;
+  if (nativeInstructions !== undefined) {
+    payload.instructions = nativeInstructions;
+  } else if (translatedInstructions.length > 0) {
+    payload.instructions = translatedInstructions.join('\n\n');
   }
   if (request.max_tokens) {
     payload.max_output_tokens = request.max_tokens;
@@ -232,6 +266,7 @@ export async function buildResponsesRequest(request: UnifiedChatRequest): Promis
     request.originalBody
   ) {
     const passthroughFields = [
+      'instructions',
       'user',
       'store',
       'background',

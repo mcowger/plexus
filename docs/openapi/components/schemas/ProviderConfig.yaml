@@ -316,6 +316,18 @@ properties:
       - `suppress_developer_role` — Rewrites the `developer` role to `system`
         for providers that do not support the OpenAI `developer` role.
 
+      - `cache_responses_instructions` — Moves top-level `instructions` to a
+        developer input item on Responses routes. Enabled automatically for
+        native Responses requests to GPT-6.2 through GPT-6.5 on Codex OAuth,
+        Copilot OAuth Responses models, and non-OAuth `api.openai.com` targets. Set
+        `{ "name": "cache_responses_instructions", "enabled": false }` at
+        provider or model level to opt out; explicitly enable it for other
+        compatible Responses routes. Skips an outbound body that still carries
+        `conversation`, `previous_response_id`, or `store: true`. Plexus resolves
+        its own `previous_response_id` history and sends `store: false` before
+        adapters run, so those replays are still relocated. Configure role
+        suppression after this adapter when needed.
+
       - `model_override` — Conditionally rewrites the provider model name
         based on request payload fields. Accepts a `rules` array in options
         where each rule specifies a `model` to match, a `rewriteTo` model name,

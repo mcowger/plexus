@@ -249,7 +249,7 @@ export class RequestManager {
         const requestWithTargetModel = { ...currentRequest, model: route.model };
 
         // Resolve adapters for this specific provider+model combination
-        const adapters = resolveAdapters(route, effectiveApiType);
+        const adapters = resolveAdapters(route, effectiveApiType, currentRequest.incomingApiType);
 
         const { payload: providerPayload, bypassTransformation } =
           await host.transformRequestPayload(
