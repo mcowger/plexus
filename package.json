@@ -73,10 +73,10 @@
     "deploy:staging": "bun run scripts/deploy-staging.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "1.5.2"
+    "@earendil-works/pi-ai": "1.6.0"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.79.0",
+    "@redocly/cli": "^2.82.0",
     "agent-browser": "^0.43.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
