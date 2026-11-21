@@ -9678,7 +9678,7 @@
           "Management — Backup"
         ],
         "summary": "Restore database from a backup (admin only)",
-        "description": "Accepts a backup file and replaces all existing data in the database.\n\nTwo input formats are accepted:\n\n- **`application/json`**: A config-only backup envelope (as produced by\n  `GET /v0/management/backup` without `?full=true`). Restores configuration\n  tables only; operational data is not affected.\n\n- **`application/octet-stream`** / **`application/gzip`**: A gzipped tar archive\n  (as produced by `GET /v0/management/backup?full=true`). Restores both\n  configuration and operational data.\n\n**Destructive operation** — all current data is deleted before the backup is\napplied. For full archive restores, the entire operation runs in a single\ndatabase transaction; if any step fails, the database is rolled back to its\npre-restore state.\n\nAfter a successful restore, a server restart is recommended so that in-memory\ncaches and long-lived connections pick up the new configuration.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Accepts a backup file and replaces all existing data in the database.\n\nTwo input formats are accepted:\n\n- **`application/json`**: A config-only backup envelope (as produced by\n  `GET /v0/management/backup` without `?full=true`). Restores configuration\n  tables only; operational data is not affected.\n\n- **`application/octet-stream`** / **`application/gzip`**: A gzipped tar archive\n  (as produced by `GET /v0/management/backup?full=true`). Restores both\n  configuration and operational data.\n\nThe maximum request body size is 512 MiB.\n\n**Destructive operation** — all current data is deleted before the backup is\napplied. For full archive restores, the entire operation runs in a single\ndatabase transaction; if any step fails, the database is rolled back to its\npre-restore state.\n\nAfter a successful restore, a server restart is recommended so that in-memory\ncaches and long-lived connections pick up the new configuration.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -9742,6 +9742,9 @@
           },
           "403": {
             "description": "Limited principals cannot access this endpoint."
+          },
+          "413": {
+            "description": "Backup exceeds the maximum request body size."
           }
         },
         "operationId": "postV0ManagementRestore"

@@ -5,7 +5,7 @@ import type { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-
 import type { UsageStorageService } from '../../services/observability/usage-storage';
 import { logger } from '../../utils/logger';
 
-const RESTORE_BODY_LIMIT = 100 * 1024 * 1024;
+const RESTORE_BODY_LIMIT = 512 * 1024 * 1024;
 
 export async function registerBackupRoutes(
   fastify: FastifyInstance,
@@ -46,6 +46,51 @@ export async function registerBackupRoutes(
       return reply.code(500).send({ error: e.message || 'Backup export failed' });
     }
   });
+
+  // ─── DELETE /v0/management/logs/reset ────────────────────────────
+
+  /**
+   * Reset all request logs, error logs, and debug trace logs.
+   * Cooldowns, configs etc. remain untouched.
+   */
+  fastify.delete('/v0/management/logs/reset', async (request, reply) => {
+    if (!usageStorage) {
+      return reply.code(500).send({ error: 'Usage storage service is not available' });
+    }
+    logger.info('[Backup] Starting logs reset (request logs, error logs, debug trace logs)');
+    try {
+      const [successUsage, successErrors, successDebug] = await Promise.all([
+        usageStorage.deleteAllUsageLogs(),
+        usageStorage.deleteAllErrors(),
+        usageStorage.deleteAllDebugLogs(),
+      ]);
+
+      let successMcp = true;
+      if (mcpUsageStorage) {
+        successMcp = await mcpUsageStorage.deleteAllLogs();
+      }
+
+      if (!successUsage || !successErrors || !successDebug || !successMcp) {
+        logger.error('[Backup] Reset logs partial failure:', {
+          successUsage,
+          successErrors,
+          successDebug,
+          successMcp,
+        });
+        return reply.code(500).send({ error: 'Failed to reset some logs' });
+      }
+
+      logger.info('[Backup] All logs reset successfully');
+      return reply.send({ success: true, message: 'All logs have been reset successfully' });
+    } catch (e: any) {
+      logger.error('[Backup] Reset logs failed:', e);
+      return reply.code(500).send({ error: e.message || 'Reset logs failed' });
+    }
+  });
+}
+
+export async function registerRestoreRoutes(fastify: FastifyInstance) {
+  const backupService = new BackupService();
 
   // ─── POST /v0/management/restore ─────────────────────────────────
 
@@ -106,45 +151,4 @@ export async function registerBackupRoutes(
       done(null, body);
     }
   );
-
-  // ─── DELETE /v0/management/logs/reset ────────────────────────────
-
-  /**
-   * Reset all request logs, error logs, and debug trace logs.
-   * Cooldowns, configs etc. remain untouched.
-   */
-  fastify.delete('/v0/management/logs/reset', async (request, reply) => {
-    if (!usageStorage) {
-      return reply.code(500).send({ error: 'Usage storage service is not available' });
-    }
-    logger.info('[Backup] Starting logs reset (request logs, error logs, debug trace logs)');
-    try {
-      const [successUsage, successErrors, successDebug] = await Promise.all([
-        usageStorage.deleteAllUsageLogs(),
-        usageStorage.deleteAllErrors(),
-        usageStorage.deleteAllDebugLogs(),
-      ]);
-
-      let successMcp = true;
-      if (mcpUsageStorage) {
-        successMcp = await mcpUsageStorage.deleteAllLogs();
-      }
-
-      if (!successUsage || !successErrors || !successDebug || !successMcp) {
-        logger.error('[Backup] Reset logs partial failure:', {
-          successUsage,
-          successErrors,
-          successDebug,
-          successMcp,
-        });
-        return reply.code(500).send({ error: 'Failed to reset some logs' });
-      }
-
-      logger.info('[Backup] All logs reset successfully');
-      return reply.send({ success: true, message: 'All logs have been reset successfully' });
-    } catch (e: any) {
-      logger.error('[Backup] Reset logs failed:', e);
-      return reply.code(500).send({ error: e.message || 'Reset logs failed' });
-    }
-  });
 }

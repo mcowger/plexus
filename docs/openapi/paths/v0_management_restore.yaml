@@ -15,6 +15,8 @@ post:
       (as produced by `GET /v0/management/backup?full=true`). Restores both
       configuration and operational data.
 
+    The maximum request body size is 512 MiB.
+
     **Destructive operation** — all current data is deleted before the backup is
     applied. For full archive restores, the entire operation runs in a single
     database transaction; if any step fails, the database is rolled back to its
@@ -66,4 +68,6 @@ post:
       description: Authentication required or invalid credentials.
     '403':
       description: Limited principals cannot access this endpoint.
+    '413':
+      description: Backup exceeds the maximum request body size.
   operationId: postV0ManagementRestore
