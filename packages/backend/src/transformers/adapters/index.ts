@@ -1,4 +1,5 @@
 import type { ProviderAdapter } from '../../types/provider-adapter';
+import { cacheResponsesInstructionsAdapter } from './cache-responses-instructions.adapter';
 import { dropUnsignedThinkingAdapter } from './drop-unsigned-thinking.adapter';
 import { modelOverrideAdapter } from './model-override.adapter';
 import { museCodeCompatAdapter } from './muse-code-compat.adapter';
@@ -15,6 +16,7 @@ import { webSearchCoercionAdapter } from './web-search-coercion.adapter';
  * Keys must match the name field used in provider/model config `adapter` entries.
  */
 export const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
+  [cacheResponsesInstructionsAdapter.name]: cacheResponsesInstructionsAdapter,
   [dropUnsignedThinkingAdapter.name]: dropUnsignedThinkingAdapter,
   [reasoningContentAdapter.name]: reasoningContentAdapter,
   [suppressDeveloperRoleAdapter.name]: suppressDeveloperRoleAdapter,

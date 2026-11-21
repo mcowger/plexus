@@ -2,10 +2,20 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { Badge } from '../../ui/Badge';
 import { ReasoningRewriteRulesEditor } from '../ReasoningRewriteRulesEditor';
-import { getAdapterName, KNOWN_ADAPTERS, normalizeAdapterEntries } from './adapter-utils';
+import {
+  CACHE_RESPONSES_INSTRUCTIONS_ADAPTER,
+  getAdapterName,
+  KNOWN_ADAPTERS,
+  normalizeAdapterEntries,
+} from './adapter-utils';
+import { CacheResponsesInstructionsControl } from './CacheResponsesInstructionsControl';
 import { GPT5_SUPPRESSION_ADAPTER, isGpt5Model } from './constants';
 import { ModelOverrideRules } from './ModelOverrideRules';
 import type { ModelConfig } from './types';
+
+const MANUAL_ADAPTERS = KNOWN_ADAPTERS.filter(
+  (adapter) => adapter.value !== CACHE_RESPONSES_INSTRUCTIONS_ADAPTER
+);
 
 interface Props {
   modelId: string;
@@ -121,7 +131,13 @@ export function ModelAdapters({
               </div>
             </label>
           )}
-          {KNOWN_ADAPTERS.map((adapter) => {
+          <CacheResponsesInstructionsControl
+            entries={modelAdapters}
+            onChange={(next) =>
+              updateModelConfig(modelId, { adapter: next.length > 0 ? next : undefined })
+            }
+          />
+          {MANUAL_ADAPTERS.map((adapter) => {
             const active = modelAdapters.some((entry) => getAdapterName(entry) === adapter.value);
             return (
               <label

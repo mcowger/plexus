@@ -25,7 +25,11 @@ import {
   listCodexOAuthModels,
 } from '../providers/provider-model-discovery';
 import type { RouteResult } from '../routing/router';
-import { isAnthropicTargetProvider } from './adapter-resolver';
+import {
+  isAdapterDisabled,
+  isAnthropicTargetProvider,
+  isCacheableInstructionsTarget,
+} from './adapter-resolver';
 import { applyBodyCacheKeyInjection } from './cache-key-injection';
 import { needsCodexReasoningCapabilities, projectCodexReasoning } from './codex-reasoning';
 import {
@@ -146,6 +150,7 @@ export async function buildRequestPayload(
   targetApiType: string,
   adapters: ResolvedAdapter[] = []
 ): Promise<RequestPayload> {
+  const aliasConfig = route.canonicalModel ? getConfig().models?.[route.canonicalModel] : undefined;
   const nativeOAuth = isNativeOAuthRoute(route, targetApiType);
   // Any other OAuth-style route (an `oauth://` provider that isn't one of the
   // native ones, and never the Claude-masking API-key route — that always
@@ -231,7 +236,19 @@ export async function buildRequestPayload(
       getApiBaseType(targetApiType) === 'messages'
         ? requestWithOAuthProvider
         : dropMidConversationEntries(requestWithOAuthProvider);
-    payload = await transformer.transformRequest(requestForTransform);
+    const translatedInstructionsAsDeveloper =
+      (incomingBaseType === 'chat' || incomingBaseType === 'messages') &&
+      isCacheableInstructionsTarget(route, targetApiType) &&
+      !isAdapterDisabled(route, 'cache_responses_instructions') &&
+      ![route.config.extraBody, route.modelConfig?.extraBody, aliasConfig?.extraBody].some(
+        (body) =>
+          body != null && (Object.hasOwn(body, 'instructions') || Object.hasOwn(body, 'input'))
+      );
+    payload = translatedInstructionsAsDeveloper
+      ? await transformer.transformRequest(requestForTransform, {
+          translatedInstructionsAsDeveloper: true,
+        })
+      : await transformer.transformRequest(requestForTransform);
   }
 
   // Claude genuine-client fast-path. Masking only exists on the native
@@ -285,7 +302,6 @@ export async function buildRequestPayload(
   if (route.modelConfig?.extraBody) payload = { ...payload, ...route.modelConfig.extraBody };
 
   if (route.canonicalModel) {
-    const aliasConfig = getConfig().models?.[route.canonicalModel];
     if (aliasConfig?.extraBody) payload = { ...payload, ...aliasConfig.extraBody };
     // Invoked even when the alias has no `advanced` entries: some behaviors
     // apply implicitly. `inject_cache_control` auto-enables for aliases that

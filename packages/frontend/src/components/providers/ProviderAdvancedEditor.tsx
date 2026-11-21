@@ -20,10 +20,14 @@ import { DebouncedInput } from '../ui/DebouncedInput';
 import { Switch } from '../ui/Switch';
 import { Tooltip } from '../ui/Tooltip';
 import {
+  CACHE_RESPONSES_INSTRUCTIONS_ADAPTER,
+  getAdapterMode,
   getAdapterName,
   KNOWN_ADAPTERS,
   normalizeAdapterEntries,
+  setAdapterMode,
 } from './model-editor/adapter-utils';
+import { CacheResponsesInstructionsControl } from './model-editor/CacheResponsesInstructionsControl';
 import { ProviderQuirksModal } from './ProviderQuirksModal';
 import { ReasoningRewriteRulesEditor } from './ReasoningRewriteRulesEditor';
 
@@ -228,7 +232,10 @@ export function ProviderAdvancedEditor({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                   {KNOWN_ADAPTERS.filter(
-                    (a) => a.value !== 'model_override' && a.value !== 'web_search_coercion'
+                    (a) =>
+                      a.value !== 'model_override' &&
+                      a.value !== 'web_search_coercion' &&
+                      a.value !== CACHE_RESPONSES_INSTRUCTIONS_ADAPTER
                   ).map((a) => {
                     const adapterEntries = normalizeAdapterEntries(editingProvider.adapter);
                     const active = adapterEntries.some((e: any) => getAdapterName(e) === a.value);
@@ -273,6 +280,10 @@ export function ProviderAdvancedEditor({
                     );
                   })}
                 </div>
+                <CacheResponsesInstructionsControl
+                  entries={normalizeAdapterEntries(editingProvider.adapter)}
+                  onChange={(adapter) => setEditingProvider({ ...editingProvider, adapter })}
+                />
 
                 {/* Reasoning Rewrite rules editor (shared with per-model UI) */}
                 <ReasoningRewriteRulesEditor
@@ -471,35 +482,13 @@ export function ProviderAdvancedEditor({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {AUTO_ANTHROPIC_ADAPTERS.map((adapter) => {
                         const entries = normalizeAdapterEntries(editingProvider.adapter);
-                        // The backend replays adapter entries in order, so a LATER
-                        // entry overrides an earlier one — read the last match, not
-                        // the first (resolveAdapters, adapter-resolver.ts).
-                        let entry: any;
-                        for (const candidate of entries) {
-                          if (getAdapterName(candidate) === adapter.name) entry = candidate;
-                        }
-                        const mode: 'auto' | 'on' | 'off' = !entry
-                          ? 'auto'
-                          : typeof entry === 'string' || entry.enabled !== false
-                            ? 'on'
-                            : 'off';
+                        const mode = getAdapterMode(entries, adapter.name);
 
                         const setMode = (value: 'auto' | 'on' | 'off') => {
-                          const withoutEntry = entries.filter(
-                            (e: any) => getAdapterName(e) !== adapter.name
-                          );
-                          const next =
-                            value === 'auto'
-                              ? withoutEntry
-                              : [
-                                  ...withoutEntry,
-                                  {
-                                    name: adapter.name,
-                                    options: {},
-                                    enabled: value === 'on',
-                                  },
-                                ];
-                          setEditingProvider({ ...editingProvider, adapter: next });
+                          setEditingProvider({
+                            ...editingProvider,
+                            adapter: setAdapterMode(entries, adapter.name, value),
+                          });
                         };
 
                         return (
@@ -556,7 +545,8 @@ export function ProviderAdvancedEditor({
                               value={mode === 'auto' ? '' : mode}
                               onChange={(e) => {
                                 const raw = e.target.value;
-                                setMode(raw === 'on' ? 'on' : raw === 'off' ? 'off' : 'auto');
+                                if (raw === 'on' || raw === 'off') setMode(raw);
+                                else setMode('auto');
                               }}
                             >
                               <option value="">{`Auto (currently: ${autoDetected ? 'enabled' : 'disabled'})`}</option>

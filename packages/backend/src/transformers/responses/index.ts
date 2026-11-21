@@ -1,7 +1,7 @@
 import { Transformer } from '../../types/transformer';
 import { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
 import { normalizeOpenAIResponsesUsage } from '../../utils/usage-normalizer';
-import { buildResponsesRequest } from './request-builder';
+import { buildResponsesRequest, ResponsesRequestOptions } from './request-builder';
 import { parseResponsesRequest } from './request-parser';
 import { formatResponsesResponse } from './response-formatter';
 import { transformResponsesResponse } from './response-transformer';
@@ -64,8 +64,11 @@ export class ResponsesTransformer implements Transformer {
   /**
    * Transforms Chat Completions request to Responses API format (not typically needed)
    */
-  async transformRequest(request: UnifiedChatRequest): Promise<any> {
-    return buildResponsesRequest(request);
+  async transformRequest(
+    request: UnifiedChatRequest,
+    options?: ResponsesRequestOptions
+  ): Promise<any> {
+    return buildResponsesRequest(request, options);
   }
 
   /**

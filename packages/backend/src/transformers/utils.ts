@@ -1,5 +1,24 @@
 import { ThinkLevel } from '../types/unified';
 
+/** Flattens string or text-block instruction content for cross-format egress. */
+export function flattenInstructionText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((part: unknown): part is { type: 'text'; text: string } =>
+      Boolean(
+        part &&
+        typeof part === 'object' &&
+        'type' in part &&
+        part.type === 'text' &&
+        'text' in part &&
+        typeof part.text === 'string'
+      )
+    )
+    .map((part) => part.text)
+    .join('\n\n');
+}
+
 export function projectReasoningForResponses(
   reasoning:
     | {

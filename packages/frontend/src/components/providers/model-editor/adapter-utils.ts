@@ -1,4 +1,5 @@
 export type AdapterEntry = string | Record<string, any>;
+export const CACHE_RESPONSES_INSTRUCTIONS_ADAPTER = 'cache_responses_instructions';
 
 export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
   {
@@ -11,6 +12,12 @@ export const KNOWN_ADAPTERS: { value: string; label: string; description: string
     value: 'suppress_developer_role',
     label: 'Suppress Developer Role',
     description: 'Rewrites the "developer" role to "system" for providers that do not support it.',
+  },
+  {
+    value: CACHE_RESPONSES_INSTRUCTIONS_ADAPTER,
+    label: 'Cache Responses Instructions',
+    description:
+      'Moves top-level Responses instructions into a leading developer message for prompt caching. Auto-enabled for known GPT-6.2–6.5 OpenAI, Codex, and Copilot targets.',
   },
   {
     value: 'model_override',
@@ -43,6 +50,28 @@ export function getAdapterName(entry: unknown): string | undefined {
     : entry && typeof entry === 'object' && typeof (entry as Record<string, any>).name === 'string'
       ? (entry as Record<string, any>).name
       : undefined;
+}
+
+export type AdapterMode = 'auto' | 'on' | 'off';
+
+export function getAdapterMode(entries: AdapterEntry[], name: string): AdapterMode {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    if (getAdapterName(entry) !== name) continue;
+    if (typeof entry !== 'string' && entry.enabled === false) return 'off';
+    return 'on';
+  }
+  return 'auto';
+}
+
+export function setAdapterMode(
+  entries: AdapterEntry[],
+  name: string,
+  mode: AdapterMode
+): AdapterEntry[] {
+  const withoutEntry = entries.filter((entry) => getAdapterName(entry) !== name);
+  if (mode === 'auto') return withoutEntry;
+  return [{ name, options: {}, enabled: mode === 'on' }, ...withoutEntry];
 }
 
 export function renameRecordKey<T>(record: Record<string, T>, oldKey: string, newKey: string) {

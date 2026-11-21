@@ -1,4 +1,5 @@
 import { type AdapterEntry, isOAuthPlaceholderUrl } from '../../config';
+import { cacheResponsesInstructionsAdapter } from '../../transformers/adapters/cache-responses-instructions.adapter';
 import { dropUnsignedThinkingAdapter } from '../../transformers/adapters/drop-unsigned-thinking.adapter';
 import { ADAPTER_REGISTRY } from '../../transformers/adapters/index';
 import {
@@ -12,7 +13,23 @@ import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapte
 import type { ResolvedAdapter } from '../../types/provider-adapter';
 import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
+import { isOAuthRoute } from '../oauth/oauth-dispatcher';
 import type { RouteResult } from '../routing/router';
+
+/** Whether the last configured entry for an adapter explicitly disables it. */
+export function isAdapterDisabled(route: RouteResult, name: string): boolean {
+  let disabled = false;
+  for (const entries of [route.config.adapter, route.modelConfig?.adapter]) {
+    for (const entry of entries ?? []) {
+      if (typeof entry === 'string') {
+        if (entry === name) disabled = false;
+      } else if (entry.name === name) {
+        disabled = entry.enabled === false;
+      }
+    }
+  }
+  return disabled;
+}
 
 /**
  * Resolves the ordered list of ProviderAdapters for a given route.
@@ -49,10 +66,16 @@ import type { RouteResult } from '../routing/router';
  *   `effectiveApiType`, NOT `targetApiType` (which can be 'oauth' or
  *   subtype-carrying). When omitted (e.g. legacy callers/tests), no
  *   format-scoped implicit adapters are injected.
+ * @param incomingApiType The incoming wire type, used to limit automatic
+ *   Responses instruction relocation to native Responses requests.
  */
-export function resolveAdapters(route: RouteResult, effectiveApiType?: string): ResolvedAdapter[] {
+export function resolveAdapters(
+  route: RouteResult,
+  effectiveApiType?: string,
+  incomingApiType?: string
+): ResolvedAdapter[] {
   const entries: AdapterEntry[] = [
-    ...resolveImplicitAdapters(route, effectiveApiType),
+    ...resolveImplicitAdapters(route, effectiveApiType, incomingApiType),
     ...(route.config.adapter ?? []),
     ...(route.modelConfig?.adapter ?? []),
   ];
@@ -65,6 +88,12 @@ export function resolveAdapters(route: RouteResult, effectiveApiType?: string): 
       resolved = resolved.filter((resolvedEntry) => resolvedEntry.adapter.name !== entry.name);
       continue;
     }
+    if (
+      entry.name === 'cache_responses_instructions' &&
+      (!effectiveApiType || getApiBaseType(effectiveApiType) !== 'responses')
+    ) {
+      continue;
+    }
     const adapter = ADAPTER_REGISTRY[entry.name];
     if (!adapter) {
       logger.warn(
@@ -74,6 +103,19 @@ export function resolveAdapters(route: RouteResult, effectiveApiType?: string): 
       continue;
     }
     resolved.push({ adapter, options: entry.options });
+  }
+
+  // Relocation can insert a developer item, so role suppression must run after it.
+  let firstSuppression = resolved.findIndex(
+    (entry) => entry.adapter.name === 'suppress_developer_role'
+  );
+  if (firstSuppression !== -1) {
+    for (let i = firstSuppression + 1; i < resolved.length; i++) {
+      if (resolved[i]!.adapter.name === 'cache_responses_instructions') {
+        const [relocation] = resolved.splice(i, 1);
+        resolved.splice(firstSuppression++, 0, relocation!);
+      }
+    }
   }
 
   return resolved;
@@ -127,7 +169,11 @@ export function resolveAdapters(route: RouteResult, effectiveApiType?: string): 
  * adapters, so an unresolved name here would fail loudly rather than
  * silently no-op.
  */
-function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string): AdapterEntry[] {
+function resolveImplicitAdapters(
+  route: RouteResult,
+  effectiveApiType?: string,
+  incomingApiType?: string
+): AdapterEntry[] {
   const adapters: AdapterEntry[] = [];
   if (isGpt5Model(route.model)) {
     adapters.push({ name: suppressUnsupportedGpt5OptionsAdapter.name, options: {}, enabled: true });
@@ -144,6 +190,13 @@ function resolveImplicitAdapters(route: RouteResult, effectiveApiType?: string):
       options: isMuseSubscriptionTarget(route) ? { inject_builtin_tool: true } : {},
       enabled: true,
     });
+  }
+  if (
+    incomingApiType &&
+    getApiBaseType(incomingApiType.toLowerCase()) === 'responses' &&
+    isCacheableInstructionsTarget(route, effectiveApiType)
+  ) {
+    adapters.push({ name: cacheResponsesInstructionsAdapter.name, options: {}, enabled: true });
   }
   if (
     effectiveApiType &&
@@ -236,6 +289,35 @@ export function selectDispatchUrls(
   const typeKey = effectiveApiType.toLowerCase();
   const selected = urlMap[typeKey] || urlMap[getApiBaseType(typeKey)];
   return typeof selected === 'string' && selected.length > 0 ? [selected] : [];
+}
+
+// OpenAI documents the instructions change starting with GPT-6.2. Assume GPT-6.3 through GPT-6.5 keep it; revisit before widening this range.
+const CACHEABLE_RESPONSES_MODEL = /(?:^|\/)gpt-6\.[2-5](?:[-.]|$)/i;
+
+/** Whether the selected Responses target benefits from instructions in input. */
+export function isCacheableInstructionsTarget(
+  route: RouteResult,
+  effectiveApiType?: string
+): boolean {
+  if (
+    !effectiveApiType ||
+    getApiBaseType(effectiveApiType.toLowerCase()) !== 'responses' ||
+    !CACHEABLE_RESPONSES_MODEL.test(route.model)
+  ) {
+    return false;
+  }
+  const [url] = selectDispatchUrls(route.config.api_base_url, effectiveApiType);
+  if (!url) return false;
+  if (isOAuthPlaceholderUrl(url)) {
+    const provider = route.config.oauth_provider || route.provider;
+    return provider === 'openai-codex' || provider === 'github-copilot';
+  }
+  if (isOAuthRoute(route, effectiveApiType)) return false;
+  try {
+    return new URL(url).hostname === 'api.openai.com';
+  } catch {
+    return false;
+  }
 }
 
 function isGpt5Model(model: string): boolean {

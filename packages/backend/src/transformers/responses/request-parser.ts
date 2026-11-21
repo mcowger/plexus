@@ -1,4 +1,8 @@
-import { UnifiedChatRequest, UnifiedMessage } from '../../types/unified';
+import {
+  RESPONSES_INSTRUCTION_ORIGIN,
+  UnifiedChatRequest,
+  UnifiedMessage,
+} from '../../types/unified';
 import {
   clearResponsesToolState,
   convertToolChoiceForChatCompletions,
@@ -99,6 +103,20 @@ export function normalizeMessageContent(content: any): string | null | any[] {
   return null;
 }
 
+function convertInputMessage(item: { role?: string; content?: unknown }): UnifiedMessage {
+  const origin =
+    item.role === 'system'
+      ? 'input_system'
+      : item.role === 'developer'
+        ? 'input_developer'
+        : undefined;
+  return {
+    role: mapInputRole(item.role),
+    content: normalizeMessageContent(item.content),
+    ...(origin ? { [RESPONSES_INSTRUCTION_ORIGIN]: origin } : {}),
+  };
+}
+
 /**
  * Converts Responses API input items to Chat Completions messages
  */
@@ -112,10 +130,7 @@ export function convertInputItemsToMessages(
     if (item === null || typeof item !== 'object') continue;
     switch (item.type) {
       case 'message':
-        messages.push({
-          role: mapInputRole(item.role),
-          content: normalizeMessageContent(item.content),
-        });
+        messages.push(convertInputMessage(item));
         break;
 
       case 'function_call': {
@@ -198,10 +213,7 @@ export function convertInputItemsToMessages(
 
       default:
         if (item.role) {
-          messages.push({
-            role: mapInputRole(item.role),
-            content: normalizeMessageContent(item.content),
-          });
+          messages.push(convertInputMessage(item));
         }
         break;
     }
@@ -255,6 +267,7 @@ export async function parseResponsesRequest(
     messages.unshift({
       role: 'system',
       content: input.instructions,
+      [RESPONSES_INSTRUCTION_ORIGIN]: 'top_level',
     });
   }
 
