@@ -280,6 +280,7 @@ packages/backend/src/routes/management/_quota-response.ts:31 [function] serializ
 packages/backend/src/routes/management/_quota-response.ts:6 [interface] QuotaSnapshotJson
 packages/backend/src/routes/management/_quota-response.ts:69 [function] resolveAttachedQuotaNames
 packages/backend/src/routes/management/backup.ts:10 [function] registerBackupRoutes
+packages/backend/src/routes/management/backup.ts:92 [function] registerRestoreRoutes
 packages/backend/src/routes/management/concurrency.ts:8 [function] registerConcurrencyRoutes
 packages/backend/src/routes/management/config.ts:104 [function] registerConfigRoutes
 packages/backend/src/routes/management/config.ts:30 [function] isRecord
