@@ -92,6 +92,15 @@ export async function registerBackupRoutes(
 export async function registerRestoreRoutes(fastify: FastifyInstance) {
   const backupService = new BackupService();
 
+  fastify.setErrorHandler(async (error, _request, reply) => {
+    if (error instanceof Error && 'code' in error && error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      return reply.code(413).send({
+        error: `Backup exceeds the maximum request body size (${RESTORE_BODY_LIMIT / (1024 * 1024)} MiB)`,
+      });
+    }
+    throw error;
+  });
+
   // ─── POST /v0/management/restore ─────────────────────────────────
 
   /**

@@ -17,10 +17,8 @@ post:
 
     The maximum request body size is 512 MiB.
 
-    **Destructive operation** — all current data is deleted before the backup is
-    applied. For full archive restores, the entire operation runs in a single
-    database transaction; if any step fails, the database is rolled back to its
-    pre-restore state.
+    **Destructive operation** — existing data is deleted before the backup is
+    applied. A failed restore may leave the database partially restored.
 
     After a successful restore, a server restart is recommended so that in-memory
     caches and long-lived connections pick up the new configuration.

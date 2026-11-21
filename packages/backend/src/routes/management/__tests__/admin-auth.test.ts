@@ -291,6 +291,26 @@ describe('Management route protection', () => {
     }
   });
 
+  it('returns a backup-specific 413 for oversized restore requests', async () => {
+    for (const contentType of ['application/gzip', 'application/json']) {
+      const res = await fastify.inject({
+        method: 'POST',
+        url: '/v0/management/restore',
+        headers: {
+          'content-type': contentType,
+          'content-length': String(512 * 1024 * 1024 + 1),
+          'x-admin-key': 'correct-admin-key',
+        },
+        payload: 'x',
+      });
+
+      expect(res.statusCode).toBe(413);
+      expect(res.json()).toEqual({
+        error: 'Backup exceeds the maximum request body size (512 MiB)',
+      });
+    }
+  });
+
   it('allows an admin to restore an archive', async () => {
     const restore = spyOn(BackupService.prototype, 'restoreFullBackup').mockResolvedValue({
       success: true,
