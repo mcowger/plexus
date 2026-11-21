@@ -1,8 +1,9 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from 'bun:test';
 
 import Fastify, { FastifyInstance } from 'fastify';
 
 import { setConfigForTesting } from '../../../config';
+import { BackupService } from '../../../services/configuration/backup-service';
 import { Dispatcher } from '../../../services/dispatch/dispatcher';
 import { DebugManager } from '../../../services/observability/debug-manager';
 import { UsageStorageService } from '../../../services/observability/usage-storage';
@@ -270,6 +271,62 @@ describe('Management route protection', () => {
     await closeFastify(fastify);
     DebugManager.getInstance().resetForTesting();
     DebugManager.getInstance().setEnabled(false);
+  });
+
+  it('authenticates restore requests before parsing their bodies', async () => {
+    for (const [key, status] of [
+      [undefined, 401],
+      ['wrong-key', 401],
+      ['sk-test-secret', 403],
+      ['correct-admin-key', 400],
+    ] as const) {
+      const res = await fastify.inject({
+        method: 'POST',
+        url: '/v0/management/restore',
+        headers: { 'content-type': 'application/json', ...(key ? { 'x-admin-key': key } : {}) },
+        payload: '{invalid json',
+      });
+
+      expect(res.statusCode).toBe(status);
+    }
+  });
+
+  it('returns a backup-specific 413 for oversized restore requests', async () => {
+    for (const contentType of ['application/gzip', 'application/json']) {
+      const res = await fastify.inject({
+        method: 'POST',
+        url: '/v0/management/restore',
+        headers: {
+          'content-type': contentType,
+          'content-length': String(512 * 1024 * 1024 + 1),
+          'x-admin-key': 'correct-admin-key',
+        },
+        payload: 'x',
+      });
+
+      expect(res.statusCode).toBe(413);
+      expect(res.json()).toEqual({
+        error: 'Backup exceeds the maximum request body size (512 MiB)',
+      });
+    }
+  });
+
+  it('allows an admin to restore an archive', async () => {
+    const restore = spyOn(BackupService.prototype, 'restoreFullBackup').mockResolvedValue({
+      success: true,
+      restored: {},
+      message: 'Restored',
+    });
+    const payload = Buffer.from('backup');
+    const res = await fastify.inject({
+      method: 'POST',
+      url: '/v0/management/restore',
+      headers: { 'content-type': 'application/gzip', 'x-admin-key': 'correct-admin-key' },
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(restore).toHaveBeenCalledWith(payload);
   });
 
   it('rejects GET /v0/management/cooldowns without admin key', async () => {

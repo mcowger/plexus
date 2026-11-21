@@ -7,7 +7,7 @@ import { ProbeService } from '../services/probes/probe-service';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
 import { authenticate, ManagementAuthError, requireAdmin } from './management/_principal';
-import { registerBackupRoutes } from './management/backup';
+import { registerBackupRoutes, registerRestoreRoutes } from './management/backup';
 import { registerConcurrencyRoutes } from './management/concurrency';
 import { registerConfigRoutes } from './management/config';
 import { registerCooldownRoutes } from './management/cooldowns';
@@ -94,6 +94,12 @@ export async function registerManagementRoutes(
       await registerErrorRoutes(scoped, usageStorage);
     });
 
+    mgmt.register(async (restore) => {
+      restore.addHook('onRequest', authenticate);
+      restore.addHook('onRequest', requireAdmin);
+      await registerRestoreRoutes(restore);
+    });
+
     // Admin-only routes: mutating config, system-level controls, etc.
     mgmt.register(async (adminOnly) => {
       adminOnly.addHook('preHandler', authenticate);
@@ -121,7 +127,7 @@ export async function registerManagementRoutes(
       await registerUserQuotaRoutes(adminOnly);
       // Model routes for AI energy calculations
       await registerModelRoutes(adminOnly);
-      // Backup and restore routes
+      // Backup and log reset routes
       await registerBackupRoutes(adminOnly, usageStorage, mcpUsageStorage);
       // Concurrency (live snapshot + historical timeline)
       await registerConcurrencyRoutes(adminOnly, usageStorage);

@@ -11,6 +11,8 @@
 - Skip the Codex 401 retry if refreshing the OAuth token changes the ChatGPT account.
 - Use the signed-in Codex account's reasoning options, clamp unsupported efforts, and strip saved reasoning updates on models that cannot replay them
 - Skip the Codex 401 retry if refreshing the OAuth token changes the ChatGPT account
+- Accept backup restore request bodies up to 512 MiB and return a restore-specific error for oversized backups.
+- Return a restore-specific 413 error when backup restore request bodies exceed the 512 MiB limit
 
 ## 2026.04.14.1 - 2026-04-14
 

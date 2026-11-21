@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn, test } from '
 import Fastify from 'fastify';
 
 import * as client from '../../../db/client';
+import { BackupService } from '../../../services/configuration/backup-service';
 import { ConfigService } from '../../../services/configuration/config-service';
 
 // Stub the database and config to avoid needing a real DB (restored after every test).
@@ -36,7 +37,7 @@ beforeEach(() => {
   })) as any);
 });
 
-import { registerBackupRoutes } from '../backup';
+import { registerBackupRoutes, registerRestoreRoutes } from '../backup';
 
 describe('Backup management routes', () => {
   let fastify: ReturnType<typeof Fastify>;
@@ -54,6 +55,7 @@ describe('Backup management routes', () => {
       deleteAllLogs: mock(async () => true),
     };
     await registerBackupRoutes(fastify, mockUsageStorage, mockMcpUsageStorage);
+    await registerRestoreRoutes(fastify);
   });
 
   afterEach(async () => {
@@ -112,16 +114,24 @@ describe('Backup management routes', () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it('accepts full restore archives larger than the global body limit', async () => {
+    it('accepts full restore archives larger than 100 MiB', async () => {
+      const restore = spyOn(BackupService.prototype, 'restoreFullBackup').mockResolvedValue({
+        success: true,
+        restored: {},
+        message: 'Restored',
+      });
+      const size = 118 * 1024 * 1024;
       const res = await fastify.inject({
         method: 'POST',
         url: '/v0/management/restore',
-        payload: Buffer.alloc(31 * 1024 * 1024),
+        payload: Buffer.alloc(size),
         headers: { 'content-type': 'application/gzip' },
       });
 
-      expect(res.statusCode).toBe(500);
-      expect(res.statusCode).not.toBe(413);
+      expect(res.statusCode).toBe(200);
+      expect(restore).toHaveBeenCalledTimes(1);
+      expect(restore).toHaveBeenCalledWith(expect.any(Buffer));
+      expect(restore.mock.calls[0]?.[0]).toHaveLength(size);
     });
   });
 
