@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { splitContentBlocks } from '../mistral';
 import { OpenAITransformer } from '../openai';
 
 const mistralBlocks = [
@@ -22,7 +23,7 @@ async function collect(stream: ReadableStream): Promise<any[]> {
   return out;
 }
 
-describe('OpenAITransformer Mistral content blocks', () => {
+describe('Mistral content blocks (via OpenAITransformer)', () => {
   it('maps block content to text + reasoning in transformResponse', async () => {
     const res = await new OpenAITransformer().transformResponse({
       id: 'c1',
@@ -76,5 +77,24 @@ describe('OpenAITransformer Mistral content blocks', () => {
     expect(chunks[0].delta.content).toBe('');
     expect(chunks[1].delta.content).toBe('pong');
     expect(chunks[2].delta.content).toBe('plain');
+  });
+});
+
+describe('splitContentBlocks', () => {
+  it('passes string and nullish content through unchanged', () => {
+    expect(splitContentBlocks('hi')).toEqual({
+      text: 'hi',
+      thinking: undefined,
+    });
+    expect(splitContentBlocks(null)).toEqual({
+      text: null,
+      thinking: undefined,
+    });
+  });
+  it('splits blocks into text and thinking', () => {
+    expect(splitContentBlocks(mistralBlocks)).toEqual({
+      text: 'pong',
+      thinking: 'réfléchit',
+    });
   });
 });

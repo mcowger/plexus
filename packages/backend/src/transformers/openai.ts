@@ -6,37 +6,7 @@ import { UnifiedChatRequest, UnifiedChatResponse } from '../types/unified';
 import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../utils/gemini-malformed-function-call';
 import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { composeContentWithImageMarkdown } from './image-rendering';
-
-/**
- * Mistral (magistral / large-4) returns `content` as an array of typed blocks
- * (`text`, and `thinking` whose `thinking` field is itself a block array)
- * instead of a string. Split it into the plain text and reasoning strings the
- * unified layer expects; string / nullish content passes through unchanged.
- */
-function splitContentBlocks(content: unknown): {
-  text: string | null | undefined;
-  thinking: string | undefined;
-} {
-  if (!Array.isArray(content))
-    return { text: content as string | null | undefined, thinking: undefined };
-  const flatten = (v: unknown): string => {
-    if (typeof v === 'string') return v;
-    if (!Array.isArray(v)) return '';
-    return v
-      .map((b: any) =>
-        typeof b === 'string' ? b : b?.type === 'thinking' ? flatten(b.thinking) : flatten(b?.text)
-      )
-      .join('');
-  };
-  let text = '';
-  let thinking = '';
-  for (const block of content as any[]) {
-    if (typeof block === 'string') text += block;
-    else if (block?.type === 'thinking') thinking += flatten(block.thinking);
-    else if (block?.type === 'text') text += flatten(block.text);
-  }
-  return { text, thinking: thinking || undefined };
-}
+import { splitContentBlocks } from './mistral';
 
 /**
  * Normalizes a Chat Completions `response_format` into the unified shape
