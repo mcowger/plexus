@@ -8,6 +8,37 @@ import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { composeContentWithImageMarkdown } from './image-rendering';
 
 /**
+ * Mistral (magistral / large-4) returns `content` as an array of typed blocks
+ * (`text`, and `thinking` whose `thinking` field is itself a block array)
+ * instead of a string. Split it into the plain text and reasoning strings the
+ * unified layer expects; string / nullish content passes through unchanged.
+ */
+function splitContentBlocks(content: unknown): {
+  text: string | null | undefined;
+  thinking: string | undefined;
+} {
+  if (!Array.isArray(content))
+    return { text: content as string | null | undefined, thinking: undefined };
+  const flatten = (v: unknown): string => {
+    if (typeof v === 'string') return v;
+    if (!Array.isArray(v)) return '';
+    return v
+      .map((b: any) =>
+        typeof b === 'string' ? b : b?.type === 'thinking' ? flatten(b.thinking) : flatten(b?.text)
+      )
+      .join('');
+  };
+  let text = '';
+  let thinking = '';
+  for (const block of content as any[]) {
+    if (typeof block === 'string') text += block;
+    else if (block?.type === 'thinking') thinking += flatten(block.thinking);
+    else if (block?.type === 'text') text += flatten(block.text);
+  }
+  return { text, thinking: thinking || undefined };
+}
+
+/**
  * Normalizes a Chat Completions `response_format` into the unified shape
  * (`json_schema` holds the raw schema; `name`/`description`/`strict` are
  * siblings — see types/unified.ts and the Responses request-parser).
@@ -254,13 +285,15 @@ export class OpenAITransformer implements Transformer {
     const message = choice?.message;
 
     const usage = response.usage ? normalizeOpenAIChatUsage(response.usage) : undefined;
+    const blocks = splitContentBlocks(message?.content);
 
     return {
       id: response.id,
       model: response.model,
       created: response.created,
-      content: message?.content || null,
-      reasoning_content: message?.reasoning_content ?? message?.reasoning ?? null,
+      content: blocks.text || null,
+      reasoning_content:
+        message?.reasoning_content ?? message?.reasoning ?? blocks.thinking ?? null,
       tool_calls: message?.tool_calls,
       usage,
       finishReason: choice?.finish_reason || null,
@@ -328,6 +361,7 @@ export class OpenAITransformer implements Transformer {
               const choice = data.choices?.[0];
 
               const usage = data.usage ? normalizeOpenAIChatUsage(data.usage) : undefined;
+              const blocks = splitContentBlocks(choice?.delta?.content);
 
               const unifiedChunk = {
                 id: data.id,
@@ -335,8 +369,9 @@ export class OpenAITransformer implements Transformer {
                 created: data.created,
                 delta: {
                   role: choice?.delta?.role,
-                  content: choice?.delta?.content,
-                  reasoning_content: choice?.delta?.reasoning_content ?? choice?.delta?.reasoning,
+                  content: blocks.text,
+                  reasoning_content:
+                    choice?.delta?.reasoning_content ?? choice?.delta?.reasoning ?? blocks.thinking,
                   tool_calls: choice?.delta?.tool_calls,
                 },
                 finish_reason:
@@ -518,7 +553,11 @@ export class OpenAITransformer implements Transformer {
                         created: unifiedChunk.created || Math.floor(Date.now() / 1000),
                         model: unifiedChunk.model,
                         choices: [
-                          { index: 0, delta: {}, finish_reason: unifiedChunk.finish_reason },
+                          {
+                            index: 0,
+                            delta: {},
+                            finish_reason: unifiedChunk.finish_reason,
+                          },
                         ],
                         ...(usagePayload ? { usage: usagePayload } : {}),
                       }),
