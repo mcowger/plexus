@@ -164,7 +164,9 @@ describe('resolveAdapters', () => {
         entry.name,
       ]);
     }
-    expect(resolveAdapters(route, 'chat')).toEqual([]);
+    expect(resolveAdapters(route, 'chat').map((item) => item.adapter.name)).toEqual([
+      'strip_cache_control',
+    ]);
     expect(resolveAdapters(route)).toEqual([]);
     expect(
       resolveAdapters(makeRoute([entry], [{ name: entry.name, enabled: false }]), 'responses')
@@ -499,7 +501,9 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       'completions',
       'ollama',
     ]) {
-      expect(resolveAdapters(route, apiType)).toHaveLength(0);
+      expect(
+        resolveAdapters(route, apiType).filter((r) => r.adapter.name !== 'strip_cache_control')
+      ).toHaveLength(0);
     }
   });
 

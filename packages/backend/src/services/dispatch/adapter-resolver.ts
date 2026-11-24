@@ -8,6 +8,7 @@ import {
   museCodeCompatAdapter,
 } from '../../transformers/adapters/muse-code-compat.adapter';
 import { normalizeAnthropicToolIdsAdapter } from '../../transformers/adapters/normalize-anthropic-tool-ids.adapter';
+import { stripCacheControlAdapter } from '../../transformers/adapters/strip-cache-control.adapter';
 import { stripUnsupportedToolSearchAdapter } from '../../transformers/adapters/strip-unsupported-tool-search.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import type { ResolvedAdapter } from '../../types/provider-adapter';
@@ -15,6 +16,9 @@ import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
 import type { RouteResult } from '../routing/router';
+
+/** Chat-style wires whose upstreams reject Anthropic's `cache_control` field. */
+const CHAT_LIKE_WIRES: ReadonlySet<string> = new Set(['chat', 'completions', 'ollama']);
 
 /** Whether the last configured entry for an adapter explicitly disables it. */
 export function isAdapterDisabled(route: RouteResult, name: string): boolean {
@@ -180,6 +184,18 @@ function resolveImplicitAdapters(
   }
   if (route.config.pi_ai_provider === 'openrouter') {
     adapters.push({ name: stripUnsupportedToolSearchAdapter.name, options: {}, enabled: true });
+  }
+  // `cache_control` is an Anthropic Messages field; chat-completions upstreams
+  // such as Mistral reject it (422 extra_forbidden). Gated on the final wire, not
+  // the client, so an alias falling back from Claude to Mistral keeps its markers
+  // on Claude. Responses/Gemini builders never emit it. OpenRouter forwards the
+  // marker to Claude, so its chat route keeps it.
+  if (
+    effectiveApiType &&
+    CHAT_LIKE_WIRES.has(getApiBaseType(effectiveApiType)) &&
+    route.config.pi_ai_provider !== 'openrouter'
+  ) {
+    adapters.push({ name: stripCacheControlAdapter.name, options: {}, enabled: true });
   }
   if (isMuseTarget(route)) {
     adapters.push({
