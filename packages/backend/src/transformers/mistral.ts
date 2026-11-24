@@ -1,3 +1,17 @@
+type ContentBlock = { type?: string; text?: unknown; thinking?: unknown } | string | null;
+
+const blockToText = (b: ContentBlock | undefined): string => {
+  if (typeof b === 'string') return b;
+  if (b?.type === 'thinking') return flatten(b.thinking);
+  return flatten(b?.text);
+};
+
+const flatten = (v: unknown): string => {
+  if (typeof v === 'string') return v;
+  if (!Array.isArray(v)) return '';
+  return v.map((b: ContentBlock) => blockToText(b)).join('');
+};
+
 /**
  * Mistral (magistral / large-4) returns `content` as an array of typed blocks
  * (`text`, and `thinking` whose `thinking` field is itself a block array)
@@ -14,18 +28,9 @@ export function splitContentBlocks(content: unknown): {
 } {
   if (!Array.isArray(content))
     return { text: content as string | null | undefined, thinking: undefined };
-  const flatten = (v: unknown): string => {
-    if (typeof v === 'string') return v;
-    if (!Array.isArray(v)) return '';
-    return v
-      .map((b: any) =>
-        typeof b === 'string' ? b : b?.type === 'thinking' ? flatten(b.thinking) : flatten(b?.text)
-      )
-      .join('');
-  };
   let text = '';
   let thinking = '';
-  for (const block of content as any[]) {
+  for (const block of content as ContentBlock[]) {
     if (typeof block === 'string') text += block;
     else if (block?.type === 'thinking') thinking += flatten(block.thinking);
     else if (block?.type === 'text') text += flatten(block.text);

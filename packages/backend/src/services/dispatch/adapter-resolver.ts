@@ -185,15 +185,15 @@ function resolveImplicitAdapters(
   if (route.config.pi_ai_provider === 'openrouter') {
     adapters.push({ name: stripUnsupportedToolSearchAdapter.name, options: {}, enabled: true });
   }
-  // `cache_control` is an Anthropic Messages field; chat-completions upstreams
-  // such as Mistral reject it (422 extra_forbidden). Gated on the final wire, not
-  // the client, so an alias falling back from Claude to Mistral keeps its markers
-  // on Claude. Responses/Gemini builders never emit it. OpenRouter forwards the
-  // marker to Claude, so its chat route keeps it.
+  // `cache_control` is an Anthropic Messages field that strict chat-completions
+  // upstreams reject (Mistral: 422 extra_forbidden). Only known strict upstreams
+  // are stripped implicitly: gateways such as OpenRouter, LiteLLM or Vercel AI
+  // Gateway forward the marker to Claude and need it for prompt caching. Other
+  // targets opt in with `{ name: 'strip_cache_control', enabled: true }`.
   if (
     effectiveApiType &&
     CHAT_LIKE_WIRES.has(getApiBaseType(effectiveApiType)) &&
-    route.config.pi_ai_provider !== 'openrouter'
+    isMistralTarget(route, effectiveApiType)
   ) {
     adapters.push({ name: stripCacheControlAdapter.name, options: {}, enabled: true });
   }
@@ -223,6 +223,19 @@ function resolveImplicitAdapters(
     adapters.push({ name: dropUnsignedThinkingAdapter.name, options: {}, enabled: true });
   }
   return adapters;
+}
+
+/** Does this route target Mistral, by `pi_ai_provider` or by the effective base URL host? */
+export function isMistralTarget(route: RouteResult, effectiveApiType?: string): boolean {
+  if (route.config.pi_ai_provider === 'mistral') return true;
+  return selectDispatchUrls(route.config.api_base_url, effectiveApiType).some((url) => {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host === 'mistral.ai' || host.endsWith('.mistral.ai');
+    } catch {
+      return false;
+    }
+  });
 }
 
 /**

@@ -164,9 +164,7 @@ describe('resolveAdapters', () => {
         entry.name,
       ]);
     }
-    expect(resolveAdapters(route, 'chat').map((item) => item.adapter.name)).toEqual([
-      'strip_cache_control',
-    ]);
+    expect(resolveAdapters(route, 'chat')).toEqual([]);
     expect(resolveAdapters(route)).toEqual([]);
     expect(
       resolveAdapters(makeRoute([entry], [{ name: entry.name, enabled: false }]), 'responses')
@@ -501,9 +499,7 @@ describe('resolveAdapters — Anthropic tool-id normalization gate', () => {
       'completions',
       'ollama',
     ]) {
-      expect(
-        resolveAdapters(route, apiType).filter((r) => r.adapter.name !== 'strip_cache_control')
-      ).toHaveLength(0);
+      expect(resolveAdapters(route, apiType)).toHaveLength(0);
     }
   });
 
@@ -813,5 +809,54 @@ describe('isAnthropicTargetProvider', () => {
     for (const apiType of [undefined, 'messages', 'chat']) {
       expect(isAnthropicTargetProvider(route, apiType)).toBe(true);
     }
+  });
+});
+
+describe('resolveAdapters — strip_cache_control gate', () => {
+  const names = (route: RouteResult, apiType: string) =>
+    resolveAdapters(route, apiType).map((r) => r.adapter.name);
+
+  it('strips implicitly for Mistral by base URL host on chat-like wires', () => {
+    const route = makeRoute(undefined, undefined, { api_base_url: 'https://api.mistral.ai/v1' });
+    for (const apiType of ['chat', 'completions', 'ollama']) {
+      expect(names(route, apiType)).toEqual(['strip_cache_control']);
+    }
+    expect(names(route, 'messages')).toEqual([]);
+  });
+
+  it('strips implicitly for Mistral by pi_ai_provider and by record base URL', () => {
+    const byProvider = makeRoute(undefined, undefined, { pi_ai_provider: 'mistral' });
+    expect(names(byProvider, 'chat')).toEqual(['strip_cache_control']);
+    const byRecord = makeRoute(undefined, undefined, {
+      api_base_url: { chat: 'https://api.mistral.ai/v1', messages: 'https://example.com' },
+    });
+    expect(names(byRecord, 'chat')).toEqual(['strip_cache_control']);
+  });
+
+  it('keeps cache_control for OpenRouter configured by URL or by pi_ai_provider', () => {
+    const byUrl = makeRoute(undefined, undefined, { api_base_url: 'https://openrouter.ai/api/v1' });
+    expect(names(byUrl, 'chat')).toEqual([]);
+    const byProvider = makeRoute(undefined, undefined, { pi_ai_provider: 'openrouter' });
+    expect(names(byProvider, 'chat')).not.toContain('strip_cache_control');
+  });
+
+  it('keeps cache_control for other cache-capable gateways', () => {
+    for (const url of [
+      'https://litellm.internal/v1',
+      'https://ai-gateway.vercel.sh/v1',
+      'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      'https://evilmistral.ai.example.com/v1',
+    ]) {
+      expect(names(makeRoute(undefined, undefined, { api_base_url: url }), 'chat')).toEqual([]);
+    }
+  });
+
+  it('lets a provider opt in on another upstream and opt out on Mistral', () => {
+    const optIn = makeRoute([{ name: 'strip_cache_control', options: {}, enabled: true }]);
+    expect(names(optIn, 'chat')).toEqual(['strip_cache_control']);
+    const optOut = makeRoute([{ name: 'strip_cache_control', enabled: false }], undefined, {
+      api_base_url: 'https://api.mistral.ai/v1',
+    });
+    expect(names(optOut, 'chat')).toEqual([]);
   });
 });
