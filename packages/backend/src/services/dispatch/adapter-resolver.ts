@@ -8,6 +8,7 @@ import {
   museCodeCompatAdapter,
 } from '../../transformers/adapters/muse-code-compat.adapter';
 import { normalizeAnthropicToolIdsAdapter } from '../../transformers/adapters/normalize-anthropic-tool-ids.adapter';
+import { stripCacheControlAdapter } from '../../transformers/adapters/strip-cache-control.adapter';
 import { stripUnsupportedToolSearchAdapter } from '../../transformers/adapters/strip-unsupported-tool-search.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from '../../transformers/adapters/suppress-unsupported-gpt5-options.adapter';
 import type { ResolvedAdapter } from '../../types/provider-adapter';
@@ -15,6 +16,9 @@ import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
 import type { RouteResult } from '../routing/router';
+
+/** Chat-style wires whose upstreams reject Anthropic's `cache_control` field. */
+const CHAT_LIKE_WIRES: ReadonlySet<string> = new Set(['chat', 'completions', 'ollama']);
 
 /** Whether the last configured entry for an adapter explicitly disables it. */
 export function isAdapterDisabled(route: RouteResult, name: string): boolean {
@@ -181,6 +185,18 @@ function resolveImplicitAdapters(
   if (route.config.pi_ai_provider === 'openrouter') {
     adapters.push({ name: stripUnsupportedToolSearchAdapter.name, options: {}, enabled: true });
   }
+  // `cache_control` is an Anthropic Messages field that strict chat-completions
+  // upstreams reject (Mistral: 422 extra_forbidden). Only known strict upstreams
+  // are stripped implicitly: gateways such as OpenRouter, LiteLLM or Vercel AI
+  // Gateway forward the marker to Claude and need it for prompt caching. Other
+  // targets opt in with `{ name: 'strip_cache_control', enabled: true }`.
+  if (
+    effectiveApiType &&
+    CHAT_LIKE_WIRES.has(getApiBaseType(effectiveApiType)) &&
+    isMistralTarget(route, effectiveApiType)
+  ) {
+    adapters.push({ name: stripCacheControlAdapter.name, options: {}, enabled: true });
+  }
   if (isMuseTarget(route)) {
     adapters.push({
       name: museCodeCompatAdapter.name,
@@ -207,6 +223,19 @@ function resolveImplicitAdapters(
     adapters.push({ name: dropUnsignedThinkingAdapter.name, options: {}, enabled: true });
   }
   return adapters;
+}
+
+/** Does this route target Mistral, by `pi_ai_provider` or by the effective base URL host? */
+export function isMistralTarget(route: RouteResult, effectiveApiType?: string): boolean {
+  if (route.config.pi_ai_provider === 'mistral') return true;
+  return selectDispatchUrls(route.config.api_base_url, effectiveApiType).some((url) => {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host === 'mistral.ai' || host.endsWith('.mistral.ai');
+    } catch {
+      return false;
+    }
+  });
 }
 
 /**

@@ -6,6 +6,7 @@ import { UnifiedChatRequest, UnifiedChatResponse } from '../types/unified';
 import { GEMINI_MALFORMED_FUNCTION_CALL_CODE } from '../utils/gemini-malformed-function-call';
 import { normalizeOpenAIChatUsage } from '../utils/usage-normalizer';
 import { composeContentWithImageMarkdown } from './image-rendering';
+import { splitContentBlocks } from './mistral';
 
 /**
  * Normalizes a Chat Completions `response_format` into the unified shape
@@ -254,13 +255,15 @@ export class OpenAITransformer implements Transformer {
     const message = choice?.message;
 
     const usage = response.usage ? normalizeOpenAIChatUsage(response.usage) : undefined;
+    const blocks = splitContentBlocks(message?.content);
 
     return {
       id: response.id,
       model: response.model,
       created: response.created,
-      content: message?.content || null,
-      reasoning_content: message?.reasoning_content ?? message?.reasoning ?? null,
+      content: blocks.text || null,
+      reasoning_content:
+        message?.reasoning_content ?? message?.reasoning ?? blocks.thinking ?? null,
       tool_calls: message?.tool_calls,
       usage,
       finishReason: choice?.finish_reason || null,
@@ -328,6 +331,7 @@ export class OpenAITransformer implements Transformer {
               const choice = data.choices?.[0];
 
               const usage = data.usage ? normalizeOpenAIChatUsage(data.usage) : undefined;
+              const blocks = splitContentBlocks(choice?.delta?.content);
 
               const unifiedChunk = {
                 id: data.id,
@@ -335,8 +339,9 @@ export class OpenAITransformer implements Transformer {
                 created: data.created,
                 delta: {
                   role: choice?.delta?.role,
-                  content: choice?.delta?.content,
-                  reasoning_content: choice?.delta?.reasoning_content ?? choice?.delta?.reasoning,
+                  content: blocks.text,
+                  reasoning_content:
+                    choice?.delta?.reasoning_content ?? choice?.delta?.reasoning ?? blocks.thinking,
                   tool_calls: choice?.delta?.tool_calls,
                 },
                 finish_reason:
@@ -518,7 +523,11 @@ export class OpenAITransformer implements Transformer {
                         created: unifiedChunk.created || Math.floor(Date.now() / 1000),
                         model: unifiedChunk.model,
                         choices: [
-                          { index: 0, delta: {}, finish_reason: unifiedChunk.finish_reason },
+                          {
+                            index: 0,
+                            delta: {},
+                            finish_reason: unifiedChunk.finish_reason,
+                          },
                         ],
                         ...(usagePayload ? { usage: usagePayload } : {}),
                       }),

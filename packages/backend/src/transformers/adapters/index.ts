@@ -6,6 +6,7 @@ import { museCodeCompatAdapter } from './muse-code-compat.adapter';
 import { normalizeAnthropicToolIdsAdapter } from './normalize-anthropic-tool-ids.adapter';
 import { reasoningContentAdapter } from './reasoning-content.adapter';
 import { reasoningRewriteAdapter } from './reasoning-rewrite.adapter';
+import { stripCacheControlAdapter } from './strip-cache-control.adapter';
 import { stripUnsupportedToolSearchAdapter } from './strip-unsupported-tool-search.adapter';
 import { suppressDeveloperRoleAdapter } from './suppress-developer-role.adapter';
 import { suppressUnsupportedGpt5OptionsAdapter } from './suppress-unsupported-gpt5-options.adapter';
@@ -23,6 +24,7 @@ export const ADAPTER_REGISTRY: Record<string, ProviderAdapter> = {
   [modelOverrideAdapter.name]: modelOverrideAdapter,
   [reasoningRewriteAdapter.name]: reasoningRewriteAdapter,
   [webSearchCoercionAdapter.name]: webSearchCoercionAdapter,
+  [stripCacheControlAdapter.name]: stripCacheControlAdapter,
   [stripUnsupportedToolSearchAdapter.name]: stripUnsupportedToolSearchAdapter,
   [suppressUnsupportedGpt5OptionsAdapter.name]: suppressUnsupportedGpt5OptionsAdapter,
   [normalizeAnthropicToolIdsAdapter.name]: normalizeAnthropicToolIdsAdapter,
