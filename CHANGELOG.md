@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Keep mobile request log rows the same height without wrapping. Show reasoning effort alongside status, and open routing and token details without expanding the row.
 - Remove stale compression and length headers from decoded MCP upstream responses. (#1089)
 - Honor per-provider timeouts for embeddings, audio transcriptions, and text-to-speech requests. (#1080)
 - Cancel upstream streams and stop reporting progress when response streams close early
