@@ -1,5 +1,15 @@
 import { clsx } from 'clsx';
-import { AlertTriangle, BrainCog, ChevronRight } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ban,
+  BrainCog,
+  CheckCircle,
+  ChevronRight,
+  CircleHelp,
+  Plane,
+  Timer,
+  XCircle,
+} from 'lucide-react';
 import React, { useRef, useState } from 'react';
 
 import { formatApiTypeLabel } from '../../lib/apiFormats';
@@ -46,40 +56,38 @@ const getThroughput = (
   return null;
 };
 
-const getStatusClass = (status: string): string => {
-  switch (status) {
-    case 'success':
-      return 'border-success/30 bg-emerald-500/15 text-success';
-    case 'pending':
-      return 'border-warning/30 bg-yellow-500/15 text-warning';
-    case 'cancelled':
-      return 'border-blue-400/30 bg-blue-500/15 text-blue-400';
-    case 'timeout':
-      return 'border-orange-400/30 bg-orange-500/15 text-orange-400';
-    default:
-      return 'border-danger/30 bg-red-500/15 text-danger';
-  }
+const ERROR_STATUS_BADGE = {
+  Icon: XCircle,
+  color: 'border-danger/30 bg-red-500/15 text-danger',
+};
+
+const STATUS_BADGES: Partial<Record<string, typeof ERROR_STATUS_BADGE>> = {
+  success: { Icon: CheckCircle, color: 'border-success/30 bg-emerald-500/15 text-success' },
+  pending: { Icon: Plane, color: 'border-warning/30 bg-yellow-500/15 text-warning' },
+  cancelled: { Icon: Ban, color: 'border-blue-400/30 bg-blue-500/15 text-blue-400' },
+  timeout: { Icon: Timer, color: 'border-orange-400/30 bg-orange-500/15 text-orange-400' },
+  unknown: { Icon: CircleHelp, color: 'border-border-glass bg-bg-subtle text-text-secondary' },
 };
 
 const MobileLogDetails = ({
   log,
-  progress,
   timestamp,
   status,
   effort,
   duration,
   cost,
-}: Pick<LogRowProps, 'log' | 'progress'> & {
+  throughput,
+}: Pick<LogRowProps, 'log'> & {
   timestamp: string;
   status: string;
   effort: string | null;
   duration: string | null;
   cost: string | null;
+  throughput: string | null;
 }) => {
   const provider = log.finalAttemptProvider ?? log.provider;
   const routeModel = log.finalAttemptModel ?? log.selectedModelName;
   const tier = getServiceTierDisplay(log);
-  const throughput = getThroughput(log, status, progress);
 
   const fields = [
     ['Model alias', log.incomingModelAlias],
@@ -153,9 +161,13 @@ export const MobileLogRow = React.memo(
       durationMs = liveTimestamp - log.startTime;
     }
     const duration = durationMs === null ? null : formatMs(Math.max(0, durationMs));
+    const throughput = getThroughput(log, status, progress);
     const costTotal = log.costTotal ?? null;
     const cost = costTotal === null ? null : formatCostIn(costTotal, { currency, rate, symbol });
-    const statusClass = getStatusClass(status);
+    const provider = log.finalAttemptProvider ?? log.provider;
+    const attemptCount = log.attemptCount ?? 0;
+    const badge = Object.hasOwn(STATUS_BADGES, status) ? STATUS_BADGES[status] : undefined;
+    const { Icon: StatusIcon, color: statusColor } = badge ?? ERROR_STATUS_BADGE;
 
     return (
       <article
@@ -170,10 +182,18 @@ export const MobileLogRow = React.memo(
           type="button"
           aria-haspopup="dialog"
           onClick={() => setDetailsOpen(true)}
-          className="hover:bg-bg-hover focus-visible:outline-primary flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-center gap-1 rounded-lg px-2.5 text-left whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
+          className="hover:bg-bg-hover focus-visible:outline-primary @container flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-center gap-1 rounded-lg px-2.5 text-left whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
         >
           <span className="flex w-full min-w-0 items-center gap-1.5">
             <span className="text-text min-w-0 flex-1 truncate text-sm font-medium">{alias}</span>
+            {throughput && (
+              <span className="text-text-secondary shrink-0 text-xs tabular-nums">
+                <span className="sr-only">
+                  {status === 'pending' ? 'Estimated throughput: ' : 'End-to-end throughput: '}
+                </span>
+                {throughput}
+              </span>
+            )}
             {shortEffort && (
               <span className="inline-flex max-w-20 shrink-0 items-center gap-1 rounded bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-300">
                 <BrainCog size={12} className="shrink-0" aria-hidden="true" />
@@ -184,12 +204,14 @@ export const MobileLogRow = React.memo(
               </span>
             )}
             <span
+              title={`Status: ${status}`}
               className={clsx(
-                'max-w-24 shrink-0 truncate rounded-md border px-1.5 py-0.5 text-xs font-semibold capitalize',
-                statusClass
+                'inline-flex size-6 shrink-0 items-center justify-center rounded-full border',
+                statusColor
               )}
             >
-              {status}
+              <StatusIcon size={14} aria-hidden="true" />
+              <span className="sr-only">Status: {status}</span>
             </span>
           </span>
           <span className="text-text-secondary flex w-full min-w-0 items-center gap-1.5 text-xs tabular-nums">
@@ -199,7 +221,7 @@ export const MobileLogRow = React.memo(
             {duration && (
               <>
                 <span aria-hidden="true">·</span>
-                <span className="min-w-0 truncate">
+                <span className="shrink-0">
                   <span className="sr-only">
                     {status === 'pending' ? 'Elapsed: ' : 'Duration: '}
                   </span>
@@ -210,11 +232,28 @@ export const MobileLogRow = React.memo(
             {cost && (
               <>
                 <span aria-hidden="true">·</span>
-                <span className="min-w-0 truncate">
+                <span className="shrink-0">
                   <span className="sr-only">Cost: </span>
                   {cost}
                 </span>
               </>
+            )}
+            {provider && (
+              <span className="min-w-0 truncate" title={provider}>
+                <span className="mr-1.5" aria-hidden="true">
+                  ·
+                </span>
+                <span className="sr-only">Provider: </span>
+                {provider}
+              </span>
+            )}
+            {attemptCount > 1 && (
+              <span className="hidden shrink-0 @min-[22rem]:inline">
+                <span className="mr-1.5" aria-hidden="true">
+                  ·
+                </span>
+                {attemptCount} attempts
+              </span>
             )}
             <ChevronRight className="ml-auto shrink-0" size={16} aria-hidden="true" />
             <span className="sr-only">View request details</span>
@@ -245,7 +284,7 @@ export const MobileLogRow = React.memo(
                     Debug trace
                   </Button>
                 )}
-                {onRetryDetails && (log.attemptCount ?? 0) > 1 && (
+                {onRetryDetails && attemptCount > 1 && (
                   <Button
                     variant="secondary"
                     onClick={() => {
@@ -253,7 +292,7 @@ export const MobileLogRow = React.memo(
                       onRetryDetails(log);
                     }}
                   >
-                    Retry history ({log.attemptCount})
+                    Retry history ({attemptCount})
                   </Button>
                 )}
                 <Button variant="secondary" autoFocus onClick={closeDetails}>
@@ -264,7 +303,7 @@ export const MobileLogRow = React.memo(
           >
             <MobileLogDetails
               log={log}
-              progress={progress}
+              throughput={throughput}
               timestamp={`${date} ${time}`}
               status={status}
               effort={effort}
