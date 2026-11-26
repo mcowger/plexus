@@ -1,4 +1,9 @@
-import { getMcpUpstreamOAuthCallbackUrl, MCP_UPSTREAM_OAUTH_CALLBACK_PATH } from '@plexus/shared';
+import {
+  getMcpUpstreamOAuthCallbackUrl,
+  MCP_UI_PATH,
+  MCP_UPSTREAM_OAUTH_CALLBACK_PATH,
+  parseMcpOAuthUrl,
+} from '@plexus/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -9,7 +14,9 @@ import {
   disconnectUpstreamMcpOAuth,
   finishUpstreamMcpOAuth,
   getUpstreamMcpOAuthStatus,
+  UpstreamOAuthClientConflict,
   UpstreamOAuthClientRegistrationRequired,
+  UpstreamOAuthUserError,
 } from '../../services/mcp-upstream-oauth/oauth';
 
 const params = z.object({ serverName: z.string().min(1).max(255) });
@@ -37,23 +44,8 @@ export async function registerMcpUpstreamOAuthRoutes(fastify: FastifyInstance) {
     const p = clientParams.safeParse(request.params);
     const b = clientBody.safeParse(request.body);
     if (!p.success || !b.success) return reply.code(400).send({ error: 'Invalid OAuth client' });
-    try {
-      const issuer = new URL(b.data.issuer);
-      if (
-        issuer.username ||
-        issuer.password ||
-        issuer.hash ||
-        issuer.search ||
-        (issuer.protocol !== 'https:' &&
-          !(
-            issuer.protocol === 'http:' &&
-            ['localhost', '127.0.0.1', '[::1]'].includes(issuer.hostname)
-          ))
-      )
-        return reply.code(400).send({ error: 'Invalid OAuth issuer' });
-    } catch {
-      return reply.code(400).send({ error: 'Invalid OAuth issuer' });
-    }
+    const issuer = parseMcpOAuthUrl(b.data.issuer);
+    if (!issuer || issuer.search) return reply.code(400).send({ error: 'Invalid OAuth issuer' });
     await repo.saveClient(p.data.id, b.data);
     return reply.code(204).send();
   });
@@ -69,7 +61,10 @@ export async function registerMcpUpstreamOAuthRoutes(fastify: FastifyInstance) {
     if (!p.success) return reply.code(400).send({ error: 'Invalid server name' });
     if (!(await repo.getConnection(p.data.serverName)))
       return reply.code(404).send({ error: 'OAuth connection not found' });
-    const credentials = request.body == null ? undefined : connectBody.safeParse(request.body);
+    const credentials =
+      request.body === null || request.body === undefined
+        ? undefined
+        : connectBody.safeParse(request.body);
     if (credentials && !credentials.success)
       return reply.code(400).send({ error: 'Invalid OAuth client' });
     const callback = getMcpUpstreamOAuthCallbackUrl(request.headers.origin);
@@ -99,14 +94,12 @@ export async function registerMcpUpstreamOAuthRoutes(fastify: FastifyInstance) {
           provider: error.provider,
         });
       }
-      const messages = [
-        'OAuth client not found',
-        'OAuth client issuer is not advertised by the resource',
-        'Google OAuth requires explicit scopes',
-      ];
+      if (error instanceof UpstreamOAuthClientConflict) {
+        return reply.code(409).send({ error: error.message, code: 'oauth_client_conflict' });
+      }
       return reply.code(400).send({
         error:
-          error instanceof Error && messages.includes(error.message)
+          error instanceof UpstreamOAuthUserError
             ? error.message
             : 'Could not start upstream OAuth connection; check the server and OAuth configuration',
       });
@@ -147,6 +140,6 @@ export async function registerMcpUpstreamOAuthCallbackRoute(fastify: FastifyInst
       const state = z.object({ state: z.string().min(1).max(256) }).safeParse(request.query);
       if (state.success) cancelUpstreamMcpOAuth(state.data.state, browser);
     }
-    return reply.redirect(`/ui/mcp?upstream_oauth=${connected ? 'connected' : 'error'}`);
+    return reply.redirect(`${MCP_UI_PATH}?upstream_oauth=${connected ? 'connected' : 'error'}`);
   });
 }

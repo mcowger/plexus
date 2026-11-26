@@ -21,6 +21,7 @@ import type {
   OAuthClientInformationMixed,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
+import { MCP_LOOPBACK_HOSTNAMES, parseMcpOAuthUrl } from '@plexus/shared';
 
 import {
   mcpUpstreamOAuthRepository as repo,
@@ -63,15 +64,8 @@ const googleScopes: Record<string, string[]> = {
 const random = () => randomBytes(32).toString('base64url');
 
 function validUrl(value: string): URL {
-  const url = new URL(value);
-  if (
-    url.username ||
-    url.password ||
-    url.hash ||
-    (url.protocol !== 'https:' &&
-      !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))
-  )
-    throw new Error('Invalid OAuth URL');
+  const url = parseMcpOAuthUrl(value);
+  if (!url) throw new Error('Invalid OAuth URL');
   return url;
 }
 function sameIssuer(a: string, b: string): boolean {
@@ -94,6 +88,21 @@ export class UpstreamOAuthClientRegistrationRequired extends Error {
     super('Authorization server requires a registered OAuth client');
   }
 }
+export class UpstreamOAuthUserError extends Error {}
+export class UpstreamOAuthClientConflict extends Error {
+  constructor() {
+    super('A different OAuth client is already saved for this issuer');
+  }
+}
+function sameCredentials(
+  saved: { clientId: string; clientSecret?: string | null },
+  submitted: { clientId: string; clientSecret?: string | null }
+): boolean {
+  return (
+    saved.clientId === submitted.clientId &&
+    (saved.clientSecret || undefined) === (submitted.clientSecret || undefined)
+  );
+}
 function privateAddress(address: string): boolean {
   if (address.includes(':')) {
     const a = address.toLowerCase();
@@ -103,7 +112,10 @@ function privateAddress(address: string): boolean {
       a.startsWith('fc') ||
       a.startsWith('fd') ||
       /^fe[89ab]/.test(a) ||
-      a.startsWith('::ffff:')
+      a.startsWith('::ffff:') ||
+      a.startsWith('64:ff9b:') ||
+      a.startsWith('2002:') ||
+      /^::[0-9a-f]/.test(a)
     );
   }
   const [a = 0, b = 0] = address.split('.').map(Number);
@@ -115,15 +127,19 @@ function privateAddress(address: string): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
     (a === 100 && b >= 64 && b <= 127)
   );
 }
+function requestHref(input: string | URL | Request): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
 async function safeFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
-  const url = validUrl(
-    typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-  );
-  const host = url.hostname.replace(/^\[|\]$/g, '');
-  if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
+  const url = validUrl(requestHref(input));
+  if (!MCP_LOOPBACK_HOSTNAMES.includes(url.hostname)) {
+    const host = url.hostname.replace(/^\[|\]$/g, '');
     const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
     if (!addresses.length || addresses.some(({ address }) => privateAddress(address)))
       throw new Error('OAuth network target is not public');
@@ -132,12 +148,10 @@ async function safeFetch(input: string | URL | Request, init?: RequestInit): Pro
 }
 function fetchForUpstream(upstreamUrl: string) {
   const upstreamHost = validUrl(upstreamUrl).hostname;
-  const allowLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(upstreamHost);
+  const allowLoopback = MCP_LOOPBACK_HOSTNAMES.includes(upstreamHost);
   return (input: string | URL | Request, init?: RequestInit) => {
-    const target = validUrl(
-      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-    );
-    if (!allowLoopback && ['localhost', '127.0.0.1', '[::1]'].includes(target.hostname))
+    const target = validUrl(requestHref(input));
+    if (!allowLoopback && MCP_LOOPBACK_HOSTNAMES.includes(target.hostname))
       throw new Error('OAuth loopback target is not allowed');
     return safeFetch(input, init);
   };
@@ -235,13 +249,15 @@ export async function beginUpstreamMcpOAuth(
   )
     throw new Error('Protected resource does not match upstream');
   const configured = connection.oauth.client ? await repo.getClient(connection.oauth.client) : null;
-  if (connection.oauth.client && !configured) throw new Error('OAuth client not found');
+  if (connection.oauth.client && !configured)
+    throw new UpstreamOAuthUserError('OAuth client not found');
   const issuers = resourceMetadata?.authorization_servers ?? [];
   const issuer = configured
     ? (issuers.find((item) => sameIssuer(item, configured.issuer)) ??
       (issuers.length ? undefined : configured.issuer))
     : (issuers[0] ?? upstream.origin);
-  if (!issuer) throw new Error('OAuth client issuer is not advertised by the resource');
+  if (!issuer)
+    throw new UpstreamOAuthUserError('OAuth client issuer is not advertised by the resource');
   validUrl(issuer);
   const metadata = await discoverAuthorizationServerMetadata(issuer, { fetchFn });
   if (!metadata) throw new Error('Authorization server metadata unavailable');
@@ -250,13 +266,15 @@ export async function beginUpstreamMcpOAuth(
   const reusable = !connection.oauth.client ? await repo.getClient(profileId) : null;
   if (reusable && !sameIssuer(reusable.issuer, metadata.issuer))
     throw new Error('OAuth client issuer mismatch');
+  if (reusable && credentials && !sameCredentials(reusable, credentials))
+    throw new UpstreamOAuthClientConflict();
   const selected = configured ?? (!credentials ? reusable : null);
   const google = sameIssuer(issuer, 'https://accounts.google.com');
   const scope = (
     connection.oauth.scopes ??
     (google && upstream.protocol === 'https:' ? googleScopes[upstream.hostname] : undefined)
   )?.join(' ');
-  if (google && !scope) throw new Error('Google OAuth requires explicit scopes');
+  if (google && !scope) throw new UpstreamOAuthUserError('Google OAuth requires explicit scopes');
   let clientInformation: OAuthClientInformationMixed;
   if (credentials && !connection.oauth.client) {
     clientInformation = {
@@ -340,6 +358,8 @@ export async function finishUpstreamMcpOAuth(
     if (item.submittedClient && item.clientProfileId) {
       const connection = await repo.getConnection(item.connection.name);
       if (!connection || connection.revision !== item.connection.revision) return false;
+      const existing = await repo.getClient(item.clientProfileId);
+      if (existing && !sameCredentials(existing, item.submittedClient)) return false;
       await repo.saveClient(item.clientProfileId, {
         issuer: item.metadata.issuer,
         ...item.submittedClient,

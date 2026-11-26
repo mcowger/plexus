@@ -1,17 +1,26 @@
 import { z } from 'zod';
 
 export const MCP_UPSTREAM_OAUTH_CALLBACK_PATH = '/oauth/mcp-upstream/callback';
+export const MCP_UI_PATH = '/ui/mcp';
+export const MCP_LOOPBACK_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+export function isMcpOAuthTransport(url: URL): boolean {
+  return (
+    url.protocol === 'https:' ||
+    (url.protocol === 'http:' && MCP_LOOPBACK_HOSTNAMES.includes(url.hostname))
+  );
+}
+
+export function parseMcpOAuthUrl(value: string): URL | null {
+  const url = URL.parse(value);
+  if (!url || url.username || url.password || url.hash || !isMcpOAuthTransport(url)) return null;
+  return url;
+}
 
 export function getMcpUpstreamOAuthCallbackUrl(origin: string | undefined): URL | null {
   if (!origin) return null;
   const url = URL.parse(origin);
-  if (!url || url.origin !== origin) return null;
-  if (
-    url.protocol !== 'https:' &&
-    !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
-  ) {
-    return null;
-  }
+  if (!url || url.origin !== origin || !isMcpOAuthTransport(url)) return null;
   return new URL(MCP_UPSTREAM_OAUTH_CALLBACK_PATH, url);
 }
 

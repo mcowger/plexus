@@ -28,7 +28,7 @@ export interface LocalMcpServer {
 }
 
 export interface McpUpstreamOAuthStatus {
-  status: 'disconnected' | 'connected' | 'reconnect_required';
+  status: 'disconnected' | 'connected' | 'reconnect_required' | 'unavailable';
   expiresAt?: number;
 }
 

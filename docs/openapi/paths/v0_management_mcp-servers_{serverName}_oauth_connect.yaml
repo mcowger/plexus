@@ -48,18 +48,21 @@ post:
     '404':
       description: No OAuth-enabled MCP server with this name.
     '409':
-      description: The issuer requires a pre-registered client.
+      description: >-
+        The issuer requires a pre-registered client (`oauth_client_registration_required`, with
+        `callbackUrl` and `provider`), or the submitted credentials differ from the client already
+        saved for this issuer (`oauth_client_conflict`).
       content:
         application/json:
           schema:
             type: object
-            required: [error, code, callbackUrl, provider]
+            required: [error, code]
             properties:
               error:
                 type: string
               code:
                 type: string
-                const: oauth_client_registration_required
+                enum: [oauth_client_registration_required, oauth_client_conflict]
               callbackUrl:
                 type: string
                 format: uri

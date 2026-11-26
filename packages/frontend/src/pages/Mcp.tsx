@@ -45,7 +45,6 @@ const EMPTY_SERVER: RemoteMcpServer = {
   upstream_url: '',
   enabled: true,
   headers: {},
-  oauth: {},
 };
 
 const EMPTY_LOCAL_SERVER: LocalMcpServer = {
@@ -162,7 +161,7 @@ export const McpPage: React.FC = () => {
             return [name, await getUpstreamOAuthStatus(name)] as const;
           } catch (e) {
             toast.error((e as Error).message, `Failed to load OAuth status for ${name}`);
-            return null;
+            return [name, { status: 'unavailable' }] as const;
           }
         })
       );

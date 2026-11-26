@@ -48,6 +48,10 @@ export type {
 
 export {
   getMcpUpstreamOAuthCallbackUrl,
+  isMcpOAuthTransport,
+  MCP_LOOPBACK_HOSTNAMES,
+  MCP_UI_PATH,
+  parseMcpOAuthUrl,
   LocalHttpMcpServerConfigSchema,
   McpKeyCreateSchema,
   McpKeySchema,

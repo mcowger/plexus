@@ -11105,7 +11105,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description The issuer requires a pre-registered client. */
+      /** @description The issuer requires a pre-registered client (`oauth_client_registration_required`, with `callbackUrl` and `provider`), or the submitted credentials differ from the client already saved for this issuer (`oauth_client_conflict`). */
       409: {
         headers: {
           [name: string]: unknown;
@@ -11113,12 +11113,12 @@ export interface operations {
         content: {
           'application/json': {
             error: string;
-            /** @constant */
-            code: 'oauth_client_registration_required';
-            /** Format: uri */
-            callbackUrl: string;
             /** @enum {string} */
-            provider: 'google' | 'other';
+            code: 'oauth_client_registration_required' | 'oauth_client_conflict';
+            /** Format: uri */
+            callbackUrl?: string;
+            /** @enum {string} */
+            provider?: 'google' | 'other';
           };
         };
       };

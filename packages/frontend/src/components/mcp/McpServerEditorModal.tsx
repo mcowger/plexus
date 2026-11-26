@@ -274,9 +274,21 @@ export function McpServerEditorModal({
                     value={remoteServer.oauth ? 'oauth' : 'static'}
                     onChange={(e) => {
                       const { oauth: _oauth, ...rest } = remoteServer;
-                      onEditingServerChange(
-                        e.target.value === 'oauth' ? { ...rest, oauth: {} } : rest
+                      if (e.target.value !== 'oauth') {
+                        onEditingServerChange(rest);
+                        return;
+                      }
+                      const headers = Object.fromEntries(
+                        Object.entries(rest.headers ?? {}).filter(
+                          ([name]) => name.toLowerCase() !== 'authorization'
+                        )
                       );
+                      onEditingServerChange({
+                        ...rest,
+                        auth_scheme: null,
+                        headers,
+                        oauth: {},
+                      });
                     }}
                   >
                     <option value="static">Static credentials / headers</option>
