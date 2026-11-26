@@ -138,9 +138,19 @@ export interface paths {
     put?: never;
     /**
      * Create a Responses API response
-     * @description OpenAI Responses API compatible. Plexus supports multi-turn continuation
-     *     via `previous_response_id` or `conversation` — it loads the prior output
-     *     items server-side so the client only needs to send the new input.
+     * @description OpenAI Responses API compatible, except storage defaults to false.
+     *     Only explicit `store: true` retains a response in Plexus, for both JSON and
+     *     streaming requests. The exact returned ID can then be retrieved or supplied
+     *     as `previous_response_id`. Plexus replays the complete stored input and output
+     *     history and sends upstream `store: false`, without an upstream response ID.
+     *     An unstored response cannot be used as a predecessor, but a `store: false`
+     *     request can reference a stored parent without retaining its own response.
+     *     Desired top-level `instructions` must be supplied again on each turn.
+     *     `conversation` and `previous_response_id` are mutually exclusive. Existing
+     *     conversations can be read with omitted or false `store`, but only `store: true`
+     *     appends the current input and output. Each stored response contains a full
+     *     replay snapshot, so cumulative storage grows with chain history. Legacy
+     *     responses without stored input cannot be continued.
      */
     post: operations['postV1Responses'];
     delete?: never;
@@ -380,7 +390,9 @@ export interface paths {
     /**
      * List configured aliases (public)
      * @description Returns all configured model aliases. If an alias has a `metadata`
-     *     block, the response includes enriched OpenRouter-style fields.
+     *     block, the response includes enriched OpenRouter-style fields. When
+     *     available, `pricing.tiers` lists context-length pricing bands; aliases can
+     *     also define these under `metadata.overrides.pricing.tiers`.
      *
      *     This endpoint computes a SHA-256 hash of the fully serialized JSON
      *     response to provide `ETag` and `Last-Modified` headers. Computing the
@@ -1515,6 +1527,24 @@ export interface paths {
      *     - Existing fields are overwritten
      *     - Fields not in the request are preserved
      *
+     *     ## Deep merge (`?merge=deep`)
+     *
+     *     A shallow merge replaces nested objects wholesale, so a `models` map has to
+     *     be resent in full and any entry a caller did not read first is dropped. With
+     *     `merge=deep` nested objects merge key by key instead:
+     *
+     *     ```
+     *     PATCH /v0/management/providers/openrouter?merge=deep
+     *     { "models": { "new-model": { "pricing": { "source": "simple", "input": 1, "output": 2 } } } }
+     *     ```
+     *
+     *     - Only the map entries you send are added or changed
+     *     - A `null` value removes a field, or a single entry when nested in a map
+     *       (`{ "models": { "old-model": null } }`)
+     *     - Arrays and scalars still replace
+     *
+     *     The Plexus management MCP tools always request this mode for `update`.
+     *
      *     **Admin only** — limited principals receive 403.
      */
     patch: operations['patchV0ManagementProvidersByslug'];
@@ -1537,6 +1567,39 @@ export interface paths {
      *     Blocks localhost and cloud metadata addresses to mitigate SSRF.
      */
     post: operations['postV0ManagementProvidersFetchmodels'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/provider-presets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List pre-configured provider presets (admin only)
+     * @description Returns the pre-configured provider preset catalog. Each preset pre-fills
+     *     the endpoint map, pi-ai provider id, and auto-compat for a known provider,
+     *     so the Add Provider flow is pick-a-preset plus an API key.
+     *
+     *     The catalog defaults to the plexus repo's raw GitHub URL, so preset
+     *     updates ship as a data-file commit with no release. Any remote failure
+     *     falls back to the built-in `packages/backend/data/provider-presets.json`.
+     *     The `source` field reports which catalog was served.
+     *
+     *     Entries carry `experimentalApis` (documented but not yet probed live) and
+     *     optional `templateVars` (`{key}` placeholders the operator fills at setup
+     *     time, e.g. the Cloudflare account ID).
+     *
+     *     **Admin only** — limited principals receive 403.
+     */
+    get: operations['getV0ManagementProviderPresets'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1730,6 +1793,13 @@ export interface paths {
      *
      *     PATCH performs a shallow merge — new fields are added, existing fields
      *     are overwritten, fields not in the request are preserved.
+     *
+     *     ## Deep merge (`?merge=deep`)
+     *
+     *     Nested objects merge key by key and a `null` value removes a field. Targets,
+     *     target groups, and the other list fields are arrays and always replace, so
+     *     send the complete list when changing one. The Plexus management MCP tools
+     *     always request this mode for `update`.
      *
      *     **Admin only** — limited principals receive 403.
      */
@@ -1952,6 +2022,13 @@ export interface paths {
      *     PATCH performs a shallow merge; fields omitted from the request keep their
      *     existing values.
      *
+     *     ## Deep merge (`?merge=deep`)
+     *
+     *     Nested objects merge key by key and a `null` value removes a field. The
+     *     list fields (`quotas`, `allowedModels`, `allowedProviders`, …) are arrays
+     *     and always replace. The Plexus management MCP tools always request this mode
+     *     for `update`.
+     *
      *     **Admin only** — limited principals receive 403.
      */
     patch: operations['patchV0ManagementKeysByname'];
@@ -1995,16 +2072,11 @@ export interface paths {
      *     - `upstream_url` — The MCP server endpoint
      *     - `enabled` — Whether the server is active
      *     - `headers` — Custom headers to include in proxy requests
-     *     - Auth fields (`auth_type`, `auth_header_value`, etc.)
+     *     - `auth_scheme` — Header scheme for stored static keys
+     *     - `oauth` — OAuth configuration, if enabled; does not contain credentials
      *
-     *     ## Auth and the proxy
-     *
-     *     These fields affect how Plexus authenticates to the upstream MCP server:
-     *     - `auth_type` — none, bearer, basic, header
-     *     - `auth_header_value` — static value for custom auth
-     *
-     *     When proxying, Plexus strips the client's `Authorization` and `x-api-key`
-     *     headers and uses the configured static auth instead.
+     *     Plexus uses its configured upstream authentication. Clients authenticate
+     *     to Plexus separately.
      *
      *     **Admin only** — limited principals receive 403.
      */
@@ -2053,7 +2125,8 @@ export interface paths {
     post?: never;
     /**
      * Delete an MCP server entry (admin only)
-     * @description Removes an MCP server configuration.
+     * @description Removes an MCP server configuration. If it is a local HTTP server, Plexus
+     *     stops its process and permanently deletes its persistent data directory.
      *
      *     ## Impact
      *
@@ -2072,9 +2145,96 @@ export interface paths {
      *
      *     PATCH performs a shallow merge; omitted fields keep their current values.
      *
+     *     ## Deep merge (`?merge=deep`)
+     *
+     *     Nested objects such as `headers` merge key by key and a `null` value removes
+     *     a field. Arrays such as `args` always replace. The Plexus management MCP
+     *     tools always request this mode for `update`.
+     *
      *     **Admin only** — limited principals receive 403.
      */
     patch: operations['patchV0ManagementMcpserversByserverName'];
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/oauth': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    /** Get the upstream MCP connection status */
+    get: operations['getV0ManagementMcpServerUpstreamOAuth'];
+    put?: never;
+    post?: never;
+    /**
+     * Clear the saved upstream MCP grant
+     * @description Disconnects this MCP server in Plexus without revoking the authorization at the issuer.
+     */
+    delete: operations['deleteV0ManagementMcpServerUpstreamOAuth'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-servers/{serverName}/oauth/connect': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start upstream MCP OAuth in the admin browser
+     * @description Builds the callback from the admin browser's origin and sets a browser-bound cookie. Open the returned URL in the same browser to complete sign-in.
+     */
+    post: operations['postV0ManagementMcpServerUpstreamOAuthConnect'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-upstream-oauth/clients': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List reusable upstream MCP OAuth clients */
+    get: operations['getV0ManagementMcpUpstreamOAuthClients'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v0/management/mcp-upstream-oauth/clients/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    /** Save a reusable upstream MCP OAuth client */
+    put: operations['putV0ManagementMcpUpstreamOAuthClient'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/v0/management/mcp-servers/{serverName}/status': {
@@ -2335,10 +2495,17 @@ export interface paths {
      *       - `displayName` — Human-readable name
      *       - `pending` — Whether initial check is pending
      *       - `meters` — Current quota meter readings
-     *       - `success` — Whether last check succeeded
-     *       - `error` — Error message if last check failed (optional)
+     *       - `checkedAt` — Timestamp represented by the result; older when stale
+     *       - `success` — Whether a successful quota snapshot is available
+     *       - `stale` — Whether the returned meters are from an earlier successful check
+     *       - `error` — Latest check error; can be present when `success` is true and `stale` is true
      *       - `oauthAccountId` — OAuth account ID if using OAuth (optional)
      *       - `oauthProvider` — OAuth provider if using OAuth (optional)
+     *
+     *     If a check fails after a successful reading is available, the configured
+     *     entry includes the last successful reading with `success: true`,
+     *     `stale: true`, and the latest check error. If there is no successful
+     *     reading to reuse, `success` is false and `meters` is empty.
      *
      *     ## Use case
      *
@@ -3923,6 +4090,13 @@ export interface paths {
      *     - Change just the limit: `{"limit": 50000}`
      *     - Change just the duration: `{"duration": "2h"}`
      *
+     *     ## Deep merge (`?merge=deep`)
+     *
+     *     Nested objects merge key by key and a `null` value removes a field. The
+     *     scope fields (`allowedProviders`, `excludedModels`, …) are arrays and always
+     *     replace. The Plexus management MCP tools always request this mode for
+     *     `update`.
+     *
      *     **Admin only** — limited principals receive 403.
      */
     patch: operations['patchV0ManagementUserquotasByname'];
@@ -4245,10 +4419,10 @@ export interface paths {
      *       (as produced by `GET /v0/management/backup?full=true`). Restores both
      *       configuration and operational data.
      *
-     *     **Destructive operation** — all current data is deleted before the backup is
-     *     applied. For full archive restores, the entire operation runs in a single
-     *     database transaction; if any step fails, the database is rolled back to its
-     *     pre-restore state.
+     *     The maximum request body size is 512 MiB.
+     *
+     *     **Destructive operation** — existing data is deleted before the backup is
+     *     applied. A failed restore may leave the database partially restored.
      *
      *     After a successful restore, a server restart is recommended so that in-memory
      *     caches and long-lived connections pick up the new configuration.
@@ -4561,7 +4735,10 @@ export interface paths {
      *
      *     ## Authentication
      *
-     *     Requires the `x-admin-key` header. Bearer inference keys are rejected.
+     *     Requires the `x-admin-key` header, or the same `ADMIN_KEY` sent as
+     *     `Authorization: Bearer <ADMIN_KEY>`. Inference API keys are rejected with
+     *     403. A non-empty `x-admin-key` header takes precedence over the bearer
+     *     token.
      *
      *     ## MCP disabled
      *
@@ -5131,13 +5308,18 @@ export interface components {
       model: string;
       input?: unknown;
       instructions?: string;
+      /** @description Continue a stored response. Cannot be combined with conversation; legacy responses without stored input cannot be continued. */
       previous_response_id?: string;
+      /** @description Read an existing conversation. Cannot be combined with previous_response_id. Only store:true appends the current input and output. */
       conversation?:
         | string
         | {
             id: string;
           };
-      /** @default true */
+      /**
+       * @description Retain this response in Plexus and append to any referenced conversation. Only explicit true stores it; upstream requests always use store:false. Stored responses contain full replay snapshots, so cumulative storage grows with chain history.
+       * @default false
+       */
       store: boolean;
       stream?: boolean;
       tools?: {
@@ -5413,9 +5595,11 @@ export interface components {
     ImageEditRequest: {
       /**
        * Format: binary
-       * @description Source image file. Must be PNG format, less than 4 MB.
+       * @description Source image file, for a single-reference edit. Must be PNG format, less than 4 MB. Send either this field or `image[]`, not both.
        */
-      image: string;
+      image?: string;
+      /** @description Source image files, repeated once per image, for a multi-image edit. Must be PNG format, less than 4 MB each. Up to 16 references. Send either this field or `image`, not both. */
+      'image[]'?: string[];
       /** @description Text description of the desired edits. */
       prompt: string;
       /**
@@ -5450,7 +5634,7 @@ export interface components {
       quality?: 'standard' | 'high' | 'medium' | 'low';
       /** @description User identifier for content policy tracking. */
       user?: string;
-    };
+    } & (unknown | unknown);
     /** @description Model alias entry. If the alias has a `metadata` block, includes enriched OpenRouter-style fields. */
     ModelListEntry: {
       /** @description Alias identifier (slug). */
@@ -5467,8 +5651,15 @@ export interface components {
        * @constant
        */
       owned_by: 'plexus';
+      /**
+       * @description Alias capability type — what the model produces. Defaults to `text` when the alias has no explicit `type`.
+       * @enum {string}
+       */
+      type?: 'text' | 'embeddings' | 'transcriptions' | 'speech' | 'image' | 'decisions';
       /** @description Display name (e.g. "OpenAI: GPT-4.1 Nano"). */
       name?: string;
+      /** @description Compact display label (e.g. "Sonnet 5.5"). Explicitly configured via the alias `metadata.overrides.short_name`, otherwise deterministically derived from `name`. */
+      short_name?: string;
       /** @description Model description from metadata. */
       description?: string;
       /** @description Maximum context window size in tokens. */
@@ -5477,17 +5668,46 @@ export interface components {
       architecture?: {
         [key: string]: unknown;
       };
-      /** @description Pricing in dollars per million tokens. */
+      /** @description Pricing in dollars per token, represented as decimal strings. */
       pricing?: {
-        /** @description Input price per million tokens. */
+        /** @description Input price per token. */
         prompt?: string;
-        /** @description Output price per million tokens. */
+        /** @description Output price per token. */
         completion?: string;
-        /** @description Cache hit price per million tokens. */
+        /** @description Cache hit price per token, as a decimal string. */
         input_cache_read?: string;
+        /** @description Cache write price per token, as a decimal string. */
+        input_cache_write?: string;
+        /** @description Context-length pricing bands, when the source catalog or alias defines them. */
+        tiers?: {
+          /** @description Apply this band when input tokens exceed this threshold. */
+          input_tokens_above: number;
+          /** @description Input price per token for this band. */
+          prompt?: string;
+          /** @description Output price per token for this band. */
+          completion?: string;
+          /** @description Cached input read price per token for this band. */
+          input_cache_read?: string;
+          /** @description Cached input write price per token for this band. */
+          input_cache_write?: string;
+        }[];
       } & {
         [key: string]: unknown;
       };
+      /** @description Reasoning effort choices. For aliases that can route to Codex Responses, these are the native choices common to every enabled failover target. Codex choices use the configured OAuth account's catalog when available, or the bundled catalog when live metadata is missing. If neither source has metadata for a Codex target, the alias retains its default reasoning options, if any. An empty values array means no shared choices. The native value `none` is reported as `off`. */
+      reasoning_options?: {
+        /** @constant */
+        type: 'effort';
+        values: string[];
+      }[];
+      pi_options?: {
+        /** @description For aliases that can route to Codex Responses, true only if every enabled failover target is a Codex target that explicitly supports effort updates via configuration_update. Mixed and unverified aliases report false. */
+        supportsConfigurationUpdate?: boolean;
+      } & {
+        [key: string]: unknown;
+      };
+      /** @description Union of native service tiers declared per model by enabled alias targets, including nested aliases. Provider-wide tier maps are not advertised. Uses canonical Plexus names in the order auto, standard, flex, priority, ultrafast. Support on one target is sufficient; another target may rewrite or downgrade the tier. Unknown capabilities contribute nothing. Omitted when no target has known, projectable capabilities; an empty array means the known maps declare no native tiers. Does not include tier pricing. */
+      service_tiers?: ('auto' | 'standard' | 'flex' | 'priority' | 'ultrafast')[];
       /** @description List of supported request parameters (e.g. temperature, tools, max_tokens). */
       supported_parameters?: string[];
       /** @description Primary provider details. */
@@ -5522,7 +5742,7 @@ export interface components {
       architecture?: {
         [key: string]: unknown;
       };
-      /** @description Price per million tokens (prompt, completion, cache hits). */
+      /** @description Per-token pricing (prompt, completion, cache hits), including optional context-length tiers in `tiers` when the source catalog provides them. */
       pricing?: {
         [key: string]: unknown;
       };
@@ -5559,6 +5779,145 @@ export interface components {
        * @enum {string|null}
        */
       limitType?: 'requests' | 'tokens' | null;
+    };
+    thinkingLevelMap: {
+      off?: string | null;
+      minimal?: string | null;
+      low?: string | null;
+      medium?: string | null;
+      high?: string | null;
+      xhigh?: string | null;
+      max?: string | null;
+    };
+    /** @description Canonical tier to native value. Unsupported or omitted tiers use the nearest equivalent. */
+    serviceTierMap: {
+      auto?: string | null;
+      standard?: string | null;
+      flex?: string | null;
+      priority?: string | null;
+      ultrafast?: string | null;
+    };
+    compat: {
+      /** @enum {string} */
+      thinkingFormat?:
+        | 'zai'
+        | 'qwen'
+        | 'qwen-chat-template'
+        | 'deepseek'
+        | 'openrouter'
+        | 'ant-ling'
+        | 'together'
+        | 'string-thinking';
+      supportsTemperature?: boolean;
+      /** @enum {string} */
+      maxTokensField?: 'max_tokens' | 'max_completion_tokens';
+      forceAdaptiveThinking?: boolean;
+      supportsReasoningEffort?: boolean;
+      /** @enum {string} */
+      serviceTierFormat?: 'service-tier' | 'anthropic-speed';
+    };
+    traits: {
+      reasoning?: boolean;
+      thinkingLevelMap?: components['schemas']['thinkingLevelMap'];
+      serviceTierMap?: components['schemas']['serviceTierMap'];
+      maxTokens?: number;
+      compat?: components['schemas']['compat'];
+    };
+    target: {
+      /** @enum {string} */
+      api:
+        'openai-completions' | 'openai-responses' | 'anthropic-messages' | 'google-generative-ai';
+      reasoning?: boolean;
+      thinkingLevelMap?: components['schemas']['thinkingLevelMap'];
+      serviceTierMap?: components['schemas']['serviceTierMap'];
+      maxTokens?: number;
+      compat?: components['schemas']['compat'];
+      models?: {
+        [key: string]: components['schemas']['traits'];
+      };
+    };
+    PiAiQuirks: {
+      chat?: components['schemas']['target'] & {
+        /** @constant */
+        api?: 'openai-completions';
+      };
+      completions?: components['schemas']['target'] & {
+        /** @constant */
+        api?: 'openai-completions';
+      };
+      messages?: components['schemas']['target'] & {
+        /** @constant */
+        api?: 'anthropic-messages';
+      };
+      responses?: components['schemas']['target'] & {
+        /** @constant */
+        api?: 'openai-responses';
+      };
+      gemini?: components['schemas']['target'] & {
+        /** @constant */
+        api?: 'google-generative-ai';
+      };
+      $defs: {
+        thinkingLevelMap: {
+          off?: string | null;
+          minimal?: string | null;
+          low?: string | null;
+          medium?: string | null;
+          high?: string | null;
+          xhigh?: string | null;
+          max?: string | null;
+        };
+        /** @description Canonical tier to native value. Unsupported or omitted tiers use the nearest equivalent. */
+        serviceTierMap: {
+          auto?: string | null;
+          standard?: string | null;
+          flex?: string | null;
+          priority?: string | null;
+          ultrafast?: string | null;
+        };
+        compat: {
+          /** @enum {string} */
+          thinkingFormat?:
+            | 'zai'
+            | 'qwen'
+            | 'qwen-chat-template'
+            | 'deepseek'
+            | 'openrouter'
+            | 'ant-ling'
+            | 'together'
+            | 'string-thinking';
+          supportsTemperature?: boolean;
+          /** @enum {string} */
+          maxTokensField?: 'max_tokens' | 'max_completion_tokens';
+          forceAdaptiveThinking?: boolean;
+          supportsReasoningEffort?: boolean;
+          /** @enum {string} */
+          serviceTierFormat?: 'service-tier' | 'anthropic-speed';
+        };
+        traits: {
+          reasoning?: boolean;
+          thinkingLevelMap?: components['schemas']['thinkingLevelMap'];
+          serviceTierMap?: components['schemas']['serviceTierMap'];
+          maxTokens?: number;
+          compat?: components['schemas']['compat'];
+        };
+        target: {
+          /** @enum {string} */
+          api:
+            | 'openai-completions'
+            | 'openai-responses'
+            | 'anthropic-messages'
+            | 'google-generative-ai';
+          reasoning?: boolean;
+          thinkingLevelMap?: components['schemas']['thinkingLevelMap'];
+          serviceTierMap?: components['schemas']['serviceTierMap'];
+          maxTokens?: number;
+          compat?: components['schemas']['compat'];
+          models?: {
+            [key: string]: components['schemas']['traits'];
+          };
+        };
+      };
     };
     /** @description Provider configuration. Used to define upstream LLM providers that Plexus can route requests to. Stored in the database. `providers` section. */
     ProviderConfig: {
@@ -5632,7 +5991,7 @@ export interface components {
                 [key: string]: unknown;
               };
               /**
-               * @description When true, enables registry-aware compatibility mapping for this model. Requires `pi_ai_model_id` to resolve to a builtin pi-ai model. Overrides are opt-in; omitted/false means no automatic reasoning/thinking/generation compatibility fields are injected.
+               * @description Enables compatibility mapping for this model when the provider links to a builtin pi-ai model or declares inline quirks for the target API. Omitted/false leaves provider-level opt-in in effect; it does not disable an enabled provider setting.
                * @default false
                */
               auto_compat: boolean;
@@ -5677,12 +6036,14 @@ export interface components {
       /** @description When true, enables Gemini-native thinking (extended reasoning) for this provider. Only applicable to Gemini-compatible providers. */
       geminiThinkingEnabled?: boolean;
       /**
-       * @description When true, enables registry-aware compatibility mapping for all models under this provider that have a resolvable `pi_ai_model_id`. Plexus uses pi-ai builtin registry metadata to map client reasoning/thinking and generation intent to provider-specific request fields. The step is opt-in and skipped for models without a registry link.
+       * @description Opts into compatibility mapping from `pi_ai_provider` and/or `pi_ai_quirks` for the target API and exact upstream model ID. Explicit quirks overlay builtin capabilities. Without either source, requests pass through unchanged.
        * @default false
        */
       auto_compat: boolean;
-      /** @description Builtin pi-ai provider ID used to validate `models[*].pi_ai_model_id` links and populate registry-backed model selectors. Custom pi-ai providers/models are not managed through Plexus; this field links only to pi-ai's builtin registry. */
+      /** @description Builtin pi-ai provider ID used with `models[*].pi_ai_model_id` or an exact catalog model match. Can be combined with `pi_ai_quirks` overlays. */
       pi_ai_provider?: string;
+      /** @description Inline compatibility traits, keyed by target API type. Model overrides use exact upstream model IDs; `thinkingLevelMap` and `serviceTierMap` replace inherited maps and named `compat` flags merge. These traits overlay a builtin model when available and work independently otherwise. Send null in PATCH to clear previously saved quirks. */
+      pi_ai_quirks?: components['schemas']['PiAiQuirks'];
       /**
        * @description When true, rewrites OpenAI-format requests to look like Claude requests before forwarding. Used for providers that require Anthropic-compatible request shapes.
        * @default false
@@ -5711,6 +6072,18 @@ export interface components {
        *
        *     - `suppress_developer_role` — Rewrites the `developer` role to `system`
        *       for providers that do not support the OpenAI `developer` role.
+       *
+       *     - `cache_responses_instructions` — Moves top-level `instructions` to a
+       *       developer input item on Responses routes. Enabled automatically for
+       *       native Responses requests to GPT-6.2 through GPT-6.5 on Codex OAuth,
+       *       Copilot OAuth Responses models, and non-OAuth `api.openai.com` targets. Set
+       *       `{ "name": "cache_responses_instructions", "enabled": false }` at
+       *       provider or model level to opt out; explicitly enable it for other
+       *       compatible Responses routes. Skips an outbound body that still carries
+       *       `conversation`, `previous_response_id`, or `store: true`. Plexus resolves
+       *       its own `previous_response_id` history and sends `store: false` before
+       *       adapters run, so those replays are still relocated. Configure role
+       *       suppression after this adapter when needed.
        *
        *     - `model_override` — Conditionally rewrites the provider model name
        *       based on request payload fields. Accepts a `rules` array in options
@@ -5754,6 +6127,21 @@ export interface components {
        *       to force it on for an Anthropic-compatible gateway hosted elsewhere, or
        *       `{ name: 'normalize_anthropic_tool_ids', enabled: false }` to opt out.
        *
+       *     - `drop_unsigned_thinking` — Removes `thinking` blocks that carry no
+       *       usable `signature` from outbound Anthropic Messages bodies, which
+       *       Anthropic rejects with a hard HTTP 400 (`thinking.signature: Field
+       *       required`). A turn left with no content is dropped and same-role
+       *       neighbours merged so roles keep alternating; when the strip leaves a
+       *       manual extended-thinking request (`thinking: {type: "enabled"}`) in an
+       *       open tool-use cycle whose assistant turn no longer opens with a
+       *       thinking block, the request-level `thinking` config and its dependent
+       *       `output_config.effort` are removed as well. Injected automatically
+       *       under the same gate as `normalize_anthropic_tool_ids`. Override per
+       *       provider or model with
+       *       `{ name: 'drop_unsigned_thinking', options: {}, enabled: true }`
+       *       to force it on for an Anthropic-compatible gateway hosted elsewhere,
+       *       or `{ name: 'drop_unsigned_thinking', enabled: false }` to opt out.
+       *
        *     Adapters run on the outbound body whether or not the pass-through optimisation is active — a same-format request skips the transformer, but its body is still cloned, given the target model and the provider/model config fields, and run through the adapter chain before dispatch.
        */
       adapter?:
@@ -5791,6 +6179,8 @@ export interface components {
     MetadataOverrides: {
       /** @description Human-readable model name. Required when `metadata.source` is `custom` (no catalog fallback). */
       name?: string;
+      /** @description Compact display label advertised as `short_name` in `GET /v1/models`. When omitted, Plexus deterministically derives one from `name` (e.g. "Claude Sonnet 5.5" becomes "Sonnet 5.5"). */
+      short_name?: string;
       /** @description Short description of the model. */
       description?: string;
       /** @description Maximum context window in tokens. */
@@ -5805,6 +6195,19 @@ export interface components {
         input_cache_read?: string;
         /** @description Cost per cached input token write. */
         input_cache_write?: string;
+        /** @description Optional context-length pricing bands. A tier applies when the request input token count is greater than `input_tokens_above`. Fields omitted from a tier inherit the base pricing values. */
+        tiers?: {
+          /** @description Input token threshold for this pricing band. */
+          input_tokens_above: number;
+          /** @description Cost per input token in this band. */
+          prompt?: string;
+          /** @description Cost per output token in this band. */
+          completion?: string;
+          /** @description Cost per cached input token read in this band. */
+          input_cache_read?: string;
+          /** @description Cost per cached input token write in this band. */
+          input_cache_write?: string;
+        }[];
       };
       /** @description Input/output modality and tokenizer information. */
       architecture?: {
@@ -5897,6 +6300,11 @@ export interface components {
        * @default false
        */
       sticky_session: boolean;
+      /**
+       * @description When enabled, translated (non-native Messages) responses for this alias carry synthetic safeguard_results (evaluated/not_flagged with an explanatory note) when the inbound Messages request asked via safeguards. Opt-in: no real classifier runs.
+       * @default false
+       */
+      synthetic_safeguard_approval: boolean;
       /** @description Model metadata strategy. When omitted or set to `auto`, Plexus derives a canonical identity from the alias targets, looks for an exact catalog entry, and falls back to conservative name and modality heuristics. Catalog sources pin a specific entry, `custom` supplies all fields, and `disabled` suppresses enrichment. Overrides win over resolved values. */
       metadata?:
         | {
@@ -5985,15 +6393,35 @@ export interface components {
             /** @description Flat fee charged per request regardless of token count. */
             amount: number;
           };
-      /** @description List of model behaviour modifiers applied during request/response transformation. */
+      /** @description List of model behaviour modifiers applied during request/response transformation. `inject_cache_control` is also applied implicitly for aliases that dispatch to Anthropic's own API; configuring it explicitly (including `enabled: false` to opt out) overrides that default. */
       advanced?: {
         /**
          * @description Behaviour modifier type.
          * @enum {string}
          */
-        type: 'strip_adaptive_thinking';
+        type: 'strip_adaptive_thinking' | 'inject_cache_control';
         /** @default true */
         enabled: boolean;
+        /**
+         * @description `inject_cache_control` only. Mark the last tool definition so the tools block is cached.
+         * @default true
+         */
+        tools: boolean;
+        /**
+         * @description `inject_cache_control` only. Mark the last system text block.
+         * @default true
+         */
+        system: boolean;
+        /**
+         * @description `inject_cache_control` only. Number of trailing ("walking") breakpoints placed on the conversation tail. 0 keeps breakpoints on the static prefix only.
+         * @default 2
+         */
+        message_breakpoints: number;
+        /**
+         * @description `inject_cache_control` only. Cache TTL; omitted leaves Anthropic's 5m default (1.25x write). `1h` doubles the cache-write cost and also extends the sticky-session window for the alias.
+         * @enum {string}
+         */
+        ttl?: '5m' | '1h';
       }[];
     };
     /** @description API key configuration. Controls access to Plexus inference endpoints. Stored in the database. */
@@ -6030,21 +6458,55 @@ export interface components {
        * @default false
        */
       allowRawPassthrough: boolean;
+      /**
+       * @description Optional default service tier for this key. Applied only when the client does not request a service tier itself; a client-supplied `service_tier` or `<model>@<tier>` suffix overrides it. Send null to clear the default with PATCH, or omit it from PUT to use the provider default.
+       * @enum {string|null}
+       */
+      defaultServiceTier?:
+        'auto' | 'default' | 'standard' | 'flex' | 'priority' | 'fast' | 'ultrafast' | null;
       /** @description Name of a user quota definition to enforce. If null, no quota is enforced for this key. */
       quota?: string | null;
     } & {
       [key: string]: unknown;
     };
-    McpServerConfig: {
-      /** Format: uri */
-      upstream_url: string;
-      /** @default true */
-      enabled: boolean;
-      /** @description Static headers forwarded upstream. */
-      headers?: {
-        [key: string]: string;
-      };
-    };
+    McpServerConfig:
+      | {
+          /** @enum {string} */
+          mode: 'local_http';
+          /** @default true */
+          enabled: boolean;
+          /** @enum {string} */
+          launcher: 'bunx' | 'uvx';
+          package: string;
+          args?: string[];
+          /** @description Environment variables passed to the local MCP process. MCP_DATA_DIR is managed by Plexus; values for this key in any casing are ignored. */
+          env?: {
+            [key: string]: string;
+          };
+          port: number;
+          /** @default /mcp */
+          path: string;
+          startup_timeout_ms?: number;
+        }
+      | {
+          /** @enum {string} */
+          mode?: 'remote_http';
+          /** Format: uri */
+          upstream_url: string;
+          /** @default true */
+          enabled: boolean;
+          /** @description Static headers forwarded upstream. */
+          headers?: {
+            [key: string]: string;
+          };
+          /** @description Enables Plexus-managed upstream OAuth. Omit for static authentication. */
+          oauth?: {
+            /** @description ID of a saved OAuth client registration. Omit to use dynamic registration when supported. */
+            client?: string;
+            /** @description Explicit OAuth scopes. When omitted, supported Google Workspace endpoints use read-only defaults. */
+            scopes?: string[];
+          };
+        };
     /** @description User quota definition. Defines a rate limit that can be assigned to API keys. The quota enforcement middleware checks keys against their assigned quota definition and rejects requests that would exceed the limit. */
     UserQuotaDefinition: {
       /**
@@ -6625,7 +7087,7 @@ export interface components {
     /**
      * @description Latest quota snapshot for a single provider checker, returned by `GET /v0/management/quotas` and `GET /v0/management/quotas/{checkerId}`.
      *
-     *     A checker reports its current readings as an array of `Meter` objects (one per quota dimension). When the last check failed, `success` is false, `meters` is empty, and `error` carries the failure message.
+     *     A checker reports readings as an array of `Meter` objects (one per quota dimension). If a check fails after a successful reading is available, the response includes that last successful reading with `success: true`, `stale: true`, and the failed check's message in `error`. In that case, `checkedAt` is the timestamp of the returned reading, not the failed attempt. If there is no successful reading to reuse, `success` is false, `meters` is empty, and `error` carries the failure message.
      */
     QuotaCheckerSnapshot: {
       /** @description Unique identifier for this quota checker. Format: `{provider}:{account}`, e.g. `naga:default`, `moonshot:work`. */
@@ -6638,11 +7100,18 @@ export interface components {
       oauthAccountId?: string;
       /** @description OAuth provider identifier (e.g. `openai-codex`, `anthropic-claude-code`). Present when credentials are stored via OAuth flow. */
       oauthProvider?: string;
-      /** @description Whether the most recent quota check succeeded. */
+      /**
+       * Format: date-time
+       * @description Timestamp represented by this result. For a stale fallback, this is the timestamp of the older successful reading; without a successful reading, it is the failed attempt's timestamp.
+       */
+      checkedAt?: string;
+      /** @description Whether a successful quota snapshot is available. A stale snapshot can have `success: true` even though the most recent check failed. */
       success?: boolean;
-      /** @description Error message when the most recent check failed. Omitted on success. */
+      /** @description Whether the returned meters come from an earlier successful check because the most recent check failed. Omitted for a current result. */
+      stale?: boolean;
+      /** @description Error from the most recent failed check. Can be present with `success: true` when `stale` is true. */
       error?: string;
-      /** @description Current meter readings for this checker (one `Meter` per quota dimension). Empty when the last check failed. */
+      /** @description Current meter readings for this checker (one `Meter` per quota dimension). For a stale result, these are the meters from the last successful reading. Can be empty when that reading reported no meters, or when there is no successful reading to reuse. */
       meters?: components['schemas']['Meter'][];
     };
     /**
@@ -7140,6 +7609,15 @@ export interface operations {
           'text/event-stream': string;
         };
       };
+      /** @description Invalid request, including mutually exclusive history references. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OpenAIError'];
+        };
+      };
       401: components['responses']['AuthError'];
       /** @description Referenced `previous_response_id` or `conversation` not found. */
       404: {
@@ -7550,7 +8028,14 @@ export interface operations {
            *           "pricing": {
            *             "prompt": "0.0000001",
            *             "completion": "0.0000004",
-           *             "input_cache_read": "0.000000025"
+           *             "input_cache_read": "0.000000025",
+           *             "tiers": [
+           *               {
+           *                 "input_tokens_above": 272000,
+           *                 "prompt": "0.0000002",
+           *                 "completion": "0.0000008"
+           *               }
+           *             ]
            *           },
            *           "supported_parameters": [
            *             "temperature",
@@ -9503,7 +9988,10 @@ export interface operations {
   };
   patchV0ManagementProvidersByslug: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description `deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge. */
+        merge?: 'deep' | 'true';
+      };
       header?: never;
       path: {
         /** @description Provider key. May contain `/` (e.g. `openai/gpt-4`) — this enables wildcard routing where requests to `openai/gpt-4` match the provider. */
@@ -9584,6 +10072,56 @@ export interface operations {
       };
       /** @description Upstream fetch timed out (10s). */
       504: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementProviderPresets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Preset catalog. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /**
+             * @description Which catalog was served
+             * @enum {string}
+             */
+            source?: 'remote' | 'local';
+            /** @description Provider presets */
+            data?: {
+              id?: string;
+              name?: string;
+              description?: string;
+              docsUrl?: string;
+              suggestedProviderId?: string;
+              suggestedName?: string;
+              apiBaseUrl?: {
+                [key: string]: string;
+              };
+              experimentalApis?: string[];
+              templateVars?: Record<string, never>[];
+              piAiProvider?: string;
+              autoCompat?: boolean;
+              notes?: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required or invalid credentials. */
+      401: {
         headers: {
           [name: string]: unknown;
         };
@@ -9824,7 +10362,10 @@ export interface operations {
   };
   patchV0ManagementAliasesByslug: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description `deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge. */
+        merge?: 'deep' | 'true';
+      };
       header?: never;
       path: {
         /** @description Alias slug (e.g. "gpt-4", "claude-3-opus"). */
@@ -10178,7 +10719,10 @@ export interface operations {
   };
   patchV0ManagementKeysByname: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description `deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge. */
+        merge?: 'deep' | 'true';
+      };
       header?: never;
       path: {
         /** @description API key name (e.g. "sk-prod", "sk-dev"). */
@@ -10393,11 +10937,21 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description MCP server not found. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
     };
   };
   patchV0ManagementMcpserversByserverName: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description `deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge. */
+        merge?: 'deep' | 'true';
+      };
       header?: never;
       path: {
         /** @description Server name (lowercase alphanumeric, max 64 chars). Must match pattern `^[a-z0-9][a-z0-9-_]{1,62}$`. */
@@ -10435,6 +10989,205 @@ export interface operations {
       };
       /** @description MCP server not found. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  getV0ManagementMcpServerUpstreamOAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Connection status, without tokens. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'disconnected' | 'connected' | 'reconnect_required';
+            /** @description Access token expiry in epoch milliseconds. */
+            expiresAt?: number;
+          };
+        };
+      };
+      /** @description No OAuth-enabled MCP server with this name. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  deleteV0ManagementMcpServerUpstreamOAuth: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Disconnected. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No OAuth-enabled MCP server with this name. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  postV0ManagementMcpServerUpstreamOAuthConnect: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Origin of the admin UI. Must be HTTPS (HTTP on localhost is allowed for development). */
+        Origin: string;
+      };
+      path: {
+        serverName: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': {
+          /** @description Pre-registered client ID. Submit only when the issuer requires client registration. */
+          clientId: string;
+          clientSecret?: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Authorization URL for the upstream issuer. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            /** Format: uri */
+            authorizationUrl: string;
+          };
+        };
+      };
+      /** @description Invalid browser origin or OAuth could not be started with the server's settings. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No OAuth-enabled MCP server with this name. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The issuer requires a pre-registered client (`oauth_client_registration_required`, with `callbackUrl` and `provider`), or the submitted credentials differ from the client already saved for this issuer (`oauth_client_conflict`). */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            error: string;
+            /** @enum {string} */
+            code: 'oauth_client_registration_required' | 'oauth_client_conflict';
+            /** Format: uri */
+            callbackUrl?: string;
+            /** @enum {string} */
+            provider?: 'google' | 'other';
+          };
+        };
+      };
+    };
+  };
+  getV0ManagementMcpUpstreamOAuthClients: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Saved client registrations. Client secrets are never returned. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            clients: {
+              id: string;
+              /** Format: uri */
+              issuer: string;
+              clientId: string;
+            }[];
+          };
+        };
+      };
+      /** @description Administrator credentials required. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  putV0ManagementMcpUpstreamOAuthClient: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          /** Format: uri */
+          issuer: string;
+          clientId: string;
+          /** @description Omit to retain a saved secret if the issuer and client ID are unchanged, or send null to remove it. */
+          clientSecret?: string | null;
+        };
+      };
+    };
+    responses: {
+      /** @description Client saved. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Invalid issuer or client configuration. */
+      400: {
         headers: {
           [name: string]: unknown;
         };
@@ -10884,8 +11637,11 @@ export interface operations {
               checkerType?: string;
               displayName?: string;
               pending?: boolean;
+              /** Format: date-time */
+              checkedAt?: string;
               meters?: components['schemas']['Meter'][];
               success?: boolean;
+              stale?: boolean;
               error?: string;
               oauthAccountId?: string;
               oauthProvider?: string;
@@ -12755,7 +13511,10 @@ export interface operations {
   };
   patchV0ManagementUserquotasByname: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description `deep` merges nested objects key by key instead of replacing them, and treats `null` as a removal. Omit for the default shallow merge. */
+        merge?: 'deep' | 'true';
+      };
       header?: never;
       path: {
         /** @description Quota definition name. Must match regex `^[a-z0-9][a-z0-9-_]{1,62}$` (lowercase letters, digits, hyphens, underscores; 2–63 chars). */
@@ -13190,6 +13949,13 @@ export interface operations {
       };
       /** @description Limited principals cannot access this endpoint. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Backup exceeds the maximum request body size. */
+      413: {
         headers: {
           [name: string]: unknown;
         };

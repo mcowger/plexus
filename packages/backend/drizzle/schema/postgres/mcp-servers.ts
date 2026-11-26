@@ -17,6 +17,8 @@ export const mcpServers = pgTable('mcp_servers', {
   rateLimitCooldownMs: integer('rate_limit_cooldown_ms').notNull().default(60000),
   quotaCooldownMs: integer('quota_cooldown_ms').notNull().default(86400000),
   authScheme: text('auth_scheme'),
+  upstreamOauth: text('upstream_oauth'),
+  upstreamOauthRevision: text('upstream_oauth_revision'),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

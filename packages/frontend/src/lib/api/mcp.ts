@@ -4,6 +4,7 @@ import type {
   McpOAuthClientRecord,
   McpServer,
   McpServerKey,
+  McpUpstreamOAuthStatus,
 } from '../../types/mcp';
 import { API_BASE, fetchWithAuth } from './core';
 
@@ -265,3 +266,54 @@ export const patchMcpEnabled = async (enabled: boolean): Promise<{ enabled: bool
   if (!res.ok) throw new Error('Failed to update MCP enabled state');
   return res.json();
 };
+
+async function upstreamOAuthRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetchWithAuth(`${API_BASE}${path}`, { credentials: 'same-origin', ...options });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      code?: string;
+      callbackUrl?: string;
+      provider?: 'google' | 'other';
+    };
+    if (
+      res.status === 409 &&
+      body.code === 'oauth_client_registration_required' &&
+      body.callbackUrl &&
+      (body.provider === 'google' || body.provider === 'other')
+    ) {
+      throw new UpstreamOAuthRegistrationRequired(body.callbackUrl, body.provider);
+    }
+    throw new Error(body.message || body.error || 'Upstream OAuth request failed');
+  }
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  return text ? (JSON.parse(text) as T) : (undefined as T);
+}
+
+export class UpstreamOAuthRegistrationRequired extends Error {
+  constructor(
+    public callbackUrl: string,
+    public provider: 'google' | 'other'
+  ) {
+    super('OAuth client registration required');
+  }
+}
+
+const upstreamOAuthPath = (name: string) =>
+  `/v0/management/mcp-servers/${encodeURIComponent(name)}/oauth`;
+export const getUpstreamOAuthStatus = (name: string) =>
+  upstreamOAuthRequest<McpUpstreamOAuthStatus>(upstreamOAuthPath(name));
+export const connectUpstreamOAuth = (
+  name: string,
+  client?: { clientId: string; clientSecret?: string }
+) =>
+  upstreamOAuthRequest<{ authorizationUrl: string }>(`${upstreamOAuthPath(name)}/connect`, {
+    method: 'POST',
+    ...(client
+      ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(client) }
+      : {}),
+  });
+export const disconnectUpstreamOAuth = (name: string) =>
+  upstreamOAuthRequest<void>(upstreamOAuthPath(name), { method: 'DELETE' });

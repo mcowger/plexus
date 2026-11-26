@@ -1,5 +1,29 @@
 import { z } from 'zod';
 
+export const MCP_UPSTREAM_OAUTH_CALLBACK_PATH = '/oauth/mcp-upstream/callback';
+export const MCP_UI_PATH = '/ui/mcp';
+export const MCP_LOOPBACK_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+export function isMcpOAuthTransport(url: URL): boolean {
+  return (
+    url.protocol === 'https:' ||
+    (url.protocol === 'http:' && MCP_LOOPBACK_HOSTNAMES.includes(url.hostname))
+  );
+}
+
+export function parseMcpOAuthUrl(value: string): URL | null {
+  const url = URL.parse(value);
+  if (!url || url.username || url.password || url.hash || !isMcpOAuthTransport(url)) return null;
+  return url;
+}
+
+export function getMcpUpstreamOAuthCallbackUrl(origin: string | undefined): URL | null {
+  if (!origin) return null;
+  const url = URL.parse(origin);
+  if (!url || url.origin !== origin || !isMcpOAuthTransport(url)) return null;
+  return new URL(MCP_UPSTREAM_OAUTH_CALLBACK_PATH, url);
+}
+
 export const McpServerSettingsSchema = z.object({
   auth_scheme: z.string().trim().min(1).nullable().optional(),
   rate_limit_cooldown_ms: z.number().int().min(0).default(60_000).optional(),
@@ -12,8 +36,31 @@ export const RemoteHttpMcpServerConfigSchema = z
     upstream_url: z.string().url(),
     enabled: z.boolean().default(true),
     headers: z.record(z.string(), z.string()).optional(),
+    oauth: z
+      .object({
+        client: z.string().trim().min(1).optional(),
+        scopes: z.array(z.string().trim().min(1).regex(/^\S+$/)).optional(),
+      })
+      .optional(),
   })
-  .extend(McpServerSettingsSchema.shape);
+  .extend(McpServerSettingsSchema.shape)
+  .superRefine((config, ctx) => {
+    if (!config.oauth) return;
+    if (config.auth_scheme) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['auth_scheme'],
+        message: 'OAuth cannot be combined with auth_scheme',
+      });
+    }
+    if (Object.keys(config.headers ?? {}).some((name) => name.toLowerCase() === 'authorization')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['headers'],
+        message: 'OAuth cannot be combined with an Authorization header',
+      });
+    }
+  });
 
 export const LocalHttpMcpServerConfigSchema = z
   .object({

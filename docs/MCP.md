@@ -71,6 +71,16 @@ files that identity can read. Only run trusted local MCP packages.
 
 Server names must match `[a-z0-9][a-z0-9-_]{1,62}`. The name `plexus` is reserved for the management MCP server and cannot be used as a gateway server name.
 
+### Upstream OAuth
+
+Plexus can sign in to a remote HTTP MCP server and refresh the upstream credentials. Clients still authenticate to Plexus. Plexus does not pass their credentials to the OAuth server or the MCP endpoint.
+
+1. Open the MCP page over HTTPS. Add the remote MCP URL, select **OAuth**, and save the server.
+2. Click **Connect**. Plexus discovers the issuer and registers a client if supported. If the issuer requires a pre-registered client, Plexus shows the callback URL and asks for the client ID and secret. It reuses that registration for other servers on the same issuer after sign-in succeeds.
+3. Sign in at the issuer. Plexus stores the grant and encrypts it at rest when `ENCRYPTION_KEY` is configured. **Disconnect** clears the grant in Plexus without revoking access at the issuer. Grants and client credentials are not included in portable backups.
+
+For [Google Workspace](https://developers.google.com/workspace/guides/configure-mcp-servers#quick-setup), add a public URL such as `https://gmailmcp.googleapis.com/mcp/v1`. When **Connect** asks for credentials, create a Google Web application client marked **Use this client for an AI-powered agent**, register the callback URL shown in Plexus, then enter the client ID and secret. Leave scopes blank to use the read-only defaults.
+
 ## Plexus Management MCP Tools
 
 The management MCP server at `/mcp/plexus` provides domain-oriented tools for inspecting and managing Plexus configuration. Each tool uses an `operation` argument to select the action, keeping the tool surface compact.

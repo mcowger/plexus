@@ -5335,7 +5335,7 @@
           "Management — Config"
         ],
         "summary": "List configured MCP servers (admin only)",
-        "description": "Returns a map of all configured MCP servers keyed by name.\n\nEach server configuration includes:\n- `upstream_url` — The MCP server endpoint\n- `enabled` — Whether the server is active\n- `headers` — Custom headers to include in proxy requests\n- Auth fields (`auth_type`, `auth_header_value`, etc.)\n\n## Auth and the proxy\n\nThese fields affect how Plexus authenticates to the upstream MCP server:\n- `auth_type` — none, bearer, basic, header\n- `auth_header_value` — static value for custom auth\n\nWhen proxying, Plexus strips the client's `Authorization` and `x-api-key`\nheaders and uses the configured static auth instead.\n\n**Admin only** — limited principals receive 403.\n",
+        "description": "Returns a map of all configured MCP servers keyed by name.\n\nEach server configuration includes:\n- `upstream_url` — The MCP server endpoint\n- `enabled` — Whether the server is active\n- `headers` — Custom headers to include in proxy requests\n- `auth_scheme` — Header scheme for stored static keys\n- `oauth` — OAuth configuration, if enabled; does not contain credentials\n\nPlexus uses its configured upstream authentication. Clients authenticate\nto Plexus separately.\n\n**Admin only** — limited principals receive 403.\n",
         "security": [
           {
             "AdminKey": []
@@ -5564,6 +5564,325 @@
           }
         },
         "operationId": "deleteV0ManagementMcpserversByserverName"
+      }
+    },
+    "/v0/management/mcp-servers/{serverName}/oauth": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "serverName",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Management — Config"
+        ],
+        "operationId": "getV0ManagementMcpServerUpstreamOAuth",
+        "summary": "Get the upstream MCP connection status",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection status, without tokens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "disconnected",
+                        "connected",
+                        "reconnect_required"
+                      ]
+                    },
+                    "expiresAt": {
+                      "type": "number",
+                      "description": "Access token expiry in epoch milliseconds."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No OAuth-enabled MCP server with this name."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Management — Config"
+        ],
+        "operationId": "deleteV0ManagementMcpServerUpstreamOAuth",
+        "summary": "Clear the saved upstream MCP grant",
+        "description": "Disconnects this MCP server in Plexus without revoking the authorization at the issuer.",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Disconnected."
+          },
+          "404": {
+            "description": "No OAuth-enabled MCP server with this name."
+          }
+        }
+      }
+    },
+    "/v0/management/mcp-servers/{serverName}/oauth/connect": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "serverName",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Management — Config"
+        ],
+        "operationId": "postV0ManagementMcpServerUpstreamOAuthConnect",
+        "summary": "Start upstream MCP OAuth in the admin browser",
+        "description": "Builds the callback from the admin browser's origin and sets a browser-bound cookie. Open the returned URL in the same browser to complete sign-in.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Origin of the admin UI. Must be HTTPS (HTTP on localhost is allowed for development)."
+          }
+        ],
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clientId"
+                ],
+                "properties": {
+                  "clientId": {
+                    "type": "string",
+                    "description": "Pre-registered client ID. Submit only when the issuer requires client registration."
+                  },
+                  "clientSecret": {
+                    "type": "string",
+                    "writeOnly": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authorization URL for the upstream issuer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "authorizationUrl"
+                  ],
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid browser origin or OAuth could not be started with the server's settings."
+          },
+          "404": {
+            "description": "No OAuth-enabled MCP server with this name."
+          },
+          "409": {
+            "description": "The issuer requires a pre-registered client (`oauth_client_registration_required`, with `callbackUrl` and `provider`), or the submitted credentials differ from the client already saved for this issuer (`oauth_client_conflict`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "oauth_client_registration_required",
+                        "oauth_client_conflict"
+                      ]
+                    },
+                    "callbackUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "provider": {
+                      "type": "string",
+                      "enum": [
+                        "google",
+                        "other"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v0/management/mcp-upstream-oauth/clients": {
+      "get": {
+        "tags": [
+          "Management — Config"
+        ],
+        "operationId": "getV0ManagementMcpUpstreamOAuthClients",
+        "summary": "List reusable upstream MCP OAuth clients",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved client registrations. Client secrets are never returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "clients"
+                  ],
+                  "properties": {
+                    "clients": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "issuer",
+                          "clientId"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "issuer": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "clientId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Administrator credentials required."
+          }
+        }
+      }
+    },
+    "/v0/management/mcp-upstream-oauth/clients/{id}": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "put": {
+        "tags": [
+          "Management — Config"
+        ],
+        "operationId": "putV0ManagementMcpUpstreamOAuthClient",
+        "summary": "Save a reusable upstream MCP OAuth client",
+        "security": [
+          {
+            "AdminKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "issuer",
+                  "clientId"
+                ],
+                "properties": {
+                  "issuer": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "clientId": {
+                    "type": "string"
+                  },
+                  "clientSecret": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "writeOnly": true,
+                    "description": "Omit to retain a saved secret if the issuer and client ID are unchanged, or send null to remove it."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Client saved."
+          },
+          "400": {
+            "description": "Invalid issuer or client configuration."
+          }
+        }
       }
     },
     "/v0/management/mcp-servers/{serverName}/status": {
@@ -14142,6 +14461,23 @@
                   "type": "string"
                 },
                 "description": "Static headers forwarded upstream."
+              },
+              "oauth": {
+                "type": "object",
+                "description": "Enables Plexus-managed upstream OAuth. Omit for static authentication.",
+                "properties": {
+                  "client": {
+                    "type": "string",
+                    "description": "ID of a saved OAuth client registration. Omit to use dynamic registration when supported."
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Explicit OAuth scopes. When omitted, supported Google Workspace endpoints use read-only defaults."
+                  }
+                }
               }
             }
           }

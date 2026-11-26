@@ -526,6 +526,13 @@
       "when": 1794784431663,
       "tag": "0074_add_response_input_history",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1795564967014,
+      "tag": "0075_add_upstream_mcp_oauth",
+      "breakpoints": true
     }
   ]
 }

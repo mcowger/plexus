@@ -1,0 +1,71 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+post:
+  tags: [Management — Config]
+  operationId: postV0ManagementMcpServerUpstreamOAuthConnect
+  summary: Start upstream MCP OAuth in the admin browser
+  description: Builds the callback from the admin browser's origin and sets a browser-bound cookie. Open the returned URL in the same browser to complete sign-in.
+  parameters:
+    - in: header
+      name: Origin
+      required: true
+      schema:
+        type: string
+      description: Origin of the admin UI. Must be HTTPS (HTTP on localhost is allowed for development).
+  security:
+    - AdminKey: []
+  requestBody:
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [clientId]
+          properties:
+            clientId:
+              type: string
+              description: Pre-registered client ID. Submit only when the issuer requires client registration.
+            clientSecret:
+              type: string
+              writeOnly: true
+  responses:
+    '200':
+      description: Authorization URL for the upstream issuer.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [authorizationUrl]
+            properties:
+              authorizationUrl:
+                type: string
+                format: uri
+    '400':
+      description: Invalid browser origin or OAuth could not be started with the server's settings.
+    '404':
+      description: No OAuth-enabled MCP server with this name.
+    '409':
+      description: >-
+        The issuer requires a pre-registered client (`oauth_client_registration_required`, with
+        `callbackUrl` and `provider`), or the submitted credentials differ from the client already
+        saved for this issuer (`oauth_client_conflict`).
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, code]
+            properties:
+              error:
+                type: string
+              code:
+                type: string
+                enum: [oauth_client_registration_required, oauth_client_conflict]
+              callbackUrl:
+                type: string
+                format: uri
+              provider:
+                type: string
+                enum: [google, other]

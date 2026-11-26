@@ -52,3 +52,15 @@ oneOf:
         additionalProperties:
           type: string
         description: Static headers forwarded upstream.
+      oauth:
+        type: object
+        description: Enables Plexus-managed upstream OAuth. Omit for static authentication.
+        properties:
+          client:
+            type: string
+            description: ID of a saved OAuth client registration. Omit to use dynamic registration when supported.
+          scopes:
+            type: array
+            items:
+              type: string
+            description: Explicit OAuth scopes. When omitted, supported Google Workspace endpoints use read-only defaults.

@@ -192,8 +192,29 @@ async function main() {
   }
   logger.warn(`Re-keyed ${mcpCount} MCP server(s)`);
 
+  let upstreamOAuthCount = 0;
+  for (const row of await db.select().from(schema.mcpUpstreamOauthClients)) {
+    if (row.clientSecret && isEncrypted(row.clientSecret)) {
+      await db
+        .update(schema.mcpUpstreamOauthClients)
+        .set({ clientSecret: reEncrypt(row.clientSecret, oldKey, newKey) })
+        .where(eq(schema.mcpUpstreamOauthClients.id, row.id));
+      upstreamOAuthCount++;
+    }
+  }
+  for (const row of await db.select().from(schema.mcpUpstreamOauthGrants)) {
+    if (isEncrypted(row.payload)) {
+      await db
+        .update(schema.mcpUpstreamOauthGrants)
+        .set({ payload: reEncrypt(row.payload, oldKey, newKey) })
+        .where(eq(schema.mcpUpstreamOauthGrants.serverId, row.serverId));
+      upstreamOAuthCount++;
+    }
+  }
+  logger.warn(`Re-keyed ${upstreamOAuthCount} upstream MCP OAuth record(s)`);
+
   logger.warn(
-    `Re-key complete. Total: ${totalReKeyed + oauthCount + providerCount + mcpCount} record(s). ` +
+    `Re-key complete. Total: ${totalReKeyed + oauthCount + providerCount + mcpCount + upstreamOAuthCount} record(s). ` +
       'Update your ENCRYPTION_KEY env var to the new key before restarting.'
   );
 }

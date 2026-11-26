@@ -137,5 +137,28 @@ export async function runEncryptionMigration(): Promise<void> {
     throw error;
   }
 
+  const clients = schema.mcpUpstreamOauthClients;
+  for (const { id, clientSecret } of await db
+    .select({ id: clients.id, clientSecret: clients.clientSecret })
+    .from(clients)) {
+    if (clientSecret && !isEncrypted(clientSecret)) {
+      await db
+        .update(clients)
+        .set({ clientSecret: encrypt(clientSecret) })
+        .where(eq(clients.id, id));
+    }
+  }
+  const grants = schema.mcpUpstreamOauthGrants;
+  for (const { serverId, payload } of await db
+    .select({ serverId: grants.serverId, payload: grants.payload })
+    .from(grants)) {
+    if (!isEncrypted(payload)) {
+      await db
+        .update(grants)
+        .set({ payload: encrypt(payload) })
+        .where(eq(grants.serverId, serverId));
+    }
+  }
+
   logger.debug('Encryption migration completed successfully');
 }

@@ -47,11 +47,17 @@ export type {
 } from './provider-presets';
 
 export {
+  getMcpUpstreamOAuthCallbackUrl,
+  isMcpOAuthTransport,
+  MCP_LOOPBACK_HOSTNAMES,
+  MCP_UI_PATH,
+  parseMcpOAuthUrl,
   LocalHttpMcpServerConfigSchema,
   McpKeyCreateSchema,
   McpKeySchema,
   McpServerConfigSchema,
   McpServerSettingsSchema,
   RemoteHttpMcpServerConfigSchema,
+  MCP_UPSTREAM_OAUTH_CALLBACK_PATH,
 } from './mcp';
 export type { McpKey, McpKeyCreate, McpServerConfig } from './mcp';
