@@ -399,6 +399,82 @@ describe('MCP Proxy Service', () => {
       registerSpy(mcpProcessManager, 'ensureRunning').mockResolvedValue(undefined);
     });
 
+    test.each([
+      ['application/json', 'gzip'],
+      ['text/event-stream', 'gzip'],
+      ['application/json', 'x-gzip'],
+      ['application/json', 'zstd'],
+      ['application/json', 'identity, gzip'],
+      ['application/json', 'gzip, identity'],
+    ])('relays a decompressed %s response encoded as %s', async (contentType, encoding) => {
+      const payload = '{"jsonrpc":"2.0","id":1,"result":{"ok":true}}';
+      const upstreamBody = contentType === 'text/event-stream' ? `data: ${payload}\n\n` : payload;
+      const compressed =
+        encoding === 'zstd' ? Bun.zstdCompressSync(upstreamBody) : Bun.gzipSync(upstreamBody);
+      const server = Bun.serve({
+        port: 0,
+        fetch: () =>
+          new Response(new Uint8Array(compressed), {
+            headers: {
+              'content-type': contentType,
+              'content-encoding': encoding,
+              'content-length': String(compressed.byteLength),
+            },
+          }),
+      });
+      try {
+        setConfigForTesting({
+          providers: {},
+          models: {},
+          keys: {},
+          failover: {
+            enabled: false,
+            retryableStatusCodes: [429, 500, 502, 503, 504],
+            retryableErrors: ['ECONNREFUSED', 'ETIMEDOUT'],
+          },
+          quotas: [],
+          mcpServers: {
+            'local-server': {
+              mode: 'local_http',
+              enabled: true,
+              launcher: 'bunx',
+              package: '@example/mcp-server',
+              port: server.port!,
+              path: '/mcp',
+            },
+          },
+        });
+        const result = await proxyMcpRequest('local-server', 'GET', {
+          'accept-encoding': encoding,
+        });
+        expect(result.status).toBe(200);
+        expect(result.headers['content-encoding']).toBeUndefined();
+        expect(result.headers['content-length']).toBeUndefined();
+        expect(result.headers['content-type']).toBe(contentType);
+        if (contentType === 'text/event-stream') {
+          expect(await new Response(result.stream).text()).toBe(upstreamBody);
+        } else {
+          expect(result.body).toEqual(JSON.parse(payload));
+        }
+      } finally {
+        server.stop(true);
+      }
+    });
+
+    test.each(['identity', 'gzip, br', 'gzip, unknown'])(
+      'preserves content encoding %s when fetch does not decode it',
+      async (encoding) => {
+        spyOn(globalThis, 'fetch').mockResolvedValue(
+          new Response('data: example\n\n', {
+            headers: { 'content-type': 'text/event-stream', 'content-encoding': encoding },
+          })
+        );
+        const result = await proxyMcpRequest('local-server', 'GET', {});
+        expect(result.headers['content-encoding']).toBe(encoding);
+        expect(await new Response(result.stream).text()).toBe('data: example\n\n');
+      }
+    );
+
     test.each(['text/event-stream', 'TEXT/EVENT-STREAM;charset=utf-8'])(
       'returns an SSE response body as a stream for %s',
       async (contentType) => {

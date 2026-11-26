@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Remove stale compression and length headers from decoded MCP upstream responses. (#1089)
 - Honor per-provider timeouts for embeddings, audio transcriptions, and text-to-speech requests. (#1080)
 - Cancel upstream streams and stop reporting progress when response streams close early
 - Use the signed-in Codex account's reasoning options. Clamp unsupported efforts and strip saved reasoning updates on models that can't replay them.
