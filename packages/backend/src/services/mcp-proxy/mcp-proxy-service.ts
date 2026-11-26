@@ -1,13 +1,16 @@
 import { and, asc, eq } from 'drizzle-orm';
 
-import { getConfig } from '../../config';
+import { getConfig, type McpServerConfig } from '../../config';
 import { getDatabase, getSchema } from '../../db/client';
-import { McpServerConfig } from '../../types/mcp';
 import { decryptField } from '../../utils/encryption';
 import { getClientIp } from '../../utils/ip';
 import { logger } from '../../utils/logger';
 import { ConfigService } from '../configuration/config-service';
 import { mcpProcessManager } from '../mcp-local/mcp-process-manager';
+import {
+  getUpstreamMcpAccessToken,
+  markUpstreamMcpTokenRejected,
+} from '../mcp-upstream-oauth/oauth';
 
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
@@ -23,6 +26,17 @@ const HOP_BY_HOP_HEADERS = new Set([
 const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'set-cookie', 'x-api-key']);
 
 const CLIENT_AUTH_HEADERS = new Set(['authorization', 'x-api-key', 'proxy-authorization']);
+const OAUTH_PROXY_AUTH_HEADERS: Record<string, true> = {
+  cookie: true,
+  'x-admin-key': true,
+  'x-goog-api-key': true,
+};
+const OAUTH_PROXY_AUTH_QUERY: Record<string, true> = {
+  key: true,
+  api_key: true,
+  access_token: true,
+};
+const UPSTREAM_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 const RESERVED_SERVER_NAMES = new Set(['plexus']);
 
@@ -394,6 +408,8 @@ export async function proxyMcpRequest(
   }
 
   const upstreamUrl = getEffectiveUpstreamUrl(serverConfig);
+  const isRemote = serverConfig.mode !== 'local_http';
+  const usesOAuth = isRemote && serverConfig.oauth !== undefined;
   const staticHeaders = serverConfig.headers || {};
   logger.debug('[mcp-proxy:' + serverName + '] proxying ' + method + ' request to ' + upstreamUrl);
 
@@ -403,18 +419,32 @@ export async function proxyMcpRequest(
 
   delete filteredClientHeaders['host'];
 
-  // Filter out client auth headers - we don't forward Plexus client credentials to upstream
-  // Upstream auth should come from static headers or URL query params only
+  // Downstream credentials authenticate to Plexus, not the upstream server.
   const clientAuthFiltered = filterClientAuthHeaders(filteredClientHeaders);
 
   const upstreamHeaders = mergeUpstreamHeaders(clientAuthFiltered, staticHeaders);
+  if (usesOAuth) {
+    for (const name of Object.keys(upstreamHeaders)) {
+      const lower = name.toLowerCase();
+      if (CLIENT_AUTH_HEADERS.has(lower) || Object.hasOwn(OAUTH_PROXY_AUTH_HEADERS, lower)) {
+        delete upstreamHeaders[name];
+      }
+    }
+  }
 
   let url = upstreamUrl;
 
   if (query && Object.keys(query).length > 0) {
-    const params = new URLSearchParams(query);
-    const separator = upstreamUrl.endsWith('?') ? '' : upstreamUrl.includes('?') ? '&' : '?';
-    url = `${upstreamUrl}${separator}${params.toString()}`;
+    const params = new URLSearchParams();
+    for (const [name, value] of Object.entries(query)) {
+      if (!usesOAuth || !Object.hasOwn(OAUTH_PROXY_AUTH_QUERY, name.toLowerCase())) {
+        params.append(name, value);
+      }
+    }
+    if (params.size > 0) {
+      const separator = upstreamUrl.endsWith('?') ? '' : upstreamUrl.includes('?') ? '&' : '?';
+      url = `${upstreamUrl}${separator}${params.toString()}`;
+    }
   }
 
   logger.silly(`Final URL: ${url}`);
@@ -426,19 +456,27 @@ export async function proxyMcpRequest(
     }
 
     const toolsListRequested = requestsToolsList(body);
-    const isRemote = !serverConfig.mode || serverConfig.mode === 'remote_http';
-    const keyConfig = isRemote ? await getActiveMcpKeys(serverName) : null;
+    let accessToken: string | null = null;
+    if (usesOAuth) {
+      try {
+        accessToken = await getUpstreamMcpAccessToken(serverName, upstreamUrl);
+      } catch {
+        return { status: 502, headers: {}, error: 'Could not refresh upstream MCP credentials' };
+      }
+      if (!accessToken) {
+        return { status: 502, headers: {}, error: 'Upstream MCP server needs an admin to connect' };
+      }
+    }
+    const keyConfig = isRemote && !usesOAuth ? await getActiveMcpKeys(serverName) : null;
     const keys = keyConfig?.keys ?? [];
     const attempts = Math.max(keys.length, 1);
     let response: Response | undefined;
 
     for (let attempt = 0; attempt < attempts; attempt++) {
       const key = selectMcpKeyRoundRobin(keyConfig?.server.id ?? 0, keys);
-      let requestHeaders = injectMcpKeyAuth(
-        upstreamHeaders,
-        keyConfig?.server.authScheme ?? null,
-        key?.key
-      );
+      let requestHeaders = accessToken
+        ? { ...upstreamHeaders, Authorization: `Bearer ${accessToken}` }
+        : injectMcpKeyAuth(upstreamHeaders, keyConfig?.server.authScheme ?? null, key?.key);
 
       const hasContentType = Object.keys(requestHeaders).some(
         (k) => k.toLowerCase() === 'content-type'
@@ -462,6 +500,7 @@ export async function proxyMcpRequest(
         method,
         headers: requestHeaders,
         body: requestBody || undefined,
+        ...(usesOAuth && { redirect: 'manual' }),
       });
 
       if ((response.status !== 429 && response.status !== 402) || !key || !keyConfig) break;
@@ -476,6 +515,21 @@ export async function proxyMcpRequest(
     }
 
     if (!response) throw new Error('MCP upstream request was not attempted');
+    if (accessToken && response.status === 401) {
+      await response.body?.cancel();
+      await markUpstreamMcpTokenRejected(serverName, accessToken).catch(() => {
+        logger.warn(`[mcp-proxy:${serverName}] could not invalidate a rejected upstream token`);
+      });
+      return { status: 502, headers: {}, error: 'Upstream MCP server rejected its OAuth token' };
+    }
+    if (usesOAuth && UPSTREAM_REDIRECT_STATUSES.has(response.status)) {
+      await response.body?.cancel();
+      return {
+        status: 502,
+        headers: {},
+        error: 'OAuth upstream MCP server redirected the request',
+      };
+    }
     logger.debug(
       '[mcp-proxy:' + serverName + '] upstream fetch completed with status ' + response.status
     );
@@ -484,6 +538,7 @@ export async function proxyMcpRequest(
     response.headers.forEach((value, key) => {
       if (
         !HOP_BY_HOP_HEADERS.has(key) &&
+        (!usesOAuth || key !== 'www-authenticate') &&
         key !== 'content-length' &&
         !(
           key === 'content-encoding' &&

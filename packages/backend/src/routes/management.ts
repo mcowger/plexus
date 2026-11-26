@@ -17,6 +17,10 @@ import { registerErrorRoutes } from './management/errors';
 import { registerLoggingRoutes } from './management/logging';
 import { registerMcpLogRoutes } from './management/mcp-logs';
 import { registerMcpOAuthManagementRoutes } from './management/mcp-oauth';
+import {
+  registerMcpUpstreamOAuthCallbackRoute,
+  registerMcpUpstreamOAuthRoutes,
+} from './management/mcp-upstream-oauth';
 import { registerMetricsRoutes } from './management/metrics';
 import { registerModelRoutes } from './management/models';
 import { registerOAuthRoutes } from './management/oauth';
@@ -40,6 +44,8 @@ export async function registerManagementRoutes(
   mcpUsageStorage?: McpUsageStorageService,
   quotaEnforcer?: QuotaEnforcer
 ) {
+  await registerMcpUpstreamOAuthCallbackRoute(fastify);
+
   // Encapsulate all management routes in their own scope so the management
   // error handler doesn't collide with the global one (avoids FSTWRN004).
   fastify.register(async (mgmt) => {
@@ -98,6 +104,12 @@ export async function registerManagementRoutes(
       restore.addHook('onRequest', authenticate);
       restore.addHook('onRequest', requireAdmin);
       await registerRestoreRoutes(restore);
+    });
+
+    mgmt.register(async (upstreamOAuth) => {
+      upstreamOAuth.addHook('onRequest', authenticate);
+      upstreamOAuth.addHook('onRequest', requireAdmin);
+      await registerMcpUpstreamOAuthRoutes(upstreamOAuth);
     });
 
     // Admin-only routes: mutating config, system-level controls, etc.

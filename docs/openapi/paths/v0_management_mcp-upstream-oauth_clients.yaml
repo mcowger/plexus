@@ -1,0 +1,30 @@
+get:
+  tags: [Management — Config]
+  operationId: getV0ManagementMcpUpstreamOAuthClients
+  summary: List reusable upstream MCP OAuth clients
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Saved client registrations. Client secrets are never returned.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [clients]
+            properties:
+              clients:
+                type: array
+                items:
+                  type: object
+                  required: [id, issuer, clientId]
+                  properties:
+                    id:
+                      type: string
+                    issuer:
+                      type: string
+                      format: uri
+                    clientId:
+                      type: string
+    '401':
+      description: Administrator credentials required.

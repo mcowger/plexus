@@ -473,6 +473,14 @@ paths:
     $ref: paths/v0_management_mcp-servers.yaml
   /v0/management/mcp-servers/{serverName}:
     $ref: paths/v0_management_mcp-servers_{serverName}.yaml
+  /v0/management/mcp-servers/{serverName}/oauth:
+    $ref: paths/v0_management_mcp-servers_{serverName}_oauth.yaml
+  /v0/management/mcp-servers/{serverName}/oauth/connect:
+    $ref: paths/v0_management_mcp-servers_{serverName}_oauth_connect.yaml
+  /v0/management/mcp-upstream-oauth/clients:
+    $ref: paths/v0_management_mcp-upstream-oauth_clients.yaml
+  /v0/management/mcp-upstream-oauth/clients/{id}:
+    $ref: paths/v0_management_mcp-upstream-oauth_clients_{id}.yaml
   /v0/management/mcp-servers/{serverName}/status:
     $ref: paths/v0_management_mcp-servers_{serverName}_status.yaml
   /v0/management/mcp-servers/{serverName}/start:

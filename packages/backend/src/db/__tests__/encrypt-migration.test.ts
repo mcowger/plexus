@@ -11,7 +11,9 @@ import {
   getSchema,
   initializeDatabase,
 } from '../client';
+import { ConfigRepository } from '../config-repository';
 import { runEncryptionMigration } from '../encrypt-migration';
+import { mcpUpstreamOAuthRepository } from '../mcp-upstream-oauth-repository';
 import { runMigrations } from '../migrate';
 
 const TEST_KEY = 'b'.repeat(64);
@@ -190,6 +192,63 @@ describe('encryption migration', () => {
     const row = rows[0]!;
     expect(isEncrypted(row.headers as string)).toBe(true);
     expect(JSON.parse(decrypt(row.headers as string))).toEqual({ 'X-Api-Key': 'mcp-secret' });
+  });
+
+  it('keeps upstream MCP OAuth grants usable when optional encryption is enabled later', async () => {
+    setEncryptionKey(undefined);
+    const repo = mcpUpstreamOAuthRepository;
+    const name = 'test-mcp-oauth';
+    const issuer = 'https://issuer.example';
+    const resource = 'https://mcp.example/mcp';
+    try {
+      await repo.saveClient(name, { issuer, clientId: 'app', clientSecret: 'client-secret' });
+      await new ConfigRepository().saveMcpServer(name, {
+        enabled: true,
+        upstream_url: resource,
+        oauth: { client: name },
+      });
+      const connection = (await repo.getConnection(name))!;
+      const registration = (await repo.getClient(name))!;
+      const tokens = {
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        token_type: 'Bearer',
+      };
+      await repo.saveGrant(connection, {
+        clientRevision: registration.revision,
+        authorizationServerUrl: issuer,
+        resource,
+        metadata: {
+          issuer,
+          authorization_endpoint: `${issuer}/authorize`,
+          token_endpoint: `${issuer}/token`,
+          response_types_supported: ['code'],
+        },
+        clientInformation: { client_id: 'app', client_secret: 'client-secret' },
+        tokens,
+      });
+      expect((await repo.getGrant(connection.id))?.tokens).toEqual(tokens);
+
+      setEncryptionKey(TEST_KEY);
+      await runEncryptionMigration();
+      const [grant] = await db
+        .select()
+        .from(schema.mcpUpstreamOauthGrants)
+        .where(eq(schema.mcpUpstreamOauthGrants.serverId, connection.id));
+      const [client] = await db
+        .select()
+        .from(schema.mcpUpstreamOauthClients)
+        .where(eq(schema.mcpUpstreamOauthClients.id, name));
+      expect(isEncrypted(grant!.payload)).toBe(true);
+      expect(isEncrypted(client!.clientSecret!)).toBe(true);
+      expect((await repo.getGrant(connection.id))?.tokens).toEqual(tokens);
+      expect((await repo.getClient(name))?.clientSecret).toBe('client-secret');
+    } finally {
+      await new ConfigRepository().deleteMcpServer(name);
+      await db
+        .delete(schema.mcpUpstreamOauthClients)
+        .where(eq(schema.mcpUpstreamOauthClients.id, name));
+    }
   });
 
   it('is idempotent (does not double-encrypt)', async () => {

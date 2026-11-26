@@ -1,6 +1,7 @@
 import { Copy, Edit2, Trash2 } from 'lucide-react';
 
 import type { McpServer } from '../../lib/api';
+import type { McpUpstreamOAuthStatus } from '../../types/mcp';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Switch } from '../ui/Switch';
@@ -16,6 +17,10 @@ interface McpServerTableProps {
   onDelete: (serverName: string) => void | Promise<void>;
   mcpPathForServer: (serverName: string) => string;
   onCopyMcpPath: (path: string) => void | Promise<void>;
+  oauthStatuses: Record<string, McpUpstreamOAuthStatus>;
+  oauthBusy: string | null;
+  onConnectOAuth: (name: string) => void;
+  onDisconnectOAuth: (name: string) => void;
 }
 
 export function McpServerTable({
@@ -29,7 +34,40 @@ export function McpServerTable({
   onDelete,
   mcpPathForServer,
   onCopyMcpPath,
+  oauthStatuses,
+  oauthBusy,
+  onConnectOAuth,
+  onDisconnectOAuth,
 }: McpServerTableProps) {
+  const oauthControls = (name: string) => {
+    const status = oauthStatuses[name]?.status;
+    return (
+      <div
+        className="mt-2 flex flex-wrap items-center gap-2 text-xs"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span>OAuth: {status ? status.replace('_', ' ') : 'loading'}</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!status || oauthBusy === name}
+          onClick={() => onConnectOAuth(name)}
+        >
+          {status === 'disconnected' ? 'Connect' : 'Reconnect'}
+        </Button>
+        {status && status !== 'disconnected' && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={oauthBusy === name}
+            onClick={() => onDisconnectOAuth(name)}
+          >
+            Disconnect
+          </Button>
+        )}
+      </div>
+    );
+  };
   return (
     <Card title="MCP Servers">
       {serverNames.length === 0 ? (
@@ -67,7 +105,7 @@ export function McpServerTable({
                       </div>
                     </button>
                     <div className="flex shrink-0 items-center gap-2">
-                      {server.mode !== 'local_http' && (
+                      {server.mode !== 'local_http' && !server.oauth && (
                         <Button size="sm" variant="secondary" onClick={() => onManageKeys(name)}>
                           Manage Keys
                         </Button>
@@ -88,6 +126,7 @@ export function McpServerTable({
                       </Button>
                     </div>
                   </div>
+                  {server.mode !== 'local_http' && server.oauth && oauthControls(name)}
                   <div className="border-border-glass bg-bg-glass mt-3 rounded border px-2 py-1.5 text-xs">
                     <span className="text-text-muted">Headers: </span>
                     <span className="text-text-secondary font-medium">
@@ -222,6 +261,7 @@ export function McpServerTable({
                             onChange={(val) => onToggleEnabled(name, val)}
                             size="sm"
                           />
+                          {server.mode !== 'local_http' && server.oauth && oauthControls(name)}
                         </div>
                       </td>
                       <td
@@ -229,7 +269,7 @@ export function McpServerTable({
                         style={{ paddingRight: '24px', textAlign: 'right' }}
                       >
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          {server.mode !== 'local_http' && (
+                          {server.mode !== 'local_http' && !server.oauth && (
                             <Button
                               size="sm"
                               variant="secondary"

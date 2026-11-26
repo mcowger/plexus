@@ -1,0 +1,34 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema:
+      type: string
+put:
+  tags: [Management — Config]
+  operationId: putV0ManagementMcpUpstreamOAuthClient
+  summary: Save a reusable upstream MCP OAuth client
+  security:
+    - AdminKey: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [issuer, clientId]
+          properties:
+            issuer:
+              type: string
+              format: uri
+            clientId:
+              type: string
+            clientSecret:
+              type: [string, 'null']
+              writeOnly: true
+              description: Omit to retain a saved secret if the issuer and client ID are unchanged, or send null to remove it.
+  responses:
+    '204':
+      description: Client saved.
+    '400':
+      description: Invalid issuer or client configuration.

@@ -6,6 +6,7 @@ export interface RemoteMcpServer {
   enabled: boolean;
   headers?: Record<string, string>;
   auth_scheme?: string | null;
+  oauth?: { client?: string; scopes?: string[] };
   rate_limit_cooldown_ms?: number;
   quota_cooldown_ms?: number;
 }
@@ -24,6 +25,11 @@ export interface LocalMcpServer {
   auth_scheme?: string | null;
   rate_limit_cooldown_ms?: number;
   quota_cooldown_ms?: number;
+}
+
+export interface McpUpstreamOAuthStatus {
+  status: 'disconnected' | 'connected' | 'reconnect_required';
+  expiresAt?: number;
 }
 
 export interface McpServerKey {

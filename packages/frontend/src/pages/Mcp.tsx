@@ -12,6 +12,7 @@ import { McpKeyManagementModal } from '../components/mcp/McpKeyManagementModal';
 import { McpOAuthClientsCard } from '../components/mcp/McpOAuthClientsCard';
 import { McpServerEditorModal } from '../components/mcp/McpServerEditorModal';
 import { McpServerTable } from '../components/mcp/McpServerTable';
+import { McpUpstreamConnectModal } from '../components/mcp/McpUpstreamConnectModal';
 import { McpUsageLogsCard } from '../components/mcp/McpUsageLogsCard';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -26,7 +27,14 @@ import {
   McpServerKey,
   RemoteMcpServer,
 } from '../lib/api';
+import {
+  connectUpstreamOAuth,
+  disconnectUpstreamOAuth,
+  getUpstreamOAuthStatus,
+  UpstreamOAuthRegistrationRequired,
+} from '../lib/api/mcp';
 import { copyToClipboard, isClipboardAvailable } from '../lib/clipboard';
+import type { McpUpstreamOAuthStatus } from '../types/mcp';
 
 const LOCAL_MCP_DEFAULT_PORT = 7345;
 const CLI_BUNX_COMMAND = 'bunx @mcowger/plexus-cli';
@@ -37,6 +45,7 @@ const EMPTY_SERVER: RemoteMcpServer = {
   upstream_url: '',
   enabled: true,
   headers: {},
+  oauth: {},
 };
 
 const EMPTY_LOCAL_SERVER: LocalMcpServer = {
@@ -74,6 +83,15 @@ export const McpPage: React.FC = () => {
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [isCliInstallOpen, setIsCliInstallOpen] = useState(false);
   const [, setCurrentTime] = useState(Date.now());
+  const [upstreamRegistration, setUpstreamRegistration] = useState<{
+    name: string;
+    callbackUrl: string;
+    provider: 'google' | 'other';
+  } | null>(null);
+  const [upstreamStatuses, setUpstreamStatuses] = useState<Record<string, McpUpstreamOAuthStatus>>(
+    {}
+  );
+  const [upstreamBusy, setUpstreamBusy] = useState<string | null>(null);
 
   // Logs state
   const [logs, setLogs] = useState<McpLogRecord[]>([]);
@@ -109,6 +127,14 @@ export const McpPage: React.FC = () => {
   useEffect(() => {
     loadData();
     loadOAuthClients();
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get('upstream_oauth');
+    if (result) {
+      if (result === 'connected') toast.success('Upstream OAuth connected');
+      else toast.error('Upstream OAuth connection failed');
+      url.searchParams.delete('upstream_oauth');
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
   }, []);
 
   useEffect(() => {
@@ -127,10 +153,56 @@ export const McpPage: React.FC = () => {
       const [data, enabled] = await Promise.all([api.getMcpServers(), api.getMcpEnabled()]);
       setServers(data);
       setMcpEnabled(enabled.enabled);
+      const oauthNames = Object.entries(data)
+        .filter(([, server]) => server.mode !== 'local_http' && server.oauth)
+        .map(([name]) => name);
+      const statuses = await Promise.all(
+        oauthNames.map(async (name) => {
+          try {
+            return [name, await getUpstreamOAuthStatus(name)] as const;
+          } catch (e) {
+            toast.error((e as Error).message, `Failed to load OAuth status for ${name}`);
+            return null;
+          }
+        })
+      );
+      setUpstreamStatuses(Object.fromEntries(statuses.filter((entry) => entry !== null)));
     } catch (e) {
       console.error('Failed to load MCP servers', e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleConnectUpstream = async (
+    name: string,
+    client?: { clientId: string; clientSecret?: string }
+  ) => {
+    setUpstreamBusy(name);
+    try {
+      const { authorizationUrl } = await connectUpstreamOAuth(name, client);
+      window.location.assign(authorizationUrl);
+    } catch (e) {
+      if (e instanceof UpstreamOAuthRegistrationRequired) {
+        setUpstreamRegistration({ name, callbackUrl: e.callbackUrl, provider: e.provider });
+      } else {
+        toast.error((e as Error).message, 'Failed to connect upstream OAuth');
+      }
+    } finally {
+      setUpstreamBusy(null);
+    }
+  };
+
+  const handleDisconnectUpstream = async (name: string) => {
+    setUpstreamBusy(name);
+    try {
+      await disconnectUpstreamOAuth(name);
+      setUpstreamStatuses((previous) => ({ ...previous, [name]: { status: 'disconnected' } }));
+      toast.success('Upstream OAuth disconnected');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to disconnect upstream OAuth');
+    } finally {
+      setUpstreamBusy(null);
     }
   };
 
@@ -414,6 +486,10 @@ export const McpPage: React.FC = () => {
       finalEnv[envKey.trim()] = envValue;
     }
 
+    const scopes =
+      editingServer.mode !== 'local_http'
+        ? editingServer.oauth?.scopes?.map((scope) => scope.trim()).filter(Boolean)
+        : undefined;
     setIsSaving(true);
     try {
       const serverSettings = {
@@ -431,7 +507,14 @@ export const McpPage: React.FC = () => {
               headers: finalHeaders,
               env: finalEnv,
             }
-          : { ...editingServer, ...serverSettings, headers: finalHeaders }
+          : {
+              ...editingServer,
+              ...serverSettings,
+              headers: finalHeaders,
+              ...(editingServer.oauth
+                ? { oauth: { ...editingServer.oauth, scopes: scopes?.length ? scopes : undefined } }
+                : {}),
+            }
       );
       await loadData();
       setIsModalOpen(false);
@@ -763,6 +846,10 @@ export const McpPage: React.FC = () => {
             onDelete={handleDelete}
             mcpPathForServer={mcpPathForServer}
             onCopyMcpPath={handleCopyMcpPath}
+            oauthStatuses={upstreamStatuses}
+            oauthBusy={upstreamBusy}
+            onConnectOAuth={handleConnectUpstream}
+            onDisconnectOAuth={handleDisconnectUpstream}
           />
 
           <McpOAuthClientsCard
@@ -792,6 +879,16 @@ export const McpPage: React.FC = () => {
             onDeleteLog={handleDeleteLog}
             onOffsetChange={setLogsOffset}
           />
+
+          {upstreamRegistration && (
+            <McpUpstreamConnectModal
+              callbackUrl={upstreamRegistration.callbackUrl}
+              provider={upstreamRegistration.provider}
+              isBusy={upstreamBusy === upstreamRegistration.name}
+              onClose={() => setUpstreamRegistration(null)}
+              onContinue={(client) => void handleConnectUpstream(upstreamRegistration.name, client)}
+            />
+          )}
 
           <McpServerEditorModal
             isOpen={isModalOpen}

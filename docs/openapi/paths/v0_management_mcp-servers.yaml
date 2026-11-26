@@ -9,16 +9,11 @@ get:
     - `upstream_url` — The MCP server endpoint
     - `enabled` — Whether the server is active
     - `headers` — Custom headers to include in proxy requests
-    - Auth fields (`auth_type`, `auth_header_value`, etc.)
+    - `auth_scheme` — Header scheme for stored static keys
+    - `oauth` — OAuth configuration, if enabled; does not contain credentials
 
-    ## Auth and the proxy
-
-    These fields affect how Plexus authenticates to the upstream MCP server:
-    - `auth_type` — none, bearer, basic, header
-    - `auth_header_value` — static value for custom auth
-
-    When proxying, Plexus strips the client's `Authorization` and `x-api-key`
-    headers and uses the configured static auth instead.
+    Plexus uses its configured upstream authentication. Clients authenticate
+    to Plexus separately.
 
     **Admin only** — limited principals receive 403.
   security:

@@ -247,17 +247,65 @@ export function McpServerEditorModal({
             </div>
           </>
         ) : (
-          <Input
-            label="Upstream URL"
-            value={remoteServer?.upstream_url ?? ''}
-            onChange={(e) =>
-              onEditingServerChange({
-                ...(remoteServer || emptyServer),
-                upstream_url: e.target.value,
-              })
-            }
-            placeholder="https://mcp.example.com/mcp"
-          />
+          <>
+            <Input
+              label="Upstream URL"
+              value={remoteServer?.upstream_url ?? ''}
+              onChange={(e) =>
+                onEditingServerChange({
+                  ...(remoteServer || emptyServer),
+                  upstream_url: e.target.value,
+                })
+              }
+              placeholder="https://mcp.example.com/mcp"
+            />
+            {remoteServer && (
+              <>
+                <div>
+                  <label
+                    className="text-text-secondary mb-1 block text-sm font-medium"
+                    htmlFor="mcp-upstream-auth"
+                  >
+                    Authentication
+                  </label>
+                  <select
+                    id="mcp-upstream-auth"
+                    className="border-border-glass bg-bg-surface text-text w-full rounded-md border px-3 py-2 text-sm"
+                    value={remoteServer.oauth ? 'oauth' : 'static'}
+                    onChange={(e) => {
+                      const { oauth: _oauth, ...rest } = remoteServer;
+                      onEditingServerChange(
+                        e.target.value === 'oauth' ? { ...rest, oauth: {} } : rest
+                      );
+                    }}
+                  >
+                    <option value="static">Static credentials / headers</option>
+                    <option value="oauth">OAuth</option>
+                  </select>
+                </div>
+                {remoteServer.oauth && (
+                  <>
+                    <Input
+                      label="OAuth scopes (comma separated)"
+                      value={(remoteServer.oauth.scopes ?? []).join(',')}
+                      onChange={(e) =>
+                        onEditingServerChange({
+                          ...remoteServer,
+                          oauth: { ...remoteServer.oauth, scopes: e.target.value.split(',') },
+                        })
+                      }
+                      placeholder="openid, email"
+                    />
+                    <p className="text-text-muted text-xs">
+                      Leave blank to use least-privilege read scopes for recognized Google Workspace
+                      endpoints, or enter scopes for different privileges. Save the server, then
+                      connect it from the server list.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </>
         )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

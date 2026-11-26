@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, spyOn, test } from 'bun:test';
 
-import { registerSpy } from '../../../../test/test-utils';
+import { asFetch, registerSpy } from '../../../../test/test-utils';
 import { setConfigForTesting } from '../../../config';
 import { mcpProcessManager } from '../../mcp-local/mcp-process-manager';
+import * as upstreamOAuth from '../../mcp-upstream-oauth/oauth';
 import {
   clampNonPositiveToolsListTtl,
   extractJsonRpcMethod,
@@ -633,6 +634,81 @@ describe('MCP Proxy Service', () => {
       expect(result.stream).toBeDefined();
       const text = await new Response(result.stream).text();
       expect(text).toBe(sse);
+    });
+  });
+
+  describe('upstream OAuth', () => {
+    const upstreamUrl = 'https://workspace.example/mcp';
+    let outgoing: Request | undefined;
+    let response: Response;
+
+    beforeEach(() => {
+      setConfigForTesting({
+        providers: {},
+        models: {},
+        keys: {},
+        failover: { enabled: false, retryableStatusCodes: [], retryableErrors: [] },
+        quotas: [],
+        mcpServers: { workspace: { upstream_url: upstreamUrl, oauth: {}, enabled: true } },
+      });
+      outgoing = undefined;
+      response = Response.json({ jsonrpc: '2.0', result: {} });
+      spyOn(upstreamOAuth, 'getUpstreamMcpAccessToken').mockResolvedValue('upstream-token');
+      spyOn(upstreamOAuth, 'markUpstreamMcpTokenRejected').mockResolvedValue(undefined);
+      spyOn(globalThis, 'fetch').mockImplementation(
+        asFetch(async (url, init) => {
+          outgoing = new Request(url, init);
+          return response;
+        })
+      );
+    });
+
+    test('replaces downstream credentials without losing transport headers or query parameters', async () => {
+      const result = await proxyMcpRequest(
+        'workspace',
+        'GET',
+        {
+          Authorization: 'Bearer plexus-token',
+          'X-Goog-Api-Key': 'plexus-key',
+          'X-Api-Key': 'plexus-key',
+          Cookie: 'session=private',
+          'MCP-Protocol-Version': '2026-07-28',
+          'Last-Event-ID': '42',
+        },
+        undefined,
+        { key: 'plexus-query-key', access_token: 'other-token', cursor: 'next' }
+      );
+
+      expect(result.status).toBe(200);
+      expect(outgoing?.url).toBe(`${upstreamUrl}?cursor=next`);
+      expect(outgoing?.headers.get('authorization')).toBe('Bearer upstream-token');
+      expect(outgoing?.headers.has('x-goog-api-key')).toBe(false);
+      expect(outgoing?.headers.has('x-api-key')).toBe(false);
+      expect(outgoing?.headers.has('cookie')).toBe(false);
+      expect(outgoing?.headers.get('mcp-protocol-version')).toBe('2026-07-28');
+      expect(outgoing?.headers.get('last-event-id')).toBe('42');
+    });
+
+    test('reports a rejected upstream token without challenging the client or replaying a tool call', async () => {
+      response = new Response(null, {
+        status: 401,
+        headers: { 'WWW-Authenticate': 'Bearer resource_metadata="https://issuer.example"' },
+      });
+      const result = await proxyMcpRequest(
+        'workspace',
+        'POST',
+        {},
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          id: 1,
+          params: { name: 'send_message' },
+        }
+      );
+
+      expect(result.status).toBe(502);
+      expect(result.headers['www-authenticate']).toBeUndefined();
+      expect(fetch).toHaveBeenCalledTimes(1);
     });
   });
 

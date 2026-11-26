@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Connect remote MCP servers with Plexus-managed OAuth, including Google Workspace. Plexus stores and refreshes the upstream grant without passing through client credentials.
+
 ### Fixed
 
 - Remove stale compression and length headers from decoded MCP upstream responses. (#1089)

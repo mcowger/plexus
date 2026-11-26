@@ -43,6 +43,7 @@ export * from './sqlite/alias-metadata-overrides';
 export * from './sqlite/api-keys';
 export * from './sqlite/user-quota-definitions';
 export * from './sqlite/mcp-servers';
+export * from './sqlite/mcp-upstream-oauth';
 export * from './sqlite/mcp-oauth';
 export * from './sqlite/mcp-keys';
 export * from './sqlite/system-settings';
@@ -67,6 +68,10 @@ export { aliasMetadataOverrides as pgAliasMetadataOverrides } from './postgres/a
 export { apiKeys as pgApiKeys } from './postgres/api-keys';
 export { userQuotaDefinitions as pgUserQuotaDefinitions } from './postgres/user-quota-definitions';
 export { mcpServers as pgMcpServers } from './postgres/mcp-servers';
+export {
+  mcpUpstreamOauthClients as pgMcpUpstreamOauthClients,
+  mcpUpstreamOauthGrants as pgMcpUpstreamOauthGrants,
+} from './postgres/mcp-upstream-oauth';
 export {
   mcpOauthClients as pgMcpOauthClients,
   mcpOauthAuthorizationCodes as pgMcpOauthAuthorizationCodes,

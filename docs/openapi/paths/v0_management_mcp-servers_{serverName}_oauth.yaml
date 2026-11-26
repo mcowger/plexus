@@ -1,0 +1,41 @@
+parameters:
+  - in: path
+    name: serverName
+    required: true
+    schema:
+      type: string
+get:
+  tags: [Management — Config]
+  operationId: getV0ManagementMcpServerUpstreamOAuth
+  summary: Get the upstream MCP connection status
+  security:
+    - AdminKey: []
+  responses:
+    '200':
+      description: Connection status, without tokens.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status:
+                type: string
+                enum: [disconnected, connected, reconnect_required]
+              expiresAt:
+                type: number
+                description: Access token expiry in epoch milliseconds.
+    '404':
+      description: No OAuth-enabled MCP server with this name.
+delete:
+  tags: [Management — Config]
+  operationId: deleteV0ManagementMcpServerUpstreamOAuth
+  summary: Clear the saved upstream MCP grant
+  description: Disconnects this MCP server in Plexus without revoking the authorization at the issuer.
+  security:
+    - AdminKey: []
+  responses:
+    '204':
+      description: Disconnected.
+    '404':
+      description: No OAuth-enabled MCP server with this name.

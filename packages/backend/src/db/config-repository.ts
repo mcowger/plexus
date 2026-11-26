@@ -1,4 +1,6 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type {
   BackgroundExplorationConfig,
@@ -308,6 +310,7 @@ export class ConfigRepository {
         ...(row.headers
           ? { headers: decryptJsonField<Record<string, string>>(row.headers) ?? undefined }
           : {}),
+        ...(row.upstreamOauth ? { oauth: JSON.parse(row.upstreamOauth) } : {}),
         auth_scheme: row.authScheme,
         rate_limit_cooldown_ms: Number(row.rateLimitCooldownMs),
         quota_cooldown_ms: Number(row.quotaCooldownMs),
@@ -331,6 +334,13 @@ export class ConfigRepository {
     const upstreamUrl = isLocal
       ? 'http://127.0.0.1:' + config.port + (config.path || '/mcp')
       : config.upstream_url;
+    const oauth =
+      !isLocal && config.oauth
+        ? JSON.stringify({
+            ...(config.oauth.client ? { client: config.oauth.client } : {}),
+            ...(config.oauth.scopes ? { scopes: config.oauth.scopes } : {}),
+          })
+        : null;
     const localFields = isLocal
       ? {
           mode: 'local_http',
@@ -363,6 +373,8 @@ export class ConfigRepository {
           authScheme: config.auth_scheme ?? null,
           rateLimitCooldownMs: config.rate_limit_cooldown_ms ?? 60000,
           quotaCooldownMs: config.quota_cooldown_ms ?? 86400000,
+          upstreamOauth: oauth,
+          upstreamOauthRevision: sql`case when ${schema.mcpServers.upstreamUrl} = ${upstreamUrl} and ${schema.mcpServers.mode} = ${isLocal ? 'local_http' : 'remote_http'} and coalesce(${schema.mcpServers.upstreamOauth}, '') = coalesce(${oauth}, '') then ${schema.mcpServers.upstreamOauthRevision} else ${randomUUID()} end`,
           ...localFields,
           updatedAt: timestamp,
         })
@@ -378,6 +390,8 @@ export class ConfigRepository {
           authScheme: config.auth_scheme ?? null,
           rateLimitCooldownMs: config.rate_limit_cooldown_ms ?? 60000,
           quotaCooldownMs: config.quota_cooldown_ms ?? 86400000,
+          upstreamOauth: oauth,
+          upstreamOauthRevision: randomUUID(),
           ...localFields,
           createdAt: timestamp,
           updatedAt: timestamp,
