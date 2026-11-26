@@ -5,9 +5,12 @@
 ### Added
 
 - Connect remote MCP servers with Plexus-managed OAuth, including Google Workspace. Plexus stores and refreshes the upstream grant without passing through client credentials.
+- Show the provider and, when there's room, the attempt count in mobile request logs. Use color-coded icons for request status.
+- Show tokens per second directly in mobile request log rows, including live estimates for in-flight requests.
 
 ### Fixed
 
+- Use more of the screen width for request logs on phones and tablets without changing the desktop table.
 - Keep mobile request log rows the same height without wrapping. Show reasoning effort alongside status, and open routing and token details without expanding the row.
 - Remove stale compression and length headers from decoded MCP upstream responses. (#1089)
 - Honor per-provider timeouts for embeddings, audio transcriptions, and text-to-speech requests. (#1080)

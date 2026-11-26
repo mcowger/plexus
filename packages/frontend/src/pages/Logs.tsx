@@ -872,8 +872,8 @@ export const Logs = () => {
         </div>
       </Drawer>
 
-      <PageContainer>
-        <Card flush>
+      <PageContainer className="max-lg:px-2!">
+        <Card flush className="max-lg:contents">
           <PaginationControls
             position="top"
             currentPage={currentPage}
@@ -885,7 +885,7 @@ export const Logs = () => {
           />
 
           {!isDesktop && (
-            <div className="space-y-1.5 p-2">
+            <div className="space-y-1.5 py-2">
               {loading ? (
                 <div className="border-border-glass bg-bg-subtle text-text-secondary rounded-lg border p-4 text-center text-sm">
                   Loading...
