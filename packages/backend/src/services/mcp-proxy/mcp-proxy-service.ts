@@ -482,7 +482,16 @@ export async function proxyMcpRequest(
 
     const responseHeaders: Record<string, string> = {};
     response.headers.forEach((value, key) => {
-      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+      if (
+        !HOP_BY_HOP_HEADERS.has(key) &&
+        key !== 'content-length' &&
+        !(
+          key === 'content-encoding' &&
+          /^(?:identity\s*,\s*)*(?:gzip|x-gzip|deflate|br|zstd)(?:\s*,\s*identity)*$/i.test(
+            value.trim()
+          )
+        )
+      ) {
         responseHeaders[key] = value;
       }
     });
@@ -515,10 +524,6 @@ export async function proxyMcpRequest(
     try {
       parsedBody = JSON.parse(responseText);
       if (toolsListRequested && clampNonPositiveToolsListTtl(parsedBody)) {
-        // The serialized body no longer matches upstream's content-length.
-        for (const key of Object.keys(responseHeaders)) {
-          if (key.toLowerCase() === 'content-length') delete responseHeaders[key];
-        }
         logger.silly(
           '[mcp-proxy:' + serverName + '] clamped non-positive ttlMs on tools/list result to 60000'
         );
