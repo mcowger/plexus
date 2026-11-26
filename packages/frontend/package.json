@@ -9,7 +9,7 @@
     "dev": "bun run build.ts --watch"
   },
   "dependencies": {
-    "@assistant-ui/react": "0.15.37",
+    "@assistant-ui/react": "0.15.38",
     "@assistant-ui/react-markdown": "^0.14.26",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -21,7 +21,7 @@
     "clsx": "^2.1.1",
     "fuse.js": "^7.5.0",
     "human-format": "^1.4.0",
-    "lucide-react": "^1.77.0",
+    "lucide-react": "^1.78.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.6",
