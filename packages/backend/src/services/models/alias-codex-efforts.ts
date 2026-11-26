@@ -34,7 +34,7 @@ function normalizeEffort(value: string): string {
   return value === 'none' ? 'off' : value;
 }
 
-function directEfforts({ route, api }: Target): string[] {
+function directEfforts({ route, api }: Target): string[] | undefined {
   const { pi_ai_provider, pi_ai_quirks } = route.config;
   const base = pi_ai_provider
     ? resolvePiAiModel(pi_ai_provider, route.modelConfig?.pi_ai_model_id ?? route.model)
@@ -42,7 +42,8 @@ function directEfforts({ route, api }: Target): string[] {
   const inline = resolveInlineQuirks(pi_ai_quirks, api, route.model);
   const capability = base ? applyQuirkOverlay(base, pi_ai_quirks, api, route.model) : inline;
   const map = capability?.thinkingLevelMap;
-  if (capability?.reasoning !== true) return [];
+  if (!capability) return undefined;
+  if (capability.reasoning !== true) return [];
   const catalogDefaults = base && inline?.thinkingLevelMap === undefined;
   const levels = new Set<string>(Object.keys(map ?? {}));
   if (catalogDefaults) {
@@ -66,7 +67,7 @@ export function createAliasCodexEffortResolver(
     }
   }
   const targets = new Map<string, Target | undefined>();
-  const directByTarget = new Map<Target, string[]>();
+  const directByTarget = new Map<Target, string[] | undefined>();
   const accounts = new Map<AccountId, Promise<Map<string, CodexReasoningCapabilities>>>();
 
   function resolveTarget(provider: string, model: string): Target | undefined {
@@ -166,17 +167,14 @@ export function createAliasCodexEffortResolver(
     const direct = candidates
       .filter((target) => !target.codex)
       .map((target) => {
-        let values = directByTarget.get(target);
-        if (!values) {
-          values = directEfforts(target);
-          directByTarget.set(target, values);
-        }
-        return values;
+        if (!directByTarget.has(target)) directByTarget.set(target, directEfforts(target));
+        return directByTarget.get(target);
       });
+    const knownDirect = direct.filter((levels) => levels !== undefined);
     const values = [...new Set(first.values)].filter(
       (value) =>
         native.every((target) => target.values.includes(value)) &&
-        direct.every((levels) => levels.includes(value))
+        knownDirect.every((levels) => levels.includes(value))
     );
     return {
       values,
