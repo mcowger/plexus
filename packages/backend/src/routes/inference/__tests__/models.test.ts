@@ -384,12 +384,18 @@ describe('GET /v1/models – account-scoped Codex efforts', () => {
         pi_options: { supportsConfigurationUpdate: false },
       });
       expect(listed.has('nested-copy')).toBe(false);
-      for (const alias of ['disjoint', 'unknown-direct', 'live-empty']) {
+      for (const alias of ['disjoint', 'live-empty']) {
+        expect(listed.get(alias)).not.toHaveProperty('reasoning_options');
         expect(listed.get(alias)).toMatchObject({
-          reasoning_options: [{ type: 'effort', values: [] }],
           pi_options: { supportsConfigurationUpdate: false },
         });
       }
+      expect(listed.get('unknown-direct')).toMatchObject({
+        reasoning_options: [
+          { type: 'effort', values: ['off', 'minimal', 'low', 'high', 'special'] },
+        ],
+        pi_options: { supportsConfigurationUpdate: false },
+      });
       expect(listed.get('unverified')).toMatchObject({
         reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
         pi_options: { supportsConfigurationUpdate: false },

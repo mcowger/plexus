@@ -249,7 +249,8 @@ export async function registerModelsRoute(fastify: FastifyInstance) {
       const codex = codexEfforts[index];
       if (codex) {
         if (codex.values !== undefined) {
-          reasoningOptions = [{ type: 'effort', values: codex.values }];
+          reasoningOptions =
+            codex.values.length > 0 ? [{ type: 'effort', values: codex.values }] : undefined;
         }
         piOptions = {
           ...piOptions,
