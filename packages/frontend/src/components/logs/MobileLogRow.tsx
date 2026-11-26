@@ -1,37 +1,127 @@
 import { clsx } from 'clsx';
-import {
-  AlertTriangle,
-  Ban,
-  BrainCog,
-  Bug,
-  CheckCircle,
-  Coins,
-  Gauge,
-  KeyRound,
-  MessagesSquare,
-  Plane,
-  Timer,
-  Wrench,
-  XCircle,
-  Zap,
-} from 'lucide-react';
-import React from 'react';
+import { AlertTriangle, BrainCog, ChevronRight } from 'lucide-react';
+import React, { useRef, useState } from 'react';
 
-import { formatLargeNumber } from '../../lib/api';
 import { formatApiTypeLabel } from '../../lib/apiFormats';
 import { useCurrency } from '../../lib/CurrencyContext';
 import { formatCostIn, formatMs, formatTPS, getEstimatedBytesPerToken } from '../../lib/format';
 import { Button } from '../ui/Button';
-import { ApiTypeIcon } from './ApiTypeIcon';
+import { Modal } from '../ui/Modal';
 import {
   formatDateSafely,
   formatReasoningEffort,
-  getAttemptIndicatorLabel,
   getServiceTierDisplay,
   hasUpstreamRewrite,
 } from './helpers';
-import { ServiceTierIndicator } from './ServiceTierIndicator';
 import type { LogRowProps } from './types';
+
+const COMPACT_EFFORTS: Partial<Record<string, string>> = {
+  minimal: 'Min',
+  medium: 'Med',
+  xhigh: 'X-Hi',
+};
+
+const getThroughput = (
+  log: LogRowProps['log'],
+  status: string,
+  progress: LogRowProps['progress']
+): string | null => {
+  if (status === 'pending') {
+    if (!progress) return null;
+    const bytesReceived = progress.semanticBytesReceived ?? progress.bytesReceived;
+    let bytesPerSec = progress.semanticBytesPerSec ?? progress.bytesPerSec ?? 0;
+    if (!(bytesPerSec > 0) && progress.elapsedMs > 0) {
+      bytesPerSec = (bytesReceived / progress.elapsedMs) * 1000;
+    }
+    if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return null;
+    const bytesPerToken = getEstimatedBytesPerToken({ ...log, isStreamed: progress.isStreamed });
+    return `~${formatTPS(bytesPerSec / bytesPerToken)} tok/s`;
+  }
+
+  const outputTokens = (log.tokensOutput ?? 0) + (log.tokensReasoning ?? 0);
+  const durationMs = log.durationMs ?? 0;
+  if (durationMs > 0 && outputTokens > 0) {
+    return `${formatTPS(outputTokens / (durationMs / 1000))} tok/s`;
+  }
+  return null;
+};
+
+const getStatusClass = (status: string): string => {
+  switch (status) {
+    case 'success':
+      return 'border-success/30 bg-emerald-500/15 text-success';
+    case 'pending':
+      return 'border-warning/30 bg-yellow-500/15 text-warning';
+    case 'cancelled':
+      return 'border-blue-400/30 bg-blue-500/15 text-blue-400';
+    case 'timeout':
+      return 'border-orange-400/30 bg-orange-500/15 text-orange-400';
+    default:
+      return 'border-danger/30 bg-red-500/15 text-danger';
+  }
+};
+
+const MobileLogDetails = ({
+  log,
+  progress,
+  timestamp,
+  status,
+  effort,
+  duration,
+  cost,
+}: Pick<LogRowProps, 'log' | 'progress'> & {
+  timestamp: string;
+  status: string;
+  effort: string | null;
+  duration: string | null;
+  cost: string | null;
+}) => {
+  const provider = log.finalAttemptProvider ?? log.provider;
+  const routeModel = log.finalAttemptModel ?? log.selectedModelName;
+  const tier = getServiceTierDisplay(log);
+  const throughput = getThroughput(log, status, progress);
+
+  const fields = [
+    ['Model alias', log.incomingModelAlias],
+    ['Status', status],
+    ['Timestamp', timestamp],
+    [status === 'pending' ? 'Elapsed' : 'Duration', duration],
+    ['Cost', cost],
+    ['Reasoning effort', effort],
+    ['Route', [provider, routeModel].filter(Boolean).join(' / ')],
+    ['Upstream model', hasUpstreamRewrite(log) ? log.upstreamModel : null],
+    ['Service tier', tier?.tooltip],
+    [
+      'Request path',
+      log.requestPath && [log.requestMethod, log.requestPath].filter(Boolean).join(' '),
+    ],
+    ['Request ID', log.requestId],
+    ['Key name', log.apiKey],
+    ['Incoming API', log.incomingApiType && formatApiTypeLabel(log.incomingApiType)],
+    ['Outgoing API', log.outgoingApiType && formatApiTypeLabel(log.outgoingApiType)],
+    ['Input tokens', log.tokensInput?.toLocaleString()],
+    ['Output tokens', log.tokensOutput?.toLocaleString()],
+    ['Reasoning tokens', log.tokensReasoning?.toLocaleString()],
+    ['Cached tokens', log.tokensCached?.toLocaleString()],
+    ['Cache write tokens', log.tokensCacheWrite?.toLocaleString()],
+    [status === 'pending' ? 'Estimated throughput' : 'End-to-end throughput', throughput],
+    ['Messages', log.messageCount],
+    ['Tool calls', log.toolCallsCount],
+  ];
+
+  return (
+    <dl className="text-text grid gap-3 text-sm whitespace-nowrap">
+      {fields.map(([label, value]) =>
+        value !== null && value !== undefined && value !== '' ? (
+          <div key={label} className="min-w-0">
+            <dt className="text-text-secondary text-xs">{label}</dt>
+            <dd className="overflow-x-auto">{value}</dd>
+          </div>
+        ) : null
+      )}
+    </dl>
+  );
+};
 
 export const MobileLogRow = React.memo(
   ({
@@ -44,253 +134,144 @@ export const MobileLogRow = React.memo(
     onRetryDetails,
   }: LogRowProps & { onRetryDetails?: (log: LogRowProps['log']) => void }) => {
     const { currency, rate, symbol } = useCurrency();
-    const formatted = formatDateSafely(log.date);
-    const totalTokens =
-      Number(log.tokensInput || 0) +
-      Number(log.tokensOutput || 0) +
-      Number(log.tokensCached || 0) +
-      Number(log.tokensCacheWrite || 0) +
-      Number(log.tokensReasoning || 0);
-    const e2eOutputTokens = Number(log.tokensOutput || 0) + Number(log.tokensReasoning || 0);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const detailsButton = useRef<HTMLButtonElement>(null);
+    const closeDetails = () => {
+      setDetailsOpen(false);
+      detailsButton.current?.focus();
+    };
+    const { date, time } = formatDateSafely(log.date);
     const status = log.responseStatus || (log.hasError ? 'error' : 'unknown');
-    const rawDurationMs =
-      log.durationMs != null && log.durationMs > 0
-        ? log.durationMs
-        : status === 'pending' && liveNow != null
-          ? liveNow - log.startTime
-          : null;
-    const mobileDuration = rawDurationMs != null ? formatMs(rawDurationMs) : '-';
-    const estimatedTokensPerSec = (() => {
-      if (!progress) return null;
-
-      const semanticBytesReceived = progress.semanticBytesReceived ?? progress.bytesReceived;
-      const semanticBytesPerSec = progress.semanticBytesPerSec ?? progress.bytesPerSec;
-      const bytesPerToken = getEstimatedBytesPerToken({
-        ...log,
-        isStreamed: progress.isStreamed,
-      });
-      const effectiveBytesPerSec =
-        semanticBytesPerSec != null && semanticBytesPerSec > 0
-          ? semanticBytesPerSec
-          : progress.elapsedMs > 0 && semanticBytesReceived > 0
-            ? (semanticBytesReceived / progress.elapsedMs) * 1000
-            : null;
-
-      return effectiveBytesPerSec != null &&
-        Number.isFinite(effectiveBytesPerSec) &&
-        effectiveBytesPerSec > 0
-        ? effectiveBytesPerSec / bytesPerToken
-        : null;
-    })();
-    const statusClass =
-      status === 'success'
-        ? 'border-success/30 bg-emerald-500/15 text-success'
-        : status === 'pending'
-          ? 'border-warning/30 bg-yellow-500/15 text-warning'
-          : status === 'cancelled'
-            ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
-            : status === 'timeout'
-              ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
-              : 'border-danger/30 bg-red-500/15 text-danger';
+    const alias = log.incomingModelAlias || log.requestPath || 'Unknown model';
+    const effort = formatReasoningEffort(log.reasoningEffort);
+    const effortKey = effort?.toLowerCase();
+    const shortEffort =
+      effortKey && Object.hasOwn(COMPACT_EFFORTS, effortKey) ? COMPACT_EFFORTS[effortKey] : effort;
+    const liveTimestamp = liveNow ?? null;
+    let durationMs = log.durationMs ?? null;
+    if (durationMs === null && status === 'pending' && liveTimestamp !== null) {
+      durationMs = liveTimestamp - log.startTime;
+    }
+    const duration = durationMs === null ? null : formatMs(Math.max(0, durationMs));
+    const costTotal = log.costTotal ?? null;
+    const cost = costTotal === null ? null : formatCostIn(costTotal, { currency, rate, symbol });
+    const statusClass = getStatusClass(status);
 
     return (
       <article
         className={clsx(
-          'border-border-glass bg-bg-card rounded-lg border p-1.5 shadow-sm',
+          'border-border-glass bg-bg-card flex h-16 min-w-0 items-center rounded-lg border shadow-sm',
           isNewest && 'animate-slide-in',
-          log.responseStatus === 'pending' && 'bg-yellow-500/5'
+          status === 'pending' && 'bg-yellow-500/5'
         )}
       >
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1 text-xs">
-            <span className="text-text shrink-0 font-mono text-[11px] font-medium">
-              {formatted.time}
-            </span>
-            <span className="text-text-muted shrink-0" aria-hidden="true">
-              ·
-            </span>
-            <span className="text-text min-w-0 truncate font-medium">
-              {log.incomingModelAlias || '-'}
-            </span>
-            <span className="text-text-muted shrink-0" aria-hidden="true">
-              ·
-            </span>
+        <button
+          ref={detailsButton}
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setDetailsOpen(true)}
+          className="hover:bg-bg-hover focus-visible:outline-primary flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-center gap-1 rounded-lg px-2.5 text-left whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
+        >
+          <span className="flex w-full min-w-0 items-center gap-1.5">
+            <span className="text-text min-w-0 flex-1 truncate text-sm font-medium">{alias}</span>
+            {shortEffort && (
+              <span className="inline-flex max-w-20 shrink-0 items-center gap-1 rounded bg-purple-500/15 px-1.5 py-0.5 text-xs font-medium text-purple-300">
+                <BrainCog size={12} className="shrink-0" aria-hidden="true" />
+                <span className="sr-only">Reasoning effort: {effort}</span>
+                <span className="truncate" aria-hidden="true">
+                  {shortEffort}
+                </span>
+              </span>
+            )}
             <span
-              className="text-text-secondary min-w-0 truncate font-normal"
-              title={(() => {
-                const routeModel = log.finalAttemptModel ?? log.selectedModelName ?? '-';
-                return hasUpstreamRewrite(log)
-                  ? `${log.provider || '-'}:${routeModel} → ${log.upstreamModel} (route → upstream)`
-                  : undefined;
-              })()}
+              className={clsx(
+                'max-w-24 shrink-0 truncate rounded-md border px-1.5 py-0.5 text-xs font-semibold capitalize',
+                statusClass
+              )}
             >
-              {(() => {
-                const routeModel = log.finalAttemptModel ?? log.selectedModelName ?? '-';
-                return hasUpstreamRewrite(log)
-                  ? `${log.provider || '-'}:${routeModel} → ${log.upstreamModel}`
-                  : `${log.provider || '-'}:${routeModel}`;
-              })()}
+              {status}
             </span>
-            {(() => {
-              const hasRewrite = hasUpstreamRewrite(log);
-              const indicatorLabel = getAttemptIndicatorLabel(log.attemptCount);
-              if (!indicatorLabel || !onRetryDetails) return null;
-              return (
-                <button
-                  type="button"
-                  onClick={() => onRetryDetails(log)}
-                  className="shrink-0 text-[10px] font-medium text-orange-500"
-                  aria-label={`View retry history (${log.attemptCount} attempts${hasRewrite ? ', model rewritten upstream' : ''})`}
-                >
-                  {indicatorLabel}
-                </button>
-              );
-            })()}
-          </div>
-          <span
-            className={clsx(
-              'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold capitalize',
-              statusClass
-            )}
-          >
-            {status === 'success' ? (
-              <CheckCircle size={10} />
-            ) : status === 'pending' ? (
-              <Plane size={10} className="animate-pulse" />
-            ) : status === 'cancelled' ? (
-              <Ban size={10} />
-            ) : status === 'timeout' ? (
-              <Timer size={10} />
-            ) : (
-              <XCircle size={10} />
-            )}
-            {status}
           </span>
-        </div>
-
-        <div className="mt-1 space-y-1">
-          {(() => {
-            const reasoning = formatReasoningEffort(log.reasoningEffort);
-            const tier = getServiceTierDisplay(log);
-            if (!reasoning && !tier) return null;
-            return (
-              <div className="text-text-secondary flex items-center gap-1 text-[10px] font-normal">
-                {reasoning && (
-                  <>
-                    <BrainCog
-                      size={12}
-                      className="shrink-0 text-purple-400"
-                      role="img"
-                      aria-label="Effort"
-                    />
-                    <span className="truncate">{reasoning}</span>
-                  </>
-                )}
-                {tier && <ServiceTierIndicator display={tier} />}
-              </div>
-            );
-          })()}
-          <div className="grid grid-cols-4 gap-1 text-[11px]">
-            <div
-              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
-              title={`Key: ${log.apiKey || '-'}`}
-            >
-              <div className="text-text flex min-w-0 items-center gap-1 truncate">
-                <KeyRound size={12} className="text-text-muted shrink-0" aria-hidden="true" />
-                {log.apiKey || '-'}
-              </div>
-            </div>
-            <div
-              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
-              title={`Messages: ${(log.messageCount || 0) === 0 ? '-' : log.messageCount} • Tool calls: ${(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount}`}
-            >
-              <div className="text-text flex min-w-0 items-center gap-0.5 whitespace-nowrap">
-                <div
-                  className="flex w-3 shrink-0 justify-center"
-                  title={formatApiTypeLabel(log.incomingApiType || '')}
-                >
-                  <ApiTypeIcon apiType={log.incomingApiType} size={12} />
-                </div>
-                <span className="text-text-muted text-[9px]" aria-hidden="true">
-                  →
+          <span className="text-text-secondary flex w-full min-w-0 items-center gap-1.5 text-xs tabular-nums">
+            <time className="shrink-0" dateTime={log.date}>
+              {time}
+            </time>
+            {duration && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 truncate">
+                  <span className="sr-only">
+                    {status === 'pending' ? 'Elapsed: ' : 'Duration: '}
+                  </span>
+                  {duration}
                 </span>
-                <div
-                  className="flex w-3 shrink-0 justify-center"
-                  title={formatApiTypeLabel(log.outgoingApiType || '')}
-                >
-                  <ApiTypeIcon apiType={log.outgoingApiType} size={12} />
-                </div>
-                <span className="text-text-muted" aria-hidden="true">
-                  ·
-                </span>
-                <MessagesSquare size={10} className="shrink-0 text-blue-400" aria-hidden="true" />
-                <span>{(log.messageCount || 0) === 0 ? '-' : log.messageCount}</span>
-                <Wrench size={10} className="shrink-0 text-orange-400" aria-hidden="true" />
-                <span>{(log.toolCallsCount || 0) === 0 ? '-' : log.toolCallsCount}</span>
-              </div>
-            </div>
-            <div
-              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
-              title={`Tokens: ${formatLargeNumber(totalTokens)} • Cost: ${log.costTotal == null || log.costTotal === 0 ? '-' : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 2 })}`}
-            >
-              <div className="text-text flex min-w-0 items-center gap-1 truncate">
-                <Coins size={12} className="text-text-muted shrink-0" aria-hidden="true" />
-                {formatLargeNumber(totalTokens)}
-                <span className="text-text-muted" aria-hidden="true">
-                  ·
-                </span>
-                {log.costTotal == null || log.costTotal === 0
-                  ? '-'
-                  : formatCostIn(log.costTotal, { currency, rate, symbol, decimals: 2 })}
-              </div>
-            </div>
-            <div
-              className="bg-bg-subtle min-w-0 overflow-hidden rounded px-1 py-0.5"
-              title={
-                status === 'pending'
-                  ? `Duration: ${mobileDuration}${estimatedTokensPerSec != null ? ` • Estimated tokens/sec: ${formatTPS(estimatedTokensPerSec)}` : ''}`
-                  : `End-to-end throughput: ${log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0 ? formatTPS(e2eOutputTokens / (log.durationMs / 1000)) : '-'}`
-              }
-            >
-              <div className="text-text flex min-w-0 items-center gap-1 truncate">
-                <Gauge size={12} className="text-text-muted shrink-0" aria-hidden="true" />
-                {status === 'pending' ? (
-                  <>
-                    {mobileDuration}
-                    {estimatedTokensPerSec != null && (
-                      <span className="text-text-secondary">
-                        {' · '}
-                        <Zap size={11} className="inline-block text-amber-400" aria-hidden="true" />
-                        {' ~'}
-                        {formatTPS(estimatedTokensPerSec)} tok/s
-                      </span>
-                    )}
-                  </>
-                ) : log.durationMs != null && log.durationMs > 0 && e2eOutputTokens > 0 ? (
-                  formatTPS(e2eOutputTokens / (log.durationMs / 1000))
-                ) : (
-                  '-'
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {(log.hasError || log.hasDebug) && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {log.hasError && (
-              <Button size="sm" variant="danger" onClick={() => onError(log.requestId)}>
-                <AlertTriangle size={12} />
-                Error
-              </Button>
+              </>
             )}
-            {log.hasDebug && (
-              <Button size="sm" variant="secondary" onClick={() => onDebug(log.requestId)}>
-                <Bug size={12} />
-                Debug
-              </Button>
+            {cost && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 truncate">
+                  <span className="sr-only">Cost: </span>
+                  {cost}
+                </span>
+              </>
             )}
-          </div>
+            <ChevronRight className="ml-auto shrink-0" size={16} aria-hidden="true" />
+            <span className="sr-only">View request details</span>
+          </span>
+        </button>
+        {log.hasError && (
+          <Button
+            type="button"
+            size="icon"
+            variant="danger"
+            className="focus-visible:outline-primary mr-1 min-h-11 min-w-11 shrink-0 focus-visible:outline-2"
+            aria-label="View error"
+            onClick={() => onError(log.requestId)}
+          >
+            <AlertTriangle size={16} aria-hidden="true" />
+          </Button>
+        )}
+        {detailsOpen && (
+          <Modal
+            isOpen
+            onClose={closeDetails}
+            title="Request details"
+            size="sm"
+            footer={
+              <>
+                {log.hasDebug && (
+                  <Button variant="secondary" onClick={() => onDebug(log.requestId)}>
+                    Debug trace
+                  </Button>
+                )}
+                {onRetryDetails && (log.attemptCount ?? 0) > 1 && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      closeDetails();
+                      onRetryDetails(log);
+                    }}
+                  >
+                    Retry history ({log.attemptCount})
+                  </Button>
+                )}
+                <Button variant="secondary" autoFocus onClick={closeDetails}>
+                  Close
+                </Button>
+              </>
+            }
+          >
+            <MobileLogDetails
+              log={log}
+              progress={progress}
+              timestamp={`${date} ${time}`}
+              status={status}
+              effort={effort}
+              duration={duration}
+              cost={cost}
+            />
+          </Modal>
         )}
       </article>
     );
