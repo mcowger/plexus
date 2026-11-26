@@ -257,7 +257,7 @@ packages/backend/src/routes/inference/index.ts:20 [function] registerInferenceRo
 packages/backend/src/routes/inference/messages.ts:23 [function] registerMessagesRoute
 packages/backend/src/routes/inference/models-ui.ts:25 [function] renderModelsUiPage
 packages/backend/src/routes/inference/models.ts:118 [function] registerModelsRoute
-packages/backend/src/routes/inference/models.ts:540 [function] registerMuseCodeModelsRoute
+packages/backend/src/routes/inference/models.ts:541 [function] registerMuseCodeModelsRoute
 packages/backend/src/routes/inference/models.ts:55 [interface] AliasInlineTarget
 packages/backend/src/routes/inference/models.ts:67 [function] quirksTargetForBuiltinApi
 packages/backend/src/routes/inference/models.ts:94 [function] resolveAliasInlineTarget
@@ -934,10 +934,10 @@ packages/backend/src/services/mcp-upstream-oauth/oauth.ts:91 [class] UpstreamOAu
 packages/backend/src/services/mcp-upstream-oauth/oauth.ts:92 [class] UpstreamOAuthClientConflict
 packages/backend/src/services/mcp-upstream-oauth/oauth.ts:93 [method] UpstreamOAuthClientConflict.constructor
 packages/backend/src/services/mcp-upstream-oauth/oauth.ts:97 [function] sameCredentials
-packages/backend/src/services/models/alias-codex-efforts.ts:132 [function] codexEfforts
+packages/backend/src/services/models/alias-codex-efforts.ts:133 [function] codexEfforts
 packages/backend/src/services/models/alias-codex-efforts.ts:33 [function] normalizeEffort
 packages/backend/src/services/models/alias-codex-efforts.ts:37 [function] directEfforts
-packages/backend/src/services/models/alias-codex-efforts.ts:58 [function] createAliasCodexEffortResolver
+packages/backend/src/services/models/alias-codex-efforts.ts:59 [function] createAliasCodexEffortResolver
 packages/backend/src/services/models/alias-service-tiers.ts:29 [function] resolveAliasServiceTiers
 packages/backend/src/services/models/cache-control-injection.ts:101 [function] countCacheBreakpoints
 packages/backend/src/services/models/cache-control-injection.ts:123 [function] buildMarker
