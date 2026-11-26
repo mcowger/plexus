@@ -21,6 +21,46 @@ const COMPACT_EFFORTS: Partial<Record<string, string>> = {
   xhigh: 'X-Hi',
 };
 
+const getThroughput = (
+  log: LogRowProps['log'],
+  status: string,
+  progress: LogRowProps['progress']
+): string | null => {
+  if (status === 'pending') {
+    if (!progress) return null;
+    const bytesReceived = progress.semanticBytesReceived ?? progress.bytesReceived;
+    let bytesPerSec = progress.semanticBytesPerSec ?? progress.bytesPerSec ?? 0;
+    if (!(bytesPerSec > 0) && progress.elapsedMs > 0) {
+      bytesPerSec = (bytesReceived / progress.elapsedMs) * 1000;
+    }
+    if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) return null;
+    const bytesPerToken = getEstimatedBytesPerToken({ ...log, isStreamed: progress.isStreamed });
+    return `~${formatTPS(bytesPerSec / bytesPerToken)} tok/s`;
+  }
+
+  const outputTokens = (log.tokensOutput ?? 0) + (log.tokensReasoning ?? 0);
+  const durationMs = log.durationMs ?? 0;
+  if (durationMs > 0 && outputTokens > 0) {
+    return `${formatTPS(outputTokens / (durationMs / 1000))} tok/s`;
+  }
+  return null;
+};
+
+const getStatusClass = (status: string): string => {
+  switch (status) {
+    case 'success':
+      return 'border-success/30 bg-emerald-500/15 text-success';
+    case 'pending':
+      return 'border-warning/30 bg-yellow-500/15 text-warning';
+    case 'cancelled':
+      return 'border-blue-400/30 bg-blue-500/15 text-blue-400';
+    case 'timeout':
+      return 'border-orange-400/30 bg-orange-500/15 text-orange-400';
+    default:
+      return 'border-danger/30 bg-red-500/15 text-danger';
+  }
+};
+
 const MobileLogDetails = ({
   log,
   progress,
@@ -39,23 +79,7 @@ const MobileLogDetails = ({
   const provider = log.finalAttemptProvider ?? log.provider;
   const routeModel = log.finalAttemptModel ?? log.selectedModelName;
   const tier = getServiceTierDisplay(log);
-  const bytesReceived = progress?.semanticBytesReceived ?? progress?.bytesReceived ?? 0;
-  const bytesPerSec = progress?.semanticBytesPerSec ?? progress?.bytesPerSec ?? 0;
-  const effectiveBytesPerSec =
-    bytesPerSec > 0
-      ? bytesPerSec
-      : progress && progress.elapsedMs > 0
-        ? (bytesReceived / progress.elapsedMs) * 1000
-        : 0;
-  const outputTokens = (log.tokensOutput ?? 0) + (log.tokensReasoning ?? 0);
-  const throughput =
-    status === 'pending'
-      ? progress && Number.isFinite(effectiveBytesPerSec) && effectiveBytesPerSec > 0
-        ? `~${formatTPS(effectiveBytesPerSec / getEstimatedBytesPerToken({ ...log, isStreamed: progress.isStreamed }))} tok/s`
-        : null
-      : log.durationMs && log.durationMs > 0 && outputTokens > 0
-        ? `${formatTPS(outputTokens / (log.durationMs / 1000))} tok/s`
-        : null;
+  const throughput = getThroughput(log, status, progress);
 
   const fields = [
     ['Model alias', log.incomingModelAlias],
@@ -88,7 +112,7 @@ const MobileLogDetails = ({
   return (
     <dl className="text-text grid gap-3 text-sm whitespace-nowrap">
       {fields.map(([label, value]) =>
-        value != null && value !== '' ? (
+        value !== null && value !== undefined && value !== '' ? (
           <div key={label} className="min-w-0">
             <dt className="text-text-secondary text-xs">{label}</dt>
             <dd className="overflow-x-auto">{value}</dd>
@@ -123,21 +147,15 @@ export const MobileLogRow = React.memo(
     const effortKey = effort?.toLowerCase();
     const shortEffort =
       effortKey && Object.hasOwn(COMPACT_EFFORTS, effortKey) ? COMPACT_EFFORTS[effortKey] : effort;
-    const durationMs =
-      log.durationMs ?? (status === 'pending' && liveNow != null ? liveNow - log.startTime : null);
-    const duration = durationMs != null ? formatMs(Math.max(0, durationMs)) : null;
-    const cost =
-      log.costTotal == null ? null : formatCostIn(log.costTotal, { currency, rate, symbol });
-    const statusClass =
-      status === 'success'
-        ? 'border-success/30 bg-emerald-500/15 text-success'
-        : status === 'pending'
-          ? 'border-warning/30 bg-yellow-500/15 text-warning'
-          : status === 'cancelled'
-            ? 'border-blue-400/30 bg-blue-500/15 text-blue-400'
-            : status === 'timeout'
-              ? 'border-orange-400/30 bg-orange-500/15 text-orange-400'
-              : 'border-danger/30 bg-red-500/15 text-danger';
+    const liveTimestamp = liveNow ?? null;
+    let durationMs = log.durationMs ?? null;
+    if (durationMs === null && status === 'pending' && liveTimestamp !== null) {
+      durationMs = liveTimestamp - log.startTime;
+    }
+    const duration = durationMs === null ? null : formatMs(Math.max(0, durationMs));
+    const costTotal = log.costTotal ?? null;
+    const cost = costTotal === null ? null : formatCostIn(costTotal, { currency, rate, symbol });
+    const statusClass = getStatusClass(status);
 
     return (
       <article
