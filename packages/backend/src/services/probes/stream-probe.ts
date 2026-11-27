@@ -23,23 +23,23 @@ const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
   'response.queued': true,
 };
 
-/** Event names whose frame may be a failure still arriving; hold until it completes. */
-const FAILURE_EVENT_TYPES: Record<string, true> = {
-  'response.failed': true,
-  error: true,
-};
+/**
+ * Decodes buffered SSE bytes with every line ending (LF, CRLF, CR) normalized to LF, so a
+ * blank line is always `\n\n`. A trailing bare CR is dropped: it may be half of a CRLF whose
+ * LF has not arrived yet, and counting it as a line ending would invent a frame boundary.
+ */
+function decodeSse(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes).replace(/\r$/, '').replace(/\r\n?/g, '\n');
+}
 
 /**
- * True when the buffered bytes hold only Responses lifecycle frames (plus, optionally, one
- * frame still arriving across reads), so nothing visible has been committed and the stream
- * can still be abandoned for another target. A trailing partial frame counts as pending
- * unless its `event:` line already names real output (a failure event is held until complete).
+ * True when the buffered bytes hold at least one complete Responses lifecycle frame
+ * (`response.created` etc.) and no other complete event, so no output has been shown and a
+ * later `response.failed` can still fail over. The SSE parser ignores comments (`: ping`)
+ * and unfinished frames. Any other first event (Chat/Anthropic SSE, NDJSON, plain JSON) is
+ * never held.
  */
 export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
-  const text = new TextDecoder().decode(concatChunks(chunks));
-  const segments = text.split(/\r?\n\r?\n/);
-  const tail = segments.pop() ?? '';
-
   let sawLifecycle = false;
   let onlyLifecycle = true;
   const parser = createParser({
@@ -57,16 +57,8 @@ export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
       }
     },
   });
-  parser.feed(segments.map((segment) => `${segment}\n\n`).join(''));
-  if (!onlyLifecycle) return false;
-
-  if (tail.trim() === '') return sawLifecycle;
-  const tailEvent = /^event:\s*(.+?)\s*$/m.exec(tail)?.[1];
-  return (
-    tailEvent === undefined ||
-    LIFECYCLE_PRELUDE_EVENT_TYPES[tailEvent] === true ||
-    FAILURE_EVENT_TYPES[tailEvent] === true
-  );
+  parser.feed(new TextDecoder().decode(concatChunks(chunks)));
+  return sawLifecycle && onlyLifecycle;
 }
 
 /**
@@ -81,8 +73,9 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
   if (!text) return null;
 
   // 1. Try parsing SSE frames (each keeps its own event type) or raw JSON
+  const sseText = decodeSse(bytes).trim();
   const candidates: { json: string; eventType: string }[] = [];
-  for (const frame of text.split(/\r?\n\r?\n/)) {
+  for (const frame of sseText.split('\n\n')) {
     let frameEventType = '';
     const frameData: string[] = [];
     for (const rawLine of frame.split('\n')) {
