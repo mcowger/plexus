@@ -397,6 +397,143 @@ describe('probeStreamingStart', () => {
       expect(result.error.message).toBe('No one started answering within 85 seconds.');
     });
 
+    test('failure frame cut inside its event name still fails over', async () => {
+      const text = new TextDecoder().decode(failed);
+      const cut = text.indexOf('response.failed') + 'response.fa'.length;
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, encoder.encode(text.slice(0, cut)), encoder.encode(text.slice(cut))])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
+    test('data-only failure cut inside the field name still fails over', async () => {
+      const text = new TextDecoder().decode(failed).replace(/^event:.*\n/, '');
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, encoder.encode(text.slice(0, 3)), encoder.encode(text.slice(3))])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
+    describe('every read boundary', () => {
+      const dataOnly = (bytes: Uint8Array) =>
+        encoder.encode(new TextDecoder().decode(bytes).replace(/^event:.*\n/, ''));
+      const withEol = (bytes: Uint8Array, eol: string) =>
+        encoder.encode(new TextDecoder().decode(bytes).replaceAll('\n', eol));
+      const join = (...parts: Uint8Array[]) =>
+        encoder.encode(parts.map((part) => new TextDecoder().decode(part)).join(''));
+      const slices = (bytes: Uint8Array, at: number) => [bytes.slice(0, at), bytes.slice(at)];
+
+      const variants: [string, (frame: Uint8Array) => Uint8Array][] = [
+        ['LF', (frame) => frame],
+        ['CRLF', (frame) => withEol(frame, '\r\n')],
+        ['CR', (frame) => withEol(frame, '\r')],
+        ['data-only LF', dataOnly],
+        ['data-only CRLF', (frame) => withEol(dataOnly(frame), '\r\n')],
+      ];
+
+      for (const [name, shape] of variants) {
+        test(`${name}: a failure fails over wherever the stream is cut`, async () => {
+          const whole = join(shape(created), shape(inProgress), shape(failed));
+          for (let at = 1; at < whole.length; at++) {
+            const result = await (new Dispatcher() as any).probeStreamingStart(
+              sseResponse(slices(whole, at))
+            );
+            expect(result.ok, `cut at byte ${at}`).toBe(false);
+            expect(result.error.message, `cut at byte ${at}`).toBe(
+              'No one started answering within 85 seconds.'
+            );
+          }
+        });
+
+        test(`${name}: the stall-aware probe fails over wherever the stream is cut`, async () => {
+          const whole = join(shape(created), shape(inProgress), shape(failed));
+          for (let at = 1; at < whole.length; at++) {
+            const result = await (new Dispatcher() as any).probeStreamingStart(
+              sseResponse(slices(whole, at)),
+              { ttfbMs: 5000, ttfbBytes: 1 }
+            );
+            expect(result.ok, `cut at byte ${at}`).toBe(false);
+            expect(result.streamStarted, `cut at byte ${at}`).toBe(false);
+            expect(result.error.message, `cut at byte ${at}`).toBe(
+              'No one started answering within 85 seconds.'
+            );
+          }
+        });
+
+        test(`${name}: a failure fails over when read one byte at a time`, async () => {
+          const whole = join(shape(created), shape(failed));
+          const singles = Array.from(whole, (byte) => Uint8Array.of(byte));
+          const result = await (new Dispatcher() as any).probeStreamingStart(sseResponse(singles));
+          expect(result.ok).toBe(false);
+          expect(result.error.message).toBe('No one started answering within 85 seconds.');
+        });
+
+        test(`${name}: real output is replayed byte-for-byte wherever it is cut`, async () => {
+          const delta = frame('response.output_text.delta', { delta: 'hi' });
+          const whole = join(shape(created), shape(delta));
+          for (let at = 1; at < whole.length; at++) {
+            const result = await (new Dispatcher() as any).probeStreamingStart(
+              sseResponse(slices(whole, at))
+            );
+            expect(result.ok, `cut at byte ${at}`).toBe(true);
+            const body = await new Response(result.response.body).arrayBuffer();
+            expect(new Uint8Array(body), `cut at byte ${at}`).toEqual(whole);
+          }
+        });
+      }
+    });
+
+    test('an unfinished frame that already shows real output is not held', async () => {
+      const open = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(created);
+            controller.enqueue(encoder.encode('event: response.output_text.delta\ndata: {"ty'));
+          },
+          pull: () => new Promise<void>(() => {}),
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+      const result = await (new Dispatcher() as any).probeStreamingStart(open);
+      expect(result.ok).toBe(true);
+    });
+
+    describe('native NDJSON is never held', () => {
+      const token = encoder.encode('{"message":{"content":"hi"},"done":false}\n');
+      // Upstream stays open after the first token: a held probe would never resolve.
+      const openNdjson = () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(token);
+            },
+            pull: () => new Promise<void>(() => {}),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } }
+        );
+
+      test('default probe returns while the upstream is still open', async () => {
+        const result = await (new Dispatcher() as any).probeStreamingStart(openNdjson());
+        expect(result.ok).toBe(true);
+        const first = await result.response.body.getReader().read();
+        expect(new TextDecoder().decode(first.value)).toContain('"content":"hi"');
+      });
+
+      test('stall-aware probe does not time out on real NDJSON output', async () => {
+        const result = await (new Dispatcher() as any).probeStreamingStart(openNdjson(), {
+          ttfbMs: 5000,
+          ttfbBytes: 10,
+        });
+        expect(result.ok).toBe(true);
+      });
+    });
+
     test('real output split across reads is not held back', async () => {
       const delta = frame('response.output_text.delta', { delta: 'hi' });
       const half = Math.floor(delta.length / 2);

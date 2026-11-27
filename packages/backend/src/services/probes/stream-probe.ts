@@ -23,22 +23,34 @@ const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
   'response.queued': true,
 };
 
-/** Event names whose frame may be a failure still arriving; hold until it completes. */
-const FAILURE_EVENT_TYPES: Record<string, true> = {
-  'response.failed': true,
-  error: true,
-};
+/**
+ * Decodes buffered SSE bytes with every line ending (LF, CRLF, CR) normalized to LF, so a
+ * blank line is always `\n\n`. A trailing bare CR is dropped: it may be half of a CRLF whose
+ * LF has not arrived yet, and counting it as a line ending would invent a frame boundary.
+ */
+function decodeSse(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes).replace(/\r$/, '').replace(/\r\n?/g, '\n');
+}
+
+/** Field names that can open an SSE line; a bare `:` opens a comment. */
+const SSE_FIELD_NAMES = ['event:', 'data:', 'id:', 'retry:'];
+
+/** True when `text` is (the start of) an SSE line, so it may still grow into a frame. */
+function couldBeSseFrame(text: string): boolean {
+  if (text.startsWith(':')) return true;
+  return SSE_FIELD_NAMES.some((field) => text.startsWith(field) || field.startsWith(text));
+}
 
 /**
- * True when the buffered bytes hold only Responses lifecycle frames (plus, optionally, one
- * frame still arriving across reads), so nothing visible has been committed and the stream
- * can still be abandoned for another target. A trailing partial frame counts as pending
- * unless its `event:` line already names real output (a failure event is held until complete).
+ * True while the buffered bytes can still turn into a failure for a stream that has shown
+ * nothing visible: every COMPLETE frame is a Responses lifecycle frame, and any incomplete
+ * trailing frame might still be an SSE frame (so it is waited out and classified once whole,
+ * never from a fragment). Non-SSE bytes (native NDJSON such as Ollama, a plain JSON body)
+ * are real output and are never held.
  */
 export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
-  const text = new TextDecoder().decode(concatChunks(chunks));
-  const segments = text.split(/\r?\n\r?\n/);
-  const tail = segments.pop() ?? '';
+  const segments = decodeSse(concatChunks(chunks)).split('\n\n');
+  const tail = (segments.pop() ?? '').trimStart();
 
   let sawLifecycle = false;
   let onlyLifecycle = true;
@@ -60,13 +72,37 @@ export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
   parser.feed(segments.map((segment) => `${segment}\n\n`).join(''));
   if (!onlyLifecycle) return false;
 
-  if (tail.trim() === '') return sawLifecycle;
-  const tailEvent = /^event:\s*(.+?)\s*$/m.exec(tail)?.[1];
-  return (
-    tailEvent === undefined ||
-    LIFECYCLE_PRELUDE_EVENT_TYPES[tailEvent] === true ||
-    FAILURE_EVENT_TYPES[tailEvent] === true
-  );
+  if (tail === '') return sawLifecycle;
+  if (!couldBeSseFrame(tail)) return false;
+  return !tailShowsRealOutput(tail);
+}
+
+/**
+ * True once a COMPLETE line of an unfinished frame already names real output, so waiting for
+ * the blank line would only delay it. Fragments are never classified: a name or JSON value
+ * still arriving (`event: response.fa`, `"type":"response.fa`) stays pending.
+ */
+function tailShowsRealOutput(tail: string): boolean {
+  const lines = tail.split('\n');
+  lines.pop(); // the last element is unterminated (or empty): not a complete line yet
+  for (const line of lines) {
+    let type: unknown;
+    if (line.startsWith('event:')) {
+      type = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      try {
+        type = JSON.parse(line.slice(5).trim())?.type;
+      } catch {
+        continue;
+      }
+    } else {
+      continue;
+    }
+    const isLifecycle = typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true;
+    const isFailure = type === 'response.failed' || type === 'error';
+    if (!isLifecycle && !isFailure) return true;
+  }
+  return false;
 }
 
 /**
@@ -81,8 +117,9 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
   if (!text) return null;
 
   // 1. Try parsing SSE frames (each keeps its own event type) or raw JSON
+  const sseText = decodeSse(bytes).trim();
   const candidates: { json: string; eventType: string }[] = [];
-  for (const frame of text.split(/\r?\n\r?\n/)) {
+  for (const frame of sseText.split('\n\n')) {
     let frameEventType = '';
     const frameData: string[] = [];
     for (const rawLine of frame.split('\n')) {
