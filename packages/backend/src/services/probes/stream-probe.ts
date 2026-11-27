@@ -397,7 +397,8 @@ async function probeStreamingStartWithStallCheck(
 
       chunks.push(value);
       totalBytes += value.length;
-      streamStarted = true;
+      // A lifecycle-only prelude has committed nothing visible, so it must stay retryable.
+      streamStarted = !isLifecyclePreludeOnly(chunks);
     }
 
     if (chunks.length > 0) {

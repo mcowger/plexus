@@ -605,6 +605,90 @@ describe('Dispatcher Failover', () => {
     expect(response.stream).toBeDefined();
   });
 
+  describe('Responses lifecycle prelude with stall detection', () => {
+    const encoder = new TextEncoder();
+    const sse = (type: string, body: object) =>
+      encoder.encode(`event: ${type}\ndata: ${JSON.stringify({ type, ...body })}\n\n`);
+    // Padded so the prelude alone satisfies ttfbBytes.
+    const created = sse('response.created', {
+      response: { id: `resp_${'x'.repeat(200)}`, status: 'queued' },
+    });
+    const okStream = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode('data: recovered\n\n'));
+            controller.close();
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    const stallConfig = () =>
+      ({ ...makeConfig({ targetCount: 2 }), stall: { ttfbSeconds: 0.05, ttfbBytes: 100 } }) as any;
+
+    test('fails over when the first target sends a prelude then response.failed', async () => {
+      setConfigForTesting(stallConfig());
+      const failed = sse('response.failed', {
+        response: {
+          status: 'failed',
+          error: { code: 'no_available_provider', message: 'No one started answering.' },
+        },
+      });
+      let sent = 0;
+      const upstream = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            const frames = [created, failed];
+            if (sent < frames.length) controller.enqueue(frames[sent++]!);
+            else controller.close();
+          },
+        },
+        { highWaterMark: 0 }
+      );
+      fetchMock
+        .mockImplementationOnce(
+          async () =>
+            new Response(upstream, {
+              status: 200,
+              headers: { 'Content-Type': 'text/event-stream' },
+            })
+        )
+        .mockImplementationOnce(async () => okStream());
+
+      const response = await new Dispatcher().dispatch(makeChatRequest(true));
+      const meta = (response as any).plexus;
+
+      expect(meta?.attemptCount).toBe(2);
+      expect(meta?.finalAttemptProvider).toBe('p2');
+    });
+
+    test('fails over through the attempt path when a prelude is followed by silence', async () => {
+      setConfigForTesting(stallConfig());
+      const silent = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(created);
+        },
+        // Never resolves: the upstream goes quiet after the prelude.
+        pull: () => new Promise<void>(() => {}),
+      });
+      fetchMock
+        .mockImplementationOnce(
+          async () =>
+            new Response(silent, {
+              status: 200,
+              headers: { 'Content-Type': 'text/event-stream' },
+            })
+        )
+        .mockImplementationOnce(async () => okStream());
+
+      const response = await new Dispatcher().dispatch(makeChatRequest(true));
+      const meta = (response as any).plexus;
+
+      expect(meta?.attemptCount).toBe(2);
+      expect(meta?.finalAttemptProvider).toBe('p2');
+    });
+  });
+
   test('no failover when disabled in config', async () => {
     setConfigForTesting(makeConfig({ targetCount: 2, failoverEnabled: false }));
     fetchMock.mockImplementation(async () => errorResponse(500, 'should not retry'));

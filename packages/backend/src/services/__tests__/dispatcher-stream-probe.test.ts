@@ -361,6 +361,27 @@ describe('probeStreamingStart', () => {
       expect(result.error.message).toBe('No one started answering within 85 seconds.');
     });
 
+    test('stall-aware timeout after only a prelude reports streamStarted false', async () => {
+      const silent = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(created);
+          },
+          pull: () => new Promise<void>(() => {}),
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(silent, {
+        ttfbMs: 50,
+        ttfbBytes: 1,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toContain('stalled');
+      expect(result.streamStarted).toBe(false);
+    });
+
     test('prelude followed by real output is replayed intact', async () => {
       const delta = frame('response.output_text.delta', { delta: 'hi' });
       const dispatcher = new Dispatcher();
