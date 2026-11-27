@@ -394,6 +394,119 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     expect(providerPayload).toEqual(snapshot);
   });
 
+  it.each(['responses', 'responses:lite'])(
+    'retries %s after removing encrypted reasoning without changing other input',
+    async (targetApiType) => {
+      const errorBody = JSON.stringify({
+        error: {
+          message:
+            'The encrypted content for item rs_1a0ccd22a0a3e5d2032f537e25630d84 could not be verified. Reason: Encrypted content could not be decrypted or parsed.',
+        },
+      });
+      const executeProviderRequest = mock()
+        .mockImplementationOnce(async () => new Response(errorBody, { status: 400 }))
+        .mockImplementationOnce(async () => new Response('{"id":"resp_1"}', { status: 200 }));
+      const host = makeHost({
+        executeProviderRequest,
+        handleNonStreamingResponse: mock(async () => ({
+          id: 'resp_1',
+          model: 'model-1',
+          content: 'ok',
+        })),
+      });
+      const providerPayload = {
+        model: 'model-1',
+        input: [
+          { type: 'message', role: 'user', content: 'hi' },
+          {
+            type: 'reasoning',
+            id: 'rs_1a0ccd22a0a3e5d2032f537e25630d84',
+            encrypted_content: 'old',
+          },
+          { type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' },
+          { type: 'function_call_output', call_id: 'call_1', output: 'result' },
+          { type: 'reasoning', id: 'rs_2', encrypted_content: 'also-old' },
+          { type: 'reasoning', id: 'rs_3', summary: [] },
+        ],
+      };
+      const snapshot = structuredClone(providerPayload);
+
+      const result = await executeStandardAttempt(
+        makeContext(host, providerPayload, { targetApiType })
+      );
+
+      expect(result.outcome).toBe('success');
+      expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+      expect(executeProviderRequest.mock.calls[1]![2].input).toEqual([
+        snapshot.input[0],
+        snapshot.input[2],
+        snapshot.input[3],
+        snapshot.input[5],
+      ]);
+      expect(providerPayload).toEqual(snapshot);
+    }
+  );
+
+  it.each([
+    ['responses', 'The encrypted content for item rs_1 could not be verified.', []],
+    [
+      'chat',
+      'The encrypted content for item rs_1 could not be verified.',
+      [{ type: 'reasoning', encrypted_content: 'old' }],
+    ],
+    [
+      'responses',
+      'The encrypted content for item rs_1 is missing.',
+      [{ type: 'reasoning', encrypted_content: 'old' }],
+    ],
+  ])(
+    'does not retry unrelated or unchanged payloads (%s)',
+    async (targetApiType, message, input) => {
+      const executeProviderRequest = mock(
+        async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+      );
+      const host = makeHost({
+        executeProviderRequest,
+        handleProviderError: mock(async () => {
+          throw new Error('HTTP 400');
+        }),
+        isRetryableStatus: mock(() => true),
+      });
+
+      const result = await executeStandardAttempt(
+        makeContext(host, { model: 'model-1', input }, { targetApiType })
+      );
+      expect(result.outcome).toBe('retry');
+      expect(executeProviderRequest).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('bounds encrypted reasoning recovery when the retried request is also rejected', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock(
+      async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+    );
+    const host = makeHost({
+      executeProviderRequest,
+      handleProviderError: mock(async () => {
+        throw new Error('HTTP 400');
+      }),
+      isRetryableStatus: mock(() => true),
+    });
+    const result = await executeStandardAttempt(
+      makeContext(
+        host,
+        {
+          model: 'model-1',
+          input: [{ type: 'reasoning', id: 'rs_1', encrypted_content: 'old' }],
+        },
+        { targetApiType: 'responses' }
+      )
+    );
+    expect(result.outcome).toBe('retry');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+  });
+
   it('clears the requested tier when a strip retry removes service_tier and the final attempt fails terminally', async () => {
     const stripBody = JSON.stringify({
       error: { message: 'Unsupported parameter: service_tier' },

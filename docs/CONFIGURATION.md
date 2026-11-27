@@ -269,6 +269,11 @@ and override the common traits. Model-specific maps replace the common
 thinking-level map; individual `compat` flags merge. No `pi_ai_model_id` is
 needed. Unknown traits remain unknown and are not advertised or rewritten.
 
+Separately, when a Responses target rejects replayed encrypted reasoning as
+unverifiable, Plexus removes encrypted reasoning items from the outbound input
+and retries that target once. Other conversation items are retained. This
+recovery applies regardless of the `auto_compat` setting.
+
 Some thinking endpoints (DeepSeek, Kimi K3, MiMo) reject a replayed history
 when any assistant message lacks `reasoning_content`. When the resolved pi-ai
 model declares `requiresReasoningContentOnAssistantMessages` — as the builtin
