@@ -2235,6 +2235,7 @@ packages/frontend/src/hooks/useCardPositions.ts:83 [function] useCardPositions
 packages/frontend/src/hooks/useLiveDashboardData.ts:117 [function] useLiveDashboardData
 packages/frontend/src/hooks/useLiveDashboardData.ts:38 [interface] UseLiveDashboardDataOptions
 packages/frontend/src/hooks/useLiveDashboardData.ts:48 [interface] LiveDashboardData
+packages/frontend/src/hooks/useMediaQuery.ts:4 [function] useMediaQuery
 packages/frontend/src/hooks/useMetadataEditor.ts:21 [function] useMetadataEditor
 packages/frontend/src/hooks/useModels.ts:12 [interface] OrphanGroup
 packages/frontend/src/hooks/useModels.ts:20 [interface] AliasSearchEntry
