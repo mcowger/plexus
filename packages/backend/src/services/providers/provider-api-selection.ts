@@ -22,6 +22,20 @@ const API_TYPE_ALIASES: Record<string, string[]> = {
   'openai-images': ['chat', 'gemini'],
 };
 
+const TEXT_API_BASE_TYPES: Record<string, true> = {
+  chat: true,
+  messages: true,
+  responses: true,
+  gemini: true,
+  completions: true,
+  ollama: true,
+};
+const NON_TEXT_API_BASE_TYPES: Record<string, true> = {
+  transcriptions: true,
+  speech: true,
+  embeddings: true,
+};
+
 function stripTrailingApiVersion(url: string): string {
   return url.replace(/\/(v\d+beta\d*)$/i, '');
 }
@@ -66,6 +80,23 @@ export function selectTargetApiType(
     availableTypes = normalizedModelTypes;
   } else {
     availableTypes = providerTypes;
+  }
+
+  // Text requests may only default to a text protocol: provider URL maps can
+  // also list image-only, audio, embedding or decisions endpoints, and their
+  // key order must not decide where a chat-style payload is sent.
+  if (incomingApiType && TEXT_API_BASE_TYPES[getApiBaseType(incomingApiType.toLowerCase())]) {
+    availableTypes = availableTypes.filter((t: string) => {
+      const base = getApiBaseType(t.toLowerCase());
+      return (
+        TEXT_API_BASE_TYPES[base] ||
+        !(
+          NON_TEXT_API_BASE_TYPES[base] ||
+          isDecisionsTargetApiType(base) ||
+          isImageTargetApiType(base)
+        )
+      );
+    });
   }
 
   let targetApiType = availableTypes[0]; // Default to first one
