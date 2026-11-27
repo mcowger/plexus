@@ -52,10 +52,11 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   const isSmUp = useMediaQuery('(min-width: 640px)');
 
   // A group with an incomplete target is never hidden, so it can't be saved unnoticed.
-  const resolvedCollapsed = groups.map((group, i) =>
+  const forcedOpen = groups.map((group) =>
     group.targets.some((t) => (t.alias !== undefined ? !t.alias : !t.provider || !t.model))
-      ? false
-      : (collapsedFlags[i] ?? (!isSmUp && i > 0))
+  );
+  const resolvedCollapsed = groups.map((_, i) =>
+    forcedOpen[i] ? false : (collapsedFlags[i] ?? (!isSmUp && i > 0))
   );
 
   // Expand a group whose target count grows from outside (e.g. Auto Add).
@@ -304,9 +305,16 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
                   onClick={() =>
                     updateCollapsed((flags) => flags.map((v, i) => (i === groupIdx ? !v : v)))
                   }
+                  disabled={forcedOpen[groupIdx]}
                   aria-expanded={!collapsed}
-                  title={collapsed ? 'Expand group' : 'Collapse group'}
-                  className={`hover:text-primary text-text-secondary transition-colors ${ICON_BTN_CLASS}`}
+                  title={
+                    forcedOpen[groupIdx]
+                      ? 'Finish incomplete targets before collapsing'
+                      : collapsed
+                        ? 'Expand group'
+                        : 'Collapse group'
+                  }
+                  className={`hover:text-primary text-text-secondary disabled:hover:text-text-secondary transition-colors disabled:opacity-30 ${ICON_BTN_CLASS}`}
                 >
                   {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 </button>
