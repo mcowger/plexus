@@ -6,6 +6,7 @@ import type { UsageRecord } from '../../types/usage';
 import { DebugLoggingInspector } from '../inspectors/debug-logging';
 import { UsageInspector } from '../inspectors/usage-logging';
 import { DebugManager } from '../observability/debug-manager';
+import { CooldownManager } from '../runtime/cooldown-manager';
 
 describe('UsageInspector Metadata Robustness', () => {
   let mockStorage: any;
@@ -107,6 +108,126 @@ describe('UsageInspector Metadata Robustness', () => {
         tokensOutput: 5,
       })
     );
+  });
+
+  describe('mid-stream response.failed on a 200 stream', () => {
+    const failedSnapshot = (code: string) => ({
+      id: 'resp_failed',
+      status: 'failed',
+      output: [],
+      error: { code, message: 'No one started answering within 85 seconds.' },
+    });
+
+    const finalize = (requestId: string, snapshot: object, responseStatus = 'success') => {
+      const usageRecord: Partial<UsageRecord> = {
+        requestId,
+        responseStatus,
+        provider: 'martllm',
+        selectedModelName: 'openai/gpt-6.2-sol',
+        finalAttemptProvider: 'martllm',
+        finalAttemptModel: 'openai/gpt-6.2-sol',
+      };
+      mockStorage.saveError = mock(() => Promise.resolve());
+      const inspector = new UsageInspector(
+        requestId,
+        mockStorage,
+        usageRecord,
+        mockPricing,
+        undefined,
+        Date.now(),
+        false,
+        'responses',
+        'responses'
+      );
+      const dm = DebugManager.getInstance();
+      dm.startLog(requestId, {});
+      dm.addReconstructedRawResponse(requestId, snapshot);
+      inspector.finalize();
+      inspector.destroy();
+      return usageRecord;
+    };
+
+    it('cools down the target and records an error instead of a success', () => {
+      const markFailure = registerSpy(
+        CooldownManager.getInstance(),
+        'markProviderFailure'
+      ).mockResolvedValue(true);
+
+      const record = finalize('stream-failed-cooldown', failedSnapshot('no_available_provider'));
+
+      expect(record.responseStatus).toBe('error');
+      expect(mockStorage.saveError).toHaveBeenCalledTimes(1);
+      expect(markFailure).toHaveBeenCalledTimes(1);
+      expect(markFailure).toHaveBeenCalledWith(
+        'martllm',
+        'openai/gpt-6.2-sol',
+        undefined,
+        expect.stringContaining('no_available_provider')
+      );
+    });
+
+    it.each([
+      ['provider_overloaded', true],
+      ['timeout', true],
+      ['authentication', false],
+      ['invalid_request', false],
+      ['server', false],
+    ])(
+      'OpenRouter error_type %s (error.code collapsed to server_error) cooldown=%s',
+      (errorType, expectCooldown) => {
+        const markFailure = registerSpy(
+          CooldownManager.getInstance(),
+          'markProviderFailure'
+        ).mockResolvedValue(true);
+
+        finalize(`stream-failed-openrouter-${errorType}`, {
+          ...failedSnapshot('server_error'),
+          error_type: errorType,
+        });
+
+        expect(markFailure).toHaveBeenCalledTimes(expectCooldown ? 1 : 0);
+      }
+    );
+
+    it('cools down for Meta documented retryable 503 codes', () => {
+      const markFailure = registerSpy(
+        CooldownManager.getInstance(),
+        'markProviderFailure'
+      ).mockResolvedValue(true);
+
+      finalize('stream-failed-meta', failedSnapshot('service_overloaded'));
+
+      expect(markFailure).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs but does not cool down for codes outside the provider-fault list', () => {
+      const markFailure = registerSpy(
+        CooldownManager.getInstance(),
+        'markProviderFailure'
+      ).mockResolvedValue(true);
+
+      const record = finalize('stream-failed-caller-fault', failedSnapshot('image_too_large'));
+
+      expect(record.responseStatus).toBe('error');
+      expect(mockStorage.saveError).toHaveBeenCalledTimes(1);
+      expect(markFailure).not.toHaveBeenCalled();
+    });
+
+    it('does not cool down when the client cancelled', () => {
+      const markFailure = registerSpy(
+        CooldownManager.getInstance(),
+        'markProviderFailure'
+      ).mockResolvedValue(true);
+
+      const record = finalize(
+        'stream-failed-cancelled',
+        failedSnapshot('no_available_provider'),
+        'cancelled'
+      );
+
+      expect(record.responseStatus).toBe('cancelled');
+      expect(markFailure).not.toHaveBeenCalled();
+    });
   });
 
   it('should extract tool call count from OpenAI non-streaming choices[0].message.tool_calls', async () => {
