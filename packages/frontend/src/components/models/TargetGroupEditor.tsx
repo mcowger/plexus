@@ -59,6 +59,8 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   );
 
   // Expand a group whose target count grows from outside (e.g. Auto Add).
+  // Edits made here record their counts in setGroups, so reorders/removals
+  // never look like growth.
   const prevTargetCounts = useRef(groups.map((g) => g.targets.length));
   useEffect(() => {
     const prev = prevTargetCounts.current;
@@ -74,7 +76,9 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   };
 
   const setGroups = (updater: (prev: AliasTargetGroup[]) => AliasTargetGroup[]) => {
-    onChange(updater([...groups]));
+    const next = updater([...groups]);
+    prevTargetCounts.current = next.map((g) => g.targets.length);
+    onChange(next);
   };
 
   const addGroup = () => {
