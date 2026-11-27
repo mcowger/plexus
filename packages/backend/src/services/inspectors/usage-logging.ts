@@ -17,6 +17,7 @@ import { extractActualServiceTier } from '../dispatch/service-tier-metadata';
 import { DebugManager } from '../observability/debug-manager';
 import { UsageStorageService } from '../observability/usage-storage';
 import { recordQuotaUsage } from '../quota/quota-middleware';
+import { CooldownManager } from '../runtime/cooldown-manager';
 import type { DebugLoggingInspector } from './debug-logging';
 
 export interface ExtractedObservedUsage {
@@ -91,6 +92,57 @@ export function extractUsageFromReconstructed(
     default:
       return null;
   }
+}
+
+interface StreamFailureSnapshot {
+  error?: { code?: string; message?: string };
+  /** OpenRouter's canonical category on `response.failed`; `error.code` is lossy there. */
+  error_type?: string;
+}
+
+/**
+ * `response.error.code` values (Responses `response.failed` / `error`) that indicate
+ * provider health problems. Sources:
+ * - OpenAI `ResponseErrorCode` enum (openai-openapi): `server_error`, `rate_limit_exceeded`
+ * - OpenAI error-codes guide / Codex client: `server_is_overloaded`
+ * - MartLLM docs (martllm.com/docs/errors): `no_available_provider`, `service_unavailable`,
+ *   `rate_limited`
+ * - Meta Model API docs (dev.meta.ai/docs/error-handling): `server_shutting_down`,
+ *   `service_overloaded`, `backend_unavailable` (all documented retryable 503s)
+ * Staging: martllm `no_available_provider` (HTTP 503, matching the mid-stream failure text).
+ */
+const PROVIDER_FAULT_STREAM_ERROR_CODES: Record<string, true> = {
+  server_error: true,
+  server_is_overloaded: true,
+  rate_limit_exceeded: true,
+  no_available_provider: true,
+  service_unavailable: true,
+  rate_limited: true,
+  server_shutting_down: true,
+  service_overloaded: true,
+  backend_unavailable: true,
+};
+
+/**
+ * OpenRouter `response.error_type` values documented as upstream provider faults
+ * (openrouter.ai/docs/api_reference/errors-and-debugging, Typed Error Codes).
+ * OpenRouter collapses auth, validation and provider failures into `error.code:
+ * "server_error"` on Responses streams, so when `error_type` is present it alone decides.
+ * `server` and `unmapped` are undocumented as provider vs caller and are excluded.
+ */
+const OPENROUTER_PROVIDER_FAULT_ERROR_TYPES: Record<string, true> = {
+  provider_overloaded: true,
+  provider_unavailable: true,
+  timeout: true,
+  rate_limit_exceeded: true,
+};
+
+function isProviderFaultStreamFailure(snapshot: StreamFailureSnapshot | null): boolean {
+  if (!snapshot) return false;
+  const errorType = snapshot.error_type;
+  if (errorType) return Object.hasOwn(OPENROUTER_PROVIDER_FAULT_ERROR_TYPES, errorType);
+  const code = snapshot.error?.code;
+  return !!code && Object.hasOwn(PROVIDER_FAULT_STREAM_ERROR_CODES, code);
 }
 
 export class UsageInspector extends PassThrough {
@@ -207,6 +259,7 @@ export class UsageInspector extends PassThrough {
           );
           this.usageRecord.toolCallsCount = responseMetadata.toolCallsCount;
           this.usageRecord.finishReason = responseMetadata.finishReason;
+          this.handleTerminalStreamFailure(reconstructed, responseMetadata.finishReason);
 
           if (this.shouldEstimateTokens) {
             // Estimation is a FALLBACK for responses that carried no usage at
@@ -464,6 +517,63 @@ export class UsageInspector extends PassThrough {
       usage = extractUsageFromReconstructed(transformedSnapshot, this.incomingApiType);
     }
     return usage;
+  }
+
+  /**
+   * A Responses stream can open with HTTP 200 and then terminate with
+   * `response.failed` (e.g. the upstream gateway's `no_available_provider`).
+   * Headers are already sent, so there is no failover, but the target must
+   * still be put on cooldown and the request recorded as an error. Raw-mode
+   * bypass streams never pass through the unified-chunk tap, so this is the
+   * one place that sees the failure for every stream shape.
+   */
+  private handleTerminalStreamFailure(
+    reconstructed: StreamFailureSnapshot | null,
+    finishReason: string | null
+  ): void {
+    if (finishReason !== 'error') return;
+    const status = this.usageRecord.responseStatus;
+    if (status === 'cancelled' || status === 'timeout' || status === 'stall') return;
+
+    const code: string | undefined = reconstructed?.error_type ?? reconstructed?.error?.code;
+    const message: string =
+      reconstructed?.error?.message ?? 'The model response failed to complete.';
+
+    if (status === 'success') {
+      this.usageRecord.responseStatus = 'error';
+      this.usageStorage
+        .saveError(
+          this.usageRecord.requestId!,
+          new Error(message),
+          {
+            apiType: this.incomingApiType,
+            provider: this.usageRecord.provider,
+            targetModel: this.usageRecord.selectedModelName,
+            statusCode: 500,
+            code: code ?? 'response_failed',
+            clientSignaled: true,
+          },
+          this.keyName
+        )
+        .catch((err) => {
+          logger.error(`Failed to save stream failure for ${this.usageRecord.requestId}:`, err);
+        });
+    }
+
+    const provider = this.usageRecord.finalAttemptProvider ?? this.usageRecord.provider;
+    const model = this.usageRecord.finalAttemptModel ?? this.usageRecord.selectedModelName;
+    if (!provider || !model || !isProviderFaultStreamFailure(reconstructed)) return;
+
+    CooldownManager.getInstance()
+      .markProviderFailure(
+        provider,
+        model,
+        undefined,
+        `Stream failed: ${code ?? 'response_failed'}: ${message}`
+      )
+      .catch((err) => {
+        logger.error(`Failed to apply cooldown for ${provider}/${model}:`, err);
+      });
   }
 
   private extractResponseMetadataFromReconstructed(
