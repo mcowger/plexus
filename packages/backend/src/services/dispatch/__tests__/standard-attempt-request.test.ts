@@ -414,6 +414,28 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
           content: 'ok',
         })),
       });
+      const shellCall = {
+        type: 'shell_call',
+        call_id: 'call_4',
+        action: { commands: ['echo hello'] },
+      };
+      const shellResult = {
+        type: 'shell_call_output',
+        call_id: 'call_4',
+        output: [{ stdout: 'hello', stderr: '', outcome: { type: 'exit', exit_code: 0 } }],
+      };
+      const patchCall = {
+        type: 'apply_patch_call',
+        call_id: 'call_5',
+        operation: { type: 'create_file', path: 'hello.txt', diff: '+hello' },
+        status: 'completed',
+      };
+      const patchResult = {
+        type: 'apply_patch_call_output',
+        call_id: 'call_5',
+        status: 'completed',
+        output: 'created hello.txt',
+      };
       const providerPayload = {
         model: 'model-1',
         input: [
@@ -424,9 +446,21 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
             encrypted_content: 'old',
           },
           { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{}' },
-          { type: 'function_call_output', call_id: 'call_1', output: 'result' },
+          { type: 'function_call_output', id: 'fco_1', call_id: 'call_1', output: 'result' },
           { type: 'custom_tool_call', id: 'ct_1', call_id: 'call_2', name: 'edit', input: 'text' },
-          { type: 'tool_search_call', id: 'ts_1', arguments: {}, execution: 'client' },
+          { type: 'custom_tool_call_output', id: 'cto_1', call_id: 'call_2', output: 'edited' },
+          {
+            type: 'tool_search_call',
+            id: 'ts_1',
+            call_id: 'call_3',
+            arguments: {},
+            execution: 'client',
+          },
+          { type: 'tool_search_output', id: 'tso_1', call_id: 'call_3', tools: [] },
+          { ...shellCall, id: 'sh_1' },
+          { ...shellResult, id: 'sho_1' },
+          { ...patchCall, id: 'ap_1' },
+          { ...patchResult, id: 'apo_1' },
           { type: 'message', id: 'msg_1', role: 'assistant', content: 'answer' },
           { type: 'reasoning', id: 'rs_2', encrypted_content: 'also-old' },
           { type: 'reasoning', id: 'rs_3', summary: [] },
@@ -443,11 +477,17 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
       expect(executeProviderRequest.mock.calls[1]![2].input).toEqual([
         snapshot.input[0],
         { type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' },
-        snapshot.input[3],
+        { type: 'function_call_output', call_id: 'call_1', output: 'result' },
         { type: 'custom_tool_call', call_id: 'call_2', name: 'edit', input: 'text' },
-        { type: 'tool_search_call', arguments: {}, execution: 'client' },
+        { type: 'custom_tool_call_output', call_id: 'call_2', output: 'edited' },
+        { type: 'tool_search_call', call_id: 'call_3', arguments: {}, execution: 'client' },
+        { type: 'tool_search_output', call_id: 'call_3', tools: [] },
+        shellCall,
+        shellResult,
+        patchCall,
+        patchResult,
         { type: 'message', role: 'assistant', content: 'answer' },
-        snapshot.input[8],
+        snapshot.input.at(-1),
       ]);
       expect(providerPayload).toEqual(snapshot);
     }

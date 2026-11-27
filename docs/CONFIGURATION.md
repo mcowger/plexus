@@ -270,8 +270,10 @@ thinking-level map; individual `compat` flags merge. No `pi_ai_model_id` is
 needed. Unknown traits remain unknown and are not advertised or rewritten.
 
 Separately, when a Responses target rejects replayed encrypted reasoning as
-unverifiable, Plexus removes encrypted reasoning items and detaches compatible
-output item IDs before retrying once. If an affected item requires its ID,
+unverifiable, Plexus removes encrypted reasoning and strips optional item IDs
+from the outputs generated after it before retrying once. Tool results keep
+their `call_id`, and assistant output messages are replayed as plain text. If
+an affected item requires its ID, or an `item_reference` names a removed item,
 Plexus leaves the request unchanged rather than sending an invalid retry.
 This recovery applies regardless of the `auto_compat` setting.
 
