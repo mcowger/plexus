@@ -86,13 +86,7 @@ export function createAliasCodexEffortResolver(
         !(modelConfig?.access_via?.length && types.every(isDecisionsTargetApiType))
       ) {
         const route = { provider, model, config, modelConfig };
-        let targetApiType: string | undefined;
-        try {
-          targetApiType = selectTargetApiType(route, 'responses').targetApiType;
-        } catch {
-          // No text protocol on this target (e.g. image- or audio-only): it
-          // cannot serve a Responses request, so it contributes no efforts.
-        }
+        const { targetApiType } = selectTargetApiType(route, 'responses');
         if (targetApiType && !isImageTargetApiType(targetApiType)) {
           const codex =
             (config.oauth_provider || provider) === 'openai-codex' &&

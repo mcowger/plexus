@@ -73,13 +73,14 @@ describe('selectTargetApiType', () => {
     );
   });
 
-  test('throws when a text request has no text protocol available', () => {
-    expect(() =>
-      selectTargetApiType(
-        route({ api_base_url: 'https://provider.example/v1' }, { access_via: ['openai-images'] }),
-        'chat'
-      )
-    ).toThrow('No available API type found');
+  test('returns no type when a text request has no text protocol, so failover can skip it', () => {
+    const result = selectTargetApiType(
+      route({ api_base_url: 'https://provider.example/v1' }, { access_via: ['openai-images'] }),
+      'chat'
+    );
+
+    expect(result.targetApiType).toBeUndefined();
+    expect(result.selectionReason).toBe("no text protocol available for incoming type 'chat'");
   });
 });
 
