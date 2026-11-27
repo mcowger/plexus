@@ -394,6 +394,266 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     expect(providerPayload).toEqual(snapshot);
   });
 
+  it.each(['responses', 'responses:lite'])(
+    'retries %s after removing encrypted reasoning and detaching dependent outputs',
+    async (targetApiType) => {
+      const errorBody = JSON.stringify({
+        error: {
+          message:
+            'The encrypted content for item rs_1a0ccd22a0a3e5d2032f537e25630d84 could not be verified. Reason: Encrypted content could not be decrypted or parsed.',
+        },
+      });
+      const executeProviderRequest = mock()
+        .mockImplementationOnce(async () => new Response(errorBody, { status: 400 }))
+        .mockImplementationOnce(async () => new Response('{"id":"resp_1"}', { status: 200 }));
+      const host = makeHost({
+        executeProviderRequest,
+        handleNonStreamingResponse: mock(async () => ({
+          id: 'resp_1',
+          model: 'model-1',
+          content: 'ok',
+        })),
+      });
+      const shellCall = {
+        type: 'shell_call',
+        call_id: 'call_4',
+        action: { commands: ['echo hello'] },
+      };
+      const shellResult = {
+        type: 'shell_call_output',
+        call_id: 'call_4',
+        output: [{ stdout: 'hello', stderr: '', outcome: { type: 'exit', exit_code: 0 } }],
+      };
+      const patchCall = {
+        type: 'apply_patch_call',
+        call_id: 'call_5',
+        operation: { type: 'create_file', path: 'hello.txt', diff: '+hello' },
+        status: 'completed',
+      };
+      const patchResult = {
+        type: 'apply_patch_call_output',
+        call_id: 'call_5',
+        status: 'completed',
+        output: 'created hello.txt',
+      };
+      const providerPayload = {
+        model: 'model-1',
+        input: [
+          { type: 'message', role: 'user', content: 'hi' },
+          {
+            type: 'reasoning',
+            id: 'rs_1a0ccd22a0a3e5d2032f537e25630d84',
+            encrypted_content: 'old',
+          },
+          { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{}' },
+          { type: 'function_call_output', id: 'fco_1', call_id: 'call_1', output: 'result' },
+          { type: 'custom_tool_call', id: 'ct_1', call_id: 'call_2', name: 'edit', input: 'text' },
+          { type: 'custom_tool_call_output', id: 'cto_1', call_id: 'call_2', output: 'edited' },
+          {
+            type: 'tool_search_call',
+            id: 'ts_1',
+            call_id: 'call_3',
+            arguments: {},
+            execution: 'client',
+          },
+          { type: 'tool_search_output', id: 'tso_1', call_id: 'call_3', tools: [] },
+          { ...shellCall, id: 'sh_1' },
+          { ...shellResult, id: 'sho_1' },
+          { ...patchCall, id: 'ap_1' },
+          { ...patchResult, id: 'apo_1' },
+          { type: 'message', id: 'msg_1', role: 'assistant', content: 'answer' },
+          { type: 'reasoning', id: 'rs_2', encrypted_content: 'also-old' },
+          { type: 'reasoning', id: 'rs_3', summary: [] },
+        ],
+      };
+      const snapshot = structuredClone(providerPayload);
+
+      const result = await executeStandardAttempt(
+        makeContext(host, providerPayload, { targetApiType })
+      );
+
+      expect(result.outcome).toBe('success');
+      expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+      expect(executeProviderRequest.mock.calls[1]![2].input).toEqual([
+        snapshot.input[0],
+        { type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'call_1', output: 'result' },
+        { type: 'custom_tool_call', call_id: 'call_2', name: 'edit', input: 'text' },
+        { type: 'custom_tool_call_output', call_id: 'call_2', output: 'edited' },
+        { type: 'tool_search_call', call_id: 'call_3', arguments: {}, execution: 'client' },
+        { type: 'tool_search_output', call_id: 'call_3', tools: [] },
+        shellCall,
+        shellResult,
+        patchCall,
+        patchResult,
+        { type: 'message', role: 'assistant', content: 'answer' },
+        snapshot.input.at(-1),
+      ]);
+      expect(providerPayload).toEqual(snapshot);
+    }
+  );
+
+  it('removes long encrypted histories in one retry', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock()
+      .mockImplementationOnce(
+        async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+      )
+      .mockImplementationOnce(async () => new Response('{"id":"resp_1"}', { status: 200 }));
+    const host = makeHost({
+      executeProviderRequest,
+      handleNonStreamingResponse: mock(async () => ({
+        id: 'resp_1',
+        model: 'model-1',
+        content: 'ok',
+      })),
+    });
+    const input = Array.from({ length: 12 }, (_, i) => [
+      { type: 'reasoning', id: `rs_${i + 1}`, encrypted_content: 'old' },
+      {
+        type: 'function_call',
+        id: `fc_${i + 1}`,
+        call_id: `call_${i + 1}`,
+        name: 'a',
+        arguments: '{}',
+      },
+    ]).flat();
+    const result = await executeStandardAttempt(
+      makeContext(host, { model: 'model-1', input }, { targetApiType: 'responses' })
+    );
+    expect(result.outcome).toBe('success');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+    expect(executeProviderRequest.mock.calls[1]![2].input).toEqual(
+      Array.from({ length: 12 }, (_, i) => ({
+        type: 'function_call',
+        call_id: `call_${i + 1}`,
+        name: 'a',
+        arguments: '{}',
+      }))
+    );
+  });
+
+  it('preserves item references and refuses to retry dependent built-ins requiring IDs', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock(
+      async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+    );
+    const host = makeHost({
+      executeProviderRequest,
+      handleProviderError: mock(async () => {
+        throw new Error('HTTP 400');
+      }),
+      isRetryableStatus: mock(() => true),
+    });
+    const input = [
+      { type: 'reasoning', id: 'rs_1', encrypted_content: 'old' },
+      { type: 'item_reference', id: 'msg_1' },
+      { type: 'web_search_call', id: 'ws_1', status: 'completed' },
+    ];
+    const snapshot = structuredClone(input);
+    const result = await executeStandardAttempt(
+      makeContext(host, { model: 'model-1', input }, { targetApiType: 'responses' })
+    );
+    expect(result.outcome).toBe('retry');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(1);
+    expect(input).toEqual(snapshot);
+  });
+
+  it.each([
+    ['responses', 'The encrypted content for item rs_1 could not be verified.', []],
+    [
+      'responses',
+      'The encrypted content for item rs_1 could not be verified.',
+      [{ type: 'reasoning', id: 'rs_other', encrypted_content: 'valid' }],
+    ],
+    [
+      'chat',
+      'The encrypted content for item rs_1 could not be verified.',
+      [{ type: 'reasoning', encrypted_content: 'old' }],
+    ],
+    [
+      'responses',
+      'The encrypted content for item rs_1 is missing.',
+      [{ type: 'reasoning', encrypted_content: 'old' }],
+    ],
+  ])(
+    'does not retry unrelated or unchanged payloads (%s)',
+    async (targetApiType, message, input) => {
+      const executeProviderRequest = mock(
+        async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+      );
+      const host = makeHost({
+        executeProviderRequest,
+        handleProviderError: mock(async () => {
+          throw new Error('HTTP 400');
+        }),
+        isRetryableStatus: mock(() => true),
+      });
+
+      const result = await executeStandardAttempt(
+        makeContext(host, { model: 'model-1', input }, { targetApiType })
+      );
+      expect(result.outcome).toBe('retry');
+      expect(executeProviderRequest).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('preserves item references while detaching optional output IDs', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock()
+      .mockImplementationOnce(
+        async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+      )
+      .mockImplementationOnce(async () => new Response('{"id":"resp_1"}', { status: 200 }));
+    const host = makeHost({
+      executeProviderRequest,
+      handleNonStreamingResponse: mock(async () => ({
+        id: 'resp_1',
+        model: 'model-1',
+        content: 'ok',
+      })),
+    });
+    const input = [
+      { type: 'reasoning', id: 'rs_1', encrypted_content: 'old' },
+      { type: 'item_reference', id: 'msg_1' },
+      { type: 'tool_search_call', id: 'ts_1', arguments: {}, execution: 'client' },
+    ];
+    const result = await executeStandardAttempt(
+      makeContext(host, { model: 'model-1', input }, { targetApiType: 'responses' })
+    );
+    expect(result.outcome).toBe('success');
+    expect(executeProviderRequest.mock.calls[1]![2].input).toEqual([
+      input[1],
+      { type: 'tool_search_call', arguments: {}, execution: 'client' },
+    ]);
+  });
+
+  it('bounds encrypted reasoning recovery when the retried request is also rejected', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock(
+      async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+    );
+    const host = makeHost({
+      executeProviderRequest,
+      handleProviderError: mock(async () => {
+        throw new Error('HTTP 400');
+      }),
+      isRetryableStatus: mock(() => true),
+    });
+    const result = await executeStandardAttempt(
+      makeContext(
+        host,
+        {
+          model: 'model-1',
+          input: [{ type: 'reasoning', id: 'rs_1', encrypted_content: 'old' }],
+        },
+        { targetApiType: 'responses' }
+      )
+    );
+    expect(result.outcome).toBe('retry');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+  });
+
   it('clears the requested tier when a strip retry removes service_tier and the final attempt fails terminally', async () => {
     const stripBody = JSON.stringify({
       error: { message: 'Unsupported parameter: service_tier' },

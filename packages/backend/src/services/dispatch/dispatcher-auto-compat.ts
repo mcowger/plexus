@@ -1236,6 +1236,182 @@ export function planUnsupportedParamStrip(
   return paramName;
 }
 
+// A rejected encrypted item can indicate an account change. Remove all
+// encrypted reasoning in one retry rather than failing on long histories.
+export const MAX_ENCRYPTED_REASONING_STRIP_RETRIES = 1;
+
+export interface EncryptedReasoningStripState {
+  attempts: number;
+  strippedIds: Set<string>;
+}
+
+export function createEncryptedReasoningStripState(): EncryptedReasoningStripState {
+  return { attempts: 0, strippedIds: new Set() };
+}
+
+export function planEncryptedReasoningStrip(
+  responseBody: string,
+  state: EncryptedReasoningStripState
+): string | undefined {
+  if (state.attempts >= MAX_ENCRYPTED_REASONING_STRIP_RETRIES) return undefined;
+  const id = /encrypted content for item\s+(rs_[\w-]+)\s+could not be verified/i.exec(
+    responseBody
+  )?.[1];
+  if (!id || state.strippedIds.has(id)) return undefined;
+  state.attempts++;
+  state.strippedIds.add(id);
+  return id;
+}
+
+export function refundEncryptedReasoningStrip(
+  state: EncryptedReasoningStripState,
+  id: string
+): void {
+  if (state.strippedIds.delete(id)) state.attempts--;
+}
+
+/** Item types whose `id` is optional on Responses input, so it can be dropped on replay. */
+const OPTIONAL_ID_ITEM_TYPES: Record<string, true> = {
+  function_call: true,
+  function_call_output: true,
+  custom_tool_call: true,
+  custom_tool_call_output: true,
+  tool_search_call: true,
+  tool_search_output: true,
+  shell_call: true,
+  shell_call_output: true,
+  apply_patch_call: true,
+  apply_patch_call_output: true,
+  computer_call_output: true,
+  mcp_approval_response: true,
+  additional_tools: true,
+  configuration_update: true,
+  compaction: true,
+  compaction_trigger: true,
+};
+
+/** The Responses input item fields recovery reads. Every field is client-supplied. */
+interface ReplayedInputItem {
+  type?: unknown;
+  id?: unknown;
+  role?: unknown;
+  content?: unknown;
+  encrypted_content?: unknown;
+  phase?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Plain-text equivalent of an assistant message's content, or `undefined` when
+ * a part has no text form. An id-less assistant message is an input message,
+ * and only its string content is guaranteed valid there.
+ */
+function assistantContentAsText(content: unknown): string | undefined {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return undefined;
+  let text = '';
+  for (const part of content as unknown[]) {
+    if (typeof part !== 'object' || part === null) return undefined;
+    // Fields are checked with typeof before use.
+    const { type, text: partText, refusal } = part as Record<string, unknown>;
+    if ((type === 'output_text' || type === 'input_text') && typeof partText === 'string') {
+      text += partText;
+    } else if (type === 'refusal' && typeof refusal === 'string') {
+      text += refusal;
+    } else {
+      return undefined;
+    }
+  }
+  return text;
+}
+
+/** The item without its `id`, or `undefined` when it can't be replayed id-less. */
+function detachItemId(item: ReplayedInputItem): Record<string, unknown> | undefined {
+  if (typeof item.type === 'string' && Object.hasOwn(OPTIONAL_ID_ITEM_TYPES, item.type)) {
+    const { id: _id, ...rest } = item;
+    return rest;
+  }
+  if (item.type === 'message' && item.role === 'assistant') {
+    const text = assistantContentAsText(item.content);
+    if (text === undefined) return undefined;
+    // Built to the documented id-less assistant input shape (EasyInputMessage:
+    // content, role, phase, type). Output-only fields such as `status` are dropped.
+    return {
+      type: 'message',
+      role: 'assistant',
+      content: text,
+      ...(item.phase === undefined ? {} : { phase: item.phase }),
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Removes every encrypted reasoning item and detaches the `id` of the items
+ * generated after it in the same turn (they point at the removed reasoning).
+ * Returns the input unchanged (`strippedCount` 0) when the rejected item is
+ * absent, or when a retry could not be valid: an affected item requires its
+ * `id`, or an `item_reference` names a removed or detached item.
+ */
+export function stripEncryptedReasoningItems(
+  payload: Record<string, unknown>,
+  rejectedId: string
+): { payload: Record<string, unknown>; strippedCount: number } {
+  const unchanged = { payload, strippedCount: 0 };
+  if (!Array.isArray(payload.input)) return unchanged;
+
+  const affectedIds = new Set<string>();
+  const referencedIds = new Set<string>();
+  const input: unknown[] = [];
+  let detached = false;
+  let foundRejected = false;
+  let strippedCount = 0;
+  for (const raw of payload.input as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) {
+      input.push(raw);
+      continue;
+    }
+    const item = raw as ReplayedInputItem; // Fields are only read through typeof/=== checks.
+
+    // A user turn ends the span, in either input shape: typed or bare `{role, content}`.
+    if (item.role === 'user' && (item.type == null || item.type === 'message')) detached = false;
+
+    const isReference =
+      item.type === 'item_reference' ||
+      (item.type == null && typeof item.id === 'string' && !('role' in item));
+    if (isReference) {
+      if (typeof item.id === 'string') referencedIds.add(item.id);
+      input.push(item);
+      continue;
+    }
+
+    if (item.type === 'reasoning') {
+      detached = typeof item.encrypted_content === 'string';
+      if (detached) {
+        strippedCount++;
+        if (item.id === rejectedId) foundRejected = true;
+        if (typeof item.id === 'string') affectedIds.add(item.id);
+        continue;
+      }
+    }
+
+    if (detached && 'id' in item) {
+      const detachedItem = detachItemId(item);
+      if (!detachedItem) return unchanged;
+      if (typeof item.id === 'string') affectedIds.add(item.id);
+      input.push(detachedItem);
+      continue;
+    }
+    input.push(item);
+  }
+
+  if (!foundRejected) return unchanged;
+  for (const id of referencedIds) {
+    if (affectedIds.has(id)) return unchanged;
+  }
+  return { payload: { ...payload, input }, strippedCount };
+}
+
 // ---------------------------------------------------------------------------
 // Reactive auto-compat: strip-and-retry on stale Anthropic thinking-block
 // signatures

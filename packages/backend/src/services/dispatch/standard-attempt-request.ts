@@ -1,5 +1,6 @@
 import type { ResolvedAdapter } from '../../types/provider-adapter';
 import type { UnifiedChatRequest, UnifiedChatResponse } from '../../types/unified';
+import { getApiBaseType } from '../../utils/api-format';
 import { logger } from '../../utils/logger';
 import type { StallConfig } from '../inspectors/stall-inspector';
 import { isOAuthRoute } from '../oauth/oauth-dispatcher';
@@ -8,21 +9,26 @@ import { CooldownManager } from '../runtime/cooldown-manager';
 import { resolveStickyCacheTtlMs } from './cache-retention';
 import {
   createAdvisorResultStripState,
+  createEncryptedReasoningStripState,
   createLiteToolStripState,
   createThinkingSignatureStripState,
   createUnsupportedParamStripState,
   deleteDottedPath,
   MAX_ADVISOR_RESULT_STRIP_RETRIES,
+  MAX_ENCRYPTED_REASONING_STRIP_RETRIES,
   MAX_LITE_TOOL_STRIP_RETRIES,
   MAX_THINKING_SIGNATURE_STRIP_RETRIES,
   MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
   planAdvisorResultStrip,
+  planEncryptedReasoningStrip,
   planLiteToolStrip,
   planThinkingSignatureStrip,
   planUnsupportedParamStrip,
   refundAdvisorResultStrip,
+  refundEncryptedReasoningStrip,
   refundThinkingSignatureStrip,
   stripAdvisorResultBlocks,
+  stripEncryptedReasoningItems,
   stripLiteUnsupportedTools,
   stripThinkingSignatureBlocks,
 } from './dispatcher-auto-compat';
@@ -202,17 +208,13 @@ async function runStandardAttempt(
 
   // Reactive auto-compat: bounded per-target state so a strip-and-retry
   // cycle (see the 400 handling below) can't loop forever (see
-  // dispatcher-auto-compat.ts for the matching/bound logic). Four
-  // independent mechanisms, four independent budgets — none resets another's
-  // counter, so the combined worst case for this target is bounded at
-  // exactly 1 (initial attempt) + MAX_THINKING_SIGNATURE_STRIP_RETRIES +
-  // MAX_ADVISOR_RESULT_STRIP_RETRIES + MAX_UNSUPPORTED_PARAM_STRIP_RETRIES +
-  // MAX_LITE_TOOL_STRIP_RETRIES fetches, however the mechanisms interleave —
-  // they can't ping-pong into an unbounded loop.
+  // dispatcher-auto-compat.ts for the matching/bound logic). Independent
+  // budgets bound each mechanism even when retries interleave.
   const paramStripState = createUnsupportedParamStripState();
   const thinkingStripState = createThinkingSignatureStripState();
   const advisorStripState = createAdvisorResultStripState();
   const liteToolStripState = createLiteToolStripState();
+  const encryptedReasoningStripState = createEncryptedReasoningStripState();
   let oauthRefreshAttempted = false;
 
   // Looped so a strip-and-retry can redo the fetch against the SAME target
@@ -388,6 +390,8 @@ async function runStandardAttempt(
       // the same way — so the mechanisms below strip the offending content
       // and retry the SAME target instead. Checked in order:
       //
+      //   0. OpenAI Responses: strip rejected encrypted reasoning and detach
+      //      dependent output items, then retry the same target.
       //   1. Stale thinking-block signatures: alias-level failover can
       //      replay a conversation whose `thinking`/`redacted_thinking`
       //      blocks were signed by a DIFFERENT Claude model/session than
@@ -408,6 +412,24 @@ async function runStandardAttempt(
       //      not the specific tool(s), so every disallowed tool is stripped
       //      at once.
       if (response.status === 400) {
+        const rejectedReasoningId =
+          getApiBaseType(targetApiType) === 'responses'
+            ? planEncryptedReasoningStrip(errorText, encryptedReasoningStripState)
+            : undefined;
+        if (rejectedReasoningId) {
+          const stripResult = stripEncryptedReasoningItems(providerPayload, rejectedReasoningId);
+          if (stripResult.strippedCount > 0) {
+            providerPayload = stripResult.payload;
+            logger.warn(
+              `Auto-compat: ${route.provider}/${route.model} rejected encrypted reasoning — ` +
+                `stripped ${stripResult.strippedCount} reasoning item(s) and retrying the same target ` +
+                `(attempt ${encryptedReasoningStripState.attempts}/${MAX_ENCRYPTED_REASONING_STRIP_RETRIES})`
+            );
+            continue;
+          }
+          refundEncryptedReasoningStrip(encryptedReasoningStripState, rejectedReasoningId);
+        }
+
         if (planThinkingSignatureStrip(errorText, providerPayload, thinkingStripState)) {
           const stripResult = stripThinkingSignatureBlocks(providerPayload);
           if (stripResult.strippedCount > 0) {
