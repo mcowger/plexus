@@ -382,6 +382,34 @@ describe('probeStreamingStart', () => {
       expect(result.streamStarted).toBe(false);
     });
 
+    test('failure frame split across reads (CRLF framing) still fails over', async () => {
+      const crlf = (bytes: Uint8Array) =>
+        encoder.encode(new TextDecoder().decode(bytes).replaceAll('\n', '\r\n'));
+      const failedBytes = crlf(failed);
+      const mid = Math.floor(failedBytes.length / 2);
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([crlf(created), failedBytes.slice(0, mid), failedBytes.slice(mid)])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.streamStarted).toBe(false);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
+    test('real output split across reads is not held back', async () => {
+      const delta = frame('response.output_text.delta', { delta: 'hi' });
+      const half = Math.floor(delta.length / 2);
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, delta.slice(0, half), delta.slice(half)])
+      );
+
+      expect(result.ok).toBe(true);
+      const body = await new Response(result.response.body).text();
+      expect(body).toContain('response.output_text.delta');
+    });
+
     test('prelude followed by real output is replayed intact', async () => {
       const delta = frame('response.output_text.delta', { delta: 'hi' });
       const dispatcher = new Dispatcher();

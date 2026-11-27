@@ -1,3 +1,5 @@
+import { createParser } from 'eventsource-parser';
+
 import { logger } from '../../utils/logger';
 import { isProviderFaultStreamFailure } from '../../utils/stream-failure';
 import type { StallConfig } from '../inspectors/stall-inspector';
@@ -21,25 +23,50 @@ const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
   'response.queued': true,
 };
 
+/** Event names whose frame may be a failure still arriving; hold until it completes. */
+const FAILURE_EVENT_TYPES: Record<string, true> = {
+  'response.failed': true,
+  error: true,
+};
+
 /**
- * True when the buffered bytes are only complete Responses lifecycle frames that carry
- * no client-visible output, so the stream can still be abandoned for another target.
+ * True when the buffered bytes hold only Responses lifecycle frames (plus, optionally, one
+ * frame still arriving across reads), so nothing visible has been committed and the stream
+ * can still be abandoned for another target. A trailing partial frame counts as pending
+ * unless its `event:` line already names real output (a failure event is held until complete).
  */
 export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
   const text = new TextDecoder().decode(concatChunks(chunks));
-  if (!text.endsWith('\n\n')) return false;
-  const frames = text.split('\n\n').filter((frame) => frame.trim() !== '');
-  if (frames.length === 0) return false;
-  return frames.every((frame) => {
-    const dataLine = frame.split('\n').find((line) => line.startsWith('data:'));
-    if (!dataLine) return false;
-    try {
-      const type: unknown = JSON.parse(dataLine.slice(5).trim())?.type;
-      return typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true;
-    } catch {
-      return false;
-    }
+  const segments = text.split(/\r?\n\r?\n/);
+  const tail = segments.pop() ?? '';
+
+  let sawLifecycle = false;
+  let onlyLifecycle = true;
+  const parser = createParser({
+    onEvent: (event) => {
+      let type: unknown;
+      try {
+        type = JSON.parse(event.data)?.type;
+      } catch {
+        type = undefined;
+      }
+      if (typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true) {
+        sawLifecycle = true;
+      } else {
+        onlyLifecycle = false;
+      }
+    },
   });
+  parser.feed(segments.map((segment) => `${segment}\n\n`).join(''));
+  if (!onlyLifecycle) return false;
+
+  if (tail.trim() === '') return sawLifecycle;
+  const tailEvent = /^event:\s*(.+?)\s*$/m.exec(tail)?.[1];
+  return (
+    tailEvent === undefined ||
+    LIFECYCLE_PRELUDE_EVENT_TYPES[tailEvent] === true ||
+    FAILURE_EVENT_TYPES[tailEvent] === true
+  );
 }
 
 /**
