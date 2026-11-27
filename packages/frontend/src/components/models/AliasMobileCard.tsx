@@ -88,7 +88,7 @@ export const AliasMobileCard: React.FC<Props> = ({
         </Button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+      <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
         <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
           <div className="text-text-muted text-[10px] tracking-wider uppercase">Selector</div>
           <div className="text-text-secondary truncate font-medium capitalize">
@@ -126,23 +126,25 @@ export const AliasMobileCard: React.FC<Props> = ({
               : '-'}
           </div>
         </div>
-        <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5">
-          <div className="text-text-muted mb-2 flex min-w-0 items-center gap-2 text-[10px] font-semibold tracking-wider uppercase">
-            <span className="shrink-0">Targets</span>
-            {firstTargetGroup && (
-              <>
-                <span
-                  className="min-w-0 flex-1 truncate normal-case opacity-40"
-                  title={`direct/${alias.id}/${firstTargetGroup.name}`}
-                >
-                  direct/{alias.id}/{firstTargetGroup.name}
-                </span>
+        <div className="border-border-glass bg-bg-glass min-w-0 rounded border px-2 py-1.5 sm:col-span-2">
+          <div className="mb-2 min-w-0">
+            <div className="text-text-muted flex min-w-0 items-center gap-2 text-[10px] font-semibold tracking-wider uppercase">
+              <span className="shrink-0">Targets</span>
+              {firstTargetGroup && (
                 <CopyButton
                   value={`direct/${alias.id}/${firstTargetGroup.name}`}
                   size="sm"
                   className="shrink-0"
                 />
-              </>
+              )}
+            </div>
+            {firstTargetGroup && (
+              <div
+                className="text-text-muted mt-0.5 font-mono text-[10px] break-all normal-case opacity-40"
+                title={`direct/${alias.id}/${firstTargetGroup.name}`}
+              >
+                direct/{alias.id}/{firstTargetGroup.name}
+              </div>
             )}
           </div>
           {alias.target_groups.length === 0 ||
@@ -204,15 +206,17 @@ export const AliasMobileCard: React.FC<Props> = ({
                       isDisabled ? 'opacity-70' : ''
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
+                        <div className="text-text-muted text-[11px] break-all">
+                          {t.provider || 'No provider'}
+                        </div>
                         <div
-                          className={`truncate text-xs font-medium ${
+                          className={`text-sm font-medium break-all ${
                             isDisabled ? 'text-danger line-through' : 'text-text-secondary'
                           }`}
                         >
-                          {t.provider || 'No provider'}{' '}
-                          <span className="text-text-muted">-&gt;</span> {t.model || 'No model'}
+                          {t.model || 'No model'}
                         </div>
                         {isProviderDisabled && (
                           <div className="text-danger mt-1 text-[11px]">Provider disabled</div>
@@ -245,7 +249,7 @@ export const AliasMobileCard: React.FC<Props> = ({
                             onTestTarget(alias.id, testKey, t.provider, t.model, testApiTypes);
                           }}
                           disabled={isDisabled}
-                          className="text-primary hover:bg-bg-hover flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                          className="text-primary hover:bg-bg-hover flex h-9 w-9 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={`Test ${alias.id} target ${i + 1}`}
                         >
                           {testState?.loading ? (
