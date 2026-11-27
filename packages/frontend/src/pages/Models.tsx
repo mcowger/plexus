@@ -266,7 +266,6 @@ export const Models = () => {
             </Button>
           </div>
         )}
-        <VisionFallthroughSelector aliases={allAliases} />
       </>
     );
   };
@@ -319,30 +318,34 @@ export const Models = () => {
         {isDesktopHeader ? (
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
             {renderFilterFields('inline')}
+            <VisionFallthroughSelector aliases={allAliases} />
           </div>
         ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full justify-start"
-            onClick={() => setIsFiltersOpen(true)}
-            leftIcon={<ListFilter size={15} />}
-            aria-haspopup="dialog"
-          >
-            <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="shrink-0">Filters &amp; search</span>
-              {activeFilterCount > 0 && (
-                <span className="bg-primary/20 text-primary shrink-0 rounded-full px-1.5 text-[11px] leading-4 font-semibold">
-                  {activeFilterCount}
-                </span>
-              )}
-              {search.trim() && (
-                <span className="text-text-muted min-w-0 truncate text-xs font-normal">
-                  &ldquo;{search.trim()}&rdquo;
-                </span>
-              )}
-            </span>
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => setIsFiltersOpen(true)}
+              leftIcon={<ListFilter size={15} />}
+              aria-haspopup="dialog"
+            >
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="shrink-0">Filters &amp; search</span>
+                {activeFilterCount > 0 && (
+                  <span className="bg-primary/20 text-primary shrink-0 rounded-full px-1.5 text-[11px] leading-4 font-semibold">
+                    {activeFilterCount}
+                  </span>
+                )}
+                {search.trim() && (
+                  <span className="text-text-muted min-w-0 truncate text-xs font-normal">
+                    &ldquo;{search.trim()}&rdquo;
+                  </span>
+                )}
+              </span>
+            </Button>
+            <VisionFallthroughSelector aliases={allAliases} />
+          </div>
         )}
       </PageHeader>
 

@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { AliasTargetGroup } from '../../lib/api';
 import { dedupeModels, getModelOptionKey } from '../../lib/modelOptions';
 import { Button } from '../ui/Button';
@@ -45,11 +46,28 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
     groupIdx: number;
     targetIdx?: number;
   } | null>(null);
-  // Collapsed flags parallel to `groups`. Missing entries use the default:
-  // expanded when there is a single group, collapsed otherwise.
+  // Collapsed flags parallel to `groups`. Missing entries default to collapsed
+  // only on mobile, and only for groups after the first. Desktop starts expanded.
   const [collapsedFlags, setCollapsedFlags] = useState<boolean[]>([]);
+  const isSmUp = useMediaQuery('(min-width: 640px)');
 
-  const resolvedCollapsed = groups.map((_, i) => collapsedFlags[i] ?? groups.length > 1);
+  // A group with an incomplete target is never hidden, so it can't be saved unnoticed.
+  const resolvedCollapsed = groups.map((group, i) =>
+    group.targets.some((t) => (t.alias !== undefined ? !t.alias : !t.provider || !t.model))
+      ? false
+      : (collapsedFlags[i] ?? (!isSmUp && i > 0))
+  );
+
+  // Expand a group whose target count grows from outside (e.g. Auto Add).
+  const prevTargetCounts = useRef(groups.map((g) => g.targets.length));
+  useEffect(() => {
+    const prev = prevTargetCounts.current;
+    const grew = groups.map((g, i) => prev[i] !== undefined && g.targets.length > prev[i]);
+    prevTargetCounts.current = groups.map((g) => g.targets.length);
+    if (grew.some(Boolean)) {
+      setCollapsedFlags((flags) => groups.map((_, i) => (grew[i] ? false : flags[i])) as boolean[]);
+    }
+  }, [groups]);
 
   const updateCollapsed = (updater: (flags: boolean[]) => boolean[]) => {
     setCollapsedFlags(updater(resolvedCollapsed));
@@ -68,7 +86,10 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   };
 
   const removeGroup = (groupIdx: number) => {
-    updateCollapsed((flags) => flags.filter((_, i) => i !== groupIdx));
+    updateCollapsed((flags) => {
+      const remaining = flags.filter((_, i) => i !== groupIdx);
+      return remaining.length === 1 ? [false] : remaining;
+    });
     setGroups((prev) => prev.filter((_, i) => i !== groupIdx));
   };
 
