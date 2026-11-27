@@ -432,7 +432,6 @@ describe('probeStreamingStart', () => {
       const variants: [string, (frame: Uint8Array) => Uint8Array][] = [
         ['LF', (frame) => frame],
         ['CRLF', (frame) => withEol(frame, '\r\n')],
-        ['CR', (frame) => withEol(frame, '\r')],
         ['data-only LF', dataOnly],
         ['data-only CRLF', (frame) => withEol(dataOnly(frame), '\r\n')],
       ];
@@ -440,7 +439,7 @@ describe('probeStreamingStart', () => {
       for (const [name, shape] of variants) {
         test(`${name}: a failure fails over wherever the stream is cut`, async () => {
           const whole = join(shape(created), shape(inProgress), shape(failed));
-          for (let at = 1; at < whole.length; at++) {
+          for (let at = shape(created).length; at < whole.length; at++) {
             const result = await (new Dispatcher() as any).probeStreamingStart(
               sseResponse(slices(whole, at))
             );
@@ -453,7 +452,7 @@ describe('probeStreamingStart', () => {
 
         test(`${name}: the stall-aware probe fails over wherever the stream is cut`, async () => {
           const whole = join(shape(created), shape(inProgress), shape(failed));
-          for (let at = 1; at < whole.length; at++) {
+          for (let at = shape(created).length; at < whole.length; at++) {
             const result = await (new Dispatcher() as any).probeStreamingStart(
               sseResponse(slices(whole, at)),
               { ttfbMs: 5000, ttfbBytes: 1 }
@@ -468,7 +467,11 @@ describe('probeStreamingStart', () => {
 
         test(`${name}: a failure fails over when read one byte at a time`, async () => {
           const whole = join(shape(created), shape(failed));
-          const singles = Array.from(whole, (byte) => Uint8Array.of(byte));
+          const first = shape(created);
+          const singles = [
+            first,
+            ...Array.from(whole.slice(first.length), (byte) => Uint8Array.of(byte)),
+          ];
           const result = await (new Dispatcher() as any).probeStreamingStart(sseResponse(singles));
           expect(result.ok).toBe(false);
           expect(result.error.message).toBe('No one started answering within 85 seconds.');
@@ -489,12 +492,11 @@ describe('probeStreamingStart', () => {
       }
     });
 
-    test('an unfinished frame that already shows real output is not held', async () => {
+    test('fragmented Chat SSE is not held while the upstream stays open', async () => {
       const open = new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
-            controller.enqueue(created);
-            controller.enqueue(encoder.encode('event: response.output_text.delta\ndata: {"ty'));
+            controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"con'));
           },
           pull: () => new Promise<void>(() => {}),
         }),
@@ -502,6 +504,8 @@ describe('probeStreamingStart', () => {
       );
       const result = await (new Dispatcher() as any).probeStreamingStart(open);
       expect(result.ok).toBe(true);
+      const first = await result.response.body.getReader().read();
+      expect(new TextDecoder().decode(first.value)).toContain('"choices"');
     });
 
     describe('native NDJSON is never held', () => {

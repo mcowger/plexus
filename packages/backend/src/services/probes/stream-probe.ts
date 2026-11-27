@@ -1,5 +1,3 @@
-import { createParser } from 'eventsource-parser';
-
 import { logger } from '../../utils/logger';
 import { isProviderFaultStreamFailure } from '../../utils/stream-failure';
 import type { StallConfig } from '../inspectors/stall-inspector';
@@ -32,77 +30,30 @@ function decodeSse(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes).replace(/\r$/, '').replace(/\r\n?/g, '\n');
 }
 
-/** Field names that can open an SSE line; a bare `:` opens a comment. */
-const SSE_FIELD_NAMES = ['event:', 'data:', 'id:', 'retry:'];
-
-/** True when `text` is (the start of) an SSE line, so it may still grow into a frame. */
-function couldBeSseFrame(text: string): boolean {
-  if (text.startsWith(':')) return true;
-  return SSE_FIELD_NAMES.some((field) => text.startsWith(field) || field.startsWith(text));
-}
-
 /**
- * True while the buffered bytes can still turn into a failure for a stream that has shown
- * nothing visible: every COMPLETE frame is a Responses lifecycle frame, and any incomplete
- * trailing frame might still be an SSE frame (so it is waited out and classified once whole,
- * never from a fragment). Non-SSE bytes (native NDJSON such as Ollama, a plain JSON body)
- * are real output and are never held.
+ * True when the buffered bytes are complete Responses lifecycle frames (`response.created`
+ * etc.) and nothing else, so no output has been shown and a later `response.failed` can
+ * still fail over. The unfinished trailing frame is ignored and waited out. Any other
+ * first chunk (Chat/Anthropic SSE, NDJSON, plain JSON) is never held.
  */
 export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
-  const segments = decodeSse(concatChunks(chunks)).split('\n\n');
-  const tail = (segments.pop() ?? '').trimStart();
+  const frames = decodeSse(concatChunks(chunks)).split('\n\n');
+  frames.pop(); // unfinished trailing frame (or empty)
+  if (frames.length === 0) return false;
 
-  let sawLifecycle = false;
-  let onlyLifecycle = true;
-  const parser = createParser({
-    onEvent: (event) => {
-      let type: unknown;
-      try {
-        type = JSON.parse(event.data)?.type;
-      } catch {
-        type = undefined;
-      }
-      if (typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true) {
-        sawLifecycle = true;
-      } else {
-        onlyLifecycle = false;
-      }
-    },
-  });
-  parser.feed(segments.map((segment) => `${segment}\n\n`).join(''));
-  if (!onlyLifecycle) return false;
-
-  if (tail === '') return sawLifecycle;
-  if (!couldBeSseFrame(tail)) return false;
-  return !tailShowsRealOutput(tail);
-}
-
-/**
- * True once a COMPLETE line of an unfinished frame already names real output, so waiting for
- * the blank line would only delay it. Fragments are never classified: a name or JSON value
- * still arriving (`event: response.fa`, `"type":"response.fa`) stays pending.
- */
-function tailShowsRealOutput(tail: string): boolean {
-  const lines = tail.split('\n');
-  lines.pop(); // the last element is unterminated (or empty): not a complete line yet
-  for (const line of lines) {
-    let type: unknown;
-    if (line.startsWith('event:')) {
-      type = line.slice(6).trim();
-    } else if (line.startsWith('data:')) {
-      try {
-        type = JSON.parse(line.slice(5).trim())?.type;
-      } catch {
-        continue;
-      }
-    } else {
-      continue;
+  return frames.every((frame) => {
+    const data = frame
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
+      .join('\n');
+    try {
+      const type: unknown = JSON.parse(data)?.type;
+      return typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true;
+    } catch {
+      return false;
     }
-    const isLifecycle = typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true;
-    const isFailure = type === 'response.failed' || type === 'error';
-    if (!isLifecycle && !isFailure) return true;
-  }
-  return false;
+  });
 }
 
 /**
