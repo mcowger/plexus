@@ -57,6 +57,31 @@ describe('selectTargetApiType', () => {
       "incoming type 'images' not supported, defaulted to 'messages'"
     );
   });
+
+  test('defaults a text request to a text protocol regardless of api_base_url key order', () => {
+    const urlMap = Object.fromEntries(
+      ['openai-images', 'transcriptions', 'chat', 'messages'].map((t) => [
+        t,
+        'https://provider.example/v1',
+      ])
+    );
+    const result = selectTargetApiType(route({ api_base_url: urlMap, api_key: 'k' }), 'gemini');
+
+    expect(result.targetApiType).toBe('chat');
+    expect(result.selectionReason).toBe(
+      "incoming type 'gemini' not supported, defaulted to 'chat'"
+    );
+  });
+
+  test('returns no type when a text request has no text protocol, so failover can skip it', () => {
+    const result = selectTargetApiType(
+      route({ api_base_url: 'https://provider.example/v1' }, { access_via: ['openai-images'] }),
+      'chat'
+    );
+
+    expect(result.targetApiType).toBeUndefined();
+    expect(result.selectionReason).toBe("no text protocol available for incoming type 'chat'");
+  });
 });
 
 describe('resolveProviderBaseUrl', () => {

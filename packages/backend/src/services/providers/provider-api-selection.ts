@@ -22,6 +22,20 @@ const API_TYPE_ALIASES: Record<string, string[]> = {
   'openai-images': ['chat', 'gemini'],
 };
 
+const TEXT_API_BASE_TYPES: Record<string, true> = {
+  chat: true,
+  messages: true,
+  responses: true,
+  gemini: true,
+  completions: true,
+  ollama: true,
+};
+const NON_TEXT_API_BASE_TYPES: Record<string, true> = {
+  transcriptions: true,
+  speech: true,
+  embeddings: true,
+};
+
 function stripTrailingApiVersion(url: string): string {
   return url.replace(/\/(v\d+beta\d*)$/i, '');
 }
@@ -66,6 +80,31 @@ export function selectTargetApiType(
     availableTypes = normalizedModelTypes;
   } else {
     availableTypes = providerTypes;
+  }
+
+  // Text requests may only use a text protocol: provider URL maps can also
+  // list image-only, audio, embedding or decisions endpoints, and their key
+  // order must not decide where a chat-style payload is sent. A target with
+  // no text protocol returns no type so failover skips it.
+  if (incomingApiType && TEXT_API_BASE_TYPES[getApiBaseType(incomingApiType.toLowerCase())]) {
+    const textTypes = availableTypes.filter((t: string) => {
+      const base = getApiBaseType(t.toLowerCase());
+      return (
+        TEXT_API_BASE_TYPES[base] ||
+        !(
+          NON_TEXT_API_BASE_TYPES[base] ||
+          isDecisionsTargetApiType(base) ||
+          isImageTargetApiType(base)
+        )
+      );
+    });
+    if (availableTypes.length > 0 && textTypes.length === 0) {
+      return {
+        targetApiType: undefined,
+        selectionReason: `no text protocol available for incoming type '${incomingApiType}'`,
+      };
+    }
+    availableTypes = textTypes;
   }
 
   let targetApiType = availableTypes[0]; // Default to first one
