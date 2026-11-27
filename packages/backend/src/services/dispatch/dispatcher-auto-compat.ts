@@ -1236,6 +1236,84 @@ export function planUnsupportedParamStrip(
   return paramName;
 }
 
+// OpenAI Responses may reject reasoning encrypted by another account. Strip
+// only the named item and detach replayed output items in that reasoning span.
+export const MAX_ENCRYPTED_REASONING_STRIP_RETRIES = 4;
+
+export interface EncryptedReasoningStripState {
+  attempts: number;
+  strippedIds: Set<string>;
+}
+
+export function createEncryptedReasoningStripState(): EncryptedReasoningStripState {
+  return { attempts: 0, strippedIds: new Set() };
+}
+
+export function planEncryptedReasoningStrip(
+  responseBody: string,
+  state: EncryptedReasoningStripState
+): string | undefined {
+  if (state.attempts >= MAX_ENCRYPTED_REASONING_STRIP_RETRIES) return undefined;
+  const id = /encrypted content for item\s+(rs_[\w-]+)\s+could not be verified/i.exec(
+    responseBody
+  )?.[1];
+  if (!id || state.strippedIds.has(id)) return undefined;
+  state.attempts++;
+  state.strippedIds.add(id);
+  return id;
+}
+
+export function refundEncryptedReasoningStrip(
+  state: EncryptedReasoningStripState,
+  id: string
+): void {
+  if (state.strippedIds.delete(id)) state.attempts--;
+}
+
+export function stripEncryptedReasoningItems(
+  payload: Record<string, unknown>,
+  rejectedId: string
+): { payload: Record<string, unknown>; strippedCount: number } {
+  if (!Array.isArray(payload.input)) return { payload, strippedCount: 0 };
+  let detached = false;
+  let strippedCount = 0;
+  const input: unknown[] = [];
+  for (const item of payload.input as unknown[]) {
+    if (!item || typeof item !== 'object' || !('type' in item)) {
+      input.push(item);
+      continue;
+    }
+    if (item.type === 'reasoning') {
+      detached =
+        'id' in item &&
+        item.id === rejectedId &&
+        'encrypted_content' in item &&
+        typeof item.encrypted_content === 'string';
+      if (detached) {
+        strippedCount++;
+        continue;
+      }
+    } else if (item.type === 'message' && 'role' in item && item.role === 'user') {
+      detached = false;
+    }
+    if (
+      detached &&
+      'id' in item &&
+      (item.type === 'function_call' ||
+        item.type === 'custom_tool_call' ||
+        (item.type === 'message' && 'role' in item && item.role === 'assistant'))
+    ) {
+      const { id: _id, ...rest } = item;
+      input.push(rest);
+    } else {
+      input.push(item);
+    }
+  }
+  return strippedCount
+    ? { payload: { ...payload, input }, strippedCount }
+    : { payload, strippedCount };
+}
+
 // ---------------------------------------------------------------------------
 // Reactive auto-compat: strip-and-retry on stale Anthropic thinking-block
 // signatures

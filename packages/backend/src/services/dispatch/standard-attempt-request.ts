@@ -9,21 +9,26 @@ import { CooldownManager } from '../runtime/cooldown-manager';
 import { resolveStickyCacheTtlMs } from './cache-retention';
 import {
   createAdvisorResultStripState,
+  createEncryptedReasoningStripState,
   createLiteToolStripState,
   createThinkingSignatureStripState,
   createUnsupportedParamStripState,
   deleteDottedPath,
   MAX_ADVISOR_RESULT_STRIP_RETRIES,
+  MAX_ENCRYPTED_REASONING_STRIP_RETRIES,
   MAX_LITE_TOOL_STRIP_RETRIES,
   MAX_THINKING_SIGNATURE_STRIP_RETRIES,
   MAX_UNSUPPORTED_PARAM_STRIP_RETRIES,
   planAdvisorResultStrip,
+  planEncryptedReasoningStrip,
   planLiteToolStrip,
   planThinkingSignatureStrip,
   planUnsupportedParamStrip,
   refundAdvisorResultStrip,
+  refundEncryptedReasoningStrip,
   refundThinkingSignatureStrip,
   stripAdvisorResultBlocks,
+  stripEncryptedReasoningItems,
   stripLiteUnsupportedTools,
   stripThinkingSignatureBlocks,
 } from './dispatcher-auto-compat';
@@ -209,7 +214,7 @@ async function runStandardAttempt(
   const thinkingStripState = createThinkingSignatureStripState();
   const advisorStripState = createAdvisorResultStripState();
   const liteToolStripState = createLiteToolStripState();
-  let encryptedReasoningStripAttempted = false;
+  const encryptedReasoningStripState = createEncryptedReasoningStripState();
   let oauthRefreshAttempted = false;
 
   // Looped so a strip-and-retry can redo the fetch against the SAME target
@@ -385,8 +390,8 @@ async function runStandardAttempt(
       // the same way — so the mechanisms below strip the offending content
       // and retry the SAME target instead. Checked in order:
       //
-      //   0. OpenAI Responses: encrypted reasoning from another account may
-      //      be unverifiable. Remove encrypted reasoning items and retry once.
+      //   0. OpenAI Responses: strip rejected encrypted reasoning and detach
+      //      dependent output items, then retry the same target.
       //   1. Stale thinking-block signatures: alias-level failover can
       //      replay a conversation whose `thinking`/`redacted_thinking`
       //      blocks were signed by a DIFFERENT Claude model/session than
@@ -407,33 +412,22 @@ async function runStandardAttempt(
       //      not the specific tool(s), so every disallowed tool is stripped
       //      at once.
       if (response.status === 400) {
-        if (
-          !encryptedReasoningStripAttempted &&
-          getApiBaseType(targetApiType) === 'responses' &&
-          /encrypted content for item\s+\S+\s+could not be verified/i.test(errorText) &&
-          Array.isArray(providerPayload?.input)
-        ) {
-          const input = providerPayload.input.filter(
-            (item: unknown) =>
-              !(
-                item &&
-                typeof item === 'object' &&
-                'type' in item &&
-                item.type === 'reasoning' &&
-                'encrypted_content' in item &&
-                typeof item.encrypted_content === 'string'
-              )
-          );
-          const strippedCount = providerPayload.input.length - input.length;
-          if (strippedCount > 0) {
-            encryptedReasoningStripAttempted = true;
-            providerPayload = { ...providerPayload, input };
+        const rejectedReasoningId =
+          getApiBaseType(targetApiType) === 'responses'
+            ? planEncryptedReasoningStrip(errorText, encryptedReasoningStripState)
+            : undefined;
+        if (rejectedReasoningId) {
+          const stripResult = stripEncryptedReasoningItems(providerPayload, rejectedReasoningId);
+          if (stripResult.strippedCount > 0) {
+            providerPayload = stripResult.payload;
             logger.warn(
               `Auto-compat: ${route.provider}/${route.model} rejected encrypted reasoning — ` +
-                `stripped ${strippedCount} reasoning item(s) and retrying the same target`
+                `stripped ${stripResult.strippedCount} reasoning item(s) and retrying the same target ` +
+                `(attempt ${encryptedReasoningStripState.attempts}/${MAX_ENCRYPTED_REASONING_STRIP_RETRIES})`
             );
             continue;
           }
+          refundEncryptedReasoningStrip(encryptedReasoningStripState, rejectedReasoningId);
         }
 
         if (planThinkingSignatureStrip(errorText, providerPayload, thinkingStripState)) {
