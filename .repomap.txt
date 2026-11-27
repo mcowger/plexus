@@ -1291,11 +1291,12 @@ packages/backend/src/services/probes/probe-service.ts:123 [method] ProbeService.
 packages/backend/src/services/probes/probe-service.ts:29 [interface] RunProbeArgs
 packages/backend/src/services/probes/probe-service.ts:37 [interface] ProbeResult
 packages/backend/src/services/probes/probe-service.ts:54 [function] buildSecondaryRequest
-packages/backend/src/services/probes/stream-probe.ts:226 [function] probeStreamingStart
-packages/backend/src/services/probes/stream-probe.ts:373 [function] probeStreamingStartWithStallCheck
-packages/backend/src/services/probes/stream-probe.ts:38 [function] isLifecyclePreludeOnly
+packages/backend/src/services/probes/stream-probe.ts:219 [function] probeStreamingStart
+packages/backend/src/services/probes/stream-probe.ts:31 [function] decodeSse
+packages/backend/src/services/probes/stream-probe.ts:366 [function] probeStreamingStartWithStallCheck
+packages/backend/src/services/probes/stream-probe.ts:42 [function] isLifecyclePreludeOnly
+packages/backend/src/services/probes/stream-probe.ts:69 [function] parseInitialStreamError
 packages/backend/src/services/probes/stream-probe.ts:7 [function] concatChunks
-packages/backend/src/services/probes/stream-probe.ts:77 [function] parseInitialStreamError
 packages/backend/src/services/provider-presets.ts:25 [interface] ProviderPresetsResult
 packages/backend/src/services/provider-presets.ts:31 [function] defaultPresetsPath
 packages/backend/src/services/provider-presets.ts:36 [function] parseAndValidatePresets
