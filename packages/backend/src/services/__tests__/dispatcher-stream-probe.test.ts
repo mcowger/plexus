@@ -492,6 +492,16 @@ describe('probeStreamingStart', () => {
       }
     });
 
+    test('an SSE comment after the prelude does not end the hold', async () => {
+      const ping = encoder.encode(': ping\n\n');
+      const result = await (new Dispatcher() as any).probeStreamingStart(
+        sseResponse([created, ping, failed])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
     test('fragmented Chat SSE is not held while the upstream stays open', async () => {
       const open = new Response(
         new ReadableStream<Uint8Array>({

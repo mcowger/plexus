@@ -1,3 +1,5 @@
+import { createParser } from 'eventsource-parser';
+
 import { logger } from '../../utils/logger';
 import { isProviderFaultStreamFailure } from '../../utils/stream-failure';
 import type { StallConfig } from '../inspectors/stall-inspector';
@@ -31,29 +33,32 @@ function decodeSse(bytes: Uint8Array): string {
 }
 
 /**
- * True when the buffered bytes are complete Responses lifecycle frames (`response.created`
- * etc.) and nothing else, so no output has been shown and a later `response.failed` can
- * still fail over. The unfinished trailing frame is ignored and waited out. Any other
- * first chunk (Chat/Anthropic SSE, NDJSON, plain JSON) is never held.
+ * True when the buffered bytes hold at least one complete Responses lifecycle frame
+ * (`response.created` etc.) and no other complete event, so no output has been shown and a
+ * later `response.failed` can still fail over. The SSE parser ignores comments (`: ping`)
+ * and unfinished frames. Any other first event (Chat/Anthropic SSE, NDJSON, plain JSON) is
+ * never held.
  */
 export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
-  const frames = decodeSse(concatChunks(chunks)).split('\n\n');
-  frames.pop(); // unfinished trailing frame (or empty)
-  if (frames.length === 0) return false;
-
-  return frames.every((frame) => {
-    const data = frame
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trim())
-      .join('\n');
-    try {
-      const type: unknown = JSON.parse(data)?.type;
-      return typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true;
-    } catch {
-      return false;
-    }
+  let sawLifecycle = false;
+  let onlyLifecycle = true;
+  const parser = createParser({
+    onEvent: (event) => {
+      let type: unknown;
+      try {
+        type = JSON.parse(event.data)?.type;
+      } catch {
+        type = undefined;
+      }
+      if (typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true) {
+        sawLifecycle = true;
+      } else {
+        onlyLifecycle = false;
+      }
+    },
   });
+  parser.feed(new TextDecoder().decode(concatChunks(chunks)));
+  return sawLifecycle && onlyLifecycle;
 }
 
 /**
