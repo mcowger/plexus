@@ -1297,6 +1297,7 @@ interface ReplayedInputItem {
   role?: unknown;
   content?: unknown;
   encrypted_content?: unknown;
+  phase?: unknown;
   [key: string]: unknown;
 }
 
@@ -1326,13 +1327,21 @@ function assistantContentAsText(content: unknown): string | undefined {
 
 /** The item without its `id`, or `undefined` when it can't be replayed id-less. */
 function detachItemId(item: ReplayedInputItem): Record<string, unknown> | undefined {
-  const { id: _id, ...rest } = item;
   if (typeof item.type === 'string' && Object.hasOwn(OPTIONAL_ID_ITEM_TYPES, item.type)) {
+    const { id: _id, ...rest } = item;
     return rest;
   }
   if (item.type === 'message' && item.role === 'assistant') {
     const text = assistantContentAsText(item.content);
-    return text === undefined ? undefined : { ...rest, content: text };
+    if (text === undefined) return undefined;
+    // Built to the documented id-less assistant input shape (EasyInputMessage:
+    // content, role, phase, type). Output-only fields such as `status` are dropped.
+    return {
+      type: 'message',
+      role: 'assistant',
+      content: text,
+      ...(item.phase === undefined ? {} : { phase: item.phase }),
+    };
   }
   return undefined;
 }

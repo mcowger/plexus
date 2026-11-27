@@ -113,7 +113,7 @@ describe('stripEncryptedReasoningItems', () => {
     ]);
   });
 
-  it('replays an assistant output message as plain text without its id', () => {
+  it('replays an assistant output message as an id-less input message without output-only fields', () => {
     const result = strip([
       encrypted('rs_1'),
       {
@@ -135,7 +135,6 @@ describe('stripEncryptedReasoningItems', () => {
         type: 'message',
         role: 'assistant',
         phase: 'final_answer',
-        status: 'completed',
         content: 'Hello, world!',
       },
     ]);
