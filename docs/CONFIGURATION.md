@@ -270,9 +270,10 @@ thinking-level map; individual `compat` flags merge. No `pi_ai_model_id` is
 needed. Unknown traits remain unknown and are not advertised or rewritten.
 
 Separately, when a Responses target rejects replayed encrypted reasoning as
-unverifiable, Plexus removes the rejected reasoning item and detaches associated
-output item IDs before retrying the target. It retries up to four distinct
-rejected items. This recovery applies regardless of the `auto_compat` setting.
+unverifiable, Plexus removes encrypted reasoning items and detaches compatible
+output item IDs before retrying once. If an affected item requires its ID,
+Plexus leaves the request unchanged rather than sending an invalid retry.
+This recovery applies regardless of the `auto_compat` setting.
 
 Some thinking endpoints (DeepSeek, Kimi K3, MiMo) reject a replayed history
 when any assistant message lacks `reasoning_content`. When the resolved pi-ai

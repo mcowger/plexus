@@ -1236,9 +1236,9 @@ export function planUnsupportedParamStrip(
   return paramName;
 }
 
-// OpenAI Responses may reject reasoning encrypted by another account. Strip
-// only the named item and detach replayed output items in that reasoning span.
-export const MAX_ENCRYPTED_REASONING_STRIP_RETRIES = 4;
+// A rejected encrypted item can indicate an account change. Remove all
+// encrypted reasoning in one retry rather than failing on long histories.
+export const MAX_ENCRYPTED_REASONING_STRIP_RETRIES = 1;
 
 export interface EncryptedReasoningStripState {
   attempts: number;
@@ -1274,7 +1274,21 @@ export function stripEncryptedReasoningItems(
   payload: Record<string, unknown>,
   rejectedId: string
 ): { payload: Record<string, unknown>; strippedCount: number } {
-  if (!Array.isArray(payload.input)) return { payload, strippedCount: 0 };
+  if (
+    !Array.isArray(payload.input) ||
+    !payload.input.some(
+      (item: unknown) =>
+        !!item &&
+        typeof item === 'object' &&
+        'type' in item &&
+        item.type === 'reasoning' &&
+        'id' in item &&
+        item.id === rejectedId &&
+        'encrypted_content' in item &&
+        typeof item.encrypted_content === 'string'
+    )
+  )
+    return { payload, strippedCount: 0 };
   let detached = false;
   let strippedCount = 0;
   const input: unknown[] = [];
@@ -1284,11 +1298,7 @@ export function stripEncryptedReasoningItems(
       continue;
     }
     if (item.type === 'reasoning') {
-      detached =
-        'id' in item &&
-        item.id === rejectedId &&
-        'encrypted_content' in item &&
-        typeof item.encrypted_content === 'string';
+      detached = 'encrypted_content' in item && typeof item.encrypted_content === 'string';
       if (detached) {
         strippedCount++;
         continue;
@@ -1296,13 +1306,15 @@ export function stripEncryptedReasoningItems(
     } else if (item.type === 'message' && 'role' in item && item.role === 'user') {
       detached = false;
     }
-    if (
-      detached &&
-      'id' in item &&
-      (item.type === 'function_call' ||
-        item.type === 'custom_tool_call' ||
-        (item.type === 'message' && 'role' in item && item.role === 'assistant'))
-    ) {
+    if (detached && 'id' in item && item.type !== 'item_reference') {
+      if (
+        item.type !== 'function_call' &&
+        item.type !== 'custom_tool_call' &&
+        item.type !== 'tool_search_call' &&
+        !(item.type === 'message' && 'role' in item && item.role === 'assistant')
+      ) {
+        return { payload, strippedCount: 0 };
+      }
       const { id: _id, ...rest } = item;
       input.push(rest);
     } else {

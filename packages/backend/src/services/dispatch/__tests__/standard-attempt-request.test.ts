@@ -395,7 +395,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
   });
 
   it.each(['responses', 'responses:lite'])(
-    'retries %s after removing rejected reasoning and detaching dependent outputs',
+    'retries %s after removing encrypted reasoning and detaching dependent outputs',
     async (targetApiType) => {
       const errorBody = JSON.stringify({
         error: {
@@ -426,6 +426,7 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
           { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{}' },
           { type: 'function_call_output', call_id: 'call_1', output: 'result' },
           { type: 'custom_tool_call', id: 'ct_1', call_id: 'call_2', name: 'edit', input: 'text' },
+          { type: 'tool_search_call', id: 'ts_1', arguments: {}, execution: 'client' },
           { type: 'message', id: 'msg_1', role: 'assistant', content: 'answer' },
           { type: 'reasoning', id: 'rs_2', encrypted_content: 'also-old' },
           { type: 'reasoning', id: 'rs_3', summary: [] },
@@ -444,25 +445,20 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
         { type: 'function_call', call_id: 'call_1', name: 'lookup', arguments: '{}' },
         snapshot.input[3],
         { type: 'custom_tool_call', call_id: 'call_2', name: 'edit', input: 'text' },
+        { type: 'tool_search_call', arguments: {}, execution: 'client' },
         { type: 'message', role: 'assistant', content: 'answer' },
-        snapshot.input[6],
-        snapshot.input[7],
+        snapshot.input[8],
       ]);
       expect(providerPayload).toEqual(snapshot);
     }
   );
 
-  it('recovers separately from multiple rejected reasoning items and preserves other IDs', async () => {
-    const error = (id: string) =>
-      new Response(
-        JSON.stringify({
-          error: { message: `The encrypted content for item ${id} could not be verified.` },
-        }),
-        { status: 400 }
-      );
+  it('removes long encrypted histories in one retry', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
     const executeProviderRequest = mock()
-      .mockImplementationOnce(async () => error('rs_1'))
-      .mockImplementationOnce(async () => error('rs_2'))
+      .mockImplementationOnce(
+        async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+      )
       .mockImplementationOnce(async () => new Response('{"id":"resp_1"}', { status: 200 }));
     const host = makeHost({
       executeProviderRequest,
@@ -472,32 +468,55 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
         content: 'ok',
       })),
     });
-    const input = [
-      { type: 'reasoning', id: 'rs_1', encrypted_content: 'one' },
-      { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'a', arguments: '{}' },
-      { type: 'reasoning', id: 'rs_2', encrypted_content: 'two' },
-      { type: 'function_call', id: 'fc_2', call_id: 'call_2', name: 'b', arguments: '{}' },
-      { type: 'message', role: 'user', content: 'next' },
-      { type: 'message', id: 'msg_other', role: 'assistant', content: 'later' },
-    ];
+    const input = Array.from({ length: 12 }, (_, i) => [
+      { type: 'reasoning', id: `rs_${i + 1}`, encrypted_content: 'old' },
+      {
+        type: 'function_call',
+        id: `fc_${i + 1}`,
+        call_id: `call_${i + 1}`,
+        name: 'a',
+        arguments: '{}',
+      },
+    ]).flat();
     const result = await executeStandardAttempt(
       makeContext(host, { model: 'model-1', input }, { targetApiType: 'responses' })
     );
     expect(result.outcome).toBe('success');
-    expect(executeProviderRequest).toHaveBeenCalledTimes(3);
-    expect(executeProviderRequest.mock.calls[1]![2].input).toEqual([
-      { type: 'function_call', call_id: 'call_1', name: 'a', arguments: '{}' },
-      input[2],
-      input[3],
-      input[4],
-      input[5],
-    ]);
-    expect(executeProviderRequest.mock.calls[2]![2].input).toEqual([
-      { type: 'function_call', call_id: 'call_1', name: 'a', arguments: '{}' },
-      { type: 'function_call', call_id: 'call_2', name: 'b', arguments: '{}' },
-      input[4],
-      input[5],
-    ]);
+    expect(executeProviderRequest).toHaveBeenCalledTimes(2);
+    expect(executeProviderRequest.mock.calls[1]![2].input).toEqual(
+      Array.from({ length: 12 }, (_, i) => ({
+        type: 'function_call',
+        call_id: `call_${i + 1}`,
+        name: 'a',
+        arguments: '{}',
+      }))
+    );
+  });
+
+  it('preserves item references and refuses to retry dependent built-ins requiring IDs', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock(
+      async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+    );
+    const host = makeHost({
+      executeProviderRequest,
+      handleProviderError: mock(async () => {
+        throw new Error('HTTP 400');
+      }),
+      isRetryableStatus: mock(() => true),
+    });
+    const input = [
+      { type: 'reasoning', id: 'rs_1', encrypted_content: 'old' },
+      { type: 'item_reference', id: 'msg_1' },
+      { type: 'web_search_call', id: 'ws_1', status: 'completed' },
+    ];
+    const snapshot = structuredClone(input);
+    const result = await executeStandardAttempt(
+      makeContext(host, { model: 'model-1', input }, { targetApiType: 'responses' })
+    );
+    expect(result.outcome).toBe('retry');
+    expect(executeProviderRequest).toHaveBeenCalledTimes(1);
+    expect(input).toEqual(snapshot);
   });
 
   it.each([
@@ -539,39 +558,34 @@ describe('executeStandardAttempt — thinking-signature strip-and-retry', () => 
     }
   );
 
-  it('bounds retries when more than four different encrypted items are rejected', async () => {
-    let attempts = 0;
-    const executeProviderRequest = mock(
-      async (_url: string, _headers: unknown, _payload: { input: unknown[] }) => {
-        attempts++;
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: `The encrypted content for item rs_${attempts} could not be verified.`,
-            },
-          }),
-          { status: 400 }
-        );
-      }
-    );
+  it('preserves item references while detaching optional output IDs', async () => {
+    const message = 'The encrypted content for item rs_1 could not be verified.';
+    const executeProviderRequest = mock()
+      .mockImplementationOnce(
+        async () => new Response(JSON.stringify({ error: { message } }), { status: 400 })
+      )
+      .mockImplementationOnce(async () => new Response('{"id":"resp_1"}', { status: 200 }));
     const host = makeHost({
       executeProviderRequest,
-      handleProviderError: mock(async () => {
-        throw new Error('HTTP 400');
-      }),
-      isRetryableStatus: mock(() => true),
+      handleNonStreamingResponse: mock(async () => ({
+        id: 'resp_1',
+        model: 'model-1',
+        content: 'ok',
+      })),
     });
-    const input = Array.from({ length: 5 }, (_, i) => ({
-      type: 'reasoning',
-      id: `rs_${i + 1}`,
-      encrypted_content: 'old',
-    }));
+    const input = [
+      { type: 'reasoning', id: 'rs_1', encrypted_content: 'old' },
+      { type: 'item_reference', id: 'msg_1' },
+      { type: 'tool_search_call', id: 'ts_1', arguments: {}, execution: 'client' },
+    ];
     const result = await executeStandardAttempt(
       makeContext(host, { model: 'model-1', input }, { targetApiType: 'responses' })
     );
-    expect(result.outcome).toBe('retry');
-    expect(executeProviderRequest).toHaveBeenCalledTimes(5);
-    expect(executeProviderRequest.mock.calls[4]![2].input).toEqual([input[4]]);
+    expect(result.outcome).toBe('success');
+    expect(executeProviderRequest.mock.calls[1]![2].input).toEqual([
+      input[1],
+      { type: 'tool_search_call', arguments: {}, execution: 'client' },
+    ]);
   });
 
   it('bounds encrypted reasoning recovery when the retried request is also rejected', async () => {
