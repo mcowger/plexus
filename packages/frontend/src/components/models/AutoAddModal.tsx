@@ -108,8 +108,9 @@ export function AutoAddModal({
       onClose={onClose}
       title="Auto Add Targets"
       size="lg"
+      fullScreenOnMobile
       footer={
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+        <div className="flex justify-end gap-3 max-sm:[&>*]:flex-1 [@media(max-height:500px)]:[&>*]:flex-1">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

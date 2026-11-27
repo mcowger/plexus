@@ -5,8 +5,10 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
+  ListFilter,
   Plus,
   Trash2,
+  X,
   Zap,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -25,10 +27,12 @@ import { VisionFallthroughSelector } from '../components/models/VisionFallthroug
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Disclosure } from '../components/ui/Disclosure';
+import { Drawer } from '../components/ui/Drawer';
 import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
 import { TagSelect } from '../components/ui/TagSelect';
 import { useToast } from '../contexts/ToastContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useModels } from '../hooks/useModels';
 import { Alias } from '../lib/api';
 import {
@@ -112,6 +116,9 @@ export const Models = () => {
   const [selectedProviderFilters, setSelectedProviderFilters] = useState<string[]>([]);
   const [sortField, setSortField] = useState<ModelListSortField>('alias');
   const [sortDirection, setSortDirection] = useState<ModelListSortDirection>('asc');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const isSmUp = useMediaQuery('(min-width: 640px)');
+  const isDesktopHeader = useMediaQuery('(min-width: 1024px) and (min-height: 501px)');
 
   const providerOptions = useMemo(
     () => getModelListProviderOptions(allAliases, providers),
@@ -225,6 +232,45 @@ export const Models = () => {
     aliases: visibleAliases.filter((a) => (a.type ?? 'text') === group.type),
   }));
 
+  const activeFilterCount = (search.trim() ? 1 : 0) + selectedProviderFilters.length;
+
+  const renderFilterFields = (layout: 'inline' | 'drawer') => {
+    const isInline = layout === 'inline';
+    return (
+      <>
+        <div className={isInline ? 'w-full sm:w-72' : 'w-full'}>
+          <SearchInput
+            placeholder="Search by alias, upstream id, tag…"
+            value={search}
+            onChange={setSearch}
+          />
+        </div>
+        <div className={isInline ? 'w-full sm:w-80' : 'w-full'}>
+          <TagSelect
+            label="Filter by provider"
+            placeholder="All providers"
+            options={providerOptions}
+            selected={selectedProviderFilters}
+            onChange={setSelectedProviderFilters}
+          />
+        </div>
+        {selectedProviderFilters.length > 0 && (
+          <div className={isInline ? 'flex items-end' : 'flex'}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedProviderFilters([])}
+              className="whitespace-nowrap"
+            >
+              Clear providers
+            </Button>
+          </div>
+        )}
+        <VisionFallthroughSelector aliases={allAliases} />
+      </>
+    );
+  };
+
   const hasActiveFilters = search.trim().length > 0 || selectedProviderFilters.length > 0;
   const emptyStateMessage =
     allAliases.length === 0
@@ -237,7 +283,10 @@ export const Models = () => {
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Models"
-        subtitle="Aliases that map gateway models to upstream provider models"
+        subtitle={
+          isSmUp ? 'Aliases that map gateway models to upstream provider models' : undefined
+        }
+        sticky={isDesktopHeader}
         actions={
           <>
             <Button
@@ -246,16 +295,20 @@ export const Models = () => {
               leftIcon={<Trash2 size={14} />}
               onClick={() => setIsDeleteAllModalOpen(true)}
               disabled={allAliases.length === 0}
+              aria-label="Delete All"
+              title="Delete All"
             >
-              Delete All
+              <span className="hidden sm:inline">Delete All</span>
             </Button>
             <Button
               variant="secondary"
               size="sm"
               leftIcon={<Download size={14} />}
               onClick={handleOpenImport}
+              aria-label="Import"
+              title="Import"
             >
-              Import
+              <span className="hidden sm:inline">Import</span>
             </Button>
             <Button leftIcon={<Plus size={14} />} onClick={handleAddNew} size="sm">
               Add model
@@ -263,38 +316,61 @@ export const Models = () => {
           </>
         }
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
-          <div className="w-full sm:w-72">
-            <SearchInput
-              placeholder="Search by alias, upstream id, tag…"
-              value={search}
-              onChange={setSearch}
-            />
+        {isDesktopHeader ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+            {renderFilterFields('inline')}
           </div>
-          <div className="w-full sm:w-80">
-            <TagSelect
-              label="Filter by provider"
-              placeholder="All providers"
-              options={providerOptions}
-              selected={selectedProviderFilters}
-              onChange={setSelectedProviderFilters}
-            />
-          </div>
-          {selectedProviderFilters.length > 0 && (
-            <div className="flex items-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedProviderFilters([])}
-                className="whitespace-nowrap"
-              >
-                Clear providers
-              </Button>
-            </div>
-          )}
-          <VisionFallthroughSelector aliases={allAliases} />
-        </div>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full justify-start"
+            onClick={() => setIsFiltersOpen(true)}
+            leftIcon={<ListFilter size={15} />}
+            aria-haspopup="dialog"
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0">Filters &amp; search</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-primary/20 text-primary shrink-0 rounded-full px-1.5 text-[11px] leading-4 font-semibold">
+                  {activeFilterCount}
+                </span>
+              )}
+              {search.trim() && (
+                <span className="text-text-muted min-w-0 truncate text-xs font-normal">
+                  &ldquo;{search.trim()}&rdquo;
+                </span>
+              )}
+            </span>
+          </Button>
+        )}
       </PageHeader>
+
+      {!isDesktopHeader && (
+        <Drawer
+          open={isFiltersOpen}
+          onClose={() => setIsFiltersOpen(false)}
+          side="right"
+          aria-label="Model filters"
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="border-border-glass flex items-start justify-between gap-4 border-b p-4">
+              <h2 className="font-heading text-text m-0 text-lg font-semibold">Filters</h2>
+              <button
+                type="button"
+                onClick={() => setIsFiltersOpen(false)}
+                className="text-text-muted hover:bg-bg-hover hover:text-text rounded-md border-0 bg-transparent p-1 transition-colors"
+                aria-label="Close filters"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {renderFilterFields('drawer')}
+            </div>
+          </div>
+        </Drawer>
+      )}
 
       <PageContainer>
         {visibleAliases.length === 0 ? (
@@ -438,8 +514,9 @@ export const Models = () => {
           onClose={() => setIsModalOpen(false)}
           title={originalId ? 'Edit Model' : 'Add Model'}
           size="lg"
+          fullScreenOnMobile
           footer={
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:gap-3 [&>button]:w-full sm:[&>button]:w-auto">
               <Button variant="ghost" onClick={() => setIsModalOpen(false)}>
                 Cancel
               </Button>
@@ -594,20 +671,19 @@ export const Models = () => {
             <div className="bg-border-glass h-px" style={{ margin: '4px 0' }}></div>
 
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="font-body text-text-secondary text-[13px] font-medium">
+              <div className="flex items-center justify-between gap-2">
+                <label className="font-body text-text-secondary min-w-0 text-[13px] font-medium">
                   Target Groups
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setIsAutoAddModalOpen(true)}
-                    leftIcon={<Zap size={14} />}
-                  >
-                    Auto Add
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={() => setIsAutoAddModalOpen(true)}
+                  leftIcon={<Zap size={14} />}
+                >
+                  Auto Add
+                </Button>
               </div>
 
               <TargetGroupEditor

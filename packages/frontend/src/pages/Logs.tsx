@@ -39,6 +39,7 @@ import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
 import { Select } from '../components/ui/Select';
 import { useAuth } from '../contexts/AuthContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { api, UsageRecord, type UsageSortDirection, type UsageSortField } from '../lib/api';
 
 const SSE_HEARTBEAT_TIMEOUT_MS = 30_000;
@@ -95,23 +96,6 @@ const getOffsetFromSearchParams = (searchParams: URLSearchParams) => {
   if (!Number.isFinite(parsedOffset) || parsedOffset < 0) return 0;
 
   return Math.floor(parsedOffset);
-};
-
-const useMediaQuery = (query: string) => {
-  const [matches, setMatches] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(query).matches
-  );
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(query);
-    const updateMatches = () => setMatches(mediaQuery.matches);
-
-    updateMatches();
-    mediaQuery.addEventListener('change', updateMatches);
-    return () => mediaQuery.removeEventListener('change', updateMatches);
-  }, [query]);
-
-  return matches;
 };
 
 export const Logs = () => {

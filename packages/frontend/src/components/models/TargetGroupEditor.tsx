@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { AliasTargetGroup } from '../../lib/api';
@@ -15,6 +15,18 @@ interface TargetGroupEditorProps {
 }
 
 import { SELECTOR_LABELS } from '../../lib/selectors';
+
+const SELECT_CLASS =
+  'font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 rounded-sm border px-1.5 py-[3px] text-sm outline-none h-10 sm:h-[26px] sm:text-xs';
+// 36px touch target on mobile; compact on sm+
+const ICON_BTN_CLASS = 'min-h-9 min-w-9 p-2 sm:min-h-0 sm:min-w-0 sm:p-0.5';
+
+const moveItem = <T,>(items: T[], from: number, to: number): T[] => {
+  const next = [...items];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+};
 
 export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   groups,
@@ -33,12 +45,22 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
     groupIdx: number;
     targetIdx?: number;
   } | null>(null);
+  // Collapsed flags parallel to `groups`. Missing entries use the default:
+  // expanded when there is a single group, collapsed otherwise.
+  const [collapsedFlags, setCollapsedFlags] = useState<boolean[]>([]);
+
+  const resolvedCollapsed = groups.map((_, i) => collapsedFlags[i] ?? groups.length > 1);
+
+  const updateCollapsed = (updater: (flags: boolean[]) => boolean[]) => {
+    setCollapsedFlags(updater(resolvedCollapsed));
+  };
 
   const setGroups = (updater: (prev: AliasTargetGroup[]) => AliasTargetGroup[]) => {
     onChange(updater([...groups]));
   };
 
   const addGroup = () => {
+    updateCollapsed((flags) => [...flags, false]);
     setGroups((prev) => [
       ...prev,
       { name: `Group ${prev.length + 1}`, selector: 'random', targets: [] },
@@ -46,6 +68,7 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   };
 
   const removeGroup = (groupIdx: number) => {
+    updateCollapsed((flags) => flags.filter((_, i) => i !== groupIdx));
     setGroups((prev) => prev.filter((_, i) => i !== groupIdx));
   };
 
@@ -141,14 +164,10 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
   };
 
   const moveGroup = (groupIdx: number, direction: 'up' | 'down') => {
-    setGroups((prev) => {
-      const next = [...prev];
-      const newIdx = direction === 'up' ? groupIdx - 1 : groupIdx + 1;
-      if (newIdx < 0 || newIdx >= next.length) return prev;
-      const [moved] = next.splice(groupIdx, 1);
-      next.splice(newIdx, 0, moved);
-      return next;
-    });
+    const newIdx = direction === 'up' ? groupIdx - 1 : groupIdx + 1;
+    if (newIdx < 0 || newIdx >= groups.length) return;
+    setGroups((prev) => moveItem(prev, groupIdx, newIdx));
+    updateCollapsed((flags) => moveItem(flags, groupIdx, newIdx));
   };
 
   // Drag-and-drop handlers
@@ -193,15 +212,15 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
     // A group can only be dropped onto another group
     if (src.mode === 'group' && destMode !== 'group') return;
 
+    if (src.mode === 'group') {
+      if (src.groupIdx === destGroupIdx) return;
+      setGroups((prev) => moveItem(prev, src.groupIdx, destGroupIdx));
+      updateCollapsed((flags) => moveItem(flags, src.groupIdx, destGroupIdx));
+      return;
+    }
+
     setGroups((prev) => {
       const next = [...prev];
-
-      if (src.mode === 'group') {
-        if (src.groupIdx === destGroupIdx) return prev;
-        const [moved] = next.splice(src.groupIdx, 1);
-        next.splice(destGroupIdx, 0, moved);
-        return next;
-      }
 
       // target mode
       if (src.groupIdx === destGroupIdx && src.targetIdx === destTargetIdx) return prev;
@@ -227,6 +246,9 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
       {groups.map((group, groupIdx) => {
         const isGroupDrag = dragState?.mode === 'group' && dragState.groupIdx === groupIdx;
         const isGroupDragOver = dragOver?.mode === 'group' && dragOver.groupIdx === groupIdx;
+        const collapsed = resolvedCollapsed[groupIdx];
+        const enabledCount = group.targets.filter((t) => t.enabled !== false).length;
+        const summary = `${group.name || 'Untitled group'} · ${SELECTOR_LABELS[group.selector] ?? group.selector} · ${group.targets.length} ${group.targets.length === 1 ? 'target' : 'targets'} (${enabledCount} enabled)`;
 
         return (
           <div
@@ -247,254 +269,302 @@ export const TargetGroupEditor: React.FC<TargetGroupEditorProps> = ({
           >
             {/* Group header */}
             <div
-              className="flex items-center gap-2 border-b px-3 py-2"
+              className={`flex flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap ${collapsed ? '' : 'border-b'}`}
               style={{ borderColor: 'var(--color-border-glass)' }}
             >
-              <div className="text-text-secondary opacity-60">
-                <GripVertical size={14} />
+              {/* Row 1 on mobile: toggle, name (or summary), delete. Flat on sm+. */}
+              <div className="flex min-w-0 basis-full items-center gap-2 sm:contents">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateCollapsed((flags) => flags.map((v, i) => (i === groupIdx ? !v : v)))
+                  }
+                  aria-expanded={!collapsed}
+                  title={collapsed ? 'Expand group' : 'Collapse group'}
+                  className={`hover:text-primary text-text-secondary transition-colors ${ICON_BTN_CLASS}`}
+                >
+                  {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                </button>
+                <div className="text-text-secondary hidden opacity-60 sm:block">
+                  <GripVertical size={14} />
+                </div>
+                {collapsed ? (
+                  <span
+                    className="font-body text-text min-w-0 flex-1 truncate text-sm font-medium"
+                    title={summary}
+                  >
+                    {summary}
+                  </span>
+                ) : (
+                  <input
+                    className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border px-2 py-2 text-sm font-medium outline-none sm:py-1"
+                    value={group.name}
+                    onChange={(e) => updateGroupField(groupIdx, 'name', e.target.value)}
+                    placeholder="Group name"
+                  />
+                )}
+                {groups.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeGroup(groupIdx)}
+                    className={`hover:text-danger text-text-secondary min-h-9 min-w-9 shrink-0 p-2 transition-colors sm:order-1 sm:min-h-0 sm:min-w-0 sm:p-1`}
+                    title="Remove group"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
-              <input
-                className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border px-2 py-1 text-sm font-medium outline-none"
-                value={group.name}
-                onChange={(e) => updateGroupField(groupIdx, 'name', e.target.value)}
-                placeholder="Group name"
-              />
-              <select
-                className="font-body text-text bg-bg-glass border-border-glass focus:border-primary rounded-sm border px-2 py-1 text-xs outline-none"
-                value={group.selector}
-                onChange={(e) => updateGroupField(groupIdx, 'selector', e.target.value)}
-              >
-                {Object.entries(SELECTOR_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => moveGroup(groupIdx, 'up')}
-                  disabled={groupIdx === 0}
-                  className="hover:text-primary disabled:hover:text-text-secondary p-1 transition-colors disabled:opacity-30"
-                  title="Move group up"
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveGroup(groupIdx, 'down')}
-                  disabled={groupIdx === groups.length - 1}
-                  className="hover:text-primary disabled:hover:text-text-secondary p-1 transition-colors disabled:opacity-30"
-                  title="Move group down"
-                >
-                  <ChevronDown size={14} />
-                </button>
+
+              {/* Row 2 on mobile: strategy (expanded only), up/down. Flat on sm+. */}
+              <div className="flex basis-full items-center justify-end gap-2 sm:contents">
+                {!collapsed && (
+                  <select
+                    className="font-body text-text bg-bg-glass border-border-glass focus:border-primary mr-auto h-10 rounded-sm border px-2 py-1 text-sm outline-none sm:mr-0 sm:h-auto sm:text-xs"
+                    value={group.selector}
+                    onChange={(e) => updateGroupField(groupIdx, 'selector', e.target.value)}
+                  >
+                    {Object.entries(SELECTOR_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => moveGroup(groupIdx, 'up')}
+                    disabled={groupIdx === 0}
+                    className={`hover:text-primary disabled:hover:text-text-secondary transition-colors disabled:opacity-30 ${ICON_BTN_CLASS}`}
+                    title="Move group up"
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveGroup(groupIdx, 'down')}
+                    disabled={groupIdx === groups.length - 1}
+                    className={`hover:text-primary disabled:hover:text-text-secondary transition-colors disabled:opacity-30 ${ICON_BTN_CLASS}`}
+                    title="Move group down"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
               </div>
-              {groups.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeGroup(groupIdx)}
-                  className="hover:text-danger text-text-secondary p-1 transition-colors"
-                  title="Remove group"
-                >
-                  <Trash2 size={13} />
-                </button>
-              )}
             </div>
 
             {/* Targets list */}
-            <div className="flex flex-col gap-1 px-3 py-2">
-              {group.targets.length === 0 && (
-                <div className="text-text-muted py-1 text-xs italic">No targets in this group</div>
-              )}
-              {group.targets.map((target, targetIdx) => {
-                const isTargetDrag =
-                  dragState?.mode === 'target' &&
-                  dragState.groupIdx === groupIdx &&
-                  dragState.targetIdx === targetIdx;
-                const isTargetDragOver =
-                  dragOver?.mode === 'target' &&
-                  dragOver.groupIdx === groupIdx &&
-                  dragOver.targetIdx === targetIdx;
-                const isAliasTarget = !!target.alias;
-                const modelOptions = isAliasTarget
-                  ? []
-                  : dedupeModels(
-                      availableModels.filter((model) => model.providerId === target.provider)
-                    ).filter(
-                      (model) =>
-                        model.id === target.model ||
-                        !groups.some((candidateGroup, candidateGroupIdx) =>
-                          candidateGroup.targets.some(
-                            (candidateTarget, candidateTargetIdx) =>
-                              (candidateGroupIdx !== groupIdx ||
-                                candidateTargetIdx !== targetIdx) &&
-                              !candidateTarget.alias &&
-                              getModelOptionKey(candidateTarget.provider, candidateTarget.model) ===
-                                getModelOptionKey(model.providerId, model.id)
-                          )
-                        )
-                    );
-                // A target can reference a model that is no longer (or never was)
-                // listed on its provider (e.g. pruned provider models, OpenRouter-style
-                // passthrough). Without a matching <option>, the <select> falls back
-                // to the "Model..." placeholder and the configured value looks lost.
-                // Keep the current value visible so it can be reviewed and saved.
-                if (
-                  !isAliasTarget &&
-                  target.model &&
-                  !modelOptions.some((model) => model.id === target.model)
-                ) {
-                  modelOptions.unshift({
-                    id: target.model,
-                    providerId: target.provider ?? '',
-                    name: `${target.model} (not on provider)`,
-                  });
-                }
-
-                return (
-                  <div
-                    key={targetIdx}
-                    draggable={true}
-                    onDragStart={(e) => {
-                      e.stopPropagation();
-                      handleDragStart(e, 'target', groupIdx, targetIdx);
-                    }}
-                    onDragOver={(e) => {
-                      e.stopPropagation();
-                      handleDragOver(e, 'target', groupIdx, targetIdx);
-                    }}
-                    onDrop={(e) => {
-                      e.stopPropagation();
-                      handleDrop(e, 'target', groupIdx, targetIdx);
-                    }}
-                    onDragEnd={handleDragEnd}
-                    className="flex items-center gap-2 rounded px-2 py-1.5 transition-all duration-150"
-                    style={{
-                      backgroundColor: isTargetDrag
-                        ? 'transparent'
-                        : isTargetDragOver
-                          ? 'rgba(245, 158, 11, 0.05)'
-                          : 'var(--color-bg-glass)',
-                      border: isTargetDrag
-                        ? '1px dashed var(--color-border-glass)'
-                        : isTargetDragOver
-                          ? '1px solid var(--color-primary)'
-                          : '1px solid transparent',
-                      opacity: isTargetDrag ? 0.5 : 1,
-                      cursor: 'grab',
-                    }}
-                  >
-                    <div className="text-text-secondary opacity-50">
-                      <GripVertical size={13} />
-                    </div>
-                    <div className="flex items-center gap-0.5 opacity-60">
-                      <button
-                        type="button"
-                        onClick={() => moveTarget(groupIdx, targetIdx, 'up')}
-                        disabled={targetIdx === 0}
-                        className="hover:text-primary p-0.5 transition-colors disabled:opacity-20"
-                      >
-                        <ChevronUp size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveTarget(groupIdx, targetIdx, 'down')}
-                        disabled={targetIdx === group.targets.length - 1}
-                        className="hover:text-primary p-0.5 transition-colors disabled:opacity-20"
-                      >
-                        <ChevronDown size={13} />
-                      </button>
-                    </div>
-                    <select
-                      className="font-body text-text bg-bg-glass border-border-glass focus:border-primary rounded-sm border text-xs outline-none"
-                      style={{ padding: '3px 6px', height: '26px' }}
-                      value={isAliasTarget ? 'alias' : 'model'}
-                      onChange={(e) =>
-                        setTargetType(groupIdx, targetIdx, e.target.value as 'model' | 'alias')
-                      }
-                    >
-                      <option value="model">Model</option>
-                      <option value="alias">Alias</option>
-                    </select>
-                    {isAliasTarget ? (
-                      <select
-                        className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border text-xs outline-none"
-                        style={{ padding: '3px 6px', height: '26px' }}
-                        value={target.alias ?? ''}
-                        onChange={(e) => setTargetAlias(groupIdx, targetIdx, e.target.value)}
-                      >
-                        <option value="">Alias...</option>
-                        {availableAliases.map((aliasSlug) => (
-                          <option key={aliasSlug} value={aliasSlug}>
-                            {aliasSlug}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <>
-                        <select
-                          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-1 rounded-sm border text-xs outline-none"
-                          style={{ padding: '3px 6px', height: '26px' }}
-                          value={target.provider ?? ''}
-                          onChange={(e) =>
-                            updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
-                          }
-                        >
-                          <option value="">Provider...</option>
-                          {providers.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="font-body text-text bg-bg-glass border-border-glass focus:border-primary min-w-0 flex-[2] rounded-sm border text-xs outline-none"
-                          style={{ padding: '3px 6px', height: '26px' }}
-                          value={target.model ?? ''}
-                          onChange={(e) =>
-                            updateTarget(groupIdx, targetIdx, 'model', e.target.value)
-                          }
-                          disabled={!target.provider}
-                        >
-                          <option value="">Model...</option>
-                          {modelOptions.map((model) => (
-                            <option
-                              key={getModelOptionKey(model.providerId, model.id)}
-                              value={model.id}
-                            >
-                              {model.name}
-                            </option>
-                          ))}
-                        </select>
-                      </>
-                    )}
-                    <Switch
-                      checked={target.enabled !== false}
-                      onChange={(val) => updateTarget(groupIdx, targetIdx, 'enabled', val)}
-                      size="sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeTarget(groupIdx, targetIdx)}
-                      className="hover:text-danger text-text-secondary p-1 transition-colors"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+            {!collapsed && (
+              <div className="flex flex-col gap-1 px-3 py-2">
+                {group.targets.length === 0 && (
+                  <div className="text-text-muted py-1 text-xs italic">
+                    No targets in this group
                   </div>
-                );
-              })}
+                )}
+                {group.targets.map((target, targetIdx) => {
+                  const isTargetDrag =
+                    dragState?.mode === 'target' &&
+                    dragState.groupIdx === groupIdx &&
+                    dragState.targetIdx === targetIdx;
+                  const isTargetDragOver =
+                    dragOver?.mode === 'target' &&
+                    dragOver.groupIdx === groupIdx &&
+                    dragOver.targetIdx === targetIdx;
+                  const isAliasTarget = !!target.alias;
+                  const modelOptions = isAliasTarget
+                    ? []
+                    : dedupeModels(
+                        availableModels.filter((model) => model.providerId === target.provider)
+                      ).filter(
+                        (model) =>
+                          model.id === target.model ||
+                          !groups.some((candidateGroup, candidateGroupIdx) =>
+                            candidateGroup.targets.some(
+                              (candidateTarget, candidateTargetIdx) =>
+                                (candidateGroupIdx !== groupIdx ||
+                                  candidateTargetIdx !== targetIdx) &&
+                                !candidateTarget.alias &&
+                                getModelOptionKey(
+                                  candidateTarget.provider,
+                                  candidateTarget.model
+                                ) === getModelOptionKey(model.providerId, model.id)
+                            )
+                          )
+                      );
+                  // A target can reference a model that is no longer (or never was)
+                  // listed on its provider (e.g. pruned provider models, OpenRouter-style
+                  // passthrough). Without a matching <option>, the <select> falls back
+                  // to the "Model..." placeholder and the configured value looks lost.
+                  // Keep the current value visible so it can be reviewed and saved.
+                  if (
+                    !isAliasTarget &&
+                    target.model &&
+                    !modelOptions.some((model) => model.id === target.model)
+                  ) {
+                    modelOptions.unshift({
+                      id: target.model,
+                      providerId: target.provider ?? '',
+                      name: `${target.model} (not on provider)`,
+                    });
+                  }
 
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => addTarget(groupIdx)}
-                leftIcon={<Plus size={13} />}
-                className="text-text-secondary hover:text-text mt-1 justify-start text-xs"
-              >
-                Add target
-              </Button>
-            </div>
+                  return (
+                    <div
+                      key={targetIdx}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        handleDragStart(e, 'target', groupIdx, targetIdx);
+                      }}
+                      onDragOver={(e) => {
+                        e.stopPropagation();
+                        handleDragOver(e, 'target', groupIdx, targetIdx);
+                      }}
+                      onDrop={(e) => {
+                        e.stopPropagation();
+                        handleDrop(e, 'target', groupIdx, targetIdx);
+                      }}
+                      onDragEnd={handleDragEnd}
+                      className="flex flex-wrap items-center gap-2 rounded px-2 py-2 transition-all duration-150 sm:flex-nowrap sm:py-1.5"
+                      style={{
+                        backgroundColor: isTargetDrag
+                          ? 'transparent'
+                          : isTargetDragOver
+                            ? 'rgba(245, 158, 11, 0.05)'
+                            : 'var(--color-bg-glass)',
+                        border: isTargetDrag
+                          ? '1px dashed var(--color-border-glass)'
+                          : isTargetDragOver
+                            ? '1px solid var(--color-primary)'
+                            : '1px solid transparent',
+                        opacity: isTargetDrag ? 0.5 : 1,
+                        cursor: 'grab',
+                      }}
+                    >
+                      <div className="text-text-secondary hidden opacity-50 sm:order-[-2] sm:block">
+                        <GripVertical size={13} />
+                      </div>
+
+                      {/* Row 1 on mobile: position, type, spacer, up/down, switch, delete. Flat on sm+. */}
+                      <div className="flex basis-full items-center gap-2 sm:contents">
+                        <span className="text-text-muted w-4 text-xs tabular-nums sm:hidden">
+                          {targetIdx + 1}
+                        </span>
+                        <select
+                          className={SELECT_CLASS}
+                          value={isAliasTarget ? 'alias' : 'model'}
+                          onChange={(e) =>
+                            setTargetType(groupIdx, targetIdx, e.target.value as 'model' | 'alias')
+                          }
+                        >
+                          <option value="model">Model</option>
+                          <option value="alias">Alias</option>
+                        </select>
+                        <div className="flex-1 sm:hidden" />
+                        <div className="flex items-center gap-0.5 opacity-60 sm:order-[-1]">
+                          <button
+                            type="button"
+                            onClick={() => moveTarget(groupIdx, targetIdx, 'up')}
+                            disabled={targetIdx === 0}
+                            className={`hover:text-primary transition-colors disabled:opacity-20 ${ICON_BTN_CLASS}`}
+                          >
+                            <ChevronUp size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveTarget(groupIdx, targetIdx, 'down')}
+                            disabled={targetIdx === group.targets.length - 1}
+                            className={`hover:text-primary transition-colors disabled:opacity-20 ${ICON_BTN_CLASS}`}
+                          >
+                            <ChevronDown size={13} />
+                          </button>
+                        </div>
+                        <div className="flex sm:order-1">
+                          <Switch
+                            checked={target.enabled !== false}
+                            onChange={(val) => updateTarget(groupIdx, targetIdx, 'enabled', val)}
+                            size="sm"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeTarget(groupIdx, targetIdx)}
+                          className="hover:text-danger text-text-secondary min-h-9 min-w-9 p-2 transition-colors sm:order-1 sm:min-h-0 sm:min-w-0 sm:p-1"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+
+                      {isAliasTarget ? (
+                        <select
+                          className={`${SELECT_CLASS} basis-full sm:flex-1`}
+                          value={target.alias ?? ''}
+                          onChange={(e) => setTargetAlias(groupIdx, targetIdx, e.target.value)}
+                        >
+                          <option value="">Alias...</option>
+                          {availableAliases.map((aliasSlug) => (
+                            <option key={aliasSlug} value={aliasSlug}>
+                              {aliasSlug}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <div className="flex min-w-0 basis-full flex-col gap-1 sm:flex-1">
+                            <span className="text-text-muted text-[11px] sm:hidden">Provider</span>
+                            <select
+                              className={`${SELECT_CLASS} w-full`}
+                              value={target.provider ?? ''}
+                              onChange={(e) =>
+                                updateTarget(groupIdx, targetIdx, 'provider', e.target.value)
+                              }
+                            >
+                              <option value="">Provider...</option>
+                              {providers.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex min-w-0 basis-full flex-col gap-1 sm:flex-[2]">
+                            <span className="text-text-muted text-[11px] sm:hidden">Model</span>
+                            <select
+                              className={`${SELECT_CLASS} w-full`}
+                              value={target.model ?? ''}
+                              onChange={(e) =>
+                                updateTarget(groupIdx, targetIdx, 'model', e.target.value)
+                              }
+                              disabled={!target.provider}
+                            >
+                              <option value="">Model...</option>
+                              {modelOptions.map((model) => (
+                                <option
+                                  key={getModelOptionKey(model.providerId, model.id)}
+                                  value={model.id}
+                                >
+                                  {model.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => addTarget(groupIdx)}
+                  leftIcon={<Plus size={13} />}
+                  className="text-text-secondary hover:text-text mt-1 justify-start text-xs"
+                >
+                  Add target
+                </Button>
+              </div>
+            )}
           </div>
         );
       })}
