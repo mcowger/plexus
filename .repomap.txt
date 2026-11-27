@@ -800,9 +800,11 @@ packages/backend/src/services/inspectors/stall-inspector.ts:297 [method] StallIn
 packages/backend/src/services/inspectors/stall-inspector.ts:42 [interface] StallConfig
 packages/backend/src/services/inspectors/stall-inspector.ts:68 [class] StallInspector
 packages/backend/src/services/inspectors/stall-inspector.ts:89 [method] StallInspector.constructor
-packages/backend/src/services/inspectors/usage-logging.ts:22 [interface] ExtractedObservedUsage
-packages/backend/src/services/inspectors/usage-logging.ts:30 [function] extractUsageFromReconstructed
-packages/backend/src/services/inspectors/usage-logging.ts:96 [class] UsageInspector
+packages/backend/src/services/inspectors/usage-logging.ts:140 [function] isProviderFaultStreamFailure
+packages/backend/src/services/inspectors/usage-logging.ts:148 [class] UsageInspector
+packages/backend/src/services/inspectors/usage-logging.ts:23 [interface] ExtractedObservedUsage
+packages/backend/src/services/inspectors/usage-logging.ts:31 [function] extractUsageFromReconstructed
+packages/backend/src/services/inspectors/usage-logging.ts:97 [interface] StreamFailureSnapshot
 packages/backend/src/services/mcp-local/mcp-data-dir.ts:12 [function] getMcpServerDataDir
 packages/backend/src/services/mcp-local/mcp-data-dir.ts:22 [function] ensureMcpServerDataDir
 packages/backend/src/services/mcp-local/mcp-data-dir.ts:47 [function] removeMcpServerDataDir
