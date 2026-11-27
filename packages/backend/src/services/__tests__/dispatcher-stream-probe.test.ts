@@ -317,6 +317,50 @@ describe('probeStreamingStart', () => {
       expect(result.error.routingContext.cooldownTriggered).toBe(true);
     });
 
+    test('caller-fault response.failed after a prelude passes through without failover', async () => {
+      const callerFault = frame('response.failed', {
+        response: {
+          id: 'resp_1',
+          status: 'failed',
+          error: { code: 'image_too_large', message: 'x' },
+        },
+      });
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, callerFault])
+      );
+
+      expect(result.ok).toBe(true);
+      const body = await new Response(result.response.body).text();
+      expect(body).toContain('image_too_large');
+    });
+
+    test('error event after a prelude keeps its own details', async () => {
+      const rateLimited = encoder.encode(
+        'event: error\ndata: {"type":"error","error":{"code":429,"message":"slow down"}}\n\n'
+      );
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, rateLimited])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toBe('slow down');
+      expect(result.error.statusCode).toBe(429);
+    });
+
+    test('stall-aware probe also fails over on a failure after a prelude that meets ttfbBytes', async () => {
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, failed]),
+        { ttfbMs: 5000, ttfbBytes: 1 }
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.isStreamError).toBe(true);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
     test('prelude followed by real output is replayed intact', async () => {
       const delta = frame('response.output_text.delta', { delta: 'hi' });
       const dispatcher = new Dispatcher();
