@@ -1,4 +1,7 @@
+import { createParser } from 'eventsource-parser';
+
 import { logger } from '../../utils/logger';
+import { isProviderFaultStreamFailure } from '../../utils/stream-failure';
 import type { StallConfig } from '../inspectors/stall-inspector';
 
 function concatChunks(chunks: Uint8Array[]): Uint8Array {
@@ -14,6 +17,58 @@ function concatChunks(chunks: Uint8Array[]): Uint8Array {
   return result;
 }
 
+const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
+  'response.created': true,
+  'response.in_progress': true,
+  'response.queued': true,
+};
+
+/** Event names whose frame may be a failure still arriving; hold until it completes. */
+const FAILURE_EVENT_TYPES: Record<string, true> = {
+  'response.failed': true,
+  error: true,
+};
+
+/**
+ * True when the buffered bytes hold only Responses lifecycle frames (plus, optionally, one
+ * frame still arriving across reads), so nothing visible has been committed and the stream
+ * can still be abandoned for another target. A trailing partial frame counts as pending
+ * unless its `event:` line already names real output (a failure event is held until complete).
+ */
+export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
+  const text = new TextDecoder().decode(concatChunks(chunks));
+  const segments = text.split(/\r?\n\r?\n/);
+  const tail = segments.pop() ?? '';
+
+  let sawLifecycle = false;
+  let onlyLifecycle = true;
+  const parser = createParser({
+    onEvent: (event) => {
+      let type: unknown;
+      try {
+        type = JSON.parse(event.data)?.type;
+      } catch {
+        type = undefined;
+      }
+      if (typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true) {
+        sawLifecycle = true;
+      } else {
+        onlyLifecycle = false;
+      }
+    },
+  });
+  parser.feed(segments.map((segment) => `${segment}\n\n`).join(''));
+  if (!onlyLifecycle) return false;
+
+  if (tail.trim() === '') return sawLifecycle;
+  const tailEvent = /^event:\s*(.+?)\s*$/m.exec(tail)?.[1];
+  return (
+    tailEvent === undefined ||
+    LIFECYCLE_PRELUDE_EVENT_TYPES[tailEvent] === true ||
+    FAILURE_EVENT_TYPES[tailEvent] === true
+  );
+}
+
 /**
  * Inspects the initial raw stream bytes for early SSE/JSON error events
  * (such as OpenRouter/OpenAI 429 rate limit or server errors sent with HTTP 200).
@@ -25,32 +80,31 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
   const text = new TextDecoder().decode(bytes).trim();
   if (!text) return null;
 
-  // 1. Try parsing SSE lines or raw JSON
-  const lines = text.split('\n');
-  let eventType = '';
-  const dataLines: string[] = [];
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (line.startsWith('event:')) {
-      eventType = line.slice(6).trim();
-    } else if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).trim());
+  // 1. Try parsing SSE frames (each keeps its own event type) or raw JSON
+  const candidates: { json: string; eventType: string }[] = [];
+  for (const frame of text.split(/\r?\n\r?\n/)) {
+    let frameEventType = '';
+    const frameData: string[] = [];
+    for (const rawLine of frame.split('\n')) {
+      const line = rawLine.trim();
+      if (line.startsWith('event:')) {
+        frameEventType = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        frameData.push(line.slice(5).trim());
+      }
     }
-  }
-
-  const candidateJsonStrings: string[] = [];
-  if (dataLines.length > 0) {
-    candidateJsonStrings.push(...dataLines);
-    if (dataLines.length > 1) {
-      candidateJsonStrings.push(dataLines.join('\n'));
+    for (const json of frameData) {
+      candidates.push({ json, eventType: frameEventType });
+    }
+    if (frameData.length > 1) {
+      candidates.push({ json: frameData.join('\n'), eventType: frameEventType });
     }
   }
   if (text.startsWith('{') || text.startsWith('[')) {
-    candidateJsonStrings.push(text);
+    candidates.push({ json: text, eventType: '' });
   }
 
-  for (const candidateJson of candidateJsonStrings) {
+  for (const { json: candidateJson, eventType } of candidates) {
     if (!candidateJson || candidateJson === '[DONE]') continue;
 
     try {
@@ -72,6 +126,14 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
         continue;
       }
 
+      // Caller-fault response.failed (e.g. image_too_large) must pass through: failing over
+      // or cooling down the target for it would sideline it for valid traffic.
+      if (
+        parsed.type === 'response.failed' &&
+        !isProviderFaultStreamFailure(parsed.response ?? null)
+      ) {
+        continue;
+      }
       const hasErrorProp = parsed.error !== undefined && parsed.error !== null;
       const isErrorEvent =
         eventType === 'error' ||
@@ -89,8 +151,14 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
         continue;
       }
 
+      const nestedError =
+        typeof parsed.response?.error === 'object' && parsed.response.error !== null
+          ? parsed.response.error
+          : null;
       const errorObj =
-        typeof parsed.error === 'object' && parsed.error !== null ? parsed.error : parsed;
+        typeof parsed.error === 'object' && parsed.error !== null
+          ? parsed.error
+          : (nestedError ?? parsed);
       const meta = errorObj.metadata || parsed.metadata;
       const rawMsg = meta?.raw;
       const message =
@@ -229,23 +297,33 @@ export async function probeStreamingStart(
     }
 
     const first = readResult as ReadableStreamReadResult<Uint8Array>;
+    const buffered: Uint8Array[] = [];
     if (!first.done && first.value) {
-      const initialError = parseInitialStreamError(first.value);
-      if (initialError) {
-        reader.cancel().catch(() => {});
-        logger.warn(`probeStreamingStart: detected early stream error: ${initialError.message}`);
-        return {
-          ok: false,
-          error: initialError,
-          streamStarted: false,
-        };
+      buffered.push(first.value);
+      // Hold back lifecycle-only prelude frames (response.created etc.): nothing visible
+      // has been committed to the client, so a later response.failed can still fail over.
+      while (true) {
+        const initialError = parseInitialStreamError(buffered);
+        if (initialError) {
+          reader.cancel().catch(() => {});
+          logger.warn(`probeStreamingStart: detected early stream error: ${initialError.message}`);
+          return {
+            ok: false,
+            error: initialError,
+            streamStarted: false,
+          };
+        }
+        if (!isLifecyclePreludeOnly(buffered)) break;
+        const next = await reader.read();
+        if (next.done) break;
+        buffered.push(next.value);
       }
     }
 
     const replay = new ReadableStream<Uint8Array>({
       start(controller) {
-        if (!first.done && first.value) {
-          controller.enqueue(first.value);
+        for (const chunk of buffered) {
+          controller.enqueue(chunk);
         }
       },
       async pull(controller) {
@@ -313,7 +391,9 @@ async function probeStreamingStartWithStallCheck(
 
   try {
     // Read chunks until we hit the TTFB byte threshold or the timeout
-    while (totalBytes < ttfbBytes) {
+    // Keep reading past lifecycle-only prelude frames (bounded by the same TTFB timer) so a
+    // later response.failed can still fail over, mirroring the non-stall probe.
+    while (totalBytes < ttfbBytes || isLifecyclePreludeOnly(chunks)) {
       const readPromise = reader.read();
       const result = await Promise.race([readPromise, ttfbTimeoutPromise]);
 
@@ -344,7 +424,8 @@ async function probeStreamingStartWithStallCheck(
 
       chunks.push(value);
       totalBytes += value.length;
-      streamStarted = true;
+      // A lifecycle-only prelude has committed nothing visible, so it must stay retryable.
+      streamStarted = !isLifecyclePreludeOnly(chunks);
     }
 
     if (chunks.length > 0) {

@@ -268,4 +268,159 @@ describe('probeStreamingStart', () => {
 
     expect(result.ok).toBe(true);
   });
+
+  describe('Responses lifecycle prelude before response.failed', () => {
+    const encoder = new TextEncoder();
+    const frame = (type: string, body: object) =>
+      encoder.encode(`event: ${type}\ndata: ${JSON.stringify({ type, ...body })}\n\n`);
+    const created = frame('response.created', { response: { id: 'resp_1', status: 'queued' } });
+    const inProgress = frame('response.in_progress', { response: { id: 'resp_1' } });
+    const failed = frame('response.failed', {
+      response: {
+        id: 'resp_1',
+        status: 'failed',
+        error: {
+          code: 'no_available_provider',
+          message: 'No one started answering within 85 seconds.',
+        },
+      },
+    });
+
+    // Pull-driven with zero buffering: each upstream read yields exactly one frame.
+    const sseResponse = (chunks: Uint8Array[]) => {
+      let index = 0;
+      return new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              const chunk = chunks[index++];
+              if (chunk) controller.enqueue(chunk);
+              else controller.close();
+            },
+          },
+          { highWaterMark: 0 }
+        ),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    };
+
+    test('failure arriving after a prelude chunk is reported before anything is committed', async () => {
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, failed])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.streamStarted).toBe(false);
+      expect(result.error.isStreamError).toBe(true);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+      expect(result.error.routingContext.cooldownTriggered).toBe(true);
+    });
+
+    test('caller-fault response.failed after a prelude passes through without failover', async () => {
+      const callerFault = frame('response.failed', {
+        response: {
+          id: 'resp_1',
+          status: 'failed',
+          error: { code: 'image_too_large', message: 'x' },
+        },
+      });
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, callerFault])
+      );
+
+      expect(result.ok).toBe(true);
+      const body = await new Response(result.response.body).text();
+      expect(body).toContain('image_too_large');
+    });
+
+    test('error event after a prelude keeps its own details', async () => {
+      const rateLimited = encoder.encode(
+        'event: error\ndata: {"type":"error","error":{"code":429,"message":"slow down"}}\n\n'
+      );
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, rateLimited])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toBe('slow down');
+      expect(result.error.statusCode).toBe(429);
+    });
+
+    test('stall-aware probe also fails over on a failure after a prelude that meets ttfbBytes', async () => {
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, failed]),
+        { ttfbMs: 5000, ttfbBytes: 1 }
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error.isStreamError).toBe(true);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
+    test('stall-aware timeout after only a prelude reports streamStarted false', async () => {
+      const silent = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(created);
+          },
+          pull: () => new Promise<void>(() => {}),
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(silent, {
+        ttfbMs: 50,
+        ttfbBytes: 1,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.error.message).toContain('stalled');
+      expect(result.streamStarted).toBe(false);
+    });
+
+    test('failure frame split across reads (CRLF framing) still fails over', async () => {
+      const crlf = (bytes: Uint8Array) =>
+        encoder.encode(new TextDecoder().decode(bytes).replaceAll('\n', '\r\n'));
+      const failedBytes = crlf(failed);
+      const mid = Math.floor(failedBytes.length / 2);
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([crlf(created), failedBytes.slice(0, mid), failedBytes.slice(mid)])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.streamStarted).toBe(false);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+    });
+
+    test('real output split across reads is not held back', async () => {
+      const delta = frame('response.output_text.delta', { delta: 'hi' });
+      const half = Math.floor(delta.length / 2);
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, delta.slice(0, half), delta.slice(half)])
+      );
+
+      expect(result.ok).toBe(true);
+      const body = await new Response(result.response.body).text();
+      expect(body).toContain('response.output_text.delta');
+    });
+
+    test('prelude followed by real output is replayed intact', async () => {
+      const delta = frame('response.output_text.delta', { delta: 'hi' });
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, delta])
+      );
+
+      expect(result.ok).toBe(true);
+      const body = await new Response(result.response.body).text();
+      expect(body.indexOf('response.created')).toBeLessThan(body.indexOf('response.in_progress'));
+      expect(body).toContain('response.output_text.delta');
+    });
+  });
 });
