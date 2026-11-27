@@ -1150,6 +1150,20 @@
       },
       "autoCompat": true,
       "notes": "Authenticate with a Neuralwatt sk- Bearer key. Effort levels collapse server-side per model; glm-5.3 and kimi-k2.7-code reason mandatorily and -fast aliases never reason. Discover models via GET /v1/models."
+    },
+    {
+      "id": "wokey",
+      "name": "Wokey",
+      "description": "Wokey gateway — one key for OpenAI- and Anthropic-compatible chat, messages, and responses.",
+      "docsUrl": "https://wokey.ai/docs",
+      "suggestedProviderId": "wokey",
+      "suggestedName": "Wokey",
+      "apiBaseUrl": {
+        "chat": "https://api.wokey.ai/v1",
+        "messages": "https://api.wokey.ai/v1",
+        "responses": "https://api.wokey.ai/v1"
+      },
+      "notes": "Authenticate with a Wokey sk- Bearer key. The gateway accepts paths with or without /v1. Balance is available at GET /v1/dashboard/balance; discover models at https://wokey.ai/models."
     }
   ]
 }

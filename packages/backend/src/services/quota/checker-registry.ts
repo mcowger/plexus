@@ -310,5 +310,6 @@ export async function loadAllCheckers(): Promise<void> {
   await import('./checkers/deepseek-checker');
   await import('./checkers/sakana-checker');
   await import('./checkers/cline-checker');
+  await import('./checkers/wokey-checker');
   await loadCustomCheckers();
 }

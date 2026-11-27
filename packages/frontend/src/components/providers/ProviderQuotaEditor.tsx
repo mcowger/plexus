@@ -26,6 +26,7 @@ import { RoutingRunQuotaConfig } from '../quota/RoutingRunQuotaConfig';
 import { SakanaQuotaConfig } from '../quota/SakanaQuotaConfig';
 import { SyntheticQuotaConfig } from '../quota/SyntheticQuotaConfig';
 import { WisdomGateQuotaConfig } from '../quota/WisdomGateQuotaConfig';
+import { WokeyQuotaConfig } from '../quota/WokeyQuotaConfig';
 import { ZAIQuotaConfig } from '../quota/ZAIQuotaConfig';
 import { ZenmuxQuotaConfig } from '../quota/ZenmuxQuotaConfig';
 
@@ -74,6 +75,7 @@ const QUOTA_CONFIG_MAP: Record<
   hyper: HyperQuotaConfig,
   sakana: SakanaQuotaConfig,
   cline: ClineQuotaConfig,
+  wokey: WokeyQuotaConfig,
   'claude-code': ClaudeCodeQuotaConfig,
 };
 
