@@ -268,4 +268,66 @@ describe('probeStreamingStart', () => {
 
     expect(result.ok).toBe(true);
   });
+
+  describe('Responses lifecycle prelude before response.failed', () => {
+    const encoder = new TextEncoder();
+    const frame = (type: string, body: object) =>
+      encoder.encode(`event: ${type}\ndata: ${JSON.stringify({ type, ...body })}\n\n`);
+    const created = frame('response.created', { response: { id: 'resp_1', status: 'queued' } });
+    const inProgress = frame('response.in_progress', { response: { id: 'resp_1' } });
+    const failed = frame('response.failed', {
+      response: {
+        id: 'resp_1',
+        status: 'failed',
+        error: {
+          code: 'no_available_provider',
+          message: 'No one started answering within 85 seconds.',
+        },
+      },
+    });
+
+    // Pull-driven with zero buffering: each upstream read yields exactly one frame.
+    const sseResponse = (chunks: Uint8Array[]) => {
+      let index = 0;
+      return new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              const chunk = chunks[index++];
+              if (chunk) controller.enqueue(chunk);
+              else controller.close();
+            },
+          },
+          { highWaterMark: 0 }
+        ),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
+    };
+
+    test('failure arriving after a prelude chunk is reported before anything is committed', async () => {
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, failed])
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.streamStarted).toBe(false);
+      expect(result.error.isStreamError).toBe(true);
+      expect(result.error.message).toBe('No one started answering within 85 seconds.');
+      expect(result.error.routingContext.cooldownTriggered).toBe(true);
+    });
+
+    test('prelude followed by real output is replayed intact', async () => {
+      const delta = frame('response.output_text.delta', { delta: 'hi' });
+      const dispatcher = new Dispatcher();
+      const result = await (dispatcher as any).probeStreamingStart(
+        sseResponse([created, inProgress, delta])
+      );
+
+      expect(result.ok).toBe(true);
+      const body = await new Response(result.response.body).text();
+      expect(body.indexOf('response.created')).toBeLessThan(body.indexOf('response.in_progress'));
+      expect(body).toContain('response.output_text.delta');
+    });
+  });
 });

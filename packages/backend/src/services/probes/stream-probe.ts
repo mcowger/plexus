@@ -14,6 +14,33 @@ function concatChunks(chunks: Uint8Array[]): Uint8Array {
   return result;
 }
 
+const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
+  'response.created': true,
+  'response.in_progress': true,
+  'response.queued': true,
+};
+
+/**
+ * True when the buffered bytes are only complete Responses lifecycle frames that carry
+ * no client-visible output, so the stream can still be abandoned for another target.
+ */
+export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
+  const text = new TextDecoder().decode(concatChunks(chunks));
+  if (!text.endsWith('\n\n')) return false;
+  const frames = text.split('\n\n').filter((frame) => frame.trim() !== '');
+  if (frames.length === 0) return false;
+  return frames.every((frame) => {
+    const dataLine = frame.split('\n').find((line) => line.startsWith('data:'));
+    if (!dataLine) return false;
+    try {
+      const type: unknown = JSON.parse(dataLine.slice(5).trim())?.type;
+      return typeof type === 'string' && LIFECYCLE_PRELUDE_EVENT_TYPES[type] === true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 /**
  * Inspects the initial raw stream bytes for early SSE/JSON error events
  * (such as OpenRouter/OpenAI 429 rate limit or server errors sent with HTTP 200).
@@ -89,8 +116,14 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
         continue;
       }
 
+      const nestedError =
+        typeof parsed.response?.error === 'object' && parsed.response.error !== null
+          ? parsed.response.error
+          : null;
       const errorObj =
-        typeof parsed.error === 'object' && parsed.error !== null ? parsed.error : parsed;
+        typeof parsed.error === 'object' && parsed.error !== null
+          ? parsed.error
+          : (nestedError ?? parsed);
       const meta = errorObj.metadata || parsed.metadata;
       const rawMsg = meta?.raw;
       const message =
@@ -229,23 +262,33 @@ export async function probeStreamingStart(
     }
 
     const first = readResult as ReadableStreamReadResult<Uint8Array>;
+    const buffered: Uint8Array[] = [];
     if (!first.done && first.value) {
-      const initialError = parseInitialStreamError(first.value);
-      if (initialError) {
-        reader.cancel().catch(() => {});
-        logger.warn(`probeStreamingStart: detected early stream error: ${initialError.message}`);
-        return {
-          ok: false,
-          error: initialError,
-          streamStarted: false,
-        };
+      buffered.push(first.value);
+      // Hold back lifecycle-only prelude frames (response.created etc.): nothing visible
+      // has been committed to the client, so a later response.failed can still fail over.
+      while (true) {
+        const initialError = parseInitialStreamError(buffered);
+        if (initialError) {
+          reader.cancel().catch(() => {});
+          logger.warn(`probeStreamingStart: detected early stream error: ${initialError.message}`);
+          return {
+            ok: false,
+            error: initialError,
+            streamStarted: false,
+          };
+        }
+        if (!isLifecyclePreludeOnly(buffered)) break;
+        const next = await reader.read();
+        if (next.done) break;
+        buffered.push(next.value);
       }
     }
 
     const replay = new ReadableStream<Uint8Array>({
       start(controller) {
-        if (!first.done && first.value) {
-          controller.enqueue(first.value);
+        for (const chunk of buffered) {
+          controller.enqueue(chunk);
         }
       },
       async pull(controller) {
