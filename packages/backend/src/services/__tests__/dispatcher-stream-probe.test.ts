@@ -523,20 +523,42 @@ describe('probeStreamingStart', () => {
       expect(result.error.message).toBe('No one started answering within 85 seconds.');
     });
 
-    test('fragmented Chat SSE is not held while the upstream stays open', async () => {
-      const open = new Response(
-        new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"con'));
-          },
-          pull: () => new Promise<void>(() => {}),
-        }),
-        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
-      );
-      const result = await (new Dispatcher() as any).probeStreamingStart(open);
-      expect(result.ok).toBe(true);
-      const first = await result.response.body.getReader().read();
-      expect(new TextDecoder().decode(first.value)).toContain('"choices"');
+    test('MartLLM prelude whose response.created spans several reads still fails over', async () => {
+      // MartLLM echoes the request's tools in every lifecycle frame (~22 KB in production),
+      // serializes `response` before `type`, and pings while it waits for capacity.
+      const tools = Array.from({ length: 200 }, (_, i) => ({
+        type: 'function',
+        name: `tool_${i}`,
+      }));
+      const martFrame = (type: string, response: object) =>
+        encoder.encode(`event: ${type}\ndata: ${JSON.stringify({ response, type })}\n\n`);
+      const martCreated = martFrame('response.created', { status: 'in_progress', tools });
+      const martInProgress = martFrame('response.in_progress', { status: 'in_progress', tools });
+      const martFailed = martFrame('response.failed', {
+        status: 'failed',
+        tools,
+        error: { code: 'no_available_provider', message: 'No one started answering.' },
+      });
+      const ping = encoder.encode(': ping\n\n');
+      const chunks = [
+        martCreated.slice(0, 4096),
+        martCreated.slice(4096),
+        martInProgress.slice(0, 4096),
+        martInProgress.slice(4096),
+        ping,
+        ping,
+        martFailed,
+      ];
+
+      for (const stallConfig of [undefined, { ttfbMs: 5000, ttfbBytes: 100 }]) {
+        const result = await (new Dispatcher() as any).probeStreamingStart(
+          sseResponse(chunks),
+          stallConfig
+        );
+        expect(result.ok).toBe(false);
+        expect(result.streamStarted).toBe(false);
+        expect(result.error.message).toBe('No one started answering.');
+      }
     });
 
     for (const [name, fragment] of [
