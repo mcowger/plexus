@@ -10,10 +10,13 @@
 #   `llm_reasoning_effort` is NOT used: the action rejects it on the Anthropic
 #   protocol, since the Anthropic API drops unknown body fields.
 # - Blocking gate is custom (OCR has no `should_block`): critical/high severities fail
-#   the job in "Check for blocking OCR findings" below. Medium stays advisory.
-# - Low-severity suppression is best-effort: the project rule asks OCR to omit lows,
-#   and the detailed summary filters them again. The action's built-in publisher has
-#   no option to drop findings by severity.
+#   the job in "Report OCR verdict" below. Medium stays advisory.
+# - Low-severity suppression is layered: the project rule asks OCR to omit lows, and
+#   `route_severity_below: low` moves any that slip through out of inline threads into
+#   the action's sticky summary (the action's routing is fail-open and never drops a
+#   finding, and OCR has no severity filter). Lows never gate or appear in our verdict.
+# - Findings live in the action's inline comments and sticky summary. Our own comment
+#   (marker below) carries only the verdict, so findings are not posted twice.
 
 name: OpenCodeReview PR Review
 run-name: 'OCR Review: PR #${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -181,6 +184,8 @@ jobs:
           llm_model: claude-opus-5-5
           llm_use_anthropic: 'true'
           llm_extra_body: '{"output_config": {"effort": "high"}}'
+          route_severity_below: low
+          incremental: 'true'
           # Keep in step with the job timeout-minutes above.
           review_task_timeout: '15'
           # For issue_comment triggers, pass the resolved refs; for
@@ -188,102 +193,63 @@ jobs:
           base_ref: ${{ steps.pr-context.outputs.base_ref }}
           head_sha: ${{ steps.pr-context.outputs.head_sha }}
 
-      - name: Check for blocking OCR findings
-        if: steps.review-gate.outputs.should_run == 'true'
-        env:
-          REVIEW_FILE: /tmp/ocr-result.json
-        run: |
-          python3 <<'PY'
-          import json
-          import os
-          import sys
-          from pathlib import Path
-
-          try:
-              review = json.loads(Path(os.environ['REVIEW_FILE']).read_text())
-          except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
-              print(f"::error::Could not parse OCR result: {e}")
-              sys.exit(1)
-
-          if review.get('status') == 'skipped':
-              print(f"::warning::OCR skipped the review: {review.get('message', 'no message')}")
-              sys.exit(0)
-
-          comments = review.get('comments', [])
-          blocking = [c for c in comments
-                      if str(c.get('severity', '')).lower() in ('critical', 'high')]
-          print(f"OCR reported {len(comments)} finding(s), "
-                f"{len(blocking)} at critical/high severity.")
-          for c in blocking:
-              line = c.get('start_line') or c.get('end_line') or '?'
-              print(f"BLOCKING {c.get('severity')}: {c.get('path')}:{line}: "
-                    f"{(c.get('content') or '')[:200]}")
-          sys.exit(1 if blocking else 0)
-          PY
-
-      - name: Post detailed OCR summary
+      - name: Report OCR verdict
+        # always(): a failed or partial OCR run must still report "incomplete"
+        # instead of leaving the claim comment saying the review "has started".
         if: always() && steps.review-gate.outputs.should_run == 'true'
         uses: actions/github-script@v9
         env:
           REVIEW_FILE: /tmp/ocr-result.json
+          OCR_OUTCOME: ${{ steps.ocr.outcome }}
         with:
           script: |
             const fs = require('fs');
             const marker = '<!-- ocr-review-detail -->';
             const prNumber = context.payload.pull_request?.number ?? context.payload.issue?.number;
-            const truncate = (value, length) => {
-              const text = String(value ?? '');
-              return text.length > length ? `${text.slice(0, length)}...` : text;
-            };
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const severityOf = (c) => String(c.severity ?? '').toLowerCase();
+
             let review = null;
             try {
               review = JSON.parse(fs.readFileSync(process.env.REVIEW_FILE, 'utf8'));
             } catch {
               review = null;
             }
-            let body;
-            if (!review || !Array.isArray(review.comments)) {
-              body = [
-                marker,
-                '## 🔍 OpenCodeReview — detailed findings',
-                '',
-                '⚠️ **Review output was unreadable, so the OCR Review check failed. See the run logs for details.**',
-              ].join('\n');
+
+            // A non-success OCR step can leave a result file holding only the files
+            // reviewed before the failure, so the outcome must be checked first.
+            const incomplete = process.env.OCR_OUTCOME !== 'success'
+              || !review
+              || (review.status !== 'skipped' && !Array.isArray(review.comments));
+            const skipped = !incomplete && review.status === 'skipped';
+            const findings = incomplete || skipped ? [] : review.comments.filter((c) => severityOf(c) !== 'low');
+            const blocking = findings.filter((c) => ['critical', 'high'].includes(severityOf(c)));
+
+            let verdict;
+            if (incomplete) {
+              verdict = `⚠️ **Review incomplete — OCR did not finish cleanly, so there is no verdict.** See the [run logs](${runUrl}).`;
+            } else if (skipped) {
+              verdict = `⏭️ **Review skipped:** ${review.message ?? 'no message'}`;
+            } else if (blocking.length > 0) {
+              verdict = `⛔ **Blocked — ${blocking.length} critical/high finding(s). Merge is not advised until these are addressed.**`;
             } else {
-              const findings = review.comments.filter((c) =>
-                String(c.severity ?? '').toLowerCase() !== 'low',
-              );
-              const blocking = findings.filter((c) =>
-                ['critical', 'high'].includes(String(c.severity ?? '').toLowerCase()),
-              );
-              const verdict = blocking.length > 0
-                ? `⛔ **Blocked — ${blocking.length} critical/high finding(s). Merge is not advised until these are addressed.**`
-                : '✅ **Passing — no critical/high findings.**';
-              const entries = findings.map((c) => {
-                const loc = c.start_line || c.end_line
-                  ? `${c.path}:${c.start_line ?? ''}${c.start_line !== c.end_line ? `-${c.end_line}` : ''}`
-                  : (c.path ?? 'general');
-                let entry = `- **${c.severity ?? 'unknown'}** — \`${truncate(loc, 300)}\`: ${truncate(c.content ?? 'No message', 1500)}`;
-                if (c.suggestion_code) {
-                  entry += `\n  <details><summary>Suggested change</summary>\n\n  \`\`\`suggestion\n  ${truncate(c.suggestion_code, 2000)}\n  \`\`\`\n  </details>`;
-                }
-                return entry;
-              });
-              body = [
-                marker,
-                '## 🔍 OpenCodeReview — detailed findings',
-                '',
-                verdict,
-                '',
-                `Reviewed ${review.summary?.files_reviewed ?? '?'} file(s), ${findings.length} finding(s) total.`,
-                '',
-                ...entries,
-              ].join('\n');
+              verdict = '✅ **Passing — no critical/high findings.**';
             }
-            body += '\n\n_Automatic review runs once per PR. Comment `/open-code-review` to request another review._';
-            if (body.length > 60000) {
-              body = `${body.slice(0, 59500)}\n\n_Additional findings were omitted because the comment was too large._`;
+
+            const lines = [marker, '## 🔍 OpenCodeReview', '', verdict];
+            if (!incomplete && !skipped) {
+              lines.push(
+                '',
+                `Reviewed ${review.summary?.files_reviewed ?? '?'} file(s); ${findings.length} finding(s) at medium or above` +
+                  ` (${blocking.length} critical/high). Details are in the inline comments and the review summary.`,
+              );
             }
+            lines.push(
+              '',
+              '_Automatic review runs once per PR. Comment `/open-code-review` to request another review._',
+            );
+            const body = lines.join('\n');
+
             try {
               const prior = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
@@ -311,5 +277,24 @@ jobs:
                 });
               }
             } catch (error) {
-              core.warning(`Could not post the detailed OCR summary: ${error.message}`);
+              core.warning(`Could not post the OCR verdict: ${error.message}`);
+            }
+
+            if (skipped) {
+              core.warning(`OCR skipped the review: ${review.message ?? 'no message'}`);
+            } else if (incomplete) {
+              core.setFailed('OCR review did not complete; no verdict was produced.');
+            } else if (blocking.length > 0) {
+              for (const c of blocking) {
+                core.error(`${c.severity}: ${truncate(c.content, 200)}`, {
+                  file: c.path,
+                  startLine: c.start_line || c.end_line || undefined,
+                });
+              }
+              core.setFailed(`OCR reported ${blocking.length} critical/high finding(s).`);
+            }
+
+            function truncate(value, length) {
+              const text = String(value ?? '');
+              return text.length > length ? `${text.slice(0, length)}...` : text;
             }
