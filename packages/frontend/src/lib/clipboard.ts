@@ -65,22 +65,28 @@ const legacyCopyToClipboard = (text: string): boolean => {
 
 /**
  * Attempt to copy text to clipboard.
- * Tries the modern Clipboard API first, then falls back to
- * document.execCommand('copy') which also works in non-secure (HTTP) contexts.
+ * Tries document.execCommand('copy') first because it runs synchronously inside
+ * the user gesture; mobile browsers (notably iOS Safari) reject or silently
+ * drop the async Clipboard API once the gesture has been consumed by an await
+ * or when the page is served over plain HTTP. Falls back to navigator.clipboard.
  * Returns success status.
  */
 export const copyToClipboard = async (text: string): Promise<boolean> => {
+  if (
+    typeof document !== 'undefined' &&
+    typeof document.execCommand === 'function' &&
+    legacyCopyToClipboard(text)
+  ) {
+    return true;
+  }
+
   if (typeof navigator !== 'undefined' && !!navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      // Fall through to the legacy path below.
+      return false;
     }
-  }
-
-  if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
-    return legacyCopyToClipboard(text);
   }
 
   return false;
