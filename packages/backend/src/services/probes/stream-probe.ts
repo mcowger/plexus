@@ -21,6 +21,8 @@ const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
   'response.created': true,
   'response.in_progress': true,
   'response.queued': true,
+  // ChatGPT/Codex backend: moderation metadata sent before any output; nothing visible.
+  'response.metadata': true,
 };
 
 /**
@@ -186,7 +188,10 @@ export function parseInitialStreamError(input: Uint8Array | Uint8Array[]): Error
         }
       }
       if (!cooldownDuration) {
-        const headerRetry = meta?.headers?.['Retry-After'] || meta?.headers?.['retry-after'];
+        // OpenRouter nests headers under `error.metadata`; the ChatGPT/Codex backend puts
+        // them directly on `error` (`error.headers['retry-after']`).
+        const headers = meta?.headers ?? errorObj.headers;
+        const headerRetry = headers?.['Retry-After'] || headers?.['retry-after'];
         if (headerRetry) {
           const sec = parseFloat(headerRetry);
           if (Number.isFinite(sec) && sec > 0) {

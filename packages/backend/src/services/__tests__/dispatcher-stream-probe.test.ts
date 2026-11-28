@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { Dispatcher } from '../dispatch/dispatcher';
+import { probeStreamingStart } from '../probes/stream-probe';
 
 // Mock fetch to prevent actual network calls
 beforeEach(() => {
@@ -333,6 +334,30 @@ describe('probeStreamingStart', () => {
       expect(result.ok).toBe(true);
       const body = await new Response(result.response.body).text();
       expect(body).toContain('image_too_large');
+    });
+
+    test('error after a response.metadata prelude frame fails over with Retry-After cooldown', async () => {
+      const metadata = frame('response.metadata', {
+        response_id: 'resp_1',
+        metadata: { openai_chatgpt_moderation_metadata: { prompt: {} } },
+      });
+      const overloaded = encoder.encode(
+        'event: error\ndata: {"type":"error","error":{"message":"Our servers are currently overloaded. Please try again later.","type":"service_unavailable_error","code":"server_is_overloaded","headers":{"retry-after":"313"}}}\n\n'
+      );
+      const result = await probeStreamingStart(
+        sseResponse([created, inProgress, metadata, overloaded, failed])
+      );
+
+      if (result.ok) throw new Error('expected probe to fail over');
+      expect(result.streamStarted).toBe(false);
+      // parseInitialStreamError attaches routing fields to a plain Error.
+      const error = result.error as Error & {
+        routingContext?: { cooldownTriggered?: boolean };
+        cooldownDuration?: number;
+      };
+      expect(error.message).toBe('Our servers are currently overloaded. Please try again later.');
+      expect(error.routingContext?.cooldownTriggered).toBe(true);
+      expect(error.cooldownDuration).toBe(313_000);
     });
 
     test('error event after a prelude keeps its own details', async () => {
