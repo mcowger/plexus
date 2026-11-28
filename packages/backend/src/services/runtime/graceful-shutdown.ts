@@ -37,12 +37,14 @@ export function parseDrainTimeoutMs(raw: string | undefined): number {
  * requests that still arrive on open connections with a retryable 503, ends
  * long-lived subscription streams (dashboard SSE, MCP notification channels),
  * and waits for in-flight requests until the deadline. Remaining connections
- * are then destroyed. A force request at any point skips the rest of the wait.
+ * are then destroyed. A force request at any point skips the rest of the wait;
+ * a second force request exits at once, even while cleanup is still running.
  */
 export class GracefulShutdown {
   private server?: FastifyInstance;
   private options?: ShutdownOptions;
   private draining = false;
+  private forced = false;
   private readonly inFlight = new Set<ServerResponse>();
   private readonly drainListeners = new Set<() => void>();
   private readonly forceRequested = Promise.withResolvers<void>();
@@ -84,26 +86,46 @@ export class GracefulShutdown {
   }
 
   /**
-   * Starts shutdown, or escalates a running drain when `mode` is `force`.
-   * Resolves after `exit` has been called (or immediately for repeat calls).
+   * Starts shutdown, escalates a running drain when `mode` is `force`, or
+   * exits immediately on a repeated force request (e.g. Ctrl-C twice while
+   * cleanup hangs). Resolves after `exit` has been called (or immediately
+   * for repeat calls).
    */
   async request(reason: string, mode: ShutdownMode, exitCode = 0): Promise<void> {
-    if (mode === 'force') this.forceRequested.resolve();
-    if (this.draining) {
-      if (mode === 'force')
-        logger.warn(`${reason} received during drain; force-closing connections`);
-      return;
-    }
     const { server, options } = this;
     if (!server || !options) throw new Error('GracefulShutdown is not attached and configured');
 
+    if (this.draining) {
+      if (mode !== 'force') return;
+      if (this.forced) {
+        logger.warn(`${reason} received again; exiting without waiting for shutdown to finish`);
+        options.exit(1);
+        return;
+      }
+      this.forced = true;
+      this.forceRequested.resolve();
+      logger.warn(`${reason} received during drain; force-closing connections`);
+      return;
+    }
+
     this.draining = true;
+    if (mode === 'force') {
+      this.forced = true;
+      this.forceRequested.resolve();
+    }
     logger.info(
       mode === 'force'
         ? `${reason} received, shutting down immediately`
         : `${reason} received, draining ${this.inFlight.size} in-flight request(s) for up to ${options.drainTimeoutMs}ms`
     );
-    for (const listener of this.drainListeners) listener();
+    // One misbehaving stream must not stop the rest of the shutdown.
+    for (const listener of this.drainListeners) {
+      try {
+        listener();
+      } catch (error) {
+        logger.warn('Drain listener failed', error);
+      }
+    }
     this.drainListeners.clear();
 
     let code = exitCode;

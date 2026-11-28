@@ -40,10 +40,8 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
       );
     };
 
-    // Endless stream: end it cleanly when the server starts draining so the
-    // dashboard reconnects to the next instance instead of holding the drain.
-    const stopDrainWatch = gracefulShutdown.onDrain(() => reply.raw.end());
-
+    // Assigned below; onDrain can run its callback (and so cleanup) immediately.
+    let stopDrainWatch = () => {};
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
@@ -56,9 +54,17 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
     // Cleanup on drain, forced shutdown, or client disconnect ('close' fires).
     reply.raw.on('close', cleanup);
 
-    while (!reply.raw.destroyed) {
+    // Endless stream: end it cleanly when the server starts draining so the
+    // dashboard reconnects to the next instance instead of holding the drain.
+    // Unsubscribe first: writing after end() raises ERR_STREAM_WRITE_AFTER_END.
+    stopDrainWatch = gracefulShutdown.onDrain(() => {
+      cleanup();
+      reply.raw.end();
+    });
+
+    while (!reply.raw.destroyed && !reply.raw.writableEnded) {
       await new Promise((resolve) => setTimeout(resolve, 10000));
-      if (!reply.raw.destroyed) {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
         reply.raw.write(
           encode({
             event: 'ping',

@@ -26,6 +26,10 @@ post:
     in-flight streams, is closed immediately. Sending `SIGTERM` to the
     process has the same effect.
 
+    Once a restart or drain is under way, Plexus no longer accepts
+    connections, so a later `{ "force": true }` request cannot reach it.
+    Send `SIGTERM` or `SIGINT` to cut a running drain short.
+
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []

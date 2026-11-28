@@ -173,4 +173,36 @@ describe('GracefulShutdown', () => {
     expect(Date.now() - startedAt).toBeLessThan(2_000);
     expect(exit).toHaveBeenCalledWith(0);
   });
+
+  test('a repeated force request exits without waiting for a hung cleanup', async () => {
+    const { shutdown, exit } = await startServer(10_000);
+    const cleanupStarted = Promise.withResolvers<void>();
+    shutdown.configure({
+      drainTimeoutMs: 10_000,
+      cleanup: () => {
+        cleanupStarted.resolve();
+        return new Promise<void>(() => {});
+      },
+      exit,
+    });
+
+    void shutdown.request('SIGTERM', 'force');
+    await cleanupStarted.promise;
+    expect(exit).not.toHaveBeenCalled();
+
+    await shutdown.request('SIGINT', 'force');
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  test('a throwing drain listener does not stop the shutdown', async () => {
+    const { shutdown, cleanup, exit } = await startServer(10_000);
+    shutdown.onDrain(() => {
+      throw new Error('stream in a bad state');
+    });
+
+    await shutdown.request('SIGUSR1', 'drain');
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
 });

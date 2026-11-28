@@ -180,12 +180,12 @@ ADMIN_KEY="your-secret" DATABASE_URL=sqlite://./data/plexus.db LOG_LEVEL=debug .
 
 Plexus picks how to stop based on the signal it receives:
 
-| Signal              | Behavior                                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SIGTERM`, `SIGINT` | Immediate shutdown. Closes every connection right away and cuts off in-flight streams. Also cuts short a drain already in progress.                           |
-| `SIGUSR1`           | Graceful drain. Stops accepting connections and lets in-flight requests and streams finish for up to `SHUTDOWN_DRAIN_TIMEOUT_MS`, then force-closes the rest. |
+| Signal              | Behavior                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIGTERM`, `SIGINT` | Immediate shutdown. Closes every connection right away and cuts off in-flight streams. Sent during a drain, cuts it short; sent again, exits without waiting for cleanup. |
+| `SIGUSR1`           | Graceful drain. Stops accepting connections and lets in-flight requests and streams finish for up to `SHUTDOWN_DRAIN_TIMEOUT_MS`, then force-closes the rest.             |
 
-During a drain, requests that arrive on already-open connections get `503 Service Unavailable` with `Retry-After: 5`. Dashboard event streams and MCP notification streams end cleanly at the start of the drain so clients reconnect. `POST /v0/management/restart` uses the same drain; send `{ "force": true }` to close connections immediately instead.
+During a drain, requests that arrive on already-open connections get `503 Service Unavailable` with `Retry-After: 5`. Dashboard event streams and MCP notification streams end cleanly at the start of the drain so clients reconnect. `POST /v0/management/restart` uses the same drain; send `{ "force": true }` to close connections immediately instead. Once a drain has started, Plexus no longer accepts connections, so only `SIGTERM` or `SIGINT` can cut it short.
 
 To drain on `docker stop`, set the stop signal to `SIGUSR1` and the stop timeout above the drain timeout (Docker kills the container after 10 seconds by default): `docker run --stop-signal SIGUSR1 --stop-timeout 45`, or `stop_signal: SIGUSR1` and `stop_grace_period: 45s` in Compose. To drain a running container without going through `docker stop`, run `docker kill --signal=SIGUSR1 plexus`.
 
