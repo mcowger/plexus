@@ -99,7 +99,7 @@ export const Keys = () => {
           </div>
         </div>
 
-        <Card className="mb-6">
+        <div className="mb-6">
           <div style={{ position: 'relative' }}>
             <Search
               size={16}
@@ -118,7 +118,7 @@ export const Keys = () => {
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-        </Card>
+        </div>
 
         {activeTab === 'keys' && (
           <KeyLists

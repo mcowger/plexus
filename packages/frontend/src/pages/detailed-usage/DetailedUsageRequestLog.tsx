@@ -17,6 +17,7 @@ export const DetailedUsageRequestLog = ({
   currency,
 }: DetailedUsageRequestLogProps) => (
   <Card
+    flush
     title="Raw Request Log"
     extra={
       <span className="text-text-secondary text-xs">
@@ -24,7 +25,7 @@ export const DetailedUsageRequestLog = ({
       </span>
     }
   >
-    <div className="max-h-125 space-y-3 overflow-y-auto md:hidden">
+    <div className="max-h-125 space-y-3 overflow-y-auto p-3 sm:p-5 md:hidden">
       {records.slice(0, 100).map((record, index) => (
         <article key={index} className="border-border-glass bg-bg-subtle rounded-md border p-3">
           <div className="flex items-start justify-between gap-3">
@@ -98,7 +99,7 @@ export const DetailedUsageRequestLog = ({
     </div>
 
     <div className="hidden max-h-125 overflow-x-auto overflow-y-auto md:block">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm [&_tr>:first-child]:pl-5 [&_tr>:last-child]:pr-5">
         <thead className="bg-bg-card sticky top-0">
           <tr className="border-border-glass text-text-secondary border-b text-left">
             {[

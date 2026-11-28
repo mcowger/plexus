@@ -57,8 +57,8 @@ export const KeyLists = ({
   onClearQuota,
 }: KeyListsProps) => (
   <>
-    <Card title="Active Keys" className="mb-6">
-      <div className="space-y-3 md:hidden">
+    <Card title="Active Keys" className="mb-6" flush>
+      <div className="space-y-3 p-3 sm:p-5 md:hidden">
         {activeKeys.length === 0 ? (
           <div className="text-text-muted py-10 text-center text-sm">No keys found</div>
         ) : (
@@ -424,10 +424,10 @@ export const KeyLists = ({
       </div>
     </Card>
 
-    <Card className="mb-6">
+    <Card className="mb-6" flush>
       <button
         type="button"
-        className="flex w-full items-center justify-between text-left"
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left sm:px-5 sm:py-3"
         onClick={() => onSetShowDisabledKeys(!showDisabledKeys)}
         aria-expanded={showDisabledKeys}
       >
@@ -440,7 +440,7 @@ export const KeyLists = ({
         />
       </button>
       {showDisabledKeys && (
-        <div className="mt-4 overflow-x-auto">
+        <div className="border-border overflow-x-auto border-t">
           {disabledKeys.length === 0 ? (
             <div className="text-text-muted py-6 text-center text-sm">No disabled keys found</div>
           ) : (
