@@ -392,6 +392,17 @@ The defaults track the endpoint, so a provider pointed at api.openai.com or api.
 }
 ```
 
+### Anthropic Server-Side Compaction
+
+Plexus doesn't support Anthropic server-side compaction (the `compact-2026-09-04` and `compact-2026-01-12` betas). Clients shouldn't enable it for Plexus models.
+
+Plexus doesn't block it either. Same-format Messages requests pass through with the client's `anthropic-beta` header, so a compaction request that lands on an Anthropic target (Anthropic OAuth or an `api.anthropic.com` URL) works. Routing doesn't know which targets support compaction, though, so it breaks once an alias fails over:
+
+- A compaction request served by another Messages target, such as OpenRouter, usually comes back as a normal reply with no `compaction` block.
+- After a successful compaction, the client sends the signed `compaction` block on every later turn. A target without compaction support rejects it with a 400, or ignores it and loses the summarized context.
+
+This is intentional. Making compaction survive failover means rewriting signed history and thinking blocks per target, and whether that holds depends on how each client replays them. Use the client's own summarization instead. In Oh My Pi, remove `remote` from `compaction.methodOrder`.
+
 ### Raw Provider Passthrough
 
 Static API-key providers can expose an opt-in raw endpoint that bypasses model routing,
