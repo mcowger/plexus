@@ -25,6 +25,23 @@ const LIFECYCLE_PRELUDE_EVENT_TYPES: Record<string, true> = {
   'response.metadata': true,
 };
 
+/** Event types a still-arriving first frame may carry without exposing output to the client. */
+const HOLDABLE_EVENT_TYPES: Record<string, true> = {
+  ...LIFECYCLE_PRELUDE_EVENT_TYPES,
+  'response.failed': true,
+  error: true,
+};
+const HOLDABLE_EVENT_NAMES = Object.keys(HOLDABLE_EVENT_TYPES);
+
+/**
+ * Whitespace-free openings of a `data:` payload that is a Responses lifecycle or failure
+ * object. MartLLM serializes `response` before `type`; OpenAI serializes `type` first.
+ */
+const HOLDABLE_DATA_OPENINGS = [
+  '{"response":',
+  ...HOLDABLE_EVENT_NAMES.map((type) => `{"type":"${type}"`),
+];
+
 /**
  * Decodes buffered SSE bytes with every line ending (LF, CRLF, CR) normalized to LF, so a
  * blank line is always `\n\n`. A trailing bare CR is dropped: it may be half of a CRLF whose
@@ -35,11 +52,43 @@ function decodeSse(bytes: Uint8Array): string {
 }
 
 /**
- * True when the buffered bytes hold at least one complete Responses lifecycle frame
- * (`response.created` etc.) and no other complete event, so no output has been shown and a
- * later `response.failed` can still fail over. The SSE parser ignores comments (`: ping`)
- * and unfinished frames. Any other first event (Chat/Anthropic SSE, NDJSON, plain JSON) is
- * never held.
+ * True when an unfinished first SSE frame may still be a Responses lifecycle or failure frame.
+ * MartLLM echoes the request's tools in `response.created`, so that frame can exceed one
+ * network read; releasing it half-read commits the stream before a later `response.failed`.
+ * A frame whose `event:` name or `data:` opening already shows anything else is released.
+ */
+function isHoldableFirstFrame(tail: string): boolean {
+  const lines = tail.split('\n');
+  let data: string | undefined;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line === '' || line.startsWith(':')) continue;
+    const complete = i < lines.length - 1;
+    if (line.startsWith('event:')) {
+      const name = line.slice(6).trim();
+      if (complete) return HOLDABLE_EVENT_TYPES[name] === true;
+      return HOLDABLE_EVENT_NAMES.some((type) => type.startsWith(name));
+    }
+    if (line.startsWith('data:')) {
+      data = (data ?? '') + line.slice(5);
+    } else if (!complete && ('event:'.startsWith(line) || 'data:'.startsWith(line))) {
+      return true;
+    }
+  }
+  if (data === undefined) return false;
+  const opening = data.slice(0, 64).replace(/\s/g, '');
+  return HOLDABLE_DATA_OPENINGS.some(
+    (prefix) => opening.startsWith(prefix) || prefix.startsWith(opening)
+  );
+}
+
+/**
+ * True while nothing visible has reached the client and a later `response.failed` can still
+ * fail over: the buffered bytes hold complete Responses lifecycle frames (`response.created`
+ * etc.) and no other complete event, or no complete event yet and a first frame that may
+ * still be a lifecycle or failure frame. The SSE parser ignores comments (`: ping`) and
+ * unfinished frames. Any other first event (Chat/Anthropic SSE, NDJSON, plain JSON) is never
+ * held.
  */
 export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
   let sawLifecycle = false;
@@ -59,8 +108,12 @@ export function isLifecyclePreludeOnly(chunks: Uint8Array[]): boolean {
       }
     },
   });
-  parser.feed(new TextDecoder().decode(concatChunks(chunks)));
-  return sawLifecycle && onlyLifecycle;
+  const bytes = concatChunks(chunks);
+  parser.feed(new TextDecoder().decode(bytes));
+  if (sawLifecycle || !onlyLifecycle) return sawLifecycle && onlyLifecycle;
+  const text = decodeSse(bytes);
+  const end = text.lastIndexOf('\n\n');
+  return isHoldableFirstFrame(end === -1 ? text : text.slice(end + 2));
 }
 
 /**

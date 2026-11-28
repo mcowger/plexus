@@ -464,7 +464,7 @@ describe('probeStreamingStart', () => {
       for (const [name, shape] of variants) {
         test(`${name}: a failure fails over wherever the stream is cut`, async () => {
           const whole = join(shape(created), shape(inProgress), shape(failed));
-          for (let at = shape(created).length; at < whole.length; at++) {
+          for (let at = 1; at < whole.length; at++) {
             const result = await (new Dispatcher() as any).probeStreamingStart(
               sseResponse(slices(whole, at))
             );
@@ -477,7 +477,7 @@ describe('probeStreamingStart', () => {
 
         test(`${name}: the stall-aware probe fails over wherever the stream is cut`, async () => {
           const whole = join(shape(created), shape(inProgress), shape(failed));
-          for (let at = shape(created).length; at < whole.length; at++) {
+          for (let at = 1; at < whole.length; at++) {
             const result = await (new Dispatcher() as any).probeStreamingStart(
               sseResponse(slices(whole, at)),
               { ttfbMs: 5000, ttfbBytes: 1 }
@@ -492,11 +492,7 @@ describe('probeStreamingStart', () => {
 
         test(`${name}: a failure fails over when read one byte at a time`, async () => {
           const whole = join(shape(created), shape(failed));
-          const first = shape(created);
-          const singles = [
-            first,
-            ...Array.from(whole.slice(first.length), (byte) => Uint8Array.of(byte)),
-          ];
+          const singles = Array.from(whole, (byte) => Uint8Array.of(byte));
           const result = await (new Dispatcher() as any).probeStreamingStart(sseResponse(singles));
           expect(result.ok).toBe(false);
           expect(result.error.message).toBe('No one started answering within 85 seconds.');
@@ -542,6 +538,27 @@ describe('probeStreamingStart', () => {
       const first = await result.response.body.getReader().read();
       expect(new TextDecoder().decode(first.value)).toContain('"choices"');
     });
+
+    for (const [name, fragment] of [
+      ['Chat', 'data: {"choices":[{"delta":{"con'],
+      ['Anthropic', 'event: message_start\ndata: {"type":"mess'],
+    ] as const) {
+      test(`fragmented ${name} SSE is not held while the upstream stays open`, async () => {
+        const open = new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(encoder.encode(fragment));
+            },
+            pull: () => new Promise<void>(() => {}),
+          }),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+        );
+        const result = await (new Dispatcher() as any).probeStreamingStart(open);
+        expect(result.ok).toBe(true);
+        const first = await result.response.body.getReader().read();
+        expect(new TextDecoder().decode(first.value)).toBe(fragment);
+      });
+    }
 
     describe('native NDJSON is never held', () => {
       const token = encoder.encode('{"message":{"content":"hi"},"done":false}\n');
