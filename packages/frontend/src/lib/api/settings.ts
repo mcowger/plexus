@@ -352,6 +352,7 @@ interface RawBackendProvider {
   enabled?: boolean;
   estimateTokens?: boolean;
   useClaudeMasking?: boolean;
+  messages_bearer_auth?: boolean;
   gemini_thinking_enabled?: boolean;
   disable_cooldown?: boolean;
   stall_cooldown?: boolean;
@@ -418,6 +419,7 @@ export const getProviders = async (): Promise<Provider[]> => {
         enabled: val.enabled !== false,
         estimateTokens: val.estimateTokens === true,
         useClaudeMasking: val.useClaudeMasking === true,
+        messagesBearerAuth: val.messages_bearer_auth === true,
         geminiThinkingEnabled: val.gemini_thinking_enabled === true,
         disableCooldown: val.disable_cooldown === true,
         stallCooldown: val.stall_cooldown === true,
@@ -487,6 +489,7 @@ export const saveProvider = async (provider: Provider, oldId?: string): Promise<
     enabled: provider.enabled,
     estimateTokens: provider.estimateTokens,
     useClaudeMasking: provider.useClaudeMasking,
+    messages_bearer_auth: provider.messagesBearerAuth === true,
     geminiThinkingEnabled: provider.geminiThinkingEnabled,
     disable_cooldown: provider.disableCooldown === true,
     stall_cooldown: provider.stallCooldown === true,

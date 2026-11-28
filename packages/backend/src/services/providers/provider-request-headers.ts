@@ -26,6 +26,9 @@ export function setupProviderHeaders(
     const type = getApiBaseType(apiType);
     if (type === 'messages') {
       headers['x-api-key'] = route.config.api_key;
+      if (route.config.messages_bearer_auth) {
+        headers['Authorization'] = `Bearer ${route.config.api_key}`;
+      }
       headers['anthropic-version'] = '2023-06-01';
     } else if (type === 'gemini') {
       headers['x-goog-api-key'] = route.config.api_key;

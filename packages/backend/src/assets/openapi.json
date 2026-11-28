@@ -13560,6 +13560,11 @@
             "default": false,
             "description": "When true, rewrites OpenAI-format requests to look like Claude requests before forwarding. Used for providers that require Anthropic-compatible request shapes.\n"
           },
+          "messages_bearer_auth": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, Messages requests send the API key as `Authorization: Bearer` in addition to `x-api-key`, for gateways that read only Bearer auth (for example Kilo).\n"
+          },
           "quota_checker": {
             "type": "object",
             "description": "Optional provider-level quota checker configuration. References a quota checker type from `GET /v0/management/quota-checker-types`.\n",

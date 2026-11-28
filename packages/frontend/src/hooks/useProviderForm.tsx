@@ -76,6 +76,7 @@ export const EMPTY_PROVIDER: Provider = {
   allow100PercentUtilization: false,
   estimateTokens: false,
   useClaudeMasking: false,
+  messagesBearerAuth: false,
   cacheKeyInjection: undefined,
   responsesExtensions: undefined,
   apiBaseUrl: {},

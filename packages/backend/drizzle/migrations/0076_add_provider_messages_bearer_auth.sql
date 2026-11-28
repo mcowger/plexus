@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `messages_bearer_auth` integer DEFAULT 0 NOT NULL;

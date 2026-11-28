@@ -1277,6 +1277,24 @@ export function ProviderAdvancedEditor({
                 </label>
                 <label className="flex cursor-pointer items-start gap-2 py-1">
                   <Switch
+                    checked={editingProvider.messagesBearerAuth || false}
+                    onChange={(checked) =>
+                      setEditingProvider({ ...editingProvider, messagesBearerAuth: checked })
+                    }
+                  />
+                  <div>
+                    <div className="font-body text-text text-[12px]">Bearer Auth on Messages</div>
+                    <div
+                      className="font-body text-text-muted text-[11px]"
+                      style={{ lineHeight: 1.35 }}
+                    >
+                      Also send the API key as Authorization: Bearer on Messages requests, for
+                      gateways that ignore x-api-key (e.g. Kilo).
+                    </div>
+                  </div>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 py-1">
+                  <Switch
                     checked={editingProvider.auto_compat || false}
                     disabled={
                       !editingProvider.pi_ai_provider &&

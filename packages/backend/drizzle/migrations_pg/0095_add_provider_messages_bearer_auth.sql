@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "messages_bearer_auth" boolean DEFAULT false NOT NULL;

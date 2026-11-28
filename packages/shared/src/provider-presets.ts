@@ -211,6 +211,8 @@ export const ProviderPresetSchema = z
     autoCompat: z.boolean().default(false),
     /** Cache/session key injection destination applied to the provider draft. */
     cacheKeyInjection: ProviderCacheKeyInjectionSchema.optional(),
+    /** Messages requests also send the key as `Authorization: Bearer`. */
+    messagesBearerAuth: z.boolean().optional(),
     /** Responses API extensions the provider accepts verbatim. */
     responsesExtensions: z.array(ResponsesExtensionSchema).optional(),
     /** Operator-facing caveats shown in the picker (auth quirks, docs gaps). */
@@ -310,6 +312,7 @@ export interface ProviderPresetDraft {
   pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
   cacheKeyInjection?: ProviderCacheKeyInjection;
+  messagesBearerAuth?: boolean;
   responsesExtensions?: ResponsesExtension[];
 }
 
@@ -358,6 +361,7 @@ export function applyProviderPreset<T extends ProviderPresetDraft>(
     pi_ai_quirks: preset.piAiQuirks ? structuredClone(preset.piAiQuirks) : undefined,
     auto_compat: preset.autoCompat,
     cacheKeyInjection: preset.cacheKeyInjection,
+    messagesBearerAuth: preset.messagesBearerAuth === true,
     responsesExtensions: preset.responsesExtensions ? [...preset.responsesExtensions] : undefined,
   };
 }

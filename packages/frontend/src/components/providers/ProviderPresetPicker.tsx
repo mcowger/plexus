@@ -68,6 +68,7 @@ interface PresetTouchedFields {
   pi_ai_quirks?: PiAiQuirks;
   auto_compat?: boolean;
   cacheKeyInjection?: ProviderCacheKeyInjection;
+  messagesBearerAuth?: boolean;
   responsesExtensions?: ResponsesExtension[];
 }
 
@@ -84,6 +85,7 @@ function blankPresetDraftBase() {
     pi_ai_quirks: undefined as PiAiQuirks | undefined,
     auto_compat: undefined as boolean | undefined,
     cacheKeyInjection: undefined as ProviderCacheKeyInjection | undefined,
+    messagesBearerAuth: undefined as boolean | undefined,
     responsesExtensions: undefined as ResponsesExtension[] | undefined,
   };
 }
@@ -119,6 +121,7 @@ const RESTORABLE_KEYS = [
   'pi_ai_quirks',
   'auto_compat',
   'cacheKeyInjection',
+  'messagesBearerAuth',
   'responsesExtensions',
 ] as const;
 
@@ -216,6 +219,7 @@ export function ProviderPresetPicker({
         pi_ai_quirks: editingProvider.pi_ai_quirks,
         auto_compat: editingProvider.auto_compat,
         cacheKeyInjection: editingProvider.cacheKeyInjection,
+        messagesBearerAuth: editingProvider.messagesBearerAuth,
         responsesExtensions: editingProvider.responsesExtensions
           ? [...editingProvider.responsesExtensions]
           : undefined,
