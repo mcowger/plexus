@@ -964,7 +964,8 @@
       },
       "piAiProvider": "openrouter",
       "autoCompat": true,
-      "notes": "Only /chat/completions is documented upstream; the other protocols proxy through the same base in production use."
+      "messagesBearerAuth": true,
+      "notes": "Only /chat/completions is documented upstream; the other protocols proxy through the same base in production use. The gateway reads only Bearer auth, so Messages requests also send Authorization: Bearer."
     },
     {
       "id": "cloudflare",

@@ -45,6 +45,7 @@ export interface Provider {
   allow100PercentUtilization?: boolean;
   estimateTokens?: boolean;
   useClaudeMasking?: boolean;
+  messagesBearerAuth?: boolean;
   geminiThinkingEnabled?: boolean;
   discount?: number;
   headers?: Record<string, string>;

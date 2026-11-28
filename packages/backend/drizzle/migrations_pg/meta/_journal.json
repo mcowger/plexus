@@ -666,6 +666,13 @@
       "when": 1795564967289,
       "tag": "0094_add_upstream_mcp_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795842662912,
+      "tag": "0095_add_provider_messages_bearer_auth",
+      "breakpoints": true
     }
   ]
 }

@@ -21,6 +21,7 @@ export const providers = sqliteTable(
     discount: real('discount'),
     estimateTokens: integer('estimate_tokens').notNull().default(0),
     useClaudeMasking: integer('use_claude_masking').notNull().default(0),
+    messagesBearerAuth: integer('messages_bearer_auth').notNull().default(0), // Also send Authorization: Bearer on Messages
     geminiThinkingEnabled: integer('gemini_thinking_enabled').notNull().default(0),
     cacheKeyInjection: text('cache_key_injection'), // enum: cache/session key injection destination
     responsesExtensions: text('responses_extensions'), // JSON: string[] — Responses extensions accepted verbatim

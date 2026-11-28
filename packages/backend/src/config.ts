@@ -320,6 +320,11 @@ export const ProviderConfigSchema = z
     estimateTokens: z.boolean().optional().default(false),
     useClaudeMasking: z.boolean().optional().default(false),
     /**
+     * Messages requests also carry the API key as `Authorization: Bearer`,
+     * alongside `x-api-key`, for gateways that read only Bearer auth (Kilo).
+     */
+    messages_bearer_auth: z.boolean().optional(),
+    /**
      * Inject Plexus's derived per-run cache/session key into this field on
      * upstream requests. `undefined` leaves the client's request unchanged,
      * except Meta OAuth routes which default to `prompt_cache_key`.

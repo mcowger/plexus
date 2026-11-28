@@ -1,6 +1,27 @@
 import { describe, expect, test } from 'bun:test';
 
+import { ProviderConfigSchema } from '../../../config';
+import type { UnifiedChatRequest } from '../../../types/unified';
+import type { RouteResult } from '../../routing/router';
 import { setupProviderHeaders } from '../provider-request-headers';
+
+function messagesRoute(config: Record<string, unknown>): RouteResult {
+  return {
+    provider: 'kilocode',
+    model: 'anthropic/claude-haiku-5.5',
+    config: ProviderConfigSchema.parse({
+      api_base_url: 'https://api.kilo.ai/api/gateway',
+      api_key: 'provider-key',
+      ...config,
+    }),
+  };
+}
+
+const messagesRequest: UnifiedChatRequest = {
+  model: 'anthropic/claude-haiku-5.5',
+  messages: [],
+  stream: false,
+};
 
 describe('setupProviderHeaders', () => {
   test('forwards session affinity headers to a Messages provider', () => {
@@ -45,6 +66,24 @@ describe('setupProviderHeaders', () => {
     );
 
     expect(headers).not.toHaveProperty('anthropic-beta');
+  });
+
+  test('sends only x-api-key on Messages by default', () => {
+    const headers = setupProviderHeaders(messagesRoute({}), 'messages', messagesRequest);
+
+    expect(headers['x-api-key']).toBe('provider-key');
+    expect(headers).not.toHaveProperty('Authorization');
+  });
+
+  test('also sends Bearer auth on Messages when messages_bearer_auth is set', () => {
+    const headers = setupProviderHeaders(
+      messagesRoute({ messages_bearer_auth: true }),
+      'messages',
+      messagesRequest
+    );
+
+    expect(headers['x-api-key']).toBe('provider-key');
+    expect(headers['Authorization']).toBe('Bearer provider-key');
   });
 
   test('uses the Plexus session id for OpenCode Go auto-compat requests', () => {

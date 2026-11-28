@@ -1357,6 +1357,9 @@
               "x-multi-turn-session-id"
             ]
           },
+          "messagesBearerAuth": {
+            "type": "boolean"
+          },
           "responsesExtensions": {
             "type": "array",
             "items": {

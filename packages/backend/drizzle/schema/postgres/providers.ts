@@ -31,6 +31,7 @@ export const providers = pgTable(
     discount: real('discount'),
     estimateTokens: boolean('estimate_tokens').notNull().default(false),
     useClaudeMasking: boolean('use_claude_masking').notNull().default(false),
+    messagesBearerAuth: boolean('messages_bearer_auth').notNull().default(false), // Also send Authorization: Bearer on Messages
     geminiThinkingEnabled: boolean('gemini_thinking_enabled').notNull().default(false),
     cacheKeyInjection: text('cache_key_injection'), // enum: cache/session key injection destination
     responsesExtensions: jsonb('responses_extensions'), // string[] — Responses extensions accepted verbatim

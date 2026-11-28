@@ -32,6 +32,7 @@ type ProviderRow = {
   discount: number | null;
   estimateTokens: unknown;
   useClaudeMasking: unknown;
+  messagesBearerAuth: unknown;
   geminiThinkingEnabled: unknown;
   cacheKeyInjection: string | null;
   responsesExtensions: unknown;
@@ -238,6 +239,7 @@ export class ProviderRepository {
       discount: config.discount ?? null,
       estimateTokens: fromBool(config.estimateTokens === true),
       useClaudeMasking: fromBool(config.useClaudeMasking === true),
+      messagesBearerAuth: fromBool(config.messages_bearer_auth === true),
       geminiThinkingEnabled: fromBool(config.geminiThinkingEnabled === true),
       cacheKeyInjection: config.cache_key_injection ?? null,
       responsesExtensions: Array.isArray(config.responses_extensions)
@@ -592,6 +594,7 @@ export class ProviderRepository {
       ...(row.discount !== null ? { discount: row.discount } : {}),
       estimateTokens: toBool(row.estimateTokens),
       useClaudeMasking: toBool(row.useClaudeMasking),
+      messages_bearer_auth: toBool(row.messagesBearerAuth),
       gemini_thinking_enabled: toBool(row.geminiThinkingEnabled),
       ...(row.cacheKeyInjection ? { cache_key_injection: row.cacheKeyInjection } : {}),
       ...(() => {
