@@ -15,7 +15,7 @@ export const PaginationControls = ({
 }: PaginationControlsProps) => (
   <div
     className={clsx(
-      'flex items-center justify-between gap-2 px-2 py-2 sm:justify-end sm:gap-3 sm:px-3 sm:py-3',
+      'flex items-center justify-between gap-2 px-2 py-1 sm:justify-end sm:gap-3 sm:px-3',
       position === 'top' ? 'border-border border-b' : 'border-border border-t'
     )}
   >

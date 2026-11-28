@@ -76,7 +76,7 @@ export const DetailedUsage = ({
     <div
       className={
         embedded
-          ? 'bg-bg-card h-full p-2'
+          ? 'bg-bg-card h-full'
           : 'from-bg-deep to-bg-surface min-h-screen bg-linear-to-br p-6 transition-all duration-300'
       }
     >

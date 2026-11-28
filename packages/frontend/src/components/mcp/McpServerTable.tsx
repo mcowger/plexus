@@ -69,14 +69,14 @@ export function McpServerTable({
     );
   };
   return (
-    <Card title="MCP Servers">
+    <Card title="MCP Servers" flush>
       {serverNames.length === 0 ? (
         <div className="text-text-secondary p-4 text-center">
           No MCP servers configured. Click "Add MCP Server" to create one.
         </div>
       ) : (
         <>
-          <div className="space-y-3 md:hidden">
+          <div className="space-y-3 p-3 sm:p-5 md:hidden">
             {serverNames.map((name) => {
               const server = servers[name];
               const headerCount = server.headers ? Object.keys(server.headers).length : 0;

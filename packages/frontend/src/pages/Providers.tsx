@@ -57,7 +57,7 @@ export const Providers = () => {
         }
       />
 
-      <PageContainer>
+      <PageContainer bleed>
         <Card flush>
           <ProviderList
             providers={f.sortedProviders}

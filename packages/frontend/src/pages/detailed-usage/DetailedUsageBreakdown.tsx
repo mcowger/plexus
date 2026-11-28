@@ -16,8 +16,8 @@ export const DetailedUsageBreakdown = ({
   if (groupBy === 'time' || aggregatedData.length === 0) return null;
 
   return (
-    <Card className="mt-6" title="Detailed Breakdown">
-      <div className="space-y-3 md:hidden">
+    <Card className="mt-6" title="Detailed Breakdown" flush>
+      <div className="space-y-3 p-3 sm:p-5 md:hidden">
         {aggregatedData.map((row, index) => (
           <article key={index} className="border-border-glass bg-bg-subtle rounded-md border p-3">
             <div className="font-heading text-text truncate text-sm font-semibold">{row.name}</div>
@@ -51,7 +51,7 @@ export const DetailedUsageBreakdown = ({
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm [&_tr>:first-child]:pl-5 [&_tr>:last-child]:pr-5">
           <thead>
             <tr className="border-border-glass text-text-secondary border-b text-left">
               <th className="py-3 pr-4">{groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}</th>

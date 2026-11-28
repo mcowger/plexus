@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PageContainer } from '../components/layout/PageContainer';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -223,12 +224,12 @@ export const SystemLogs: React.FC = () => {
         }
         subtitle="Live tail · stderr+stdout"
       />
-      <PageContainer>
-        <div className="glass-bg flex flex-col gap-3 overflow-hidden rounded-lg">
+      <PageContainer bleed>
+        <Card flush>
           <div className="border-border-glass flex flex-col gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <h3 className="font-heading text-h3 text-text m-0 font-semibold">Live Output</h3>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="w-full sm:min-w-[120px]">
+              <div className="w-full sm:w-auto sm:min-w-[120px]">
                 <Select
                   value={selectedLevel}
                   onChange={setSelectedLevel}
@@ -362,7 +363,7 @@ export const SystemLogs: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-terminal-bg text-terminal-fg h-[55vh] max-h-[700px] min-h-[280px] overflow-y-auto p-2 font-mono text-xs sm:h-[60vh] sm:min-h-[320px] sm:p-3">
+          <div className="bg-terminal-bg text-terminal-fg h-[55vh] max-h-[700px] min-h-[280px] overflow-y-auto p-2 font-mono text-xs sm:h-[60vh] sm:min-h-[320px] sm:p-3 lg:h-[calc(100vh-13rem)] lg:max-h-none">
             {logs.length === 0 && (
               <div className="text-text-muted mt-8 text-center italic">Waiting for logs...</div>
             )}
@@ -396,7 +397,7 @@ export const SystemLogs: React.FC = () => {
             ))}
             <div ref={logsEndRef} />
           </div>
-        </div>
+        </Card>
       </PageContainer>
     </div>
   );

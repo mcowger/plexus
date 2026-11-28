@@ -856,7 +856,7 @@ export const Logs = () => {
         </div>
       </Drawer>
 
-      <PageContainer className="max-lg:px-2!">
+      <PageContainer bleed className="max-lg:px-2!">
         <Card flush className="max-lg:contents">
           <PaginationControls
             position="top"
