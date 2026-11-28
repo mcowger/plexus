@@ -136,23 +136,37 @@ describe('OCR review workflow', () => {
     await expect(runGate()).rejects.toThrow('GitHub API unavailable');
   });
 
-  it('updates the starting comment with the summary instead of duplicating the marker', async () => {
+  async function runVerdict(result: unknown, outcome = 'success') {
     await runGate();
-    const summary = steps.find(
-      (step: { name: string }) => step.name === 'Post detailed OCR summary'
-    );
-    const readReview = mock(() => JSON.stringify({ comments: [], summary: { files_reviewed: 1 } }));
+    const verdict = steps.find((step: { name: string }) => step.name === 'Report OCR verdict');
+    const core = { warning: mock(), error: mock(), setFailed: mock() };
+    const readReview = mock(() => {
+      if (result === undefined) throw new Error('ENOENT');
+      return JSON.stringify(result);
+    });
 
-    await runInNewContext(`(async () => { ${summary.with.script} })()`, {
+    await runInNewContext(`(async () => { ${verdict.with.script} })()`, {
       github,
-      core: { warning: mock() },
+      core,
       context: {
+        serverUrl: 'https://github.com',
+        runId: 1,
         repo: { owner: 'owner', repo: 'plexus' },
         payload: { pull_request: { number: 123 } },
       },
       require: () => ({ readFileSync: readReview }),
-      process: { env: { REVIEW_FILE: '/tmp/ocr-result.json' } },
+      process: { env: { REVIEW_FILE: '/tmp/ocr-result.json', OCR_OUTCOME: outcome } },
     });
+    return core;
+  }
+
+  function lastBody() {
+    const update = github.rest.issues.updateComment.mock.calls.at(-1)?.[0] as { body: string };
+    return update.body;
+  }
+
+  it('updates the starting comment with the verdict instead of duplicating the marker', async () => {
+    const core = await runVerdict({ comments: [], summary: { files_reviewed: 1 } });
 
     expect(github.rest.issues.updateComment).toHaveBeenCalledWith({
       owner: 'owner',
@@ -161,16 +175,43 @@ describe('OCR review workflow', () => {
       body: expect.stringContaining(marker),
     });
     expect(github.rest.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(lastBody()).toContain('Passing');
+    expect(core.setFailed).not.toHaveBeenCalled();
   });
 
-  it('gates every subsequent step, including the always-run summary', () => {
+  it('fails on critical/high findings and ignores lows', async () => {
+    const core = await runVerdict({
+      comments: [
+        { severity: 'high', path: 'a.ts', start_line: 3, end_line: 3, content: 'bad' },
+        { severity: 'low', path: 'b.ts', content: 'nit' },
+      ],
+    });
+
+    expect(lastBody()).toContain('Blocked');
+    expect(core.setFailed).toHaveBeenCalledTimes(1);
+
+    const lowOnly = await runVerdict({ comments: [{ severity: 'low', path: 'b.ts' }] });
+    expect(lastBody()).toContain('Passing');
+    expect(lowOnly.setFailed).not.toHaveBeenCalled();
+  });
+
+  it('never reports Passing when OCR did not finish cleanly', async () => {
+    const partial = await runVerdict({ comments: [] }, 'failure');
+    expect(lastBody()).toContain('Review incomplete');
+    expect(lastBody()).not.toContain('Passing');
+    expect(partial.setFailed).toHaveBeenCalledTimes(1);
+
+    const unreadable = await runVerdict(undefined);
+    expect(lastBody()).toContain('Review incomplete');
+    expect(unreadable.setFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it('gates every subsequent step, including the always-run verdict', () => {
     expect(gate).toBe(steps[0]);
     for (const step of steps.slice(1)) {
       expect(step.if).toContain("steps.review-gate.outputs.should_run == 'true'");
     }
-    const summary = steps.find(
-      (step: { name: string }) => step.name === 'Post detailed OCR summary'
-    );
-    expect(summary.if).toContain('always()');
+    const verdict = steps.find((step: { name: string }) => step.name === 'Report OCR verdict');
+    expect(verdict.if).toContain('always()');
   });
 });
