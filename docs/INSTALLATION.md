@@ -32,6 +32,7 @@ docker run -p 4000:4000 \
 - `DATABASE_URL` is optional (defaults to SQLite at `./data/plexus.db` when unset) — set it to a `sqlite://` path (inside the mounted volume) or a `postgres://` connection string when connecting to PostgreSQL or custom locations.
 - Set `LOG_LEVEL` to control verbosity.
 - The Docker image includes `bunx` and `uvx` so Plexus can run configured Local HTTP MCP servers inside the container.
+- `docker stop` sends `SIGTERM`, which closes in-flight requests immediately. To drain them instead, add `--stop-signal SIGUSR1 --stop-timeout 45` (or `stop_signal: SIGUSR1` and `stop_grace_period: 45s` in Compose). See [Shutdown](#shutdown).
 
 ## Building the Docker Image
 
@@ -167,12 +168,26 @@ When running Plexus, you can use the following environment variables to control 
 - **`FRPC_AUTH_TOKEN`** (Development only): Token shared with frps.
 - **`FRPC_SERVER_PORT`** (Development only): frps control port. Default: `7000`.
 - **`FRPC_SUBDOMAIN_HOST`** (Development only): Optional suffix used only to print the full HTTPS URL. The frps `subDomainHost` setting controls routing.
+- **`SHUTDOWN_DRAIN_TIMEOUT_MS`** (Optional): How long a graceful shutdown waits for in-flight requests, in milliseconds. Default: `30000`. `0` force-closes immediately.
 
 ### Example Usage
 
 ```bash
 ADMIN_KEY="your-secret" DATABASE_URL=sqlite://./data/plexus.db LOG_LEVEL=debug ./plexus
 ```
+
+## Shutdown
+
+Plexus picks how to stop based on the signal it receives:
+
+| Signal              | Behavior                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SIGTERM`, `SIGINT` | Immediate shutdown. Closes every connection right away and cuts off in-flight streams. Also cuts short a drain already in progress.                           |
+| `SIGUSR1`           | Graceful drain. Stops accepting connections and lets in-flight requests and streams finish for up to `SHUTDOWN_DRAIN_TIMEOUT_MS`, then force-closes the rest. |
+
+During a drain, requests that arrive on already-open connections get `503 Service Unavailable` with `Retry-After: 5`. Dashboard event streams and MCP notification streams end cleanly at the start of the drain so clients reconnect. `POST /v0/management/restart` uses the same drain; send `{ "force": true }` to close connections immediately instead.
+
+To drain on `docker stop`, set the stop signal to `SIGUSR1` and the stop timeout above the drain timeout (Docker kills the container after 10 seconds by default): `docker run --stop-signal SIGUSR1 --stop-timeout 45`, or `stop_signal: SIGUSR1` and `stop_grace_period: 45s` in Compose. To drain a running container without going through `docker stop`, run `docker kill --signal=SIGUSR1 plexus`.
 
 ---
 

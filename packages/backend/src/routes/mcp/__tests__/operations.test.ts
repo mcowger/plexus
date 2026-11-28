@@ -107,6 +107,33 @@ describe('Plexus management MCP routes - operations', () => {
     expect(JSON.parse(restartBody.result.content[0].text).data.message).toContain('restarting');
   });
 
+  test('forwards force to the restart route', async () => {
+    const restartResponse = await fixture.postPlexusMcp(
+      {
+        method: 'tools/call',
+        id: 3,
+        params: {
+          name: 'plexus_operations',
+          arguments: { operation: 'restart', destructive: 'acknowledged', body: { force: true } },
+        },
+      },
+      fixture.adminHeaders()
+    );
+    expect(
+      JSON.parse(fixture.parseJsonRpcResponse(restartResponse).result.content[0].text).ok
+    ).toBe(true);
+
+    const inject = fixture.fastify.inject as unknown as jest.Mock;
+    const restartCall = inject.mock.calls.find(
+      ([options]) =>
+        typeof options === 'object' &&
+        options !== null &&
+        'url' in options &&
+        options.url === '/v0/management/restart'
+    );
+    expect(restartCall?.[0]).toMatchObject({ method: 'POST', payload: { force: true } });
+  });
+
   test('implements plexus_operations refresh_metadata response', async () => {
     registerSpy(ModelMetadataManager.getInstance(), 'refreshAll').mockResolvedValue({
       success: true,

@@ -70,7 +70,8 @@
     "code:review": "opencodereview review",
     "code:review:branch": "opencodereview review --from origin/main --to HEAD",
     "code:review:commit": "opencodereview review --commit HEAD",
-    "deploy:staging": "bun run scripts/deploy-staging.ts"
+    "deploy:staging": "bun run scripts/deploy-staging.ts",
+    "deploy:staging:force": "bun run scripts/deploy-staging.ts --force"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.6.0"

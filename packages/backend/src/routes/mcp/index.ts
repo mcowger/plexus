@@ -10,6 +10,7 @@ import {
 } from '../../services/mcp-oauth/url';
 import * as mcpProxyService from '../../services/mcp-proxy/mcp-proxy-service';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
+import { gracefulShutdown } from '../../services/runtime/graceful-shutdown';
 import { attachPlexusApiKeyAuth, isRequestIpAllowed, validatePlexusApiKey } from '../../utils/auth';
 import { getClientIp } from '../../utils/ip';
 import { logger } from '../../utils/logger';
@@ -200,7 +201,10 @@ async function streamUpstreamResponse(
     reader.cancel().catch(() => {});
   };
   reply.raw.on('close', onClose);
-
+  // A GET stream is MCP's open-ended server-notification channel: end it when
+  // draining starts. POST streams carry one finite response and drain normally.
+  const stopDrainWatch =
+    reply.request.method === 'GET' ? gracefulShutdown.onDrain(onClose) : () => {};
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -215,6 +219,7 @@ async function streamUpstreamResponse(
     logger.silly(`[mcp] Upstream stream error: ${(error as Error).message}`);
   } finally {
     reply.raw.removeListener('close', onClose);
+    stopDrainWatch();
     reply.raw.end();
   }
 }

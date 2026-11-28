@@ -44,6 +44,10 @@
       "type": "command",
       "command": "bun run deploy:staging"
     },
+    "deploy:staging:force": {
+      "type": "command",
+      "command": "bun run deploy:staging:force"
+    },
     "release": {
       "type": "command",
       "command": "bun run release"

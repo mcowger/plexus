@@ -147,7 +147,7 @@ export function getToolDescription(toolName: string) {
     case 'plexus_system_logs':
       return 'Inspect recent Plexus system logs and control runtime log verbosity. Operations: recent, level, set_level, reset_level.';
     case 'plexus_operations':
-      return 'Run high-impact operational actions. Operations: backup, restore, restart, refresh_metadata, refresh_catalog, list_cooldowns, clear_cooldowns, reset_logs.';
+      return 'Run high-impact operational actions. Operations: backup, restore, restart, refresh_metadata, refresh_catalog, list_cooldowns, clear_cooldowns, reset_logs. restart drains in-flight requests before exiting; body { force: true } closes connections immediately instead.';
     default:
       return 'Plexus management tool.';
   }

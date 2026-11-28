@@ -1,6 +1,7 @@
 import { encode } from 'eventsource-encoder';
 import { FastifyInstance } from 'fastify';
 
+import { gracefulShutdown } from '../../services/runtime/graceful-shutdown';
 import { getRecentLogCount, getRecentLogs, logEmitter } from '../../utils/logger';
 
 export async function registerSystemLogRoutes(fastify: FastifyInstance) {
@@ -39,16 +40,20 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
       );
     };
 
+    // Endless stream: end it cleanly when the server starts draining so the
+    // dashboard reconnects to the next instance instead of holding the drain.
+    const stopDrainWatch = gracefulShutdown.onDrain(() => reply.raw.end());
+
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
       logEmitter.off('log', listener);
+      stopDrainWatch();
     };
 
     logEmitter.on('log', listener);
 
-    // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
-    // and as a fallback for other disconnect scenarios.
+    // Cleanup on drain, forced shutdown, or client disconnect ('close' fires).
     reply.raw.on('close', cleanup);
 
     while (!reply.raw.destroyed) {
