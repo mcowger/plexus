@@ -1,6 +1,7 @@
 import { encode } from 'eventsource-encoder';
 import { FastifyInstance } from 'fastify';
 
+import { gracefulShutdown } from '../../services/runtime/graceful-shutdown';
 import { getRecentLogCount, getRecentLogs, logEmitter } from '../../utils/logger';
 
 export async function registerSystemLogRoutes(fastify: FastifyInstance) {
@@ -39,21 +40,31 @@ export async function registerSystemLogRoutes(fastify: FastifyInstance) {
       );
     };
 
+    // Assigned below; onDrain can run its callback (and so cleanup) immediately.
+    let stopDrainWatch = () => {};
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
       logEmitter.off('log', listener);
+      stopDrainWatch();
     };
 
     logEmitter.on('log', listener);
 
-    // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
-    // and as a fallback for other disconnect scenarios.
+    // Cleanup on drain, forced shutdown, or client disconnect ('close' fires).
     reply.raw.on('close', cleanup);
 
-    while (!reply.raw.destroyed) {
+    // Endless stream: end it cleanly when the server starts draining so the
+    // dashboard reconnects to the next instance instead of holding the drain.
+    // Unsubscribe first: writing after end() raises ERR_STREAM_WRITE_AFTER_END.
+    stopDrainWatch = gracefulShutdown.onDrain(() => {
+      cleanup();
+      reply.raw.end();
+    });
+
+    while (!reply.raw.destroyed && !reply.raw.writableEnded) {
       await new Promise((resolve) => setTimeout(resolve, 10000));
-      if (!reply.raw.destroyed) {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
         reply.raw.write(
           encode({
             event: 'ping',

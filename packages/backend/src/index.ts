@@ -35,7 +35,7 @@ import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import indexHtmlPath from '../../frontend/dist/index.html' with { type: 'file' };
 import mainJsPath from '../../frontend/dist/main.js' with { type: 'file' };
 import { getConfig } from './config';
-import { initializeDatabase } from './db/client';
+import { closeDatabase, initializeDatabase } from './db/client';
 import { runEncryptionMigration } from './db/encrypt-migration';
 import { runMcpKeyMigration } from './db/mcp-key-migration';
 import { runMigrations } from './db/migrate';
@@ -63,6 +63,7 @@ import { ResponsesStorageService } from './services/responses/responses-storage'
 import { BackgroundExplorer } from './services/routing/background-explorer';
 import { SelectorFactory } from './services/routing/selectors/factory';
 import { CooldownManager } from './services/runtime/cooldown-manager';
+import { gracefulShutdown, parseDrainTimeoutMs } from './services/runtime/graceful-shutdown';
 import { isEncryptionEnabled } from './utils/encryption';
 import { closeFetchSessions } from './utils/fetch-sessions';
 import { logger } from './utils/logger';
@@ -100,8 +101,12 @@ logger.debug(`PORT: ${process.env.PORT || '4000'}`);
 const fastify = Fastify({
   logger: false, // We use a custom winston-based logger
   bodyLimit: 30 * 1024 * 1024, // 30MB to accommodate 25MB audio files + metadata
-  forceCloseConnections: true, // Destroy all open sockets on shutdown (fixes SSE hang)
+  // GracefulShutdown drains in-flight requests, then destroys what remains,
+  // and answers requests arriving during the drain with its own 503.
+  forceCloseConnections: false,
+  return503OnClosing: false,
 });
+gracefulShutdown.attach(fastify);
 
 // --- Plugin Registration ---
 
@@ -485,25 +490,30 @@ const start = async () => {
     await fastify.listen({ port, host });
     logger.info(`Server listening on http://localhost:${port}`);
 
-    const shutdown = async (signal: string) => {
-      logger.info(`Received ${signal}, shutting down gracefully...`);
-      await quotaScheduler.stop();
-      await usageStorage.stopCleanupJob();
-      await mcpUsageStorage.stopCleanupJob();
-      await responsesStorage.stopCleanupJob();
-      await mcpProcessManager.stopAll();
-      await fastify.close();
-      // After the server has drained: in-flight streams may still be reading
-      // from session sockets, so sessions close last.
-      closeFetchSessions();
-      const { closeDatabase } = await import('./db/client');
-      await closeDatabase();
-      logger.info('Shutdown complete');
-      process.exit(0);
-    };
+    gracefulShutdown.configure({
+      drainTimeoutMs: parseDrainTimeoutMs(process.env.SHUTDOWN_DRAIN_TIMEOUT_MS),
+      cleanup: async () => {
+        await quotaScheduler.stop();
+        await usageStorage.stopCleanupJob();
+        await mcpUsageStorage.stopCleanupJob();
+        await responsesStorage.stopCleanupJob();
+        await mcpProcessManager.stopAll();
+        // After the server has drained: in-flight streams may still be reading
+        // from session sockets, so sessions close last.
+        closeFetchSessions();
+        await closeDatabase();
+      },
+      exit: (code) => process.exit(code),
+    });
 
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    // SIGTERM/SIGINT close every connection immediately (and cut short a
+    // running drain); SIGUSR1 drains in-flight requests first.
+    const onForceSignal = (signal: NodeJS.Signals) => {
+      void gracefulShutdown.request(signal, 'force');
+    };
+    process.on('SIGTERM', onForceSignal);
+    process.on('SIGINT', onForceSignal);
+    process.on('SIGUSR1', () => void gracefulShutdown.request('SIGUSR1', 'drain'));
   } catch (err) {
     logger.error('Fatal error during server startup', err);
     process.exit(1);

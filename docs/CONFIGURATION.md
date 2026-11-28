@@ -10,20 +10,21 @@ Plexus stores all configuration in the database and manages it via the **Admin U
 
 ## Environment Variables
 
-| Variable                      | Description                                                                                                                       | Required |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `ADMIN_KEY`                   | Password for admin dashboard and management API. Server refuses to start if unset.                                                | Yes      |
-| `DATABASE_URL`                | Connection string. Supports `sqlite://` and `postgres://` URIs.                                                                   | No       |
-| `ENCRYPTION_KEY`              | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32`                                          | No       |
-| `DATA_DIR`                    | Directory for SQLite database.                                                                                                    | No       |
-| `LOG_LEVEL`                   | Verbosity: `error`, `warn`, `info`, `debug`, `silly`                                                                              | No       |
-| `PLEXUS_USAGE_RETENTION_DAYS` | Retention for request usage, debug, error, MCP, and quota meter-snapshot logs in days (default 365). Older rows are pruned daily. | No       |
-| `PORT`                        | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`).                              | No       |
-| `HOST`                        | Address to bind to.                                                                                                               | No       |
-| `FRPC_SERVER_ADDR`            | Development-only LAN address of the frps server.                                                                                  | No       |
-| `FRPC_AUTH_TOKEN`             | Development-only token shared with frps.                                                                                          | No       |
-| `FRPC_SERVER_PORT`            | Development-only frps control port (defaults to 7000).                                                                            | No       |
-| `FRPC_SUBDOMAIN_HOST`         | Optional development-only host suffix used to print the full HTTPS tunnel URL.                                                    | No       |
+| Variable                      | Description                                                                                                                                                                   | Required |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `ADMIN_KEY`                   | Password for admin dashboard and management API. Server refuses to start if unset.                                                                                            | Yes      |
+| `DATABASE_URL`                | Connection string. Supports `sqlite://` and `postgres://` URIs.                                                                                                               | No       |
+| `ENCRYPTION_KEY`              | 32-byte key for encrypting sensitive data at rest. Generated via: `openssl rand -hex 32`                                                                                      | No       |
+| `DATA_DIR`                    | Directory for SQLite database.                                                                                                                                                | No       |
+| `LOG_LEVEL`                   | Verbosity: `error`, `warn`, `info`, `debug`, `silly`                                                                                                                          | No       |
+| `PLEXUS_USAGE_RETENTION_DAYS` | Retention for request usage, debug, error, MCP, and quota meter-snapshot logs in days (default 365). Older rows are pruned daily.                                             | No       |
+| `SHUTDOWN_DRAIN_TIMEOUT_MS`   | How long `SIGUSR1` and management-API restarts wait for in-flight requests before force-closing them (default 30000). See [Installation: Shutdown](INSTALLATION.md#shutdown). | No       |
+| `PORT`                        | HTTP server port (defaults to 4000; auto-derived from git worktree name when running `bun run dev`).                                                                          | No       |
+| `HOST`                        | Address to bind to.                                                                                                                                                           | No       |
+| `FRPC_SERVER_ADDR`            | Development-only LAN address of the frps server.                                                                                                                              | No       |
+| `FRPC_AUTH_TOKEN`             | Development-only token shared with frps.                                                                                                                                      | No       |
+| `FRPC_SERVER_PORT`            | Development-only frps control port (defaults to 7000).                                                                                                                        | No       |
+| `FRPC_SUBDOMAIN_HOST`         | Optional development-only host suffix used to print the full HTTPS tunnel URL.                                                                                                | No       |
 
 ### Quick Start
 

@@ -8,6 +8,7 @@ import {
   type UsageSortField,
   UsageStorageService,
 } from '../../services/observability/usage-storage';
+import { gracefulShutdown } from '../../services/runtime/graceful-shutdown';
 import { logger } from '../../utils/logger';
 import { isLimited, scopedKeyName } from './_principal';
 
@@ -887,28 +888,38 @@ export async function registerUsageRoutes(
     }, 1000);
     progressInterval.unref?.();
 
-    // Cleanup on server shutdown (closeAllConnections destroys sockets → 'close' fires)
-    // and as a fallback for other disconnect scenarios.
+    // Cleanup on drain, forced shutdown, or client disconnect ('close' fires).
     let cleanedUp = false;
     const unsubscribe = usageEventsBroadcaster.subscribe({
       scopeKey,
       send: sendEvent,
     });
+    // Assigned below; onDrain can run its callback (and so cleanup) immediately.
+    let stopDrainWatch = () => {};
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
       clearInterval(progressInterval);
       unsubscribe();
+      stopDrainWatch();
     };
 
     reply.raw.once('close', cleanup);
     reply.raw.once('error', cleanup);
 
+    // Endless stream: end it cleanly when the server starts draining so the
+    // dashboard reconnects to the next instance instead of holding the drain.
+    // Unsubscribe first: writing after end() raises ERR_STREAM_WRITE_AFTER_END.
+    stopDrainWatch = gracefulShutdown.onDrain(() => {
+      cleanup();
+      reply.raw.end();
+    });
+
     try {
       // Keep connection alive with periodic pings
-      while (!reply.raw.destroyed) {
+      while (!reply.raw.destroyed && !reply.raw.writableEnded) {
         await new Promise((resolve) => setTimeout(resolve, 10000));
-        if (!reply.raw.destroyed) {
+        if (!reply.raw.destroyed && !reply.raw.writableEnded) {
           reply.raw.write(
             encode({
               event: 'ping',

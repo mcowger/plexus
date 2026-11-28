@@ -204,11 +204,19 @@ export async function handleOperationsTool(
         ...(await callManagementRoute(shimContext, 'POST', '/v0/management/restore', body)),
       });
     }
-    case 'restart':
+    case 'restart': {
+      // The route validates `force`; forward it as given so bad values surface as 400s.
+      const force = input.body?.force;
       return successResponse(
         input.operation,
-        await callManagementRoute(shimContext, 'POST', '/v0/management/restart')
+        await callManagementRoute(
+          shimContext,
+          'POST',
+          '/v0/management/restart',
+          force === undefined ? undefined : { force }
+        )
       );
+    }
     case 'refresh_metadata':
       return successResponse(
         input.operation,

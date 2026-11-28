@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Drain in-flight requests and streams on `SIGUSR1` and management-API restarts instead of resetting their connections. `SHUTDOWN_DRAIN_TIMEOUT_MS` (default 30s) bounds the wait. `SIGTERM` and `SIGINT` still close connections immediately and cut short a running drain, as does `POST /v0/management/restart` with `{ "force": true }`. (#1116)
 - Use more of the screen width for request logs on phones and tablets without changing the desktop table.
 - Keep mobile request log rows the same height without wrapping. Show reasoning effort alongside status, and open routing and token details without expanding the row.
 - Remove stale compression and length headers from decoded MCP upstream responses. (#1089)

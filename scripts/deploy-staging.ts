@@ -3,6 +3,11 @@
  * The image is built by the remote Docker daemon; Compose is invoked on the
  * host so it can read its local Compose file.
  *
+ * By default the running container is stopped with SIGUSR1 first, so Plexus
+ * drains in-flight requests before Compose replaces it. Pass `--force`
+ * (`bun run deploy:staging:force`) to skip the drain: Compose then stops the
+ * container with SIGTERM, which closes connections immediately.
+ *
  * Required environment variables:
  *   PLEXUS_STAGING_DOCKER_CONTEXT   Docker context for the staging host
  *   PLEXUS_STAGING_URL              Public staging URL
@@ -13,7 +18,9 @@
  *   PLEXUS_STAGING_IMAGE_RETAIN     Number of timestamped images to keep (3)
  *   PLEXUS_STAGING_BACKUP_DIR       Local backup directory (.staging-backups)
  *   PLEXUS_STAGING_HEALTH_TIMEOUT   Health-check timeout in seconds (60)
- *   PLEXUS_TARGETPLATFORM           Docker target platform (linux/amd64)
+ *   PLEXUS_STAGING_DRAIN_TIMEOUT    Seconds to wait for the drain before Docker
+ *                                   kills the container (45; keep it above the
+ *                                   container's SHUTDOWN_DRAIN_TIMEOUT_MS)
  */
 
 import { spawnSync } from 'node:child_process';
@@ -40,6 +47,8 @@ const BACKUP_RETAIN = parseInt(optionalEnv('PLEXUS_STAGING_BACKUP_RETAIN', '3'),
 const IMAGE_RETAIN = parseInt(optionalEnv('PLEXUS_STAGING_IMAGE_RETAIN', '3'), 10);
 const BACKUP_DIR = optionalEnv('PLEXUS_STAGING_BACKUP_DIR', '.staging-backups');
 const HEALTH_TIMEOUT = parseInt(optionalEnv('PLEXUS_STAGING_HEALTH_TIMEOUT', '60'), 10);
+const DRAIN_TIMEOUT = parseInt(optionalEnv('PLEXUS_STAGING_DRAIN_TIMEOUT', '45'), 10);
+const FORCE = process.argv.includes('--force');
 const TARGETPLATFORM = optionalEnv('PLEXUS_TARGETPLATFORM', 'linux/amd64');
 const SERVICE = 'plexus';
 const LATEST_TAG = 'plexus:staging-latest';
@@ -158,6 +167,9 @@ console.log(`\n  Docker context:  ${CTX}`);
 console.log(`  SSH host:        ${SSH_HOST}`);
 console.log(`  Staging URL:     ${STAGING_URL}`);
 console.log(`  New image tag:   ${NEW_TAG}`);
+console.log(
+  `  Shutdown:        ${FORCE ? 'forced (SIGTERM)' : `drain (SIGUSR1, up to ${DRAIN_TIMEOUT}s)`}`
+);
 
 step(1, 'Inspect Compose container');
 const containerName = findComposeContainer(SERVICE);
@@ -230,7 +242,17 @@ docker(
 );
 console.log(`  ✓ Built ${NEW_TAG} and ${LATEST_TAG}`);
 
-step(4, 'Recreate service with Compose');
+step(4, FORCE ? 'Recreate service with Compose (forced)' : 'Drain and recreate service');
+if (FORCE) {
+  console.log('  --force: skipping drain; Compose stops the container with SIGTERM.');
+} else if (before.State?.Running) {
+  // SIGUSR1 makes Plexus finish in-flight requests before exiting. `docker stop`
+  // (unlike `docker kill`) marks the container stopped, so its restart policy
+  // doesn't bring the old image back before Compose recreates it.
+  const drainStart = Date.now();
+  docker(['stop', '--signal', 'SIGUSR1', '--time', String(DRAIN_TIMEOUT), containerName]);
+  console.log(`  ✓ Drained and stopped in ${((Date.now() - drainStart) / 1000).toFixed(1)}s`);
+}
 const composeCommand = `cd -- ${shellQuote(workingDir)} && docker compose --project-name ${shellQuote(project)} up --detach --force-recreate ${shellQuote(SERVICE)}`;
 run('ssh', [SSH_HOST, composeCommand]);
 

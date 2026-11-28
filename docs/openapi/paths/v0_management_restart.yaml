@@ -3,7 +3,7 @@ post:
     - Management — Restart
   summary: Gracefully restart the process (admin only)
   description: |
-    Initiates a graceful shutdown and exits with status 0.
+    Drains in-flight requests, then exits with status 1.
 
     ## Process manager assumption
 
@@ -13,19 +13,37 @@ post:
 
     ## Behaviour
 
-    - `SIGTERM` is sent to initiate graceful shutdown
-    - Fastify stops accepting new connections
-    - In-flight requests are allowed to complete
-    - Server exits with code 0
+    - Plexus stops accepting new connections
+    - Requests arriving on open connections receive `503` with `Retry-After`
+    - In-flight requests are allowed to complete for up to
+      `SHUTDOWN_DRAIN_TIMEOUT_MS` (default 30 seconds); remaining
+      connections are then closed
+    - Server exits with code 1
 
-    ## Alternative
+    ## Forced restart
 
-    For non-graceful restart, the process manager may be configured to
-    send `SIGKILL` after a timeout.
+    Send `{ "force": true }` to skip the drain: every connection, including
+    in-flight streams, is closed immediately. Sending `SIGTERM` to the
+    process has the same effect.
+
+    Once a restart or drain is under way, Plexus no longer accepts
+    connections, so a later `{ "force": true }` request cannot reach it.
+    Send `SIGTERM` or `SIGINT` to cut a running drain short.
 
     **Admin only** — limited principals receive 403.
   security:
     - AdminKey: []
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            force:
+              type: boolean
+              default: false
+              description: Close connections immediately instead of draining in-flight requests.
   responses:
     '200':
       description: Restart acknowledged.
