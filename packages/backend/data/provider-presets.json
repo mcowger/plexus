@@ -877,6 +877,19 @@
       "notes": "Get a key at https://uberllm.dev/signup (prepaid, no monthly fee) and send it as a Bearer token. Model ids keep the vendor prefix, such as deepseek/deepseek-v4-flash, openai/gpt-5.4-mini, anthropic/claude-haiku-4.5 or z-ai/glm-5; per-model prices are at https://uberllm.dev/models. Fetch Models reads GET /v1/models on the same base, which is public. Messages-format requests go to /v1/messages. Failed requests are not billed. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
     },
     {
+      "id": "llmtr",
+      "name": "LLMTR",
+      "description": "LLMTR prepaid model gateway, OpenAI-compatible chat completions plus a responses endpoint on one base.",
+      "docsUrl": "https://llmtr.com/docs/",
+      "suggestedProviderId": "llmtr",
+      "suggestedName": "LLMTR",
+      "apiBaseUrl": {
+        "chat": "https://llmtr.com/v1",
+        "responses": "https://llmtr.com/v1"
+      },
+      "notes": "Create a key at https://llmtr.com/dashboard/keys (prepaid) and send it as a Bearer token. Model ids keep the vendor prefix, such as qwen/qwen3.8-flash. Fetch Models reads GET /v1/models on the same base, which is public and lists supported_endpoints per model: a few newer models only accept /v1/responses and not chat completions, so check that list before routing a model to the chat type. No Anthropic-style messages endpoint is listed. No pi-ai quirk source is declared, so auto-compat is off and request bodies pass through unchanged."
+    },
+    {
       "id": "atlascloud",
       "name": "Atlas Cloud",
       "description": "Atlas Cloud model gateway, OpenAI-compatible chat completions plus responses and messages endpoints on one base.",
