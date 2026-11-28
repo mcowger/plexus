@@ -1107,8 +1107,6 @@ export function useProviderForm() {
       if (!options.token || !(options.token as string).trim())
         return '_token cookie value is required for MiniMax quota checker';
     }
-    if (quotaType === 'wisdomgate' && (!options.session || !(options.session as string).trim()))
-      return 'Session cookie is required for Wisdom Gate quota checker';
     if (quotaType === 'devpass' && (!options.session || !(options.session as string).trim()))
       return 'Session cookie is required for DevPass quota checker';
     if (quotaType === 'opencode-go') {

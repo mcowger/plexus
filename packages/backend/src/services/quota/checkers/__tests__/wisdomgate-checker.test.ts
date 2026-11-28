@@ -5,9 +5,18 @@ import checkerDef from '../wisdomgate-checker';
 
 const makeCtx = (options: Record<string, unknown> = {}) =>
   createMeterContext('wisdomgate-test', 'wisdomgate', {
-    session: 'test_session_token',
+    apiKey: 'test-api-key',
     ...options,
   });
+
+const balanceBody = (overrides: Record<string, unknown> = {}) => ({
+  available_balance: 12.5,
+  package_balance: 10,
+  cash_balance: 2.5,
+  token_balance: 3.25,
+  is_token_unlimited_quota: true,
+  ...overrides,
+});
 
 describe('wisdomgate checker', () => {
   const setFetchMock = (impl: (...args: unknown[]) => Promise<Response>): void => {
@@ -22,39 +31,51 @@ describe('wisdomgate checker', () => {
     expect(isCheckerRegistered('wisdomgate')).toBe(true);
   });
 
-  it('queries with session cookie and returns allowance meter', async () => {
+  it('queries with bearer API key and returns single balance meter when token quota is unlimited', async () => {
     let capturedUrl: string | undefined;
-    let capturedCookie: string | undefined;
+    let capturedAuth: string | undefined;
 
     setFetchMock(async (input: unknown, init: unknown) => {
       capturedUrl = String(input as string);
-      capturedCookie =
-        new Headers((init as RequestInit | undefined)?.headers).get('Cookie') ?? undefined;
-      return new Response(
-        JSON.stringify({
-          object: 'usage_details',
-          total_usage: 148.49091,
-          total_available: 0.067706,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
+      capturedAuth =
+        new Headers((init as RequestInit | undefined)?.headers).get('Authorization') ?? undefined;
+      return new Response(JSON.stringify(balanceBody()), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     });
 
-    const meters = await checkerDef.check(makeCtx({ session: 'my-session-token' }));
+    const meters = await checkerDef.check(makeCtx({ apiKey: 'my-api-key' }));
 
-    expect(capturedUrl).toBe('https://wisgate.ai/api/dashboard/billing/usage/details');
-    expect(capturedCookie).toBe('session=my-session-token');
+    expect(capturedUrl).toBe('https://api.wisgate.ai/v1/users/me/balance');
+    expect(capturedAuth).toBe('Bearer my-api-key');
     expect(meters).toHaveLength(1);
     const m = meters[0]!;
-    expect(m.kind).toBe('allowance');
+    expect(m.kind).toBe('balance');
+    expect(m.key).toBe('account_balance');
     expect(m.unit).toBe('usd');
-    expect(m.used).toBeCloseTo(148.49091, 6);
-    expect(m.remaining).toBeCloseTo(0.067706, 6);
-    expect(m.limit).toBeCloseTo(148.558616, 6);
-    expect(m.label).toBe('Wisdom Gate subscription');
-    expect(m.periodValue).toBe(1);
-    expect(m.periodUnit).toBe('month');
-    expect(m.periodCycle).toBe('fixed');
+    expect(m.remaining).toBeCloseTo(12.5, 6);
+    expect(m.label).toBe('Wisdom Gate balance');
+  });
+
+  it('adds api_key_balance meter when token quota is limited', async () => {
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify(balanceBody({ is_token_unlimited_quota: false })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    const meters = await checkerDef.check(makeCtx());
+
+    expect(meters).toHaveLength(2);
+    const quota = meters[1]!;
+    expect(quota.kind).toBe('balance');
+    expect(quota.key).toBe('api_key_balance');
+    expect(quota.unit).toBe('usd');
+    expect(quota.remaining).toBeCloseTo(3.25, 6);
+    expect(quota.label).toBe('API key quota');
   });
 
   it('throws for non-200 response', async () => {
@@ -65,29 +86,42 @@ describe('wisdomgate checker', () => {
     await expect(checkerDef.check(makeCtx())).rejects.toThrow('HTTP 401: Unauthorized');
   });
 
-  it('uses custom endpoint when provided', async () => {
+  it('throws when available_balance is missing', async () => {
+    setFetchMock(
+      async () =>
+        new Response(JSON.stringify(balanceBody({ available_balance: undefined })), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    await expect(checkerDef.check(makeCtx())).rejects.toThrow(
+      'Invalid response: missing available_balance'
+    );
+  });
+
+  it('ignores legacy session-era endpoint option', async () => {
     let capturedUrl: string | undefined;
 
     setFetchMock(async (input: unknown) => {
       capturedUrl = String(input as string);
-      return new Response(
-        JSON.stringify({ object: 'usage_details', total_usage: 10, total_available: 10 }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify(balanceBody()), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     });
 
     await checkerDef.check(
       makeCtx({
-        endpoint: 'https://custom.endpoint.example.com/api/dashboard/billing/usage/details',
+        session: 'legacy-session',
+        endpoint: 'https://wisgate.ai/api/dashboard/billing/usage/details',
       })
     );
 
-    expect(capturedUrl).toBe(
-      'https://custom.endpoint.example.com/api/dashboard/billing/usage/details'
-    );
+    expect(capturedUrl).toBe('https://api.wisgate.ai/v1/users/me/balance');
   });
 
-  it('throws when session option is missing', async () => {
+  it('throws when apiKey option is missing', async () => {
     const ctx = createMeterContext('wisdomgate-test', 'wisdomgate', {});
     await expect(checkerDef.check(ctx)).rejects.toThrow();
   });

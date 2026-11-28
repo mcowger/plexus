@@ -3,51 +3,58 @@ import { z } from 'zod';
 import { logger } from '../../../utils/logger';
 import { defineChecker } from '../checker-registry';
 
-interface WisdomGateUsageResponse {
-  object: string;
-  total_usage: number;
-  total_available: number;
+interface WisdomGateBalanceResponse {
+  available_balance: number;
+  package_balance: number;
+  cash_balance: number;
+  token_balance: number;
+  is_token_unlimited_quota: boolean;
 }
+
+const BALANCE_ENDPOINT = 'https://api.wisgate.ai/v1/users/me/balance';
 
 export default defineChecker({
   type: 'wisdomgate',
   displayName: 'Wisdom Gate',
   optionsSchema: z.object({
-    session: z.string().trim().min(1, 'Session cookie is required'),
-    endpoint: z.string().url().optional(),
+    apiKey: z.string().trim().min(1, 'Wisdom Gate API key is required'),
   }),
   async check(ctx) {
-    const session = ctx.requireOption<string>('session');
-    const endpoint = ctx.getOption<string>(
-      'endpoint',
-      'https://wisgate.ai/api/dashboard/billing/usage/details'
-    );
+    const apiKey = ctx.requireOption<string>('apiKey');
 
-    logger.silly(`Calling ${endpoint}`);
-    const response = await fetch(endpoint, {
+    logger.silly(`Calling ${BALANCE_ENDPOINT}`);
+    const response = await fetch(BALANCE_ENDPOINT, {
       method: 'GET',
-      headers: { Cookie: `session=${session}`, Accept: 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-    const data: WisdomGateUsageResponse = await response.json();
-    const used = data.total_usage;
-    const remaining = data.total_available;
-    const limit = used + remaining;
+    const data: WisdomGateBalanceResponse = await response.json();
 
-    return [
-      ctx.allowance({
-        key: 'monthly_credits',
-        label: 'Wisdom Gate subscription',
+    if (!Number.isFinite(data.available_balance))
+      throw new Error('Invalid response: missing available_balance');
+
+    const meters = [
+      ctx.balance({
+        key: 'account_balance',
+        label: 'Wisdom Gate balance',
         unit: 'usd',
-        limit,
-        used,
-        remaining,
-        periodValue: 1,
-        periodUnit: 'month',
-        periodCycle: 'fixed',
+        remaining: data.available_balance,
       }),
     ];
+
+    if (data.is_token_unlimited_quota === false && Number.isFinite(data.token_balance)) {
+      meters.push(
+        ctx.balance({
+          key: 'api_key_balance',
+          label: 'API key quota',
+          unit: 'usd',
+          remaining: data.token_balance,
+        })
+      );
+    }
+
+    return meters;
   },
 });
