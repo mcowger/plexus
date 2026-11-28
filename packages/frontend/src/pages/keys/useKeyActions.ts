@@ -106,11 +106,16 @@ export function useKeyActions({ loadData }: UseKeyActionsOptions) {
   };
 
   const handleCopy = async (text: string, keyId: string) => {
-    if (!isClipboardAvailable()) return;
+    if (!isClipboardAvailable()) {
+      toast.error('Clipboard is unavailable in this browser');
+      return;
+    }
     const success = await copyToClipboard(text);
     if (success) {
       setCopiedKey(keyId);
       setTimeout(() => setCopiedKey(null), 2000);
+    } else {
+      toast.error('Failed to copy key');
     }
   };
 

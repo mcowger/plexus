@@ -57,10 +57,20 @@ describe('clipboard helpers', () => {
     expect(isClipboardAvailable()).toBe(true);
   });
 
-  it('falls back to execCommand when the modern API throws', async () => {
-    const writeText = mock().mockRejectedValue(new Error('denied'));
+  it('prefers execCommand so the copy stays inside the user gesture', async () => {
+    const writeText = mock().mockResolvedValue(undefined);
     overrideProperty(navigator, 'clipboard', { writeText });
-    stubLegacyDocument();
+    const { execCommand } = stubLegacyDocument();
+
+    await expect(copyToClipboard('hello')).resolves.toBe(true);
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the modern API when execCommand fails', async () => {
+    const writeText = mock().mockResolvedValue(undefined);
+    overrideProperty(navigator, 'clipboard', { writeText });
+    stubLegacyDocument(false);
 
     await expect(copyToClipboard('hello')).resolves.toBe(true);
     expect(writeText).toHaveBeenCalledWith('hello');
