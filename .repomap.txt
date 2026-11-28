@@ -1444,7 +1444,7 @@ packages/backend/src/services/quota/checkers/synthetic-checker.ts:11 [interface]
 packages/backend/src/services/quota/checkers/synthetic-checker.ts:28 [function] parsePercent
 packages/backend/src/services/quota/checkers/synthetic-checker.ts:33 [function] toIsoDate
 packages/backend/src/services/quota/checkers/synthetic-checker.ts:5 [interface] SyntheticWeeklyPercentLimit
-packages/backend/src/services/quota/checkers/wisdomgate-checker.ts:6 [interface] WisdomGateUsageResponse
+packages/backend/src/services/quota/checkers/wisdomgate-checker.ts:6 [interface] WisdomGateBalanceResponse
 packages/backend/src/services/quota/checkers/wokey-checker.ts:6 [interface] WokeyBalanceResponse
 packages/backend/src/services/quota/checkers/zai-checker.ts:15 [interface] ZAIQuotaResponse
 packages/backend/src/services/quota/checkers/zai-checker.ts:6 [interface] ZAILimit
